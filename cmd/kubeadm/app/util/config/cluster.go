@@ -93,6 +93,15 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		if err := getAPIEndpoint(configMap.Data, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
+	} else {
+		// In the case where newControlPlane is true we don't go through getNodeRegistration() and initcfg.NodeRegistration.CRISocket is empty.
+		// This forces DetectCRISocket() to be called later on, and if there is more than one CRI installed on the system, it will error out,
+		// while asking for the user to provide an override for the CRI socket. Even if the user provides an override, the call to
+		// DetectCRISocket() can happen too early and thus ignore it (while still erroring out).
+		// However, if newControlPlane == true, initcfg.NodeRegistration is not used at all and it's overwritten later on.
+		// Thus it's necessary to supply some default value, that will avoid the call to DetectCRISocket() and as
+		// initcfg.NodeRegistration is discarded, setting whatever value here is harmless.
+		initcfg.NodeRegistration.CRISocket = constants.DefaultDockerCRISocket
 	}
 	return initcfg, nil
 }
@@ -105,10 +114,10 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 		return errors.Wrap(err, "failed to get node name from kubelet config")
 	}
 
-	// gets the corresponding node and retrives attributes stored there.
+	// gets the corresponding node and retrieves attributes stored there.
 	node, err := client.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "faild to get corresponding node")
+		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
 	criSocket, ok := node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
@@ -126,7 +135,7 @@ func getNodeRegistration(kubeconfigDir string, client clientset.Interface, nodeR
 	return nil
 }
 
-// getNodeNameFromConfig gets the node name from a kubelet config file
+// getNodeNameFromKubeletConfig gets the node name from a kubelet config file
 // TODO: in future we want to switch to a more canonical way for doing this e.g. by having this
 //       information in the local kubelet config.yaml
 func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
@@ -167,7 +176,7 @@ func getNodeNameFromKubeletConfig(kubeconfigDir string) (string, error) {
 // getAPIEndpoint returns the APIEndpoint for the current node
 func getAPIEndpoint(data map[string]string, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
 	// gets the ClusterStatus from kubeadm-config
-	clusterStatus, err := unmarshalClusterStatus(data)
+	clusterStatus, err := UnmarshalClusterStatus(data)
 	if err != nil {
 		return err
 	}
@@ -210,7 +219,7 @@ func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, er
 		return nil, err
 	}
 
-	clusterStatus, err := unmarshalClusterStatus(configMap.Data)
+	clusterStatus, err := UnmarshalClusterStatus(configMap.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +227,8 @@ func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, er
 	return clusterStatus, nil
 }
 
-func unmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
+// UnmarshalClusterStatus takes raw ConfigMap.Data and converts it to a ClusterStatus object
+func UnmarshalClusterStatus(data map[string]string) (*kubeadmapi.ClusterStatus, error) {
 	clusterStatusData, ok := data[constants.ClusterStatusConfigMapKey]
 	if !ok {
 		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterStatusConfigMapKey)

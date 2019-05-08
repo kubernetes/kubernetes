@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	systemdutil "github.com/coreos/go-systemd/util"
 	. "github.com/onsi/ginkgo"
@@ -80,7 +81,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			node := getLocalNode(f)
 			memoryCapacity := node.Status.Capacity["memory"]
 			memoryLimit := memoryCapacity.Value()
-			fsCapacityBounds := bounded(100*framework.Mb, 10*framework.Tb)
+			fsCapacityBounds := bounded(100*volume.Mb, 10*volume.Tb)
 			// Expectations for system containers.
 			sysContExpectations := func() types.GomegaMatcher {
 				return gstruct.MatchAllFields(gstruct.Fields{
@@ -95,10 +96,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time": recent(maxStatsAge),
 						// We don't limit system container memory.
 						"AvailableBytes":  BeNil(),
-						"UsageBytes":      bounded(1*framework.Mb, memoryLimit),
-						"WorkingSetBytes": bounded(1*framework.Mb, memoryLimit),
+						"UsageBytes":      bounded(1*volume.Mb, memoryLimit),
+						"WorkingSetBytes": bounded(1*volume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
-						"RSSBytes":        bounded(1*framework.Mb, memoryLimit),
+						"RSSBytes":        bounded(1*volume.Mb, memoryLimit),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -112,10 +113,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			podsContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
 				"Time": recent(maxStatsAge),
 				// Pods are limited by Node Allocatable
-				"AvailableBytes":  bounded(1*framework.Kb, memoryLimit),
-				"UsageBytes":      bounded(10*framework.Kb, memoryLimit),
-				"WorkingSetBytes": bounded(10*framework.Kb, memoryLimit),
-				"RSSBytes":        bounded(1*framework.Kb, memoryLimit),
+				"AvailableBytes":  bounded(1*volume.Kb, memoryLimit),
+				"UsageBytes":      bounded(10*volume.Kb, memoryLimit),
+				"WorkingSetBytes": bounded(10*volume.Kb, memoryLimit),
+				"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
 				"PageFaults":      bounded(0, 1000000),
 				"MajorPageFaults": bounded(0, 10),
 			})
@@ -157,9 +158,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time": recent(maxStatsAge),
 					// We don't limit system container memory.
 					"AvailableBytes":  BeNil(),
-					"UsageBytes":      bounded(100*framework.Kb, memoryLimit),
-					"WorkingSetBytes": bounded(100*framework.Kb, memoryLimit),
-					"RSSBytes":        bounded(100*framework.Kb, memoryLimit),
+					"UsageBytes":      bounded(100*volume.Kb, memoryLimit),
+					"WorkingSetBytes": bounded(100*volume.Kb, memoryLimit),
+					"RSSBytes":        bounded(100*volume.Kb, memoryLimit),
 					"PageFaults":      bounded(1000, 1E9),
 					"MajorPageFaults": bounded(0, 100000),
 				})
@@ -180,10 +181,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
-							"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
-							"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
-							"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
-							"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
+							"AvailableBytes":  bounded(1*volume.Kb, 80*volume.Mb),
+							"UsageBytes":      bounded(10*volume.Kb, 80*volume.Mb),
+							"WorkingSetBytes": bounded(10*volume.Kb, 80*volume.Mb),
+							"RSSBytes":        bounded(1*volume.Kb, 80*volume.Mb),
 							"PageFaults":      bounded(100, 1000000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
@@ -192,7 +193,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 10*framework.Mb),
+							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
 							"InodesFree":     bounded(1E4, 1E8),
 							"Inodes":         bounded(1E4, 1E8),
 							"InodesUsed":     bounded(0, 1E8),
@@ -201,7 +202,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 10*framework.Mb),
+							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
 							"InodesFree":     bounded(1E4, 1E8),
 							"Inodes":         bounded(1E4, 1E8),
 							"InodesUsed":     bounded(0, 1E8),
@@ -213,9 +214,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time": recent(maxStatsAge),
 					"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
 						"Name":     Equal("eth0"),
-						"RxBytes":  bounded(10, 10*framework.Mb),
+						"RxBytes":  bounded(10, 10*volume.Mb),
 						"RxErrors": bounded(0, 1000),
-						"TxBytes":  bounded(10, 10*framework.Mb),
+						"TxBytes":  bounded(10, 10*volume.Mb),
 						"TxErrors": bounded(0, 1000),
 					}),
 					"Interfaces": Not(BeNil()),
@@ -227,10 +228,10 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
 					"Time":            recent(maxStatsAge),
-					"AvailableBytes":  bounded(1*framework.Kb, 80*framework.Mb),
-					"UsageBytes":      bounded(10*framework.Kb, 80*framework.Mb),
-					"WorkingSetBytes": bounded(10*framework.Kb, 80*framework.Mb),
-					"RSSBytes":        bounded(1*framework.Kb, 80*framework.Mb),
+					"AvailableBytes":  bounded(1*volume.Kb, 80*volume.Mb),
+					"UsageBytes":      bounded(10*volume.Kb, 80*volume.Mb),
+					"WorkingSetBytes": bounded(10*volume.Kb, 80*volume.Mb),
+					"RSSBytes":        bounded(1*volume.Kb, 80*volume.Mb),
 					"PageFaults":      bounded(0, 1000000),
 					"MajorPageFaults": bounded(0, 10),
 				}),
@@ -242,7 +243,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
-							"UsedBytes":      bounded(framework.Kb, 1*framework.Mb),
+							"UsedBytes":      bounded(volume.Kb, 1*volume.Mb),
 							"InodesFree":     bounded(1E4, 1E8),
 							"Inodes":         bounded(1E4, 1E8),
 							"InodesUsed":     bounded(0, 1E8),
@@ -253,7 +254,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"Time":           recent(maxStatsAge),
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      bounded(framework.Kb, 21*framework.Mb),
+					"UsedBytes":      bounded(volume.Kb, 21*volume.Mb),
 					"InodesFree":     bounded(1E4, 1E8),
 					"Inodes":         bounded(1E4, 1E8),
 					"InodesUsed":     bounded(0, 1E8),
@@ -272,11 +273,11 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
 						"Time":            recent(maxStatsAge),
-						"AvailableBytes":  bounded(100*framework.Mb, memoryLimit),
-						"UsageBytes":      bounded(10*framework.Mb, memoryLimit),
-						"WorkingSetBytes": bounded(10*framework.Mb, memoryLimit),
+						"AvailableBytes":  bounded(100*volume.Mb, memoryLimit),
+						"UsageBytes":      bounded(10*volume.Mb, memoryLimit),
+						"WorkingSetBytes": bounded(10*volume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
-						"RSSBytes":        bounded(1*framework.Kb, memoryLimit),
+						"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -285,9 +286,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"Time": recent(maxStatsAge),
 						"InterfaceStats": gstruct.MatchAllFields(gstruct.Fields{
 							"Name":     Or(BeEmpty(), Equal("eth0")),
-							"RxBytes":  Or(BeNil(), bounded(1*framework.Mb, 100*framework.Gb)),
+							"RxBytes":  Or(BeNil(), bounded(1*volume.Mb, 100*volume.Gb)),
 							"RxErrors": Or(BeNil(), bounded(0, 100000)),
-							"TxBytes":  Or(BeNil(), bounded(10*framework.Kb, 10*framework.Gb)),
+							"TxBytes":  Or(BeNil(), bounded(10*volume.Kb, 10*volume.Gb)),
 							"TxErrors": Or(BeNil(), bounded(0, 100000)),
 						}),
 						"Interfaces": Not(BeNil()),
@@ -297,7 +298,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"AvailableBytes": fsCapacityBounds,
 						"CapacityBytes":  fsCapacityBounds,
 						// we assume we are not running tests on machines < 10tb of disk
-						"UsedBytes":  bounded(framework.Kb, 10*framework.Tb),
+						"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
 						"InodesFree": bounded(1E4, 1E8),
 						"Inodes":     bounded(1E4, 1E8),
 						"InodesUsed": bounded(0, 1E8),
@@ -308,7 +309,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							// we assume we are not running tests on machines < 10tb of disk
-							"UsedBytes":  bounded(framework.Kb, 10*framework.Tb),
+							"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
 							"InodesFree": bounded(1E4, 1E8),
 							"Inodes":     bounded(1E4, 1E8),
 							"InodesUsed": bounded(0, 1E8),

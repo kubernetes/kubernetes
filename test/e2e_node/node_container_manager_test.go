@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
@@ -40,7 +39,6 @@ import (
 )
 
 func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
-	initialConfig.FeatureGates[string(features.SupportNodePidsLimit)] = true
 	initialConfig.EnforceNodeAllocatable = []string{"pods", kubeReservedCgroup, systemReservedCgroup}
 	initialConfig.SystemReserved = map[string]string{
 		string(v1.ResourceCPU):    "100m",
@@ -79,7 +77,7 @@ func expectFileValToEqual(filePath string, expectedValue, delta int64) error {
 		return fmt.Errorf("failed to parse output %v", err)
 	}
 
-	// Ensure that values are within a delta range to work arounding rounding errors.
+	// Ensure that values are within a delta range to work around rounding errors.
 	if (actual < (expectedValue - delta)) || (actual > (expectedValue + delta)) {
 		return fmt.Errorf("Expected value at %q to be between %d and %d. Got %d", filePath, (expectedValue - delta), (expectedValue + delta), actual)
 	}

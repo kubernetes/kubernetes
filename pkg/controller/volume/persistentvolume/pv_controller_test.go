@@ -30,6 +30,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 
 var (
@@ -55,30 +57,30 @@ func TestControllerSync(t *testing.T) {
 			// addClaim gets a new claim. Check it's bound to a volume.
 			"5-2 - complete bind",
 			newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
-			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
+			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
 			noclaims, /* added in testAddClaim5_2 */
-			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
+			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			noevents, noerrors,
 			// Custom test function that generates an add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil)
-				reactor.addClaimEvent(claim)
+				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
 		{
 			// deleteClaim with a bound claim makes bound volume released.
 			"5-3 - delete claim",
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
-			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
+			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			noclaims,
 			noevents, noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
-				reactor.deleteClaimEvent(claim)
+				reactor.DeleteClaimEvent(claim)
 				return nil
 			},
 		},
@@ -87,14 +89,14 @@ func TestControllerSync(t *testing.T) {
 			"5-4 - delete volume",
 			newVolumeArray("volume5-4", "1Gi", "uid5-4", "claim5-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty),
 			novolumes,
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, annBoundByController, annBindCompleted),
+			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
+			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			[]string{"Warning ClaimLost"}, noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
 				volume := obj.(*v1.PersistentVolume)
-				reactor.deleteVolumeEvent(volume)
+				reactor.DeleteVolumeEvent(volume)
 				return nil
 			},
 		},
@@ -120,13 +122,13 @@ func TestControllerSync(t *testing.T) {
 
 		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
-			reactor.claims[claim.Name] = claim
+			reactor.AddClaim(claim)
 			go func(claim *v1.PersistentVolumeClaim) {
 				fakeClaimWatch.Add(claim)
 			}(claim)
 		}
 		for _, volume := range test.initialVolumes {
-			reactor.volumes[volume.Name] = volume
+			reactor.AddVolume(volume)
 			go func(volume *v1.PersistentVolume) {
 				fakeVolumeWatch.Add(volume)
 			}(volume)
@@ -148,7 +150,7 @@ func TestControllerSync(t *testing.T) {
 		klog.V(4).Infof("controller synced, starting test")
 
 		// Call the tested function
-		err = test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor.VolumeReactor, test)
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}
@@ -162,7 +164,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		close(stopCh)
 
-		evaluateTestResults(ctrl, reactor, test, t)
+		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 	}
 }
 
@@ -234,14 +236,6 @@ func TestControllerCacheParsingError(t *testing.T) {
 	}
 }
 
-func addVolumeAnnotation(volume *v1.PersistentVolume, annName, annValue string) *v1.PersistentVolume {
-	if volume.Annotations == nil {
-		volume.Annotations = make(map[string]string)
-	}
-	volume.Annotations[annName] = annValue
-	return volume
-}
-
 func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -253,7 +247,7 @@ func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeCl
 	}
 
 	if hasSelectNodeAnno {
-		claim.Annotations[annSelectedNode] = "node-name"
+		claim.Annotations[pvutil.AnnSelectedNode] = "node-name"
 	}
 
 	return claim

@@ -17,6 +17,8 @@ limitations under the License.
 package pluginregistration
 
 const (
-	CSIPlugin    = "CSIPlugin"
+	// CSIPlugin identifier for registered CSI plugins
+	CSIPlugin = "CSIPlugin"
+	// DevicePlugin identifier for registered device plugins
 	DevicePlugin = "DevicePlugin"
 )

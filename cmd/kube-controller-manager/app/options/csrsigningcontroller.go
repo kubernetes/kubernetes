@@ -19,7 +19,7 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
 )
 
 const (
@@ -34,7 +34,7 @@ const (
 
 // CSRSigningControllerOptions holds the CSRSigningController options.
 type CSRSigningControllerOptions struct {
-	*kubectrlmgrconfig.CSRSigningControllerConfiguration
+	*csrsigningconfig.CSRSigningControllerConfiguration
 }
 
 // AddFlags adds flags related to CSRSigningController for controller manager to the specified FlagSet.
@@ -49,7 +49,7 @@ func (o *CSRSigningControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up CSRSigningController config with options.
-func (o *CSRSigningControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.CSRSigningControllerConfiguration) error {
+func (o *CSRSigningControllerOptions) ApplyTo(cfg *csrsigningconfig.CSRSigningControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

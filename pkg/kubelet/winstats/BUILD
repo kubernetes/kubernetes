@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "network_stats.go",
         "perfcounter_nodestats.go",
         "perfcounters.go",
         "version.go",
@@ -13,6 +14,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/github.com/JeffAshton/win_pdh:go_default_library",
             "//vendor/github.com/google/cadvisor/info/v1:go_default_library",

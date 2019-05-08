@@ -21,10 +21,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/proxy/config"
 )
 
 // ProxyProvider is the interface provided by proxier implementations.
 type ProxyProvider interface {
+	config.EndpointsHandler
+	config.ServiceHandler
+
 	// Sync immediately synchronizes the ProxyProvider's current state to proxy rules.
 	Sync()
 	// SyncLoop runs periodic work.

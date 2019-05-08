@@ -185,9 +185,7 @@ func traverseMetadata(head *store.NodeExtern, handleFunc func(*store.NodeExtern)
 
 		handleFunc(n)
 
-		for _, next := range n.Nodes {
-			q = append(q, next)
-		}
+		q = append(q, n.Nodes...)
 	}
 }
 

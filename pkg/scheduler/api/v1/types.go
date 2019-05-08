@@ -156,7 +156,7 @@ type ExtenderTLSConfig struct {
 	// Server should be accessed without verifying the TLS certificate. For testing only.
 	Insecure bool `json:"insecure,omitempty"`
 	// ServerName is passed to the server for SNI and is used in the client to check server
-	// ceritificates against. If ServerName is empty, the hostname used to contact the
+	// certificates against. If ServerName is empty, the hostname used to contact the
 	// server is used.
 	ServerName string `json:"serverName,omitempty"`
 

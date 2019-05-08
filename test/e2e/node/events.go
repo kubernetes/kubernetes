@@ -20,13 +20,14 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -88,7 +89,7 @@ var _ = SIGDescribe("Events", func() {
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		framework.Logf("%+v\n", podWithUid)
+		e2elog.Logf("%+v\n", podWithUid)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
@@ -105,7 +106,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				framework.Logf("Saw scheduler event for our pod.")
+				e2elog.Logf("Saw scheduler event for our pod.")
 				return true, nil
 			}
 			return false, nil
@@ -125,7 +126,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				framework.Logf("Saw kubelet event for our pod.")
+				e2elog.Logf("Saw kubelet event for our pod.")
 				return true, nil
 			}
 			return false, nil

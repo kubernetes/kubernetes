@@ -92,6 +92,14 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		)
 		return nil, false, err
 	}
+	if options.Preconditions.ResourceVersion != nil && *options.Preconditions.ResourceVersion != crd.ResourceVersion {
+		err = apierrors.NewConflict(
+			apiextensions.Resource("customresourcedefinitions"),
+			name,
+			fmt.Errorf("Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v", *options.Preconditions.ResourceVersion, crd.ResourceVersion),
+		)
+		return nil, false, err
+	}
 
 	// upon first request to delete, add our finalizer and then delegate
 	if crd.DeletionTimestamp.IsZero() {
@@ -100,7 +108,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 			return nil, false, err
 		}
 
-		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+		preconditions := storage.Preconditions{UID: options.Preconditions.UID, ResourceVersion: options.Preconditions.ResourceVersion}
 
 		out := r.Store.NewFunc()
 		err = r.Store.Storage.GuaranteedUpdate(

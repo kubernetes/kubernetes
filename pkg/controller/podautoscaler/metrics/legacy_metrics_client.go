@@ -73,7 +73,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 		return nil, time.Time{}, fmt.Errorf("failed to get pod resource metrics: %v", err)
 	}
 
-	klog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
+	klog.V(8).Infof("Heapster metrics result: %s", string(resultRaw))
 
 	metrics := metricsapi.PodMetricsList{}
 	err = json.Unmarshal(resultRaw, &metrics)

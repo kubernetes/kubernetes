@@ -30,10 +30,9 @@ import (
 type JoinData interface {
 	CertificateKey() string
 	Cfg() *kubeadmapi.JoinConfiguration
-	KubeConfigPath() string
 	TLSBootstrapCfg() (*clientcmdapi.Config, error)
 	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	ClientSetFromFile(path string) (*clientset.Clientset, error)
+	ClientSet() (*clientset.Clientset, error)
 	IgnorePreflightErrors() sets.String
 	OutputWriter() io.Writer
 }

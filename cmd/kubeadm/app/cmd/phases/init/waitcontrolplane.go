@@ -77,7 +77,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
-	klog.V(1).Infof("[wait-control-plane] Waiting for the API server to be healthy")
+	klog.V(1).Infoln("[wait-control-plane] Waiting for the API server to be healthy")
 
 	client, err := data.Client()
 	if err != nil {
@@ -133,8 +133,7 @@ func printFilesIfDryRunning(data InitData) error {
 	return dryrunutil.PrintDryRunFiles(files, data.OutputWriter())
 }
 
-// NewControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
-// TODO: make private (lowercase) after self-hosting phase is removed.
+// newControlPlaneWaiter returns a new waiter that is used to wait on the control plane to boot up.
 func newControlPlaneWaiter(dryRun bool, timeout time.Duration, client clientset.Interface, out io.Writer) (apiclient.Waiter, error) {
 	if dryRun {
 		return dryrunutil.NewWaiter(), nil

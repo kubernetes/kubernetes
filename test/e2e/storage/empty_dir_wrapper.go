@@ -310,7 +310,7 @@ func deleteConfigMaps(f *framework.Framework, configMapNames []string) {
 	By("Cleaning up the configMaps")
 	for _, configMapName := range configMapNames {
 		err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configMapName, nil)
-		Expect(err).NotTo(HaveOccurred(), "unable to delete configMap %v", configMapName)
+		framework.ExpectNoError(err, "unable to delete configMap %v", configMapName)
 	}
 }
 
@@ -403,7 +403,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 		},
 	}
 	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rc)
-	Expect(err).NotTo(HaveOccurred(), "error creating replication controller")
+	framework.ExpectNoError(err, "error creating replication controller")
 
 	defer func() {
 		err := framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
@@ -421,6 +421,6 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 			continue
 		}
 		err = f.WaitForPodRunning(pod.Name)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for pod %s to enter running state", pod.Name)
+		framework.ExpectNoError(err, "Failed waiting for pod %s to enter running state", pod.Name)
 	}
 }

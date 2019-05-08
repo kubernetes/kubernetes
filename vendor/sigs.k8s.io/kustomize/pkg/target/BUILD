@@ -13,7 +13,6 @@ go_library(
         "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/constants:go_default_library",
-        "//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/ifc:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/ifc/transformer:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/internal/error:go_default_library",

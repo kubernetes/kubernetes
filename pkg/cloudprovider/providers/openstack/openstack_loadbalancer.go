@@ -85,8 +85,6 @@ type LbaasV2 struct {
 	LoadBalancer
 }
 
-type empty struct{}
-
 func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, error) {
 	seen := make(map[string]bool)
 

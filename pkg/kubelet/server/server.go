@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"path"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
@@ -59,8 +60,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
+	servermetrics "k8s.io/kubernetes/pkg/kubelet/server/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -71,12 +74,13 @@ import (
 )
 
 const (
-	metricsPath         = "/metrics"
-	cadvisorMetricsPath = "/metrics/cadvisor"
-	proberMetricsPath   = "/metrics/probes"
-	specPath            = "/spec/"
-	statsPath           = "/stats/"
-	logsPath            = "/logs/"
+	metricsPath               = "/metrics"
+	cadvisorMetricsPath       = "/metrics/cadvisor"
+	resourceMetricsPathPrefix = "/metrics/resource"
+	proberMetricsPath         = "/metrics/probes"
+	specPath                  = "/spec/"
+	statsPath                 = "/stats/"
+	logsPath                  = "/logs/"
 )
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
@@ -307,6 +311,12 @@ func (s *Server) InstallDefaultHandlers() {
 	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
+	)
+
+	v1alpha1ResourceRegistry := prometheus.NewRegistry()
+	v1alpha1ResourceRegistry.MustRegister(stats.NewPrometheusResourceMetricCollector(s.resourceAnalyzer, v1alpha1.Config()))
+	s.restfulCont.Handle(path.Join(resourceMetricsPathPrefix, v1alpha1.Version),
+		promhttp.HandlerFor(v1alpha1ResourceRegistry, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
 
 	// prober metrics are exposed under a different endpoint
@@ -798,6 +808,35 @@ func (s *Server) getPortForward(request *restful.Request, response *restful.Resp
 	proxyStream(response.ResponseWriter, request.Request, url)
 }
 
+// trimURLPath trims a URL path.
+// For paths in the format of "/metrics/xxx", "metrics/xxx" is returned;
+// For all other paths, the first part of the path is returned.
+func trimURLPath(path string) string {
+	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 3)
+	if len(parts) == 0 {
+		return path
+	}
+
+	if parts[0] == "metrics" && len(parts) > 1 {
+		return fmt.Sprintf("%s/%s", parts[0], parts[1])
+
+	}
+	return parts[0]
+}
+
+var longRunningRequestPathMap = map[string]bool{
+	"exec":        true,
+	"attach":      true,
+	"portforward": true,
+	"debug":       true,
+}
+
+// isLongRunningRequest determines whether the request is long-running or not.
+func isLongRunningRequest(path string) bool {
+	_, ok := longRunningRequestPathMap[path]
+	return ok
+}
+
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer httplog.NewLogged(req, &w).StacktraceWhen(
@@ -811,6 +850,27 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.StatusSwitchingProtocols,
 		),
 	).Log()
+
+	// monitor http requests
+	var serverType string
+	if s.auth == nil {
+		serverType = "readonly"
+	} else {
+		serverType = "readwrite"
+	}
+
+	method, path, host := req.Method, trimURLPath(req.URL.Path), req.URL.Host
+
+	longRunning := strconv.FormatBool(isLongRunningRequest(path))
+
+	servermetrics.HTTPRequests.WithLabelValues(method, path, host, serverType, longRunning).Inc()
+
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, host, serverType, longRunning).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, host, serverType, longRunning).Dec()
+
+	startTime := time.Now()
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, host, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+
 	s.restfulCont.ServeHTTP(w, req)
 }
 

@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -55,27 +55,27 @@ var _ = SIGDescribe("Windows volume mounts ", func() {
 			},
 		}
 	)
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessNodeOSDistroIs("windows")
 	})
 
-	Context("check volume mount permissions", func() {
+	ginkgo.Context("check volume mount permissions", func() {
 
-		It("container should have readOnly permissions on emptyDir", func() {
+		ginkgo.It("container should have readOnly permissions on emptyDir", func() {
 
-			By("creating a container with readOnly permissions on emptyDir volume")
+			ginkgo.By("creating a container with readOnly permissions on emptyDir volume")
 			doReadOnlyTest(f, emptyDirSource, emptyDirVolumePath)
 
-			By("creating two containers, one with readOnly permissions the other with read-write permissions on emptyDir volume")
+			ginkgo.By("creating two containers, one with readOnly permissions the other with read-write permissions on emptyDir volume")
 			doReadWriteReadOnlyTest(f, emptyDirSource, emptyDirVolumePath)
 		})
 
-		It("container should have readOnly permissions on hostMapPath", func() {
+		ginkgo.It("container should have readOnly permissions on hostMapPath", func() {
 
-			By("creating a container with readOnly permissions on hostMap volume")
+			ginkgo.By("creating a container with readOnly permissions on hostMap volume")
 			doReadOnlyTest(f, hostMapSource, hostMapPath)
 
-			By("creating two containers, one with readOnly permissions the other with read-write permissions on hostMap volume")
+			ginkgo.By("creating two containers, one with readOnly permissions the other with read-write permissions on hostMap volume")
 			doReadWriteReadOnlyTest(f, hostMapSource, hostMapPath)
 		})
 
@@ -95,7 +95,7 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
 
-	Expect(stderr).To(Equal("Access is denied."))
+	gomega.Expect(stderr).To(gomega.Equal("Access is denied."))
 
 }
 
@@ -123,18 +123,18 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
-	stdout_rw, stderr_rw, err_rw := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, cmd...)
-	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", cmd, stdout_rw, stderr_rw)
-	Expect(err_rw).NotTo(HaveOccurred(), msg)
+	stdoutRW, stderrRW, errRW := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, cmd...)
+	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", cmd, stdoutRW, stderrRW)
+	gomega.Expect(errRW).NotTo(gomega.HaveOccurred(), msg)
 
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	Expect(stderr).To(Equal("Access is denied."))
+	gomega.Expect(stderr).To(gomega.Equal("Access is denied."))
 
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)
-	Expect(readout).To(Equal("windows-volume-test"))
-	Expect(err).NotTo(HaveOccurred(), readmsg)
+	gomega.Expect(readout).To(gomega.Equal("windows-volume-test"))
+	gomega.Expect(err).NotTo(gomega.HaveOccurred(), readmsg)
 }
 
 func testPodWithROVolume(podName string, source v1.VolumeSource, path string) *v1.Pod {

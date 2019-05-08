@@ -202,6 +202,18 @@ func TestPodAdmission(t *testing.T) {
 			testName: "added memoryPressure/DiskPressure for Burstable pod",
 		},
 		{
+			pod:                       bestEffortPod,
+			defaultClusterTolerations: []api.Toleration{},
+			namespaceTolerations:      []api.Toleration{},
+			whitelist:                 []api.Toleration{},
+			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}, {Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
+			mergedTolerations: []api.Toleration{
+				{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil},
+			},
+			admit:    true,
+			testName: "Besteffort pod should overwrite for conflicting tolerations",
+		},
+		{
 			pod:                       guaranteedPod,
 			defaultClusterTolerations: []api.Toleration{},
 			namespaceTolerations:      []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},

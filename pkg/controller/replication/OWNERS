@@ -1,13 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- caesarxuchao
-- lavalamp
-- enisoc
+- sig-apps-approvers
 reviewers:
-- caesarxuchao
-- lavalamp
-- tnozicka
-- enisoc
+- sig-apps-reviewers
 labels:
 - sig/apps

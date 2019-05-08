@@ -72,8 +72,9 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 				continue
 			}
 			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+			return apierrors.NewInternalError(err)
 		}
-		return apierrors.NewInternalError(err)
+		return err
 	}
 
 	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes
@@ -92,6 +93,12 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
 			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
 		}
+	}
+
+	// Currently dispatcher only supports `v1beta1` AdmissionReview
+	// TODO: Make the dispatcher capable of sending multiple AdmissionReview versions
+	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, h) {
+		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReview")}
 	}
 
 	// Make the webhook request

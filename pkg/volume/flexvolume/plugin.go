@@ -18,7 +18,7 @@ package flexvolume
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -56,7 +56,7 @@ type flexVolumeAttachablePlugin struct {
 
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
-var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
+var _ volume.NodeExpandableVolumePlugin = &flexVolumePlugin{}
 var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
@@ -69,7 +69,7 @@ type PluginFactory interface {
 type pluginFactory struct{}
 
 func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Interface) (volume.VolumePlugin, error) {
-	execPath := path.Join(pluginDir, name)
+	execPath := filepath.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapeQualifiedName(name)
 
@@ -105,7 +105,7 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")
 	execName := parts[len(parts)-1]
-	execPath := path.Join(plugin.execPath, execName)
+	execPath := filepath.Join(plugin.execPath, execName)
 	if runtime.GOOS == "windows" {
 		execPath = util.GetWindowsPath(execPath)
 	}
@@ -256,8 +256,12 @@ func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 	return plugin.NewDetacher()
 }
 
-func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *flexVolumeAttachablePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
@@ -311,8 +315,8 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 		return "", fmt.Errorf("GetVolumeName failed from getDeviceMountPath: %s", err)
 	}
 
-	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
-	return path.Join(mountsDir, volumeName), nil
+	mountsDir := filepath.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
+	return filepath.Join(mountsDir, volumeName), nil
 }
 
 func (plugin *flexVolumePlugin) RequiresFSResize() bool {

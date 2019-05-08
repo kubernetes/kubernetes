@@ -19,7 +19,6 @@ package etcd
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"net"
 	"net/url"
 	"path/filepath"
@@ -322,17 +321,17 @@ func (c *Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
 func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	for i := 0; i < retries; i++ {
 		if i > 0 {
-			fmt.Printf("[util/etcd] Waiting %v until next retry\n", retryInterval)
+			klog.V(1).Infof("[etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)
 		}
-		klog.V(2).Infof("attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
+		klog.V(2).Infof("[etcd] attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
 		resp, err := c.ClusterAvailable()
 		if err != nil {
 			switch err {
 			case context.DeadlineExceeded:
-				fmt.Println("[util/etcd] Attempt timed out")
+				klog.V(1).Infof("[etcd] Attempt timed out")
 			default:
-				fmt.Printf("[util/etcd] Attempt failed with error: %v\n", err)
+				klog.V(1).Infof("[etcd] Attempt failed with error: %v\n", err)
 			}
 			continue
 		}

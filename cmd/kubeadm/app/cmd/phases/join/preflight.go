@@ -54,7 +54,7 @@ var (
 // NewPreflightPhase creates a kubeadm workflow phase that implements preflight checks for a new node join
 func NewPreflightPhase() workflow.Phase {
 	return workflow.Phase{
-		Name:    "preflight",
+		Name:    "preflight [api-server-endpoint]",
 		Short:   "Run join pre-flight checks",
 		Long:    "Run pre-flight checks for kubeadm join.",
 		Example: preflightExample,
@@ -73,6 +73,7 @@ func NewPreflightPhase() workflow.Phase {
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
 			options.TokenDiscoverySkipCAHash,
+			options.CertificateKey,
 		},
 	}
 }
@@ -117,9 +118,10 @@ func runPreflight(c workflow.RunData) error {
 			return errors.New(msg.String())
 		}
 
-		// run kubeadm init preflight checks for checking all the prequisites
+		// run kubeadm init preflight checks for checking all the prerequisites
 		fmt.Println("[preflight] Running pre-flight checks before initializing the new control plane instance")
-		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors()); err != nil {
+
+		if err := preflight.RunInitNodeChecks(utilsexec.New(), initCfg, j.IgnorePreflightErrors(), true, hasCertificateKey); err != nil {
 			return err
 		}
 

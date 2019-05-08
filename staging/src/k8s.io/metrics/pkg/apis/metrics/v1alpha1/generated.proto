@@ -30,7 +30,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
-// resource usage metrics of a container.
+// ContainerMetrics sets resource usage metrics of a container.
 message ContainerMetrics {
   // Container name corresponding to the one from pod.spec.containers.
   optional string name = 1;
@@ -39,7 +39,7 @@ message ContainerMetrics {
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> usage = 2;
 }
 
-// resource usage metrics of a node.
+// NodeMetrics sets resource usage metrics of a node.
 message NodeMetrics {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -63,7 +63,7 @@ message NodeMetricsList {
   repeated NodeMetrics items = 2;
 }
 
-// resource usage metrics of a pod.
+// PodMetrics sets resource usage metrics of a pod.
 message PodMetrics {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 

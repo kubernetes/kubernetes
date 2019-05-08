@@ -27,7 +27,7 @@ const (
 	// DockerOperationsKey is the key for docker operation metrics.
 	DockerOperationsKey = "docker_operations_total"
 	// DockerOperationsLatencyKey is the key for the operation latency metrics.
-	DockerOperationsLatencyKey = "docker_operations_latency_seconds"
+	DockerOperationsLatencyKey = "docker_operations_duration_seconds"
 	// DockerOperationsErrorsKey is the key for the operation error metrics.
 	DockerOperationsErrorsKey = "docker_operations_errors_total"
 	// DockerOperationsTimeoutKey is the key for the operation timeout metrics.

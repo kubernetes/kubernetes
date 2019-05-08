@@ -30,7 +30,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -71,13 +71,13 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 			name:               "set k8s version",
 			expectedImageCount: defaultNumberOfImages,
 			expectedImageSubstrings: []string{
-				":v1.12.1",
+				constants.CurrentKubernetesVersion.String(),
 			},
-			configContents: []byte(dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
+				apiVersion: kubeadm.k8s.io/v1beta2
 				kind: ClusterConfiguration
-				kubernetesVersion: v1.12.1
-			`)),
+				kubernetesVersion: %s
+			`, constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -86,7 +86,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: kubeadm.k8s.io/v1beta2
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
 			`, constants.MinimumControlPlaneVersion))),
@@ -106,8 +106,8 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 					KubernetesVersion: dummyKubernetesVersion,
 				},
 			})
@@ -135,33 +135,33 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta1.InitConfiguration
+		cfg            kubeadmapiv1beta2.InitConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 					KubernetesVersion: dummyKubernetesVersion,
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 					CRISocket: constants.DefaultDockerCRISocket,
 				},
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					Etcd: kubeadmapiv1beta1.Etcd{
-						External: &kubeadmapiv1beta1.ExternalEtcd{
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
+					Etcd: kubeadmapiv1beta2.Etcd{
+						External: &kubeadmapiv1beta2.ExternalEtcd{
 							Endpoints: []string{"https://some.etcd.com:2379"},
 						},
 					},
 					KubernetesVersion: dummyKubernetesVersion,
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 					CRISocket: constants.DefaultDockerCRISocket,
 				},
 			},
@@ -169,11 +169,11 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 					KubernetesVersion: dummyKubernetesVersion,
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 					CRISocket: constants.DefaultDockerCRISocket,
 				},
 			},
@@ -181,14 +181,14 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 					KubernetesVersion: dummyKubernetesVersion,
-					DNS: kubeadmapiv1beta1.DNS{
-						Type: kubeadmapiv1beta1.KubeDNS,
+					DNS: kubeadmapiv1beta2.DNS{
+						Type: kubeadmapiv1beta2.KubeDNS,
 					},
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
 					CRISocket: constants.DefaultDockerCRISocket,
 				},
 			},
@@ -244,11 +244,11 @@ func TestImagesPull(t *testing.T) {
 	}
 
 	images := []string{"a", "b", "c", "d", "a"}
-	ip := NewImagesPull(containerRuntime, images)
-
-	err = ip.PullAll()
-	if err != nil {
-		t.Fatalf("expected nil but found %v", err)
+	for _, image := range images {
+		if err := containerRuntime.PullImage(image); err != nil {
+			t.Fatalf("expected nil but found %v", err)
+		}
+		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
 
 	if fcmd.CombinedOutputCalls != len(images) {
@@ -258,8 +258,8 @@ func TestImagesPull(t *testing.T) {
 
 func TestMigrate(t *testing.T) {
 	cfg := []byte(dedent.Dedent(`
-		# This is intentionally testing an old API version and the old kind naming and making sure the output is correct
-		apiVersion: kubeadm.k8s.io/v1alpha3
+		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
+		apiVersion: kubeadm.k8s.io/v1beta1
 		kind: InitConfiguration
 	`))
 	configFile, cleanup := tempConfig(t, cfg)

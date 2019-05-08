@@ -13,8 +13,8 @@
 package errors
 
 import (
-	"bytes"
 	"fmt"
+	"strings"
 
 	"gonum.org/v1/gonum/graph/formats/dot/internal/token"
 )
@@ -31,7 +31,7 @@ type Error struct {
 }
 
 func (e *Error) String() string {
-	w := new(bytes.Buffer)
+	w := new(strings.Builder)
 	fmt.Fprintf(w, "Error")
 	if e.Err != nil {
 		fmt.Fprintf(w, " %s\n", e.Err)
@@ -52,7 +52,7 @@ func (e *Error) String() string {
 }
 
 func (e *Error) Error() string {
-	w := new(bytes.Buffer)
+	w := new(strings.Builder)
 	fmt.Fprintf(w, "Error in S%d: %s, %s", e.StackTop, token.TokMap.TokenString(e.ErrorToken), e.ErrorToken.Pos.String())
 	if e.Err != nil {
 		fmt.Fprintf(w, ": %+v", e.Err)

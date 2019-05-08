@@ -18,9 +18,12 @@ package renewal
 
 import (
 	"crypto/x509"
+	"path/filepath"
 
 	"github.com/pkg/errors"
+	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -47,6 +50,72 @@ func RenewExistingCert(certsDir, baseName string, impl Interface) error {
 		return errors.Wrapf(err, "failed to write new certificate %s", baseName)
 	}
 	return nil
+}
+
+// RenewEmbeddedClientCert loads a kubeconfig file, uses the renew interface to renew the client certificate
+// embedded in it, and then saves the resulting kubeconfig and key over the old one.
+func RenewEmbeddedClientCert(kubeConfigFileDir, kubeConfigFileName string, impl Interface) error {
+	kubeConfigFilePath := filepath.Join(kubeConfigFileDir, kubeConfigFileName)
+
+	// try to load the kubeconfig file
+	kubeconfig, err := clientcmd.LoadFromFile(kubeConfigFilePath)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load kubeconfig file %s", kubeConfigFilePath)
+	}
+
+	// get current context
+	if _, ok := kubeconfig.Contexts[kubeconfig.CurrentContext]; !ok {
+		return errors.Errorf("invalid kubeconfig file %s: missing context %s", kubeConfigFilePath, kubeconfig.CurrentContext)
+	}
+
+	// get cluster info for current context and ensure a server certificate is embedded in it
+	clusterName := kubeconfig.Contexts[kubeconfig.CurrentContext].Cluster
+	if _, ok := kubeconfig.Clusters[clusterName]; !ok {
+		return errors.Errorf("invalid kubeconfig file %s: missing cluster %s", kubeConfigFilePath, clusterName)
+	}
+
+	cluster := kubeconfig.Clusters[clusterName]
+	if len(cluster.CertificateAuthorityData) == 0 {
+		return errors.Errorf("kubeconfig file %s does not have and embedded server certificate", kubeConfigFilePath)
+	}
+
+	// get auth info for current context and ensure a client certificate is embedded in it
+	authInfoName := kubeconfig.Contexts[kubeconfig.CurrentContext].AuthInfo
+	if _, ok := kubeconfig.AuthInfos[authInfoName]; !ok {
+		return errors.Errorf("invalid kubeconfig file %s: missing authInfo %s", kubeConfigFilePath, authInfoName)
+	}
+
+	authInfo := kubeconfig.AuthInfos[authInfoName]
+	if len(authInfo.ClientCertificateData) == 0 {
+		return errors.Errorf("kubeconfig file %s does not have and embedded client certificate", kubeConfigFilePath)
+	}
+
+	// parse the client certificate, retrive the cert config and then renew it
+	certs, err := certutil.ParseCertsPEM(authInfo.ClientCertificateData)
+	if err != nil {
+		return errors.Wrapf(err, "kubeconfig file %s does not contain a valid client certificate", kubeConfigFilePath)
+	}
+
+	cfg := certToConfig(certs[0])
+
+	newCert, newKey, err := impl.Renew(cfg)
+	if err != nil {
+		return errors.Wrapf(err, "failed to renew certificate embedded in %s", kubeConfigFilePath)
+	}
+
+	// encodes the new key
+	encodedClientKey, err := keyutil.MarshalPrivateKeyToPEM(newKey)
+	if err != nil {
+		return errors.Wrapf(err, "failed to marshal private key to PEM")
+	}
+
+	// create a kubeconfig copy with the new client certs
+	newConfig := kubeconfig.DeepCopy()
+	newConfig.AuthInfos[authInfoName].ClientKeyData = encodedClientKey
+	newConfig.AuthInfos[authInfoName].ClientCertificateData = pkiutil.EncodeCertPEM(newCert)
+
+	// writes the kubeconfig to disk
+	return clientcmd.WriteToFile(*newConfig, kubeConfigFilePath)
 }
 
 func certToConfig(cert *x509.Certificate) *certutil.Config {

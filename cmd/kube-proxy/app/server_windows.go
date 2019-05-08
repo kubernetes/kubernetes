@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+
+	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
 
 	"k8s.io/api/core/v1"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
@@ -63,7 +64,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
-		return &ProxyServer{CleanupAndExit: cleanupAndExit}, nil
+		return &ProxyServer{}, nil
 	}
 
 	client, eventClient, err := createClients(config.ClientConnection, master)
@@ -94,13 +95,11 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 	}
 
 	var proxier proxy.ProxyProvider
-	var serviceEventHandler proxyconfig.ServiceHandler
-	var endpointsEventHandler proxyconfig.EndpointsHandler
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
 		klog.V(0).Info("Using Kernelspace Proxier.")
-		proxierKernelspace, err := winkernel.NewProxier(
+		proxier, err = winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
 			config.IPTables.MasqueradeAll,
@@ -115,23 +114,14 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		proxier = proxierKernelspace
-		endpointsEventHandler = proxierKernelspace
-		serviceEventHandler = proxierKernelspace
 	} else {
 		klog.V(0).Info("Using userspace Proxier.")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)
 
-		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
-		// our config.EndpointsConfigHandler.
-		loadBalancer := winuserspace.NewLoadBalancerRR()
-
-		// set EndpointsConfigHandler to our loadBalancer
-		endpointsEventHandler = loadBalancer
-		proxierUserspace, err := winuserspace.NewProxier(
-			loadBalancer,
+		proxier, err = winuserspace.NewProxier(
+			winuserspace.NewLoadBalancerRR(),
 			net.ParseIP(config.BindAddress),
 			netshInterface,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
@@ -142,28 +132,22 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		proxier = proxierUserspace
-		serviceEventHandler = proxierUserspace
-		klog.V(0).Info("Tearing down pure-winkernel proxy rules.")
-		winkernel.CleanupLeftovers()
 	}
 
 	return &ProxyServer{
-		Client:                client,
-		EventClient:           eventClient,
-		Proxier:               proxier,
-		Broadcaster:           eventBroadcaster,
-		Recorder:              recorder,
-		ProxyMode:             proxyMode,
-		NodeRef:               nodeRef,
-		MetricsBindAddress:    config.MetricsBindAddress,
-		EnableProfiling:       config.EnableProfiling,
-		OOMScoreAdj:           config.OOMScoreAdj,
-		ResourceContainer:     config.ResourceContainer,
-		ConfigSyncPeriod:      config.ConfigSyncPeriod.Duration,
-		ServiceEventHandler:   serviceEventHandler,
-		EndpointsEventHandler: endpointsEventHandler,
-		HealthzServer:         healthzServer,
+		Client:             client,
+		EventClient:        eventClient,
+		Proxier:            proxier,
+		Broadcaster:        eventBroadcaster,
+		Recorder:           recorder,
+		ProxyMode:          proxyMode,
+		NodeRef:            nodeRef,
+		MetricsBindAddress: config.MetricsBindAddress,
+		EnableProfiling:    config.EnableProfiling,
+		OOMScoreAdj:        config.OOMScoreAdj,
+		ResourceContainer:  config.ResourceContainer,
+		ConfigSyncPeriod:   config.ConfigSyncPeriod.Duration,
+		HealthzServer:      healthzServer,
 	}, nil
 }
 

@@ -17,11 +17,11 @@ limitations under the License.
 package testing
 
 import (
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
-	nodev1alpha1 "k8s.io/node-api/pkg/apis/node/v1alpha1"
-	nodeapiclient "k8s.io/node-api/pkg/client/clientset/versioned"
-	nodeapifake "k8s.io/node-api/pkg/client/clientset/versioned/fake"
 )
 
 const (
@@ -34,10 +34,10 @@ const (
 	EmptyRuntimeClass = "native"
 )
 
-// NewPopulatedClient creates a node-api client for use with the runtimeclass.Manager,
+// NewPopulatedClient creates a fake client for use with the runtimeclass.Manager,
 // and populates it with a few test RuntimeClass objects.
-func NewPopulatedClient() nodeapiclient.Interface {
-	return nodeapifake.NewSimpleClientset(
+func NewPopulatedClient() clientset.Interface {
+	return fake.NewSimpleClientset(
 		NewRuntimeClass(EmptyRuntimeClass, ""),
 		NewRuntimeClass(SandboxRuntimeClass, SandboxRuntimeHandler),
 	)
@@ -57,13 +57,11 @@ func StartManagerSync(m *runtimeclass.Manager) func() {
 
 // NewRuntimeClass is a helper to generate a RuntimeClass resource with
 // the given name & handler.
-func NewRuntimeClass(name, handler string) *nodev1alpha1.RuntimeClass {
-	return &nodev1alpha1.RuntimeClass{
+func NewRuntimeClass(name, handler string) *nodev1beta1.RuntimeClass {
+	return &nodev1beta1.RuntimeClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: nodev1alpha1.RuntimeClassSpec{
-			RuntimeHandler: &handler,
-		},
+		Handler: handler,
 	}
 }

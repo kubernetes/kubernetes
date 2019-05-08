@@ -91,6 +91,10 @@ type Framer interface {
 type SerializerInfo struct {
 	// MediaType is the value that represents this serializer over the wire.
 	MediaType string
+	// MediaTypeType is the first part of the MediaType ("application" in "application/json").
+	MediaTypeType string
+	// MediaTypeSubType is the second part of the MediaType ("json" in "application/json").
+	MediaTypeSubType string
 	// EncodesAsText indicates this serializer can be encoded to UTF-8 safely.
 	EncodesAsText bool
 	// Serializer is the individual object serializer for this media type.

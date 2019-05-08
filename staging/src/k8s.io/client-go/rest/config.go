@@ -487,7 +487,7 @@ func AddUserAgent(config *Config, userAgent string) *Config {
 	return config
 }
 
-// AnonymousClientConfig returns a copy of the given config with all user credentials (cert/key, bearer token, and username/password) removed
+// AnonymousClientConfig returns a copy of the given config with all user credentials (cert/key, bearer token, and username/password) and custom transports (WrapTransport, Transport) removed
 func AnonymousClientConfig(config *Config) *Config {
 	// copy only known safe fields
 	return &Config{
@@ -500,14 +500,12 @@ func AnonymousClientConfig(config *Config) *Config {
 			CAFile:     config.TLSClientConfig.CAFile,
 			CAData:     config.TLSClientConfig.CAData,
 		},
-		RateLimiter:   config.RateLimiter,
-		UserAgent:     config.UserAgent,
-		Transport:     config.Transport,
-		WrapTransport: config.WrapTransport,
-		QPS:           config.QPS,
-		Burst:         config.Burst,
-		Timeout:       config.Timeout,
-		Dial:          config.Dial,
+		RateLimiter: config.RateLimiter,
+		UserAgent:   config.UserAgent,
+		QPS:         config.QPS,
+		Burst:       config.Burst,
+		Timeout:     config.Timeout,
+		Dial:        config.Dial,
 	}
 }
 

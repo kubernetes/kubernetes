@@ -75,6 +75,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
 func init() {
@@ -135,22 +136,6 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/)
 }
 
-func newTestKubeletWithoutFakeVolumePlugin(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
-	imageList := []kubecontainer.Image{
-		{
-			ID:       "abc",
-			RepoTags: []string{"k8s.gcr.io:v1", "k8s.gcr.io:v2"},
-			Size:     123,
-		},
-		{
-			ID:       "efg",
-			RepoTags: []string{"k8s.gcr.io:v3", "k8s.gcr.io:v4"},
-			Size:     456,
-		},
-	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, false /*initFakeVolumePlugin*/)
-}
-
 func newTestKubeletWithImageList(
 	t *testing.T,
 	imageList []kubecontainer.Image,
@@ -176,6 +161,7 @@ func newTestKubeletWithImageList(
 	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
 	kubelet.mounter = &mount.FakeMounter{}
+	kubelet.subpather = &subpath.FakeSubpath{}
 
 	kubelet.hostname = testKubeletHostname
 	kubelet.nodeName = types.NodeName(testKubeletHostname)
@@ -303,7 +289,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock)
+	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.podManager.GetMirrorPodByPod, kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock)
 
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)

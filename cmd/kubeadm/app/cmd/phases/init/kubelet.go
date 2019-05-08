@@ -36,8 +36,8 @@ var (
 func NewKubeletStartPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:    "kubelet-start",
-		Short:   "Writes kubelet settings and (re)starts the kubelet",
-		Long:    "Writes a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)starts kubelet.",
+		Short:   "Write kubelet settings and (re)start the kubelet",
+		Long:    "Write a file with KubeletConfiguration and an environment file with node specific kubelet settings, and then (re)start kubelet.",
 		Example: kubeletStartPhaseExample,
 		Run:     runKubeletStart,
 		InheritFlags: []string{
@@ -58,7 +58,7 @@ func runKubeletStart(c workflow.RunData) error {
 	// First off, configure the kubelet. In this short timeframe, kubeadm is trying to stop/restart the kubelet
 	// Try to stop the kubelet service so no race conditions occur when configuring it
 	if !data.DryRun() {
-		klog.V(1).Infof("Stopping the kubelet")
+		klog.V(1).Infoln("Stopping the kubelet")
 		kubeletphase.TryStopKubelet()
 	}
 
@@ -76,7 +76,7 @@ func runKubeletStart(c workflow.RunData) error {
 
 	// Try to start the kubelet service in case it's inactive
 	if !data.DryRun() {
-		klog.V(1).Infof("Starting the kubelet")
+		klog.V(1).Infoln("Starting the kubelet")
 		kubeletphase.TryStartKubelet()
 	}
 

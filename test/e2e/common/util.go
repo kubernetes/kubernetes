@@ -22,7 +22,7 @@ import (
 	"text/template"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,6 +48,7 @@ var CurrentSuite Suite
 // only used by node e2e test.
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
+	imageutils.GetE2EImage(imageutils.AuditProxy),
 	imageutils.GetE2EImage(imageutils.BusyBox),
 	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
@@ -171,7 +172,7 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Wait for their boot IDs to change.
 	for i := range nodes {
 		node := &nodes[i]
-		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
 			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)

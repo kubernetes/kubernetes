@@ -22,6 +22,7 @@ import (
 	"strings"
 )
 
+// KubemarkResourceUsage is a struct for tracking the resource usage of kubemark.
 type KubemarkResourceUsage struct {
 	Name                    string
 	MemoryWorkingSetInBytes uint64
@@ -36,6 +37,7 @@ func getMasterUsageByPrefix(prefix string) (string, error) {
 	return sshResult.Stdout, nil
 }
 
+// GetKubemarkMasterComponentsResourceUsage returns the resource usage of kubemark which contains multiple combinations of cpu and memory usage for each pod name.
 // TODO: figure out how to move this to kubemark directory (need to factor test SSH out of e2e framework)
 func GetKubemarkMasterComponentsResourceUsage() map[string]*KubemarkResourceUsage {
 	result := make(map[string]*KubemarkResourceUsage)

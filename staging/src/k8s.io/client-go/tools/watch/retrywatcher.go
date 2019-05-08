@@ -153,7 +153,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 			// We need to inspect the event and get ResourceVersion out of it
 			switch event.Type {
-			case watch.Added, watch.Modified, watch.Deleted:
+			case watch.Added, watch.Modified, watch.Deleted, watch.Bookmark:
 				metaObject, ok := event.Object.(resourceVersionGetter)
 				if !ok {
 					_ = rw.send(watch.Event{
@@ -184,12 +184,16 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				continue
 
 			case watch.Error:
-				status, ok := event.Object.(*metav1.Status)
+				// This round trip allows us to handle unstructured status
+				errObject := apierrors.FromObject(event.Object)
+				statusErr, ok := errObject.(*apierrors.StatusError)
 				if !ok {
 					klog.Error(spew.Sprintf("Received an error which is not *metav1.Status but %#+v", event.Object))
 					// Retry unknown errors
 					return false, 0
 				}
+
+				status := statusErr.ErrStatus
 
 				statusDelay := time.Duration(0)
 				if status.Details != nil {

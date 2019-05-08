@@ -207,7 +207,13 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 		doTest0777(f, testImageNonRootUid, v1.StorageMediumDefault)
 	})
 
-	It("pod should support shared volumes between containers", func() {
+	/*
+		Release : v1.15
+		Testname: EmptyDir, Shared volumes between containers
+		Description: A Pod created with an 'emptyDir' Volume, should share volumes between the containeres in the pod. The two busybox image containers shoud share the volumes mounted to the pod.
+		The main container shoud wait until the sub container drops a file, and main container acess the shared data.
+	*/
+	framework.ConformanceIt("pod should support shared volumes between containers", func() {
 		var (
 			volumeName                 = "shared-data"
 			busyBoxMainVolumeMountPath = "/usr/share/volumeshare"
@@ -218,6 +224,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 			busyBoxMainContainerName   = "busybox-main-container"
 			busyBoxSubContainerName    = "busybox-sub-container"
 			resultString               = ""
+			deletionGracePeriod        = int64(0)
 		)
 
 		pod := &v1.Pod{
@@ -238,7 +245,7 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 						Name:    busyBoxMainContainerName,
 						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 						Command: []string{"/bin/sh"},
-						Args:    []string{"-c", "sleep 10"},
+						Args:    []string{"-c", "sleep 100000"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -259,7 +266,8 @@ var _ = Describe("[sig-storage] EmptyDir volumes", func() {
 						},
 					},
 				},
-				RestartPolicy: v1.RestartPolicyNever,
+				TerminationGracePeriodSeconds: &deletionGracePeriod,
+				RestartPolicy:                 v1.RestartPolicyNever,
 			},
 		}
 

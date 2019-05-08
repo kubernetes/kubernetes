@@ -47,6 +47,8 @@ import (
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
+	nodev1alpha1 "k8s.io/api/node/v1alpha1"
+	nodev1beta1 "k8s.io/api/node/v1beta1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -94,6 +96,7 @@ import (
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
+	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
@@ -345,6 +348,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		coordinationrest.RESTStorageProvider{},
 		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
+		noderest.RESTStorageProvider{},
 		policyrest.RESTStorageProvider{},
 		rbacrest.RESTStorageProvider{Authorizer: c.GenericConfig.Authorization.Authorizer},
 		schedulingrest.RESTStorageProvider{},
@@ -375,7 +379,7 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 
 	controllerName := "bootstrap-controller"
 	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient)
+	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
 	m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
@@ -388,8 +392,12 @@ func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient core
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
 	m.GenericAPIServer.AddHealthzChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Name: "apiserver_proxy_tunnel_sync_duration_seconds",
 		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Help: "(Deprecated) The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
 }
 
@@ -490,6 +498,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion,
 		networkingapiv1.SchemeGroupVersion,
 		networkingapiv1beta1.SchemeGroupVersion,
+		nodev1beta1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
@@ -520,6 +529,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
+		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,
 		settingsv1alpha1.SchemeGroupVersion,

@@ -25,8 +25,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/cached/disk:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
@@ -49,11 +49,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/printers:all-srcs",
-        "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions/resource:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

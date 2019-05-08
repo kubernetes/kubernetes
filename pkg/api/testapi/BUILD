@@ -41,6 +41,8 @@ go_library(
         "//pkg/apis/imagepolicy/install:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/networking/install:go_default_library",
+        "//pkg/apis/node:go_default_library",
+        "//pkg/apis/node/install:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/policy/install:go_default_library",
         "//pkg/apis/rbac:go_default_library",

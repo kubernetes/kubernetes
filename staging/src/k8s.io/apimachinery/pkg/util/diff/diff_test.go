@@ -27,6 +27,20 @@ func TestObjectReflectDiff(t *testing.T) {
 		a, b interface{}
 		out  string
 	}{
+		"both nil": {
+			a: interface{}(nil),
+			b: interface{}(nil),
+		},
+		"a nil": {
+			a:   interface{}(nil),
+			b:   "test",
+			out: "a is nil and b is not-nil",
+		},
+		"b nil": {
+			a:   "test",
+			b:   interface{}(nil),
+			out: "a is not-nil and b is nil",
+		},
 		"map": {
 			a: map[string]int{},
 			b: map[string]int{},

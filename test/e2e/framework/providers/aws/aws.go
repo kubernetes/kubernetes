@@ -27,8 +27,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	"k8s.io/api/core/v1"
-	awscloud "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/test/e2e/framework"
+	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
 func init() {

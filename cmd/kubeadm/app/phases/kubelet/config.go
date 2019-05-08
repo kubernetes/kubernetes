@@ -127,7 +127,7 @@ func DownloadConfig(client clientset.Interface, kubeletVersion *version.Version,
 	// Download the ConfigMap from the cluster based on what version the kubelet is
 	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
 
-	fmt.Printf("[kubelet] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
+	fmt.Printf("[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
 		configMapName, metav1.NamespaceSystem)
 
 	kubeletCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})

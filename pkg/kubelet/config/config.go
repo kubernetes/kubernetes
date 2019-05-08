@@ -314,9 +314,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 	case kubetypes.RESTORE:
 		klog.V(4).Infof("Restoring pods for source %s", source)
-		for _, value := range update.Pods {
-			restorePods = append(restorePods, value)
-		}
+		restorePods = append(restorePods, update.Pods...)
 
 	default:
 		klog.Warningf("Received invalid update type: %v", update)

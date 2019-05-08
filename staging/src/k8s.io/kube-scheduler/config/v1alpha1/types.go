@@ -78,10 +78,6 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored.
 	PercentageOfNodesToScore int32 `json:"percentageOfNodesToScore"`
 
-	// DEPRECATED.
-	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
-	FailureDomains string `json:"failureDomains"`
-
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.

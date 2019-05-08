@@ -27,7 +27,7 @@ const (
 	// NetworkPluginOperationsKey is the key for operation count metrics.
 	NetworkPluginOperationsKey = "network_plugin_operations"
 	// NetworkPluginOperationsLatencyKey is the key for the operation latency metrics.
-	NetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_seconds"
+	NetworkPluginOperationsLatencyKey = "network_plugin_operations_duration_seconds"
 	// DeprecatedNetworkPluginOperationsLatencyKey is the deprecated key for the operation latency metrics.
 	DeprecatedNetworkPluginOperationsLatencyKey = "network_plugin_operations_latency_microseconds"
 

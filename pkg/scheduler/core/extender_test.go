@@ -29,7 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -197,7 +198,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	// and get cached node info by given node name.
 	nodeInfoCopy := f.cachedNodeNameToInfo[node.GetName()].Clone()
 
-	potentialVictims := util.SortableList{CompFunc: util.HigherPriorityPod}
+	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
 
 	removePod := func(rp *v1.Pod) {
 		nodeInfoCopy.RemovePod(rp)
@@ -530,7 +531,8 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			cache := schedulerinternalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}
@@ -542,7 +544,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				predicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
-				emptyPluginSet,
+				fwk,
 				extenders,
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},

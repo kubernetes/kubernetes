@@ -102,6 +102,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/controller/podautoscaler/config:all-srcs",
         "//pkg/controller/podautoscaler/metrics:all-srcs",
     ],
     tags = ["automanaged"],

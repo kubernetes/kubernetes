@@ -70,6 +70,10 @@ import (
 	fakenetworkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1/fake"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	fakenetworkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1/fake"
+	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
+	fakenodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1/fake"
+	nodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1"
+	fakenodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1/fake"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	fakepolicyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
@@ -107,7 +111,7 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	cs := &Clientset{}
+	cs := &Clientset{tracker: o}
 	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
@@ -129,10 +133,15 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 type Clientset struct {
 	testing.Fake
 	discovery *fakediscovery.FakeDiscovery
+	tracker   testing.ObjectTracker
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.discovery
+}
+
+func (c *Clientset) Tracker() testing.ObjectTracker {
+	return c.tracker
 }
 
 var _ clientset.Interface = &Clientset{}
@@ -250,6 +259,16 @@ func (c *Clientset) NetworkingV1() networkingv1.NetworkingV1Interface {
 // NetworkingV1beta1 retrieves the NetworkingV1beta1Client
 func (c *Clientset) NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface {
 	return &fakenetworkingv1beta1.FakeNetworkingV1beta1{Fake: &c.Fake}
+}
+
+// NodeV1alpha1 retrieves the NodeV1alpha1Client
+func (c *Clientset) NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface {
+	return &fakenodev1alpha1.FakeNodeV1alpha1{Fake: &c.Fake}
+}
+
+// NodeV1beta1 retrieves the NodeV1beta1Client
+func (c *Clientset) NodeV1beta1() nodev1beta1.NodeV1beta1Interface {
+	return &fakenodev1beta1.FakeNodeV1beta1{Fake: &c.Fake}
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client

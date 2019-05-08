@@ -42,6 +42,7 @@ import _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
   Register a custom resource type with the API, create/update/query this custom
   type, and write a controller that drives the cluster state based on the changes to
   the custom resources.
+- [**Leader election**](./leader-election): Demonstrates the use of the leader election package, which can be used to implement HA controllers.
 
 [informer]: https://godoc.org/k8s.io/client-go/tools/cache#NewInformer
 

@@ -35,6 +35,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	keyutil "k8s.io/client-go/util/keyutil"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
@@ -85,7 +86,7 @@ func CreateCertificateKey() (string, error) {
 
 //UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
 func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[upload-certs] storing the certificates in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
 		return err
@@ -191,6 +192,7 @@ func certsToTransfer(cfg *kubeadmapi.InitConfiguration) map[string]string {
 		certs[externalEtcdCert] = cfg.Etcd.External.CertFile
 		certs[externalEtcdKey] = cfg.Etcd.External.KeyFile
 	}
+
 	return certs
 }
 
@@ -209,7 +211,7 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 
 // DownloadCerts downloads the certificates needed to join a new control plane.
 func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[download-certs] downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	fmt.Printf("[download-certs] Downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
@@ -229,7 +231,11 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {
-			return errors.New("couldn't find required certificate or key in Secret")
+			return errors.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
+		}
+		if len(certOrKeyData) == 0 {
+			klog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)
+			continue
 		}
 		if err := writeCertOrKey(certOrKeyPath, certOrKeyData); err != nil {
 			return err
@@ -252,7 +258,7 @@ func getSecret(client clientset.Interface) (*v1.Secret, error) {
 	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --experimental-upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 		}
 		return nil, err
 	}
@@ -261,14 +267,20 @@ func getSecret(client clientset.Interface) (*v1.Secret, error) {
 
 func getDataFromSecret(secret *v1.Secret, key []byte) (map[string][]byte, error) {
 	secretData := map[string][]byte{}
-	for certName, encryptedCert := range secret.Data {
-		cert, err := cryptoutil.DecryptBytes(encryptedCert, key)
-		if err != nil {
-			// If any of the decrypt operations fail do not return a partial result,
-			// return an empty result immediately
-			return map[string][]byte{}, err
+	for secretName, encryptedSecret := range secret.Data {
+		// In some cases the secret might have empty data if the secrets were not present on disk
+		// when uploading. This can specially happen with external insecure etcd (no certs)
+		if len(encryptedSecret) > 0 {
+			cert, err := cryptoutil.DecryptBytes(encryptedSecret, key)
+			if err != nil {
+				// If any of the decrypt operations fail do not return a partial result,
+				// return an empty result immediately
+				return map[string][]byte{}, err
+			}
+			secretData[secretName] = cert
+		} else {
+			secretData[secretName] = []byte{}
 		}
-		secretData[certName] = cert
 	}
 	return secretData, nil
 }

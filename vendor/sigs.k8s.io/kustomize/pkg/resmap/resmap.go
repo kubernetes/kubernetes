@@ -32,24 +32,18 @@ import (
 // ResMap is a map from ResId to Resource.
 type ResMap map[resid.ResId]*resource.Resource
 
-// FindByGVKN find the matched ResIds by Group/Version/Kind and Name
-func (m ResMap) FindByGVKN(inputId resid.ResId) []resid.ResId {
+type IdMatcher func(resid.ResId) bool
+
+// GetMatchingIds returns a slice of ResId keys from the map
+// that all satisfy the given matcher function.
+func (m ResMap) GetMatchingIds(matches IdMatcher) []resid.ResId {
 	var result []resid.ResId
 	for id := range m {
-		if id.GvknEquals(inputId) {
+		if matches(id) {
 			result = append(result, id)
 		}
 	}
 	return result
-}
-
-// DemandOneMatchForId find the matched resource by Group/Version/Kind and Name
-func (m ResMap) DemandOneMatchForId(inputId resid.ResId) (*resource.Resource, bool) {
-	result := m.FindByGVKN(inputId)
-	if len(result) == 1 {
-		return m[result[0]], true
-	}
-	return nil, false
 }
 
 // EncodeAsYaml encodes a ResMap to YAML; encoded objects separated by `---`.
@@ -177,7 +171,7 @@ func MergeWithOverride(maps ...ResMap) (ResMap, error) {
 			continue
 		}
 		for id, r := range m {
-			matchedId := result.FindByGVKN(id)
+			matchedId := result.GetMatchingIds(id.GvknEquals)
 			if len(matchedId) == 1 {
 				id = matchedId[0]
 				switch r.Behavior() {

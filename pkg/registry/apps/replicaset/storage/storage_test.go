@@ -173,7 +173,7 @@ func TestGenerationNumber(t *testing.T) {
 	}
 
 	// Updates to spec should increment the generation number
-	storedRS.Spec.Replicas += 1
+	storedRS.Spec.Replicas++
 	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestGenerationNumber(t *testing.T) {
 	}
 
 	// Updates to status should not increment either spec or status generation numbers
-	storedRS.Status.Replicas += 1
+	storedRS.Status.Replicas++
 	if _, _, err := storage.ReplicaSet.Update(ctx, storedRS.Name, rest.DefaultUpdatedObjectInfo(storedRS), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

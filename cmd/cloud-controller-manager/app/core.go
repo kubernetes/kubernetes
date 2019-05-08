@@ -66,17 +66,6 @@ func startCloudNodeLifecycleController(ctx *cloudcontrollerconfig.CompletedConfi
 	return nil, true, nil
 }
 
-func startPersistentVolumeLabelController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
-	// Start the PersistentVolumeLabelController
-	pvlController := cloudcontrollers.NewPersistentVolumeLabelController(
-		ctx.ClientBuilder.ClientOrDie("pvl-controller"),
-		cloud,
-	)
-	go pvlController.Run(5, stopCh)
-
-	return nil, true, nil
-}
-
 func startServiceController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
 	// Start the service controller
 	serviceController, err := servicecontroller.New(

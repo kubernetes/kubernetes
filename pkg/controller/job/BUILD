@@ -78,6 +78,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/job/config:all-srcs",
+    ],
     tags = ["automanaged"],
 )

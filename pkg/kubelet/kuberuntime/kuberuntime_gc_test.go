@@ -25,7 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
@@ -412,10 +412,16 @@ func TestPodLogDirectoryGC(t *testing.T) {
 	// pod log directories without corresponding pods should be removed.
 	podStateProvider.existingPods["123"] = struct{}{}
 	podStateProvider.existingPods["456"] = struct{}{}
+	podStateProvider.existingPods["321"] = struct{}{}
 	podStateProvider.runningPods["123"] = struct{}{}
 	podStateProvider.runningPods["456"] = struct{}{}
-	files := []string{"123", "456", "789", "012"}
-	removed := []string{filepath.Join(podLogsRootDirectory, "789"), filepath.Join(podLogsRootDirectory, "012")}
+	podStateProvider.existingPods["321"] = struct{}{}
+	files := []string{"123", "456", "789", "012", "name_namespace_321", "name_namespace_654"}
+	removed := []string{
+		filepath.Join(podLogsRootDirectory, "789"),
+		filepath.Join(podLogsRootDirectory, "012"),
+		filepath.Join(podLogsRootDirectory, "name_namespace_654"),
+	}
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

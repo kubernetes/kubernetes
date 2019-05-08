@@ -28,13 +28,28 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dgerq2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgerq2(m, n int, a []float64, lda int, tau, work []float64) {
-	checkMatrix(m, n, a, lda)
-	k := min(m, n)
-	if len(tau) < k {
-		panic(badTau)
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case len(work) < m:
+		panic(shortWork)
 	}
-	if len(work) < m {
-		panic(badWork)
+
+	// Quick return if possible.
+	k := min(m, n)
+	if k == 0 {
+		return
+	}
+
+	switch {
+	case len(a) < (m-1)*lda+n:
+		panic(shortA)
+	case len(tau) < k:
+		panic(shortTau)
 	}
 
 	for i := k - 1; i >= 0; i-- {

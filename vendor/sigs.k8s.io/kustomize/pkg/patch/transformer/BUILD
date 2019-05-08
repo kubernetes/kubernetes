@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "factory.go",
         "patchjson6902json.go",
-        "util.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/sigs.k8s.io/kustomize/pkg/patch/transformer",
     importpath = "sigs.k8s.io/kustomize/pkg/patch/transformer",
@@ -13,6 +12,7 @@ go_library(
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/gvk:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/ifc:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/patch:go_default_library",

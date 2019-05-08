@@ -22,6 +22,12 @@ set -o pipefail
 # https://github.com/kubernetes/kubernetes/issues/52255
 unset CDPATH
 
+# Until all GOPATH references are removed from all build scripts as well,
+# explicitly reset to auto mode to avoid picking up user-set GO111MODULE preferences.
+# As individual scripts (like hack/update-vendor.sh) make use of go modules,
+# they can explicitly set GO111MODULE=on
+export GO111MODULE=auto
+
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 
@@ -80,6 +86,8 @@ events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
 networking.k8s.io/v1beta1 \
+node.k8s.io/v1alpha1 \
+node.k8s.io/v1beta1 \
 policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \

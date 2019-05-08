@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/config"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var cadvisor struct {
@@ -39,14 +39,15 @@ var _ = instrumentation.SIGDescribe("Cadvisor", func() {
 
 	f := framework.NewDefaultFramework("cadvisor")
 
-	It("should be healthy on every node.", func() {
+	ginkgo.It("should be healthy on every node.", func() {
 		CheckCadvisorHealthOnAllNodes(f.ClientSet, 5*time.Minute)
 	})
 })
 
+// CheckCadvisorHealthOnAllNodes check cadvisor health via kubelet endpoint
 func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration) {
 	// It should be OK to list unschedulable Nodes here.
-	By("getting list of nodes")
+	ginkgo.By("getting list of nodes")
 	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	var errors []error
@@ -58,7 +59,7 @@ func CheckCadvisorHealthOnAllNodes(c clientset.Interface, timeout time.Duration)
 			// cadvisor is not accessible directly unless its port (4194 by default) is exposed.
 			// Here, we access '/stats/' REST endpoint on the kubelet which polls cadvisor internally.
 			statsResource := fmt.Sprintf("api/v1/nodes/%s/proxy/stats/", node.Name)
-			By(fmt.Sprintf("Querying stats from node %s using url %s", node.Name, statsResource))
+			ginkgo.By(fmt.Sprintf("Querying stats from node %s using url %s", node.Name, statsResource))
 			_, err = c.CoreV1().RESTClient().Get().AbsPath(statsResource).Timeout(timeout).Do().Raw()
 			if err != nil {
 				errors = append(errors, err)

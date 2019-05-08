@@ -86,7 +86,7 @@ type DefaultStorageFactory struct {
 	APIResourceConfigSource APIResourceConfigSource
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
-	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, err error)
+	newStorageCodecFn func(opts StorageCodecConfig) (codec runtime.Codec, encodeVersioner runtime.GroupVersioner, err error)
 }
 
 type groupResourceOverrides struct {
@@ -278,7 +278,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 	codecConfig.Config = storageConfig
 
-	storageConfig.Codec, err = s.newStorageCodecFn(codecConfig)
+	storageConfig.Codec, storageConfig.EncodeVersioner, err = s.newStorageCodecFn(codecConfig)
 	if err != nil {
 		return nil, err
 	}

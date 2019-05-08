@@ -201,12 +201,15 @@ func (plugin *rbdPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize resource.
 	}
 }
 
-func (plugin *rbdPlugin) ExpandFS(spec *volume.Spec, devicePath, deviceMountPath string, _, _ resource.Quantity) error {
-	_, err := volutil.GenericResizeFS(plugin.host, plugin.GetPluginName(), devicePath, deviceMountPath)
-	return err
+func (plugin *rbdPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
+	_, err := volutil.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-var _ volume.FSResizableVolumePlugin = &rbdPlugin{}
+var _ volume.NodeExpandableVolumePlugin = &rbdPlugin{}
 
 func (expander *rbdVolumeExpander) ResizeImage(oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	return expander.manager.ExpandImage(expander, oldSize, newSize)
@@ -371,8 +374,8 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 
 func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	pluginMntDir := volutil.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -1076,15 +1079,6 @@ func getVolumeAccessModes(spec *volume.Spec) ([]v1.PersistentVolumeAccessMode, e
 	}
 
 	return nil, nil
-}
-
-func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
-	secret, err := volutil.GetSecretForPod(pod, secretName, kubeClient)
-	if err != nil {
-		klog.Errorf("failed to get secret from [%q/%q]: %+v", pod.Namespace, secretName, err)
-		return "", fmt.Errorf("failed to get secret from [%q/%q]: %+v", pod.Namespace, secretName, err)
-	}
-	return parseSecretMap(secret)
 }
 
 func parsePVSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {

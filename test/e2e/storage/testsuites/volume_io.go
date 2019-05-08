@@ -30,11 +30,12 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -80,6 +81,9 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		testCleanup func()
 
 		resource *genericVolumeTestResource
+
+		intreeOps   opCounts
+		migratedOps opCounts
 	}
 	var (
 		dInfo = driver.GetDriverInfo()
@@ -99,10 +103,13 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 		// Now do the more expensive test initialization.
 		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
+
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
 		if l.resource.volSource == nil {
 			framework.Skipf("Driver %q does not define volumeSource - skipping", dInfo.Name)
 		}
+
 	}
 
 	cleanup := func() {
@@ -115,6 +122,8 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 			l.testCleanup()
 			l.testCleanup = nil
 		}
+
+		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	It("should write files of various sizes, verify size, validate content [Slow]", func() {
@@ -125,7 +134,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		fileSizes := createFileSizes(dInfo.MaxFileSize)
 		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
 		var fsGroup *int64
-		if dInfo.Capabilities[CapFsGroup] {
+		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {
 			fsGroupVal := int64(1234)
 			fsGroup = &fsGroupVal
 		}
@@ -133,7 +142,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 			FSGroup: fsGroup,
 		}
 		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 }
 
@@ -155,7 +164,7 @@ func createFileSizes(maxFileSize int64) []int64 {
 }
 
 // Return the plugin's client pod spec. Use an InitContainer to setup the file i/o test env.
-func makePodSpec(config framework.VolumeTestConfig, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
+func makePodSpec(config volume.TestConfig, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
 	var gracePeriod int64 = 1
 	volName := fmt.Sprintf("io-volume-%s", config.Namespace)
 	return &v1.Pod{
@@ -269,7 +278,7 @@ func deleteFile(pod *v1.Pod, fpath string) {
 	_, err := utils.PodExec(pod, fmt.Sprintf("rm -f %s", fpath))
 	if err != nil {
 		// keep going, the test dir will be deleted when the volume is unmounted
-		framework.Logf("unable to delete test file %s: %v\nerror ignored, continuing test", fpath, err)
+		e2elog.Logf("unable to delete test file %s: %v\nerror ignored, continuing test", fpath, err)
 	}
 }
 
@@ -279,7 +288,7 @@ func deleteFile(pod *v1.Pod, fpath string) {
 // Note: nil can be passed for the podSecContext parm, in which case it is ignored.
 // Note: `fsizes` values are enforced to each be at least `MinFileSize` and a multiple of `MinFileSize`
 //   bytes.
-func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framework.VolumeTestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
+func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.TestConfig, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext, file string, fsizes []int64) (err error) {
 	ddInput := filepath.Join(mountPath, fmt.Sprintf("%s-%s-dd_if", config.Prefix, config.Namespace))
 	writeBlk := strings.Repeat("abcdefghijklmnopqrstuvwxyz123456", 32) // 1KiB value
 	loopCnt := testpatterns.MinFileSize / int64(len(writeBlk))
@@ -301,13 +310,13 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config framewo
 		By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
 		e := framework.DeletePodWithWait(f, cs, clientPod)
 		if e != nil {
-			framework.Logf("client pod failed to delete: %v", e)
+			e2elog.Logf("client pod failed to delete: %v", e)
 			if err == nil { // delete err is returned if err is not set
 				err = e
 			}
 		} else {
-			framework.Logf("sleeping a bit so kubelet can unmount and detach the volume")
-			time.Sleep(framework.PodCleanupTimeout)
+			e2elog.Logf("sleeping a bit so kubelet can unmount and detach the volume")
+			time.Sleep(volume.PodCleanupTimeout)
 		}
 	}()
 

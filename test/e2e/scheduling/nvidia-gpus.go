@@ -20,12 +20,13 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -53,8 +54,17 @@ func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Name:  "vector-addition",
+					Name:  "vector-addition-cuda8",
 					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+						},
+					},
+				},
+				{
+					Name:  "vector-addition-cuda10",
+					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
 							gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
@@ -114,7 +124,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	} else {
 		dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
 	}
-	gpuResourceName = framework.NVIDIAGPUResourceName
+	gpuResourceName = gpu.NVIDIAGPUResourceName
 
 	framework.Logf("Using %v", dsYamlUrl)
 	// Creates the DaemonSet that installs Nvidia Drivers.

@@ -84,6 +84,15 @@ type CustomResourceConversion struct {
 
 	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
 	WebhookClientConfig *WebhookClientConfig
+
+	// ConversionReviewVersions is an ordered list of preferred `ConversionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, conversion will fail for this object.
+	// If a persisted Webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail.
+	// +optional
+	ConversionReviewVersions []string
 }
 
 // WebhookClientConfig contains the information to make a TLS
@@ -123,8 +132,6 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// Port 443 will be used if it is open, otherwise it is an error.
-	//
 	// +optional
 	Service *ServiceReference
 
@@ -147,6 +154,11 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string
+
+	// If specified, the port on the service that hosting webhook.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port int32
 }
 
 // CustomResourceDefinitionVersion describes a version for CRD.
@@ -258,7 +270,7 @@ const (
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// Type is the type of the condition.
+	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.

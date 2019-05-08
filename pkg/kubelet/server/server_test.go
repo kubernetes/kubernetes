@@ -49,8 +49,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -257,8 +257,11 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 	return map[string]volume.Volume{}, true
 }
 
-func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)                { return nil, nil }
-func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error)             { return nil, nil }
+func (*fakeKubelet) RootFsStats() (*statsapi.FsStats, error)    { return nil, nil }
+func (*fakeKubelet) ListPodStats() ([]statsapi.PodStats, error) { return nil, nil }
+func (*fakeKubelet) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return nil, nil
+}
 func (*fakeKubelet) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) { return nil, nil }
 func (*fakeKubelet) ImageFsStats() (*statsapi.FsStats, error)               { return nil, nil }
 func (*fakeKubelet) RlimitStats() (*statsapi.RlimitStats, error)            { return nil, nil }
@@ -1662,4 +1665,25 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+}
+
+func TestTrimURLPath(t *testing.T) {
+	tests := []struct {
+		path, expected string
+	}{
+		{"", ""},
+		{"//", ""},
+		{"/pods", "pods"},
+		{"pods", "pods"},
+		{"pods/", "pods"},
+		{"good/", "good"},
+		{"pods/probes", "pods"},
+		{"metrics", "metrics"},
+		{"metrics/resource", "metrics/resource"},
+		{"metrics/hello", "metrics/hello"},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expected, trimURLPath(test.path), fmt.Sprintf("path is: %s", test.path))
+	}
 }

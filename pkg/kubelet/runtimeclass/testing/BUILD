@@ -7,10 +7,10 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/runtimeclass:go_default_library",
+        "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned/fake:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )
 

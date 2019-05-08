@@ -80,7 +80,6 @@ func (s *Set) Intersection(s2 *Set) *Set {
 // Difference returns a Set containing elements which:
 // * appear in s
 // * do not appear in s2
-// * and are not children of elements that appear in s2.
 //
 // In other words, for leaf fields, this acts like a regular set difference
 // operation. When non leaf fields are compared with leaf fields ("parents"
@@ -284,9 +283,6 @@ func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap {
 	out := &SetNodeMap{}
 	for k, sn := range s.members {
 		pe := sn.pathElement
-		if s2.Members.Has(pe) {
-			continue
-		}
 		if sn2, ok := s2.Children.members[k]; ok {
 			diff := *sn.set.Difference(sn2.set)
 			// We aren't permitted to add nodes with no elements.

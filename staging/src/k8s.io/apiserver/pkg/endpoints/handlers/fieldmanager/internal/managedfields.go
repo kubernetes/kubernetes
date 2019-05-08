@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -114,6 +115,9 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet *fieldpath.VersionedSet, err error) {
 	versionedSet = &fieldpath.VersionedSet{}
 	versionedSet.APIVersion = fieldpath.APIVersion(encodedVersionedSet.APIVersion)
+	if encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply {
+		versionedSet.Applied = true
+	}
 
 	fields := metav1.Fields{}
 	if encodedVersionedSet.Fields != nil {
@@ -146,6 +150,31 @@ func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedF
 		}
 		encodedManagedFields = append(encodedManagedFields, *v)
 	}
+	return sortEncodedManagedFields(encodedManagedFields)
+}
+
+func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (sortedManagedFields []metav1.ManagedFieldsEntry, err error) {
+	sort.Slice(encodedManagedFields, func(i, j int) bool {
+		p, q := encodedManagedFields[i], encodedManagedFields[j]
+
+		if p.Operation != q.Operation {
+			return p.Operation < q.Operation
+		}
+
+		ntime := &metav1.Time{Time: time.Time{}}
+		if p.Time == nil {
+			p.Time = ntime
+		}
+		if q.Time == nil {
+			q.Time = ntime
+		}
+		if !p.Time.Equal(q.Time) {
+			return p.Time.Before(q.Time)
+		}
+
+		return p.Manager < q.Manager
+	})
+
 	return encodedManagedFields, nil
 }
 
@@ -158,8 +187,11 @@ func encodeManagerVersionedSet(manager string, versionedSet *fieldpath.Versioned
 		return nil, fmt.Errorf("error unmarshalling manager identifier %v: %v", manager, err)
 	}
 
-	// Get the APIVersion and Fields from the VersionedSet
+	// Get the APIVersion, Operation, and Fields from the VersionedSet
 	encodedVersionedSet.APIVersion = string(versionedSet.APIVersion)
+	if versionedSet.Applied {
+		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
+	}
 	fields, err := SetToFields(*versionedSet.Set)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding set: %v", err)

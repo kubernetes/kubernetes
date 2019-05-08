@@ -77,7 +77,7 @@ type PriorityConfigFactory struct {
 }
 
 var (
-	schedulerFactoryMutex sync.Mutex
+	schedulerFactoryMutex sync.RWMutex
 
 	// maps that hold registered algorithm types
 	fitPredicateMap        = make(map[string]FitPredicateFactory)
@@ -139,7 +139,6 @@ func RemovePredicateKeyFromAlgorithmProviderMap(key string) {
 	for _, provider := range algorithmProviderMap {
 		provider.FitPredicateKeys.Delete(key)
 	}
-	return
 }
 
 // InsertPredicateKeyToAlgoProvider insert a fit predicate key to algorithmProvider.
@@ -246,8 +245,8 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 
 // IsFitPredicateRegistered is useful for testing providers.
 func IsFitPredicateRegistered(name string) bool {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 	_, ok := fitPredicateMap[name]
 	return ok
 }
@@ -376,8 +375,8 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 
 // IsPriorityFunctionRegistered is useful for testing providers.
 func IsPriorityFunctionRegistered(name string) bool {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 	_, ok := priorityFunctionMap[name]
 	return ok
 }
@@ -397,8 +396,8 @@ func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.Str
 
 // GetAlgorithmProvider should not be used to modify providers. It is publicly visible for testing.
 func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	provider, ok := algorithmProviderMap[name]
 	if !ok {
@@ -409,8 +408,8 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 }
 
 func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]predicates.FitPredicate, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	fitPredicates := map[string]predicates.FitPredicate{}
 	for _, name := range names.List() {
@@ -452,8 +451,8 @@ func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateM
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var configs []priorities.PriorityConfig
 	for _, name := range names.List() {
@@ -539,8 +538,8 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 
 // ListRegisteredFitPredicates returns the registered fit predicates.
 func ListRegisteredFitPredicates() []string {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var names []string
 	for name := range fitPredicateMap {
@@ -551,8 +550,8 @@ func ListRegisteredFitPredicates() []string {
 
 // ListRegisteredPriorityFunctions returns the registered priority functions.
 func ListRegisteredPriorityFunctions() []string {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var names []string
 	for name := range priorityFunctionMap {

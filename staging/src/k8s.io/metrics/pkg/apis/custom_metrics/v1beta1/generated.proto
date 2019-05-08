@@ -42,7 +42,7 @@ message MetricListOptions {
   optional string metricLabelSelector = 2;
 }
 
-// a metric value for some object
+// MetricValue is a metric value for some object
 message MetricValue {
   // a reference to the described object
   optional k8s.io.api.core.v1.ObjectReference describedObject = 1;
@@ -70,7 +70,7 @@ message MetricValue {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 6;
 }
 
-// a list of values for a given metric for some set of objects
+// MetricValueList is a list of values for a given metric for some set of objects
 message MetricValueList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 

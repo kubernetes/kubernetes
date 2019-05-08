@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -178,7 +178,7 @@ func newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.Endpoint {
 	return &endpointsInfo{BaseEndpointInfo: baseInfo}
 }
 
-// Equal overrides the Equal() function imlemented by proxy.BaseEndpointInfo.
+// Equal overrides the Equal() function implemented by proxy.BaseEndpointInfo.
 func (e *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	o, ok := other.(*endpointsInfo)
 	if !ok {
@@ -369,6 +369,7 @@ var iptablesJumpChains = []iptablesJumpChain{
 	{utiliptables.TableFilter, kubeExternalServicesChain, utiliptables.ChainInput, "kubernetes externally-visible service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainForward, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
+	{utiliptables.TableFilter, kubeServicesChain, utiliptables.ChainInput, "kubernetes service portals", []string{"-m", "conntrack", "--ctstate", "NEW"}},
 	{utiliptables.TableFilter, kubeForwardChain, utiliptables.ChainForward, "kubernetes forwarding rules", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainOutput, "kubernetes service portals", nil},
 	{utiliptables.TableNAT, kubeServicesChain, utiliptables.ChainPrerouting, "kubernetes service portals", nil},
@@ -673,6 +674,9 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.GetProtocol() == v1.ProtocolUDP {
 			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIPString())
 			staleServices.Insert(svcInfo.ClusterIPString())
+			for _, extIP := range svcInfo.ExternalIPStrings() {
+				staleServices.Insert(extIP)
+			}
 		}
 	}
 
@@ -847,6 +851,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 		} else {
+			// No endpoints.
 			writeLine(proxier.filterRules,
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -917,6 +922,7 @@ func (proxier *Proxier) syncProxyRules() {
 				// This covers cases like GCE load-balancers which get added to the local routing table.
 				writeLine(proxier.natRules, append(dstLocalOnlyArgs, "-j", string(svcChain))...)
 			} else {
+				// No endpoints.
 				writeLine(proxier.filterRules,
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -929,10 +935,10 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		// Capture load-balancer ingress.
-		if hasEndpoints {
-			fwChain := svcInfo.serviceFirewallChainName
-			for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
-				if ingress.IP != "" {
+		fwChain := svcInfo.serviceFirewallChainName
+		for _, ingress := range svcInfo.LoadBalancerStatus.Ingress {
+			if ingress.IP != "" {
+				if hasEndpoints {
 					// create service firewall chain
 					if chain, ok := existingNATChains[fwChain]; ok {
 						writeBytesLine(proxier.natChains, chain)
@@ -993,10 +999,19 @@ func (proxier *Proxier) syncProxyRules() {
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
 					// It means the packet cannot go thru the firewall, then mark it for DROP
 					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkDropChain))...)
+				} else {
+					// No endpoints.
+					writeLine(proxier.filterRules,
+						"-A", string(kubeServicesChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
+						"-m", protocol, "-p", protocol,
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
+						"--dport", strconv.Itoa(svcInfo.Port),
+						"-j", "REJECT",
+					)
 				}
 			}
 		}
-		// FIXME: do we need REJECT rules for load-balancer ingress if !hasEndpoints?
 
 		// Capture nodeports.  If we had more than 2 rules it might be
 		// worthwhile to make a new per-service chain for nodeport rules, but
@@ -1078,6 +1093,7 @@ func (proxier *Proxier) syncProxyRules() {
 					writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
 				}
 			} else {
+				// No endpoints.
 				writeLine(proxier.filterRules,
 					"-A", string(kubeExternalServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
@@ -1136,7 +1152,16 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Now write loadbalancing & DNAT rules.
 		n := len(endpointChains)
+		localEndpoints := make([]*endpointsInfo, 0)
+		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i, endpointChain := range endpointChains {
+			// Write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
+			if svcInfo.OnlyNodeLocalEndpoints && endpoints[i].IsLocal {
+				// These slices parallel each other; must be kept in sync
+				localEndpoints = append(localEndpoints, endpoints[i])
+				localEndpointChains = append(localEndpointChains, endpointChains[i])
+			}
+
 			epIP := endpoints[i].IP()
 			if epIP == "" {
 				// Error parsing this endpoint has been logged. Skip to next endpoint.
@@ -1177,17 +1202,6 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		// Now write ingress loadbalancing & DNAT rules only for services that request OnlyLocal traffic.
-		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
-		localEndpoints := make([]*endpointsInfo, 0)
-		localEndpointChains := make([]utiliptables.Chain, 0)
-		for i := range endpointChains {
-			if endpoints[i].IsLocal {
-				// These slices parallel each other; must be kept in sync
-				localEndpoints = append(localEndpoints, endpoints[i])
-				localEndpointChains = append(localEndpointChains, endpointChains[i])
-			}
-		}
 		// First rule in the chain redirects all pod -> external VIP traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified
@@ -1297,6 +1311,16 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(proxier.natRules, args...)
 		}
 	}
+
+	// Drop the packets in INVALID state, which would potentially cause
+	// unexpected connection reset.
+	// https://github.com/kubernetes/kubernetes/issues/74839
+	writeLine(proxier.filterRules,
+		"-A", string(kubeForwardChain),
+		"-m", "conntrack",
+		"--ctstate", "INVALID",
+		"-j", "DROP",
+	)
 
 	// If the masqueradeMark has been added then we want to forward that same
 	// traffic, this allows NodePort traffic to be forwarded even if the default

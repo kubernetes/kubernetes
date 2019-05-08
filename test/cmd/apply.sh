@@ -249,12 +249,12 @@ run_kubectl_apply_tests() {
   set -o errexit
 
   create_and_use_new_namespace
-  kube::log::status "Testing kubectl apply --server-side"
+  kube::log::status "Testing kubectl apply --experimental-server-side"
   ## kubectl apply should create the resource that doesn't exist yet
   # Pre-Condition: no POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: apply a pod "test-pod" (doesn't exist) should create this pod
-  kubectl apply --server-side -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kubectl apply --experimental-server-side -f hack/testdata/pod.yaml "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" is created
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
   # Clean up
@@ -265,13 +265,13 @@ run_kubectl_apply_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   # apply dry-run
-  kubectl apply --server-side --server-dry-run -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kubectl apply --experimental-server-side --server-dry-run -f hack/testdata/pod.yaml "${kube_flags[@]}"
   # No pod exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # apply non dry-run creates the pod
-  kubectl apply --server-side -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  kubectl apply --experimental-server-side -f hack/testdata/pod.yaml "${kube_flags[@]}"
   # apply changes
-  kubectl apply --server-side --server-dry-run -f hack/testdata/pod-apply.yaml "${kube_flags[@]}"
+  kubectl apply --experimental-server-side --server-dry-run -f hack/testdata/pod-apply.yaml "${kube_flags[@]}"
   # Post-Condition: label still has initial value
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
 
@@ -302,7 +302,7 @@ run_kubectl_apply_tests() {
 __EOF__
 
   # Dry-run create the CR
-  kubectl "${kube_flags[@]}" apply --server-side --server-dry-run -f hack/testdata/CRD/resource.yaml "${kube_flags[@]}"
+  kubectl "${kube_flags[@]}" apply --experimental-server-side --server-dry-run -f hack/testdata/CRD/resource.yaml "${kube_flags[@]}"
   # Make sure that the CR doesn't exist
   ! kubectl "${kube_flags[@]}" get resource/myobj
 

@@ -67,7 +67,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 	// 1. node lifecycle manager generate a status change: [NodeReady=true, status=ConditionUnknown]
 	// 1. it's applied with node.kubernetes.io/unreachable=:NoExecute taint
 	// 2. pods without toleration are applied with toleration with tolerationSeconds=300
-	// 3. pods with toleration and without tolerationSeconds won't be modifed, and won't be evicted
+	// 3. pods with toleration and without tolerationSeconds won't be modified, and won't be evicted
 	// 4. pods with toleration and with tolerationSeconds won't be modified, and will be evicted after tolerationSeconds
 	// When network issue recovers, it's expected to see:
 	// 5. node lifecycle manager generate a status change: [NodeReady=true, status=ConditionTrue]

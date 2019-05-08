@@ -22,6 +22,12 @@
   clusters. DO NOT USE THIS MODULE FOR PRODUCTION.
 #>
 
+# IMPORTANT PLEASE NOTE:
+# Any time the file structure in the `windows` directory changes, `windows/BUILD`
+# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# We HIGHLY recommend not changing the file structure, because consumers of
+# Kubernetes releases depend on the release structure remaining stable.
+
 Import-Module -Force C:\common.psm1
 
 $OPENSSH_ROOT = 'C:\Program Files\OpenSSH'
@@ -106,7 +112,7 @@ function Setup_WriteSshKeysScript {
 
   # Fetch helper module for manipulating Windows user profiles.
   if (ShouldWrite-File $USER_PROFILE_MODULE) {
-    $module = Get-InstanceMetadataValue 'user-profile-psm1'
+    $module = Get-InstanceMetadataAttribute 'user-profile-psm1'
     New-Item -ItemType file -Force $USER_PROFILE_MODULE | Out-Null
     Set-Content $USER_PROFILE_MODULE $module
   }

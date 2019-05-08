@@ -21,7 +21,6 @@ package local
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -302,7 +301,7 @@ func TestMountUnmount(t *testing.T) {
 		t.Fatalf("Got a nil Mounter")
 	}
 
-	volPath := path.Join(tmpDir, testMountPath)
+	volPath := filepath.Join(tmpDir, testMountPath)
 	path := mounter.GetPath()
 	if path != volPath {
 		t.Errorf("Got unexpected path: %s", path)
@@ -356,7 +355,7 @@ func TestMapUnmap(t *testing.T) {
 		t.Fatalf("Got a nil Mounter")
 	}
 
-	expectedGlobalPath := path.Join(tmpDir, testGlobalPath)
+	expectedGlobalPath := filepath.Join(tmpDir, testGlobalPath)
 	globalPath, err := mapper.GetGlobalMapPath(volSpec)
 	if err != nil {
 		t.Errorf("Failed to get global path: %v", err)
@@ -364,7 +363,7 @@ func TestMapUnmap(t *testing.T) {
 	if globalPath != expectedGlobalPath {
 		t.Errorf("Got unexpected path: %s, expected %s", globalPath, expectedGlobalPath)
 	}
-	expectedPodPath := path.Join(tmpDir, testPodPath)
+	expectedPodPath := filepath.Join(tmpDir, testPodPath)
 	podPath, volName := mapper.GetPodDeviceMapPath()
 	if podPath != expectedPodPath {
 		t.Errorf("Got unexpected pod path: %s, expected %s", podPath, expectedPodPath)
@@ -407,7 +406,7 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 		return fmt.Errorf("Got a nil Mounter")
 	}
 
-	volPath := path.Join(tmpDir, testMountPath)
+	volPath := filepath.Join(tmpDir, testMountPath)
 	path := mounter.GetPath()
 	if path != volPath {
 		return fmt.Errorf("Got unexpected path: %s", path)
@@ -423,7 +422,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
-	volPath := path.Join(tmpDir, testMountPath)
+	volPath := filepath.Join(tmpDir, testMountPath)
 	spec, err := plug.ConstructVolumeSpec(testPVName, volPath)
 	if err != nil {
 		t.Errorf("ConstructVolumeSpec() failed: %v", err)
@@ -464,7 +463,7 @@ func TestConstructBlockVolumeSpec(t *testing.T) {
 	tmpDir, plug := getBlockPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
-	podPath := path.Join(tmpDir, testPodPath)
+	podPath := filepath.Join(tmpDir, testPodPath)
 	spec, err := plug.ConstructBlockVolumeSpec(types.UID("poduid"), testPVName, podPath)
 	if err != nil {
 		t.Errorf("ConstructBlockVolumeSpec() failed: %v", err)

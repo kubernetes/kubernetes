@@ -41,12 +41,12 @@ func TestObserveAdmissionStep(t *testing.T) {
 		"type":      "admit",
 		"rejected":  "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_step_admission_latencies_seconds_summary", wantLabels)
+	expectHistogramCountTotal(t, "apiserver_admission_step_admission_duration_seconds", wantLabels, 1)
+	expectFindMetric(t, "apiserver_admission_step_admission_duration_seconds_summary", wantLabels)
 
 	wantLabels["type"] = "validate"
-	expectHistogramCountTotal(t, "apiserver_admission_step_admission_latencies_seconds", wantLabels, 1)
-	expectFindMetric(t, "apiserver_admission_step_admission_latencies_seconds_summary", wantLabels)
+	expectHistogramCountTotal(t, "apiserver_admission_step_admission_duration_seconds", wantLabels, 1)
+	expectFindMetric(t, "apiserver_admission_step_admission_duration_seconds_summary", wantLabels)
 }
 
 func TestObserveAdmissionController(t *testing.T) {
@@ -60,10 +60,10 @@ func TestObserveAdmissionController(t *testing.T) {
 		"type":      "admit",
 		"rejected":  "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", wantLabels, 1)
 
 	wantLabels["type"] = "validate"
-	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", wantLabels, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", wantLabels, 1)
 }
 
 func TestObserveWebhook(t *testing.T) {
@@ -75,7 +75,7 @@ func TestObserveWebhook(t *testing.T) {
 		"type":      "admit",
 		"rejected":  "false",
 	}
-	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_latencies_seconds", wantLabels, 1)
+	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
 }
 
 func TestWithMetrics(t *testing.T) {
@@ -158,9 +158,9 @@ func TestWithMetrics(t *testing.T) {
 			filter["rejected"] = "true"
 		}
 		if _, mutating := test.handler.(admission.MutationInterface); mutating {
-			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", filter, 1)
+			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", filter, 1)
 		} else {
-			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", filter, 0)
+			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", filter, 0)
 		}
 
 		if err != nil {
@@ -183,9 +183,9 @@ func TestWithMetrics(t *testing.T) {
 			filter["rejected"] = "true"
 		}
 		if _, validating := test.handler.(admission.ValidationInterface); validating {
-			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", filter, 1)
+			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", filter, 1)
 		} else {
-			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_latencies_seconds", filter, 0)
+			expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", filter, 0)
 		}
 	}
 }

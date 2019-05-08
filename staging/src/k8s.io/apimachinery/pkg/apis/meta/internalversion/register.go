@@ -95,6 +95,12 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1beta1.PartialObjectMetadata{},
 		&metav1beta1.PartialObjectMetadataList{},
 	)
+	scheme.AddKnownTypes(metav1.SchemeGroupVersion,
+		&metav1.Table{},
+		&metav1.TableOptions{},
+		&metav1.PartialObjectMetadata{},
+		&metav1.PartialObjectMetadataList{},
+	)
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
 	scheme.AddUnversionedTypes(SchemeGroupVersion,
 		&metav1.DeleteOptions{},

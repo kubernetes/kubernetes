@@ -25,9 +25,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
@@ -163,24 +163,31 @@ func getStableKey(pod *v1.Pod, container *v1.Container) string {
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }
 
+// logPathDelimiter is the delimiter used in the log path.
+const logPathDelimiter = "_"
+
 // buildContainerLogsPath builds log path for container relative to pod logs directory.
 func buildContainerLogsPath(containerName string, restartCount int) string {
 	return filepath.Join(containerName, fmt.Sprintf("%d.log", restartCount))
 }
 
-// buildFullContainerLogsPath builds absolute log path for container.
-func buildFullContainerLogsPath(podUID types.UID, containerName string, restartCount int) string {
-	return filepath.Join(buildPodLogsDirectory(podUID), buildContainerLogsPath(containerName, restartCount))
-}
-
 // BuildContainerLogsDirectory builds absolute log directory path for a container in pod.
-func BuildContainerLogsDirectory(podUID types.UID, containerName string) string {
-	return filepath.Join(buildPodLogsDirectory(podUID), containerName)
+func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID, containerName string) string {
+	return filepath.Join(BuildPodLogsDirectory(podNamespace, podName, podUID), containerName)
 }
 
-// buildPodLogsDirectory builds absolute log directory path for a pod sandbox.
-func buildPodLogsDirectory(podUID types.UID) string {
-	return filepath.Join(podLogsRootDirectory, string(podUID))
+// BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
+func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
+	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
+		string(podUID)}, logPathDelimiter))
+}
+
+// parsePodUIDFromLogsDirectory parses pod logs directory name and returns the pod UID.
+// It supports both the old pod log directory /var/log/pods/UID, and the new pod log
+// directory /var/log/pods/NAMESPACE_NAME_UID.
+func parsePodUIDFromLogsDirectory(name string) types.UID {
+	parts := strings.Split(name, logPathDelimiter)
+	return types.UID(parts[len(parts)-1])
 }
 
 // toKubeRuntimeStatus converts the runtimeapi.RuntimeStatus to kubecontainer.RuntimeStatus.

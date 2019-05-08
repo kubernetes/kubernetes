@@ -7,6 +7,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/storage:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/storage/volumeattachment:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

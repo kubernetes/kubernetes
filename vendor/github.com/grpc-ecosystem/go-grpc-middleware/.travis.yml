@@ -1,7 +1,7 @@
 sudo: false
 language: go
 go:
-  - 1.8.x
+  - 1.11.x
 env:
   - DEP_VERSION="0.3.2"
 
@@ -15,7 +15,6 @@ install:
   - dep ensure
 
 script:
- - make checkdocs
  - make test
  
 after_success:

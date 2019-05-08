@@ -25,8 +25,9 @@ import (
 	"github.com/coreos/etcd/clientv3"
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -121,6 +122,10 @@ func (f fakeEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
+func getEtcdVersion(v *version.Version) string {
+	return constants.SupportedEtcdVersion[uint8(v.Minor())]
+}
+
 func TestGetAvailableUpgrades(t *testing.T) {
 	etcdClient := fakeEtcdClient{}
 	tests := []struct {
@@ -137,12 +142,12 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "no action needed, already up-to-date",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3",
-				kubeadmVersion: "v1.10.3",
+				clusterVersion: constants.MinimumControlPlaneVersion.String(),
+				kubeletVersion: constants.MinimumKubeletVersion.String(),
+				kubeadmVersion: constants.MinimumControlPlaneVersion.String(),
 
-				stablePatchVersion: "v1.10.3",
-				stableVersion:      "v1.10.3",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.String(),
+				stableVersion:      constants.MinimumControlPlaneVersion.String(),
 			},
 			beforeDNSType:     kubeadmapi.CoreDNS,
 			beforeDNSVersion:  "v1.0.6",
@@ -155,35 +160,35 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "simple patch version upgrade",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.1",
-				kubeletVersion: "v1.10.1", // the kubelet are on the same version as the control plane
-				kubeadmVersion: "v1.10.2",
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(1).String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
 
-				stablePatchVersion: "v1.10.3",
-				stableVersion:      "v1.10.3",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				stableVersion:      constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
 			dnsType:          kubeadmapi.CoreDNS,
 			expectedUpgrades: []Upgrade{
 				{
-					Description: "version in the v1.10 series",
+					Description: fmt.Sprintf("version in the v%d.%d series", constants.MinimumControlPlaneVersion.Major(), constants.MinimumControlPlaneVersion.Minor()),
 					Before: ClusterState{
-						KubeVersion: "v1.10.1",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.1": 1,
+							constants.MinimumKubeletVersion.WithPatch(1).String(): 1,
 						},
-						KubeadmVersion: "v1.10.2",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.10.3",
-						KubeadmVersion: "v1.10.3",
+						KubeVersion:    constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.1.12",
+						EtcdVersion:    getEtcdVersion(constants.MinimumControlPlaneVersion),
 					},
 				},
 			},
@@ -194,35 +199,35 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "no version provided to offline version getter does not change behavior",
 			vg: NewOfflineVersionGetter(&fakeVersionGetter{
-				clusterVersion: "v1.10.1",
-				kubeletVersion: "v1.10.1", // the kubelet are on the same version as the control plane
-				kubeadmVersion: "v1.10.2",
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(1).String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
 
-				stablePatchVersion: "v1.10.3",
-				stableVersion:      "v1.10.3",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				stableVersion:      constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 			}, ""),
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
 			dnsType:          kubeadmapi.CoreDNS,
 			expectedUpgrades: []Upgrade{
 				{
-					Description: "version in the v1.10 series",
+					Description: fmt.Sprintf("version in the v%d.%d series", constants.MinimumControlPlaneVersion.Major(), constants.MinimumControlPlaneVersion.Minor()),
 					Before: ClusterState{
-						KubeVersion: "v1.10.1",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.1": 1,
+							constants.MinimumKubeletVersion.WithPatch(1).String(): 1,
 						},
-						KubeadmVersion: "v1.10.2",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.10.3",
-						KubeadmVersion: "v1.10.3",
+						KubeVersion:    constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.1.12",
+						EtcdVersion:    getEtcdVersion(constants.MinimumControlPlaneVersion),
 					},
 				},
 			},
@@ -233,12 +238,12 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "minor version upgrade only",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.1",
-				kubeletVersion: "v1.10.1", // the kubelet are on the same version as the control plane
-				kubeadmVersion: "v1.11.0",
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(1).String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: constants.CurrentKubernetesVersion.String(),
 
-				stablePatchVersion: "v1.10.1",
-				stableVersion:      "v1.11.0",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+				stableVersion:      constants.CurrentKubernetesVersion.String(),
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -247,21 +252,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "stable version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.1",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.1": 1,
+							constants.MinimumKubeletVersion.WithPatch(1).String(): 1,
 						},
-						KubeadmVersion: "v1.11.0",
+						KubeadmVersion: constants.CurrentKubernetesVersion.String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.0",
-						KubeadmVersion: "v1.11.0",
+						KubeVersion:    constants.CurrentKubernetesVersion.String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -272,55 +277,55 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "both minor version upgrade and patch version upgrade available",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.3",
-				kubeletVersion: "v1.10.3", // the kubelet are on the same version as the control plane
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(3).String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 
-				stablePatchVersion: "v1.10.5",
-				stableVersion:      "v1.11.1",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				stableVersion:      constants.CurrentKubernetesVersion.WithPatch(1).String(),
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
 			dnsType:          kubeadmapi.CoreDNS,
 			expectedUpgrades: []Upgrade{
 				{
-					Description: "version in the v1.10 series",
+					Description: fmt.Sprintf("version in the v%d.%d series", constants.MinimumControlPlaneVersion.Major(), constants.MinimumControlPlaneVersion.Minor()),
 					Before: ClusterState{
-						KubeVersion: "v1.10.3",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.3": 1,
+							constants.MinimumKubeletVersion.WithPatch(3).String(): 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.10.5",
-						KubeadmVersion: "v1.10.5", // Note: The kubeadm version mustn't be "downgraded" here
+						KubeVersion:    constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(), // Note: The kubeadm version mustn't be "downgraded" here
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.1.12",
+						EtcdVersion:    getEtcdVersion(constants.MinimumControlPlaneVersion),
 					},
 				},
 				{
 					Description: "stable version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.3",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.3": 1,
+							constants.MinimumKubeletVersion.WithPatch(3).String(): 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.1",
-						KubeadmVersion: "v1.11.1",
+						KubeVersion:    constants.CurrentKubernetesVersion.WithPatch(1).String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.WithPatch(1).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -350,13 +355,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "upgrade to an unstable version should be supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.5",
-				kubeletVersion: "v1.10.5",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(5).String(),
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 
-				stablePatchVersion: "v1.10.5",
-				stableVersion:      "v1.10.5",
-				latestVersion:      "v1.11.0-alpha.2",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				stableVersion:      constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				latestVersion:      constants.CurrentKubernetesVersion.WithPreRelease("alpha.2").String(),
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -365,21 +370,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "experimental version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.5",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							constants.MinimumControlPlaneVersion.WithPatch(5).String(): 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.0-alpha.2",
-						KubeadmVersion: "v1.11.0-alpha.2",
+						KubeVersion:    constants.CurrentKubernetesVersion.WithPreRelease("alpha.2").String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.WithPreRelease("alpha.2").String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -390,13 +395,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "upgrade from an unstable version to an unstable version should be supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.11.0-alpha.1",
-				kubeletVersion: "v1.10.5",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: constants.CurrentKubernetesVersion.WithPreRelease("alpha.1").String(),
+				kubeletVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 
-				stablePatchVersion: "v1.10.5",
-				stableVersion:      "v1.10.5",
-				latestVersion:      "v1.11.0-alpha.2",
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				stableVersion:      constants.MinimumControlPlaneVersion.WithPatch(5).String(),
+				latestVersion:      constants.CurrentKubernetesVersion.WithPreRelease("alpha.2").String(),
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -405,21 +410,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "experimental version",
 					Before: ClusterState{
-						KubeVersion: "v1.11.0-alpha.1",
+						KubeVersion: constants.CurrentKubernetesVersion.WithPreRelease("alpha.1").String(),
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							constants.MinimumControlPlaneVersion.WithPatch(5).String(): 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(5).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.0-alpha.2",
-						KubeadmVersion: "v1.11.0-alpha.2",
+						KubeVersion:    constants.CurrentKubernetesVersion.WithPreRelease("alpha.2").String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.WithPreRelease("alpha.2").String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -430,14 +435,14 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "v1.X.0-alpha.0 should be ignored",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.5",
-				kubeletVersion: "v1.10.5",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: "v1.11.5",
+				kubeletVersion: "v1.11.5",
+				kubeadmVersion: "v1.11.5",
 
-				stablePatchVersion:     "v1.10.5",
-				stableVersion:          "v1.10.5",
-				latestDevBranchVersion: "v1.11.0-beta.1",
-				latestVersion:          constants.MinimumControlPlaneVersion.WithPreRelease("alpha.0").String(),
+				stablePatchVersion:     "v1.11.5",
+				stableVersion:          "v1.11.5",
+				latestDevBranchVersion: "v1.13.0-beta.1",
+				latestVersion:          "v1.12.0-alpha.0",
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -446,21 +451,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "experimental version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.5",
+						KubeVersion: "v1.11.5",
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							"v1.11.5": 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: "v1.11.5",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.0-beta.1",
-						KubeadmVersion: "v1.11.0-beta.1",
+						KubeVersion:    "v1.13.0-beta.1",
+						KubeadmVersion: "v1.13.0-beta.1",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    "3.2.24",
 					},
 				},
 			},
@@ -471,14 +476,14 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "upgrade to an RC version should be supported",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.5",
-				kubeletVersion: "v1.10.5",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: "v1.11.5",
+				kubeletVersion: "v1.11.5",
+				kubeadmVersion: "v1.11.5",
 
-				stablePatchVersion:     "v1.10.5",
-				stableVersion:          "v1.10.5",
-				latestDevBranchVersion: "v1.11.0-rc.1",
-				latestVersion:          constants.MinimumControlPlaneVersion.WithPreRelease("alpha.1").String(),
+				stablePatchVersion:     "v1.11.5",
+				stableVersion:          "v1.11.5",
+				latestDevBranchVersion: "v1.13.0-rc.1",
+				latestVersion:          "v1.12.0-alpha.1",
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -487,21 +492,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "release candidate version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.5",
+						KubeVersion: "v1.11.5",
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							"v1.11.5": 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: "v1.11.5",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.0-rc.1",
-						KubeadmVersion: "v1.11.0-rc.1",
+						KubeVersion:    "v1.13.0-rc.1",
+						KubeadmVersion: "v1.13.0-rc.1",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    "3.2.24",
 					},
 				},
 			},
@@ -512,14 +517,14 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "it is possible (but very uncommon) that the latest version from the previous branch is an rc and the current latest version is alpha.0. In that case, show the RC",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.5",
-				kubeletVersion: "v1.10.5",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: "v1.11.5",
+				kubeletVersion: "v1.11.5",
+				kubeadmVersion: "v1.11.5",
 
-				stablePatchVersion:     "v1.10.5",
-				stableVersion:          "v1.10.5",
-				latestDevBranchVersion: "v1.11.6-rc.1",
-				latestVersion:          constants.MinimumControlPlaneVersion.WithPatch(1).WithPreRelease("alpha.0").String(),
+				stablePatchVersion:     "v1.11.5",
+				stableVersion:          "v1.11.5",
+				latestDevBranchVersion: "v1.13.6-rc.1",
+				latestVersion:          "v1.12.1-alpha.0",
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -528,21 +533,21 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "experimental version", // Note that this is considered an experimental version in this uncommon scenario
 					Before: ClusterState{
-						KubeVersion: "v1.10.5",
+						KubeVersion: "v1.11.5",
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							"v1.11.5": 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: "v1.11.5",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.6-rc.1",
-						KubeadmVersion: "v1.11.6-rc.1",
+						KubeVersion:    "v1.13.6-rc.1",
+						KubeadmVersion: "v1.13.6-rc.1",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    "3.2.24",
 					},
 				},
 			},
@@ -553,14 +558,14 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "upgrade to an RC version should be supported. There may also be an even newer unstable version.",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.10.5",
-				kubeletVersion: "v1.10.5",
-				kubeadmVersion: "v1.10.5",
+				clusterVersion: "v1.11.5",
+				kubeletVersion: "v1.11.5",
+				kubeadmVersion: "v1.11.5",
 
-				stablePatchVersion:     "v1.10.5",
-				stableVersion:          "v1.10.5",
-				latestDevBranchVersion: "v1.11.0-rc.1",
-				latestVersion:          constants.MinimumControlPlaneVersion.WithPreRelease("alpha.2").String(),
+				stablePatchVersion:     "v1.11.5",
+				stableVersion:          "v1.11.5",
+				latestDevBranchVersion: "v1.13.0-rc.1",
+				latestVersion:          "v1.12.0-alpha.2",
 			},
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
@@ -569,38 +574,38 @@ func TestGetAvailableUpgrades(t *testing.T) {
 				{
 					Description: "release candidate version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.5",
+						KubeVersion: "v1.11.5",
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							"v1.11.5": 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: "v1.11.5",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    "v1.11.0-rc.1",
-						KubeadmVersion: "v1.11.0-rc.1",
+						KubeVersion:    "v1.13.0-rc.1",
+						KubeadmVersion: "v1.13.0-rc.1",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.18",
+						EtcdVersion:    "3.2.24",
 					},
 				},
 				{
 					Description: "experimental version",
 					Before: ClusterState{
-						KubeVersion: "v1.10.5",
+						KubeVersion: "v1.11.5",
 						KubeletVersions: map[string]uint16{
-							"v1.10.5": 1,
+							"v1.11.5": 1,
 						},
-						KubeadmVersion: "v1.10.5",
+						KubeadmVersion: "v1.11.5",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    constants.MinimumControlPlaneVersion.WithPreRelease("alpha.2").String(),
-						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPreRelease("alpha.2").String(),
+						KubeVersion:    "v1.12.0-alpha.2",
+						KubeadmVersion: "v1.12.0-alpha.2",
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
 						EtcdVersion:    "3.2.24",
@@ -615,11 +620,11 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "Upgrades with external etcd with mismatched versions should not be allowed.",
 			vg: &fakeVersionGetter{
-				clusterVersion:     "v1.10.3",
-				kubeletVersion:     "v1.10.3",
-				kubeadmVersion:     "v1.10.3",
-				stablePatchVersion: "v1.10.3",
-				stableVersion:      "v1.10.3",
+				clusterVersion:     constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				kubeletVersion:     constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				kubeadmVersion:     constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				stablePatchVersion: constants.MinimumControlPlaneVersion.WithPatch(3).String(),
+				stableVersion:      constants.MinimumControlPlaneVersion.WithPatch(3).String(),
 			},
 			allowRCs:          false,
 			allowExperimental: false,
@@ -630,33 +635,33 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "offline version getter",
 			vg: NewOfflineVersionGetter(&fakeVersionGetter{
-				clusterVersion: "v1.11.1",
-				kubeletVersion: "v1.11.0",
-				kubeadmVersion: "v1.11.1",
-			}, constants.MinimumControlPlaneVersion.WithPatch(1).String()),
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.String(),
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+			}, constants.CurrentKubernetesVersion.WithPatch(1).String()),
 			etcdClient:       etcdClient,
 			beforeDNSType:    kubeadmapi.CoreDNS,
 			beforeDNSVersion: "1.0.6",
 			dnsType:          kubeadmapi.CoreDNS,
 			expectedUpgrades: []Upgrade{
 				{
-					Description: "version in the v1.11 series",
+					Description: fmt.Sprintf("version in the v%d.%d series", constants.MinimumControlPlaneVersion.Major(), constants.MinimumControlPlaneVersion.Minor()),
 					Before: ClusterState{
-						KubeVersion: "v1.11.1",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.11.0": 1,
+							constants.MinimumKubeletVersion.String(): 1,
 						},
-						KubeadmVersion: "v1.11.1",
+						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.0.6",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    constants.MinimumControlPlaneVersion.WithPatch(1).String(),
-						KubeadmVersion: constants.MinimumControlPlaneVersion.WithPatch(1).String(),
+						KubeVersion:    constants.CurrentKubernetesVersion.WithPatch(1).String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.WithPatch(1).String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.24",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -664,12 +669,12 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "kubedns to coredns",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.11.2",
-				kubeletVersion: "v1.11.2", // the kubelet are on the same version as the control plane
-				kubeadmVersion: constants.MinimumControlPlaneVersion.String(),
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(2).String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: constants.CurrentKubernetesVersion.String(),
 
-				stablePatchVersion: constants.MinimumControlPlaneVersion.String(),
-				stableVersion:      constants.MinimumControlPlaneVersion.String(),
+				stablePatchVersion: constants.CurrentKubernetesVersion.String(),
+				stableVersion:      constants.CurrentKubernetesVersion.String(),
 			},
 			etcdClient:       etcdClient,
 			beforeDNSType:    kubeadmapi.KubeDNS,
@@ -677,23 +682,23 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			dnsType:          kubeadmapi.CoreDNS,
 			expectedUpgrades: []Upgrade{
 				{
-					Description: "version in the v1.11 series",
+					Description: fmt.Sprintf("version in the v%d.%d series", constants.MinimumControlPlaneVersion.Major(), constants.MinimumControlPlaneVersion.Minor()),
 					Before: ClusterState{
-						KubeVersion: "v1.11.2",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.11.2": 1,
+							constants.MinimumControlPlaneVersion.WithPatch(2).String(): 1,
 						},
-						KubeadmVersion: constants.MinimumControlPlaneVersion.String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.String(),
 						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.7",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    constants.MinimumControlPlaneVersion.String(),
-						KubeadmVersion: constants.MinimumControlPlaneVersion.String(),
+						KubeVersion:    constants.CurrentKubernetesVersion.String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.String(),
 						DNSType:        kubeadmapi.CoreDNS,
 						DNSVersion:     "1.3.1",
-						EtcdVersion:    "3.2.24",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -701,12 +706,12 @@ func TestGetAvailableUpgrades(t *testing.T) {
 		{
 			name: "keep coredns",
 			vg: &fakeVersionGetter{
-				clusterVersion: "v1.11.2",
-				kubeletVersion: "v1.11.2", // the kubelet are on the same version as the control plane
-				kubeadmVersion: constants.MinimumControlPlaneVersion.String(),
+				clusterVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
+				kubeletVersion: constants.MinimumKubeletVersion.WithPatch(2).String(), // the kubelet are on the same version as the control plane
+				kubeadmVersion: constants.CurrentKubernetesVersion.String(),
 
-				stablePatchVersion: constants.MinimumControlPlaneVersion.String(),
-				stableVersion:      constants.MinimumControlPlaneVersion.String(),
+				stablePatchVersion: constants.CurrentKubernetesVersion.String(),
+				stableVersion:      constants.CurrentKubernetesVersion.String(),
 			},
 			etcdClient:       etcdClient,
 			beforeDNSType:    kubeadmapi.KubeDNS,
@@ -714,23 +719,23 @@ func TestGetAvailableUpgrades(t *testing.T) {
 			dnsType:          kubeadmapi.KubeDNS,
 			expectedUpgrades: []Upgrade{
 				{
-					Description: "version in the v1.11 series",
+					Description: fmt.Sprintf("version in the v%d.%d series", constants.MinimumControlPlaneVersion.Major(), constants.MinimumControlPlaneVersion.Minor()),
 					Before: ClusterState{
-						KubeVersion: "v1.11.2",
+						KubeVersion: constants.MinimumControlPlaneVersion.WithPatch(2).String(),
 						KubeletVersions: map[string]uint16{
-							"v1.11.2": 1,
+							constants.MinimumControlPlaneVersion.WithPatch(2).String(): 1,
 						},
-						KubeadmVersion: constants.MinimumControlPlaneVersion.String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.String(),
 						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.7",
 						EtcdVersion:    "3.1.12",
 					},
 					After: ClusterState{
-						KubeVersion:    constants.MinimumControlPlaneVersion.String(),
-						KubeadmVersion: constants.MinimumControlPlaneVersion.String(),
+						KubeVersion:    constants.CurrentKubernetesVersion.String(),
+						KubeadmVersion: constants.CurrentKubernetesVersion.String(),
 						DNSType:        kubeadmapi.KubeDNS,
 						DNSVersion:     "1.14.13",
-						EtcdVersion:    "3.2.24",
+						EtcdVersion:    getEtcdVersion(constants.CurrentKubernetesVersion),
 					},
 				},
 			},
@@ -873,10 +878,6 @@ func TestGetBranchFromVersion(t *testing.T) {
 		{
 			version:         "v1.9.0-rc.1",
 			expectedVersion: "1.9",
-		},
-		{
-			version:         constants.MinimumControlPlaneVersion.WithPatch(5).String(),
-			expectedVersion: "1.12",
 		},
 		{
 			version:         "v1.11.0-alpha.0",

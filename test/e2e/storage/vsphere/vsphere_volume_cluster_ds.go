@@ -76,7 +76,7 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 		volumeOptions.Datastore = clusterDatastore
 
 		volumePath, err := nodeInfo.VSphere.CreateVolume(volumeOptions, nodeInfo.DataCenterRef)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		defer func() {
 			By("Deleting the vsphere volume")
@@ -87,13 +87,13 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 
 		By("Creating pod")
 		pod, err := client.CoreV1().Pods(namespace).Create(podspec)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		By("Waiting for pod to be ready")
 		Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
 
 		// get fresh pod info
 		pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		nodeName := pod.Spec.NodeName
 
 		By("Verifying volume is attached")
@@ -101,11 +101,11 @@ var _ = utils.SIGDescribe("Volume Provisioning On Clustered Datastore [Feature:v
 
 		By("Deleting pod")
 		err = framework.DeletePodWithWait(f, client, pod)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Waiting for volumes to be detached from the node")
 		err = waitForVSphereDiskToDetach(volumePath, nodeName)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	/*

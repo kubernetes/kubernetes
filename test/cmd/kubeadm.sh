@@ -28,9 +28,12 @@ run_kubeadm_tests() {
   # comment this out to save yourself from needlessly building here.
   make -C "${KUBE_ROOT}" WHAT=cmd/kubeadm
 
+  #TODO(runyontr): Remove the the KUBE_TIMEOUT override when 
+  # kubernetes/kubeadm/issues/1430 is fixed
   make -C "${KUBE_ROOT}" test \
   WHAT=k8s.io/kubernetes/cmd/kubeadm/test/cmd \
-  KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'"
+  KUBE_TEST_ARGS="--kubeadm-path '${KUBEADM_PATH}'" \
+  KUBE_TIMEOUT="--timeout 600s"
   set +o nounset
   set +o errexit
 }

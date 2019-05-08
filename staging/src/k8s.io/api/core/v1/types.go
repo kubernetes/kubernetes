@@ -151,6 +151,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume attached and mounted on Kubernetes nodes.
 	// +optional
 	StorageOS *StorageOSVolumeSource `json:"storageos,omitempty" protobuf:"bytes,27,opt,name=storageos"`
+	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).
+	// +optional
+	CSI *CSIVolumeSource `json:"csi,omitempty" protobuf:"bytes,28,opt,name=csi"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -248,7 +251,7 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
-	// CSI represents storage that handled by an external CSI driver (Beta feature).
+	// CSI represents storage that is handled by an external CSI driver (Beta feature).
 	// +optional
 	CSI *CSIPersistentVolumeSource `json:"csi,omitempty" protobuf:"bytes,22,opt,name=csi"`
 }
@@ -1691,6 +1694,37 @@ type CSIPersistentVolumeSource struct {
 	NodePublishSecretRef *SecretReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,8,opt,name=nodePublishSecretRef"`
 }
 
+// Represents a source location of a volume to mount, managed by an external CSI driver
+type CSIVolumeSource struct {
+	// Driver is the name of the CSI driver that handles this volume.
+	// Consult with your admin for the correct name as registered in the cluster.
+	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
+
+	// Specifies a read-only configuration for the volume.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,2,opt,name=readOnly"`
+
+	// Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
+	// If not provided, the empty value is passed to the associated CSI driver
+	// which will determine the default filesystem to apply.
+	// +optional
+	FSType *string `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+
+	// VolumeAttributes stores driver-specific properties that are passed to the CSI
+	// driver. Consult your driver's documentation for supported values.
+	// +optional
+	VolumeAttributes map[string]string `json:"volumeAttributes,omitempty" protobuf:"bytes,4,rep,name=volumeAttributes"`
+
+	// NodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secret references are passed.
+	// +optional
+	NodePublishSecretRef *LocalObjectReference `json:"nodePublishSecretRef,omitempty" protobuf:"bytes,5,opt,name=nodePublishSecretRef"`
+}
+
 // ContainerPort represents a network port in a single container.
 type ContainerPort struct {
 	// If specified, this must be an IANA_SVC_NAME and unique within the pod. Each
@@ -1741,7 +1775,7 @@ type VolumeMount struct {
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
-	// This field is alpha in 1.14.
+	// This field is beta in 1.15.
 	// +optional
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
 }
@@ -2931,7 +2965,7 @@ type PodSpec struct {
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
@@ -2966,6 +3000,9 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,1,opt,name=seLinuxOptions"`
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,8,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -4667,6 +4704,7 @@ type EventSeries struct {
 	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
 	// State of this Series: Ongoing or Finished
+	// Deprecated. Planned removal for 1.18
 	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`
 }
 
@@ -5233,6 +5271,9 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,3,opt,name=seLinuxOptions"`
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,10,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -5301,6 +5342,11 @@ type SELinuxOptions struct {
 	// Level is SELinux level label that applies to the container.
 	// +optional
 	Level string `json:"level,omitempty" protobuf:"bytes,4,opt,name=level"`
+}
+
+// WindowsSecurityContextOptions contain Windows-specific options and credentials.
+type WindowsSecurityContextOptions struct {
+	// intentionally left empty for now
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

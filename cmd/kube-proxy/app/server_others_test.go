@@ -45,7 +45,7 @@ func Test_getProxyMode(t *testing.T) {
 		},
 		{ // flag says iptables, error detecting version
 			flag:          "iptables",
-			iptablesError: fmt.Errorf("oops!"),
+			iptablesError: fmt.Errorf("flag says iptables, error detecting version"),
 			expected:      proxyModeUserspace,
 		},
 		{ // flag says iptables, version too low
@@ -67,7 +67,7 @@ func Test_getProxyMode(t *testing.T) {
 		},
 		{ // detect, error
 			flag:          "",
-			iptablesError: fmt.Errorf("oops!"),
+			iptablesError: fmt.Errorf("oops"),
 			expected:      proxyModeUserspace,
 		},
 		{ // detect, version too low

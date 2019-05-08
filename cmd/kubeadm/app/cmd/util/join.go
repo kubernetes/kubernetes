@@ -30,12 +30,24 @@ import (
 )
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
-	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}}{{range $h := .CAPubKeyPins}} --discovery-token-ca-cert-hash {{$h}}{{end}}{{if .UploadCerts}} --certificate-key {{.CertificateKey}}{{end}}`,
+	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}} \
+    {{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
+    --experimental-control-plane {{if .CertificateKey}}--certificate-key {{.CertificateKey}}{{end}}{{end}}`,
 ))
 
-// GetJoinCommand returns the kubeadm join command for a given token and
+// GetJoinWorkerCommand returns the kubeadm join command for a given token and
 // and Kubernetes cluster (the current cluster in the kubeconfig file)
-func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCerts bool) (string, error) {
+func GetJoinWorkerCommand(kubeConfigFile, token string, skipTokenPrint bool) (string, error) {
+	return getJoinCommand(kubeConfigFile, token, "", false, skipTokenPrint, false)
+}
+
+// GetJoinControlPlaneCommand returns the kubeadm join command for a given token and
+// and Kubernetes cluster (the current cluster in the kubeconfig file)
+func GetJoinControlPlaneCommand(kubeConfigFile, token, key string, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
+	return getJoinCommand(kubeConfigFile, token, key, true, skipTokenPrint, skipCertificateKeyPrint)
+}
+
+func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPrint, skipCertificateKeyPrint bool) (string, error) {
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {
@@ -74,12 +86,15 @@ func GetJoinCommand(kubeConfigFile, token, key string, skipTokenPrint, uploadCer
 		"Token":                token,
 		"CAPubKeyPins":         publicKeyPins,
 		"ControlPlaneHostPort": strings.Replace(clusterConfig.Server, "https://", "", -1),
-		"UploadCerts":          uploadCerts,
 		"CertificateKey":       key,
+		"ControlPlane":         controlPlane,
 	}
 
 	if skipTokenPrint {
 		ctx["Token"] = template.HTML("<value withheld>")
+	}
+	if skipCertificateKeyPrint {
+		ctx["CertificateKey"] = template.HTML("<value withheld>")
 	}
 
 	var out bytes.Buffer

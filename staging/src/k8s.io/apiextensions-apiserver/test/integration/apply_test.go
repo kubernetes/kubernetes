@@ -71,6 +71,7 @@ values:
 	result, err := rest.Patch(types.ApplyPatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
+		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
@@ -90,6 +91,7 @@ values:
 	result, err = rest.Patch(types.ApplyPatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
+		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err == nil {
@@ -108,6 +110,7 @@ values:
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name("mytest").
 		Param("force", "true").
+		Param("fieldManager", "apply_test").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {

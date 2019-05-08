@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -527,14 +527,14 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
-	datadirSymlink := path.Join(volumePath, "..data")
+	datadirSymlink := filepath.Join(volumePath, "..data")
 	datadir, err := os.Readlink(datadirSymlink)
 	if err != nil && os.IsNotExist(err) {
 		t.Fatalf("couldn't find volume path's data dir, %s", datadirSymlink)
 	} else if err != nil {
 		t.Fatalf("couldn't read symlink, %s", datadirSymlink)
 	}
-	datadirPath := path.Join(volumePath, datadir)
+	datadirPath := filepath.Join(volumePath, datadir)
 
 	infos, err := ioutil.ReadDir(volumePath)
 	if err != nil {
@@ -665,7 +665,7 @@ func secret(namespace, name string) v1.Secret {
 
 func doTestSecretDataInVolume(volumePath string, secret v1.Secret, t *testing.T) {
 	for key, value := range secret.Data {
-		secretDataHostPath := path.Join(volumePath, key)
+		secretDataHostPath := filepath.Join(volumePath, key)
 		if _, err := os.Stat(secretDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find secret data on disk: %v", secretDataHostPath)
 		} else {

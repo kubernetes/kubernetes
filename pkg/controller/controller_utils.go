@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
@@ -83,6 +84,12 @@ const (
 )
 
 var UpdateTaintBackoff = wait.Backoff{
+	Steps:    5,
+	Duration: 100 * time.Millisecond,
+	Jitter:   1.0,
+}
+
+var UpdateLabelBackoff = wait.Backoff{
 	Steps:    5,
 	Duration: 100 * time.Millisecond,
 	Jitter:   1.0,
@@ -153,11 +160,11 @@ type ControllerExpectations struct {
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
 func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
-	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+	exp, exists, err := r.GetByKey(controllerKey)
+	if err == nil && exists {
 		return exp.(*ControlleeExpectations), true, nil
-	} else {
-		return nil, false, err
 	}
+	return nil, false, err
 }
 
 // DeleteExpectations deletes the expectations of the given controller from the TTLStore.
@@ -569,18 +576,19 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
-	if newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod); err != nil {
+	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
 		return err
-	} else {
-		accessor, err := meta.Accessor(object)
-		if err != nil {
-			klog.Errorf("parentObject does not have ObjectMeta, %v", err)
-			return nil
-		}
-		klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
 	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		return nil
+	}
+	klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
+	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+
 	return nil
 }
 
@@ -1044,4 +1052,75 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 	}
 
 	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+}
+
+func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
+	firstTry := true
+	return clientretry.RetryOnConflict(UpdateLabelBackoff, func() error {
+		var err error
+		var node *v1.Node
+		// First we try getting node from the API server cache, as it's cheaper. If it fails
+		// we get it from etcd to be sure to have fresh data.
+		if firstTry {
+			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			firstTry = false
+		} else {
+			node, err = kubeClient.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		}
+		if err != nil {
+			return err
+		}
+
+		// Make a copy of the node and update the labels.
+		newNode := node.DeepCopy()
+		if newNode.Labels == nil {
+			newNode.Labels = make(map[string]string)
+		}
+		for key, value := range labelsToUpdate {
+			newNode.Labels[key] = value
+		}
+
+		oldData, err := json.Marshal(node)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the existing node %#v: %v", node, err)
+		}
+		newData, err := json.Marshal(newNode)
+		if err != nil {
+			return fmt.Errorf("failed to marshal the new node %#v: %v", newNode, err)
+		}
+		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, &v1.Node{})
+		if err != nil {
+			return fmt.Errorf("failed to create a two-way merge patch: %v", err)
+		}
+		if _, err := kubeClient.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes); err != nil {
+			return fmt.Errorf("failed to patch the node: %v", err)
+		}
+		return nil
+	})
+}
+
+func getOrCreateServiceAccount(coreClient v1core.CoreV1Interface, namespace, name string) (*v1.ServiceAccount, error) {
+	sa, err := coreClient.ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	if err == nil {
+		return sa, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Create the namespace if we can't verify it exists.
+	// Tolerate errors, since we don't know whether this component has namespace creation permissions.
+	if _, err := coreClient.Namespaces().Get(namespace, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+		if _, err = coreClient.Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}}); err != nil && !apierrors.IsAlreadyExists(err) {
+			klog.Warningf("create non-exist namespace %s failed:%v", namespace, err)
+		}
+	}
+
+	// Create the service account
+	sa, err = coreClient.ServiceAccounts(namespace).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name}})
+	if apierrors.IsAlreadyExists(err) {
+		// If we're racing to init and someone else already created it, re-fetch
+		return coreClient.ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	}
+	return sa, err
 }

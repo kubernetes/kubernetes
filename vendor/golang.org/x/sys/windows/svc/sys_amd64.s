@@ -7,7 +7,7 @@
 // func servicemain(argc uint32, argv **uint16)
 TEXT ·servicemain(SB),7,$0
 	MOVL	CX, ·sArgc(SB)
-	MOVL	DX, ·sArgv(SB)
+	MOVQ	DX, ·sArgv(SB)
 
 	SUBQ	$32, SP		// stack for the first 4 syscall params
 

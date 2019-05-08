@@ -30,6 +30,7 @@ type InitData interface {
 	UploadCerts() bool
 	CertificateKey() string
 	SetCertificateKey(key string)
+	SkipCertificateKeyPrint() bool
 	Cfg() *kubeadmapi.InitConfiguration
 	DryRun() bool
 	SkipTokenPrint() bool

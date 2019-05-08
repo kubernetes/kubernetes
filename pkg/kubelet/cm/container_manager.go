@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"

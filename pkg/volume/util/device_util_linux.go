@@ -21,7 +21,8 @@ package util
 import (
 	"errors"
 	"fmt"
-	"path"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -76,10 +77,10 @@ func (handler *deviceHandler) FindSlaveDevicesOnMultipath(dm string) []string {
 		return devices
 	}
 	disk := parts[2]
-	slavesPath := path.Join("/sys/block/", disk, "/slaves/")
+	slavesPath := filepath.Join("/sys/block/", disk, "/slaves/")
 	if files, err := io.ReadDir(slavesPath); err == nil {
 		for _, f := range files {
-			devices = append(devices, path.Join("/dev/", f.Name()))
+			devices = append(devices, filepath.Join("/dev/", f.Name()))
 		}
 	}
 	return devices
@@ -99,6 +100,9 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 	sysPath := "/sys/class/iscsi_host"
 	hostDirs, err := io.ReadDir(sysPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return portalHostMap, nil
+		}
 		return nil, err
 	}
 	for _, hostDir := range hostDirs {

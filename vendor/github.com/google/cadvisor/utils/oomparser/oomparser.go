@@ -101,8 +101,9 @@ func (self *OomParser) StreamOoms(outStream chan<- *OomInstance) {
 		in_oom_kernel_log := checkIfStartOfOomMessages(msg.Message)
 		if in_oom_kernel_log {
 			oomCurrentInstance := &OomInstance{
-				ContainerName: "/",
-				TimeOfDeath:   msg.Timestamp,
+				ContainerName:       "/",
+				VictimContainerName: "/",
+				TimeOfDeath:         msg.Timestamp,
 			}
 			for msg := range kmsgEntries {
 				err := getContainerName(msg.Message, oomCurrentInstance)

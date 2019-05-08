@@ -111,7 +111,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
 	nodetaint.Register(plugins)
-	label.Register(plugins) // DEPRECATED in favor of NewPersistentVolumeLabelController in CCM
+	label.Register(plugins) // DEPRECATED, future PVs should not rely on labels for zone topology
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)
@@ -128,15 +128,16 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
 func DefaultOffAdmissionPlugins() sets.String {
 	defaultOnPlugins := sets.NewString(
-		lifecycle.PluginName,                //NamespaceLifecycle
-		limitranger.PluginName,              //LimitRanger
-		serviceaccount.PluginName,           //ServiceAccount
-		setdefault.PluginName,               //DefaultStorageClass
-		resize.PluginName,                   //PersistentVolumeClaimResize
-		defaulttolerationseconds.PluginName, //DefaultTolerationSeconds
-		mutatingwebhook.PluginName,          //MutatingAdmissionWebhook
-		validatingwebhook.PluginName,        //ValidatingAdmissionWebhook
-		resourcequota.PluginName,            //ResourceQuota
+		lifecycle.PluginName,                    //NamespaceLifecycle
+		limitranger.PluginName,                  //LimitRanger
+		serviceaccount.PluginName,               //ServiceAccount
+		setdefault.PluginName,                   //DefaultStorageClass
+		resize.PluginName,                       //PersistentVolumeClaimResize
+		defaulttolerationseconds.PluginName,     //DefaultTolerationSeconds
+		mutatingwebhook.PluginName,              //MutatingAdmissionWebhook
+		validatingwebhook.PluginName,            //ValidatingAdmissionWebhook
+		resourcequota.PluginName,                //ResourceQuota
+		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
 	)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {

@@ -25,30 +25,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-func TestAssertVersionStringIsEmpty(t *testing.T) {
-	var tcases = []struct {
-		name        string
-		version     string
-		expectedErr bool
-	}{
-		{
-			name:    "Version string is not empty",
-			version: "some string",
-		},
-		{
-			name:        "Version string is empty",
-			expectedErr: true,
-		},
-	}
-	for _, tt := range tcases {
-		t.Run(tt.name, func(t *testing.T) {
-			if assertVersionStringIsEmpty(tt.version) == nil && tt.expectedErr {
-				t.Errorf("No error triggered for string '%s'", tt.version)
-			}
-		})
-	}
-}
-
 func TestSessionIsInteractive(t *testing.T) {
 	var tcases = []struct {
 		name     string

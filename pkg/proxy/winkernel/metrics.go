@@ -29,7 +29,7 @@ var (
 	SyncProxyRulesLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: kubeProxySubsystem,
-			Name:      "sync_proxy_rules_latency_seconds",
+			Name:      "sync_proxy_rules_duration_seconds",
 			Help:      "SyncProxyRules latency in seconds",
 			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 15),
 		},

@@ -223,7 +223,7 @@ func testAudit(t *testing.T, version string) {
 	}
 }
 
-// configMapOperations is a set of known operations perfomed on the configmap type
+// configMapOperations is a set of known operations performed on the configmap type
 // which correspond to the expected events.
 // This is shared by the dynamic test
 func configMapOperations(t *testing.T, kubeclient kubernetes.Interface) {

@@ -18,7 +18,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -133,6 +133,10 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
 	v1.TypeMeta `json:",inline"`
+
+	// NoHeaders is only exposed for internal callers.
+	NoHeaders bool `json:"-"`
+
 	// includeObject decides whether to include each object along with its columnar information.
 	// Specifying "None" will return no object, specifying "Object" will return the full object contents, and
 	// specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind
@@ -155,6 +159,10 @@ type PartialObjectMetadata struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type PartialObjectMetadataList struct {
 	v1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	// +optional
+	v1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,2,opt,name=metadata"`
 
 	// items contains each of the included items.
 	Items []*PartialObjectMetadata `json:"items" protobuf:"bytes,1,rep,name=items"`

@@ -259,7 +259,7 @@ func stopKubelet(host, workspace string) error {
 }
 
 // RunTest runs test on the node.
-func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName string, timeout time.Duration) (string, error) {
+func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, _, systemSpecName, extraEnvs string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
 	if err := setupCNI(host, workspace); err != nil {
 		return "", err
@@ -293,8 +293,8 @@ func (c *ConformanceRemote) RunTest(host, workspace, results, imageDesc, junitFi
 	// Run the tests
 	klog.V(2).Infof("Starting tests on %q", host)
 	podManifestPath := getPodPath(workspace)
-	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s %s'",
-		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, getConformanceTestImageName(systemSpecName))
+	cmd := fmt.Sprintf("'timeout -k 30s %fs docker run --rm --privileged=true --net=host -v /:/rootfs -v %s:%s -v %s:/var/result -e TEST_ARGS=--report-prefix=%s -e EXTRA_ENVS=%s %s'",
+		timeout.Seconds(), podManifestPath, podManifestPath, results, junitFilePrefix, extraEnvs, getConformanceTestImageName(systemSpecName))
 	testOutput, err := SSH(host, "sh", "-c", cmd)
 	if err != nil {
 		return testOutput, err

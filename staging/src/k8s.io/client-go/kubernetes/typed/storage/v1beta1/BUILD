@@ -8,6 +8,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "csidriver.go",
+        "csinode.go",
         "doc.go",
         "generated_expansion.go",
         "storage_client.go",
@@ -19,7 +21,6 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",

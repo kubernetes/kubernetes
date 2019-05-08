@@ -33,6 +33,7 @@ var _ InitData = &testInitData{}
 func (t *testInitData) UploadCerts() bool                    { return false }
 func (t *testInitData) CertificateKey() string               { return "" }
 func (t *testInitData) SetCertificateKey(key string)         {}
+func (t *testInitData) SkipCertificateKeyPrint() bool        { return false }
 func (t *testInitData) Cfg() *kubeadmapi.InitConfiguration   { return nil }
 func (t *testInitData) DryRun() bool                         { return false }
 func (t *testInitData) SkipTokenPrint() bool                 { return false }

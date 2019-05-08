@@ -47,8 +47,6 @@ if ! ${ALL} ; then
 	echo "Running in short-circuit mode; run with FORCE_ALL=true to force all scripts to run."
 fi
 
-"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
-
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
@@ -57,8 +55,8 @@ BASH_TARGETS="
 	update-generated-docs
 	update-generated-swagger-docs
 	update-openapi-spec
-	update-staging-godeps
-	update-bazel"
+	update-bazel
+	update-gofmt"
 
 for t in ${BASH_TARGETS}; do
 	echo -e "${color_yellow}Running ${t}${color_norm}"

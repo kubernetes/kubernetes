@@ -25,6 +25,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+function convert-manifest-params {
+  # A helper function to convert the manifest args from a string to a list of
+  # flag arguments.
+  # Old format:
+  #   command=["/bin/sh", "-c", "exec KUBE_EXEC_BINARY --param1=val1 --param2-val2"].
+  # New format:
+  #   command=["KUBE_EXEC_BINARY"]  # No shell dependencies.
+  #   args=["--param1=val1", "--param2-val2"]
+  IFS=' ' read -ra FLAGS <<< "$1"
+  params=""
+  for flag in "${FLAGS[@]}"; do
+    params+="\n\"$flag\","
+  done
+  if [ ! -z $params ]; then
+    echo "${params::-1}"  #  drop trailing comma
+  fi
+}
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -98,9 +116,16 @@ function config-ip-firewall {
     iptables -w -t nat -N IP-MASQ
     iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 100.64.0.0/10 -m comment --comment "ip-masq: RFC 6598 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.0.0.0/24 -m comment --comment "ip-masq: RFC 6890 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.0.2.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.88.99.0/24 -m comment --comment "ip-masq: RFC 7526 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 198.18.0.0/15 -m comment --comment "ip-masq: RFC 2544 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 203.0.113.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 240.0.0.0/4 -m comment --comment "ip-masq: Former Class E range obsoleted by RFC 3232 is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 
@@ -374,6 +399,21 @@ function setup-logrotate() {
 }
 EOF
 
+  # Configure log rotation for pod logs in /var/log/pods/NAMESPACE_NAME_UID.
+  cat > /etc/logrotate.d/allpodlogs <<EOF
+/var/log/pods/*/*.log {
+    rotate ${POD_LOG_MAX_FILE:-5}
+    copytruncate
+    missingok
+    notifempty
+    compress
+    maxsize ${POD_LOG_MAX_SIZE:-5M}
+    daily
+    dateext
+    dateformat -%Y%m%d-%s
+    create 0644 root root
+}
+EOF
 }
 
 # Finds the master PD device; returns it in MASTER_PD_DEVICE
@@ -564,6 +604,9 @@ function create-master-auth {
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "system:cluster-bootstrap,uid:system:cluster-bootstrap,system:masters"
+  fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
@@ -578,6 +621,12 @@ function create-master-auth {
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+  fi
+  if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
+  fi
+  if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -773,6 +822,7 @@ function create-master-audit-policy {
       - group: "extensions"
       - group: "metrics.k8s.io"
       - group: "networking.k8s.io"
+      - group: "node.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
       - group: "scheduling.k8s.io"
@@ -935,6 +985,32 @@ EOF
   fi
 }
 
+function create-kubeconfig {
+  local component=$1
+  local token=$2
+  echo "Creating kubeconfig file for component ${component}"
+  mkdir -p /etc/srv/kubernetes/${component}
+  cat <<EOF >/etc/srv/kubernetes/${component}/kubeconfig
+apiVersion: v1
+kind: Config
+users:
+- name: ${component}
+  user:
+    token: ${token}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: ${component}
+  name: ${component}
+current-context: ${component}
+EOF
+}
+
 # Arg 1: the IP address of the API server
 function create-kubelet-kubeconfig() {
   local apiserver_address="${1}"
@@ -1008,78 +1084,6 @@ current-context: service-account-context
 EOF
 }
 
-function create-kubecontrollermanager-kubeconfig {
-  echo "Creating kube-controller-manager kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/kube-controller-manager
-  cat <<EOF >/etc/srv/kubernetes/kube-controller-manager/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: kube-controller-manager
-  user:
-    token: ${KUBE_CONTROLLER_MANAGER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: kube-controller-manager
-  name: service-account-context
-current-context: service-account-context
-EOF
-}
-
-function create-kubescheduler-kubeconfig {
-  echo "Creating kube-scheduler kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/kube-scheduler
-  cat <<EOF >/etc/srv/kubernetes/kube-scheduler/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: kube-scheduler
-  user:
-    token: ${KUBE_SCHEDULER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: kube-scheduler
-  name: kube-scheduler
-current-context: kube-scheduler
-EOF
-}
-
-function create-clusterautoscaler-kubeconfig {
-  echo "Creating cluster-autoscaler kubeconfig file"
-  mkdir -p /etc/srv/kubernetes/cluster-autoscaler
-  cat <<EOF >/etc/srv/kubernetes/cluster-autoscaler/kubeconfig
-apiVersion: v1
-kind: Config
-users:
-- name: cluster-autoscaler
-  user:
-    token: ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
-clusters:
-- name: local
-  cluster:
-    insecure-skip-tls-verify: true
-    server: https://localhost:443
-contexts:
-- context:
-    cluster: local
-    user: cluster-autoscaler
-  name: cluster-autoscaler
-current-context: cluster-autoscaler
-EOF
-}
-
 function create-kubescheduler-policy-config {
   echo "Creating kube-scheduler policy config file"
   mkdir -p /etc/srv/kubernetes/kube-scheduler
@@ -1134,19 +1138,19 @@ function create-master-etcd-apiserver-auth {
      echo "${ETCD_APISERVER_CA_KEY}" | base64 --decode > "${ETCD_APISERVER_CA_KEY_PATH}"
 
      ETCD_APISERVER_CA_CERT_PATH="${auth_dir}/etcd-apiserver-ca.crt"
-     echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-ca.crt"
+     echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CA_CERT_PATH}"
 
      ETCD_APISERVER_SERVER_KEY_PATH="${auth_dir}/etcd-apiserver-server.key"
      echo "${ETCD_APISERVER_SERVER_KEY}" | base64 --decode > "${ETCD_APISERVER_SERVER_KEY_PATH}"
 
      ETCD_APISERVER_SERVER_CERT_PATH="${auth_dir}/etcd-apiserver-server.crt"
-     echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-server.crt"
+     echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_SERVER_CERT_PATH}"
 
      ETCD_APISERVER_CLIENT_KEY_PATH="${auth_dir}/etcd-apiserver-client.key"
-     echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${auth_dir}/etcd-apiserver-client.key"
+     echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${ETCD_APISERVER_CLIENT_KEY_PATH}"
 
      ETCD_APISERVER_CLIENT_CERT_PATH="${auth_dir}/etcd-apiserver-client.crt"
-     echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${auth_dir}/etcd-apiserver-client.crt"
+     echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CLIENT_CERT_PATH}"
    fi
 }
 
@@ -1257,21 +1261,25 @@ EOF
 function start-node-problem-detector {
   echo "Start node problem detector"
   local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
-  local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
-  # TODO(random-liu): Handle this for alternative container runtime.
-  local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
-  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
   echo "Using node problem detector binary at ${npd_bin}"
-  local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
-  flags+=" --logtostderr"
-  flags+=" --system-log-monitors=${km_config},${dm_config}"
-  flags+=" --custom-plugin-monitors=${custom_km_config}"
-  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
-  local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
-  flags+=" --port=${npd_port}"
-  if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
-    flags+=" ${EXTRA_NPD_ARGS}"
+
+  local flags="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+  if [[ -z "${flags}" ]]; then
+    local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+    # TODO(random-liu): Handle this for alternative container runtime.
+    local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
+    local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json,${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
+    flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
+    flags+=" --logtostderr"
+    flags+=" --system-log-monitors=${km_config},${dm_config}"
+    flags+=" --custom-plugin-monitors=${custom_km_config}"
+    local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
+    flags+=" --port=${npd_port}"
+    if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
+      flags+=" ${EXTRA_NPD_ARGS}"
+    fi
   fi
+  flags+=" --apiserver-override=https://${KUBERNETES_MASTER_NAME}?inClusterConfig=false&auth=/var/lib/node-problem-detector/kubeconfig"
 
   # Write the systemd service file for node problem detector.
   cat <<EOF >/etc/systemd/system/node-problem-detector.service
@@ -1557,6 +1565,10 @@ function start-kube-apiserver {
     params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   fi
   params+=" --secure-port=443"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    # Default is :8080
+    params+=" --insecure-port=0"
+  fi
   params+=" --tls-cert-file=${APISERVER_SERVER_CERT_PATH}"
   params+=" --tls-private-key-file=${APISERVER_SERVER_KEY_PATH}"
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
@@ -1705,6 +1717,11 @@ function start-kube-apiserver {
     fi
   fi
 
+  if [[ "${ENABLE_APISERVER_DYNAMIC_AUDIT:-}" == "true" ]]; then
+    params+=" --audit-dynamic-configuration"
+    RUNTIME_CONFIG="${RUNTIME_CONFIG},auditconfiguration.k8s.io/v1alpha1=true"
+  fi
+
   if [[ "${ENABLE_APISERVER_LOGS_HANDLER:-}" == "false" ]]; then
     params+=" --enable-logs-handler=false"
   fi
@@ -1737,6 +1754,9 @@ function start-kube-apiserver {
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
+  fi
+  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
+    params+=" --runtime-config=node.k8s.io/v1alpha1=true"
   fi
   if [[ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]]; then
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
@@ -1822,6 +1842,10 @@ function start-kube-apiserver {
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
 
+  params+=" --log-file=${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
+  params+=" --logtostderr=false"
+  params+=" --log-file-max-size=0"
+  params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -1834,7 +1858,6 @@ function start-kube-apiserver {
   sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
   sed -i -e "s@{{liveness_probe_initial_delay}}@${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
-  sed -i -e "s@{{secure_port}}@8080@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
   sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
@@ -1927,6 +1950,35 @@ function setup-etcd-encryption {
   fi
 }
 
+# Updates node labels used by addons.
+function update-legacy-addon-node-labels() {
+  # need kube-apiserver to be ready
+  until kubectl get nodes; do
+    sleep 5
+  done
+  update-node-label "beta.kubernetes.io/metadata-proxy-ready=true,cloud.google.com/metadata-proxy-ready!=true" "cloud.google.com/metadata-proxy-ready=true"
+  update-node-label "beta.kubernetes.io/kube-proxy-ds-ready=true,node.kubernetes.io/kube-proxy-ds-ready!=true" "node.kubernetes.io/kube-proxy-ds-ready=true"
+  update-node-label "beta.kubernetes.io/masq-agent-ds-ready=true,node.kubernetes.io/masq-agent-ds-ready!=true" "node.kubernetes.io/masq-agent-ds-ready=true"
+}
+
+# A helper function for labeling all nodes matching a given selector.
+# Runs: kubectl label --overwrite nodes -l "${1}" "${2}"
+# Retries on failure
+#
+# $1: label selector of nodes
+# $2: label to apply
+function update-node-label() {
+  local selector="$1"
+  local label="$2"
+  local retries=5
+  until (( retries == 0 )); do
+    if kubectl label --overwrite nodes -l "${selector}" "${label}"; then
+      break
+    fi
+    (( retries-- ))
+    sleep 3
+  done
+}
 
 # Applies encryption provider config.
 # This function may be triggered in two scenarios:
@@ -1973,8 +2025,9 @@ function apply-encryption-config() {
 #   DOCKER_REGISTRY
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
-  create-kubecontrollermanager-kubeconfig
-  prepare-log-file /var/log/kube-controller-manager.log
+  create-kubeconfig "kube-controller-manager" ${KUBE_CONTROLLER_MANAGER_TOKEN}
+  local LOG_PATH=/var/log/kube-controller-manager.log
+  prepare-log-file "${LOG_PATH}"
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --use-service-account-credentials"
@@ -2002,7 +2055,7 @@ function start-kube-controller-manager {
     params+=" --concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}"
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
-    params+=" --allocate-node-cidrs=true"
+    params+=" --allocate-node-cidrs"
   elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
@@ -2033,9 +2086,14 @@ function start-kube-controller-manager {
     params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
   fi
   if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    params+=" --controllers=${RUN_CONTROLLERS}"
+    # Trim the `RUN_CONTROLLERS` value. This field is quoted which is
+    # incompatible with the `convert-manifest-params` format.
+    params+=" --controllers=${RUN_CONTROLLERS//\'}"
   fi
-
+  params+=" --log-file=${LOG_PATH}"
+  params+=" --logtostderr=false"
+  params+=" --log-file-max-size=0"
+  params="$(convert-manifest-params "${params}")"
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
@@ -2069,8 +2127,9 @@ function start-kube-controller-manager {
 #   DOCKER_REGISTRY
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
-  create-kubescheduler-kubeconfig
-  prepare-log-file /var/log/kube-scheduler.log
+  create-kubeconfig "kube-scheduler" ${KUBE_SCHEDULER_TOKEN}
+  local LOG_PATH=/var/log/kube-scheduler.log
+  prepare-log-file "${LOG_PATH}"
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
@@ -2086,6 +2145,11 @@ function start-kube-scheduler {
     params+=" --use-legacy-policy-config"
     params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
   fi
+
+  params+=" --log-file=${LOG_PATH}"
+  params+=" --logtostderr=false"
+  params+=" --log-file-max-size=0"
+  params="$(convert-manifest-params "${params}")"
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.
@@ -2107,7 +2171,7 @@ function start-cluster-autoscaler {
   if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
     echo "Start kubernetes cluster autoscaler"
     setup-addon-manifests "addons" "rbac/cluster-autoscaler"
-    create-clusterautoscaler-kubeconfig
+    create-kubeconfig "cluster-autoscaler" ${KUBE_CLUSTER_AUTOSCALER_TOKEN}
     prepare-log-file /var/log/cluster-autoscaler.log
 
     # Remove salt comments and replace variables with values
@@ -2366,7 +2430,7 @@ function setup-fluentd {
   fluentd_gcp_yaml_version="${FLUENTD_GCP_YAML_VERSION:-v3.2.0}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_yaml}"
   sed -i -e "s@{{ fluentd_gcp_yaml_version }}@${fluentd_gcp_yaml_version}@g" "${fluentd_gcp_scaler_yaml}"
-  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
+  fluentd_gcp_version="${FLUENTD_GCP_VERSION:-1.6.8}"
   sed -i -e "s@{{ fluentd_gcp_version }}@${fluentd_gcp_version}@g" "${fluentd_gcp_yaml}"
   update-daemon-set-prometheus-to-sd-parameters ${fluentd_gcp_yaml}
   start-fluentd-resource-update ${fluentd_gcp_yaml}
@@ -2444,6 +2508,8 @@ function start-kube-addons {
   echo "Prepare kube-addons manifests and start kube addon manager"
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
   local -r dst_dir="/etc/kubernetes/addons"
+
+  create-kubeconfig "addon-manager" ${ADDON_MANAGER_TOKEN}
 
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac/kubelet-api-auth"
@@ -2634,9 +2700,6 @@ EOF
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi
-  if [[ "${FEATURE_GATES:-}" =~ "AllAlpha=true"  || "${FEATURE_GATES:-}" =~ "CSIDriverRegistry=true" || "${FEATURE_GATES:-}" =~ "CSINodeInfo=true" ]]; then
-    setup-addon-manifests "addons" "storage-crds"
-  fi
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
   fi
@@ -2651,9 +2714,6 @@ EOF
     else
       setup-addon-manifests "addons" "istio/noauth"
     fi
-  fi
-  if [[ "${FEATURE_GATES:-}" =~ "RuntimeClass=true" ]]; then
-    setup-addon-manifests "addons" "runtimeclass"
   fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
     download-extra-addons
@@ -2683,6 +2743,8 @@ function start-lb-controller {
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
+    setup-addon-manifests "addons" "rbac/cluster-loadbalancing/glbc"
+    create-kubeconfig "l7-lb-controller" ${GCE_GLBC_TOKEN}
 
     local -r src_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
     local -r dest_manifest="/etc/kubernetes/manifests/glbc.manifest"
@@ -2801,6 +2863,20 @@ spec:
 EOF
 }
 
+function wait-till-apiserver-ready() {
+  until kubectl get nodes; do
+    sleep 5
+  done
+}
+
+function ensure-bootstrap-kubectl-auth {
+  # Creating an authenticated kubeconfig is only necessary if the insecure port is disabled.
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN}" ]]; then
+    create-kubeconfig "cluster-bootstrap" ${KUBE_BOOTSTRAP_TOKEN}
+    export KUBECONFIG=/etc/srv/kubernetes/cluster-bootstrap/kubeconfig
+  fi
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
@@ -2848,10 +2924,16 @@ function main() {
     fi
   fi
 
-  # generate the controller manager, scheduler and cluster autoscaler tokens here since they are only used on the master.
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
+  fi
+  if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
+    GCE_GLBC_TOKEN="$(secure_random 32)"
+  fi
+  ADDON_MANAGER_TOKEN="$(secure_random 32)"
 
   setup-os-params
   config-ip-firewall
@@ -2864,6 +2946,7 @@ function main() {
     create-node-pki
     create-master-pki
     create-master-auth
+    ensure-bootstrap-kubectl-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -2896,9 +2979,11 @@ function main() {
     start-kube-apiserver
     start-kube-controller-manager
     start-kube-scheduler
+    wait-till-apiserver-ready
     start-kube-addons
     start-cluster-autoscaler
     start-lb-controller
+    update-legacy-addon-node-labels &
     apply-encryption-config &
   else
     if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then

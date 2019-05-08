@@ -33,8 +33,10 @@ go_test(
         "//test/e2e/scheduling:go_default_library",
         "//test/e2e/servicecatalog:go_default_library",
         "//test/e2e/storage:go_default_library",
+        "//test/e2e/storage/external:go_default_library",
         "//test/e2e/ui:go_default_library",
         "//test/e2e/windows:go_default_library",
+        "//test/utils/image:go_default_library",
     ],
 )
 
@@ -62,6 +64,7 @@ go_library(
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/providers/aws:go_default_library",
@@ -69,6 +72,7 @@ go_library(
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/providers/kubemark:go_default_library",
         "//test/e2e/framework/providers/openstack:go_default_library",
+        "//test/e2e/framework/providers/vsphere:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/manifest:go_default_library",
         "//test/utils:go_default_library",

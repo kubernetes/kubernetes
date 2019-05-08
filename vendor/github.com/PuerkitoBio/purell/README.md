@@ -12,6 +12,7 @@ Based on the [wikipedia paper][wiki] and the [RFC 3986 document][rfc].
 
 ## Changelog
 
+*    **2016-11-14 (v1.1.0)** : IDN: Conform to RFC 5895: Fold character width (thanks to @beeker1121).
 *    **2016-07-27 (v1.0.0)** : Normalize IDN to ASCII (thanks to @zenovich).
 *    **2015-02-08** : Add fix for relative paths issue ([PR #5][pr5]) and add fix for unnecessary encoding of reserved characters ([see issue #7][iss7]).
 *    **v0.2.0** : Add benchmarks, Attempt IDN support.
@@ -172,6 +173,7 @@ And with `FlagsUnsafeGreedy`:
 @opennota
 @pchristopher1275
 @zenovich
+@beeker1121
 
 ## License
 

@@ -27,7 +27,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
-	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -72,13 +71,12 @@ func NewHollowProxyOrDie(
 ) (*HollowProxy, error) {
 	// Create proxier and service/endpoint handlers.
 	var proxier proxy.ProxyProvider
-	var serviceHandler proxyconfig.ServiceHandler
-	var endpointsHandler proxyconfig.EndpointsHandler
+	var err error
 
 	if useRealProxier {
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
-		proxierIPTables, err := iptables.NewProxier(
+		proxier, err = iptables.NewProxier(
 			iptInterface,
 			sysctl,
 			execer,
@@ -96,13 +94,8 @@ func NewHollowProxyOrDie(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		proxier = proxierIPTables
-		serviceHandler = proxierIPTables
-		endpointsHandler = proxierIPTables
 	} else {
 		proxier = &FakeProxier{}
-		serviceHandler = &FakeProxier{}
-		endpointsHandler = &FakeProxier{}
 	}
 
 	// Create a Hollow Proxy instance.
@@ -114,19 +107,17 @@ func NewHollowProxyOrDie(
 	}
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Client:                client,
-			EventClient:           eventClient,
-			IptInterface:          iptInterface,
-			Proxier:               proxier,
-			Broadcaster:           broadcaster,
-			Recorder:              recorder,
-			ProxyMode:             "fake",
-			NodeRef:               nodeRef,
-			OOMScoreAdj:           utilpointer.Int32Ptr(0),
-			ResourceContainer:     "",
-			ConfigSyncPeriod:      30 * time.Second,
-			ServiceEventHandler:   serviceHandler,
-			EndpointsEventHandler: endpointsHandler,
+			Client:            client,
+			EventClient:       eventClient,
+			IptInterface:      iptInterface,
+			Proxier:           proxier,
+			Broadcaster:       broadcaster,
+			Recorder:          recorder,
+			ProxyMode:         "fake",
+			NodeRef:           nodeRef,
+			OOMScoreAdj:       utilpointer.Int32Ptr(0),
+			ResourceContainer: "",
+			ConfigSyncPeriod:  30 * time.Second,
 		},
 	}, nil
 }

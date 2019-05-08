@@ -45,7 +45,7 @@ func getTestTaint() v1.Taint {
 	}
 }
 
-// Create a defaut pod for this test, with argument saying if the Pod should have
+// Create a default pod for this test, with argument saying if the Pod should have
 // toleration for Taits used in this test.
 func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, podLabel, ns string) *v1.Pod {
 	grace := int64(1)
@@ -410,10 +410,16 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 
 		By("Starting pods...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod1, 2*time.Minute)
+		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		nodeHostNameLabel, ok := node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
+		if !ok {
+			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+		}
 		framework.ExpectNoError(err)
 		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName)
 		// ensure pod2 lands on the same node as pod1
-		pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeName}
+		pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeHostNameLabel}
 		_, err = testutils.RunPodAndGetNodeName(cs, pod2, 2*time.Minute)
 		framework.ExpectNoError(err)
 		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName)

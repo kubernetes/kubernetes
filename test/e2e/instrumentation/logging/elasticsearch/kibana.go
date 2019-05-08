@@ -26,7 +26,6 @@ import (
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -67,17 +66,17 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for the Kibana pod(s) to enter the running state.
 	ginkgo.By("Checking to make sure the Kibana pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{kibanaKey: kibanaValue}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
 	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).List(options)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {
 		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("Checking to make sure we get a response from the Kibana UI.")
@@ -101,5 +100,5 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }

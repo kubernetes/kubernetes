@@ -30,16 +30,18 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclient "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -48,10 +50,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -97,11 +101,12 @@ type AttachDetachController interface {
 // NewAttachDetachController returns a new instance of AttachDetachController.
 func NewAttachDetachController(
 	kubeClient clientset.Interface,
-	csiClient csiclient.Interface,
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
+	csiNodeInformer storageinformers.CSINodeInformer,
+	csiDriverInformer storageinformers.CSIDriverInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
@@ -124,7 +129,6 @@ func NewAttachDetachController(
 	// deleted (probably can't do this with sharedInformer), etc.
 	adc := &attachDetachController{
 		kubeClient:  kubeClient,
-		csiClient:   csiClient,
 		pvcLister:   pvcInformer.Lister(),
 		pvcsSynced:  pvcInformer.Informer().HasSynced,
 		pvLister:    pvInformer.Lister(),
@@ -136,6 +140,17 @@ func NewAttachDetachController(
 		nodesSynced: nodeInformer.Informer().HasSynced,
 		cloud:       cloud,
 		pvcQueue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcs"),
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
+		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		adc.csiNodeLister = csiNodeInformer.Lister()
+		adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		adc.csiDriverLister = csiDriverInformer.Lister()
+		adc.csiDriversSynced = csiDriverInformer.Informer().HasSynced
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -240,10 +255,6 @@ type attachDetachController struct {
 	// the API server.
 	kubeClient clientset.Interface
 
-	// csiClient is the csi.storage.k8s.io API client used by volumehost to communicate with
-	// the API server.
-	csiClient csiclient.Interface
-
 	// pvcLister is the shared PVC lister used to fetch and store PVC
 	// objects from the API server. It is shared with other controllers and
 	// therefore the PVC objects in its store should be treated as immutable.
@@ -262,6 +273,15 @@ type attachDetachController struct {
 
 	nodeLister  corelisters.NodeLister
 	nodesSynced kcache.InformerSynced
+
+	csiNodeLister storagelisters.CSINodeLister
+	csiNodeSynced kcache.InformerSynced
+
+	// csiDriverLister is the shared CSIDriver lister used to fetch and store
+	// CSIDriver objects from the API server. It is shared with other controllers
+	// and therefore the CSIDriver objects in its store should be treated as immutable.
+	csiDriverLister  storagelisters.CSIDriverLister
+	csiDriversSynced kcache.InformerSynced
 
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
@@ -315,7 +335,15 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting attach detach controller")
 	defer klog.Infof("Shutting down attach detach controller")
 
-	if !controller.WaitForCacheSync("attach detach", stopCh, adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced) {
+	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced}
+	if adc.csiNodeSynced != nil {
+		synced = append(synced, adc.csiNodeSynced)
+	}
+	if adc.csiDriversSynced != nil {
+		synced = append(synced, adc.csiDriversSynced)
+	}
+
+	if !controller.WaitForCacheSync("attach detach", stopCh, synced...) {
 		return
 	}
 
@@ -649,6 +677,21 @@ func (adc *attachDetachController) processVolumesInUse(
 	}
 }
 
+var _ volume.VolumeHost = &attachDetachController{}
+var _ volume.AttachDetachVolumeHost = &attachDetachController{}
+
+func (adc *attachDetachController) CSINodeLister() storagelisters.CSINodeLister {
+	return adc.csiNodeLister
+}
+
+func (adc *attachDetachController) CSIDriverLister() storagelisters.CSIDriverLister {
+	return adc.csiDriverLister
+}
+
+func (adc *attachDetachController) IsAttachDetachController() bool {
+	return true
+}
+
 // VolumeHost implementation
 // This is an unfortunate requirement of the current factoring of volume plugin
 // initializing code. It requires kubelet specific methods used by the mounting
@@ -765,6 +808,11 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 	return adc.recorder
 }
 
-func (adc *attachDetachController) GetCSIClient() csiclient.Interface {
-	return adc.csiClient
+func (adc *attachDetachController) GetSubpather() subpath.Interface {
+	// Subpaths not needed in attachdetach controller
+	return nil
+}
+
+func (adc *attachDetachController) GetCSIDriverLister() storagelisters.CSIDriverLister {
+	return adc.csiDriverLister
 }

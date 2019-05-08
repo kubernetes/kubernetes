@@ -70,6 +70,7 @@ var (
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
+// NewCmdProxy returns the proxy Cobra command
 func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
@@ -97,6 +98,7 @@ func NewCmdProxy(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 	return cmd
 }
 
+// RunProxy checks given arguments and executes command
 func RunProxy(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 	path := cmdutil.GetFlagString(cmd, "unix-socket")
 	port := cmdutil.GetFlagInt(cmd, "port")

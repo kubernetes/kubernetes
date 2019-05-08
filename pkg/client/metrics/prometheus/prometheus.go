@@ -32,8 +32,18 @@ var (
 	// "verb" and "url" labels. It is used for the rest client latency metrics.
 	requestLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "rest_client_request_latency_seconds",
+			Name:    "rest_client_request_duration_seconds",
 			Help:    "Request latency in seconds. Broken down by verb and URL.",
+			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
+		},
+		[]string{"verb", "url"},
+	)
+
+	// deprecatedRequestLatency is deprecated, please use requestLatency.
+	deprecatedRequestLatency = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "rest_client_request_latency_seconds",
+			Help:    "(Deprecated) Request latency in seconds. Broken down by verb and URL.",
 			Buckets: prometheus.ExponentialBuckets(0.001, 2, 10),
 		},
 		[]string{"verb", "url"},
@@ -50,16 +60,19 @@ var (
 
 func init() {
 	prometheus.MustRegister(requestLatency)
+	prometheus.MustRegister(deprecatedRequestLatency)
 	prometheus.MustRegister(requestResult)
-	metrics.Register(&latencyAdapter{requestLatency}, &resultAdapter{requestResult})
+	metrics.Register(&latencyAdapter{m: requestLatency, dm: deprecatedRequestLatency}, &resultAdapter{requestResult})
 }
 
 type latencyAdapter struct {
-	m *prometheus.HistogramVec
+	m  *prometheus.HistogramVec
+	dm *prometheus.HistogramVec
 }
 
 func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
 	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+	l.dm.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
 type resultAdapter struct {

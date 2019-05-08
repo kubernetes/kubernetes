@@ -19,7 +19,7 @@ package quobyte
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	gostrings "strings"
 
 	"github.com/pborman/uuid"
@@ -254,6 +254,7 @@ func (mounter *quobyteMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	os.MkdirAll(dir, 0750)
 	var options []string
+	options = append(options, "allow-usermapping-in-volumename")
 	if mounter.readOnly {
 		options = append(options, "ro")
 	}
@@ -285,7 +286,7 @@ func (quobyteVolume *quobyte) GetPath() string {
 	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
 	pluginDir := quobyteVolume.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
-	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
+	return filepath.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
 }
 
 type quobyteUnmounter struct {

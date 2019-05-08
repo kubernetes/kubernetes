@@ -63,7 +63,7 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, nodeName string, c
 
 // CheckLocalEtcdClusterStatus verifies health state of local/stacked etcd cluster before installing a new etcd member
 func CheckLocalEtcdClusterStatus(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration) error {
-	fmt.Println("[etcd] Checking etcd cluster health")
+	klog.V(1).Info("[etcd] Checking etcd cluster health")
 
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")

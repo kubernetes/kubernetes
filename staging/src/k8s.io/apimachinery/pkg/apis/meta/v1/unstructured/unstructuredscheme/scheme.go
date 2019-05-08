@@ -51,6 +51,8 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 	return []runtime.SerializerInfo{
 		{
 			MediaType:        "application/json",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "json",
 			EncodesAsText:    true,
 			Serializer:       json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, false),
 			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, true),
@@ -61,9 +63,11 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 			},
 		},
 		{
-			MediaType:     "application/yaml",
-			EncodesAsText: true,
-			Serializer:    json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
+			MediaType:        "application/yaml",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "yaml",
+			EncodesAsText:    true,
+			Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
 		},
 	}
 }

@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
@@ -211,13 +211,6 @@ func NewInternalNamespacedType(kind, apiversion, name, namespace string) *Intern
 }
 
 var errInvalidVersion = errors.New("not a version")
-
-func versionErrIfFalse(b bool) error {
-	if b {
-		return nil
-	}
-	return errInvalidVersion
-}
 
 // ValidVersion of API
 var ValidVersion = "v1"

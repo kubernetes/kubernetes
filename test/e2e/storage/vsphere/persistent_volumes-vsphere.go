@@ -21,11 +21,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -76,7 +77,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 
 		if volumePath == "" {
 			volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "vspherepv-",
 				Labels:     volLabel,
@@ -96,22 +97,22 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		}
 		By("Creating the PV and PVC")
 		pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 		By("Creating the Client Pod")
 		clientPod, err = framework.CreateClientPod(c, ns, pvc)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		node = clientPod.Spec.NodeName
 
 		By("Verify disk should be attached to the node")
 		isAttached, err := diskIsAttached(volumePath, node)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
 	})
 
 	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources")
+		e2elog.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 
@@ -207,10 +208,10 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of vsphere volume", func() {
 		By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(ns, nil)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Verifying Persistent Disk detaches")
 		waitForVSphereDiskToDetach(volumePath, node)

@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -2907,6 +2908,152 @@ func TestNodeEventGeneration(t *testing.T) {
 		actualUID := string(involvedObject.UID)
 		if actualUID != "1234567890" {
 			t.Fatalf("unexpected event uid: %v", actualUID)
+		}
+	}
+}
+
+func TestReconcileNodeLabels(t *testing.T) {
+	fakeNow := metav1.Date(2017, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 10 * time.Minute
+
+	fakeNodeHandler := &testutil.FakeNodeHandler{
+		Existing: []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelZoneRegion:        "region1",
+						v1.LabelZoneFailureDomain: "zone1",
+					},
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             v1.ConditionTrue,
+							LastHeartbeatTime:  metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+							LastTransitionTime: metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+	}
+
+	nodeController, _ := newNodeLifecycleControllerFromClient(
+		fakeNodeHandler,
+		evictionTimeout,
+		testRateLimiterQPS,
+		testRateLimiterQPS,
+		testLargeClusterThreshold,
+		testUnhealthyThreshold,
+		testNodeMonitorGracePeriod,
+		testNodeStartupGracePeriod,
+		testNodeMonitorPeriod,
+		true)
+	nodeController.now = func() metav1.Time { return fakeNow }
+	nodeController.recorder = testutil.NewFakeRecorder()
+
+	tests := []struct {
+		Name           string
+		Node           *v1.Node
+		ExpectedLabels map[string]string
+	}{
+		{
+			Name: "No-op if node has no labels",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			ExpectedLabels: nil,
+		},
+		{
+			Name: "No-op if no target labels present",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						v1.LabelZoneRegion: "region1",
+					},
+				},
+			},
+			ExpectedLabels: map[string]string{
+				v1.LabelZoneRegion: "region1",
+			},
+		},
+		{
+			Name: "Create OS/arch stable labels when they don't exist",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelOS:   "linux",
+						kubeletapis.LabelArch: "amd64",
+					},
+				},
+			},
+			ExpectedLabels: map[string]string{
+				kubeletapis.LabelOS:   "linux",
+				kubeletapis.LabelArch: "amd64",
+				v1.LabelOSStable:      "linux",
+				v1.LabelArchStable:    "amd64",
+			},
+		},
+		{
+			Name: "Reconcile OS/arch stable labels to match beta labels",
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					Labels: map[string]string{
+						kubeletapis.LabelOS:   "linux",
+						kubeletapis.LabelArch: "amd64",
+						v1.LabelOSStable:      "windows",
+						v1.LabelArchStable:    "arm",
+					},
+				},
+			},
+			ExpectedLabels: map[string]string{
+				kubeletapis.LabelOS:   "linux",
+				kubeletapis.LabelArch: "amd64",
+				v1.LabelOSStable:      "linux",
+				v1.LabelArchStable:    "amd64",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		fakeNodeHandler.Update(test.Node)
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		nodeController.reconcileNodeLabels(test.Node.Name)
+		if err := nodeController.syncNodeStore(fakeNodeHandler); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		node0, err := nodeController.nodeLister.Get("node0")
+		if err != nil {
+			t.Fatalf("Can't get current node0...")
+		}
+		if len(node0.Labels) != len(test.ExpectedLabels) {
+			t.Errorf("%s: Unexpected number of taints: expected %d, got %d",
+				test.Name, len(test.ExpectedLabels), len(node0.Labels))
+		}
+		for key, expectedValue := range test.ExpectedLabels {
+			actualValue, ok := node0.Labels[key]
+			if !ok {
+				t.Errorf("%s: Can't find label %v in %v", test.Name, key, node0.Labels)
+			}
+			if actualValue != expectedValue {
+				t.Errorf("%s: label %q: expected value %q, got value %q", test.Name, key, expectedValue, actualValue)
+			}
+
 		}
 	}
 }

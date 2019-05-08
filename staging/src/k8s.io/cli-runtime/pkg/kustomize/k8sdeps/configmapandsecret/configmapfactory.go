@@ -81,8 +81,8 @@ func (f *ConfigMapFactory) MakeConfigMap(
 	}
 	all = append(all, pairs...)
 
-	for _, kv := range all {
-		err = addKvToConfigMap(cm, kv.Key, kv.Value)
+	for _, p := range all {
+		err = addKvToConfigMap(cm, p.Key, p.Value)
 		if err != nil {
 			return nil, err
 		}

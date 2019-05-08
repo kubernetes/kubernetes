@@ -30,21 +30,21 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 
 	f := framework.NewDefaultFramework("crd-watch")
 
-	Context("CustomResourceDefinition Watch", func() {
+	ginkgo.Context("CustomResourceDefinition Watch", func() {
 		/*
 			   	   Testname: crd-watch
 			   	   Description: Create a Custom Resource Definition and make sure
 				   watches observe events on create/delete.
 		*/
-		It("watch on custom resource definition objects", func() {
+		ginkgo.It("watch on custom resource definition objects", func() {
 
 			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
 
@@ -80,35 +80,35 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			noxuResourceClient := newNamespacedCustomResourceClient(ns, f.DynamicClient, noxuDefinition)
 
 			watchA, err := watchCRWithName(noxuResourceClient, watchCRNameA)
-			Expect(err).NotTo(HaveOccurred(), "failed to watch custom resource: %s", watchCRNameA)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to watch custom resource: %s", watchCRNameA)
 
 			watchB, err := watchCRWithName(noxuResourceClient, watchCRNameB)
-			Expect(err).NotTo(HaveOccurred(), "failed to watch custom resource: %s", watchCRNameB)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to watch custom resource: %s", watchCRNameB)
 
 			testCrA := fixtures.NewNoxuInstance(ns, watchCRNameA)
 			testCrB := fixtures.NewNoxuInstance(ns, watchCRNameB)
 
-			By("Creating first CR ")
+			ginkgo.By("Creating first CR ")
 			testCrA, err = instantiateCustomResource(testCrA, noxuResourceClient, noxuDefinition)
-			Expect(err).NotTo(HaveOccurred(), "failed to instantiate custom resource: %+v", testCrA)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to instantiate custom resource: %+v", testCrA)
 			expectEvent(watchA, watch.Added, testCrA)
 			expectNoEvent(watchB, watch.Added, testCrA)
 
-			By("Creating second CR")
+			ginkgo.By("Creating second CR")
 			testCrB, err = instantiateCustomResource(testCrB, noxuResourceClient, noxuDefinition)
-			Expect(err).NotTo(HaveOccurred(), "failed to instantiate custom resource: %+v", testCrB)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to instantiate custom resource: %+v", testCrB)
 			expectEvent(watchB, watch.Added, testCrB)
 			expectNoEvent(watchA, watch.Added, testCrB)
 
-			By("Deleting first CR")
+			ginkgo.By("Deleting first CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameA)
-			Expect(err).NotTo(HaveOccurred(), "failed to delete custom resource: %s", watchCRNameA)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete custom resource: %s", watchCRNameA)
 			expectEvent(watchA, watch.Deleted, nil)
 			expectNoEvent(watchB, watch.Deleted, nil)
 
-			By("Deleting second CR")
+			ginkgo.By("Deleting second CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameB)
-			Expect(err).NotTo(HaveOccurred(), "failed to delete custom resource: %s", watchCRNameB)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete custom resource: %s", watchCRNameB)
 			expectEvent(watchB, watch.Deleted, nil)
 			expectNoEvent(watchA, watch.Deleted, nil)
 		})
@@ -159,8 +159,7 @@ func newNamespacedCustomResourceClient(ns string, client dynamic.Interface, crd 
 
 	if crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
 		return client.Resource(gvr).Namespace(ns)
-	} else {
-		return client.Resource(gvr)
 	}
+	return client.Resource(gvr)
 
 }

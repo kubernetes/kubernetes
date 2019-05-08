@@ -2,6 +2,27 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file"
 load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
+    name = "bazel_toolchains",
+    sha256 = "f5acacb61693e00c993dbe3357cb4eb71eb49c6ed1e8b11215cef8738c7674cb",
+    strip_prefix = "bazel-toolchains-997c10a",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/997c10a.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/archive/997c10a.tar.gz",
+    ],
+)
+
+load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
+
+rbe_autoconfig(
+    name = "rbe_default",
+    base_container_digest = "sha256:677c1317f14c6fd5eba2fd8ec645bfdc5119f64b3e5e944e13c89e0525cc8ad1",
+    digest = "sha256:b7c2e7a18968b9df2db43eda722c5ae592aafbf774ba2766074a9c96926743d8",
+    registry = "gcr.io",
+    repository = "k8s-testimages/bazel-krte",
+    # tag = "latest",
+)
+
+http_archive(
     name = "bazel_skylib",
     sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
     strip_prefix = "bazel-skylib-0.6.0",
@@ -10,29 +31,19 @@ http_archive(
 
 load("@bazel_skylib//lib:versions.bzl", "versions")
 
-versions.check(minimum_bazel_version = "0.18.0")
+versions.check(minimum_bazel_version = "0.23.0")
 
 http_archive(
     name = "io_k8s_repo_infra",
-    sha256 = "2cc74219eafebb0af1e0cf80b9c2b78aac9aa570de762bfb82b83e9164be9da2",
-    strip_prefix = "repo-infra-b461270ab6ccfb94ff2d78df96d26f669376d660",
-    urls = mirror("https://github.com/kubernetes/repo-infra/archive/b461270ab6ccfb94ff2d78df96d26f669376d660.tar.gz"),
-)
-
-ETCD_VERSION = "3.3.10"
-
-http_archive(
-    name = "com_coreos_etcd",
-    build_file = "@//third_party:etcd.BUILD",
-    sha256 = "1620a59150ec0a0124a65540e23891243feb2d9a628092fb1edcc23974724a45",
-    strip_prefix = "etcd-v%s-linux-amd64" % ETCD_VERSION,
-    urls = mirror("https://github.com/coreos/etcd/releases/download/v%s/etcd-v%s-linux-amd64.tar.gz" % (ETCD_VERSION, ETCD_VERSION)),
+    sha256 = "4a8384320fba401cbf21fef177aa113ed8fe35952ace98e00b796cac87ae7868",
+    strip_prefix = "repo-infra-df02ded38f9506e5bbcbf21702034b4fef815f2f",
+    urls = mirror("https://github.com/kubernetes/repo-infra/archive/df02ded38f9506e5bbcbf21702034b4fef815f2f.tar.gz"),
 )
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "492c3ac68ed9dcf527a07e6a1b2dcbf199c6bf8b35517951467ac32e421c06c1",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.17.0/rules_go-0.17.0.tar.gz"),
+    sha256 = "91b79f4758fd16f2c6426279ce00c1d2d8577d61c519db39675ed84657e1a95e",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.17.4/rules_go-0.17.4.tar.gz"),
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
@@ -40,7 +51,7 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.11.5",
+    go_version = "1.12.4",
 )
 
 http_archive(
@@ -61,7 +72,7 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 container_pull(
     name = "official_busybox",
-    digest = "sha256:cb63aa0641a885f54de20f61d152187419e8f6b159ed11a251a09d115fdff9bd",
+    digest = "sha256:5e8e0509e829bb8f990249135a36e81a3ecbe94294e7a185cc14616e5fad96bd",
     registry = "index.docker.io",
     repository = "library/busybox",
     tag = "latest",  # ignored, but kept here for documentation

@@ -35,7 +35,12 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
-const defaultHost = "http://127.0.0.1:8080"
+const (
+	defaultHost = "http://127.0.0.1:8080"
+
+	// DefaultNumNodes is the number of nodes. If not specified, then number of nodes is auto-detected
+	DefaultNumNodes = -1
+)
 
 // TestContextType contains test settings and global state. Due to
 // historic reasons, it is a mixture of items managed by the test
@@ -75,6 +80,8 @@ type TestContextType struct {
 	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
 	RepoRoot                string
 	DockershimCheckpointDir string
+	// ListImages will list off all images that are used then quit
+	ListImages bool
 
 	// Provider identifies the infrastructure provider (gce, gke, aws)
 	Provider string
@@ -93,7 +100,6 @@ type TestContextType struct {
 	SystemPodsStartupTimeout    time.Duration
 	EtcdUpgradeStorage          string
 	EtcdUpgradeVersion          string
-	IngressUpgradeImage         string
 	GCEUpgradeScript            string
 	ContainerRuntime            string
 	ContainerRuntimeEndpoint    string
@@ -193,10 +199,13 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+	// ExtraEnvs is a map of environment names to values.
+	ExtraEnvs map[string]string
 }
 
+// CloudConfig holds the cloud configuration for e2e test suites.
 type CloudConfig struct {
-	ApiEndpoint       string
+	APIEndpoint       string
 	ProjectID         string
 	Zone              string // for multizone tests, arbitrarily chosen zone
 	Region            string
@@ -216,9 +225,10 @@ type CloudConfig struct {
 	Provider ProviderInterface
 }
 
+// TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
 
-// Register flags common to all e2e test suites.
+// RegisterCommonFlags registers flags common to all e2e test suites.
 func RegisterCommonFlags() {
 	// Turn on verbose by default to get spec names
 	config.DefaultReporterConfig.Verbose = true
@@ -257,9 +267,11 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
+
+	flag.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 }
 
-// Register flags specific to the cluster e2e test suite.
+// RegisterClusterFlags registers flags specific to the cluster e2e test suite.
 func RegisterClusterFlags() {
 	flag.BoolVar(&TestContext.VerifyServiceAccount, "e2e-verify-service-account", true, "If true tests will verify the service account before running.")
 	flag.StringVar(&TestContext.KubeConfig, clientcmd.RecommendedConfigPathFlag, os.Getenv(clientcmd.RecommendedConfigPathEnvVar), "Path to kubeconfig containing embedded authinfo.")
@@ -283,7 +295,7 @@ func RegisterClusterFlags() {
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
 	cloudConfig := &TestContext.CloudConfig
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&cloudConfig.ApiEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
+	flag.StringVar(&cloudConfig.APIEndpoint, "gce-api-endpoint", "", "The GCE APIEndpoint being used, if applicable")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 	flag.StringVar(&cloudConfig.Region, "gce-region", "", "GCE region being used, if applicable")
@@ -292,7 +304,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
-	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
+	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%q' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
 	flag.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flag.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
 	flag.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")
@@ -305,7 +317,6 @@ func RegisterClusterFlags() {
 	flag.DurationVar(&TestContext.SystemDaemonsetStartupTimeout, "system-daemonsets-startup-timeout", 5*time.Minute, "Timeout for waiting for all system daemonsets to be ready.")
 	flag.StringVar(&TestContext.EtcdUpgradeStorage, "etcd-upgrade-storage", "", "The storage version to upgrade to (either 'etcdv2' or 'etcdv3') if doing an etcd upgrade test.")
 	flag.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
-	flag.StringVar(&TestContext.IngressUpgradeImage, "ingress-upgrade-image", "", "Image to upgrade to if doing an upgrade test for ingress.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 
@@ -317,7 +328,7 @@ func RegisterClusterFlags() {
 	flag.DurationVar(&nodeKiller.SimulatedDowntime, "node-killer-simulated-downtime", 10*time.Minute, "A delay between node death and recreation")
 }
 
-// Register flags specific to the node e2e test suite.
+// RegisterNodeFlags registers flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	// Mark the test as node e2e when node flags are api.Registry.
 	TestContext.NodeE2E = true
@@ -332,6 +343,7 @@ func RegisterNodeFlags() {
 	flag.BoolVar(&TestContext.PrepullImages, "prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 	flag.StringVar(&TestContext.ImageDescription, "image-description", "", "The description of the image which the test will be running on.")
 	flag.StringVar(&TestContext.SystemSpecName, "system-spec-name", "", "The name of the system spec (e.g., gke) that's used in the node e2e test. The system specs are in test/e2e_node/system/specs/. This is used by the test framework to determine which tests to run for validating the system requirements.")
+	flag.Var(cliflag.NewMapStringString(&TestContext.ExtraEnvs), "extra-envs", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 }
 
 // HandleFlags sets up all flags and parses the command line.

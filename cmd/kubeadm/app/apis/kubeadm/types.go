@@ -17,7 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -34,11 +34,8 @@ type InitConfiguration struct {
 
 	// ClusterConfiguration holds the cluster-wide information, and embeds that struct (which can be (un)marshalled separately as well)
 	// When InitConfiguration is marshalled to bytes in the external version, this information IS NOT preserved (which can be seen from
-	// the `json:"-"` tag in the external variant of these API types. Here, in the internal version `json:",inline"` is used, which means
-	// that all of ClusterConfiguration's fields will appear as they would be InitConfiguration's fields. This is used in practice solely
-	// in kubeadm API roundtrip unit testing. Check out `cmd/kubeadm/app/util/config/*_test.go` for more information. Normally, the internal
-	// type is NEVER marshalled, but always converted to some external version first.
-	ClusterConfiguration `json:",inline"`
+	// the `json:"-"` tag in the external variant of these API types.
+	ClusterConfiguration `json:"-"`
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	BootstrapTokens []BootstrapToken
@@ -53,6 +50,10 @@ type InitConfiguration struct {
 	// on. By default, kubeadm tries to auto-detect the IP of the default interface and use that, but in case that process
 	// fails you may set the desired value here.
 	LocalAPIEndpoint APIEndpoint
+
+	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
+	// a secret in the cluster during the uploadcerts init phase.
+	CertificateKey string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -335,6 +336,10 @@ type JoinConfiguration struct {
 type JoinControlPlane struct {
 	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
 	LocalAPIEndpoint APIEndpoint
+
+	// CertificateKey is the key that is used for decryption of certificates after they are downloaded from the secret
+	// upon joining a new control plane node. The corresponding encryption key is in the InitConfiguration.
+	CertificateKey string
 }
 
 // Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
@@ -413,51 +418,4 @@ type HostPathMount struct {
 	ReadOnly bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
-}
-
-// CommonConfiguration defines the list of common configuration elements and the getter
-// methods that must exist for both the InitConfiguration and JoinConfiguration objects.
-// This is used internally to deduplicate the kubeadm preflight checks.
-type CommonConfiguration interface {
-	GetCRISocket() string
-	GetNodeName() string
-	GetKubernetesVersion() string
-}
-
-// GetCRISocket will return the CRISocket that is defined for the InitConfiguration.
-// This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *InitConfiguration) GetCRISocket() string {
-	return cfg.NodeRegistration.CRISocket
-}
-
-// GetNodeName will return the NodeName that is defined for the InitConfiguration.
-// This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *InitConfiguration) GetNodeName() string {
-	return cfg.NodeRegistration.Name
-}
-
-// GetKubernetesVersion will return the KubernetesVersion that is defined for the InitConfiguration.
-// This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *InitConfiguration) GetKubernetesVersion() string {
-	return cfg.KubernetesVersion
-}
-
-// GetCRISocket will return the CRISocket that is defined for the JoinConfiguration.
-// This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *JoinConfiguration) GetCRISocket() string {
-	return cfg.NodeRegistration.CRISocket
-}
-
-// GetNodeName will return the NodeName that is defined for the JoinConfiguration.
-// This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *JoinConfiguration) GetNodeName() string {
-	return cfg.NodeRegistration.Name
-}
-
-// GetKubernetesVersion will return an empty string since KubernetesVersion is not a
-// defined property for JoinConfiguration. This will just cause the regex validation
-// of the defined version to be skipped during the preflight checks.
-// This is used internally to deduplicate the kubeadm preflight checks.
-func (cfg *JoinConfiguration) GetKubernetesVersion() string {
-	return ""
 }

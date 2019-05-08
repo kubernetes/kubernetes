@@ -42,19 +42,19 @@ var (
 	cacheEntryCounter = prometheus.NewCounter(cacheEntryCounterOpts)
 	cacheGetLatency   = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name: "etcd_request_cache_get_latency_seconds",
+			Name: "etcd_request_cache_get_duration_seconds",
 			Help: "Latency in seconds of getting an object from etcd cache",
 		},
 	)
 	cacheAddLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
-			Name: "etcd_request_cache_add_latency_seconds",
+			Name: "etcd_request_cache_add_duration_seconds",
 			Help: "Latency in seconds of adding an object to etcd cache",
 		},
 	)
 	etcdRequestLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name: "etcd_request_latency_seconds",
+			Name: "etcd_request_duration_seconds",
 			Help: "Etcd request latency in seconds for each operation and object type.",
 		},
 		[]string{"operation", "type"},

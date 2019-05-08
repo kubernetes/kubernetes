@@ -17,7 +17,7 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -51,7 +51,7 @@ func NewCertsAPIRenawal(client kubernetes.Interface) Interface {
 }
 
 // Renew takes a certificate using the cert and key.
-func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
+func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
 	reqTmp := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -95,7 +95,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
-	fmt.Printf("[certs] certificate request %q created\n", req.Name)
+	fmt.Printf("[certs] Certificate request %q created\n", req.Name)
 
 	certData, err := csrutil.WaitForCertificate(r.client.CertificateSigningRequests(), req, watchTimeout)
 	if err != nil {

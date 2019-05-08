@@ -42,7 +42,7 @@ import (
 	"github.com/elazarl/goproxy"
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,9 +58,12 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/utils/crd"
 	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo"
@@ -75,6 +78,7 @@ const (
 	guestbookResponseTimeout = 3 * time.Minute
 	simplePodSelector        = "name=nginx"
 	simplePodName            = "nginx"
+	simplePodResourceName    = "pod/nginx"
 	nginxDefaultOutput       = "Welcome to nginx!"
 	simplePodPort            = 80
 	pausePodSelector         = "name=pause"
@@ -88,6 +92,7 @@ const (
 	nginxDeployment1Filename = "nginx-deployment1.yaml.in"
 	nginxDeployment2Filename = "nginx-deployment2.yaml.in"
 	nginxDeployment3Filename = "nginx-deployment3.yaml.in"
+	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
 var (
@@ -136,7 +141,7 @@ func runKubectlRetryOrDie(args ...string) string {
 	// Expect no errors to be present after retries are finished
 	// Copied from framework #ExecOrDie
 	framework.Logf("stdout: %q", output)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	return output
 }
 
@@ -404,6 +409,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		})
 
+		ginkgo.It("should support exec using resource/name", func() {
+			ginkgo.By("executing a command in the container")
+			execOutput := framework.RunKubectlOrDie("exec", fmt.Sprintf("--namespace=%v", ns), simplePodResourceName, "echo", "running", "in", "container")
+			if e, a := "running in container", strings.TrimSpace(execOutput); e != a {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", e, a)
+			}
+		})
+
 		ginkgo.It("should support exec through an HTTP proxy", func() {
 			// Fail if the variable isn't set
 			if framework.TestContext.Host == "" {
@@ -568,6 +581,21 @@ var _ = SIGDescribe("Kubectl client", func() {
 			gomega.Expect(c.BatchV1().Jobs(ns).Delete("run-test-3", nil)).To(gomega.BeNil())
 		})
 
+		ginkgo.It("should contain last line of the log", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			podName := "run-log-test"
+
+			ginkgo.By("executing a command with run")
+			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
+
+			if !framework.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
+				framework.Failf("Pod for run-log-test was not ready")
+			}
+
+			logOutput := framework.RunKubectlOrDie(nsFlag, "logs", "-f", "run-log-test")
+			gomega.Expect(logOutput).To(gomega.ContainSubstring("EOF"))
+		})
+
 		ginkgo.It("should support port-forward", func() {
 			ginkgo.By("forwarding the container port to a local port")
 			cmd := runPortForward(ns, simplePodName, simplePodPort)
@@ -588,10 +616,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		ginkgo.It("should handle in-cluster config", func() {
 			ginkgo.By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-			framework.BindClusterRole(f.ClientSet.RbacV1beta1(), "view", f.Namespace.Name,
+			err := auth.BindClusterRole(f.ClientSet.RbacV1beta1(), "view", f.Namespace.Name,
 				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+			framework.ExpectNoError(err)
 
-			err := framework.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+			err = auth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
 			framework.ExpectNoError(err)
@@ -819,6 +848,69 @@ metadata:
 		})
 	})
 
+	framework.KubeDescribe("Kubectl client-side validation", func() {
+		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
+			ginkgo.By("create CRD with no validation schema")
+			crd, err := crd.CreateTestCRD(f)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer crd.CleanUp()
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+			randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
+			if err := createApplyCustomResource(randomCR, f.Namespace.Name, "test-cr", crd); err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
+			ginkgo.By("prepare CRD with validation schema")
+			crd, err := crd.CreateTestCRD(f)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer crd.CleanUp()
+			if err := crd.PatchSchema(schemaFoo); err != nil {
+				framework.Failf("%v", err)
+			}
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+			validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
+			if err := createApplyCustomResource(validCR, f.Namespace.Name, "test-cr", crd); err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
+			ginkgo.By("prepare CRD with partially-specified validation schema")
+			crd, err := crd.CreateTestCRD(f)
+			if err != nil {
+				framework.Failf("failed to create test CRD: %v", err)
+			}
+			defer crd.CleanUp()
+			if err := crd.PatchSchema(schemaFoo); err != nil {
+				framework.Failf("%v", err)
+			}
+
+			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
+			time.Sleep(10 * time.Second)
+
+			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
+			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+	})
+
 	framework.KubeDescribe("Kubectl cluster-info", func() {
 		/*
 			Release : v1.9
@@ -853,7 +945,7 @@ metadata:
 		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
 			kv, err := framework.KubectlVersion()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			serviceJSON := readTestFileOrDie(redisServiceFilename)
@@ -919,7 +1011,7 @@ metadata:
 			// Node
 			// It should be OK to list unschedulable Nodes here.
 			nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			node := nodes.Items[0]
 			output = framework.RunKubectlOrDie("describe", "node", node.Name)
 			requiredStrings = [][]string{
@@ -1008,10 +1100,10 @@ metadata:
 					}
 					return true, nil
 				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 
 				service, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 
 				if len(service.Spec.Ports) != 1 {
 					framework.Failf("1 port is expected")
@@ -1155,7 +1247,7 @@ metadata:
 			forEachPod(func(pod v1.Pod) {
 				ginkgo.By("checking for a matching strings")
 				_, err := framework.LookForStringInLog(ns, pod.Name, containerName, "The server is now ready to accept connections", framework.PodStartTimeout)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 
 				ginkgo.By("limiting log lines")
 				out := framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--tail=1")
@@ -1403,7 +1495,7 @@ metadata:
 				}
 				return true, nil
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		/*
@@ -1619,8 +1711,8 @@ metadata:
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
 			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
-			err := framework.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			err := jobutil.WaitForJobGone(c, ns, jobName, wait.ForeverTestTimeout)
+			framework.ExpectNoError(err)
 
 			ginkgo.By("verifying the job " + jobName + " was deleted")
 			_, err = c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
@@ -1981,7 +2073,7 @@ func validateGuestbookApp(c clientset.Interface, ns string) {
 	framework.Logf("Waiting for all frontend pods to be Running.")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.Logf("Waiting for frontend to serve content.")
 	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
@@ -2066,7 +2158,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 		label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		rcs, err = c.CoreV1().ReplicationControllers(ns).List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		if len(rcs.Items) > 0 {
 			break
 		}
@@ -2159,3 +2251,71 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 	p.Logger = log.New(logs, "", 0)
 	return httptest.NewServer(p), logs
 }
+
+// createApplyCustomResource asserts that given CustomResource be created and applied
+// without being rejected by client-side validation
+func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
+	ns := fmt.Sprintf("--namespace=%v", namespace)
+	ginkgo.By("successfully create CR")
+	if _, err := framework.RunKubectlInput(resource, ns, "create", "-f", "-"); err != nil {
+		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, ns, err)
+	}
+	if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), name); err != nil {
+		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+	}
+	ginkgo.By("successfully apply CR")
+	if _, err := framework.RunKubectlInput(resource, ns, "apply", "-f", "-"); err != nil {
+		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, ns, err)
+	}
+	if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), name); err != nil {
+		return fmt.Errorf("failed to delete CR %s: %v", name, err)
+	}
+	return nil
+}
+
+var schemaFoo = []byte(`description: Foo CRD for Testing
+type: object
+properties:
+  spec:
+    type: object
+    description: Specification of Foo
+    properties:
+      bars:
+        description: List of Bars and their specs.
+        type: array
+        items:
+          type: object
+          required:
+          - name
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            age:
+              description: Age of Bar.
+              type: string
+            bazs:
+              description: List of Bazs.
+              items:
+                type: string
+              type: array
+  status:
+    description: Status of Foo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            available:
+              description: Whether the Bar is installed.
+              type: boolean
+            quxType:
+              description: Indicates to external qux type.
+              pattern: in-tree|out-of-tree
+              type: string`)

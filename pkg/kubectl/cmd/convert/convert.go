@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -263,9 +263,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			gvks, _, err := scheme.Scheme.ObjectKinds(info.Object)
 			if err == nil {
 				for _, gvk := range gvks {
-					for _, version := range scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group) {
-						targetVersions = append(targetVersions, version)
-					}
+					targetVersions = append(targetVersions, scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group)...)
 				}
 			}
 		}

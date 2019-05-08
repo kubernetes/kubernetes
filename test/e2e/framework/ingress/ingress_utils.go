@@ -38,7 +38,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,6 +85,9 @@ const (
 
 	// IngressManifestPath is the parent path to yaml test manifests.
 	IngressManifestPath = "test/e2e/testing-manifests/ingress"
+
+	// GCEIngressManifestPath is the parent path to GCE-specific yaml test manifests.
+	GCEIngressManifestPath = IngressManifestPath + "/gce"
 
 	// IngressReqTimeout is the timeout on a single http request.
 	IngressReqTimeout = 10 * time.Second
@@ -298,7 +301,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("Failed creating cert: %v", err)
 	}
 	if err := pem.Encode(&keyOut, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)}); err != nil {
-		return nil, nil, fmt.Errorf("Failed creating keay: %v", err)
+		return nil, nil, fmt.Errorf("Failed creating key: %v", err)
 	}
 	return certOut.Bytes(), keyOut.Bytes(), nil
 }
@@ -667,9 +670,23 @@ func (j *TestJig) pollIngressWithCert(ing *extensions.Ingress, address string, k
 }
 
 // WaitForIngress waits for the Ingress to get an address.
+// WaitForIngress returns when it gets the first 200 response
 func (j *TestJig) WaitForIngress(waitForNodePort bool) {
 	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, framework.LoadBalancerPollTimeout); err != nil {
 		framework.Failf("error in waiting for ingress to get an address: %s", err)
+	}
+}
+
+// WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
+func (j *TestJig) WaitForIngressToStable() {
+	if err := wait.Poll(10*time.Second, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+		_, err := j.GetDistinctResponseFromIngress()
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		framework.Failf("error in waiting for ingress to stablize: %v", err)
 	}
 }
 
@@ -718,7 +735,7 @@ func (j *TestJig) VerifyURL(route, host string, iterations int, interval time.Du
 			framework.Logf(b)
 			return err
 		}
-		j.Logger.Infof("Verfied %v with host %v %d times, sleeping for %v", route, host, i, interval)
+		j.Logger.Infof("Verified %v with host %v %d times, sleeping for %v", route, host, i, interval)
 		time.Sleep(interval)
 	}
 	return nil
@@ -854,7 +871,7 @@ func generateBacksideHTTPSIngressSpec(ns string) *extensions.Ingress {
 			Namespace: ns,
 		},
 		Spec: extensions.IngressSpec{
-			// Note kubemci requres a default backend.
+			// Note kubemci requires a default backend.
 			Backend: &extensions.IngressBackend{
 				ServiceName: "echoheaders-https",
 				ServicePort: intstr.IntOrString{

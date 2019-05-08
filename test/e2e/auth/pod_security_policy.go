@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -33,12 +33,15 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+const nobodyUser = int64(65534)
 
 var _ = SIGDescribe("PodSecurityPolicy", func() {
 	f := framework.NewDefaultFramework("podsecuritypolicy")
@@ -52,7 +55,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		if !framework.IsPodSecurityPolicyEnabled(f) {
 			framework.Skipf("PodSecurityPolicy not enabled")
 		}
-		if !framework.IsRBACEnabled(f) {
+		if !auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
 			framework.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
@@ -68,8 +71,9 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		framework.ExpectNoError(err)
 
 		By("Binding the edit role to the default SA")
-		framework.BindClusterRole(f.ClientSet.RbacV1beta1(), "edit", ns,
+		err = auth.BindClusterRole(f.ClientSet.RbacV1beta1(), "edit", ns,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+		framework.ExpectNoError(err)
 	})
 
 	It("should forbid pod creation when no PSP is available", func() {
@@ -186,6 +190,20 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 		sysadmin.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = nil
 		tester(sysadmin)
 	})
+
+	By("Running a RunAsGroup pod", func() {
+		sysadmin := restrictedPod("runasgroup")
+		gid := int64(0)
+		sysadmin.Spec.Containers[0].SecurityContext.RunAsGroup = &gid
+		tester(sysadmin)
+	})
+
+	By("Running a RunAsUser pod", func() {
+		sysadmin := restrictedPod("runasuser")
+		uid := int64(0)
+		sysadmin.Spec.Containers[0].SecurityContext.RunAsUser = &uid
+		tester(sysadmin)
+	})
 }
 
 // createAndBindPSP creates a PSP in the policy API group.
@@ -214,12 +232,14 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policy.PodSecurityPol
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
-	framework.BindRoleInNamespace(f.ClientSet.RbacV1beta1(), name, ns, rbacv1beta1.Subject{
+	err = auth.BindRoleInNamespace(f.ClientSet.RbacV1beta1(), name, ns, rbacv1beta1.Subject{
 		Kind:      rbacv1beta1.ServiceAccountKind,
 		Namespace: ns,
 		Name:      "default",
 	})
-	framework.ExpectNoError(framework.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+	framework.ExpectNoError(err)
+
+	framework.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
 		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
 		schema.GroupResource{Group: "policy", Resource: "podsecuritypolicies"}, true))
 
@@ -244,7 +264,8 @@ func restrictedPod(name string) *v1.Pod {
 				Image: imageutils.GetPauseImageName(),
 				SecurityContext: &v1.SecurityContext{
 					AllowPrivilegeEscalation: boolPtr(false),
-					RunAsUser:                utilpointer.Int64Ptr(65534),
+					RunAsUser:                utilpointer.Int64Ptr(nobodyUser),
+					RunAsGroup:               utilpointer.Int64Ptr(nobodyUser),
 				},
 			}},
 		},
@@ -269,6 +290,9 @@ func privilegedPSP(name string) *policy.PodSecurityPolicy {
 			HostPID:                  true,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyRunAsAny,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyRunAsAny,
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,
@@ -324,6 +348,11 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 			HostPID:     false,
 			RunAsUser: policy.RunAsUserStrategyOptions{
 				Rule: policy.RunAsUserStrategyMustRunAsNonRoot,
+			},
+			RunAsGroup: &policy.RunAsGroupStrategyOptions{
+				Rule: policy.RunAsGroupStrategyMustRunAs,
+				Ranges: []policy.IDRange{
+					{Min: nobodyUser, Max: nobodyUser}},
 			},
 			SELinux: policy.SELinuxStrategyOptions{
 				Rule: policy.SELinuxStrategyRunAsAny,

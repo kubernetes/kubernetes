@@ -29,9 +29,9 @@ import (
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -398,11 +398,14 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	if ingress != nil || egress != nil {
 		bandwidthParam := cniBandwidthEntry{}
 		if ingress != nil {
-			bandwidthParam.IngressRate = int(ingress.Value() / 1000)
+			// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md and
+			// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
+			// Rates are in bits per second, burst values are in bits.
+			bandwidthParam.IngressRate = int(ingress.Value())
 			bandwidthParam.IngressBurst = math.MaxInt32 // no limit
 		}
 		if egress != nil {
-			bandwidthParam.EgressRate = int(egress.Value() / 1000)
+			bandwidthParam.EgressRate = int(egress.Value())
 			bandwidthParam.EgressBurst = math.MaxInt32 // no limit
 		}
 		rt.CapabilityArgs["bandwidth"] = bandwidthParam

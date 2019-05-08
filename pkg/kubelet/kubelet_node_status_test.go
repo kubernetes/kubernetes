@@ -167,10 +167,6 @@ func (s sortableNodeAddress) Less(i, j int) bool {
 }
 func (s sortableNodeAddress) Swap(i, j int) { s[j], s[i] = s[i], s[j] }
 
-func sortNodeAddresses(addrs sortableNodeAddress) {
-	sort.Sort(addrs)
-}
-
 func TestUpdateNewNodeStatus(t *testing.T) {
 	cases := []struct {
 		desc                string
@@ -939,7 +935,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	assert.Equal(t, v1.NodeReady, updatedNode.Status.Conditions[len(updatedNode.Status.Conditions)-1].Type,
 		"NodeReady should be the last condition")
 
-	// Update node status again when nothing is changed (except heatbeat time).
+	// Update node status again when nothing is changed (except heartbeat time).
 	// Report node status if it has exceeded the duration of nodeStatusReportFrequency.
 	clock.Step(time.Minute)
 	assert.NoError(t, kubelet.updateNodeStatus())
@@ -964,7 +960,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	}
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode, updatedNode), "%s", diff.ObjectDiff(expectedNode, updatedNode))
 
-	// Update node status again when nothing is changed (except heatbeat time).
+	// Update node status again when nothing is changed (except heartbeat time).
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
 	assert.NoError(t, kubelet.updateNodeStatus())

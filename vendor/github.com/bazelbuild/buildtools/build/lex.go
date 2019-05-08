@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/bazelbuild/buildtools/tables"
 )
 
 // Parse parses the input data and returns the corresponding parse tree.
@@ -35,15 +37,19 @@ func Parse(filename string, data []byte) (*File, error) {
 // An input represents a single input file being parsed.
 type input struct {
 	// Lexing state.
-	filename  string    // name of input file, for errors
-	complete  []byte    // entire input
-	remaining []byte    // remaining input
-	token     []byte    // token being scanned
-	lastToken string    // most recently returned token, for error messages
-	pos       Position  // current input position
-	comments  []Comment // accumulated comments
-	endRule   int       // position of end of current rule
-	depth     int       // nesting of [ ] { } ( )
+	filename       string    // name of input file, for errors
+	complete       []byte    // entire input
+	remaining      []byte    // remaining input
+	token          []byte    // token being scanned
+	lastToken      string    // most recently returned token, for error messages
+	pos            Position  // current input position
+	lineComments   []Comment // accumulated line comments
+	suffixComments []Comment // accumulated suffix comments
+	endStmt        int       // position of the end of the current statement
+	depth          int       // nesting of [ ] { } ( )
+	cleanLine      bool      // true if the current line only contains whitespace before the current position
+	indent         int       // current line indentation in spaces
+	indents        []int     // stack of indentation levels in spaces
 
 	// Parser state.
 	file       *File // returned top-level syntax tree
@@ -55,12 +61,24 @@ type input struct {
 }
 
 func newInput(filename string, data []byte) *input {
+	// The syntax requires that each simple statement ends with '\n', however it's optional at EOF.
+	// If `data` doesn't end with '\n' we add it here to keep parser simple.
+	// It shouldn't affect neither the parsed tree nor its formatting.
+	data = append(data, '\n')
+
 	return &input{
 		filename:  filename,
 		complete:  data,
 		remaining: data,
 		pos:       Position{Line: 1, LineRune: 1, Byte: 0},
+		cleanLine: true,
+		indents:   []int{0},
+		endStmt:   -1, // -1 denotes it's not inside a statement
 	}
+}
+
+func (in *input) currentIndent() int {
+	return in.indents[len(in.indents)-1]
 }
 
 // parse parses the input file.
@@ -169,29 +187,23 @@ func (in *input) Lex(val *yySymType) int {
 	// Skip past spaces, stopping at non-space or EOF.
 	countNL := 0 // number of newlines we've skipped past
 	for !in.eof() {
-		// The parser does not track indentation, because for the most part
-		// BUILD expressions don't care about how they are indented.
-		// However, we do need to be able to distinguish
+		// If a single statement is split into multiple lines, we don't need
+		// to track indentations and unindentations within these lines. For example:
 		//
-		//	x = y[0]
+		// def f(
+		//     # This indentation should be ignored
+		//     x):
+		//  # This unindentation should be ignored
+		//  # Actual indentation is from 0 to 2 spaces here
+		//  return x
 		//
-		// from the occasional
+		// To handle this case, when we reach the beginning of a statement  we scan forward to see where
+		// it should end and record the number of input bytes remaining at that endpoint.
 		//
-		//	x = y
-		//	[0]
-		//
-		// To handle this one case, when we reach the beginning of a
-		// top-level BUILD expression, we scan forward to see where
-		// it should end and record the number of input bytes remaining
-		// at that endpoint. When we reach that point in the input, we
-		// insert an implicit semicolon to force the two expressions
-		// to stay separate.
-		//
-		if in.endRule != 0 && len(in.remaining) == in.endRule {
-			in.endRule = 0
-			in.lastToken = "implicit ;"
-			val.tok = ";"
-			return ';'
+		// If --format_bzl is set to false, top level blocks (e.g. an entire function definition)
+		// is considered as a single statement.
+		if in.endStmt != -1 && len(in.remaining) == in.endStmt {
+			in.endStmt = -1
 		}
 
 		// Skip over spaces. Count newlines so we can give the parser
@@ -199,15 +211,19 @@ func (in *input) Lex(val *yySymType) int {
 		// for top-level comment assignment.
 		c := in.peekRune()
 		if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
-			if c == '\n' && in.endRule == 0 {
-				// Not in a rule. Tell parser about top-level blank line.
-				in.startToken(val)
-				in.readRune()
-				in.endToken(val)
-				return '\n'
-			}
 			if c == '\n' {
+				in.indent = 0
+				in.cleanLine = true
+				if in.endStmt == -1 {
+					// Not in a statememt. Tell parser about top-level blank line.
+					in.startToken(val)
+					in.readRune()
+					in.endToken(val)
+					return '\n'
+				}
 				countNL++
+			} else if c == ' ' && in.cleanLine {
+				in.indent++
 			}
 			in.readRune()
 			continue
@@ -215,6 +231,11 @@ func (in *input) Lex(val *yySymType) int {
 
 		// Comment runs to end of line.
 		if c == '#' {
+			// If a line contains just a comment its indentation level doesn't matter.
+			// Reset it to zero.
+			in.indent = 0
+			in.cleanLine = true
+
 			// Is this comment the only thing on its line?
 			// Find the last \n before this # and see if it's all
 			// spaces from there to here.
@@ -231,10 +252,12 @@ func (in *input) Lex(val *yySymType) int {
 				isSuffix = false
 			}
 
-			// Consume comment.
+			// Consume comment without the \n it ends with.
 			in.startToken(val)
-			for len(in.remaining) > 0 && in.readRune() != '\n' {
+			for len(in.remaining) > 0 && in.peekRune() != '\n' {
+				in.readRune()
 			}
+
 			in.endToken(val)
 
 			val.tok = strings.TrimRight(val.tok, "\n")
@@ -243,28 +266,68 @@ func (in *input) Lex(val *yySymType) int {
 			// If we are at top level (not in a rule), hand the comment to
 			// the parser as a _COMMENT token. The grammar is written
 			// to handle top-level comments itself.
-			if in.endRule == 0 {
-				// Not in a rule. Tell parser about top-level comment.
+			if in.endStmt == -1 {
+				// Not in a statement. Tell parser about top-level comment.
 				return _COMMENT
 			}
 
 			// Otherwise, save comment for later attachment to syntax tree.
 			if countNL > 1 {
-				in.comments = append(in.comments, Comment{val.pos, "", false})
+				in.lineComments = append(in.lineComments, Comment{val.pos, ""})
 			}
-			in.comments = append(in.comments, Comment{val.pos, val.tok, isSuffix})
-			countNL = 1
+			if isSuffix {
+				in.suffixComments = append(in.suffixComments, Comment{val.pos, val.tok})
+			} else {
+				in.lineComments = append(in.lineComments, Comment{val.pos, val.tok})
+			}
+			countNL = 0
 			continue
 		}
 
 		if c == '\\' && len(in.remaining) >= 2 && in.remaining[1] == '\n' {
-			// We can ignore a trailing \ at end of line.
+			// We can ignore a trailing \ at end of line together with the \n.
+			in.readRune()
 			in.readRune()
 			continue
 		}
 
 		// Found non-space non-comment.
 		break
+	}
+
+	// Check for changes in indentation
+	// Skip if --format_bzl is set to false, if we're inside a statement, or if there were non-space
+	// characters before in the current line.
+	if tables.FormatBzlFiles && in.endStmt == -1 && in.cleanLine {
+		if in.indent > in.currentIndent() {
+			// A new indentation block starts
+			in.indents = append(in.indents, in.indent)
+			in.lastToken = "indent"
+			in.cleanLine = false
+			return _INDENT
+		} else if in.indent < in.currentIndent() {
+			// An indentation block ends
+			in.indents = in.indents[:len(in.indents)-1]
+
+			// It's a syntax error if the current line indentation level in now greater than
+			// currentIndent(), should be either equal (a parent block continues) or still less
+			// (need to unindent more).
+			if in.indent > in.currentIndent() {
+				in.pos = val.pos
+				in.Error("unexpected indentation")
+			}
+			in.lastToken = "unindent"
+			return _UNINDENT
+		}
+	}
+
+	in.cleanLine = false
+
+	// If the file ends with an indented block, return the corresponding amounts of unindents.
+	if in.eof() && in.currentIndent() > 0 {
+		in.indents = in.indents[:len(in.indents)-1]
+		in.lastToken = "unindent"
+		return _UNINDENT
 	}
 
 	// Found the beginning of the next token.
@@ -277,16 +340,9 @@ func (in *input) Lex(val *yySymType) int {
 		return _EOF
 	}
 
-	// If endRule is 0, we need to recompute where the end
-	// of the next rule (Python expression) is, so that we can
-	// generate a virtual end-of-rule semicolon (see above).
-	if in.endRule == 0 {
-		in.endRule = len(in.skipPython(in.remaining))
-		if in.endRule == 0 {
-			// skipPython got confused.
-			// No more virtual semicolons.
-			in.endRule = -1
-		}
+	// If endStmt is 0, we need to recompute where the end of the next statement is.
+	if in.endStmt == -1 {
+		in.endStmt = len(in.skipStmt(in.remaining))
 	}
 
 	// Punctuation tokens.
@@ -301,12 +357,17 @@ func (in *input) Lex(val *yySymType) int {
 		in.readRune()
 		return c
 
-	case '.', '-', '%', ':', ';', ',', '/', '*': // single-char tokens
+	case '.', ':', ';', ',': // single-char tokens
 		in.readRune()
 		return c
 
-	case '<', '>', '=', '!', '+': // possibly followed by =
+	case '<', '>', '=', '!', '+', '-', '*', '/', '%': // possibly followed by =
 		in.readRune()
+		if c == '/' && in.peekRune() == '/' {
+			// integer division
+			in.readRune()
+		}
+
 		if in.peekRune() == '=' {
 			in.readRune()
 			switch c {
@@ -318,8 +379,8 @@ func (in *input) Lex(val *yySymType) int {
 				return _EQ
 			case '!':
 				return _NE
-			case '+':
-				return _ADDEQ
+			default:
+				return _AUGM
 			}
 		}
 		return c
@@ -395,15 +456,17 @@ func (in *input) Lex(val *yySymType) int {
 		in.Error(fmt.Sprintf("unexpected input character %#q", c))
 	}
 
-	// Look for raw Python block (class, def, if, etc at beginning of line) and pass through.
-	if in.depth == 0 && in.pos.LineRune == 1 && hasPythonPrefix(in.remaining) {
-		// Find end of Python block and advance input beyond it.
-		// Have to loop calling readRune in order to maintain line number info.
-		rest := in.skipPython(in.remaining)
-		for len(in.remaining) > len(rest) {
-			in.readRune()
+	if !tables.FormatBzlFiles {
+		// Look for raw Python block (class, def, if, etc at beginning of line) and pass through.
+		if in.depth == 0 && in.pos.LineRune == 1 && hasPythonPrefix(in.remaining) {
+			// Find end of Python block and advance input beyond it.
+			// Have to loop calling readRune in order to maintain line number info.
+			rest := in.skipStmt(in.remaining)
+			for len(in.remaining) > len(rest) {
+				in.readRune()
+			}
+			return _PYTHON
 		}
-		return _PYTHON
 	}
 
 	// Scan over alphanumeric identifier.
@@ -442,11 +505,15 @@ var keywordToken = map[string]int{
 	"for":    _FOR,
 	"if":     _IF,
 	"else":   _ELSE,
+	"elif":   _ELIF,
 	"in":     _IN,
 	"is":     _IS,
 	"lambda": _LAMBDA,
+	"load":   _LOAD,
 	"not":    _NOT,
 	"or":     _OR,
+	"def":    _DEF,
+	"return": _RETURN,
 }
 
 // Python scanning.
@@ -457,6 +524,10 @@ var keywordToken = map[string]int{
 // hasPythonPrefix reports whether p begins with a keyword that would
 // introduce an uninterpreted Python block.
 func hasPythonPrefix(p []byte) bool {
+	if tables.FormatBzlFiles {
+		return false
+	}
+
 	for _, pre := range prefixes {
 		if hasPrefixSpace(p, pre) {
 			return true
@@ -474,10 +545,14 @@ var prefixes = []string{
 	"for",
 	"if",
 	"try",
+	"else",
+	"elif",
+	"except",
 }
 
 // hasPrefixSpace reports whether p begins with pre followed by a space or colon.
 func hasPrefixSpace(p []byte, pre string) bool {
+
 	if len(p) <= len(pre) || p[len(pre)] != ' ' && p[len(pre)] != '\t' && p[len(pre)] != ':' {
 		return false
 	}
@@ -489,43 +564,45 @@ func hasPrefixSpace(p []byte, pre string) bool {
 	return true
 }
 
-func isBlankOrComment(b []byte) bool {
+// A utility function for the legacy formatter.
+// Returns whether a given code starts with a top-level statement (maybe with some preceeding
+// comments and blank lines)
+func isOutsideBlock(b []byte) bool {
+	isBlankLine := true
+	isComment := false
 	for _, c := range b {
-		if c == '#' || c == '\n' {
-			return true
-		}
-		if c != ' ' && c != '\t' && c != '\r' {
-			return false
+		switch {
+		case c == ' ' || c == '\t' || c == '\r':
+			isBlankLine = false
+		case c == '#':
+			isBlankLine = false
+			isComment = true
+		case c == '\n':
+			isBlankLine = true
+			isComment = false
+		default:
+			if !isComment {
+				return isBlankLine
+			}
 		}
 	}
 	return true
 }
 
-// hasPythonContinuation reports whether p begins with a keyword that
-// continues an uninterpreted Python block.
-func hasPythonContinuation(p []byte) bool {
-	for _, pre := range continuations {
-		if hasPrefixSpace(p, pre) {
-			return true
-		}
-	}
-	return false
-}
-
-// These keywords continue uninterpreted Python blocks.
-var continuations = []string{
-	"except",
-	"else",
-}
-
-// skipPython returns the data remaining after the uninterpreted
-// Python block beginning at p. It does not advance the input position.
+// skipStmt returns the data remaining after the statement  beginning at p.
+// It does not advance the input position.
 // (The only reason for the input receiver is to be able to call in.Error.)
-func (in *input) skipPython(p []byte) []byte {
+func (in *input) skipStmt(p []byte) []byte {
 	quote := byte(0)     // if non-zero, the kind of quote we're in
 	tripleQuote := false // if true, the quote is a triple quote
 	depth := 0           // nesting depth for ( ) [ ] { }
 	var rest []byte      // data after the Python block
+
+	defer func() {
+		if quote != 0 {
+			in.Error("EOF scanning Python quoted string")
+		}
+	}()
 
 	// Scan over input one byte at a time until we find
 	// an unindented, non-blank, non-comment line
@@ -559,20 +636,23 @@ func (in *input) skipPython(p []byte) []byte {
 			continue
 		}
 
-		if depth == 0 && i > 0 && p[i-1] == '\n' && (i < 2 || p[i-2] != '\\') {
+		if depth == 0 && i > 0 && p[i] == '\n' && p[i-1] != '\\' {
 			// Possible stopping point. Save the earliest one we find.
 			if rest == nil {
 				rest = p[i:]
 			}
 
-			if !isBlankOrComment(p[i:]) {
-				if !hasPythonContinuation(p[i:]) && c != ' ' && c != '\t' {
-					// Yes, stop here.
-					break
-				}
-				// Not a stopping point after all.
-				rest = nil
+			if tables.FormatBzlFiles {
+				// In the bzl files mode we only care about the end of the statement, we've found it.
+				return rest
 			}
+			// In the legacy mode we need to find where the current block ends
+			if isOutsideBlock(p[i+1:]) {
+				return rest
+			}
+			// Not a stopping point after all.
+			rest = nil
+
 		}
 
 		switch c {
@@ -581,6 +661,8 @@ func (in *input) skipPython(p []byte) []byte {
 			for i < len(p) && p[i] != '\n' {
 				i++
 			}
+			// Rewind 1 position back because \n should be handled at the next iteration
+			i--
 
 		case '(', '[', '{':
 			depth++
@@ -588,9 +670,6 @@ func (in *input) skipPython(p []byte) []byte {
 		case ')', ']', '}':
 			depth--
 		}
-	}
-	if quote != 0 {
-		in.Error("EOF scanning Python quoted string")
 	}
 	return rest
 }
@@ -691,8 +770,9 @@ func (in *input) order(v Expr) {
 		in.order(&v.End)
 	case *SliceExpr:
 		in.order(v.X)
-		in.order(v.Y)
-		in.order(v.Z)
+		in.order(v.From)
+		in.order(v.To)
+		in.order(v.Step)
 	case *IndexExpr:
 		in.order(v.X)
 		in.order(v.Y)
@@ -701,6 +781,32 @@ func (in *input) order(v Expr) {
 			in.order(name)
 		}
 		in.order(v.Expr)
+	case *ReturnExpr:
+		if v.X != nil {
+			in.order(v.X)
+		}
+	case *FuncDef:
+		for _, x := range v.Args {
+			in.order(x)
+		}
+		for _, x := range v.Body.Statements {
+			in.order(x)
+		}
+	case *ForLoop:
+		for _, x := range v.LoopVars {
+			in.order(x)
+		}
+		in.order(v.Iterable)
+		for _, x := range v.Body.Statements {
+			in.order(x)
+		}
+	case *IfElse:
+		for _, condition := range v.Conditions {
+			in.order(condition.If)
+			for _, x := range condition.Then.Statements {
+				in.order(x)
+			}
+		}
 	}
 	if v != nil {
 		in.post = append(in.post, v)
@@ -712,17 +818,8 @@ func (in *input) assignComments() {
 	// Generate preorder and postorder lists.
 	in.order(in.file)
 
-	// Split into whole-line comments and suffix comments.
-	var line, suffix []Comment
-	for _, com := range in.comments {
-		if com.Suffix {
-			suffix = append(suffix, com)
-		} else {
-			line = append(line, com)
-		}
-	}
-
 	// Assign line comments to syntax immediately following.
+	line := in.lineComments
 	for _, x := range in.pre {
 		start, _ := x.Span()
 		xcom := x.Comment()
@@ -736,6 +833,7 @@ func (in *input) assignComments() {
 	in.file.After = append(in.file.After, line...)
 
 	// Assign suffix comments to syntax immediately before.
+	suffix := in.suffixComments
 	for i := len(in.post) - 1; i >= 0; i-- {
 		x := in.post[i]
 

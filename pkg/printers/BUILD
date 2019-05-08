@@ -9,19 +9,20 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "humanreadable.go",
         "interface.go",
+        "tablegenerator.go",
+        "tableprinter.go",
         "tabwriter.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/printers",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/duration:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//vendor/github.com/liggitt/tabwriter:go_default_library",
     ],
@@ -46,10 +47,10 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["humanreadable_test.go"],
+    srcs = ["tableprinter_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

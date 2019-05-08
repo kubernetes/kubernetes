@@ -24,12 +24,13 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -39,13 +40,13 @@ const (
 	dnsReadyTimeout = time.Minute
 )
 
-const queryDnsPythonTemplate string = `
+const queryDNSPythonTemplate string = `
 import socket
 try:
 	socket.gethostbyname('%s')
-	print 'ok'
+	print('ok')
 except:
-	print 'err'`
+	print('err')`
 
 var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
@@ -108,7 +109,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			Expect(err).NotTo(HaveOccurred(), "failed to list pods in namespace: %s", ns.Name)
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
-			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
+			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
 			err = framework.ServiceResponding(c, ns.Name, backendSvcName)
 			Expect(err).NotTo(HaveOccurred(), "waiting for the service to respond")
@@ -131,8 +132,8 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 		podName := pods.Items[0].Name
 
-		queryDns := fmt.Sprintf(queryDnsPythonTemplate, backendSvcName+"."+namespaces[0].Name)
-		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDns}, "ok", dnsReadyTimeout)
+		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
+		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
 		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
 
 		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))

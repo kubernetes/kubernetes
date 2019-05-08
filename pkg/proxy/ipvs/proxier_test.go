@@ -125,7 +125,7 @@ func (fakeSysctl *FakeSysctl) SetSysctl(sysctl string, newVal int) error {
 	return nil
 }
 
-func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []string) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet) *Proxier {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 			func() ([]byte, error) { return []byte("dummy device have been created"), nil },
@@ -155,6 +155,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		ipvs:              ipvs,
 		ipset:             ipset,
 		clusterCIDR:       "10.0.0.0/24",
+		strictARP:         false,
 		hostname:          testHostname,
 		portsMap:          make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:        &fakePortOpener{[]*utilproxy.LocalPort{}},
@@ -2822,7 +2823,7 @@ func TestCleanLegacyService(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, []string{"3.3.3.0/24", "4.4.4.0/24"})
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"}))
 
 	// All ipvs services that were processed in the latest sync loop.
 	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
@@ -2924,11 +2925,66 @@ func TestCleanLegacyService(t *testing.T) {
 
 }
 
+func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	gtm := NewGracefulTerminationManager(ipvs)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"4.4.4.4/32"}))
+	fp.gracefuldeleteManager = gtm
+
+	vs := &utilipvs.VirtualServer{
+		Address:   net.ParseIP("4.4.4.4"),
+		Protocol:  string(v1.ProtocolUDP),
+		Port:      56,
+		Scheduler: "rr",
+		Flags:     utilipvs.FlagHashed,
+	}
+
+	fp.ipvs.AddVirtualServer(vs)
+
+	rss := []*utilipvs.RealServer{
+		{
+			Address:      net.ParseIP("10.10.10.10"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+		},
+		{
+			Address:      net.ParseIP("11.11.11.11"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+		},
+	}
+	for _, rs := range rss {
+		fp.ipvs.AddRealServer(vs, rs)
+	}
+
+	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
+
+	fp.netlinkHandle.EnsureAddressBind("4.4.4.4", DefaultDummyDevice)
+
+	fp.cleanLegacyService(
+		map[string]bool{},
+		map[string]*utilipvs.VirtualServer{"ipvs0": vs},
+		map[string]bool{"4.4.4.4": true},
+	)
+
+	fp.gracefuldeleteManager.tryDeleteRs()
+
+	remainingRealServers, _ := fp.ipvs.GetRealServers(vs)
+
+	if len(remainingRealServers) != 2 {
+		t.Errorf("Expected number of remaining IPVS real servers after cleanup should be %v. Got %v", 2, len(remainingRealServers))
+	}
+}
+
 func TestCleanLegacyService6(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, []string{"3000::/64", "4000::/64"})
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3000::/64", "4000::/64"}))
 	fp.nodeIP = net.ParseIP("::1")
 
 	// All ipvs services that were processed in the latest sync loop.

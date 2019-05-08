@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package encoding provides a common graph encoding API.
-package encoding
+package encoding // import "gonum.org/v1/gonum/graph/encoding"

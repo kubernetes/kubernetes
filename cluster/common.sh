@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/.. && pwd)
+KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}")/.. && pwd)
 
 DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 
@@ -323,7 +323,7 @@ function find-tar() {
 #   KUBE_MANIFESTS_TAR
 function find-release-tars() {
   SERVER_BINARY_TAR=$(find-tar kubernetes-server-linux-amd64.tar.gz)
-  if [[ "${NUM_WINDOWS_NODES}" -gt "0" && "${USE_RELEASE_NODE_BINARIES:-false}" == "false" ]]; then
+  if [[ "${NUM_WINDOWS_NODES}" -gt "0" ]]; then
     NODE_BINARY_TAR=$(find-tar kubernetes-node-windows-amd64.tar.gz)
   fi
 

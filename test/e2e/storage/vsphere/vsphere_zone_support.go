@@ -24,10 +24,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -134,7 +135,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		Expect(err).To(HaveOccurred())
 		errorMsg := "Failed to find a shared datastore matching zone [" + zoneD + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -165,7 +166,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones)
 		errorMsg := "The specified datastore " + scParameters[Datastore] + " does not match the provided zones : [" + zoneC + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -176,6 +177,13 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones)
 	})
 
+	It("Verify a pod is created on a non-Workspace zone and attached to a dynamically created PV, based on the allowed zones and storage policy specified in storage class", func() {
+		By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneB, compatPolicy))
+		scParameters[SpbmStoragePolicy] = compatPolicy
+		zones = append(zones, zoneB)
+		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones)
+	})
+
 	It("Verify PVC creation with incompatible storagePolicy and zone combination specified in storage class fails", func() {
 		By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneA, nonCompatPolicy))
 		scParameters[SpbmStoragePolicy] = nonCompatPolicy
@@ -183,7 +191,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones)
 		errorMsg := "No compatible datastores found that satisfy the storage policy requirements"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -203,7 +211,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones)
 		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + nonCompatPolicy + "\\\"."
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -215,7 +223,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones)
 		errorMsg := "The specified datastore " + scParameters[Datastore] + " does not match the provided zones : [" + zoneC + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -224,7 +232,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, nil, nil)
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -234,7 +242,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, nil)
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -244,7 +252,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, nil)
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -255,7 +263,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, nil)
 		errorMsg := "No shared datastores found in the Kubernetes cluster"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -265,7 +273,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, nil, zones)
 		errorMsg := "Failed to find a shared datastore matching zone [" + zoneC + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -276,7 +284,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, nil, zones)
 		errorMsg := "Failed to find a shared datastore matching zone [" + zoneA + " " + zoneC + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -287,7 +295,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		err := verifyPVCCreationFails(client, namespace, scParameters, zones)
 		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
 		if !strings.Contains(err.Error(), errorMsg) {
-			Expect(err).NotTo(HaveOccurred(), errorMsg)
+			framework.ExpectNoError(err, errorMsg)
 		}
 	})
 
@@ -303,23 +311,23 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 
 func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("Creating pod to attach PV to the node")
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("Verify persistent volume was created on the right zone")
 	verifyVolumeCreationOnRightZone(persistentvolumes, pod.Spec.NodeName, zones)
@@ -336,12 +344,12 @@ func verifyPVCAndPodCreationSucceeds(client clientset.Interface, namespace strin
 
 func verifyPVCCreationFails(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) error {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", scParameters, zones))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -352,25 +360,25 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	Expect(err).To(HaveOccurred())
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
-	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
+	e2elog.Logf("Failure message : %+q", eventList.Items[0].Message)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 
 func verifyPVZoneLabels(client clientset.Interface, namespace string, scParameters map[string]string, zones []string) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("zone-sc", nil, zones))
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the storage class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Waiting for claim to be in bound phase")
 	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	By("Verify zone information is present in the volume labels")
 	for _, pv := range persistentvolumes {

@@ -21,7 +21,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -73,8 +72,6 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		return nil, genericclioptions.NoCompatiblePrinterError{Options: f, AllowedFormats: f.AllowedFormats()}
 	}
 
-	decoder := scheme.Codecs.UniversalDecoder()
-
 	showKind := false
 	if f.ShowKind != nil {
 		showKind = *f.ShowKind
@@ -90,7 +87,7 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		columnLabels = *f.ColumnLabels
 	}
 
-	p := printers.NewHumanReadablePrinter(decoder, printers.PrintOptions{
+	p := printers.NewTablePrinter(printers.PrintOptions{
 		Kind:          f.Kind,
 		WithKind:      showKind,
 		NoHeaders:     f.NoHeaders,

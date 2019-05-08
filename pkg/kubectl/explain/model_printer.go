@@ -21,12 +21,13 @@ import (
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
-// fieldIndentLevel is the level of indentation for fields.
-const fieldIndentLevel = 3
-
-// descriptionIndentLevel is the level of indentation for the
-// description.
-const descriptionIndentLevel = 5
+const (
+	// fieldIndentLevel is the level of indentation for fields.
+	fieldIndentLevel = 3
+	// descriptionIndentLevel is the level of indentation for the
+	// description.
+	descriptionIndentLevel = 5
+)
 
 // modelPrinter prints a schema in Writer. Its "Builder" will decide if
 // it's recursive or not.

@@ -214,6 +214,23 @@ func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taints
 	return true
 }
 
+// AddOrUpdateLabelsOnNode updates the labels on the node and returns true on
+// success and false on failure.
+func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, labelsToUpdate map[string]string, node *v1.Node) bool {
+	err := controller.AddOrUpdateLabelsOnNode(kubeClient, node.Name, labelsToUpdate)
+	if err != nil {
+		utilruntime.HandleError(
+			fmt.Errorf(
+				"unable to update labels %+v for Node %q: %v",
+				labelsToUpdate,
+				node.Name,
+				err))
+		return false
+	}
+	klog.V(4).Infof("Updated labels %+v to Node %v", labelsToUpdate, node.Name)
+	return true
+}
+
 // CreateAddNodeHandler creates an add node handler.
 func CreateAddNodeHandler(f func(node *v1.Node) error) func(obj interface{}) {
 	return func(originalObj interface{}) {

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,7 +52,7 @@ type describeClient struct {
 }
 
 func TestDescribePod(t *testing.T) {
-	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	gracePeriod := int64(1234)
 	condition1 := corev1.PodConditionType("condition1")
 	condition2 := corev1.PodConditionType("condition2")
@@ -937,7 +938,7 @@ func TestGetPodsTotalRequests(t *testing.T) {
 func TestPersistentVolumeDescriber(t *testing.T) {
 	block := corev1.PersistentVolumeBlock
 	file := corev1.PersistentVolumeFilesystem
-	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	testCases := []struct {
 		name               string
 		plugin             string
@@ -1305,7 +1306,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	file := corev1.PersistentVolumeFilesystem
 	goldClassName := "gold"
 	now := time.Now()
-	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0)}
+	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	testCases := []struct {
 		name               string
 		pvc                *corev1.PersistentVolumeClaim
@@ -1628,7 +1629,7 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 	if err != nil {
 		t.Errorf("unable to parse label selector: %v", err)
 	}
-	tests := []struct {
+	testsV2beta2 := []struct {
 		name string
 		hpa  autoscalingv2beta2.HorizontalPodAutoscaler
 	}{
@@ -2270,7 +2271,102 @@ func TestDescribeHorizontalPodAutoscaler(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for _, test := range testsV2beta2 {
+		t.Run(test.name, func(t *testing.T) {
+			test.hpa.ObjectMeta = metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: "foo",
+			}
+			fake := fake.NewSimpleClientset(&test.hpa)
+			desc := HorizontalPodAutoscalerDescriber{fake}
+			str, err := desc.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
+			if err != nil {
+				t.Errorf("Unexpected error for test %s: %v", test.name, err)
+			}
+			if str == "" {
+				t.Errorf("Unexpected empty string for test %s.  Expected HPA Describer output", test.name)
+			}
+			t.Logf("Description for %q:\n%s", test.name, str)
+		})
+	}
+
+	testsV1 := []struct {
+		name string
+		hpa  autoscalingv1.HorizontalPodAutoscaler
+	}{
+		{
+			"minReplicas unset",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MaxReplicas: 10,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"minReplicas set",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas: &minReplicasVal,
+					MaxReplicas: 10,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"with target no current",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas:                    &minReplicasVal,
+					MaxReplicas:                    10,
+					TargetCPUUtilizationPercentage: &targetUtilizationVal,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 4,
+					DesiredReplicas: 5,
+				},
+			},
+		},
+		{
+			"with target and current",
+			autoscalingv1.HorizontalPodAutoscaler{
+				Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+					ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
+						Name: "some-rc",
+						Kind: "ReplicationController",
+					},
+					MinReplicas:                    &minReplicasVal,
+					MaxReplicas:                    10,
+					TargetCPUUtilizationPercentage: &targetUtilizationVal,
+				},
+				Status: autoscalingv1.HorizontalPodAutoscalerStatus{
+					CurrentReplicas:                 4,
+					DesiredReplicas:                 5,
+					CurrentCPUUtilizationPercentage: &currentUtilizationVal,
+				},
+			},
+		},
+	}
+
+	for _, test := range testsV1 {
 		t.Run(test.name, func(t *testing.T) {
 			test.hpa.ObjectMeta = metav1.ObjectMeta{
 				Name:      "bar",
@@ -2499,7 +2595,11 @@ func TestDescribeUnstructuredContent(t *testing.T) {
 	}{
 		{
 			expected: `API Version:	v1
-Dummy 2:	present
+Dummy - Dummy:	present
+dummy-dummy@dummy:	present
+dummy/dummy:	present
+dummy2:	present
+Dummy Dummy:	present
 Items:
   Item Bool:	true
   Item Int:	42
@@ -2537,10 +2637,14 @@ URL:	http://localhost
 	w := NewPrefixWriter(out)
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Test",
-			"dummy1":     "present",
-			"dummy2":     "present",
+			"apiVersion":        "v1",
+			"kind":              "Test",
+			"dummyDummy":        "present",
+			"dummy/dummy":       "present",
+			"dummy-dummy@dummy": "present",
+			"dummy-dummy":       "present",
+			"dummy1":            "present",
+			"dummy2":            "present",
 			"metadata": map[string]interface{}{
 				"name":              "MyName",
 				"namespace":         "MyNamespace",
@@ -2984,12 +3088,6 @@ func TestDescribeStatefulSet(t *testing.T) {
 	}
 }
 
-// boolPtr returns a pointer to a bool
-func boolPtr(b bool) *bool {
-	o := b
-	return &o
-}
-
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
 	f := fake.NewSimpleClientset(
@@ -3019,7 +3117,7 @@ func TestControllerRef(t *testing.T) {
 				Name:            "barpod",
 				Namespace:       "foo",
 				Labels:          map[string]string{"abc": "xyz"},
-				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: boolPtr(true)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: utilpointer.BoolPtr(true)}},
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",
@@ -3056,7 +3154,7 @@ func TestControllerRef(t *testing.T) {
 				Name:            "buzpod",
 				Namespace:       "foo",
 				Labels:          map[string]string{"abc": "xyz"},
-				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: boolPtr(true)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: utilpointer.BoolPtr(true)}},
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",

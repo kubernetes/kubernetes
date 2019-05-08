@@ -87,8 +87,9 @@ func (APIVersions) SwaggerDoc() map[string]string {
 }
 
 var map_CreateOptions = map[string]string{
-	"":       "CreateOptions may be provided when creating an API object.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "CreateOptions may be provided when creating an API object.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (CreateOptions) SwaggerDoc() map[string]string {
@@ -196,10 +197,11 @@ func (List) SwaggerDoc() map[string]string {
 }
 
 var map_ListMeta = map[string]string{
-	"":                "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
-	"selfLink":        "selfLink is a URL representing this object. Populated by the system. Read-only.",
-	"resourceVersion": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency",
-	"continue":        "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message.",
+	"":                   "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+	"selfLink":           "selfLink is a URL representing this object. Populated by the system. Read-only.",
+	"resourceVersion":    "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency",
+	"continue":           "continue may be set if the user set a limit on the number of items returned, and indicates that the server has more data available. The value is opaque and may be used to issue another request to the endpoint that served this list to retrieve the next set of available objects. Continuing a consistent list may not be possible if the server configuration has changed or more than a few minutes have passed. The resourceVersion field returned when using this continue value will be identical to the value in the first response, unless you have received this token from an error message.",
+	"remainingItemCount": "RemainingItemCount is the number of subsequent items in the list which are not included in this list response. If the list request contained label or field selectors, then the number of remaining items is unknown and this field will be unset. If the list is complete (either because it is unpaginated or because this is the last page), then there are no more remaining items and this field will also be unset.  Servers older than v1.15 do not set this field.",
 }
 
 func (ListMeta) SwaggerDoc() map[string]string {
@@ -207,14 +209,15 @@ func (ListMeta) SwaggerDoc() map[string]string {
 }
 
 var map_ListOptions = map[string]string{
-	"":                "ListOptions is the query options to a standard REST list call.",
-	"labelSelector":   "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-	"fieldSelector":   "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-	"watch":           "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-	"resourceVersion": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-	"timeoutSeconds":  "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
-	"limit":           "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-	"continue":        "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
+	"":                    "ListOptions is the query options to a standard REST list call.",
+	"labelSelector":       "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"fieldSelector":       "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
+	"watch":               "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
+	"allowWatchBookmarks": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored. If the feature gate WatchBookmarks is not enabled in apiserver, this field is ignored.\n\nThis field is alpha and can be changed or removed without notice.",
+	"resourceVersion":     "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
+	"timeoutSeconds":      "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+	"limit":               "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
+	"continue":            "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server, the server will respond with a 410 ResourceExpired error together with a continue token. If the client needs a consistent list, it must restart their list without the continue field. Otherwise, the client may send another list request with the token received with the 410 error, the server will respond with a list starting from the next key, but from the latest snapshot, which is inconsistent from the previous list results - objects that are created, modified, or deleted after the first list request will be included in the response, as long as their keys are after the \"next key\".\n\nThis field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
 }
 
 func (ListOptions) SwaggerDoc() map[string]string {
@@ -273,6 +276,25 @@ func (OwnerReference) SwaggerDoc() map[string]string {
 	return map_OwnerReference
 }
 
+var map_PartialObjectMetadata = map[string]string{
+	"":         "PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients to get access to a particular ObjectMeta schema without knowing the details of the version.",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+}
+
+func (PartialObjectMetadata) SwaggerDoc() map[string]string {
+	return map_PartialObjectMetadata
+}
+
+var map_PartialObjectMetadataList = map[string]string{
+	"":         "PartialObjectMetadataList contains a list of objects containing only their metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "items contains each of the included items.",
+}
+
+func (PartialObjectMetadataList) SwaggerDoc() map[string]string {
+	return map_PartialObjectMetadataList
+}
+
 var map_Patch = map[string]string{
 	"": "Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.",
 }
@@ -282,9 +304,10 @@ func (Patch) SwaggerDoc() map[string]string {
 }
 
 var map_PatchOptions = map[string]string{
-	"":       "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
-	"force":  "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"":             "PatchOptions may be provided when patching an API object. PatchOptions is meant to be a superset of UpdateOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"force":        "Force is going to \"force\" Apply requests. It means user will re-acquire conflicting fields owned by other people. Force flag must be unset for non-apply patch requests.",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint. This field is required for apply requests (application/apply-patch) but optional for non-apply patch types (JsonPatch, MergePatch, StrategicMergePatch).",
 }
 
 func (PatchOptions) SwaggerDoc() map[string]string {
@@ -292,8 +315,9 @@ func (PatchOptions) SwaggerDoc() map[string]string {
 }
 
 var map_Preconditions = map[string]string{
-	"":    "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
-	"uid": "Specifies the target UID.",
+	"":                "Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.",
+	"uid":             "Specifies the target UID.",
+	"resourceVersion": "Specifies the target ResourceVersion",
 }
 
 func (Preconditions) SwaggerDoc() map[string]string {
@@ -358,6 +382,62 @@ func (StatusDetails) SwaggerDoc() map[string]string {
 	return map_StatusDetails
 }
 
+var map_Table = map[string]string{
+	"":                  "Table is a tabular representation of a set of API resources. The server transforms the object into a set of preferred columns for quickly reviewing the objects.",
+	"metadata":          "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"columnDefinitions": "columnDefinitions describes each column in the returned items array. The number of cells per row will always match the number of column definitions.",
+	"rows":              "rows is the list of items in the table.",
+}
+
+func (Table) SwaggerDoc() map[string]string {
+	return map_Table
+}
+
+var map_TableColumnDefinition = map[string]string{
+	"":            "TableColumnDefinition contains information about a column returned in the Table.",
+	"name":        "name is a human readable name for the column.",
+	"type":        "type is an OpenAPI type definition for this column, such as number, integer, string, or array. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+	"format":      "format is an optional OpenAPI type modifier for this column. A format modifies the type and imposes additional rules, like date or time formatting for a string. The 'name' format is applied to the primary identifier column which has type 'string' to assist in clients identifying column is the resource name. See https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#data-types for more.",
+	"description": "description is a human readable description of this column.",
+	"priority":    "priority is an integer defining the relative importance of this column compared to others. Lower numbers are considered higher priority. Columns that may be omitted in limited space scenarios should be given a higher priority.",
+}
+
+func (TableColumnDefinition) SwaggerDoc() map[string]string {
+	return map_TableColumnDefinition
+}
+
+var map_TableOptions = map[string]string{
+	"":              "TableOptions are used when a Table is requested by the caller.",
+	"includeObject": "includeObject decides whether to include each object along with its columnar information. Specifying \"None\" will return no object, specifying \"Object\" will return the full object contents, and specifying \"Metadata\" (the default) will return the object's metadata in the PartialObjectMetadata kind in version v1beta1 of the meta.k8s.io API group.",
+}
+
+func (TableOptions) SwaggerDoc() map[string]string {
+	return map_TableOptions
+}
+
+var map_TableRow = map[string]string{
+	"":           "TableRow is an individual row in a table.",
+	"cells":      "cells will be as wide as the column definitions array and may contain strings, numbers (float64 or int64), booleans, simple maps, lists, or null. See the type field of the column definition for a more detailed description.",
+	"conditions": "conditions describe additional status of a row that are relevant for a human user. These conditions apply to the row, not to the object, and will be specific to table output. The only defined condition type is 'Completed', for a row that indicates a resource that has run to completion and can be given less visual priority.",
+	"object":     "This field contains the requested additional information about each object based on the includeObject policy when requesting the Table. If \"None\", this field is empty, if \"Object\" this will be the default serialization of the object for the current API version, and if \"Metadata\" (the default) will contain the object metadata. Check the returned kind and apiVersion of the object before parsing. The media type of the object will always match the enclosing list - if this as a JSON table, these will be JSON encoded objects.",
+}
+
+func (TableRow) SwaggerDoc() map[string]string {
+	return map_TableRow
+}
+
+var map_TableRowCondition = map[string]string{
+	"":        "TableRowCondition allows a row to be marked with additional information.",
+	"type":    "Type of row condition. The only defined value is 'Completed' indicating that the object this row represents has reached a completed state and may be given less visual priority than other rows. Clients are not required to honor any conditions but should be consistent where possible about handling the conditions.",
+	"status":  "Status of the condition, one of True, False, Unknown.",
+	"reason":  "(brief) machine readable reason for the condition's last transition.",
+	"message": "Human readable message indicating details about last transition.",
+}
+
+func (TableRowCondition) SwaggerDoc() map[string]string {
+	return map_TableRowCondition
+}
+
 var map_TypeMeta = map[string]string{
 	"":           "TypeMeta describes an individual object in an API response or request with strings representing the type of the object and its API schema version. Structures that are versioned or persisted should inline TypeMeta.",
 	"kind":       "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -369,8 +449,9 @@ func (TypeMeta) SwaggerDoc() map[string]string {
 }
 
 var map_UpdateOptions = map[string]string{
-	"":       "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
-	"dryRun": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"":             "UpdateOptions may be provided when updating an API object. All fields in UpdateOptions should also be present in PatchOptions.",
+	"dryRun":       "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+	"fieldManager": "fieldManager is a name associated with the actor or entity that is making these changes. The value must be less than or 128 characters long, and only contain printable characters, as defined by https://golang.org/pkg/unicode/#IsPrint.",
 }
 
 func (UpdateOptions) SwaggerDoc() map[string]string {

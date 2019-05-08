@@ -28,18 +28,18 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -47,12 +47,13 @@ import (
 type localTestConfig struct {
 	ns           string
 	nodes        []v1.Node
-	nodeExecPods map[string]*v1.Pod
 	node0        *v1.Node
 	client       clientset.Interface
 	scName       string
 	ssTester     *framework.StatefulSetTester
 	discoveryDir string
+	hostExec     utils.HostExec
+	ltrMgr       utils.LocalTestResourceManager
 }
 
 type localVolumeType string
@@ -82,44 +83,28 @@ const (
 	BlockFsWithoutFormatLocalVolumeType localVolumeType = "blockfswithoutformat"
 )
 
-var setupLocalVolumeMap = map[localVolumeType]func(*localTestConfig, *v1.Node) *localTestVolume{
-	GCELocalSSDVolumeType:                   setupLocalVolumeGCELocalSSD,
-	TmpfsLocalVolumeType:                    setupLocalVolumeTmpfs,
-	DirectoryLocalVolumeType:                setupLocalVolumeDirectory,
-	DirectoryLinkLocalVolumeType:            setupLocalVolumeDirectoryLink,
-	DirectoryBindMountedLocalVolumeType:     setupLocalVolumeDirectoryBindMounted,
-	DirectoryLinkBindMountedLocalVolumeType: setupLocalVolumeDirectoryLinkBindMounted,
-	BlockLocalVolumeType:                    setupLocalVolumeBlock,
-	BlockFsWithFormatLocalVolumeType:        setupLocalVolumeBlockFsWithFormat,
-	BlockFsWithoutFormatLocalVolumeType:     setupLocalVolumeBlockFsWithoutFormat,
-}
-
-var cleanupLocalVolumeMap = map[localVolumeType]func(*localTestConfig, *localTestVolume){
-	GCELocalSSDVolumeType:                   cleanupLocalVolumeGCELocalSSD,
-	TmpfsLocalVolumeType:                    cleanupLocalVolumeTmpfs,
-	DirectoryLocalVolumeType:                cleanupLocalVolumeDirectory,
-	DirectoryLinkLocalVolumeType:            cleanupLocalVolumeDirectoryLink,
-	DirectoryBindMountedLocalVolumeType:     cleanupLocalVolumeDirectoryBindMounted,
-	DirectoryLinkBindMountedLocalVolumeType: cleanupLocalVolumeDirectoryLinkBindMounted,
-	BlockLocalVolumeType:                    cleanupLocalVolumeBlock,
-	BlockFsWithFormatLocalVolumeType:        cleanupLocalVolumeBlockFsWithFormat,
-	BlockFsWithoutFormatLocalVolumeType:     cleanupLocalVolumeBlockFsWithoutFormat,
+// map to local test resource type
+var setupLocalVolumeMap = map[localVolumeType]utils.LocalVolumeType{
+	GCELocalSSDVolumeType:                   utils.LocalVolumeGCELocalSSD,
+	TmpfsLocalVolumeType:                    utils.LocalVolumeTmpfs,
+	DirectoryLocalVolumeType:                utils.LocalVolumeDirectory,
+	DirectoryLinkLocalVolumeType:            utils.LocalVolumeDirectoryLink,
+	DirectoryBindMountedLocalVolumeType:     utils.LocalVolumeDirectoryBindMounted,
+	DirectoryLinkBindMountedLocalVolumeType: utils.LocalVolumeDirectoryLinkBindMounted,
+	BlockLocalVolumeType:                    utils.LocalVolumeBlock, // block device in Block mode
+	BlockFsWithFormatLocalVolumeType:        utils.LocalVolumeBlockFS,
+	BlockFsWithoutFormatLocalVolumeType:     utils.LocalVolumeBlock, // block device in Filesystem mode (default in this test suite)
 }
 
 type localTestVolume struct {
-	// Node that the volume is on
-	node *v1.Node
-	// Path to the volume on the host node
-	hostDir string
+	// Local test resource
+	ltr *utils.LocalTestResource
 	// PVC for this volume
 	pvc *v1.PersistentVolumeClaim
 	// PV for this volume
 	pv *v1.PersistentVolume
 	// Type of local volume
 	localVolumeType localVolumeType
-	// Path to the loop block device on the host node.
-	// Used during cleanup after block tests.
-	loopDevDir string
 }
 
 const (
@@ -176,15 +161,18 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		node0 := &nodes.Items[0]
 
 		ssTester := framework.NewStatefulSetTester(f.ClientSet)
+		hostExec := utils.NewHostExec(f)
+		ltrMgr := utils.NewLocalResourceManager("local-volume-test", hostExec, hostBase)
 		config = &localTestConfig{
 			ns:           f.Namespace.Name,
 			client:       f.ClientSet,
 			nodes:        nodes.Items[:maxLen],
-			nodeExecPods: make(map[string]*v1.Pod, maxLen),
 			node0:        node0,
 			scName:       scName,
 			ssTester:     ssTester,
 			discoveryDir: filepath.Join(hostBase, f.Namespace.Name),
+			hostExec:     hostExec,
+			ltrMgr:       ltrMgr,
 		}
 	})
 
@@ -225,7 +213,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				BeforeEach(func() {
 					By("Creating pod1")
 					pod1, pod1Err = createLocalPod(config, testVol, nil)
-					Expect(pod1Err).NotTo(HaveOccurred())
+					framework.ExpectNoError(pod1Err)
 					verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 					writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -250,7 +238,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVolType)
 
 					By("Writing in pod1")
-					writeCmd := createWriteCmd(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/, testVolType)
+					writeCmd := createWriteCmd(volumeDir, testFile, testVol.ltr.Path /*writeTestFileContent*/, testVolType)
 					podRWCmdExec(pod1, writeCmd)
 				})
 			})
@@ -274,14 +262,14 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					}
 				})
 
-				It("should set fsGroup for one pod", func() {
+				It("should set fsGroup for one pod [Slow]", func() {
 					By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(config, testVol, 1234, 1234)
 					By("Deleting pod")
 					framework.DeletePodOrFail(config.client, config.ns, pod.Name)
 				})
 
-				It("should set same fsGroup for two pods simultaneously", func() {
+				It("should set same fsGroup for two pods simultaneously [Slow]", func() {
 					fsGroup := int64(1234)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup, fsGroup)
@@ -294,12 +282,13 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				})
 
 				It("should set different fsGroup for second pod if first pod is deleted", func() {
+					framework.Skipf("Disabled temporarily, reopen after #73168 is fixed")
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
 					By("Deleting first pod")
 					err := framework.DeletePodWithWait(f, config.client, pod1)
-					Expect(err).NotTo(HaveOccurred(), "while deleting first pod")
+					framework.ExpectNoError(err, "while deleting first pod")
 					By("Create second pod and check fsGroup is the new one")
 					pod2 := createPodWithFsGroupTest(config, testVol, fsGroup2, fsGroup2)
 					By("Deleting second pod")
@@ -315,8 +304,10 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		// - check for these errors in unit tests instead
 		It("should fail due to non-existent path", func() {
 			testVol := &localTestVolume{
-				node:            config.node0,
-				hostDir:         "/non-existent/location/nowhere",
+				ltr: &utils.LocalTestResource{
+					Node: config.node0,
+					Path: "/non-existent/location/nowhere",
+				},
 				localVolumeType: DirectoryLocalVolumeType,
 			}
 			By("Creating local PVC and PV")
@@ -338,7 +329,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 			pod := makeLocalPodWithNodeName(config, testVol, config.nodes[1].Name)
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			Expect(err).To(HaveOccurred())
@@ -564,7 +555,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 					pod := framework.MakeSecPod(config.ns, pvcs, false, "sleep 1", false, false, selinuxLabel, nil)
 					pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 					pods[pod.Name] = pod
 					numCreated++
 				}
@@ -577,7 +568,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 				for _, pod := range pods {
 					if err := deletePodAndPVCs(config, pod); err != nil {
-						framework.Logf("Deleting pod %v failed: %v", pod.Name, err)
+						e2elog.Logf("Deleting pod %v failed: %v", pod.Name, err)
 					}
 				}
 			}()
@@ -601,7 +592,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						}
 						delete(pods, pod.Name)
 						numFinished++
-						framework.Logf("%v/%v pods finished", numFinished, totalPods)
+						e2elog.Logf("%v/%v pods finished", numFinished, totalPods)
 					case v1.PodFailed:
 					case v1.PodUnknown:
 						return false, fmt.Errorf("pod %v is in %v phase", pod.Name, pod.Status.Phase)
@@ -610,13 +601,78 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 				return numFinished == totalPods, nil
 			})
-			Expect(err).ToNot(HaveOccurred())
+			framework.ExpectNoError(err)
+		})
+	})
+
+	Context("Pods sharing a single local PV [Serial]", func() {
+		var (
+			pv *v1.PersistentVolume
+		)
+
+		BeforeEach(func() {
+			localVolume := &localTestVolume{
+				ltr: &utils.LocalTestResource{
+					Node: config.node0,
+					Path: "/tmp",
+				},
+				localVolumeType: DirectoryLocalVolumeType,
+			}
+			pvConfig := makeLocalPVConfig(config, localVolume)
+			var err error
+			pv, err = framework.CreatePV(config.client, framework.MakePersistentVolume(pvConfig))
+			framework.ExpectNoError(err)
+		})
+
+		AfterEach(func() {
+			if pv == nil {
+				return
+			}
+			By(fmt.Sprintf("Clean PV %s", pv.Name))
+			err := config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		It("all pods should be running", func() {
+			var (
+				pvc   *v1.PersistentVolumeClaim
+				pods  = map[string]*v1.Pod{}
+				count = 50
+				err   error
+			)
+			pvc = framework.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
+			By(fmt.Sprintf("Create a PVC %s", pvc.Name))
+			pvc, err = framework.CreatePVC(config.client, config.ns, pvc)
+			framework.ExpectNoError(err)
+			By(fmt.Sprintf("Create %d pods to use this PVC", count))
+			for i := 0; i < count; i++ {
+				pod := framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{pvc}, false, "", false, false, selinuxLabel, nil)
+				pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
+				framework.ExpectNoError(err)
+				pods[pod.Name] = pod
+			}
+			By("Wait for all pods are running")
+			err = wait.PollImmediate(time.Second, 5*time.Minute, func() (done bool, err error) {
+				podsList, err := config.client.CoreV1().Pods(config.ns).List(metav1.ListOptions{})
+				if err != nil {
+					return false, err
+				}
+				runningPods := 0
+				for _, pod := range podsList.Items {
+					switch pod.Status.Phase {
+					case v1.PodRunning:
+						runningPods++
+					}
+				}
+				return runningPods == count, nil
+			})
+			framework.ExpectNoError(err)
 		})
 	})
 })
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
-	framework.Logf("Deleting pod %v", pod.Name)
+	e2elog.Logf("Deleting pod %v", pod.Name)
 	if err := config.client.CoreV1().Pods(config.ns).Delete(pod.Name, nil); err != nil {
 		return err
 	}
@@ -642,10 +698,10 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
 	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = framework.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 // The tests below are run against multiple mount point types
@@ -654,7 +710,7 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1 to write to the PV")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
-	Expect(pod1Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod1Err)
 	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -667,19 +723,19 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 
 	By("Creating pod2 to read from the PV")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
-	Expect(pod2Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod2Err)
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	// testFileContent was written after creating pod1
 	testReadFileContent(volumeDir, testFile, testFileContent, pod2, testVol.localVolumeType)
 
-	writeCmd = createWriteCmd(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/, testVol.localVolumeType)
+	writeCmd = createWriteCmd(volumeDir, testFile, testVol.ltr.Path /*writeTestFileContent*/, testVol.localVolumeType)
 
 	By("Writing in pod2")
 	podRWCmdExec(pod2, writeCmd)
 
 	By("Reading in pod1")
-	testReadFileContent(volumeDir, testFile, testVol.hostDir, pod1, testVol.localVolumeType)
+	testReadFileContent(volumeDir, testFile, testVol.ltr.Path, pod1, testVol.localVolumeType)
 
 	By("Deleting pod1")
 	framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
@@ -691,7 +747,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1")
 	pod1, pod1Err := createLocalPod(config, testVol, nil)
-	Expect(pod1Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod1Err)
 	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	writeCmd := createWriteCmd(volumeDir, testFile, testFileContent, testVol.localVolumeType)
@@ -707,7 +763,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 
 	By("Creating pod2")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
-	Expect(pod2Err).NotTo(HaveOccurred())
+	framework.ExpectNoError(pod2Err)
 	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	By("Reading in pod2")
@@ -722,7 +778,7 @@ func createPodWithFsGroupTest(config *localTestConfig, testVol *localTestVolume,
 	pod, err := createLocalPod(config, testVol, &fsGroup)
 	framework.ExpectNoError(err)
 	_, err = framework.LookForStringInPodExec(config.ns, pod.Name, []string{"stat", "-c", "%g", volumeDir}, strconv.FormatInt(expectedFsGroup, 10), time.Second*3)
-	Expect(err).NotTo(HaveOccurred(), "failed to get expected fsGroup %d on directory %s in pod %s", fsGroup, volumeDir, pod.Name)
+	framework.ExpectNoError(err, "failed to get expected fsGroup %d on directory %s in pod %s", fsGroup, volumeDir, pod.Name)
 	return pod
 }
 
@@ -735,8 +791,8 @@ func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMod
 		VolumeBindingMode: mode,
 	}
 
-	sc, err := config.client.StorageV1().StorageClasses().Create(sc)
-	Expect(err).NotTo(HaveOccurred())
+	_, err := config.client.StorageV1().StorageClasses().Create(sc)
+	framework.ExpectNoError(err)
 }
 
 func cleanupStorageClass(config *localTestConfig) {
@@ -753,10 +809,13 @@ func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
 func setupLocalVolumes(config *localTestConfig, localVolumeType localVolumeType, node *v1.Node, count int) []*localTestVolume {
 	vols := []*localTestVolume{}
 	for i := 0; i < count; i++ {
-		setupLocalVolume, ok := setupLocalVolumeMap[localVolumeType]
+		ltrType, ok := setupLocalVolumeMap[localVolumeType]
 		Expect(ok).To(BeTrue())
-		testVol := setupLocalVolume(config, node)
-		vols = append(vols, testVol)
+		ltr := config.ltrMgr.Create(node, ltrType, nil)
+		vols = append(vols, &localTestVolume{
+			ltr:             ltr,
+			localVolumeType: localVolumeType,
+		})
 	}
 	return vols
 }
@@ -776,194 +835,8 @@ func cleanupLocalVolumes(config *localTestConfig, volumes []*localTestVolume) {
 	cleanupLocalPVCsPVs(config, volumes)
 
 	for _, volume := range volumes {
-		cleanup := cleanupLocalVolumeMap[volume.localVolumeType]
-		cleanup(config, volume)
+		config.ltrMgr.Remove(volume.ltr)
 	}
-}
-
-func generateLocalTestVolume(hostDir string, config *localTestConfig, localVolumeType localVolumeType, node *v1.Node) *localTestVolume {
-	if localVolumeType != BlockLocalVolumeType && localVolumeType != BlockFsWithoutFormatLocalVolumeType {
-		mkdirCmd := fmt.Sprintf("mkdir -p %s", hostDir)
-		err := issueNodeCommand(config, mkdirCmd, node)
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	return &localTestVolume{
-		node:            node,
-		hostDir:         hostDir,
-		localVolumeType: localVolumeType,
-	}
-}
-
-func setupLocalVolumeTmpfs(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	createAndMountTmpfsLocalVolume(config, hostDir, node)
-	return generateLocalTestVolume(hostDir, config, TmpfsLocalVolumeType, node)
-}
-
-func setupLocalVolumeGCELocalSSD(config *localTestConfig, node *v1.Node) *localTestVolume {
-	res, err := issueNodeCommandWithResult(config, "ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", node)
-	Expect(err).NotTo(HaveOccurred())
-	dirName := strings.Fields(res)[0]
-	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
-	// gce local ssd does not need to create a directory
-	return &localTestVolume{
-		node:            node,
-		hostDir:         hostDir,
-		localVolumeType: GCELocalSSDVolumeType,
-	}
-}
-
-func setupLocalVolumeDirectory(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	return generateLocalTestVolume(hostDir, config, DirectoryLocalVolumeType, node)
-}
-
-// launchNodeExecPodForLocalPV launches a hostexec pod for local PV and waits
-// until it's Running.
-func launchNodeExecPodForLocalPV(client clientset.Interface, ns, node string) *v1.Pod {
-	hostExecPod := framework.NewExecPodSpec(ns, fmt.Sprintf("hostexec-%s", node), true)
-	hostExecPod.Spec.NodeName = node
-	hostExecPod.Spec.Volumes = []v1.Volume{
-		{
-			// Required to enter into host mount namespace via nsenter.
-			Name: "rootfs",
-			VolumeSource: v1.VolumeSource{
-				HostPath: &v1.HostPathVolumeSource{
-					Path: "/",
-				},
-			},
-		},
-	}
-	hostExecPod.Spec.Containers[0].VolumeMounts = []v1.VolumeMount{
-		{
-			Name:      "rootfs",
-			MountPath: "/rootfs",
-			ReadOnly:  true,
-		},
-	}
-	hostExecPod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
-		Privileged: func(privileged bool) *bool {
-			return &privileged
-		}(true),
-	}
-	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
-	framework.ExpectNoError(err)
-	err = framework.WaitForPodRunningInNamespace(client, pod)
-	framework.ExpectNoError(err)
-	return pod
-}
-
-// issueNodeCommandWithResult issues command on given node and returns stdout.
-func issueNodeCommandWithResult(config *localTestConfig, cmd string, node *v1.Node) (string, error) {
-	var pod *v1.Pod
-	pod, ok := config.nodeExecPods[node.Name]
-	if !ok {
-		pod = launchNodeExecPodForLocalPV(config.client, config.ns, node.Name)
-		if pod == nil {
-			return "", fmt.Errorf("failed to create hostexec pod for node %q", node)
-		}
-		config.nodeExecPods[node.Name] = pod
-	}
-	args := []string{
-		"exec",
-		fmt.Sprintf("--namespace=%v", pod.Namespace),
-		pod.Name,
-		"--",
-		"nsenter",
-		"--mount=/rootfs/proc/1/ns/mnt",
-		"--",
-		"sh",
-		"-c",
-		cmd,
-	}
-	return framework.RunKubectl(args...)
-}
-
-// issueNodeCommand works like issueNodeCommandWithResult, but discards result.
-func issueNodeCommand(config *localTestConfig, cmd string, node *v1.Node) error {
-	_, err := issueNodeCommandWithResult(config, cmd, node)
-	return err
-}
-
-func setupLocalVolumeDirectoryLink(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir %s && sudo ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
-	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
-	return generateLocalTestVolume(hostDir, config, DirectoryLinkLocalVolumeType, node)
-}
-
-func setupLocalVolumeDirectoryBindMounted(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s", hostDir, hostDir, hostDir)
-	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
-	return generateLocalTestVolume(hostDir, config, DirectoryBindMountedLocalVolumeType, node)
-}
-
-func setupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s && sudo ln -s %s %s",
-		hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
-	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
-	return generateLocalTestVolume(hostDir, config, DirectoryLinkBindMountedLocalVolumeType, node)
-}
-
-func setupLocalVolumeBlock(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	createAndMapBlockLocalVolume(config, hostDir, node)
-	loopDev := getBlockLoopDev(config, hostDir, node)
-	volume := generateLocalTestVolume(loopDev, config, BlockLocalVolumeType, node)
-	volume.hostDir = loopDev
-	volume.loopDevDir = hostDir
-	return volume
-}
-
-func setupLocalVolumeBlockFsWithFormat(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	createAndMapBlockLocalVolume(config, hostDir, node)
-	loopDev := getBlockLoopDev(config, hostDir, node)
-	// format and mount at hostDir
-	// give others rwx for read/write testing
-	cmd := fmt.Sprintf("sudo mkfs -t ext4 %s && sudo mount -t ext4 %s %s && sudo chmod o+rwx %s", loopDev, loopDev, hostDir, hostDir)
-	_, err := issueNodeCommandWithResult(config, cmd, node)
-	Expect(err).NotTo(HaveOccurred())
-	volume := generateLocalTestVolume(hostDir, config, BlockFsWithFormatLocalVolumeType, node)
-	volume.hostDir = hostDir
-	volume.loopDevDir = loopDev
-	return volume
-}
-
-func setupLocalVolumeBlockFsWithoutFormat(config *localTestConfig, node *v1.Node) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-	createAndMapBlockLocalVolume(config, hostDir, node)
-	loopDev := getBlockLoopDev(config, hostDir, node)
-	volume := generateLocalTestVolume(loopDev, config, BlockFsWithoutFormatLocalVolumeType, node)
-	// we do this in order to set block device path to local PV spec path directly
-	// and test local volume plugin FileSystem mode on block device
-	volume.hostDir = loopDev
-	volume.loopDevDir = hostDir
-	return volume
-}
-
-// Determine the /dev/loopXXX device associated with this test, via its hostDir.
-func getBlockLoopDev(config *localTestConfig, hostDir string, node *v1.Node) string {
-	loopDevCmd := fmt.Sprintf("E2E_LOOP_DEV=$(sudo losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", hostDir)
-	loopDevResult, err := issueNodeCommandWithResult(config, loopDevCmd, node)
-	Expect(err).NotTo(HaveOccurred())
-	return strings.TrimSpace(loopDevResult)
 }
 
 func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
@@ -972,97 +845,9 @@ func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
 
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
 	podNodeName, err := podNodeName(config, pod)
-	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
+	framework.ExpectNoError(err)
+	e2elog.Logf("pod %q created on Node %q", pod.Name, podNodeName)
 	Expect(podNodeName).To(Equal(expectedNodeName))
-}
-
-// Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
-func cleanupLocalVolumeGCELocalSSD(config *localTestConfig, volume *localTestVolume) {
-	By("Removing the test directory")
-	file := volume.hostDir + "/" + testFile
-	removeCmd := fmt.Sprintf("if [ -f %s ]; then rm %s; fi", file, file)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
-func cleanupLocalVolumeTmpfs(config *localTestConfig, volume *localTestVolume) {
-	unmountTmpfsLocalVolume(config, volume.hostDir, volume.node)
-
-	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
-func cleanupLocalVolumeDirectory(config *localTestConfig, volume *localTestVolume) {
-	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
-func cleanupLocalVolumeDirectoryLink(config *localTestConfig, volume *localTestVolume) {
-	By("Removing the test directory")
-	hostDir := volume.hostDir
-	hostDirBackend := hostDir + "-backend"
-	removeCmd := fmt.Sprintf("sudo rm -r %s && rm -r %s", hostDir, hostDirBackend)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
-func cleanupLocalVolumeDirectoryBindMounted(config *localTestConfig, volume *localTestVolume) {
-	By("Removing the test directory")
-	hostDir := volume.hostDir
-	removeCmd := fmt.Sprintf("sudo umount %s && rm -r %s", hostDir, hostDir)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory.
-func cleanupLocalVolumeDirectoryLinkBindMounted(config *localTestConfig, volume *localTestVolume) {
-	By("Removing the test directory")
-	hostDir := volume.hostDir
-	hostDirBackend := hostDir + "-backend"
-	removeCmd := fmt.Sprintf("sudo rm %s && sudo umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV and removes the test directory holding the block file.
-func cleanupLocalVolumeBlock(config *localTestConfig, volume *localTestVolume) {
-	volume.hostDir = volume.loopDevDir
-	unmapBlockLocalVolume(config, volume.hostDir, volume.node)
-	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-// Deletes the PVC/PV and removes the test directory holding the block file.
-func cleanupLocalVolumeBlockFsWithFormat(config *localTestConfig, volume *localTestVolume) {
-	// umount first
-	By("Umount blockfs mountpoint")
-	umountCmd := fmt.Sprintf("sudo umount %s", volume.hostDir)
-	err := issueNodeCommand(config, umountCmd, volume.node)
-	unmapBlockLocalVolume(config, volume.hostDir, volume.node)
-	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err = issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func cleanupLocalVolumeBlockFsWithoutFormat(config *localTestConfig, volume *localTestVolume) {
-	volume.hostDir = volume.loopDevDir
-	unmapBlockLocalVolume(config, volume.hostDir, volume.node)
-	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := issueNodeCommand(config, removeCmd, volume.node)
-	Expect(err).NotTo(HaveOccurred())
 }
 
 func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) framework.PersistentVolumeClaimConfig {
@@ -1080,10 +865,10 @@ func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) fra
 func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framework.PersistentVolumeConfig {
 	// TODO: hostname may not be the best option
 	nodeKey := "kubernetes.io/hostname"
-	if volume.node.Labels == nil {
+	if volume.ltr.Node.Labels == nil {
 		framework.Failf("Node does not have labels")
 	}
-	nodeValue, found := volume.node.Labels[nodeKey]
+	nodeValue, found := volume.ltr.Node.Labels[nodeKey]
 	if !found {
 		framework.Failf("Node does not have required label %q", nodeKey)
 	}
@@ -1091,7 +876,7 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 	pvConfig := framework.PersistentVolumeConfig{
 		PVSource: v1.PersistentVolumeSource{
 			Local: &v1.LocalVolumeSource{
-				Path: volume.hostDir,
+				Path: volume.ltr.Path,
 			},
 		},
 		NamePrefix:       "local-pv",
@@ -1203,36 +988,6 @@ func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *i
 	return framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, fsGroup, framework.PodStartShortTimeout)
 }
 
-func createAndMountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
-	By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", node.Name, dir))
-	err := issueNodeCommand(config, fmt.Sprintf("mkdir -p %q && sudo mount -t tmpfs -o size=1m tmpfs-%q %q", dir, dir, dir), node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func unmountTmpfsLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
-	By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", node.Name, dir))
-	err := issueNodeCommand(config, fmt.Sprintf("sudo umount %q", dir), node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func createAndMapBlockLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
-	By(fmt.Sprintf("Creating block device on node %q using path %q", node.Name, dir))
-	mkdirCmd := fmt.Sprintf("mkdir -p %s", dir)
-	// Create 10MB file that will serve as the backing for block device.
-	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=512 count=20480", dir)
-	losetupCmd := fmt.Sprintf("sudo losetup -f  %s/file", dir)
-	err := issueNodeCommand(config, fmt.Sprintf("%s && %s && %s", mkdirCmd, ddCmd, losetupCmd), node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func unmapBlockLocalVolume(config *localTestConfig, dir string, node *v1.Node) {
-	loopDev := getBlockLoopDev(config, dir, node)
-	By(fmt.Sprintf("Unmap block device %q on node %q at path %s/file", loopDev, node.Name, dir))
-	losetupDeleteCmd := fmt.Sprintf("sudo losetup -d %s", loopDev)
-	err := issueNodeCommand(config, losetupDeleteCmd, node)
-	Expect(err).NotTo(HaveOccurred())
-}
-
 func createWriteCmd(testDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) string {
 	if volumeType == BlockLocalVolumeType {
 		// testDir is the block device.
@@ -1253,6 +1008,7 @@ func createWriteCmd(testDir string, testFile string, writeTestFileContent string
 		return fmt.Sprintf("mkdir -p %s; echo %s > %s", testDir, writeTestFileContent, testFilePath)
 	}
 }
+
 func createReadCmd(testFileDir string, testFile string, volumeType localVolumeType) string {
 	if volumeType == BlockLocalVolumeType {
 		// Create the command to read the beginning of the block device and print it in ascii.
@@ -1275,8 +1031,8 @@ func testReadFileContent(testFileDir string, testFile string, testFileContent st
 // Fail on error
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
 	out, err := utils.PodExec(pod, cmd)
-	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
-	Expect(err).NotTo(HaveOccurred())
+	e2elog.Logf("podRWCmdExec out: %q err: %v", out, err)
+	framework.ExpectNoError(err)
 	return out
 }
 
@@ -1393,7 +1149,7 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	}
 
 	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 
 	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)
 	return ss
@@ -1422,7 +1178,7 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 			if pvcSource != nil {
 				err := framework.WaitForPersistentVolumeClaimPhase(
 					v1.ClaimBound, config.client, config.ns, pvcSource.ClaimName, framework.Poll, time.Second)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 			}
 		}
 	}
@@ -1432,10 +1188,10 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 // and skips if a disk of that type does not exist on the node
 func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
-	res, err := issueNodeCommandWithResult(config, ssdCmd, node)
-	Expect(err).NotTo(HaveOccurred())
+	res, err := config.hostExec.IssueCommandWithResult(ssdCmd, node)
+	framework.ExpectNoError(err)
 	num, err := strconv.Atoi(strings.TrimSpace(res))
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	if num < 1 {
 		framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
 	}

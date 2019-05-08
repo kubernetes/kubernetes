@@ -23,7 +23,13 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-APIROOTS=${APIROOTS:-pkg/api pkg/apis pkg/watch staging/src/k8s.io/apimachinery/pkg/api staging/src/k8s.io/apimachinery/pkg/apis staging/src/k8s.io/apiserver/pkg staging/src/k8s.io/api staging/src/k8s.io/metrics/pkg/apis}
+APIROOTS=$({
+  # gather the packages explicitly requesting generation
+  git grep --files-with-matches -e '// +k8s:protobuf-gen=package' cmd pkg staging | xargs -n 1 dirname
+  # add the root apimachinery pkg containing implicitly generated files (--apimachinery-packages)
+  echo staging/src/k8s.io/apimachinery/pkg
+} | sort | uniq)
+
 _tmp="${KUBE_ROOT}/_tmp"
 
 cleanup() {

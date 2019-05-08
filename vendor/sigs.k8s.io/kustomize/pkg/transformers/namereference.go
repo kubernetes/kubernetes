@@ -89,7 +89,7 @@ func (o *nameReferenceTransformer) updateNameReference(
 			s, _ := in.(string)
 			for id, res := range m {
 				if id.Gvk().IsSelected(&backRef) && id.Name() == s {
-					matchedIds := m.FindByGVKN(id)
+					matchedIds := m.GetMatchingIds(id.GvknEquals)
 					// If there's more than one match, there's no way
 					// to know which one to pick, so emit error.
 					if len(matchedIds) > 1 {
@@ -115,7 +115,7 @@ func (o *nameReferenceTransformer) updateNameReference(
 			for id, res := range m {
 				indexes := indexOf(id.Name(), names)
 				if id.Gvk().IsSelected(&backRef) && len(indexes) > 0 {
-					matchedIds := m.FindByGVKN(id)
+					matchedIds := m.GetMatchingIds(id.GvknEquals)
 					if len(matchedIds) > 1 {
 						return nil, fmt.Errorf(
 							"Multiple matches for name %s:\n %v", id, matchedIds)

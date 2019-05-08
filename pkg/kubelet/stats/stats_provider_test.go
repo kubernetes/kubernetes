@@ -682,6 +682,10 @@ func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) 
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }

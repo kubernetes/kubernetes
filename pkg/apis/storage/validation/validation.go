@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -36,6 +37,8 @@ const (
 
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
+
+	csiNodeIDMaxLength = 128
 )
 
 // ValidateStorageClass validates a StorageClass.
@@ -262,6 +265,147 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 		}
 
 		rawTopologies = append(rawTopologies, exprMap)
+	}
+
+	return allErrs
+}
+
+// ValidateCSINode validates a CSINode.
+func ValidateCSINode(csiNode *storage.CSINode) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&csiNode.ObjectMeta, false, apivalidation.ValidateNodeName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateCSINodeSpec(&csiNode.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateCSINodeUpdate validates a CSINode.
+func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
+	allErrs := ValidateCSINode(new)
+
+	// Validate modifying fields inside an existing CSINodeDriver entry is not allowed
+	for _, oldDriver := range old.Spec.Drivers {
+		for _, newDriver := range new.Spec.Drivers {
+			if oldDriver.Name == newDriver.Name {
+				if !apiequality.Semantic.DeepEqual(oldDriver, newDriver) {
+					allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
+				}
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateCSINodeSpec tests that the specified CSINodeSpec has valid data.
+func validateCSINodeSpec(
+	spec *storage.CSINodeSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"))...)
+	return allErrs
+}
+
+// ValidateCSINodeDrivers tests that the specified CSINodeDrivers have valid data.
+func validateCSINodeDrivers(drivers []storage.CSINodeDriver, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	driverNamesInSpecs := make(sets.String)
+	for i, driver := range drivers {
+		idxPath := fldPath.Index(i)
+		allErrs = append(allErrs, validateCSINodeDriver(driver, driverNamesInSpecs, idxPath)...)
+	}
+
+	return allErrs
+}
+
+// validateCSINodeDriverNodeID tests if Name in CSINodeDriver is a valid node id.
+func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	// nodeID is always required
+	if len(nodeID) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, nodeID))
+	}
+	if len(nodeID) > csiNodeIDMaxLength {
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
+	}
+	return allErrs
+}
+
+// validateCSINodeDriver tests if CSINodeDriver has valid entries
+func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.String, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"))...)
+	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"))...)
+
+	// check for duplicate entries for the same driver in specs
+	if driverNamesInSpecs.Has(driver.Name) {
+		allErrs = append(allErrs, field.Duplicate(fldPath.Child("name"), driver.Name))
+	}
+	driverNamesInSpecs.Insert(driver.Name)
+	topoKeys := make(sets.String)
+	for _, key := range driver.TopologyKeys {
+		if len(key) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, key))
+		}
+
+		if topoKeys.Has(key) {
+			allErrs = append(allErrs, field.Duplicate(fldPath, key))
+		}
+		topoKeys.Insert(key)
+
+		for _, msg := range validation.IsQualifiedName(key) {
+			allErrs = append(allErrs, field.Invalid(fldPath, driver.TopologyKeys, msg))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateCSIDriver validates a CSIDriver.
+func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(csiDriver.Name, field.NewPath("name"))...)
+
+	allErrs = append(allErrs, validateCSIDriverSpec(&csiDriver.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateCSIDriverUpdate validates a CSIDriver.
+func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
+	allErrs := ValidateCSIDriver(new)
+
+	// Spec is read-only
+	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
+	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
+	}
+	return allErrs
+}
+
+// ValidateCSIDriverSpec tests that the specified CSIDriverSpec
+// has valid data.
+func validateCSIDriverSpec(
+	spec *storage.CSIDriverSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
+	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
+	return allErrs
+}
+
+// validateAttachRequired tests if attachRequired is set for CSIDriver.
+func validateAttachRequired(attachRequired *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if attachRequired == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validatePodInfoOnMount tests if podInfoOnMount is set for CSIDriver.
+func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if podInfoOnMount == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
 	return allErrs

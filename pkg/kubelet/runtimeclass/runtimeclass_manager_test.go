@@ -33,7 +33,6 @@ func TestLookupRuntimeHandler(t *testing.T) {
 		expected    string
 		expectError bool
 	}{
-		{rcn: nil, expected: ""},
 		{rcn: pointer.StringPtr(""), expected: ""},
 		{rcn: pointer.StringPtr(rctest.EmptyRuntimeClass), expected: ""},
 		{rcn: pointer.StringPtr(rctest.SandboxRuntimeClass), expected: "kata-containers"},

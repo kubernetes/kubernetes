@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -240,6 +241,10 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	// we don't have an entry and we do want one (2B,2C)
 	case apierrors.IsNotFound(err) && desired != nil:
 		_, err := c.apiServiceClient.APIServices().Create(desired)
+		if apierrors.IsAlreadyExists(err) {
+			// created in the meantime, we'll get called again
+			return nil
+		}
 		return err
 
 	// we aren't trying to manage this APIService (3A,3B,3C)
@@ -256,7 +261,13 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 
 	// we have a spurious APIService that we're managing, delete it (5A,6A)
 	case desired == nil:
-		return c.apiServiceClient.APIServices().Delete(curr.Name, nil)
+		opts := &metav1.DeleteOptions{Preconditions: metav1.NewUIDPreconditions(string(curr.UID))}
+		err := c.apiServiceClient.APIServices().Delete(curr.Name, opts)
+		if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+			// deleted or changed in the meantime, we'll get called again
+			return nil
+		}
+		return err
 
 	// if the specs already match, nothing for us to do
 	case reflect.DeepEqual(curr.Spec, desired.Spec):
@@ -267,6 +278,10 @@ func (c *autoRegisterController) checkAPIService(name string) (err error) {
 	apiService := curr.DeepCopy()
 	apiService.Spec = desired.Spec
 	_, err = c.apiServiceClient.APIServices().Update(apiService)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	return err
 }
 

@@ -55,7 +55,7 @@ const (
 )
 
 // PatchResource returns a function that will handle a resource patch.
-func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
+func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interface, patchTypes []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Patch " + req.URL.Path)
@@ -95,7 +95,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
 
-		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
 		if err != nil {
 			scope.err(err, w, req)
 			return
@@ -191,12 +191,12 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			subresource:     scope.Subresource,
 			dryRun:          dryrun.IsDryRun(options.DryRun),
 
-			objectInterfaces: &scope,
+			objectInterfaces: scope,
 
 			hubGroupVersion: scope.HubGroupVersion,
 
-			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, &scope), scope.Authorizer, createAuthorizerAttributes),
-			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, &scope),
+			createValidation: withAuthorization(rest.AdmissionToValidateObjectFunc(admit, staticCreateAttributes, scope), scope.Authorizer, createAuthorizerAttributes),
+			updateValidation: rest.AdmissionToValidateObjectUpdateFunc(admit, staticUpdateAttributes, scope),
 			admissionCheck:   mutatingAdmission,
 
 			codec: codec,
@@ -235,8 +235,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 		if wasCreated {
 			status = http.StatusCreated
 		}
-		scope.Trace = trace
-		transformResponseObject(ctx, scope, req, w, status, outputMediaType, result)
+		transformResponseObject(ctx, scope, trace, req, w, status, outputMediaType, result)
 	}
 }
 
@@ -320,7 +319,7 @@ func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (r
 	}
 
 	if p.fieldManager != nil {
-		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, prefixFromUserAgent(p.userAgent)); err != nil {
+		if objToUpdate, err = p.fieldManager.Update(currentObject, objToUpdate, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (json PATCH for %v) managed fields: %v", p.kind, err)
 		}
 	}
@@ -387,7 +386,7 @@ func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (ru
 	}
 
 	if p.fieldManager != nil {
-		if newObj, err = p.fieldManager.Update(currentObject, newObj, prefixFromUserAgent(p.userAgent)); err != nil {
+		if newObj, err = p.fieldManager.Update(currentObject, newObj, managerOrUserAgent(p.options.FieldManager, p.userAgent)); err != nil {
 			return nil, fmt.Errorf("failed to update object (smp PATCH for %v) managed fields: %v", p.kind, err)
 		}
 	}
@@ -414,7 +413,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if p.fieldManager == nil {
 		panic("FieldManager must be installed to run apply")
 	}
-	return p.fieldManager.Apply(obj, p.patch, force)
+	return p.fieldManager.Apply(obj, p.patch, p.options.FieldManager, force)
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
@@ -517,7 +516,7 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 }
 
 // patchResource divides PatchResource for easier unit testing
-func (p *patcher) patchResource(ctx context.Context, scope RequestScope) (runtime.Object, bool, error) {
+func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runtime.Object, bool, error) {
 	p.namespace = request.NamespaceValue(ctx)
 	switch p.patchType {
 	case types.JSONPatchType, types.MergePatchType:

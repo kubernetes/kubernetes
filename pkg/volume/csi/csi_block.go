@@ -21,13 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -37,8 +36,8 @@ import (
 )
 
 type csiBlockMapper struct {
+	csiClientGetter
 	k8s        kubernetes.Interface
-	csiClient  csiClient
 	plugin     *csiPlugin
 	driverName csiDriverName
 	specName   string
@@ -63,14 +62,14 @@ func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // Example: plugins/kubernetes.io/csi/volumeDevices/staging/{pvname}
 func (m *csiBlockMapper) getStagingPath() string {
 	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
-	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", sanitizedSpecVolID)
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", sanitizedSpecVolID)
 }
 
 // getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{pvname}
 func (m *csiBlockMapper) getPublishPath() string {
 	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
-	return path.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", sanitizedSpecVolID)
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", sanitizedSpecVolID)
 }
 
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume
@@ -227,7 +226,7 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	// Search for attachment by VolumeAttachment.Spec.Source.PersistentVolumeName
 	nodeName := string(m.plugin.host.GetNodeName())
 	attachID := getAttachmentName(csiSource.VolumeHandle, csiSource.Driver, nodeName)
-	attachment, err := m.k8s.StorageV1beta1().VolumeAttachments().Get(attachID, meta.GetOptions{})
+	attachment, err := m.k8s.StorageV1().VolumeAttachments().Get(attachID, meta.GetOptions{})
 	if err != nil {
 		klog.Error(log("blockMapper.SetupDevice failed to get volume attachment [id=%v]: %v", attachID, err))
 		return "", err
@@ -247,14 +246,20 @@ func (m *csiBlockMapper) SetUpDevice() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
+	csiClient, err := m.csiClientGetter.Get()
+	if err != nil {
+		klog.Error(log("blockMapper.SetUpDevice failed to get CSI client: %v", err))
+		return "", err
+	}
+
 	// Call NodeStageVolume
-	stagingPath, err := m.stageVolumeForBlock(ctx, m.csiClient, accessMode, csiSource, attachment)
+	stagingPath, err := m.stageVolumeForBlock(ctx, csiClient, accessMode, csiSource, attachment)
 	if err != nil {
 		return "", err
 	}
 
 	// Call NodePublishVolume
-	publishPath, err := m.publishVolumeForBlock(ctx, m.csiClient, accessMode, csiSource, attachment, stagingPath)
+	publishPath, err := m.publishVolumeForBlock(ctx, csiClient, accessMode, csiSource, attachment, stagingPath)
 	if err != nil {
 		return "", err
 	}
@@ -326,6 +331,12 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
+	csiClient, err := m.csiClientGetter.Get()
+	if err != nil {
+		klog.Error(log("blockMapper.TearDownDevice failed to get CSI client: %v", err))
+		return err
+	}
+
 	// Call NodeUnpublishVolume
 	publishPath := m.getPublishPath()
 	if _, err := os.Stat(publishPath); err != nil {
@@ -335,7 +346,7 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 			return err
 		}
 	} else {
-		err := m.unpublishVolumeForBlock(ctx, m.csiClient, publishPath)
+		err := m.unpublishVolumeForBlock(ctx, csiClient, publishPath)
 		if err != nil {
 			return err
 		}
@@ -350,7 +361,7 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 			return err
 		}
 	} else {
-		err := m.unstageVolumeForBlock(ctx, m.csiClient, stagingPath)
+		err := m.unstageVolumeForBlock(ctx, csiClient, stagingPath)
 		if err != nil {
 			return err
 		}

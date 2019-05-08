@@ -33,11 +33,6 @@ import (
 
 type runnerMap map[string]common.Runner
 
-type runRequestJSON struct {
-	runner  string
-	options interface{}
-}
-
 var (
 	// flags for the command line. See usage args below for
 	// descriptions.
@@ -156,7 +151,4 @@ func handleRunRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprintf(w, "ok\noutput:\n\n"+output.b.String())
-}
-
-func setupLogger() {
 }

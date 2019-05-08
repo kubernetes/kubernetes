@@ -31,8 +31,8 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
-	"github.com/google/cadvisor/manager/watcher"
 	dockerutil "github.com/google/cadvisor/utils/docker"
+	"github.com/google/cadvisor/watcher"
 	"github.com/google/cadvisor/zfs"
 
 	docker "github.com/docker/docker/client"
@@ -325,7 +325,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 
 	dockerAPIVersion, _ := APIVersion()
 
-	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
+	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems(includedMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}

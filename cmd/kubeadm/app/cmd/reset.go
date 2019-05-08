@@ -32,12 +32,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	uploadconfig "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -58,26 +59,27 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "reset",
-		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
+		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'",
 		Run: func(cmd *cobra.Command, args []string) {
 			ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
 			kubeadmutil.CheckErr(err)
 
-			kubeConfigFile = cmdutil.FindExistingKubeConfig(kubeConfigFile)
-			if _, err := os.Stat(kubeConfigFile); !os.IsNotExist(err) {
-				client, err = getClientset(kubeConfigFile, false)
-				kubeadmutil.CheckErr(err)
-			}
-
-			cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
-			if err != nil {
-				klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+			var cfg *kubeadmapi.InitConfiguration
+			client, err = getClientset(kubeConfigFile, false)
+			if err == nil {
+				klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", kubeConfigFile)
+				cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "reset", false)
+				if err != nil {
+					klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
+				}
+			} else {
+				klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", kubeConfigFile)
 			}
 
 			if criSocketPath == "" {
 				criSocketPath, err = resetDetectCRISocket(cfg)
 				kubeadmutil.CheckErr(err)
-				klog.V(1).Infof("[reset] detected and using CRI socket: %s", criSocketPath)
+				klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
 			}
 
 			r, err := NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
@@ -90,7 +92,7 @@ func NewCmdReset(in io.Reader, out io.Writer) *cobra.Command {
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	cmd.PersistentFlags().StringVar(
-		&certsDir, "cert-dir", kubeadmapiv1beta1.DefaultCertificatesDir,
+		&certsDir, "cert-dir", kubeadmapiv1beta2.DefaultCertificatesDir,
 		"The path to the directory where the certificates are stored. If specified, clean this directory.",
 	)
 
@@ -113,8 +115,8 @@ type Reset struct {
 // NewReset instantiate Reset struct
 func NewReset(in io.Reader, ignorePreflightErrors sets.String, forceReset bool, certsDir, criSocketPath string) (*Reset, error) {
 	if !forceReset {
-		fmt.Println("[reset] WARNING: changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
-		fmt.Print("[reset] are you sure you want to proceed? [y/N]: ")
+		fmt.Println("[reset] WARNING: Changes made to this host by 'kubeadm init' or 'kubeadm join' will be reverted.")
+		fmt.Print("[reset] Are you sure you want to proceed? [y/N]: ")
 		s := bufio.NewScanner(in)
 		s.Scan()
 		if err := s.Err(); err != nil {
@@ -125,7 +127,7 @@ func NewReset(in io.Reader, ignorePreflightErrors sets.String, forceReset bool, 
 		}
 	}
 
-	fmt.Println("[preflight] running pre-flight checks")
+	fmt.Println("[preflight] Running pre-flight checks")
 	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
 		return nil, err
 	}
@@ -139,10 +141,15 @@ func NewReset(in io.Reader, ignorePreflightErrors sets.String, forceReset bool, 
 // Run reverts any changes made to this host by "kubeadm init" or "kubeadm join".
 func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.InitConfiguration) error {
 	var dirsToClean []string
-	// Only clear etcd data when using local etcd.
-	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 
-	klog.V(1).Infof("[reset] checking for etcd config")
+	// Reset the ClusterStatus for a given control-plane node.
+	if isControlPlane() && cfg != nil {
+		uploadconfig.ResetClusterStatusForNode(cfg.NodeRegistration.Name, client)
+	}
+
+	// Only clear etcd data when using local etcd.
+	klog.V(1).Infoln("[reset] Checking for etcd config")
+	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
 	if err == nil {
 		dirsToClean = append(dirsToClean, etcdDataDir)
@@ -152,52 +159,52 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 			}
 		}
 	} else {
-		fmt.Println("[reset] no etcd config found. Assuming external etcd")
-		fmt.Println("[reset] please manually reset etcd to prevent further issues")
+		fmt.Println("[reset] No etcd config found. Assuming external etcd")
+		fmt.Println("[reset] Please manually reset etcd to prevent further issues")
 	}
 
 	// Try to stop the kubelet service
-	klog.V(1).Infof("[reset] getting init system")
+	klog.V(1).Infoln("[reset] Getting init system")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
-		klog.Warningln("[reset] the kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
-		klog.Warningln("[reset] please ensure kubelet is stopped manually")
+		klog.Warningln("[reset] The kubelet service could not be stopped by kubeadm. Unable to detect a supported init system!")
+		klog.Warningln("[reset] Please ensure kubelet is stopped manually")
 	} else {
-		fmt.Println("[reset] stopping the kubelet service")
+		fmt.Println("[reset] Stopping the kubelet service")
 		if err := initSystem.ServiceStop("kubelet"); err != nil {
-			klog.Warningf("[reset] the kubelet service could not be stopped by kubeadm: [%v]\n", err)
-			klog.Warningln("[reset] please ensure kubelet is stopped manually")
+			klog.Warningf("[reset] The kubelet service could not be stopped by kubeadm: [%v]\n", err)
+			klog.Warningln("[reset] Please ensure kubelet is stopped manually")
 		}
 	}
 
 	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
-	fmt.Printf("[reset] unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
+	fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
 	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", kubeadmconstants.KubeletRunDirectory)
 
-	klog.V(1).Infof("[reset] executing command %q", umountDirsCmd)
+	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
 	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
 	if err != nil {
-		klog.Errorf("[reset] failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		klog.Errorf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
 	}
 
-	klog.V(1).Info("[reset] removing Kubernetes-managed containers")
+	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
 	if err := removeContainers(utilsexec.New(), r.criSocketPath); err != nil {
-		klog.Errorf("[reset] failed to remove containers: %v", err)
+		klog.Errorf("[reset] Failed to remove containers: %v", err)
 	}
 
 	dirsToClean = append(dirsToClean, []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories
-	fmt.Printf("[reset] deleting contents of stateful directories: %v\n", dirsToClean)
+	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
-		klog.V(1).Infof("[reset] deleting content of %s", dir)
+		klog.V(1).Infof("[reset] Deleting content of %s", dir)
 		cleanDir(dir)
 	}
 
 	// Remove contents from the config and pki directories
-	klog.V(1).Infoln("[reset] removing contents from the config and pki directories")
-	if r.certsDir != kubeadmapiv1beta1.DefaultCertificatesDir {
-		klog.Warningf("[reset] WARNING: cleaning a non-default certificates directory: %q\n", r.certsDir)
+	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
+	if r.certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
+		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", r.certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
 
@@ -210,7 +217,9 @@ func (r *Reset) Run(out io.Writer, client clientset.Interface, cfg *kubeadmapi.I
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
-
+		
+		The reset process does not clean your kubeconfig files and you must remove them manually.
+		Please, check the contents of the $HOME/.kube/config file.
 	`)
 	fmt.Print(msg)
 
@@ -286,10 +295,10 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ManifestsSubDirName),
 		pkiPathDir,
 	}
-	fmt.Printf("[reset] deleting contents of config directories: %v\n", dirsToClean)
+	fmt.Printf("[reset] Deleting contents of config directories: %v\n", dirsToClean)
 	for _, dir := range dirsToClean {
 		if err := cleanDir(dir); err != nil {
-			klog.Errorf("[reset] failed to remove directory: %q [%v]\n", dir, err)
+			klog.Errorf("[reset] Failed to remove directory: %q [%v]\n", dir, err)
 		}
 	}
 
@@ -300,10 +309,10 @@ func resetConfigDir(configPathDir, pkiPathDir string) {
 		filepath.Join(configPathDir, kubeadmconstants.ControllerManagerKubeConfigFileName),
 		filepath.Join(configPathDir, kubeadmconstants.SchedulerKubeConfigFileName),
 	}
-	fmt.Printf("[reset] deleting files: %v\n", filesToClean)
+	fmt.Printf("[reset] Deleting files: %v\n", filesToClean)
 	for _, path := range filesToClean {
 		if err := os.RemoveAll(path); err != nil {
-			klog.Errorf("[reset] failed to remove file: %q [%v]\n", path, err)
+			klog.Errorf("[reset] Failed to remove file: %q [%v]\n", path, err)
 		}
 	}
 }
@@ -316,4 +325,14 @@ func resetDetectCRISocket(cfg *kubeadmapi.InitConfiguration) (string, error) {
 
 	// if this fails, try to detect it
 	return utilruntime.DetectCRISocket()
+}
+
+// isControlPlane checks if a node is a control-plane node by looking up
+// the kube-apiserver manifest file
+func isControlPlane() bool {
+	filepath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, kubeadmconstants.GetStaticPodDirectory())
+	if _, err := os.Stat(filepath); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }

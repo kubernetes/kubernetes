@@ -95,7 +95,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 
 	waitPDBStable(t, clientSet, numOfEvictions, ns.Name, pdb.Name)
 
-	var numberPodsEvicted uint32 = 0
+	var numberPodsEvicted uint32
 	errCh := make(chan error, 3*numOfEvictions)
 	var wg sync.WaitGroup
 	// spawn numOfEvictions goroutines to concurrently evict the pods

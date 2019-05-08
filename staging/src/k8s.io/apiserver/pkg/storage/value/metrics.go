@@ -33,7 +33,7 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "transformation_latencies_seconds",
+			Name:      "transformation_duration_seconds",
 			Help:      "Latencies in seconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
@@ -76,7 +76,7 @@ var (
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: subsystem,
-			Name:      "data_key_generation_latencies_seconds",
+			Name:      "data_key_generation_duration_seconds",
 			Help:      "Latencies in seconds of data encryption key(DEK) generation operations.",
 			Buckets:   prometheus.ExponentialBuckets(5e-6, 2, 14),
 		},

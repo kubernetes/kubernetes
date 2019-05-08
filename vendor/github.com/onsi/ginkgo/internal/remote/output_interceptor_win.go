@@ -4,6 +4,7 @@ package remote
 
 import (
 	"errors"
+	"os"
 )
 
 func NewOutputInterceptor() OutputInterceptor {
@@ -31,3 +32,5 @@ func (interceptor *outputInterceptor) StopInterceptingAndReturnOutput() (string,
 
 	return "", nil
 }
+
+func (interceptor *outputInterceptor) StreamTo(*os.File) {}

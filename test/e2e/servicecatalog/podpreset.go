@@ -77,7 +77,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if errors.IsNotFound(err) {
 			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating the pod")
 		name := "pod-preset-pod"
@@ -97,6 +97,13 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 					{
 						Name:  "nginx",
 						Image: imageutils.GetE2EImage(imageutils.Nginx),
+					},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name:    "init1",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/true"},
 					},
 				},
 			},
@@ -153,6 +160,9 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if !reflect.DeepEqual(pip.Spec.Env, pod.Spec.Containers[0].Env) {
 			framework.Failf("env of pod container does not match the env of the pip: expected %#v, got: %#v", pip.Spec.Env, pod.Spec.Containers[0].Env)
 		}
+		if !reflect.DeepEqual(pip.Spec.Env, pod.Spec.InitContainers[0].Env) {
+			framework.Failf("env of pod init container does not match the env of the pip: expected %#v, got: %#v", pip.Spec.Env, pod.Spec.InitContainers[0].Env)
+		}
 	})
 
 	ginkgo.It("should not modify the pod on conflict", func() {
@@ -185,7 +195,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if errors.IsNotFound(err) {
 			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
 		}
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating the pod")
 		name := "pod-preset-pod"
@@ -206,6 +216,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 						Name:  "nginx",
 						Image: imageutils.GetE2EImage(imageutils.Nginx),
 						Env:   []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
+					},
+				},
+				InitContainers: []v1.Container{
+					{
+						Name:    "init1",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Env:     []v1.EnvVar{{Name: "abc", Value: "value2"}, {Name: "ABC", Value: "value"}},
+						Command: []string{"/bin/true"},
 					},
 				},
 			},
@@ -262,21 +280,13 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		if !reflect.DeepEqual(originalPod.Spec.Containers[0].Env, pod.Spec.Containers[0].Env) {
 			framework.Failf("env of pod container does not match the env of the original pod: expected %#v, got: %#v", originalPod.Spec.Containers[0].Env, pod.Spec.Containers[0].Env)
 		}
+		if !reflect.DeepEqual(originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env) {
+			framework.Failf("env of pod init container does not match the env of the original pod: expected %#v, got: %#v", originalPod.Spec.InitContainers[0].Env, pod.Spec.InitContainers[0].Env)
+		}
+
 	})
 })
 
-func getPodPreset(c clientset.Interface, ns, name string) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Get(name, metav1.GetOptions{})
-}
-
 func createPodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
 	return c.SettingsV1alpha1().PodPresets(ns).Create(job)
-}
-
-func updatePodPreset(c clientset.Interface, ns string, job *settings.PodPreset) (*settings.PodPreset, error) {
-	return c.SettingsV1alpha1().PodPresets(ns).Update(job)
-}
-
-func deletePodPreset(c clientset.Interface, ns, name string) error {
-	return c.SettingsV1alpha1().PodPresets(ns).Delete(name, nil)
 }

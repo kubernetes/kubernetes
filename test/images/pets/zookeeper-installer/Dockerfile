@@ -30,4 +30,4 @@ RUN wget -q -O /zookeeper-3.5.0-alpha.tar.gz http://archive.apache.org/dist/zook
 
 ADD install.sh /
 RUN chmod -c 755 /install.sh /on-start.sh /peer-finder
-Entrypoint ["/install.sh"]
+ENTRYPOINT ["/install.sh"]

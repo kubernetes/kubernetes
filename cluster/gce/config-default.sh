@@ -38,13 +38,7 @@ MASTER_ROOT_DISK_SIZE=${MASTER_ROOT_DISK_SIZE:-$(get-master-root-disk-size)}
 NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
 NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
 NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
-
-# Historically fluentd was a manifest pod and then was migrated to DaemonSet.
-# To avoid situation during cluster upgrade when there are two instances
-# of fluentd running on a node, kubelet need to mark node on which
-# fluentd is not running as a manifest pod with appropriate label.
-# TODO(piosz): remove this in 1.8
-NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
+NODE_LABELS="${KUBE_NODE_LABELS:-}"
 WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS:-}"
 
 # An extension to local SSDs allowing users to specify block/fs and SCSI/NVMe devices
@@ -85,7 +79,7 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-65-10323-64-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-beta-73-11647-64-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -217,28 +211,11 @@ ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-false}" # true, fals
 METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # true, false
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
+  NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
+  # TODO(liggitt): remove this in v1.16
   NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
-fi
-
-
-# Enable AESGCM encryption of secrets by default.
-ENCRYPTION_PROVIDER_CONFIG="${ENCRYPTION_PROVIDER_CONFIG:-}"
-if [[ -z "${ENCRYPTION_PROVIDER_CONFIG}" ]]; then
-    ENCRYPTION_PROVIDER_CONFIG=$(cat << EOM | base64 | tr -d '\r\n'
-kind: EncryptionConfiguration
-apiVersion: apiserver.config.k8s.io/v1
-resources:
-  - resources:
-    - secrets
-    providers:
-    - aesgcm:
-        keys:
-        - name: key1
-          secret: $(dd if=/dev/urandom iflag=fullblock bs=32 count=1 2>/dev/null | base64 | tr -d '\r\n')
-EOM
-)
 fi
 
 # Optional: Enable node logging.
@@ -296,6 +273,11 @@ else
 fi
 NODE_PROBLEM_DETECTOR_VERSION="${NODE_PROBLEM_DETECTOR_VERSION:-}"
 NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
+NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
+NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+
+CNI_VERSION="${CNI_VERSION:-}"
+CNI_SHA1="${CNI_SHA1:-}"
 
 # Optional: Create autoscaler for cluster's nodes.
 ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
@@ -354,6 +336,7 @@ fi
 if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
 fi
+CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection
@@ -415,10 +398,18 @@ if [[ -n "${LOGROTATE_MAX_SIZE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_MAX_SIZE"
 fi
 
+if [[ -n "${POD_LOG_MAX_FILE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_FILE"
+fi
+
+if [[ -n "${POD_LOG_MAX_SIZE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} POD_LOG_MAX_SIZE"
+fi
+
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
 FLUENTD_GCP_YAML_VERSION="v3.2.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-0.6-1.6.0-1}"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.8}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"
@@ -479,3 +470,6 @@ fi
 # Taint Windows nodes by default to prevent Linux workloads from being
 # scheduled onto them.
 WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSchedule}"
+
+# Whether to set up a private GCE cluster, i.e. a cluster where nodes have only private IPs.
+GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"

@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
@@ -132,6 +132,9 @@ func checkErr(err error, handleErr func(string, int)) {
 	case kerrors.IsInvalid(err):
 		details := err.(*kerrors.StatusError).Status().Details
 		s := fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
+		if len(details.Kind) == 0 && len(details.Name) == 0 {
+			s = "The request is invalid"
+		}
 		if len(details.Causes) > 0 {
 			errs := statusCausesToAggrError(details.Causes)
 			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)
@@ -406,8 +409,9 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
-	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().Bool("experimental-server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
+	cmd.Flags().Bool("experimental-force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
+	cmd.Flags().String("experimental-field-manager", "kubectl", "Name of the manager used to track field ownership. This is an alpha feature and flag.")
 }
 
 func AddIncludeUninitializedFlag(cmd *cobra.Command) {
@@ -484,11 +488,15 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 }
 
 func GetServerSideApplyFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "server-side")
+	return GetFlagBool(cmd, "experimental-server-side")
 }
 
 func GetForceConflictsFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "force-conflicts")
+	return GetFlagBool(cmd, "experimental-force-conflicts")
+}
+
+func GetFieldManagerFlag(cmd *cobra.Command) string {
+	return GetFlagString(cmd, "experimental-field-manager")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {

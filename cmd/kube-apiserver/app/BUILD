@@ -29,7 +29,6 @@ go_library(
         "//pkg/registry/rbac/rest:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/flag:go_default_library",
-        "//pkg/util/reflector/prometheus:go_default_library",
         "//pkg/util/workqueue/prometheus:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
@@ -39,6 +38,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
@@ -76,7 +76,6 @@ go_library(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
     ],
 )
 
