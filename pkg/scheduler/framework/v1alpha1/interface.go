@@ -113,6 +113,17 @@ type PrebindPlugin interface {
 	Prebind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
 }
 
+// UnreservePlugin is an interface for Unreserve plugins. This is an informational
+// extension point. If a pod was reserved and then rejected in a later phase, then
+// un-reserve plugins will be notified. Un-reserve plugins should clean up state
+// associated with the reserved Pod.
+type UnreservePlugin interface {
+	Plugin
+	// Unreserve is called by the scheduling framework when a reserved pod was
+	// rejected in a later phase.
+	Unreserve(pc *PluginContext, p *v1.Pod, nodeName string)
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -128,6 +139,9 @@ type Framework interface {
 	// plugins returns an error, it does not continue running the remaining ones and
 	// returns the error. In such case, pod will not be scheduled.
 	RunReservePlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	// RunUnreservePlugins runs the set of configured unreserve plugins.
+	RunUnreservePlugins(pc *PluginContext, pod *v1.Pod, nodeName string)
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is
