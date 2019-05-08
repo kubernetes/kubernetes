@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,7 +43,7 @@ import (
 type StorageClassTest struct {
 	Client               clientset.Interface
 	Claim                *v1.PersistentVolumeClaim
-	Class                *storage.StorageClass
+	Class                *storagev1.StorageClass
 	Name                 string
 	CloudProviders       []string
 	Provisioner          string
@@ -89,7 +88,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		testCase *StorageClassTest
 		cs       clientset.Interface
 		pvc      *v1.PersistentVolumeClaim
-		sc       *storage.StorageClass
+		sc       *storagev1.StorageClass
 
 		intreeOps   opCounts
 		migratedOps opCounts
@@ -615,7 +614,7 @@ func prepareDataSourceForProvisioning(
 	client clientset.Interface,
 	dynamicClient dynamic.Interface,
 	initClaim *v1.PersistentVolumeClaim,
-	class *storage.StorageClass,
+	class *storagev1.StorageClass,
 	snapshotClass *unstructured.Unstructured,
 ) (*v1.TypedLocalObjectReference, func()) {
 	var err error

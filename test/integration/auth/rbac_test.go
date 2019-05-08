@@ -44,7 +44,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
-	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/client-go/transport"
@@ -74,10 +73,10 @@ func clientForToken(user string) *http.Client {
 	}
 }
 
-func clientsetForToken(user string, config *restclient.Config) (clientset.Interface, externalclientset.Interface) {
+func clientsetForToken(user string, config *restclient.Config) (clientset.Interface, clientset.Interface) {
 	configCopy := *config
 	configCopy.BearerToken = user
-	return clientset.NewForConfigOrDie(&configCopy), externalclientset.NewForConfigOrDie(&configCopy)
+	return clientset.NewForConfigOrDie(&configCopy), clientset.NewForConfigOrDie(&configCopy)
 }
 
 func crdClientsetForToken(user string, config *restclient.Config) apiextensionsclient.Interface {

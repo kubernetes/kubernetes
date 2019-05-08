@@ -30,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
-	ga "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -635,7 +634,7 @@ func TestFirewallNeedsUpdate(t *testing.T) {
 		ports        []v1.ServicePort
 		ipnet        utilnet.IPNetSet
 		fwIPProtocol string
-		getHook      func(context.Context, *meta.Key, *cloud.MockFirewalls) (bool, *ga.Firewall, error)
+		getHook      func(context.Context, *meta.Key, *cloud.MockFirewalls) (bool, *compute.Firewall, error)
 		sourceRange  string
 		exists       bool
 		needsUpdate  bool
@@ -1073,7 +1072,7 @@ func TestExternalLoadBalancerEnsureHttpHealthCheck(t *testing.T) {
 			gce, err := fakeGCECloud(DefaultTestClusterValues())
 			require.NoError(t, err)
 			c := gce.c.(*cloud.MockGCE)
-			c.MockHttpHealthChecks.UpdateHook = func(ctx context.Context, key *meta.Key, obj *ga.HttpHealthCheck, m *cloud.MockHttpHealthChecks) error {
+			c.MockHttpHealthChecks.UpdateHook = func(ctx context.Context, key *meta.Key, obj *compute.HttpHealthCheck, m *cloud.MockHttpHealthChecks) error {
 				m.Objects[*key] = &cloud.MockHttpHealthChecksObj{Obj: obj}
 				return nil
 			}
