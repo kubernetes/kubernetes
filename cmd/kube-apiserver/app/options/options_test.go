@@ -155,7 +155,7 @@ func TestAddFlags(t *testing.T) {
 				CompactionInterval:    storagebackend.DefaultCompactInterval,
 				CountMetricPollPeriod: time.Minute,
 			},
-			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
+			DefaultStorageMediaType: kubeoptions.DefaultStorageMediaType,
 			DeleteCollectionWorkers: 1,
 			EnableGarbageCollection: true,
 			EnableWatchCache:        true,
