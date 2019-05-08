@@ -60,6 +60,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -140,7 +141,7 @@ func runKubectlRetryOrDie(args ...string) string {
 	}
 	// Expect no errors to be present after retries are finished
 	// Copied from framework #ExecOrDie
-	framework.Logf("stdout: %q", output)
+	e2elog.Logf("stdout: %q", output)
 	framework.ExpectNoError(err)
 	return output
 }
@@ -234,7 +235,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 	debugDiscovery := func() {
 		home := os.Getenv("HOME")
 		if len(home) == 0 {
-			framework.Logf("no $HOME envvar set")
+			e2elog.Logf("no $HOME envvar set")
 			return
 		}
 
@@ -250,17 +251,17 @@ var _ = SIGDescribe("Kubectl client", func() {
 			if len(parts) != 3 || parts[1] != "v1" || parts[2] != "serverresources.json" {
 				return nil
 			}
-			framework.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
+			e2elog.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
 
 			data, readError := ioutil.ReadFile(path)
 			if readError != nil {
-				framework.Logf("%s error: %v", path, readError)
+				e2elog.Logf("%s error: %v", path, readError)
 			} else {
-				framework.Logf("%s content: %s", path, string(data))
+				e2elog.Logf("%s content: %s", path, string(data))
 			}
 			return nil
 		})
-		framework.Logf("scanned %s for discovery docs: %v", home, err)
+		e2elog.Logf("scanned %s for discovery docs: %v", home, err)
 	}
 
 	framework.KubeDescribe("Update Demo", func() {
@@ -348,7 +349,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			})
 			ginkgo.By("creating all guestbook components")
 			forEachGBFile(func(contents string) {
-				framework.Logf(contents)
+				e2elog.Logf(contents)
 				framework.RunKubectlOrDieInput(contents, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			})
 
@@ -604,7 +605,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("curling local port output")
 			localAddr := fmt.Sprintf("http://localhost:%d", cmd.port)
 			body, err := curl(localAddr)
-			framework.Logf("got: %s", body)
+			e2elog.Logf("got: %s", body)
 			if err != nil {
 				framework.Failf("Failed http.Get of forwarded port (%s): %v", localAddr, err)
 			}
@@ -639,7 +640,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			inClusterHost := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_HOST"))
 			inClusterPort := strings.TrimSpace(framework.RunHostCmdOrDie(ns, simplePodName, "printenv KUBERNETES_SERVICE_PORT"))
 
-			framework.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
+			e2elog.Logf("copying %s to the %s pod", kubectlPath, simplePodName)
 			framework.RunKubectlOrDie("cp", kubectlPath, ns+"/"+simplePodName+":/tmp/")
 
 			// Build a kubeconfig file that will make use of the injected ca and token,
@@ -669,7 +670,7 @@ users:
   user:
     tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
 `), os.FileMode(0755)))
-			framework.Logf("copying override kubeconfig to the %s pod", simplePodName)
+			e2elog.Logf("copying override kubeconfig to the %s pod", simplePodName)
 			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, overrideKubeconfigName), ns+"/"+simplePodName+":/tmp/")
 
 			framework.ExpectNoError(ioutil.WriteFile(filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), []byte(`
@@ -685,7 +686,7 @@ apiVersion: v1
 metadata:
   name: "configmap without namespace and invalid name"
 `), os.FileMode(0755)))
-			framework.Logf("copying configmap manifests to the %s pod", simplePodName)
+			e2elog.Logf("copying configmap manifests to the %s pod", simplePodName)
 			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-with-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
 			framework.RunKubectlOrDie("cp", filepath.Join(tmpDir, "invalid-configmap-without-namespace.yaml"), ns+"/"+simplePodName+":/tmp/")
 
@@ -709,7 +710,7 @@ metadata:
 
 			ginkgo.By("trying to use kubectl with invalid token")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
-			framework.Logf("got err %v", err)
+			e2elog.Logf("got err %v", err)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
@@ -718,7 +719,7 @@ metadata:
 
 			ginkgo.By("trying to use kubectl with invalid server")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
-			framework.Logf("got err %v", err)
+			e2elog.Logf("got err %v", err)
 			gomega.Expect(err).To(gomega.HaveOccurred())
 			gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
 			gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
@@ -1059,14 +1060,14 @@ metadata:
 
 			ginkgo.By("creating Redis RC")
 
-			framework.Logf("namespace %v", ns)
+			e2elog.Logf("namespace %v", ns)
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
 			ginkgo.By("Waiting for Redis master to start.")
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
-				framework.Logf("wait on redis-master startup in %v ", ns)
+				e2elog.Logf("wait on redis-master startup in %v ", ns)
 				framework.LookForStringInLog(ns, pod.Name, "redis-master", "The server is now ready to accept connections", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
@@ -1074,7 +1075,7 @@ metadata:
 					endpoints, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 					if err != nil {
 						// log the real error
-						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
+						e2elog.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
 
 						// if the error is API not found or could not find default credentials or TLS handshake timeout, try again
 						if apierrs.IsNotFound(err) ||
@@ -1087,7 +1088,7 @@ metadata:
 
 					uidToPort := framework.GetContainerPortsByPodUID(endpoints)
 					if len(uidToPort) == 0 {
-						framework.Logf("No endpoint found, retrying")
+						e2elog.Logf("No endpoint found, retrying")
 						return false, nil
 					}
 					if len(uidToPort) > 1 {
@@ -2070,21 +2071,21 @@ func curl(url string) (string, error) {
 }
 
 func validateGuestbookApp(c clientset.Interface, ns string) {
-	framework.Logf("Waiting for all frontend pods to be Running.")
+	e2elog.Logf("Waiting for all frontend pods to be Running.")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"tier": "frontend", "app": "guestbook"}))
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 	framework.ExpectNoError(err)
-	framework.Logf("Waiting for frontend to serve content.")
+	e2elog.Logf("Waiting for frontend to serve content.")
 	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
-	framework.Logf("Trying to add a new entry to the guestbook.")
+	e2elog.Logf("Trying to add a new entry to the guestbook.")
 	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
-	framework.Logf("Verifying that added entry can be retrieved.")
+	e2elog.Logf("Verifying that added entry can be retrieved.")
 	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
@@ -2097,7 +2098,7 @@ func waitForGuestbookResponse(c clientset.Interface, cmd, arg, expectedResponse 
 		if err == nil && res == expectedResponse {
 			return true
 		}
-		framework.Logf("Failed to get response from guestbook. err: %v, response: %s", err, res)
+		e2elog.Logf("Failed to get response from guestbook. err: %v, response: %s", err, res)
 	}
 	return false
 }
@@ -2192,7 +2193,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c clientset.Interface, podID string) error {
-		framework.Logf("validating pod %s", podID)
+		e2elog.Logf("validating pod %s", podID)
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 		defer cancel()
@@ -2212,12 +2213,12 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 			}
 			return err
 		}
-		framework.Logf("got data: %s", body)
+		e2elog.Logf("got data: %s", body)
 		var data updateDemoData
 		if err := json.Unmarshal(body, &data); err != nil {
 			return err
 		}
-		framework.Logf("Unmarshalled json jpg/img => %s , expecting %s .", data, jpgExpected)
+		e2elog.Logf("Unmarshalled json jpg/img => %s , expecting %s .", data, jpgExpected)
 		if strings.Contains(data.Image, jpgExpected) {
 			return nil
 		}

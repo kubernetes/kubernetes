@@ -32,10 +32,11 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -136,7 +137,7 @@ type portForwardCommand struct {
 func (c *portForwardCommand) Stop() {
 	// SIGINT signals that kubectl port-forward should gracefully terminate
 	if err := c.cmd.Process.Signal(syscall.SIGINT); err != nil {
-		framework.Logf("error sending SIGINT to kubectl port-forward: %v", err)
+		e2elog.Logf("error sending SIGINT to kubectl port-forward: %v", err)
 	}
 
 	// try to wait for a clean exit
@@ -154,12 +155,12 @@ func (c *portForwardCommand) Stop() {
 			// success
 			return
 		}
-		framework.Logf("error waiting for kubectl port-forward to exit: %v", err)
+		e2elog.Logf("error waiting for kubectl port-forward to exit: %v", err)
 	case <-expired.C:
-		framework.Logf("timed out waiting for kubectl port-forward to exit")
+		e2elog.Logf("timed out waiting for kubectl port-forward to exit")
 	}
 
-	framework.Logf("trying to forcibly kill kubectl port-forward")
+	e2elog.Logf("trying to forcibly kill kubectl port-forward")
 	framework.TryKill(c.cmd)
 }
 
@@ -169,7 +170,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	// This is somewhat ugly but is the only way to retrieve the port that was picked
 	// by the port-forward command. We don't want to hard code the port as we have no
 	// way of guaranteeing we can pick one that isn't in use, particularly on Jenkins.
-	framework.Logf("starting port-forward command and streaming output")
+	e2elog.Logf("starting port-forward command and streaming output")
 	portOutput, _, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		framework.Failf("Failed to start port-forward command: %v", err)
@@ -178,7 +179,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 	buf := make([]byte, 128)
 
 	var n int
-	framework.Logf("reading from `kubectl port-forward` command's stdout")
+	e2elog.Logf("reading from `kubectl port-forward` command's stdout")
 	if n, err = portOutput.Read(buf); err != nil {
 		framework.Failf("Failed to read from kubectl port-forward stdout: %v", err)
 	}
