@@ -1851,3 +1851,47 @@ func TestMarkAsDeleting(t *testing.T) {
 		})
 	}
 }
+
+type staleGuaranteedUpdateStorage struct {
+	storage.Interface
+	cachedObj runtime.Object
+}
+
+// GuaranteedUpdate overwrites the method with one that always suggests the cachedObj.
+func (s *staleGuaranteedUpdateStorage) GuaranteedUpdate(
+	ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
+	preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, _ ...runtime.Object) error {
+	return s.Interface.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate, s.cachedObj)
+}
+
+func TestDeleteWithCachedObject(t *testing.T) {
+	podName := "foo"
+	podWithFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Finalizers: []string{"foo.com/x"}},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	podWithNoFinalizer := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	defer destroyFunc()
+	// cached object does not have any finalizer.
+	registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: podWithNoFinalizer}
+	// created object with pending finalizer.
+	_, err := registry.Create(ctx, podWithFinalizer, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The object shouldn't be deleted, because the persisted object has pending finalizers.
+	_, _, err = registry.Delete(ctx, podName, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The object should still be there
+	_, err = registry.Get(ctx, podName, &metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
