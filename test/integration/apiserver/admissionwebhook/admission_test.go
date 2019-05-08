@@ -52,7 +52,8 @@ import (
 )
 
 const (
-	testNamespace = "webhook-integration"
+	testNamespace      = "webhook-integration"
+	testClientUsername = "webhook-integration-client"
 
 	mutation   = "mutation"
 	validation = "validation"
@@ -336,19 +337,34 @@ func TestWebhookV1beta1(t *testing.T) {
 	})
 	defer master.Cleanup()
 
-	if _, err := master.Client.CoreV1().Namespaces().Create(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	// Configure a client with a distinct user name so that it is easy to distinguish requests
+	// made by the client from requests made by controllers. We use this to filter out requests
+	// before recording them to ensure we don't accidentally mistake requests from controllers
+	// as requests made by the client.
+	clientConfig := master.Config
+	clientConfig.Impersonate.UserName = testClientUsername
+	clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
+	client, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := createV1beta1MutationWebhook(master.Client, webhookServer.URL+"/"+mutation); err != nil {
+
+	if _, err := client.CoreV1().Namespaces().Create(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := createV1beta1ValidationWebhook(master.Client, webhookServer.URL+"/"+validation); err != nil {
+	if err := createV1beta1MutationWebhook(client, webhookServer.URL+"/"+mutation); err != nil {
+		t.Fatal(err)
+	}
+	if err := createV1beta1ValidationWebhook(client, webhookServer.URL+"/"+validation); err != nil {
 		t.Fatal(err)
 	}
 
 	// gather resources to test
-	dynamicClient := master.Dynamic
-	_, resources, err := master.Client.Discovery().ServerGroupsAndResources()
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, resources, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
 	}
@@ -412,7 +428,7 @@ func TestWebhookV1beta1(t *testing.T) {
 							t:               t,
 							admissionHolder: holder,
 							client:          dynamicClient,
-							clientset:       master.Client,
+							clientset:       client,
 							verb:            verb,
 							gvr:             gvr,
 							resource:        resource,
@@ -938,7 +954,11 @@ func newWebhookHandler(t *testing.T, holder *holder, phase string) http.Handler 
 			}
 			review.Request.OldObject.Object = u
 		}
-		holder.record(phase, review.Request)
+
+		if review.Request.UserInfo.Username == testClientUsername {
+			// only record requests originating from this integration test's client
+			holder.record(phase, review.Request)
+		}
 
 		review.Response = &v1beta1.AdmissionResponse{
 			Allowed: true,
