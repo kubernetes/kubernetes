@@ -197,11 +197,11 @@ message IpRange {
 // Bandwidth specifies the interface bandwidth limits of a sandbox
 message Bandwidth {
     // Rate limit for ingress in bits per second
-    int32 ingress_rate = 1;
+    int64 ingress_rate = 1;
     // Burst limit for ingress in bits per second
     int32 ingress_burst = 2;
     // Rate limit for egress in bits per second
-    int32 egress_rate = 3;
+    int64 egress_rate = 3;
     // Burst limit for egress in bits per second
     int32 egress_burst = 4;
 }

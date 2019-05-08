@@ -50,6 +50,7 @@ go_library(
         "//pkg/kubelet/util/logreduction:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/securitycontext:go_default_library",
+        "//pkg/util/bandwidth:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/tail:go_default_library",

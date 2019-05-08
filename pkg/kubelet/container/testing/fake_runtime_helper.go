@@ -65,3 +65,7 @@ func (f *FakeRuntimeHelper) GetPodDir(podUID kubetypes.UID) string {
 func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int64 {
 	return nil
 }
+
+func (f *FakeRuntimeHelper) GetPodCIDR() string {
+	return "10.244.0.0/24"
+}

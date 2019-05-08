@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -84,4 +84,9 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 // have to implement it.
 func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	return kl.dnsConfigurer.GetPodDNS(pod)
+}
+
+// GetPodCIDR returns the pod CIDR.
+func (kl *Kubelet) GetPodCIDR() string {
+	return kl.runtimeState.podCIDR()
 }

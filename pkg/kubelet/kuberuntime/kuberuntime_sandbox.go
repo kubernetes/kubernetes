@@ -18,11 +18,12 @@ package kuberuntime
 
 import (
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -31,6 +32,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
@@ -127,6 +129,38 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings
 	}
+
+	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(newPodAnnotations(pod))
+	if err != nil {
+		return nil, fmt.Errorf("Error reading pod bandwidth annotations: %v", err)
+	}
+	if ingress != nil || egress != nil {
+		bandwidthParam := &runtimeapi.Bandwidth{}
+		if ingress != nil {
+			// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md and
+			// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
+			// Rates are in bits per second, burst values are in bits.
+			bandwidthParam.IngressRate = int64(ingress.Value())
+			bandwidthParam.IngressBurst = math.MaxInt32 // no limit
+		}
+		if egress != nil {
+			bandwidthParam.EgressRate = int64(egress.Value())
+			bandwidthParam.EgressBurst = math.MaxInt32 // no limit
+		}
+		podSandboxConfig.Bandwidth = bandwidthParam
+	}
+
+	// TODO(dual-stack) there can be mulitple PodCIDR per node and per IP family
+	ipRange := &runtimeapi.IpRange{
+		Subnet: m.runtimeHelper.GetPodCIDR(),
+	}
+	ranges := []*runtimeapi.IpRange{}
+	ranges = append(ranges, ipRange)
+
+	ipRanges := []*runtimeapi.IpRanges{}
+	ipRanges = append(ipRanges, &runtimeapi.IpRanges{ranges})
+
+	podSandboxConfig.IpRanges = ipRanges
 
 	lc, err := m.generatePodSandboxLinuxConfig(pod)
 	if err != nil {
