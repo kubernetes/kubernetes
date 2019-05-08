@@ -50,6 +50,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -99,8 +100,10 @@ const (
 	dirName                   = "../../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
 	filenameRCJSON            = "../../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
 
-	filenameWidgetClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
-	filenameWidgetServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
+	filenameWidgetClientside    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
+	filenameWidgetServerside    = "../../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
+	filenameDeployObjServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
+	filenameDeployObjClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
 )
 
 func readConfigMapList(t *testing.T, filename string) [][]byte {
@@ -869,11 +872,6 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	}
 }
 
-const (
-	filenameDeployObjServerside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-serverside.yaml"
-	filenameDeployObjClientside = "../../../../test/fixtures/pkg/kubectl/cmd/apply/deploy-clientside.yaml"
-)
-
 func readDeploymentFromFile(t *testing.T, file string) []byte {
 	raw := readBytesFromFile(t, file)
 	obj := &appsv1.Deployment{}
@@ -1251,7 +1249,7 @@ func TestForceApply(t *testing.T) {
 						var bodyRC io.ReadCloser
 						if isScaledDownToZero {
 							rcObj := readReplicationControllerFromFile(t, filenameRC)
-							rcObj.Spec.Replicas = cmdtesting.Int32ptr(0)
+							rcObj.Spec.Replicas = utilpointer.Int32Ptr(0)
 							rcBytes, err := runtime.Encode(codec, rcObj)
 							if err != nil {
 								t.Fatal(err)

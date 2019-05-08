@@ -17,7 +17,6 @@ go_test(
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
@@ -44,6 +43,7 @@ go_test(
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1:go_default_library",
         "//staging/src/k8s.io/sample-apiserver/pkg/cmd/server:go_default_library",
         "//test/integration/framework:go_default_library",
+        "//test/utils:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -23,7 +23,6 @@ go_library(
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/instrumentation/logging/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
     ],
 )
 

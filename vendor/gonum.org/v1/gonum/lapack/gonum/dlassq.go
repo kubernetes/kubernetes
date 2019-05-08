@@ -13,9 +13,19 @@ import "math"
 //
 // Dlassq is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlassq(n int, x []float64, incx int, scale float64, sumsq float64) (scl, smsq float64) {
-	if n <= 0 {
+	switch {
+	case n < 0:
+		panic(nLT0)
+	case incx <= 0:
+		panic(badIncX)
+	case len(x) < 1+(n-1)*incx:
+		panic(shortX)
+	}
+
+	if n == 0 {
 		return scale, sumsq
 	}
+
 	for ix := 0; ix <= (n-1)*incx; ix += incx {
 		absxi := math.Abs(x[ix])
 		if absxi > 0 || math.IsNaN(absxi) {

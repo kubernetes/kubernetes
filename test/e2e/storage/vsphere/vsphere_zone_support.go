@@ -24,10 +24,11 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -173,6 +174,13 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneA, compatPolicy))
 		scParameters[SpbmStoragePolicy] = compatPolicy
 		zones = append(zones, zoneA)
+		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones)
+	})
+
+	It("Verify a pod is created on a non-Workspace zone and attached to a dynamically created PV, based on the allowed zones and storage policy specified in storage class", func() {
+		By(fmt.Sprintf("Creating storage class with zone :%s and storage policy :%s", zoneB, compatPolicy))
+		scParameters[SpbmStoragePolicy] = compatPolicy
+		zones = append(zones, zoneB)
 		verifyPVCAndPodCreationSucceeds(client, namespace, scParameters, zones)
 	})
 
@@ -352,7 +360,7 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	Expect(err).To(HaveOccurred())
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
-	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
+	e2elog.Logf("Failure message : %+q", eventList.Items[0].Message)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 

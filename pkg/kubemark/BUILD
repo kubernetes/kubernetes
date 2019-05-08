@@ -26,7 +26,6 @@ go_library(
         "//pkg/kubelet/dockershim:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/proxy:go_default_library",
-        "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/mount:go_default_library",

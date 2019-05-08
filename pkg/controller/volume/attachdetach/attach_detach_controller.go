@@ -106,6 +106,7 @@ func NewAttachDetachController(
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
 	pvInformer coreinformers.PersistentVolumeInformer,
 	csiNodeInformer storageinformers.CSINodeInformer,
+	csiDriverInformer storageinformers.CSIDriverInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber,
@@ -145,6 +146,11 @@ func NewAttachDetachController(
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		adc.csiNodeLister = csiNodeInformer.Lister()
 		adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		adc.csiDriverLister = csiDriverInformer.Lister()
+		adc.csiDriversSynced = csiDriverInformer.Informer().HasSynced
 	}
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
@@ -271,6 +277,12 @@ type attachDetachController struct {
 	csiNodeLister storagelisters.CSINodeLister
 	csiNodeSynced kcache.InformerSynced
 
+	// csiDriverLister is the shared CSIDriver lister used to fetch and store
+	// CSIDriver objects from the API server. It is shared with other controllers
+	// and therefore the CSIDriver objects in its store should be treated as immutable.
+	csiDriverLister  storagelisters.CSIDriverLister
+	csiDriversSynced kcache.InformerSynced
+
 	// cloud provider used by volume host
 	cloud cloudprovider.Interface
 
@@ -326,6 +338,9 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced}
 	if adc.csiNodeSynced != nil {
 		synced = append(synced, adc.csiNodeSynced)
+	}
+	if adc.csiDriversSynced != nil {
+		synced = append(synced, adc.csiDriversSynced)
 	}
 
 	if !controller.WaitForCacheSync("attach detach", stopCh, synced...) {
@@ -669,6 +684,10 @@ func (adc *attachDetachController) CSINodeLister() storagelisters.CSINodeLister 
 	return adc.csiNodeLister
 }
 
+func (adc *attachDetachController) CSIDriverLister() storagelisters.CSIDriverLister {
+	return adc.csiDriverLister
+}
+
 func (adc *attachDetachController) IsAttachDetachController() bool {
 	return true
 }
@@ -792,4 +811,8 @@ func (adc *attachDetachController) GetEventRecorder() record.EventRecorder {
 func (adc *attachDetachController) GetSubpather() subpath.Interface {
 	// Subpaths not needed in attachdetach controller
 	return nil
+}
+
+func (adc *attachDetachController) GetCSIDriverLister() storagelisters.CSIDriverLister {
+	return adc.csiDriverLister
 }

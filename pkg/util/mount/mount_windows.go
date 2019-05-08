@@ -72,7 +72,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	bindSource := source
 
 	// tell it's going to mount azure disk or azure file according to options
-	if bind, _, _ := isBind(options); bind {
+	if bind, _, _ := IsBind(options); bind {
 		// mount azure disk
 		bindSource = normalizeWindowsPath(source)
 	} else {
@@ -173,11 +173,6 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	return mp.Path == dir
 }
 
-// IsNotMountPoint determines if a directory is a mountpoint.
-func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return isNotMountPoint(mounter, dir)
-}
-
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	stat, err := os.Lstat(file)
@@ -201,14 +196,14 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 // GetDeviceNameFromMount given a mnt point, find the device
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
+func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
+	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
 }
 
 // getDeviceNameFromMount find the device(drive) name in which
-// the mount path reference should match the given plugin directory. In case no mount path reference
+// the mount path reference should match the given plugin mount directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
@@ -217,7 +212,7 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 	if len(refs) == 0 {
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
-	basemountPath := normalizeWindowsPath(path.Join(pluginDir, MountsInGlobalPDPath))
+	basemountPath := normalizeWindowsPath(pluginMountDir)
 	for _, ref := range refs {
 		if strings.Contains(ref, basemountPath) {
 			volumeID, err := filepath.Rel(normalizeWindowsPath(basemountPath), ref)

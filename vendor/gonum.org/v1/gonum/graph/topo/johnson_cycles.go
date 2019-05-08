@@ -10,6 +10,7 @@ import (
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/internal/ordered"
 	"gonum.org/v1/gonum/graph/internal/set"
+	"gonum.org/v1/gonum/graph/iterator"
 )
 
 // johnson implements Johnson's "Finding all the elementary
@@ -132,7 +133,7 @@ type johnsonGraph struct {
 
 // johnsonGraphFrom returns a deep copy of the graph g.
 func johnsonGraphFrom(g graph.Directed) johnsonGraph {
-	nodes := g.Nodes()
+	nodes := graph.NodesOf(g.Nodes())
 	sort.Sort(ordered.ByID(nodes))
 	c := johnsonGraph{
 		orig:  nodes,
@@ -144,7 +145,7 @@ func johnsonGraphFrom(g graph.Directed) johnsonGraph {
 	for i, u := range nodes {
 		uid := u.ID()
 		c.index[uid] = i
-		for _, v := range g.From(uid) {
+		for _, v := range graph.NodesOf(g.From(uid)) {
 			if c.succ[uid] == nil {
 				c.succ[uid] = make(set.Int64s)
 				c.nodes.Add(uid)
@@ -239,28 +240,31 @@ func (g johnsonGraph) sccSubGraph(sccs [][]graph.Node, min int) johnsonGraph {
 }
 
 // Nodes is required to satisfy Tarjan.
-func (g johnsonGraph) Nodes() []graph.Node {
+func (g johnsonGraph) Nodes() graph.Nodes {
 	n := make([]graph.Node, 0, len(g.nodes))
 	for id := range g.nodes {
 		n = append(n, johnsonGraphNode(id))
 	}
-	return n
+	return iterator.NewOrderedNodes(n)
 }
 
 // Successors is required to satisfy Tarjan.
-func (g johnsonGraph) From(id int64) []graph.Node {
+func (g johnsonGraph) From(id int64) graph.Nodes {
 	adj := g.succ[id]
 	if len(adj) == 0 {
-		return nil
+		return graph.Empty
 	}
 	succ := make([]graph.Node, 0, len(adj))
 	for id := range adj {
 		succ = append(succ, johnsonGraphNode(id))
 	}
-	return succ
+	return iterator.NewOrderedNodes(succ)
 }
 
 func (johnsonGraph) Has(int64) bool {
+	panic("topo: unintended use of johnsonGraph")
+}
+func (johnsonGraph) Node(int64) graph.Node {
 	panic("topo: unintended use of johnsonGraph")
 }
 func (johnsonGraph) HasEdgeBetween(_, _ int64) bool {
@@ -272,7 +276,7 @@ func (johnsonGraph) Edge(_, _ int64) graph.Edge {
 func (johnsonGraph) HasEdgeFromTo(_, _ int64) bool {
 	panic("topo: unintended use of johnsonGraph")
 }
-func (johnsonGraph) To(int64) []graph.Node {
+func (johnsonGraph) To(int64) graph.Nodes {
 	panic("topo: unintended use of johnsonGraph")
 }
 

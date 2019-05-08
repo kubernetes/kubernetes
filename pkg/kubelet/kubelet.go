@@ -78,6 +78,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/nodelease"
+	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/preemption"
@@ -464,7 +465,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	containerRefManager := kubecontainer.NewRefManager()
 
-	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
+	oomWatcher := oomwatcher.NewOOMWatcher(kubeDeps.Recorder)
 
 	clusterDNS := make([]net.IP, 0, len(kubeCfg.ClusterDNS))
 	for _, ipEntry := range kubeCfg.ClusterDNS {
@@ -900,7 +901,7 @@ type Kubelet struct {
 	iptClient       utilipt.Interface
 	rootDirectory   string
 
-	lastObservedNodeAddressesMux sync.Mutex
+	lastObservedNodeAddressesMux sync.RWMutex
 	lastObservedNodeAddresses    []v1.NodeAddress
 
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
@@ -1078,7 +1079,7 @@ type Kubelet struct {
 	os kubecontainer.OSInterface
 
 	// Watcher of out of memory events.
-	oomWatcher OOMWatcher
+	oomWatcher oomwatcher.OOMWatcher
 
 	// Monitor resource usage
 	resourceAnalyzer serverstats.ResourceAnalyzer

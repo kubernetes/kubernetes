@@ -4,4 +4,6 @@
 
 // Package simple provides a suite of simple graph implementations satisfying
 // the gonum/graph interfaces.
+//
+// All types in simple return the graph.Empty value for empty iterators.
 package simple // import "gonum.org/v1/gonum/graph/simple"

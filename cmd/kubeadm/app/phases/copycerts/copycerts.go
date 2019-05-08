@@ -86,7 +86,7 @@ func CreateCertificateKey() (string, error) {
 
 //UploadCerts save certs needs to join a new control-plane on kubeadm-certs sercret.
 func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
-	fmt.Printf("[upload-certs] Storing the certificates in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
 		return err
@@ -231,7 +231,7 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {
-			return errors.New("couldn't find required certificate or key in Secret")
+			return errors.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
 		}
 		if len(certOrKeyData) == 0 {
 			klog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)

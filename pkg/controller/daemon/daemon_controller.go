@@ -960,10 +960,10 @@ func (dsc *DaemonSetsController) manage(ds *apps.DaemonSet, nodeList []*v1.Node,
 		failedPodsObserved += failedPodsObservedOnNode
 	}
 
-	// Remove pods assigned to not existing nodes when daemonset pods are scheduled by default scheduler.
+	// Remove unscheduled pods assigned to not existing nodes when daemonset pods are scheduled by scheduler.
 	// If node doesn't exist then pods are never scheduled and can't be deleted by PodGCController.
 	if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-		podsToDelete = append(podsToDelete, getPodsWithoutNode(nodeList, nodeToDaemonPods)...)
+		podsToDelete = append(podsToDelete, getUnscheduledPodsWithoutNode(nodeList, nodeToDaemonPods)...)
 	}
 
 	// Label new pods using the hash label value of the current history when creating them
@@ -1067,7 +1067,7 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 		}
 		createWait.Wait()
 		// any skipped pods that we never attempted to start shouldn't be expected.
-		skippedPods := createDiff - batchSize
+		skippedPods := createDiff - (batchSize + pos)
 		if errorCount < len(errCh) && skippedPods > 0 {
 			klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for set %q/%q", skippedPods, ds.Namespace, ds.Name)
 			for i := 0; i < skippedPods; i++ {
@@ -1198,6 +1198,10 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 		return fmt.Errorf("error storing status for daemon set %#v: %v", ds, err)
 	}
 
+	// Resync the DaemonSet after MinReadySeconds as a last line of defense to guard against clock-skew.
+	if ds.Spec.MinReadySeconds > 0 && numberReady != numberAvailable {
+		dsc.enqueueDaemonSetAfter(ds, time.Duration(ds.Spec.MinReadySeconds)*time.Second)
+	}
 	return nil
 }
 
@@ -1527,8 +1531,9 @@ func failedPodsBackoffKey(ds *apps.DaemonSet, nodeName string) string {
 	return fmt.Sprintf("%s/%d/%s", ds.UID, ds.Status.ObservedGeneration, nodeName)
 }
 
-// getPodsWithoutNode returns list of pods assigned to not existing nodes.
-func getPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) []string {
+// getUnscheduledPodsWithoutNode returns list of unscheduled pods assigned to not existing nodes.
+// Returned pods can't be deleted by PodGCController so they should be deleted by DaemonSetController.
+func getUnscheduledPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods map[string][]*v1.Pod) []string {
 	var results []string
 	isNodeRunning := make(map[string]bool)
 	for _, node := range runningNodesList {
@@ -1537,7 +1542,9 @@ func getPodsWithoutNode(runningNodesList []*v1.Node, nodeToDaemonPods map[string
 	for n, pods := range nodeToDaemonPods {
 		if !isNodeRunning[n] {
 			for _, pod := range pods {
-				results = append(results, pod.Name)
+				if len(pod.Spec.NodeName) == 0 {
+					results = append(results, pod.Name)
+				}
 			}
 		}
 	}

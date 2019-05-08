@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -498,14 +498,14 @@ func TestPluginOptional(t *testing.T) {
 		}
 	}
 
-	datadirSymlink := path.Join(volumePath, "..data")
+	datadirSymlink := filepath.Join(volumePath, "..data")
 	datadir, err := os.Readlink(datadirSymlink)
 	if err != nil && os.IsNotExist(err) {
 		t.Fatalf("couldn't find volume path's data dir, %s", datadirSymlink)
 	} else if err != nil {
 		t.Fatalf("couldn't read symlink, %s", datadirSymlink)
 	}
-	datadirPath := path.Join(volumePath, datadir)
+	datadirPath := filepath.Join(volumePath, datadir)
 
 	infos, err := ioutil.ReadDir(volumePath)
 	if err != nil {
@@ -689,7 +689,7 @@ func configMap(namespace, name string) v1.ConfigMap {
 
 func doTestConfigMapDataInVolume(volumePath string, configMap v1.ConfigMap, t *testing.T) {
 	for key, value := range configMap.Data {
-		configMapDataHostPath := path.Join(volumePath, key)
+		configMapDataHostPath := filepath.Join(volumePath, key)
 		if _, err := os.Stat(configMapDataHostPath); err != nil {
 			t.Fatalf("SetUp() failed, couldn't find configMap data on disk: %v", configMapDataHostPath)
 		} else {

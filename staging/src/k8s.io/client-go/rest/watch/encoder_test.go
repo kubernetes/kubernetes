@@ -56,6 +56,10 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 			watch.Deleted,
 			&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
 		},
+		{
+			watch.Bookmark,
+			&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+		},
 	}
 	for i, testCase := range testCases {
 		buf := &bytes.Buffer{}

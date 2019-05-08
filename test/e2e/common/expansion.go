@@ -18,13 +18,15 @@ package common
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
+	"time"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -157,7 +159,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's subpath can be set using an
 			expansion of environment variables.
 	*/
-	It("should allow substituting values in a volume subpath [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion]", func() {
+	It("should allow substituting values in a volume subpath [sig-storage][NodeFeature:VolumeSubpathEnvExpansion]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -217,7 +219,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's subpath can not be set using an
 			expansion of environment variables when backticks are supplied.
 	*/
-	It("should fail substituting values in a volume subpath with backticks [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should fail substituting values in a volume subpath with backticks [sig-storage][NodeFeature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -266,7 +268,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		    Description: Make sure a container's subpath can not be set using an
 			expansion of environment variables when absolute path is supplied.
 	*/
-	It("should fail substituting values in a volume subpath with absolute path [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should fail substituting values in a volume subpath with absolute path [sig-storage][NodeFeature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -314,7 +316,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	   Testname: var-expansion-subpath-ready-from-failed-state
 	   Description: Verify that a failing subpath expansion can be modified during the lifecycle of a container.
 	*/
-	It("should verify that a failing subpath expansion can be modified during the lifecycle of a container [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][NodeFeature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		containerName := "dapi-container"
@@ -405,7 +407,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 			3.	successful expansion of the subpathexpr isn't required for volume cleanup
 
 	*/
-	It("should succeed in writing subpaths in container [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should succeed in writing subpaths in container [sig-storage][NodeFeature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		containerName := "dapi-container"
@@ -514,7 +516,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 	*/
 
-	It("should not change the subpath mount on a container restart if the environment variable changes [Feature:VolumeSubpathEnvExpansion][NodeAlphaFeature:VolumeSubpathEnvExpansion][Slow]", func() {
+	It("should not change the subpath mount on a container restart if the environment variable changes [sig-storage][NodeFeature:VolumeSubpathEnvExpansion][Slow]", func() {
 
 		suffix := string(uuid.NewUUID())
 		podName := fmt.Sprintf("var-expansion-%s", suffix)
@@ -658,7 +660,7 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 	By("Failing liveness probe")
 	stdout, stderr, err := f.ExecShellInPodWithFullOutput(pod.Name, fmt.Sprintf("rm %v", volumeMount))
 
-	framework.Logf("Pod exec output: %v / %v", stdout, stderr)
+	e2elog.Logf("Pod exec output: %v / %v", stdout, stderr)
 	Expect(err).ToNot(HaveOccurred(), "while failing liveness probe")
 
 	// Check that container has restarted
@@ -671,10 +673,10 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 		}
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == pod.Spec.Containers[0].Name {
-				framework.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
+				e2elog.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
 				restarts = status.RestartCount
 				if restarts > 0 {
-					framework.Logf("Container has restart count: %v", restarts)
+					e2elog.Logf("Container has restart count: %v", restarts)
 					return true, nil
 				}
 			}
@@ -686,7 +688,7 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 	// Fix liveness probe
 	By("Rewriting the file")
 	stdout, _, err = f.ExecShellInPodWithFullOutput(pod.Name, fmt.Sprintf("echo test-after > %v", volumeMount))
-	framework.Logf("Pod exec output: %v", stdout)
+	e2elog.Logf("Pod exec output: %v", stdout)
 	Expect(err).ToNot(HaveOccurred(), "while rewriting the probe file")
 
 	// Wait for container restarts to stabilize
@@ -703,13 +705,13 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 				if status.RestartCount == restarts {
 					stableCount++
 					if stableCount > stableThreshold {
-						framework.Logf("Container restart has stabilized")
+						e2elog.Logf("Container restart has stabilized")
 						return true, nil
 					}
 				} else {
 					restarts = status.RestartCount
 					stableCount = 0
-					framework.Logf("Container has restart count: %v", restarts)
+					e2elog.Logf("Container has restart count: %v", restarts)
 				}
 				break
 			}

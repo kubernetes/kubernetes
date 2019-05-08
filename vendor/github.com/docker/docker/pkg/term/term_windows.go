@@ -62,13 +62,6 @@ func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 		}
 	}
 
-	if os.Getenv("ConEmuANSI") == "ON" || os.Getenv("ConsoleZVersion") != "" {
-		// The ConEmu and ConsoleZ terminals emulate ANSI on output streams well.
-		emulateStdin = true
-		emulateStdout = false
-		emulateStderr = false
-	}
-
 	// Temporarily use STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and
 	// STD_ERROR_HANDLE from syscall rather than x/sys/windows as long as
 	// go-ansiterm hasn't switch to x/sys/windows.

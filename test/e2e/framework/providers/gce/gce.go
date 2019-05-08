@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/test/e2e/framework"
+	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
 
 func init() {
@@ -184,16 +184,12 @@ func (p *Provider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) erro
 }
 
 func getGCEZoneForGroup(group string) (string, error) {
-	zone := framework.TestContext.CloudConfig.Zone
-	if framework.TestContext.CloudConfig.MultiZone {
-		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "list",
-			"--project="+framework.TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("Failed to get zone for node group %s: %s", group, output)
-		}
-		zone = strings.TrimSpace(string(output))
+	output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "list",
+		"--project="+framework.TestContext.CloudConfig.ProjectID, "--format=value(zone)", "--filter=name="+group).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("Failed to get zone for node group %s: %s", group, output)
 	}
-	return zone, nil
+	return strings.TrimSpace(string(output)), nil
 }
 
 // DeleteNode deletes a node which is specified as the argument

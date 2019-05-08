@@ -22,13 +22,14 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -145,11 +146,11 @@ func testPreStop(c clientset.Interface, ns string) {
 			}
 			By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
-			framework.Logf("Saw: %s", string(body))
+			e2elog.Logf("Saw: %s", string(body))
 			state := State{}
 			err := json.Unmarshal(body, &state)
 			if err != nil {
-				framework.Logf("Error parsing: %v", err)
+				e2elog.Logf("Error parsing: %v", err)
 				return false, nil
 			}
 			if state.Received["prestop"] != 0 {
@@ -212,7 +213,7 @@ var _ = SIGDescribe("PreStop", func() {
 				if pod.Name != kubeletPod.Name {
 					continue
 				} else if kubeletPod.Status.Phase == v1.PodRunning {
-					framework.Logf("pod is running")
+					e2elog.Logf("pod is running")
 					return true, err
 				}
 			}

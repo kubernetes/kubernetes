@@ -33,6 +33,7 @@ staging_repos = [
     "k8s.io/kube-proxy",
     "k8s.io/kube-scheduler",
     "k8s.io/kubelet",
+    "k8s.io/legacy-cloud-providers",
     "k8s.io/metrics",
     "k8s.io/node-api",
     "k8s.io/sample-apiserver",

@@ -2,11 +2,45 @@ package mount // import "github.com/docker/docker/pkg/mount"
 
 import (
 	"sort"
+	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/sirupsen/logrus"
 )
+
+// mountError records an error from mount or unmount operation
+type mountError struct {
+	op             string
+	source, target string
+	flags          uintptr
+	data           string
+	err            error
+}
+
+func (e *mountError) Error() string {
+	out := e.op + " "
+
+	if e.source != "" {
+		out += e.source + ":" + e.target
+	} else {
+		out += e.target
+	}
+
+	if e.flags != uintptr(0) {
+		out += ", flags: 0x" + strconv.FormatUint(uint64(e.flags), 16)
+	}
+	if e.data != "" {
+		out += ", data: " + e.data
+	}
+
+	out += ": " + e.err.Error()
+	return out
+}
+
+// Cause returns the underlying cause of the error
+func (e *mountError) Cause() error {
+	return e.err
+}
 
 // FilterFunc is a type defining a callback function
 // to filter out unwanted entries. It takes a pointer
@@ -89,12 +123,7 @@ func ForceMount(device, target, mType, options string) error {
 // Unmount lazily unmounts a filesystem on supported platforms, otherwise
 // does a normal unmount.
 func Unmount(target string) error {
-	err := unmount(target, mntDetach)
-	if err == syscall.EINVAL {
-		// ignore "not mounted" error
-		err = nil
-	}
-	return err
+	return unmount(target, mntDetach)
 }
 
 // RecursiveUnmount unmounts the target and all mounts underneath, starting with
@@ -114,25 +143,14 @@ func RecursiveUnmount(target string) error {
 		logrus.Debugf("Trying to unmount %s", m.Mountpoint)
 		err = unmount(m.Mountpoint, mntDetach)
 		if err != nil {
-			// If the error is EINVAL either this whole package is wrong (invalid flags passed to unmount(2)) or this is
-			// not a mountpoint (which is ok in this case).
-			// Meanwhile calling `Mounted()` is very expensive.
-			//
-			// We've purposefully used `syscall.EINVAL` here instead of `unix.EINVAL` to avoid platform branching
-			// Since `EINVAL` is defined for both Windows and Linux in the `syscall` package (and other platforms),
-			//   this is nicer than defining a custom value that we can refer to in each platform file.
-			if err == syscall.EINVAL {
-				continue
-			}
-			if i == len(mounts)-1 {
+			if i == len(mounts)-1 { // last mount
 				if mounted, e := Mounted(m.Mountpoint); e != nil || mounted {
 					return err
 				}
-				continue
+			} else {
+				// This is some submount, we can ignore this error for now, the final unmount will fail if this is a real problem
+				logrus.WithError(err).Warnf("Failed to unmount submount %s", m.Mountpoint)
 			}
-			// This is some submount, we can ignore this error for now, the final unmount will fail if this is a real problem
-			logrus.WithError(err).Warnf("Failed to unmount submount %s", m.Mountpoint)
-			continue
 		}
 
 		logrus.Debugf("Unmounted %s", m.Mountpoint)

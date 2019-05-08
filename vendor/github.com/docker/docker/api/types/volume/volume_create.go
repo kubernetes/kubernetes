@@ -7,7 +7,7 @@ package volume
 // See hack/generate-swagger-api.sh
 // ----------------------------------------------------------------------------
 
-// VolumeCreateBody
+// VolumeCreateBody Volume configuration
 // swagger:model VolumeCreateBody
 type VolumeCreateBody struct {
 

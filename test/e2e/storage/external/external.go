@@ -38,6 +38,7 @@ import (
 
 // List of testSuites to be executed for each external driver.
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
 	testsuites.InitSubPathTestSuite,

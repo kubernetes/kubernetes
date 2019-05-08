@@ -3088,12 +3088,6 @@ func TestDescribeStatefulSet(t *testing.T) {
 	}
 }
 
-// boolPtr returns a pointer to a bool
-func boolPtr(b bool) *bool {
-	o := b
-	return &o
-}
-
 func TestControllerRef(t *testing.T) {
 	var replicas int32 = 1
 	f := fake.NewSimpleClientset(
@@ -3123,7 +3117,7 @@ func TestControllerRef(t *testing.T) {
 				Name:            "barpod",
 				Namespace:       "foo",
 				Labels:          map[string]string{"abc": "xyz"},
-				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: boolPtr(true)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "bar", UID: "123456", Controller: utilpointer.BoolPtr(true)}},
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",
@@ -3160,7 +3154,7 @@ func TestControllerRef(t *testing.T) {
 				Name:            "buzpod",
 				Namespace:       "foo",
 				Labels:          map[string]string{"abc": "xyz"},
-				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: boolPtr(true)}},
+				OwnerReferences: []metav1.OwnerReference{{Name: "buz", UID: "654321", Controller: utilpointer.BoolPtr(true)}},
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "Pod",

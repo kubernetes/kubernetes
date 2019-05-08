@@ -132,7 +132,17 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1beta1_MutatingWebhookConfiguration_To_admissionregistration_MutatingWebhookConfiguration(in *v1beta1.MutatingWebhookConfiguration, out *admissionregistration.MutatingWebhookConfiguration, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Webhooks = *(*[]admissionregistration.Webhook)(unsafe.Pointer(&in.Webhooks))
+	if in.Webhooks != nil {
+		in, out := &in.Webhooks, &out.Webhooks
+		*out = make([]admissionregistration.Webhook, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_Webhook_To_admissionregistration_Webhook(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Webhooks = nil
+	}
 	return nil
 }
 
@@ -143,7 +153,17 @@ func Convert_v1beta1_MutatingWebhookConfiguration_To_admissionregistration_Mutat
 
 func autoConvert_admissionregistration_MutatingWebhookConfiguration_To_v1beta1_MutatingWebhookConfiguration(in *admissionregistration.MutatingWebhookConfiguration, out *v1beta1.MutatingWebhookConfiguration, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Webhooks = *(*[]v1beta1.Webhook)(unsafe.Pointer(&in.Webhooks))
+	if in.Webhooks != nil {
+		in, out := &in.Webhooks, &out.Webhooks
+		*out = make([]v1beta1.Webhook, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_Webhook_To_v1beta1_Webhook(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Webhooks = nil
+	}
 	return nil
 }
 
@@ -154,7 +174,17 @@ func Convert_admissionregistration_MutatingWebhookConfiguration_To_v1beta1_Mutat
 
 func autoConvert_v1beta1_MutatingWebhookConfigurationList_To_admissionregistration_MutatingWebhookConfigurationList(in *v1beta1.MutatingWebhookConfigurationList, out *admissionregistration.MutatingWebhookConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]admissionregistration.MutatingWebhookConfiguration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistration.MutatingWebhookConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_MutatingWebhookConfiguration_To_admissionregistration_MutatingWebhookConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -165,7 +195,17 @@ func Convert_v1beta1_MutatingWebhookConfigurationList_To_admissionregistration_M
 
 func autoConvert_admissionregistration_MutatingWebhookConfigurationList_To_v1beta1_MutatingWebhookConfigurationList(in *admissionregistration.MutatingWebhookConfigurationList, out *v1beta1.MutatingWebhookConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.MutatingWebhookConfiguration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.MutatingWebhookConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_MutatingWebhookConfiguration_To_v1beta1_MutatingWebhookConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -230,6 +270,9 @@ func autoConvert_v1beta1_ServiceReference_To_admissionregistration_ServiceRefere
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -242,6 +285,9 @@ func autoConvert_admissionregistration_ServiceReference_To_v1beta1_ServiceRefere
 	out.Namespace = in.Namespace
 	out.Name = in.Name
 	out.Path = (*string)(unsafe.Pointer(in.Path))
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -252,7 +298,17 @@ func Convert_admissionregistration_ServiceReference_To_v1beta1_ServiceReference(
 
 func autoConvert_v1beta1_ValidatingWebhookConfiguration_To_admissionregistration_ValidatingWebhookConfiguration(in *v1beta1.ValidatingWebhookConfiguration, out *admissionregistration.ValidatingWebhookConfiguration, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Webhooks = *(*[]admissionregistration.Webhook)(unsafe.Pointer(&in.Webhooks))
+	if in.Webhooks != nil {
+		in, out := &in.Webhooks, &out.Webhooks
+		*out = make([]admissionregistration.Webhook, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_Webhook_To_admissionregistration_Webhook(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Webhooks = nil
+	}
 	return nil
 }
 
@@ -263,7 +319,17 @@ func Convert_v1beta1_ValidatingWebhookConfiguration_To_admissionregistration_Val
 
 func autoConvert_admissionregistration_ValidatingWebhookConfiguration_To_v1beta1_ValidatingWebhookConfiguration(in *admissionregistration.ValidatingWebhookConfiguration, out *v1beta1.ValidatingWebhookConfiguration, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
-	out.Webhooks = *(*[]v1beta1.Webhook)(unsafe.Pointer(&in.Webhooks))
+	if in.Webhooks != nil {
+		in, out := &in.Webhooks, &out.Webhooks
+		*out = make([]v1beta1.Webhook, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_Webhook_To_v1beta1_Webhook(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Webhooks = nil
+	}
 	return nil
 }
 
@@ -274,7 +340,17 @@ func Convert_admissionregistration_ValidatingWebhookConfiguration_To_v1beta1_Val
 
 func autoConvert_v1beta1_ValidatingWebhookConfigurationList_To_admissionregistration_ValidatingWebhookConfigurationList(in *v1beta1.ValidatingWebhookConfigurationList, out *admissionregistration.ValidatingWebhookConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]admissionregistration.ValidatingWebhookConfiguration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]admissionregistration.ValidatingWebhookConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_ValidatingWebhookConfiguration_To_admissionregistration_ValidatingWebhookConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -285,7 +361,17 @@ func Convert_v1beta1_ValidatingWebhookConfigurationList_To_admissionregistration
 
 func autoConvert_admissionregistration_ValidatingWebhookConfigurationList_To_v1beta1_ValidatingWebhookConfigurationList(in *admissionregistration.ValidatingWebhookConfigurationList, out *v1beta1.ValidatingWebhookConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.ValidatingWebhookConfiguration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.ValidatingWebhookConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_admissionregistration_ValidatingWebhookConfiguration_To_v1beta1_ValidatingWebhookConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -334,7 +420,15 @@ func Convert_admissionregistration_Webhook_To_v1beta1_Webhook(in *admissionregis
 
 func autoConvert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientConfig(in *v1beta1.WebhookClientConfig, out *admissionregistration.WebhookClientConfig, s conversion.Scope) error {
 	out.URL = (*string)(unsafe.Pointer(in.URL))
-	out.Service = (*admissionregistration.ServiceReference)(unsafe.Pointer(in.Service))
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		*out = new(admissionregistration.ServiceReference)
+		if err := Convert_v1beta1_ServiceReference_To_admissionregistration_ServiceReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Service = nil
+	}
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }
@@ -346,7 +440,15 @@ func Convert_v1beta1_WebhookClientConfig_To_admissionregistration_WebhookClientC
 
 func autoConvert_admissionregistration_WebhookClientConfig_To_v1beta1_WebhookClientConfig(in *admissionregistration.WebhookClientConfig, out *v1beta1.WebhookClientConfig, s conversion.Scope) error {
 	out.URL = (*string)(unsafe.Pointer(in.URL))
-	out.Service = (*v1beta1.ServiceReference)(unsafe.Pointer(in.Service))
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		*out = new(v1beta1.ServiceReference)
+		if err := Convert_admissionregistration_ServiceReference_To_v1beta1_ServiceReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Service = nil
+	}
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }

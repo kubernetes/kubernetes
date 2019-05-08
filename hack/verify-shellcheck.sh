@@ -66,8 +66,13 @@ remove_container () {
 # ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
 
-# find all shell scripts excluding ./_*, ./.git/*, ./vendor*,
-# and anything git-ignored
+# Find all shell scripts excluding:
+# - Anything git-ignored - No need to lint untracked files.
+# - ./_* - No need to lint output directories.
+# - ./.git/* - Ignore anything in the git object store.
+# - ./vendor* - Vendored code should be fixed upstream instead.
+# - ./third_party/*, but re-include ./third_party/forked/*  - only code we
+#    forked should be linted and fixed.
 all_shell_scripts=()
 while IFS=$'\n' read -r script;
   do git check-ignore -q "$script" || all_shell_scripts+=("$script");
@@ -75,7 +80,8 @@ done < <(find . -name "*.sh" \
   -not \( \
     -path ./_\*      -o \
     -path ./.git\*   -o \
-    -path ./vendor\*    \
+    -path ./vendor\* -o \
+    \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
   \))
 
 # make sure known failures are sorted
@@ -117,6 +123,13 @@ else
   fi
 fi
 
+# if KUBE_JUNIT_REPORT_DIR is set, disable colorized output.
+# Colorized output causes malformed XML in the JUNIT report.
+SHELLCHECK_COLORIZED_OUTPUT="auto"
+if [[ -n "${KUBE_JUNIT_REPORT_DIR:-}" ]]; then
+  SHELLCHECK_COLORIZED_OUTPUT="never"
+fi
+
 # common arguments we'll pass to shellcheck
 SHELLCHECK_OPTIONS=(
   # allow following sourced files that are not specified in the command,
@@ -125,6 +138,8 @@ SHELLCHECK_OPTIONS=(
   "--external-sources"
   # include our disabled lints
   "--exclude=${SHELLCHECK_DISABLED}"
+  # set colorized output
+  "--color=${SHELLCHECK_COLORIZED_OUTPUT}"
 )
 
 # lint each script, tracking failures
@@ -163,7 +178,7 @@ else
     echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
@@ -175,7 +190,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
 # Check that all failing_packages actually still exist
@@ -193,5 +208,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi

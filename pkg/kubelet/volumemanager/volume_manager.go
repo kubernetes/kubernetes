@@ -245,6 +245,11 @@ func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan str
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
+	if vm.kubeClient != nil {
+		// start informer for CSIDriver
+		vm.volumePluginMgr.Run(stopCh)
+	}
+
 	<-stopCh
 	klog.Infof("Shutting down Kubelet Volume Manager")
 }

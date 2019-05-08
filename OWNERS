@@ -31,3 +31,11 @@ filters:
   "BUILD(\\.bazel)?$":
     approvers:
       - ixdy
+
+  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
+  # dep-approvers
+  "go\\.(mod|sum)$":
+    required_reviewers:
+      - kubernetes/dep-approvers
+    labels:
+      - area/dependency

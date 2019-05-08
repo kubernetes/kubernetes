@@ -160,11 +160,11 @@ type ControllerExpectations struct {
 
 // GetExpectations returns the ControlleeExpectations of the given controller.
 func (r *ControllerExpectations) GetExpectations(controllerKey string) (*ControlleeExpectations, bool, error) {
-	if exp, exists, err := r.GetByKey(controllerKey); err == nil && exists {
+	exp, exists, err := r.GetByKey(controllerKey)
+	if err == nil && exists {
 		return exp.(*ControlleeExpectations), true, nil
-	} else {
-		return nil, false, err
 	}
+	return nil, false, err
 }
 
 // DeleteExpectations deletes the expectations of the given controller from the TTLStore.
@@ -576,18 +576,19 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
-	if newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod); err != nil {
+	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
+	if err != nil {
 		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
 		return err
-	} else {
-		accessor, err := meta.Accessor(object)
-		if err != nil {
-			klog.Errorf("parentObject does not have ObjectMeta, %v", err)
-			return nil
-		}
-		klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-		r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
 	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		klog.Errorf("parentObject does not have ObjectMeta, %v", err)
+		return nil
+	}
+	klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
+	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+
 	return nil
 }
 

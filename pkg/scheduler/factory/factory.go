@@ -51,12 +51,10 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/plugins"
-	pluginsv1alpha1 "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -93,8 +91,8 @@ type Config struct {
 	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
 	// the preemptor pod.
 	PodPreemptor PodPreemptor
-	// PlugingSet has a set of plugins and data used to run them.
-	PluginSet pluginsv1alpha1.PluginSet
+	// Framework runs scheduler plugins at configured extension points.
+	Framework framework.Framework
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -184,8 +182,8 @@ type configFactory struct {
 	pdbLister policylisters.PodDisruptionBudgetLister
 	// a means to list all StorageClasses
 	storageClassLister storagelisters.StorageClassLister
-	// pluginRunner has a set of plugins and the context used for running them.
-	pluginSet pluginsv1alpha1.PluginSet
+	// framework has a set of plugins and the context used for running them.
+	framework framework.Framework
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -239,6 +237,7 @@ type ConfigFactoryArgs struct {
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
+	Registry                       framework.Registry
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
@@ -249,6 +248,11 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		stopEverything = wait.NeverStop
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
+	// TODO(bsalamat): config files should be passed to the framework.
+	framework, err := framework.NewFramework(args.Registry, nil)
+	if err != nil {
+		klog.Fatalf("error initializing the scheduling framework: %v", err)
+	}
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelisters.StorageClassLister
@@ -268,6 +272,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		statefulSetLister:              args.StatefulSetInformer.Lister(),
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
+		framework:                      framework,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  args.SchedulerName,
@@ -436,9 +441,6 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
-	// TODO(bsalamat): the default registrar should be able to process config files.
-	c.pluginSet = plugins.NewDefaultPluginSet(pluginsv1alpha1.NewPluginContext(), &c.schedulerCache)
-
 	algo := core.NewGenericScheduler(
 		c.schedulerCache,
 		c.podQueue,
@@ -446,7 +448,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
-		c.pluginSet,
+		c.framework,
 		extenders,
 		c.volumeBinder,
 		c.pVCLister,
@@ -456,7 +458,6 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.percentageOfNodesToScore,
 	)
 
-	podBackoff := util.CreateDefaultPodBackoff()
 	return &Config{
 		SchedulerCache: c.schedulerCache,
 		// The scheduler only needs to consider schedulable nodes.
@@ -465,12 +466,12 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		GetBinder:           getBinderFunc(c.client, extenders),
 		PodConditionUpdater: &podConditionUpdater{c.client},
 		PodPreemptor:        &podPreemptor{c.client},
-		PluginSet:           c.pluginSet,
+		Framework:           c.framework,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
 		NextPod:         internalqueue.MakeNextPodFunc(c.podQueue),
-		Error:           MakeDefaultErrorFunc(c.client, podBackoff, c.podQueue, c.schedulerCache, c.StopEverything),
+		Error:           MakeDefaultErrorFunc(c.client, c.podQueue, c.schedulerCache, c.StopEverything),
 		StopEverything:  c.StopEverything,
 		VolumeBinder:    c.volumeBinder,
 		SchedulingQueue: c.podQueue,
@@ -639,7 +640,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
@@ -662,7 +663,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			}
 		}
 
-		backoff.Gc()
 		podSchedulingCycle := podQueue.SchedulingCycle()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
@@ -673,23 +673,18 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 				Name:      pod.Name,
 			}
 
-			// When pod priority is enabled, we would like to place an unschedulable
-			// pod in the unschedulable queue. This ensures that if the pod is nominated
-			// to run on a node, scheduler takes the pod into account when running
-			// predicates for the node.
-			if !util.PodPriorityEnabled() {
-				if !backoff.TryBackoffAndWait(podID, stopEverything) {
-					klog.Warningf("Request for pod %v already in flight, abandoning", podID)
-					return
-				}
-			}
+			// An unschedulable pod will be placed in the unschedulable queue.
+			// This ensures that if the pod is nominated to run on a node,
+			// scheduler takes the pod into account when running predicates for the node.
 			// Get the pod again; it may have changed/been scheduled already.
 			getBackoff := initialGetBackoff
 			for {
 				pod, err := client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
-						podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle)
+						if err := podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle); err != nil {
+							klog.Error(err)
+						}
 					}
 					break
 				}
@@ -705,24 +700,6 @@ func MakeDefaultErrorFunc(client clientset.Interface, backoff *util.PodBackoff, 
 			}
 		}()
 	}
-}
-
-// nodeEnumerator allows a cache.Poller to enumerate items in a v1.NodeList
-type nodeEnumerator struct {
-	*v1.NodeList
-}
-
-// Len returns the number of items in the node list.
-func (ne *nodeEnumerator) Len() int {
-	if ne.NodeList == nil {
-		return 0
-	}
-	return len(ne.Items)
-}
-
-// Get returns the item (and ID) with the particular index.
-func (ne *nodeEnumerator) Get(index int) interface{} {
-	return &ne.Items[index]
 }
 
 type binder struct {

@@ -101,7 +101,7 @@ func safeOpenSubPath(mounter mount.Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := mounter.IsNotMountPoint(bindPathTarget)
+	notMount, err := mount.IsNotMountPoint(mounter, bindPathTarget)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)

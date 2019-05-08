@@ -61,6 +61,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/filesystem"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
@@ -91,6 +92,7 @@ const (
 // proxyRun defines the interface to run a specified ProxyServer
 type proxyRun interface {
 	Run() error
+	CleanupAndExit() error
 }
 
 // Options contains everything necessary to create and run a proxy server.
@@ -196,6 +198,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
 }
 
+// NewOptions returns initialized Options
 func NewOptions() *Options {
 	return &Options{
 		config:      new(kubeproxyconfig.KubeProxyConfiguration),
@@ -212,17 +215,17 @@ func NewOptions() *Options {
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
-		o.applyDeprecatedHealthzPortToConfig()
-		o.applyDeprecatedMetricsPortToConfig()
+		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
+		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
 
 	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
 	if len(o.ConfigFile) > 0 {
-		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+		c, err := o.loadConfigFromFile(o.ConfigFile)
+		if err != nil {
 			return err
-		} else {
-			o.config = c
 		}
+		o.config = c
 
 		if err := o.initWatcher(); err != nil {
 			return err
@@ -233,10 +236,7 @@ func (o *Options) Complete() error {
 		return err
 	}
 
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
-		return err
-	}
-	return nil
+	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
 }
 
 // Creates a new filesystem watcher and adds watches for the config file.
@@ -295,6 +295,7 @@ func (o *Options) Validate(args []string) error {
 	return nil
 }
 
+// Run runs the specified ProxyServer.
 func (o *Options) Run() error {
 	defer close(o.errCh)
 	if len(o.WriteConfigTo) > 0 {
@@ -305,6 +306,11 @@ func (o *Options) Run() error {
 	if err != nil {
 		return err
 	}
+
+	if o.CleanupAndExit {
+		return proxyServer.CleanupAndExit()
+	}
+
 	o.proxyServer = proxyServer
 	return o.runLoop()
 }
@@ -332,7 +338,7 @@ func (o *Options) runLoop() error {
 	}
 }
 
-func (o *Options) writeConfigFile() error {
+func (o *Options) writeConfigFile() (err error) {
 	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(o.codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
@@ -345,10 +351,15 @@ func (o *Options) writeConfigFile() error {
 	if err != nil {
 		return err
 	}
-	// TODO handle error
-	defer configFile.Close()
 
-	if err := encoder.Encode(o.config, configFile); err != nil {
+	defer func() {
+		ferr := configFile.Close()
+		if ferr != nil && err == nil {
+			err = ferr
+		}
+	}()
+
+	if err = encoder.Encode(o.config, configFile); err != nil {
 		return err
 	}
 
@@ -357,38 +368,15 @@ func (o *Options) writeConfigFile() error {
 	return nil
 }
 
-// applyDeprecatedHealthzPortToConfig sets o.config.HealthzBindAddress from
-// flags passed on the command line based on the following rules:
-//
-// 1. If --healthz-port is 0, disable the healthz server.
-// 2. Otherwise, use the value of --healthz-port for the port portion of
-//    o.config.HealthzBindAddress
-func (o *Options) applyDeprecatedHealthzPortToConfig() {
-	if o.healthzPort == 0 {
-		o.config.HealthzBindAddress = ""
-		return
+// addressFromDeprecatedFlags returns server address from flags
+// passed on the command line based on the following rules:
+// 1. If port is 0, disable the server (e.g. set address to empty).
+// 2. Otherwise, set the port portion of the config accordingly.
+func addressFromDeprecatedFlags(addr string, port int32) string {
+	if port == 0 {
+		return ""
 	}
-
-	index := strings.Index(o.config.HealthzBindAddress, ":")
-	if index != -1 {
-		o.config.HealthzBindAddress = o.config.HealthzBindAddress[0:index]
-	}
-
-	o.config.HealthzBindAddress = fmt.Sprintf("%s:%d", o.config.HealthzBindAddress, o.healthzPort)
-}
-
-func (o *Options) applyDeprecatedMetricsPortToConfig() {
-	if o.metricsPort == 0 {
-		o.config.MetricsBindAddress = ""
-		return
-	}
-
-	index := strings.Index(o.config.MetricsBindAddress, ":")
-	if index != -1 {
-		o.config.MetricsBindAddress = o.config.MetricsBindAddress[0:index]
-	}
-
-	o.config.MetricsBindAddress = fmt.Sprintf("%s:%d", o.config.MetricsBindAddress, o.metricsPort)
+	return proxyutil.AppendPortIfNeeded(addr, port)
 }
 
 // loadConfigFromFile loads the contents of file and decodes it as a
@@ -415,6 +403,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 	return proxyConfig, nil
 }
 
+// ApplyDefaults applies the default values to Options.
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
@@ -494,15 +483,12 @@ type ProxyServer struct {
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
 	NodeRef                *v1.ObjectReference
-	CleanupAndExit         bool
 	CleanupIPVS            bool
 	MetricsBindAddress     string
 	EnableProfiling        bool
 	OOMScoreAdj            *int32
 	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
-	ServiceEventHandler    config.ServiceHandler
-	EndpointsEventHandler  config.EndpointsHandler
 	HealthzServer          *healthcheck.HealthzServer
 }
 
@@ -545,19 +531,10 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).
+// TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
-	// remove iptables rules and exit
-	if s.CleanupAndExit {
-		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
-		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
-		if encounteredError {
-			return errors.New("encountered an error while tearing down rules")
-		}
-		return nil
-	}
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
@@ -657,16 +634,16 @@ func (s *ProxyServer) Run() error {
 	// only notify on changes, and the initial update (on process start) may be lost if no handlers
 	// are registered yet.
 	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.ConfigSyncPeriod)
-	serviceConfig.RegisterEventHandler(s.ServiceEventHandler)
+	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
-	endpointsConfig.RegisterEventHandler(s.EndpointsEventHandler)
+	endpointsConfig.RegisterEventHandler(s.Proxier)
 	go endpointsConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
 	// functions must configure their shared informer event handlers first.
-	go informerFactory.Start(wait.NeverStop)
+	informerFactory.Start(wait.NeverStop)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
@@ -702,4 +679,16 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		return floor, nil
 	}
 	return 0, nil
+}
+
+// CleanupAndExit remove iptables rules and exit if success return nil
+func (s *ProxyServer) CleanupAndExit() error {
+	encounteredError := userspace.CleanupLeftovers(s.IptInterface)
+	encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
+	encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface, s.IpsetInterface, s.CleanupIPVS) || encounteredError
+	if encounteredError {
+		return errors.New("encountered an error while tearing down rules")
+	}
+
+	return nil
 }

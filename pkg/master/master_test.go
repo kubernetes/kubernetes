@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -52,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -86,6 +86,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	resourceEncodingOverrides := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
 		apisstorage.Resource("volumeattachments").WithVersion("v1beta1"),
+		networking.Resource("ingresses").WithVersion("v1beta1"),
 	}
 	resourceEncoding = resourceconfig.MergeResourceEncodingConfigs(resourceEncoding, resourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), legacyscheme.Codecs, resourceEncoding, DefaultAPIResourceConfigSource(), nil)
@@ -231,12 +232,6 @@ func TestVersion(t *testing.T) {
 	if !reflect.DeepEqual(kubeversion.Get(), info) {
 		t.Errorf("Expected %#v, Got %#v", kubeversion.Get(), info)
 	}
-}
-
-type fakeEndpointReconciler struct{}
-
-func (*fakeEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	return nil
 }
 
 func makeNodeList(nodes []string, nodeResources apiv1.NodeResources) *apiv1.NodeList {

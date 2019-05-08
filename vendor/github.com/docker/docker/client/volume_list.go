@@ -22,11 +22,11 @@ func (cli *Client) VolumeList(ctx context.Context, filter filters.Args) (volumet
 		query.Set("filters", filterJSON)
 	}
 	resp, err := cli.get(ctx, "/volumes", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return volumes, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&volumes)
-	ensureReaderClosed(resp)
 	return volumes, err
 }

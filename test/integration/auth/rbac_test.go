@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	api "k8s.io/api/core/v1"
+	rbacapi "k8s.io/api/rbac/v1"
 	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -41,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	clientset "k8s.io/client-go/kubernetes"
 	externalclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -48,9 +51,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
@@ -119,25 +120,25 @@ type bootstrapRoles struct {
 // client should be authenticated as the RBAC super user.
 func (b bootstrapRoles) bootstrap(client clientset.Interface) error {
 	for _, r := range b.clusterRoles {
-		_, err := client.Rbac().ClusterRoles().Create(&r)
+		_, err := client.RbacV1().ClusterRoles().Create(&r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roles {
-		_, err := client.Rbac().Roles(r.Namespace).Create(&r)
+		_, err := client.RbacV1().Roles(r.Namespace).Create(&r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.clusterRoleBindings {
-		_, err := client.Rbac().ClusterRoleBindings().Create(&r)
+		_, err := client.RbacV1().ClusterRoleBindings().Create(&r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
 	}
 	for _, r := range b.roleBindings {
-		_, err := client.Rbac().RoleBindings(r.Namespace).Create(&r)
+		_, err := client.RbacV1().RoleBindings(r.Namespace).Create(&r)
 		if err != nil {
 			return fmt.Errorf("failed to make request: %v", err)
 		}
@@ -282,9 +283,9 @@ var (
 
 // Declare some PolicyRules beforehand.
 var (
-	ruleAllowAll  = rbacapi.NewRule("*").Groups("*").Resources("*").RuleOrDie()
-	ruleReadPods  = rbacapi.NewRule("list", "get", "watch").Groups("").Resources("pods").RuleOrDie()
-	ruleWriteJobs = rbacapi.NewRule("*").Groups("batch").Resources("*").RuleOrDie()
+	ruleAllowAll  = rbachelper.NewRule("*").Groups("*").Resources("*").RuleOrDie()
+	ruleReadPods  = rbachelper.NewRule("list", "get", "watch").Groups("").Resources("pods").RuleOrDie()
+	ruleWriteJobs = rbachelper.NewRule("*").Groups("batch").Resources("*").RuleOrDie()
 )
 
 func TestRBAC(t *testing.T) {
@@ -345,13 +346,13 @@ func TestRBAC(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
 						Rules: []rbacapi.PolicyRule{
-							rbacapi.NewRule("create").Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
+							rbachelper.NewRule("create").Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
 						Rules: []rbacapi.PolicyRule{
-							rbacapi.NewRule("bind").Groups("rbac.authorization.k8s.io").Resources("clusterroles").RuleOrDie(),
+							rbachelper.NewRule("bind").Groups("rbac.authorization.k8s.io").Resources("clusterroles").RuleOrDie(),
 						},
 					},
 				},
@@ -452,7 +453,7 @@ func TestRBAC(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
 						Rules: []rbacapi.PolicyRule{
-							rbacapi.NewRule("update").Groups("").Resources("limitranges").RuleOrDie(),
+							rbachelper.NewRule("update").Groups("").Resources("limitranges").RuleOrDie(),
 						},
 					},
 				},
@@ -486,7 +487,7 @@ func TestRBAC(t *testing.T) {
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
 						Rules: []rbacapi.PolicyRule{
-							rbacapi.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
+							rbachelper.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
 						},
 					},
 				},
@@ -638,7 +639,7 @@ func TestBootstrapping(t *testing.T) {
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
-	watcher, err := clientset.Rbac().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
+	watcher, err := clientset.RbacV1().ClusterRoles().Watch(metav1.ListOptions{ResourceVersion: "0"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -654,7 +655,7 @@ func TestBootstrapping(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	clusterRoles, err := clientset.Rbac().ClusterRoles().List(metav1.ListOptions{})
+	clusterRoles, err := clientset.RbacV1().ClusterRoles().List(metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -701,7 +702,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	// Modify the default RBAC discovery ClusterRoleBidnings to look more like the defaults that
 	// existed prior to v1.14, but with user modifications.
 	t.Logf("Modifying default `system:discovery` ClusterRoleBinding")
-	discRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	discRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
 	discRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	discRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
 	discRoleBinding.Subjects = []rbacapi.Subject{
@@ -711,18 +712,18 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 			APIGroup: "rbac.authorization.k8s.io",
 		},
 	}
-	if discRoleBinding, err = client.Rbac().ClusterRoleBindings().Update(discRoleBinding); err != nil {
+	if discRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(discRoleBinding); err != nil {
 		t.Fatalf("Failed to update `system:discovery` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Modifying default `system:basic-user` ClusterRoleBinding")
-	basicUserRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	basicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
 	basicUserRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	basicUserRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
-	if basicUserRoleBinding, err = client.Rbac().ClusterRoleBindings().Update(basicUserRoleBinding); err != nil {
+	if basicUserRoleBinding, err = client.RbacV1().ClusterRoleBindings().Update(basicUserRoleBinding); err != nil {
 		t.Fatalf("Failed to update `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	t.Logf("Deleting default `system:public-info-viewer` ClusterRoleBinding")
-	if err = client.Rbac().ClusterRoleBindings().Delete("system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
+	if err = client.RbacV1().ClusterRoleBindings().Delete("system:public-info-viewer", &metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("Failed to delete `system:public-info-viewer` ClusterRoleBinding: %v", err)
 	}
 
@@ -736,21 +737,21 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 
 	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[api.GroupName].GroupVersion()}})
 
-	newDiscRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
+	newDiscRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:discovery", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:discovery` ClusterRoleBinding: %v", err)
 	}
 	if !reflect.DeepEqual(newDiscRoleBinding, discRoleBinding) {
 		t.Errorf("`system:discovery` should have been unmodified. Wanted: %v, got %v", discRoleBinding, newDiscRoleBinding)
 	}
-	newBasicUserRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
+	newBasicUserRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:basic-user", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:basic-user` ClusterRoleBinding: %v", err)
 	}
 	if !reflect.DeepEqual(newBasicUserRoleBinding, basicUserRoleBinding) {
 		t.Errorf("`system:basic-user` should have been unmodified. Wanted: %v, got %v", basicUserRoleBinding, newBasicUserRoleBinding)
 	}
-	publicInfoViewerRoleBinding, err := client.Rbac().ClusterRoleBindings().Get("system:public-info-viewer", metav1.GetOptions{})
+	publicInfoViewerRoleBinding, err := client.RbacV1().ClusterRoleBindings().Get("system:public-info-viewer", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get `system:public-info-viewer` ClusterRoleBinding: %v", err)
 	}

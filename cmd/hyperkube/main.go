@@ -87,30 +87,10 @@ func commandFor(basename string, defaultCommand *cobra.Command, commands []func(
 func NewHyperKubeCommand(stopCh <-chan struct{}) (*cobra.Command, []func() *cobra.Command) {
 	// these have to be functions since the command is polymorphic. Cobra wants you to be top level
 	// command to get executed
-	apiserver := func() *cobra.Command {
-		ret := kubeapiserver.NewAPIServerCommand(stopCh)
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"apiserver"}
-		return ret
-	}
-	controller := func() *cobra.Command {
-		ret := kubecontrollermanager.NewControllerManagerCommand()
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"controller-manager"}
-		return ret
-	}
-	proxy := func() *cobra.Command {
-		ret := kubeproxy.NewProxyCommand()
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"proxy"}
-		return ret
-	}
-	scheduler := func() *cobra.Command {
-		ret := kubescheduler.NewSchedulerCommand()
-		// add back some unfortunate aliases that should be removed
-		ret.Aliases = []string{"scheduler"}
-		return ret
-	}
+	apiserver := func() *cobra.Command { return kubeapiserver.NewAPIServerCommand(stopCh) }
+	controller := func() *cobra.Command { return kubecontrollermanager.NewControllerManagerCommand() }
+	proxy := func() *cobra.Command { return kubeproxy.NewProxyCommand() }
+	scheduler := func() *cobra.Command { return kubescheduler.NewSchedulerCommand() }
 	kubectlCmd := func() *cobra.Command { return kubectl.NewDefaultKubectlCommand() }
 	kubelet := func() *cobra.Command { return kubelet.NewKubeletCommand(stopCh) }
 	cloudController := func() *cobra.Command { return cloudcontrollermanager.NewCloudControllerManagerCommand() }

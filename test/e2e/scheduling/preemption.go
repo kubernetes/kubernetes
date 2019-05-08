@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -620,6 +621,6 @@ func createPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSe
 
 func runPauseRS(f *framework.Framework, conf pauseRSConfig) *appsv1.ReplicaSet {
 	rs := createPauseRS(f, conf)
-	framework.ExpectNoError(framework.WaitForReplicaSetTargetAvailableReplicas(f.ClientSet, rs, conf.Replicas))
+	framework.ExpectNoError(replicaset.WaitForReplicaSetTargetAvailableReplicas(f.ClientSet, rs, conf.Replicas))
 	return rs
 }

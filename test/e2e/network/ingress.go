@@ -26,8 +26,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +35,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 
 	. "github.com/onsi/ginkgo"
@@ -63,10 +64,11 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		framework.BindClusterRole(jig.Client.RbacV1beta1(), "cluster-admin", f.Namespace.Name,
+		err := auth.BindClusterRole(jig.Client.RbacV1beta1(), "cluster-admin", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+		framework.ExpectNoError(err)
 
-		err := framework.WaitForAuthorizationUpdate(jig.Client.AuthorizationV1beta1(),
+		err = auth.WaitForAuthorizationUpdate(jig.Client.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			"", "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
@@ -121,74 +123,6 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		It("should not reconcile manually modified health check for ingress", func() {
-			By("Creating a basic HTTP ingress and wait for it to come up.")
-			jig.CreateIngress(filepath.Join(ingress.IngressManifestPath, "http"), ns, nil, nil)
-			jig.WaitForIngress(true)
-
-			// Get cluster UID.
-			clusterID, err := gce.GetClusterID(f.ClientSet)
-			Expect(err).NotTo(HaveOccurred())
-			// Get the related nodeports.
-			nodePorts := jig.GetIngressNodePorts(false)
-			Expect(len(nodePorts)).ToNot(Equal(0))
-
-			// Filter health check using cluster UID as the suffix.
-			By("Retrieving relevant health check resources from GCE.")
-			gceCloud, err := gce.GetGCECloud()
-			Expect(err).NotTo(HaveOccurred())
-			hcs, err := gceCloud.ListHealthChecks()
-			Expect(err).NotTo(HaveOccurred())
-			var hcToChange *compute.HealthCheck
-			for _, hc := range hcs {
-				if strings.HasSuffix(hc.Name, clusterID) {
-					Expect(hc.HttpHealthCheck).NotTo(BeNil())
-					if fmt.Sprintf("%d", hc.HttpHealthCheck.Port) == nodePorts[0] {
-						hcToChange = hc
-						break
-					}
-				}
-			}
-			Expect(hcToChange).NotTo(BeNil())
-
-			By(fmt.Sprintf("Modifying health check %v without involving ingress.", hcToChange.Name))
-			// Change timeout from 60s to 25s.
-			hcToChange.TimeoutSec = 25
-			// Change path from /healthz to /.
-			hcToChange.HttpHealthCheck.RequestPath = "/"
-			err = gceCloud.UpdateHealthCheck(hcToChange)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Add one more path to ingress to trigger resource syncing.
-			By("Adding a new path to ingress and wait for it to take effect.")
-			jig.Update(func(ing *extensions.Ingress) {
-				ing.Spec.Rules = append(ing.Spec.Rules, extensions.IngressRule{
-					Host: "ingress.test.com",
-					IngressRuleValue: extensions.IngressRuleValue{
-						HTTP: &extensions.HTTPIngressRuleValue{
-							Paths: []extensions.HTTPIngressPath{
-								{
-									Path: "/test",
-									// Copy backend from the first rule.
-									Backend: ing.Spec.Rules[0].HTTP.Paths[0].Backend,
-								},
-							},
-						},
-					},
-				})
-			})
-			// Wait for change to take effect before checking the health check resource.
-			jig.WaitForIngress(false)
-
-			// Validate the modified fields on health check are intact.
-			By("Checking if the modified health check is unchanged.")
-			hcAfterSync, err := gceCloud.GetHealthCheck(hcToChange.Name)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(hcAfterSync.HttpHealthCheck).ToNot(Equal(nil))
-			Expect(hcAfterSync.TimeoutSec).To(Equal(hcToChange.TimeoutSec))
-			Expect(hcAfterSync.HttpHealthCheck.RequestPath).To(Equal(hcToChange.HttpHealthCheck.RequestPath))
-		})
-
 		It("should create ingress with pre-shared certificate", func() {
 			executePresharedCertTest(f, jig, "")
 		})
@@ -241,7 +175,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
 				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
-					framework.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
+					e2elog.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
 					return false, nil
 				}
 				return true, nil
@@ -366,7 +300,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false)); err != nil {
-					framework.Logf("Failed to verify IG backend service: %v", err)
+					e2elog.Logf("Failed to verify IG backend service: %v", err)
 					return false, nil
 				}
 				return true, nil
@@ -384,7 +318,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}
 			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false)); err != nil {
-					framework.Logf("Failed to verify NEG backend service: %v", err)
+					e2elog.Logf("Failed to verify NEG backend service: %v", err)
 					return false, nil
 				}
 				return true, nil
@@ -421,7 +355,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					if err != nil {
 						return false, nil
 					}
-					framework.Logf("Expecting %d backends, got %d", num, res.Len())
+					e2elog.Logf("Expecting %d backends, got %d", num, res.Len())
 					return res.Len() == num, nil
 				})
 				Expect(err).NotTo(HaveOccurred())
@@ -489,13 +423,12 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				if int(deploy.Status.UpdatedReplicas) == replicas {
 					if res.Len() == replicas {
 						return true, nil
-					} else {
-						framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
-						return false, nil
 					}
+					e2elog.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
+					return false, nil
 
 				} else {
-					framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
+					e2elog.Logf("Waiting for rolling update to finished. Keep sending traffic.")
 					return false, nil
 				}
 			})
@@ -522,30 +455,30 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 					v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
 					if !ok {
 						// Wait for NEG sync loop to find NEGs
-						framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+						e2elog.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
 						return false, nil
 					}
 					err = json.Unmarshal([]byte(v), &status)
 					if err != nil {
-						framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+						e2elog.Logf("Error in parsing Expose NEG annotation: %v", err)
 						return false, nil
 					}
-					framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+					e2elog.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
 
 					// Expect 2 NEGs to be created based on the test setup (neg-exposed)
 					if len(status.NetworkEndpointGroups) != 2 {
-						framework.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
+						e2elog.Logf("Expected 2 NEGs, got %d", len(status.NetworkEndpointGroups))
 						return false, nil
 					}
 
 					for _, port := range expectedKeys {
 						if _, ok := status.NetworkEndpointGroups[port]; !ok {
-							framework.Logf("Expected ServicePort key %v, but does not exist", port)
+							e2elog.Logf("Expected ServicePort key %v, but does not exist", port)
 						}
 					}
 
 					if len(status.NetworkEndpointGroups) != len(expectedKeys) {
-						framework.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
+						e2elog.Logf("Expected length of %+v to equal length of %+v, but does not", status.NetworkEndpointGroups, expectedKeys)
 					}
 
 					gceCloud, err := gce.GetGCECloud()
@@ -554,7 +487,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 						networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
 						Expect(err).NotTo(HaveOccurred())
 						if len(networkEndpoints) != num {
-							framework.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
+							e2elog.Logf("Expect number of endpoints to be %d, but got %d", num, len(networkEndpoints))
 							return false, nil
 						}
 					}
@@ -784,7 +717,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			if framework.ProviderIs("gce", "gke") {
 				framework.ExpectNoError(gce.GcloudComputeResourceCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", framework.TestContext.CloudConfig.Network))
 			} else {
-				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
+				e2elog.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
 
 			nginxController.Init()
@@ -849,7 +782,7 @@ func executePresharedCertTest(f *framework.Framework, jig *ingress.TestJig, stat
 		By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
 		err := wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
 			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {
-				framework.Logf("Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
+				e2elog.Logf("Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
 				return false, nil
 			}
 			return true, nil
@@ -916,39 +849,16 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
 		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
-			framework.Logf("SimpleGET failed: %v", err)
+			e2elog.Logf("SimpleGET failed: %v", err)
 			return false, nil
 		}
 		if !strings.Contains(resp, "request_scheme=https") {
 			return false, fmt.Errorf("request wasn't served by HTTPS, response body: %s", resp)
 		}
-		framework.Logf("Poll succeeded, request was served by HTTPS")
+		e2elog.Logf("Poll succeeded, request was served by HTTPS")
 		return true, nil
 	})
 	Expect(err).NotTo(HaveOccurred(), "Failed to verify backside re-encryption ingress")
-}
-
-func detectHttpVersionAndSchemeTest(f *framework.Framework, jig *ingress.TestJig, address, version, scheme string) {
-	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
-	resp := ""
-	err := wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
-		var err error
-		resp, err = framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", address), "")
-		if err != nil {
-			framework.Logf("SimpleGET failed: %v", err)
-			return false, nil
-		}
-		if !strings.Contains(resp, version) {
-			framework.Logf("Waiting for transition to HTTP/2")
-			return false, nil
-		}
-		if !strings.Contains(resp, scheme) {
-			return false, nil
-		}
-		framework.Logf("Poll succeeded, request was served by HTTP2")
-		return true, nil
-	})
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to get %s or %s, response body: %s", version, scheme, resp))
 }
 
 func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceController *gce.IngressController, ns, name string, negs int) {
@@ -962,7 +872,7 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 		if negs == 0 {
 			err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false))
 			if err != nil {
-				framework.Logf("Failed to validate IG backend service: %v", err)
+				e2elog.Logf("Failed to validate IG backend service: %v", err)
 				return false, nil
 			}
 			return true, nil
@@ -971,19 +881,19 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 		var status ingress.NegStatus
 		v, ok := svc.Annotations[ingress.NEGStatusAnnotation]
 		if !ok {
-			framework.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
+			e2elog.Logf("Waiting for %v, got: %+v", ingress.NEGStatusAnnotation, svc.Annotations)
 			return false, nil
 		}
 
 		err = json.Unmarshal([]byte(v), &status)
 		if err != nil {
-			framework.Logf("Error in parsing Expose NEG annotation: %v", err)
+			e2elog.Logf("Error in parsing Expose NEG annotation: %v", err)
 			return false, nil
 		}
-		framework.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
+		e2elog.Logf("Got %v: %v", ingress.NEGStatusAnnotation, v)
 
 		if len(status.NetworkEndpointGroups) != negs {
-			framework.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
+			e2elog.Logf("Expected %d NEGs, got %d", negs, len(status.NetworkEndpointGroups))
 			return false, nil
 		}
 
@@ -993,14 +903,14 @@ func detectNegAnnotation(f *framework.Framework, jig *ingress.TestJig, gceContro
 			networkEndpoints, err := gceCloud.ListNetworkEndpoints(neg, gceController.Cloud.Zone, false)
 			Expect(err).NotTo(HaveOccurred())
 			if len(networkEndpoints) != 1 {
-				framework.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
+				e2elog.Logf("Expect NEG %s to exist, but got %d", neg, len(networkEndpoints))
 				return false, nil
 			}
 		}
 
 		err = gceController.BackendServiceUsingNEG(jig.GetServicePorts(false))
 		if err != nil {
-			framework.Logf("Failed to validate NEG backend service: %v", err)
+			e2elog.Logf("Failed to validate NEG backend service: %v", err)
 			return false, nil
 		}
 		return true, nil

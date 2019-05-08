@@ -16,7 +16,7 @@
 // Most LAPACK functions are built on top the routines defined in the BLAS API,
 // and as such the computation time for many LAPACK functions is
 // dominated by BLAS calls. Here, BLAS is accessed through the
-// the blas64 package (https://godoc.org/golang.org/v1/gonum/blas/blas64). In particular,
+// blas64 package (https://godoc.org/golang.org/v1/gonum/blas/blas64). In particular,
 // this implies that an external BLAS library will be used if it is
 // registered in blas64.
 //

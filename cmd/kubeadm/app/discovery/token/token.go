@@ -18,8 +18,6 @@ package token
 
 import (
 	"bytes"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"sync"
 	"time"
@@ -31,10 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	certutil "k8s.io/client-go/util/cert"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
@@ -64,7 +63,7 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 	// The endpoint that wins the race and completes the task first gets its kubeconfig returned below
 	baseKubeConfig, err := fetchKubeConfigWithTimeout(cfg.Discovery.BootstrapToken.APIServerEndpoint, cfg.Discovery.Timeout.Duration, func(endpoint string) (*clientcmdapi.Config, error) {
 
-		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, kubeadmapiv1beta1.DefaultClusterName)
+		insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, kubeadmapiv1beta2.DefaultClusterName)
 		clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
 		insecureClient, err := kubeconfigutil.ToClientSet(insecureBootstrapConfig)
@@ -119,14 +118,14 @@ func RetrieveValidatedConfigInfo(cfg *kubeadmapi.JoinConfiguration) (*clientcmda
 		for _, cluster := range insecureConfig.Clusters {
 			clusterCABytes = cluster.CertificateAuthorityData
 		}
-		clusterCA, err := parsePEMCert(clusterCABytes)
+		clusterCAs, err := certutil.ParseCertsPEM(clusterCABytes)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to parse cluster CA from the %s configmap", bootstrapapi.ConfigMapClusterInfo)
 
 		}
 
 		// Validate the cluster CA public key against the pinned set
-		err = pubKeyPins.Check(clusterCA)
+		err = pubKeyPins.CheckAny(clusterCAs)
 		if err != nil {
 			return nil, errors.Wrapf(err, "cluster CA found in %s configmap is invalid", bootstrapapi.ConfigMapClusterInfo)
 		}
@@ -224,16 +223,4 @@ func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Durati
 		wg.Wait()
 		return resultingKubeConfig, nil
 	}
-}
-
-// parsePEMCert decodes a PEM-formatted certificate and returns it as an x509.Certificate
-func parsePEMCert(certData []byte) (*x509.Certificate, error) {
-	pemBlock, trailingData := pem.Decode(certData)
-	if pemBlock == nil {
-		return nil, errors.New("invalid PEM data")
-	}
-	if len(trailingData) != 0 {
-		return nil, errors.New("trailing data after first PEM block")
-	}
-	return x509.ParseCertificate(pemBlock.Bytes)
 }

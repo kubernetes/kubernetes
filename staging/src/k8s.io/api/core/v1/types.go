@@ -1775,7 +1775,7 @@ type VolumeMount struct {
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
-	// This field is alpha in 1.14.
+	// This field is beta in 1.15.
 	// +optional
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
 }
@@ -2965,7 +2965,7 @@ type PodSpec struct {
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
 	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
-	// This is an alpha feature and may change in the future.
+	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
@@ -3000,6 +3000,9 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,1,opt,name=seLinuxOptions"`
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,8,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -4701,6 +4704,7 @@ type EventSeries struct {
 	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime `json:"lastObservedTime,omitempty" protobuf:"bytes,2,name=lastObservedTime"`
 	// State of this Series: Ongoing or Finished
+	// Deprecated. Planned removal for 1.18
 	State EventSeriesState `json:"state,omitempty" protobuf:"bytes,3,name=state"`
 }
 
@@ -5267,6 +5271,9 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" protobuf:"bytes,3,opt,name=seLinuxOptions"`
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" protobuf:"bytes,10,opt,name=windowsOptions"`
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -5335,6 +5342,11 @@ type SELinuxOptions struct {
 	// Level is SELinux level label that applies to the container.
 	// +optional
 	Level string `json:"level,omitempty" protobuf:"bytes,4,opt,name=level"`
+}
+
+// WindowsSecurityContextOptions contain Windows-specific options and credentials.
+type WindowsSecurityContextOptions struct {
+	// intentionally left empty for now
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

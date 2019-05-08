@@ -104,6 +104,10 @@ func (s *simpleProvider) MutatePod(pod *api.Pod) error {
 
 	pod.Spec.SecurityContext = sc.PodSecurityContext()
 
+	if s.psp.Spec.RuntimeClass != nil && pod.Spec.RuntimeClassName == nil {
+		pod.Spec.RuntimeClassName = s.psp.Spec.RuntimeClass.DefaultRuntimeClassName
+	}
+
 	for i := range pod.Spec.InitContainers {
 		if err := s.mutateContainer(pod, &pod.Spec.InitContainers[i]); err != nil {
 			return err
@@ -295,6 +299,10 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 		}
 	}
 
+	if s.psp.Spec.RuntimeClass != nil {
+		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
+	}
+
 	fldPath := field.NewPath("spec", "initContainers")
 	for i := range pod.Spec.InitContainers {
 		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.InitContainers[i], fldPath.Index(i))...)
@@ -412,4 +420,21 @@ func hostPortRangesToString(ranges []policy.HostPortRange) string {
 		formattedString = strings.Join(strRanges, ",")
 	}
 	return formattedString
+}
+
+// validates that the actual RuntimeClassName is contained in the list of valid names.
+func validateRuntimeClassName(actual *string, validNames []string) field.ErrorList {
+	if actual == nil {
+		return nil // An unset RuntimeClassName is always allowed.
+	}
+
+	for _, valid := range validNames {
+		if valid == policy.AllowAllRuntimeClassNames {
+			return nil
+		}
+		if *actual == valid {
+			return nil
+		}
+	}
+	return field.ErrorList{field.Invalid(field.NewPath("spec", "runtimeClassName"), *actual, "")}
 }

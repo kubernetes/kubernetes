@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -54,6 +53,8 @@ type csiAttacher struct {
 
 // volume.Attacher methods
 var _ volume.Attacher = &csiAttacher{}
+
+var _ volume.Detacher = &csiAttacher{}
 
 var _ volume.DeviceMounter = &csiAttacher{}
 
@@ -598,7 +599,7 @@ func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
 		return "", fmt.Errorf("makeDeviceMountPath failed, pv name empty")
 	}
 
-	return path.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, pvName, globalMountInGlobalPath), nil
+	return filepath.Join(plugin.host.GetPluginDir(plugin.GetPluginName()), persistentVolumeInGlobalPath, pvName, globalMountInGlobalPath), nil
 }
 
 func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMountPath string) (string, string, error) {

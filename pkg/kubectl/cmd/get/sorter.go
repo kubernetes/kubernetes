@@ -46,13 +46,27 @@ type SortingPrinter struct {
 }
 
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	if !meta.IsListType(obj) {
+	if table, isTable := obj.(*metav1beta1.Table); isTable && len(table.Rows) > 1 {
+		parsedField, err := RelaxedJSONPathExpression(s.SortField)
+		if err != nil {
+			parsedField = s.SortField
+		}
+
+		if sorter, err := NewTableSorter(table, parsedField); err != nil {
+			return err
+		} else if err := sorter.Sort(); err != nil {
+			return err
+		}
+		return s.Delegate.PrintObj(table, out)
+	}
+
+	if meta.IsListType(obj) {
+		if err := s.sortObj(obj); err != nil {
+			return err
+		}
 		return s.Delegate.PrintObj(obj, out)
 	}
 
-	if err := s.sortObj(obj); err != nil {
-		return err
-	}
 	return s.Delegate.PrintObj(obj, out)
 }
 

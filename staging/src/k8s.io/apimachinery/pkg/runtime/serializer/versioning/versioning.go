@@ -199,23 +199,22 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
+	objectKind := obj.GetObjectKind()
+	old := objectKind.GroupVersionKind()
+	// restore the old GVK after encoding
+	defer objectKind.SetGroupVersionKind(old)
+
 	if c.encodeVersion == nil || isUnversioned {
 		if e, ok := obj.(runtime.NestedObjectEncoder); ok {
 			if err := e.EncodeNestedObjects(runtime.WithVersionEncoder{Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
 				return err
 			}
 		}
-		objectKind := obj.GetObjectKind()
-		old := objectKind.GroupVersionKind()
 		objectKind.SetGroupVersionKind(gvks[0])
-		err = c.encoder.Encode(obj, w)
-		objectKind.SetGroupVersionKind(old)
-		return err
+		return c.encoder.Encode(obj, w)
 	}
 
 	// Perform a conversion if necessary
-	objectKind := obj.GetObjectKind()
-	old := objectKind.GroupVersionKind()
 	out, err := c.convertor.ConvertToVersion(obj, c.encodeVersion)
 	if err != nil {
 		return err
@@ -228,14 +227,13 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	}
 
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
-	err = c.encoder.Encode(out, w)
-	// restore the old GVK, in case conversion returned the same object
-	objectKind.SetGroupVersionKind(old)
-	return err
+	return c.encoder.Encode(out, w)
 }
 
-// DirectEncoder was movend and renamed in 1.15 and will be removed in 1.16.
+// DirectEncoder was moved and renamed to runtime.WithVersionEncoder in 1.15.
+// TODO: remove in 1.16.
 type DirectEncoder = runtime.WithVersionEncoder
 
-// DirectDecoder was movend and renamed in 1.15 and will be removed in 1.16.
+// DirectDecoder was moved and renamed to runtime.WithoutVersionDecoder in 1.15.
+// TODO: remove in 1.16.
 type DirectDecoder = runtime.WithoutVersionDecoder

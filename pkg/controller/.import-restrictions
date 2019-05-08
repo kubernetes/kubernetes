@@ -258,7 +258,8 @@
         "k8s.io/kubernetes/pkg/fieldpath",
         "k8s.io/kubernetes/pkg/scheduler/volumebinder",
         "k8s.io/kubernetes/pkg/util/resizefs",
-        "k8s.io/kubernetes/pkg/apis/apps"
+        "k8s.io/kubernetes/pkg/apis/apps",
+        "k8s.io/kubernetes/pkg/scheduler/metrics"
       ]
     },
     {

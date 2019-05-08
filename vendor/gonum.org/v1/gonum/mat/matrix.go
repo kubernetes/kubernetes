@@ -89,6 +89,13 @@ type UntransposeTrier interface {
 	UntransposeTri() Triangular
 }
 
+// UntransposeTriBander is a type that can undo an implicit triangular banded
+// transpose.
+type UntransposeTriBander interface {
+	// Untranspose returns the underlying Triangular stored for the implicit transpose.
+	UntransposeTriBand() TriBanded
+}
+
 // Mutable is a matrix interface type that allows elements to be altered.
 type Mutable interface {
 	// Set alters the matrix element at row i, column j to v.
@@ -200,6 +207,73 @@ type ColNonZeroDoer interface {
 	DoColNonZero(j int, fn func(i, j int, v float64))
 }
 
+// untranspose untransposes a matrix if applicable. If a is an Untransposer, then
+// untranspose returns the underlying matrix and true. If it is not, then it returns
+// the input matrix and false.
+func untranspose(a Matrix) (Matrix, bool) {
+	if ut, ok := a.(Untransposer); ok {
+		return ut.Untranspose(), true
+	}
+	return a, false
+}
+
+// untransposeExtract returns an untransposed matrix in a built-in matrix type.
+//
+// The untransposed matrix is returned unaltered if it is a built-in matrix type.
+// Otherwise, if it implements a Raw method, an appropriate built-in type value
+// is returned holding the raw matrix value of the input. If neither of these
+// is possible, the untransposed matrix is returned.
+func untransposeExtract(a Matrix) (Matrix, bool) {
+	ut, trans := untranspose(a)
+	switch m := ut.(type) {
+	case *DiagDense, *SymBandDense, *TriBandDense, *BandDense, *TriDense, *SymDense, *Dense:
+		return m, trans
+	// TODO(btracey): Add here if we ever have an equivalent of RawDiagDense.
+	case RawSymBander:
+		rsb := m.RawSymBand()
+		if rsb.Uplo != blas.Upper {
+			return ut, trans
+		}
+		var sb SymBandDense
+		sb.SetRawSymBand(rsb)
+		return &sb, trans
+	case RawTriBander:
+		rtb := m.RawTriBand()
+		if rtb.Diag == blas.Unit {
+			return ut, trans
+		}
+		var tb TriBandDense
+		tb.SetRawTriBand(rtb)
+		return &tb, trans
+	case RawBander:
+		var b BandDense
+		b.SetRawBand(m.RawBand())
+		return &b, trans
+	case RawTriangular:
+		rt := m.RawTriangular()
+		if rt.Diag == blas.Unit {
+			return ut, trans
+		}
+		var t TriDense
+		t.SetRawTriangular(rt)
+		return &t, trans
+	case RawSymmetricer:
+		rs := m.RawSymmetric()
+		if rs.Uplo != blas.Upper {
+			return ut, trans
+		}
+		var s SymDense
+		s.SetRawSymmetric(rs)
+		return &s, trans
+	case RawMatrixer:
+		var d Dense
+		d.SetRawMatrix(m.RawMatrix())
+		return &d, trans
+	default:
+		return ut, trans
+	}
+}
+
 // TODO(btracey): Consider adding CopyCol/CopyRow if the behavior seems useful.
 // TODO(btracey): Add in fast paths to Row/Col for the other concrete types
 // (TriDense, etc.) as well as relevant interfaces (RowColer, RawRowViewer, etc.)
@@ -226,9 +300,8 @@ func Col(dst []float64, j int, a Matrix) []float64 {
 			copy(dst, m.Data[j*m.Stride:j*m.Stride+m.Cols])
 			return dst
 		}
-		blas64.Copy(r,
-			blas64.Vector{Inc: m.Stride, Data: m.Data[j:]},
-			blas64.Vector{Inc: 1, Data: dst},
+		blas64.Copy(blas64.Vector{N: r, Inc: m.Stride, Data: m.Data[j:]},
+			blas64.Vector{N: r, Inc: 1, Data: dst},
 		)
 		return dst
 	}
@@ -257,9 +330,8 @@ func Row(dst []float64, i int, a Matrix) []float64 {
 	if rm, ok := aU.(RawMatrixer); ok {
 		m := rm.RawMatrix()
 		if aTrans {
-			blas64.Copy(c,
-				blas64.Vector{Inc: m.Stride, Data: m.Data[i:]},
-				blas64.Vector{Inc: 1, Data: dst},
+			blas64.Copy(blas64.Vector{N: c, Inc: m.Stride, Data: m.Data[i:]},
+				blas64.Vector{N: c, Inc: 1, Data: dst},
 			)
 			return dst
 		}
@@ -338,7 +410,7 @@ func Dot(a, b Vector) float64 {
 	}
 	if arv, ok := a.(RawVectorer); ok {
 		if brv, ok := b.(RawVectorer); ok {
-			return blas64.Dot(la, arv.RawVector(), brv.RawVector())
+			return blas64.Dot(arv.RawVector(), brv.RawVector())
 		}
 	}
 	var sum float64
@@ -401,7 +473,7 @@ func Equal(a, b Matrix) bool {
 		if rb, ok := bU.(*VecDense); ok {
 			// If the raw vectors are the same length they must either both be
 			// transposed or both not transposed (or have length 1).
-			for i := 0; i < ra.n; i++ {
+			for i := 0; i < ra.mat.N; i++ {
 				if ra.mat.Data[i*ra.mat.Inc] != rb.mat.Data[i*rb.mat.Inc] {
 					return false
 				}
@@ -473,7 +545,7 @@ func EqualApprox(a, b Matrix, epsilon float64) bool {
 		if rb, ok := bU.(*VecDense); ok {
 			// If the raw vectors are the same length they must either both be
 			// transposed or both not transposed (or have length 1).
-			for i := 0; i < ra.n; i++ {
+			for i := 0; i < ra.mat.N; i++ {
 				if !floats.EqualWithinAbsOrRel(ra.mat.Data[i*ra.mat.Inc], rb.mat.Data[i*rb.mat.Inc], epsilon, epsilon) {
 					return false
 				}
@@ -699,17 +771,17 @@ func Norm(a Matrix, norm float64) float64 {
 			panic("unreachable")
 		case 1:
 			if aTrans {
-				imax := blas64.Iamax(rma.n, rv)
+				imax := blas64.Iamax(rv)
 				return math.Abs(rma.At(imax, 0))
 			}
-			return blas64.Asum(rma.n, rv)
+			return blas64.Asum(rv)
 		case 2:
-			return blas64.Nrm2(rma.n, rv)
+			return blas64.Nrm2(rv)
 		case math.Inf(1):
 			if aTrans {
-				return blas64.Asum(rma.n, rv)
+				return blas64.Asum(rv)
 			}
-			imax := blas64.Iamax(rma.n, rv)
+			imax := blas64.Iamax(rv)
 			return math.Abs(rma.At(imax, 0))
 		}
 	}
@@ -762,7 +834,7 @@ func normLapack(norm float64, aTrans bool) lapack.MatrixNorm {
 		}
 		return n
 	case 2:
-		return lapack.NormFrob
+		return lapack.Frobenius
 	case math.Inf(1):
 		n := lapack.MaxRowSum
 		if aTrans {
@@ -798,44 +870,28 @@ func Sum(a Matrix) float64 {
 	return sum
 }
 
+// A Tracer can compute the trace of the matrix. Trace must panic if the
+// matrix is not square.
+type Tracer interface {
+	Trace() float64
+}
+
 // Trace returns the trace of the matrix. Trace will panic if the
 // matrix is not square.
 func Trace(a Matrix) float64 {
+	m, _ := untransposeExtract(a)
+	if t, ok := m.(Tracer); ok {
+		return t.Trace()
+	}
 	r, c := a.Dims()
 	if r != c {
 		panic(ErrSquare)
 	}
-
-	aU, _ := untranspose(a)
-	switch m := aU.(type) {
-	case RawMatrixer:
-		rm := m.RawMatrix()
-		var t float64
-		for i := 0; i < r; i++ {
-			t += rm.Data[i*rm.Stride+i]
-		}
-		return t
-	case RawTriangular:
-		rm := m.RawTriangular()
-		var t float64
-		for i := 0; i < r; i++ {
-			t += rm.Data[i*rm.Stride+i]
-		}
-		return t
-	case RawSymmetricer:
-		rm := m.RawSymmetric()
-		var t float64
-		for i := 0; i < r; i++ {
-			t += rm.Data[i*rm.Stride+i]
-		}
-		return t
-	default:
-		var t float64
-		for i := 0; i < r; i++ {
-			t += a.At(i, i)
-		}
-		return t
+	var v float64
+	for i := 0; i < r; i++ {
+		v += a.At(i, i)
 	}
+	return v
 }
 
 func min(a, b int) int {

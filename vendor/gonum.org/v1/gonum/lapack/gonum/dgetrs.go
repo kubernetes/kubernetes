@@ -21,18 +21,35 @@ import (
 // a and ipiv contain the LU factorization of A and the permutation indices as
 // computed by Dgetrf. ipiv is zero-indexed.
 func (impl Implementation) Dgetrs(trans blas.Transpose, n, nrhs int, a []float64, lda int, ipiv []int, b []float64, ldb int) {
-	checkMatrix(n, n, a, lda)
-	checkMatrix(n, nrhs, b, ldb)
-	if len(ipiv) < n {
-		panic(badIpiv)
+	switch {
+	case trans != blas.NoTrans && trans != blas.Trans && trans != blas.ConjTrans:
+		panic(badTrans)
+	case n < 0:
+		panic(nLT0)
+	case nrhs < 0:
+		panic(nrhsLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case ldb < max(1, nrhs):
+		panic(badLdB)
 	}
+
+	// Quick return if possible.
 	if n == 0 || nrhs == 0 {
 		return
 	}
-	if trans != blas.Trans && trans != blas.NoTrans {
-		panic(badTrans)
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
+	case len(b) < (n-1)*ldb+nrhs:
+		panic(shortB)
+	case len(ipiv) != n:
+		panic(badLenIpiv)
 	}
+
 	bi := blas64.Implementation()
+
 	if trans == blas.NoTrans {
 		// Solve A * X = B.
 		impl.Dlaswp(nrhs, b, ldb, 0, n-1, ipiv, 1)

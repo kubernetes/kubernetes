@@ -23,12 +23,13 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -119,13 +120,13 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		claimSize := dDriver.GetClaimSize()
 		pvc := getClaim(claimSize, config.Framework.Namespace.Name)
 		pvc.Spec.StorageClassName = &class.Name
-		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
+		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		By("creating a StorageClass " + class.Name)
 		class, err := cs.StorageV1().StorageClasses().Create(class)
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.Logf("deleting storage class %s", class.Name)
+			e2elog.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
 
@@ -133,7 +134,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
 			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil && !apierrs.IsNotFound(err) {
@@ -156,7 +157,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
+			e2elog.Logf("deleting SnapshotClass %s", vsc.GetName())
 			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
 		}()
 
@@ -166,7 +167,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
+			e2elog.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
 			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
 			if err != nil && !apierrs.IsNotFound(err) {
@@ -202,27 +203,27 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use or until timeout occurs, whichever comes first.
 func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, Poll, timeout time.Duration) error {
-	framework.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
+	e2elog.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		snapshot, err := c.Resource(snapshotGVR).Namespace(ns).Get(snapshotName, metav1.GetOptions{})
 		if err != nil {
-			framework.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
+			e2elog.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
 			continue
 		} else {
 			status := snapshot.Object["status"]
 			if status == nil {
-				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+				e2elog.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 				continue
 			}
 			value := status.(map[string]interface{})
 			if value["readyToUse"] == true {
-				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				e2elog.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
 				return nil
 			} else if value["ready"] == true {
-				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				e2elog.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
 				return nil
 			} else {
-				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+				e2elog.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 			}
 		}
 	}

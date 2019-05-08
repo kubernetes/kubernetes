@@ -19,10 +19,16 @@ package apiclient
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
+	core "k8s.io/client-go/testing"
 )
+
+const configMapName = "configmap"
 
 func TestPatchNodeNonErrorCases(t *testing.T) {
 	testcases := []struct {
@@ -79,5 +85,97 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 				t.Fatalf("expected %v got %v", tc.success, success)
 			}
 		})
+	}
+}
+
+func TestCreateOrMutateConfigMap(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	err := CreateOrMutateConfigMap(client, &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			"key": "some-value",
+		},
+	}, func(cm *v1.ConfigMap) error {
+		t.Fatal("mutate should not have been called, since the ConfigMap should have been created instead of mutated")
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("error creating ConfigMap: %v", err)
+	}
+	_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("error retrieving ConfigMap: %v", err)
+	}
+}
+
+func createClientAndConfigMap(t *testing.T) *fake.Clientset {
+	client := fake.NewSimpleClientset()
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: map[string]string{
+			"key": "some-value",
+		},
+	})
+	if err != nil {
+		t.Fatalf("error creating ConfigMap: %v", err)
+	}
+	return client
+}
+
+func TestMutateConfigMap(t *testing.T) {
+	client := createClientAndConfigMap(t)
+
+	err := MutateConfigMap(client, metav1.ObjectMeta{
+		Name:      configMapName,
+		Namespace: metav1.NamespaceSystem,
+	}, func(cm *v1.ConfigMap) error {
+		cm.Data["key"] = "some-other-value"
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("error mutating regular ConfigMap: %v", err)
+	}
+
+	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	if cm.Data["key"] != "some-other-value" {
+		t.Fatalf("ConfigMap mutation was invalid, has: %q", cm.Data["key"])
+	}
+}
+
+func TestMutateConfigMapWithConflict(t *testing.T) {
+	client := createClientAndConfigMap(t)
+
+	// Mimic that the first 5 updates of the ConfigMap returns a conflict, whereas the sixth update
+	// succeeds
+	conflict := 5
+	client.PrependReactor("update", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+		update := action.(core.UpdateAction)
+		if conflict > 0 {
+			conflict--
+			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), configMapName, errors.New("Conflict"))
+		}
+		return false, update.GetObject(), nil
+	})
+
+	err := MutateConfigMap(client, metav1.ObjectMeta{
+		Name:      configMapName,
+		Namespace: metav1.NamespaceSystem,
+	}, func(cm *v1.ConfigMap) error {
+		cm.Data["key"] = "some-other-value"
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("error mutating conflicting ConfigMap: %v", err)
+	}
+
+	cm, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(configMapName, metav1.GetOptions{})
+	if cm.Data["key"] != "some-other-value" {
+		t.Fatalf("ConfigMap mutation with conflict was invalid, has: %q", cm.Data["key"])
 	}
 }

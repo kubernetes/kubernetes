@@ -31,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
@@ -95,9 +95,8 @@ type initOptions struct {
 	featureGatesString      string
 	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
-	externalcfg             *kubeadmapiv1beta1.InitConfiguration
+	externalcfg             *kubeadmapiv1beta2.InitConfiguration
 	uploadCerts             bool
-	certificateKey          string
 	skipCertificateKeyPrint bool
 }
 
@@ -117,10 +116,8 @@ type initData struct {
 	dryRunDir               string
 	externalCA              bool
 	client                  clientset.Interface
-	waiter                  apiclient.Waiter
 	outputWriter            io.Writer
 	uploadCerts             bool
-	certificateKey          string
 	skipCertificateKeyPrint bool
 }
 
@@ -135,7 +132,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this command in order to set up the Kubernetes control plane.",
+		Short: "Run this command in order to set up the Kubernetes control plane",
 		Run: func(cmd *cobra.Command, args []string) {
 			c, err := initRunner.InitData(args)
 			kubeadmutil.CheckErr(err)
@@ -196,7 +193,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, featureGatesString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
@@ -232,6 +229,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
+	flagSet.StringVar(
+		&cfg.CertificateKey, options.CertificateKey, "",
+		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
+	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
@@ -256,10 +257,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		&initOptions.uploadCerts, options.UploadCerts, initOptions.uploadCerts,
 		"Upload control-plane certificates to the kubeadm-certs Secret.",
 	)
-	flagSet.StringVar(
-		&initOptions.certificateKey, options.CertificateKey, "",
-		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
-	)
 	flagSet.BoolVar(
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",
@@ -269,7 +266,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta2.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 
 	// Create the options object for the bootstrap token-related flags, and override the default value for .Description
@@ -388,7 +385,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		externalCA:              externalCA,
 		outputWriter:            out,
 		uploadCerts:             options.uploadCerts,
-		certificateKey:          options.certificateKey,
 		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
 	}, nil
 }
@@ -400,12 +396,12 @@ func (d *initData) UploadCerts() bool {
 
 // CertificateKey returns the key used to encrypt the certs.
 func (d *initData) CertificateKey() string {
-	return d.certificateKey
+	return d.cfg.CertificateKey
 }
 
 // SetCertificateKey set the key used to encrypt the certs.
 func (d *initData) SetCertificateKey(key string) {
-	d.certificateKey = key
+	d.cfg.CertificateKey = key
 }
 
 // SkipCertificateKeyPrint returns the skipCertificateKeyPrint flag.
@@ -519,7 +515,7 @@ func (d *initData) Tokens() []string {
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.skipCertificateKeyPrint)
+	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint)
 	if err != nil {
 		return err
 	}

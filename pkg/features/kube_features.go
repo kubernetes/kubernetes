@@ -21,7 +21,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	cloudfeatures "k8s.io/cloud-provider/features"
 )
 
 const (
@@ -322,7 +321,7 @@ const (
 	PodReadinessGates utilfeature.Feature = "PodReadinessGates"
 
 	// owner: @kevtaylor
-	// alpha: v1.11
+	// beta: v1.15
 	//
 	// Allow subpath environment variable substitution
 	// Only applicable if the VolumeSubpath feature is also enabled
@@ -418,7 +417,7 @@ const (
 	CSIMigrationAWS utilfeature.Feature = "CSIMigrationAWS"
 
 	// owner: @RobertKrawitz
-	// alpha: v1.14
+	// beta: v1.15
 	//
 	// Implement support for limiting pids in nodes
 	SupportNodePidsLimit utilfeature.Feature = "SupportNodePidsLimit"
@@ -434,6 +433,12 @@ const (
 	//
 	// Enables the OpenStack Cinder in-tree driver to OpenStack Cinder CSI Driver migration feature.
 	CSIMigrationOpenStack utilfeature.Feature = "CSIMigrationOpenStack"
+
+	// owner: @verult
+	// GA: v1.13
+	//
+	// Enables the regional PD feature on GCE.
+	deprecatedGCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
 )
 
 func init() {
@@ -479,14 +484,14 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: utilfeature.Alpha},
 	SupportIPVSProxyMode:                        {Default: true, PreRelease: utilfeature.GA},
 	SupportPodPidsLimit:                         {Default: true, PreRelease: utilfeature.Beta},
-	SupportNodePidsLimit:                        {Default: false, PreRelease: utilfeature.Alpha},
+	SupportNodePidsLimit:                        {Default: true, PreRelease: utilfeature.Beta},
 	HyperVContainer:                             {Default: false, PreRelease: utilfeature.Alpha},
 	ScheduleDaemonSetPods:                       {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
-	cloudfeatures.GCERegionalPersistentDisk:     {Default: true, PreRelease: utilfeature.GA},
+	deprecatedGCERegionalPersistentDisk:         {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.17
 	CSIMigration:                                {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: utilfeature.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: utilfeature.Alpha},
@@ -495,7 +500,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	VolumeSubpath:                               {Default: true, PreRelease: utilfeature.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: utilfeature.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
-	VolumeSubpathEnvExpansion:                   {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeSubpathEnvExpansion:                   {Default: true, PreRelease: utilfeature.Beta},
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: utilfeature.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: utilfeature.Beta},
 	CSIBlockVolume:                              {Default: true, PreRelease: utilfeature.Beta},
@@ -519,6 +524,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: utilfeature.Beta},
 	genericfeatures.ServerSideApply:         {Default: false, PreRelease: utilfeature.Alpha},
+	genericfeatures.RequestManagement:       {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

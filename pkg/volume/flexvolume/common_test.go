@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/test/utils/harness"
@@ -106,23 +105,6 @@ func fakeVolumeSpec() *volume.Spec {
 		},
 	}
 	return volume.NewSpecFromVolume(vol)
-}
-
-func fakePersistentVolumeSpec() *volume.Spec {
-	vol := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "vol1",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				FlexVolume: &v1.FlexPersistentVolumeSource{
-					Driver:   "kubernetes.io/fakeAttacher",
-					ReadOnly: false,
-				},
-			},
-		},
-	}
-	return volume.NewSpecFromPersistentVolume(vol, false)
 }
 
 func specJSON(plugin *flexVolumeAttachablePlugin, spec *volume.Spec, extraOptions map[string]string) string {

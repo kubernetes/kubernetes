@@ -20,9 +20,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -65,7 +66,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			pv        *v1.PersistentVolume
 		)
 		BeforeEach(func() {
-			framework.Logf("Initializing pod and pvcs for test")
+			e2elog.Logf("Initializing pod and pvcs for test")
 			clientPod, pvc, pv = createPodPVCFromSC(f, c, ns)
 		})
 		for _, test := range disruptiveTestTable {
@@ -77,7 +78,7 @@ var _ = utils.SIGDescribe("GenericPersistentVolume[Disruptive]", func() {
 			}(test)
 		}
 		AfterEach(func() {
-			framework.Logf("Tearing down test spec")
+			e2elog.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv, false)
 			pvc, clientPod = nil, nil
 		})

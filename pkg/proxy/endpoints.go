@@ -282,7 +282,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 // The changes map is cleared after applying them.
 // In addition it returns (via argument) and resets the lastChangeTriggerTimes for all endpoints
 // that were changed and will result in syncing the proxy rules.
-func (endpointsMap EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
+func (em EndpointsMap) apply(changes *EndpointChangeTracker, staleEndpoints *[]ServiceEndpoint,
 	staleServiceNames *[]ServicePortName, lastChangeTriggerTimes *[]time.Time) {
 	if changes == nil {
 		return
@@ -290,8 +290,8 @@ func (endpointsMap EndpointsMap) apply(changes *EndpointChangeTracker, staleEndp
 	changes.lock.Lock()
 	defer changes.lock.Unlock()
 	for _, change := range changes.items {
-		endpointsMap.Unmerge(change.previous)
-		endpointsMap.Merge(change.current)
+		em.Unmerge(change.previous)
+		em.Merge(change.current)
 		detectStaleConnections(change.previous, change.current, staleEndpoints, staleServiceNames)
 	}
 	changes.items = make(map[types.NamespacedName]*endpointsChange)

@@ -35,11 +35,11 @@ func (cli *Client) ImageList(ctx context.Context, options types.ImageListOptions
 	}
 
 	serverResp, err := cli.get(ctx, "/images/json", query, nil)
+	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return images, err
 	}
 
 	err = json.NewDecoder(serverResp.body).Decode(&images)
-	ensureReaderClosed(serverResp)
 	return images, err
 }

@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -189,7 +190,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			e2elog.Logf("Got logs for pod %q: %q", podName, logs)
 			if !strings.Contains(logs, "Operation not permitted") {
 				framework.Failf("unprivileged container shouldn't be able to create dummy device")
 			}

@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -113,7 +113,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		{"invalid-node?name", "/some/path", true},                                            // Unsupported characters
 		{"valid-nodename", "/some/path", false},                                              // supported
 		{"valid-nodename-with-numbers01234", "/some/path/with/numbers/01234/", false},        // supported, with numbers as well
-		{"valid-nodename", kubeadmapiv1beta1.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
+		{"valid-nodename", kubeadmapiv1beta2.DefaultUrlScheme + "://" + "/some/path", false}, // supported, with socket url
 		{"valid-nodename", "bla:///some/path", true},                                         // unsupported url scheme
 		{"valid-nodename", ":::", true},                                                      // unparseable url
 	}
@@ -144,6 +144,11 @@ func TestValidateCertSANs(t *testing.T) {
 		{[]string{"my-hostname2", "my.other.subdomain", "10.0.0.10"}, true},    // supported
 		{[]string{"my-hostname", "my.subdomain", "2001:db8::4"}, true},         // supported
 		{[]string{"my-hostname2", "my.other.subdomain", "2001:db8::10"}, true}, // supported
+		{[]string{"*.my-hostname2", "*.my.other.subdomain"}, true},             // supported Wildcard DNS label
+		{[]string{"**.my-hostname2", "my.other.subdomain"}, false},             // not a Wildcard DNS label
+		{[]string{"*.*.my-hostname2", "my.other.subdomain"}, false},            // not a Wildcard DNS label
+		{[]string{"a.*.my-hostname2", "my.other.subdomain"}, false},            // not a Wildcard DNS label
+		{[]string{"*", "my.other.subdomain", "2001:db8::10"}, false},           // not a Wildcard DNS label
 	}
 	for _, rt := range tests {
 		actual := ValidateCertSANs(rt.sans, nil)

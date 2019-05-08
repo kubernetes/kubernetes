@@ -42,7 +42,7 @@ const (
 	defaultFSType = "ext4"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&localVolumePlugin{}}
 }
@@ -222,7 +222,7 @@ func (plugin *localVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volu
 }
 
 func (plugin *localVolumePlugin) generateBlockDeviceBaseGlobalPath() string {
-	return filepath.Join(plugin.host.GetPluginDir(localVolumePluginName), mount.MountsInGlobalPDPath)
+	return filepath.Join(plugin.host.GetPluginDir(localVolumePluginName), util.MountsInGlobalPDPath)
 }
 
 func (plugin *localVolumePlugin) getGlobalLocalPath(spec *volume.Spec) (string, error) {
@@ -441,7 +441,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return fmt.Errorf("invalid path: %s %v", m.globalPath, err)
 	}
 
-	notMnt, err := m.mounter.IsNotMountPoint(dir)
+	notMnt, err := mount.IsNotMountPoint(m.mounter, dir)
 	klog.V(4).Infof("LocalVolume mount setup: PodDir(%s) VolDir(%s) Mounted(%t) Error(%v), ReadOnly(%t)", dir, m.globalPath, !notMnt, err, m.readOnly)
 	if err != nil && !os.IsNotExist(err) {
 		klog.Errorf("cannot validate mount point: %s %v", dir, err)
@@ -492,7 +492,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	err = m.mounter.Mount(globalPath, dir, "", mountOptions)
 	if err != nil {
 		klog.Errorf("Mount of volume %s failed: %v", dir, err)
-		notMnt, mntErr := m.mounter.IsNotMountPoint(dir)
+		notMnt, mntErr := mount.IsNotMountPoint(m.mounter, dir)
 		if mntErr != nil {
 			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 			return err
@@ -502,7 +502,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 				klog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			notMnt, mntErr = m.mounter.IsNotMountPoint(dir)
+			notMnt, mntErr = mount.IsNotMountPoint(m.mounter, dir)
 			if mntErr != nil {
 				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
 				return err
@@ -587,15 +587,15 @@ func (u *localVolumeUnmapper) TearDownDevice(mapPath, _ string) error {
 
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}
-func (lv *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return filepath.Join(lv.plugin.host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(localVolumePluginName)),
-		lv.volName), nil
+func (l *localVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return filepath.Join(l.plugin.host.GetVolumeDevicePluginDir(utilstrings.EscapeQualifiedName(localVolumePluginName)),
+		l.volName), nil
 }
 
 // GetPodDeviceMapPath returns pod device map path and volume name.
 // path: pods/{podUid}/volumeDevices/kubernetes.io~local-volume
 // volName: local-pv-ff0d6d4
-func (lv *localVolume) GetPodDeviceMapPath() (string, string) {
-	return lv.plugin.host.GetPodVolumeDeviceDir(lv.podUID,
-		utilstrings.EscapeQualifiedName(localVolumePluginName)), lv.volName
+func (l *localVolume) GetPodDeviceMapPath() (string, string) {
+	return l.plugin.host.GetPodVolumeDeviceDir(l.podUID,
+		utilstrings.EscapeQualifiedName(localVolumePluginName)), l.volName
 }

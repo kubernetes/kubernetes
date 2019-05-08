@@ -46,7 +46,7 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "plan [version] [flags]",
-		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter.",
+		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter",
 		Run: func(_ *cobra.Command, args []string) {
 			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, false)
 			kubeadmutil.CheckErr(err)

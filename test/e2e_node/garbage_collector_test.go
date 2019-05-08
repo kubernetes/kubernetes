@@ -200,7 +200,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 						containerCount := 0
 						for _, containerName := range containerNames {
 							if containerName == pod.getContainerName(i) {
-								containerCount += 1
+								containerCount++
 							}
 						}
 						if containerCount > maxPerPodContainer+1 {
@@ -228,7 +228,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 							containerCount := 0
 							for _, containerName := range containerNames {
 								if containerName == pod.getContainerName(i) {
-									containerCount += 1
+									containerCount++
 								}
 							}
 							if pod.restartCount > 0 && containerCount < maxPerPodContainer+1 {

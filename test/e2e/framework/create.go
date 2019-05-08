@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -100,9 +101,9 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 	return nil
 }
 
-// PatchItems modifies the given items in place such that each test
-// gets its own instances, to avoid conflicts between different tests
-// and between tests and normal deployments.
+// PatchItems modifies the given items in place such that each
+// test gets its own instances, to avoid conflicts between different tests and
+// between tests and normal deployments.
 //
 // This is done by:
 // - creating namespaced items inside the test's namespace
@@ -287,18 +288,27 @@ var factories = map[What]ItemFactory{
 	{"StorageClass"}:       &storageClassFactory{},
 }
 
-// PatchName makes the name of some item unique by appending the
-// generated unique name.
-func (f *Framework) PatchName(item *string) {
+// uniquifyName makes the name of some item unique per namespace by appending the
+// generated unique name of the test namespace.
+func (f *Framework) uniquifyName(item *string) {
 	if *item != "" {
 		*item = *item + "-" + f.UniqueName
 	}
 }
 
-// PatchNamespace moves the item into the test's namespace.  Not
+// randomizeStorageClassName makes the name of the storage class unique per call
+// by appending the generated unique name of the test namespace and a random 5
+// character string
+func (f *Framework) randomizeStorageClassName(item *string) {
+	if *item != "" {
+		*item = names.SimpleNameGenerator.GenerateName(*item + "-" + f.UniqueName + "-")
+	}
+}
+
+// patchNamespace moves the item into the test's namespace.  Not
 // all items can be namespaced. For those, the name also needs to be
 // patched.
-func (f *Framework) PatchNamespace(item *string) {
+func (f *Framework) patchNamespace(item *string) {
 	if f.Namespace != nil {
 		*item = f.Namespace.GetName()
 	}
@@ -307,31 +317,31 @@ func (f *Framework) PatchNamespace(item *string) {
 func (f *Framework) patchItemRecursively(item interface{}) error {
 	switch item := item.(type) {
 	case *rbac.Subject:
-		f.PatchNamespace(&item.Namespace)
+		f.patchNamespace(&item.Namespace)
 	case *rbac.RoleRef:
 		// TODO: avoid hard-coding this special name. Perhaps add a Framework.PredefinedRoles
 		// which contains all role names that are defined cluster-wide before the test starts?
 		// All those names are excempt from renaming. That list could be populated by querying
 		// and get extended by tests.
 		if item.Name != "e2e-test-privileged-psp" {
-			f.PatchName(&item.Name)
+			f.uniquifyName(&item.Name)
 		}
 	case *rbac.ClusterRole:
-		f.PatchName(&item.Name)
+		f.uniquifyName(&item.Name)
 	case *rbac.Role:
-		f.PatchNamespace(&item.Namespace)
+		f.patchNamespace(&item.Namespace)
 		// Roles are namespaced, but because for RoleRef above we don't
 		// know whether the referenced role is a ClusterRole or Role
 		// and therefore always renames, we have to do the same here.
-		f.PatchName(&item.Name)
+		f.uniquifyName(&item.Name)
 	case *storage.StorageClass:
-		f.PatchName(&item.Name)
+		f.randomizeStorageClassName(&item.Name)
 	case *v1.ServiceAccount:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		f.patchNamespace(&item.ObjectMeta.Namespace)
 	case *v1.Secret:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		f.patchNamespace(&item.ObjectMeta.Namespace)
 	case *rbac.ClusterRoleBinding:
-		f.PatchName(&item.Name)
+		f.uniquifyName(&item.Name)
 		for i := range item.Subjects {
 			if err := f.patchItemRecursively(&item.Subjects[i]); err != nil {
 				return errors.Wrapf(err, "%T", f)
@@ -341,7 +351,7 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 			return errors.Wrapf(err, "%T", f)
 		}
 	case *rbac.RoleBinding:
-		f.PatchNamespace(&item.Namespace)
+		f.patchNamespace(&item.Namespace)
 		for i := range item.Subjects {
 			if err := f.patchItemRecursively(&item.Subjects[i]); err != nil {
 				return errors.Wrapf(err, "%T", f)
@@ -351,11 +361,11 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 			return errors.Wrapf(err, "%T", f)
 		}
 	case *v1.Service:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		f.patchNamespace(&item.ObjectMeta.Namespace)
 	case *apps.StatefulSet:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		f.patchNamespace(&item.ObjectMeta.Namespace)
 	case *apps.DaemonSet:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		f.patchNamespace(&item.ObjectMeta.Namespace)
 	default:
 		return errors.Errorf("missing support for patching item of type %T", item)
 	}

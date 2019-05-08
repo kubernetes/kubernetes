@@ -211,16 +211,16 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 		volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 		if err != nil || volumePlugin == nil {
-			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+			retErr := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
 				"waiting for an external controller to process this PVC")
 			eventType := v1.EventTypeNormal
 			if err != nil {
 				eventType = v1.EventTypeWarning
 			}
 			expc.recorder.Event(newPVC, eventType, events.ExternalExpanding,
-				fmt.Sprintf("Ignoring the PVC: %v.", err))
+				fmt.Sprintf("Ignoring the PVC: %v.", retErr))
 			klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
-				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, err)
+				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, retErr)
 			return
 		}
 		expc.resizeMap.AddPVCUpdate(newPVC, pv)

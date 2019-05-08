@@ -22,12 +22,14 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -66,7 +68,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 		// Start the NFS server pod.
-		_, nfsServerPod, nfsServerIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+		_, nfsServerPod, nfsServerIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 		nfsPVconfig = framework.PersistentVolumeConfig{
 			NamePrefix: "nfs-",
 			Labels:     volLabel,
@@ -86,7 +88,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		// Get the first ready node IP that is not hosting the NFS pod.
 		var err error
 		if clientNodeIP == "" {
-			framework.Logf("Designating test node")
+			e2elog.Logf("Designating test node")
 			nodes := framework.GetReadySchedulableNodesOrDie(c)
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
@@ -120,7 +122,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.SkipUnlessSSHKeyPresent()
 
 			By("Initializing first PD with PVPVC binding")
-			pvSource1, diskName1 = framework.CreateGCEVolume()
+			pvSource1, diskName1 = volume.CreateGCEVolume()
 			framework.ExpectNoError(err)
 			pvConfig1 = framework.PersistentVolumeConfig{
 				NamePrefix: "gce-",
@@ -133,7 +135,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv1, pvc1))
 
 			By("Initializing second PD with PVPVC binding")
-			pvSource2, diskName2 = framework.CreateGCEVolume()
+			pvSource2, diskName2 = volume.CreateGCEVolume()
 			framework.ExpectNoError(err)
 			pvConfig2 = framework.PersistentVolumeConfig{
 				NamePrefix: "gce-",
@@ -184,7 +186,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForControllerManagerUp()
 			framework.ExpectNoError(err)
-			framework.Logf("kube-controller-manager restarted")
+			e2elog.Logf("kube-controller-manager restarted")
 
 			By("Observing the kube-controller-manager healthy for at least 2 minutes")
 			// Continue checking for 2 minutes to make sure kube-controller-manager is healthy
@@ -202,12 +204,12 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		)
 
 		BeforeEach(func() {
-			framework.Logf("Initializing test spec")
+			e2elog.Logf("Initializing test spec")
 			clientPod, pv, pvc = initTestCase(f, c, nfsPVconfig, pvcConfig, ns, clientNode.Name)
 		})
 
 		AfterEach(func() {
-			framework.Logf("Tearing down test spec")
+			e2elog.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv, true /* force PV delete */)
 			pv, pvc, clientPod = nil, nil, nil
 		})
@@ -255,9 +257,9 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 	framework.ExpectNoError(err)
 	pod := framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
-	framework.Logf("Creating NFS client pod.")
+	e2elog.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(pod)
-	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
+	e2elog.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
 	framework.ExpectNoError(err)
 	defer func() {
 		if err != nil {

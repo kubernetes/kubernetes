@@ -38,10 +38,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	plugins "k8s.io/kubernetes/pkg/scheduler/plugins/v1alpha1"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -134,27 +134,9 @@ func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[str
 	return nil
 }
 
-// EmptyPluginSet is a test plugin set used by the default scheduler.
-type EmptyPluginSet struct{}
-
-var _ plugins.PluginSet = EmptyPluginSet{}
-
-// ReservePlugins returns a slice of default reserve plugins.
-func (r EmptyPluginSet) ReservePlugins() []plugins.ReservePlugin {
-	return []plugins.ReservePlugin{}
-}
-
-// PrebindPlugins returns a slice of default prebind plugins.
-func (r EmptyPluginSet) PrebindPlugins() []plugins.PrebindPlugin {
-	return []plugins.PrebindPlugin{}
-}
-
-// Data returns a pointer to PluginData.
-func (r EmptyPluginSet) Data() *plugins.PluginData {
-	return &plugins.PluginData{}
-}
-
-var emptyPluginSet = &EmptyPluginSet{}
+// EmptyPluginRegistry is a test plugin set used by the default scheduler.
+var EmptyPluginRegistry = framework.Registry{}
+var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil)
 
 func makeNodeList(nodeNames []string) []*v1.Node {
 	result := make([]*v1.Node, 0, len(nodeNames))
@@ -456,6 +438,7 @@ func TestGenericScheduler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -474,7 +457,7 @@ func TestGenericScheduler(t *testing.T) {
 				algorithmpredicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
-				emptyPluginSet,
+				fwk,
 				[]algorithm.SchedulerExtender{},
 				nil,
 				pvcLister,
@@ -498,6 +481,7 @@ func TestGenericScheduler(t *testing.T) {
 func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes []*v1.Node) *genericScheduler {
 	algorithmpredicates.SetPredicatesOrdering(order)
 	cache := internalcache.New(time.Duration(0), wait.NeverStop)
+	fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
@@ -510,10 +494,10 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		algorithmpredicates.EmptyPredicateMetadataProducer,
 		prioritizers,
 		priorities.EmptyPriorityMetadataProducer,
-		emptyPluginSet,
+		fwk,
 		nil, nil, nil, nil, false, false,
 		schedulerapi.DefaultPercentageOfNodesToScore)
-	cache.UpdateNodeInfoSnapshot(&s.(*genericScheduler).nodeInfoSnapshot)
+	cache.UpdateNodeInfoSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
 
 }
@@ -1483,6 +1467,7 @@ func TestPreempt(t *testing.T) {
 			t.Logf("===== Running test %v", t.Name())
 			stop := make(chan struct{})
 			cache := internalcache.New(time.Duration(0), stop)
+			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1509,7 +1494,7 @@ func TestPreempt(t *testing.T) {
 				algorithmpredicates.EmptyPredicateMetadataProducer,
 				[]priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
 				priorities.EmptyPriorityMetadataProducer,
-				emptyPluginSet,
+				fwk,
 				extenders,
 				nil,
 				schedulertesting.FakePersistentVolumeClaimLister{},

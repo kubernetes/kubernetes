@@ -395,6 +395,14 @@ message ListMeta {
   // identical to the value in the first response, unless you have received this token from an error
   // message.
   optional string continue = 3;
+
+  // RemainingItemCount is the number of subsequent items in the list which are not included in this
+  // list response. If the list request contained label or field selectors, then the number of
+  // remaining items is unknown and this field will be unset. If the list is complete (either
+  // because it is unpaginated or because this is the last page), then there are no more remaining
+  // items and this field will also be unset.  Servers older than v1.15 do not set this field.
+  // +optional
+  optional int64 remainingItemCount = 4;
 }
 
 // ListOptions is the query options to a standard REST list call.
@@ -413,6 +421,20 @@ message ListOptions {
   // add, update, and remove notifications. Specify resourceVersion.
   // +optional
   optional bool watch = 3;
+
+  // allowWatchBookmarks requests watch events with type "BOOKMARK".
+  // Servers that do not implement bookmarks may ignore this flag and
+  // bookmarks are sent at the server's discretion. Clients should not
+  // assume bookmarks are returned at any specific interval, nor may they
+  // assume the server will send any BOOKMARK event during a session.
+  // If this is not a watch, this field is ignored.
+  // If the feature gate WatchBookmarks is not enabled in apiserver,
+  // this field is ignored.
+  //
+  // This field is alpha and can be changed or removed without notice.
+  //
+  // +optional
+  optional bool allowWatchBookmarks = 9;
 
   // When specified with a watch call, shows changes that occur after that particular version of a resource.
   // Defaults to changes from the beginning of history.
@@ -717,6 +739,28 @@ message OwnerReference {
   optional bool blockOwnerDeletion = 7;
 }
 
+// PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients
+// to get access to a particular ObjectMeta schema without knowing the details of the version.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+message PartialObjectMetadata {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional ObjectMeta metadata = 1;
+}
+
+// PartialObjectMetadataList contains a list of objects containing only their metadata
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+message PartialObjectMetadataList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional ListMeta metadata = 1;
+
+  // items contains each of the included items.
+  repeated PartialObjectMetadata items = 2;
+}
+
 // Patch is provided to give a concrete name and type to the Kubernetes PATCH request body.
 message Patch {
 }
@@ -877,6 +921,16 @@ message StatusDetails {
   // before taking the alternate action.
   // +optional
   optional int32 retryAfterSeconds = 5;
+}
+
+// TableOptions are used when a Table is requested by the caller.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+message TableOptions {
+  // includeObject decides whether to include each object along with its columnar information.
+  // Specifying "None" will return no object, specifying "Object" will return the full object contents, and
+  // specifying "Metadata" (the default) will return the object's metadata in the PartialObjectMetadata kind
+  // in version v1beta1 of the meta.k8s.io API group.
+  optional string includeObject = 1;
 }
 
 // Time is a wrapper around time.Time which supports correct

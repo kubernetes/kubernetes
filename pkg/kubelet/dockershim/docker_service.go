@@ -331,7 +331,7 @@ func (ds *dockerService) Version(_ context.Context, r *runtimeapi.VersionRequest
 	}, nil
 }
 
-// dockerVersion gets the version information from docker.
+// getDockerVersion gets the version information from docker.
 func (ds *dockerService) getDockerVersion() (*dockertypes.Version, error) {
 	v, err := ds.client.Version()
 	if err != nil {

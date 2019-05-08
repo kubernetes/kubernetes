@@ -572,18 +572,3 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 func runHelp(cmd *cobra.Command, args []string) {
 	cmd.Help()
 }
-
-// deprecatedAlias is intended to be used to create a "wrapper" command around
-// an existing command. The wrapper works the same but prints a deprecation
-// message before running. This command is identical functionality.
-func deprecatedAlias(deprecatedVersion string, cmd *cobra.Command) *cobra.Command {
-	// Have to be careful here because Cobra automatically extracts the name
-	// of the command from the .Use field.
-	originalName := cmd.Name()
-
-	cmd.Use = deprecatedVersion
-	cmd.Deprecated = fmt.Sprintf("use %q instead", originalName)
-	cmd.Short = fmt.Sprintf("%s. This command is deprecated, use %q instead", cmd.Short, originalName)
-	cmd.Hidden = true
-	return cmd
-}

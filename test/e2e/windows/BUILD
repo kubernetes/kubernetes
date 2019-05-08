@@ -31,6 +31,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

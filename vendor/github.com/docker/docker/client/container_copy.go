@@ -21,10 +21,10 @@ func (cli *Client) ContainerStatPath(ctx context.Context, containerID, path stri
 
 	urlStr := "/containers/" + containerID + "/archive"
 	response, err := cli.head(ctx, urlStr, query, nil)
+	defer ensureReaderClosed(response)
 	if err != nil {
 		return types.ContainerPathStat{}, wrapResponseError(err, response, "container:path", containerID+":"+path)
 	}
-	defer ensureReaderClosed(response)
 	return getContainerPathStatFromHeader(response.header)
 }
 
@@ -45,11 +45,12 @@ func (cli *Client) CopyToContainer(ctx context.Context, containerID, dstPath str
 	apiPath := "/containers/" + containerID + "/archive"
 
 	response, err := cli.putRaw(ctx, apiPath, query, content, nil)
+	defer ensureReaderClosed(response)
 	if err != nil {
 		return wrapResponseError(err, response, "container:path", containerID+":"+dstPath)
 	}
-	defer ensureReaderClosed(response)
 
+	// TODO this code converts non-error status-codes (e.g., "204 No Content") into an error; verify if this is the desired behavior
 	if response.statusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code from daemon: %d", response.statusCode)
 	}
@@ -69,6 +70,7 @@ func (cli *Client) CopyFromContainer(ctx context.Context, containerID, srcPath s
 		return nil, types.ContainerPathStat{}, wrapResponseError(err, response, "container:path", containerID+":"+srcPath)
 	}
 
+	// TODO this code converts non-error status-codes (e.g., "204 No Content") into an error; verify if this is the desired behavior
 	if response.statusCode != http.StatusOK {
 		return nil, types.ContainerPathStat{}, fmt.Errorf("unexpected status code from daemon: %d", response.statusCode)
 	}

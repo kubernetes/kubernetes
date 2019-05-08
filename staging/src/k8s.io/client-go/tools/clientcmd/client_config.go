@@ -296,16 +296,6 @@ func makeUserIdentificationConfig(info clientauth.Info) *restclient.Config {
 	return config
 }
 
-// makeUserIdentificationFieldsConfig returns a client.Config capable of being merged using mergo for only server identification information
-func makeServerIdentificationConfig(info clientauth.Info) restclient.Config {
-	config := restclient.Config{}
-	config.CAFile = info.CAFile
-	if info.Insecure != nil {
-		config.Insecure = *info.Insecure
-	}
-	return config
-}
-
 func canIdentifyUser(config restclient.Config) bool {
 	return len(config.Username) > 0 ||
 		(len(config.CertFile) > 0 || len(config.CertData) > 0) ||

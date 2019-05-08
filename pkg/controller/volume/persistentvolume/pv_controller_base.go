@@ -40,6 +40,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	vol "k8s.io/kubernetes/pkg/volume"
 
@@ -426,9 +427,9 @@ func (ctrl *PersistentVolumeController) resync() {
 }
 
 // setClaimProvisioner saves
-// claim.Annotations[annStorageProvisioner] = class.Provisioner
+// claim.Annotations[pvutil.AnnStorageProvisioner] = class.Provisioner
 func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
-	if val, ok := claim.Annotations[annStorageProvisioner]; ok && val == provisionerName {
+	if val, ok := claim.Annotations[pvutil.AnnStorageProvisioner]; ok && val == provisionerName {
 		// annotation is already set, nothing to do
 		return claim, nil
 	}
@@ -436,7 +437,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
-	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, provisionerName)
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 	if err != nil {
 		return newClaim, err
@@ -451,14 +452,14 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 // Stateless functions
 
 func getClaimStatusForLogging(claim *v1.PersistentVolumeClaim) string {
-	bound := metav1.HasAnnotation(claim.ObjectMeta, annBindCompleted)
-	boundByController := metav1.HasAnnotation(claim.ObjectMeta, annBoundByController)
+	bound := metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted)
+	boundByController := metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBoundByController)
 
 	return fmt.Sprintf("phase: %s, bound to: %q, bindCompleted: %v, boundByController: %v", claim.Status.Phase, claim.Spec.VolumeName, bound, boundByController)
 }
 
 func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
-	boundByController := metav1.HasAnnotation(volume.ObjectMeta, annBoundByController)
+	boundByController := metav1.HasAnnotation(volume.ObjectMeta, pvutil.AnnBoundByController)
 	claimName := ""
 	if volume.Spec.ClaimRef != nil {
 		claimName = fmt.Sprintf("%s/%s (uid: %s)", volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name, volume.Spec.ClaimRef.UID)

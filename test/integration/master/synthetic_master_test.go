@@ -35,6 +35,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	api "k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,11 +46,9 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
-	clientsetv1 "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -104,7 +103,7 @@ func TestKubernetesService(t *testing.T) {
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)
 	err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-		if _, err := coreClient.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
+		if _, err := coreClient.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{}); err != nil && errors.IsNotFound(err) {
 			return false, nil
 		} else if err != nil {
 			return false, err
@@ -306,7 +305,7 @@ func TestObjectSizeResponses(t *testing.T) {
 	_, s, closeFn := framework.RunAMaster(nil)
 	defer closeFn()
 
-	client := clientsetv1.NewForConfigOrDie(&restclient.Config{Host: s.URL})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	const DeploymentMegabyteSize = 100000
 	const DeploymentTwoMegabyteSize = 1000000
@@ -653,7 +652,7 @@ func TestMasterService(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
-		svcList, err := client.Core().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
+		svcList, err := client.CoreV1().Services(metav1.NamespaceDefault).List(metav1.ListOptions{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 			return false, nil
@@ -666,7 +665,7 @@ func TestMasterService(t *testing.T) {
 			}
 		}
 		if found {
-			ep, err := client.Core().Endpoints(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+			ep, err := client.CoreV1().Endpoints(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 			if err != nil {
 				return false, nil
 			}
@@ -710,7 +709,7 @@ func TestServiceAlloc(t *testing.T) {
 
 	// Wait until the default "kubernetes" service is created.
 	if err = wait.Poll(250*time.Millisecond, time.Minute, func() (bool, error) {
-		_, err := client.Core().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
+		_, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return false, err
 		}
@@ -721,18 +720,18 @@ func TestServiceAlloc(t *testing.T) {
 
 	// make 5 more services to take up all IPs
 	for i := 0; i < 5; i++ {
-		if _, err := client.Core().Services(metav1.NamespaceDefault).Create(svc(i)); err != nil {
+		if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc(i)); err != nil {
 			t.Error(err)
 		}
 	}
 
 	// Make another service. It will fail because we're out of cluster IPs
-	if _, err := client.Core().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
 		if !strings.Contains(err.Error(), "range is full") {
 			t.Errorf("unexpected error text: %v", err)
 		}
 	} else {
-		svcs, err := client.Core().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+		svcs, err := client.CoreV1().Services(metav1.NamespaceAll).List(metav1.ListOptions{})
 		if err != nil {
 			t.Fatalf("unexpected success, and error getting the services: %v", err)
 		}
@@ -744,12 +743,12 @@ func TestServiceAlloc(t *testing.T) {
 	}
 
 	// Delete the first service.
-	if err := client.Core().Services(metav1.NamespaceDefault).Delete(svc(1).ObjectMeta.Name, nil); err != nil {
+	if err := client.CoreV1().Services(metav1.NamespaceDefault).Delete(svc(1).ObjectMeta.Name, nil); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 
 	// This time creating the second service should work.
-	if _, err := client.Core().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(svc(8)); err != nil {
 		t.Fatalf("got unexpected error: %v", err)
 	}
 }

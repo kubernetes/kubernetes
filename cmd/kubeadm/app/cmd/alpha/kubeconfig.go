@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -37,11 +37,11 @@ var (
 	` + cmdutil.AlphaDisclaimer)
 
 	userKubeconfigLongDesc = normalizer.LongDesc(`
-	Outputs a kubeconfig file for an additional user.
+	Output a kubeconfig file for an additional user.
 	` + cmdutil.AlphaDisclaimer)
 
 	userKubeconfigExample = normalizer.Examples(`
-	# Outputs a kubeconfig file for an additional user named foo
+	# Output a kubeconfig file for an additional user named foo
 	kubeadm alpha kubeconfig user --client-name=foo
 	`)
 )
@@ -61,7 +61,7 @@ func newCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 // newCmdUserKubeConfig returns sub commands for kubeconfig phase
 func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
-	cfg := &kubeadmapiv1beta1.InitConfiguration{}
+	cfg := &kubeadmapiv1beta2.InitConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -72,7 +72,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	// Creates the UX Command
 	cmd := &cobra.Command{
 		Use:     "user",
-		Short:   "Outputs a kubeconfig file for an additional user",
+		Short:   "Output a kubeconfig file for an additional user",
 		Long:    userKubeconfigLongDesc,
 		Example: userKubeconfigExample,
 		Run: func(cmd *cobra.Command, args []string) {
