@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -456,15 +457,15 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 
 // WaitForControlledPodsRunning waits up to 10 minutes for pods to become Running.
 func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind schema.GroupKind) error {
-	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
+	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
 		return err
 	}
-	selector, err := getSelectorFromRuntimeObject(rtObject)
+	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
 	if err != nil {
 		return err
 	}
-	replicas, err := getReplicasFromRuntimeObject(rtObject)
+	replicas, err := e2eresource.GetReplicasFromRuntimeObject(rtObject)
 	if err != nil {
 		return err
 	}
@@ -477,11 +478,11 @@ func WaitForControlledPodsRunning(c clientset.Interface, ns, name string, kind s
 
 // WaitForControlledPods waits up to podListTimeout for getting pods of the specified controller name and return them.
 func WaitForControlledPods(c clientset.Interface, ns, name string, kind schema.GroupKind) (pods *v1.PodList, err error) {
-	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
+	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
 		return nil, err
 	}
-	selector, err := getSelectorFromRuntimeObject(rtObject)
+	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
 	if err != nil {
 		return nil, err
 	}

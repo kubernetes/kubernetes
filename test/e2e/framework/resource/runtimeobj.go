@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pod
+package resource
 
 import (
 	"fmt"
@@ -34,9 +34,9 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-// TODO: This function is generic enough and used enough that it should be
-// moved to its own subpkg.
-func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
+// GetRuntimeObjectForKind returns a runtime.Object based on its GroupKind,
+// namespace and name.
+func GetRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
@@ -53,9 +53,8 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	}
 }
 
-// TODO: This function is generic enough and used enough that it should be
-// moved to its own subpkg.
-func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
+// GetSelectorFromRuntimeObject returns the labels for the given object.
+func GetSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	switch typed := obj.(type) {
 	case *v1.ReplicationController:
 		return labels.SelectorFromSet(typed.Spec.Selector), nil
@@ -78,9 +77,9 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	}
 }
 
-// TODO: This function is generic enough and used enough that it should be
-// moved to its own subpkg.
-func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
+// GetReplicasFromRuntimeObject returns the number of replicas for the given
+// object.
+func GetReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 	switch typed := obj.(type) {
 	case *v1.ReplicationController:
 		if typed.Spec.Replicas != nil {
