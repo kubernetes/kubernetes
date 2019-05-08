@@ -33,18 +33,13 @@ func NewSocketMask(Mask []int64) SocketMask {
 }
 
 // GetSocketMask calculates the socket mask.
-func (sm SocketMask) GetSocketMask(socketMask []SocketMask, maskHolder []string, count int) (SocketMask, []string) {
-	var socketAffinityInt64 [][]int64
-	for r := range socketMask {
-		socketAffinityVals := []int64(socketMask[r])
-		socketAffinityInt64 = append(socketAffinityInt64, socketAffinityVals)
-	}
+func (sm SocketMask) GetSocketMask(socketMaskInt64 [][]int64, maskHolder []string, count int) (SocketMask, []string) {
 	if count == 0 {
-		maskHolder = buildMaskHolder(socketAffinityInt64)
+		maskHolder = buildMaskHolder(socketMaskInt64)
 	}
 	klog.V(4).Infof("[socketmask] MaskHolder : %v", maskHolder)
 	klog.V(4).Infof("[socketmask] %v is passed into arrange function", socketMask)
-	arrangedMask := arrangeMask(socketAffinityInt64)
+	arrangedMask := arrangeMask(socketMaskInt64)
 	newMask := getTopologyAffinity(arrangedMask, maskHolder)
 	klog.V(4).Infof("[socketmask] New Mask after getTopologyAffinity (new mask) : %v ", newMask)
 	finalMaskValue := parseMask(newMask)
