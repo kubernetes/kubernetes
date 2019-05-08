@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	appstyped "k8s.io/client-go/kubernetes/typed/apps/v1"
@@ -41,6 +40,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -239,8 +240,8 @@ func updateStrategies() []*apps.DaemonSetUpdateStrategy {
 	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
 }
 
-func featureGates() []utilfeature.Feature {
-	return []utilfeature.Feature{
+func featureGates() []featuregate.Feature {
+	return []featuregate.Feature{
 		features.ScheduleDaemonSetPods,
 	}
 }
@@ -490,7 +491,7 @@ func forEachFeatureGate(t *testing.T, tf func(t *testing.T)) {
 	for _, fg := range featureGates() {
 		for _, f := range []bool{true, false} {
 			func() {
-				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
 			}()
 		}
@@ -701,7 +702,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 // When ScheduleDaemonSetPods is disabled, DaemonSets should not launch onto nodes with insufficient capacity.
 // Look for TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled, we don't need this test anymore.
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
@@ -742,7 +743,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 // feature is enabled, the DaemonSet should create Pods for all the nodes regardless of available resource
 // on the nodes, and kube-scheduler should not schedule Pods onto the nodes with insufficient resource.
 func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, true)()
 
 	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 		server, closeFn, dc, informers, clientset := setup(t)
@@ -983,7 +984,7 @@ func TestTaintedNode(t *testing.T) {
 // TestUnschedulableNodeDaemonDoesLaunchPod tests that the DaemonSet Pods can still be scheduled
 // to the Unschedulable nodes when TaintNodesByCondition are enabled.
 func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	forEachFeatureGate(t, func(t *testing.T) {
 		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {

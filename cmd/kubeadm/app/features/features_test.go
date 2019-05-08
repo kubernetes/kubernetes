@@ -20,16 +20,16 @@ import (
 	"reflect"
 	"testing"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestKnownFeatures(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
-		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature3": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}},
-		"hidden":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}, HiddenInHelpText: true},
+		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}},
+		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"feature3": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.GA}},
+		"hidden":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.GA}, HiddenInHelpText: true},
 	}
 
 	r := KnownFeatures(&someFeatures)
@@ -57,9 +57,9 @@ func TestKnownFeatures(t *testing.T) {
 
 func TestNewFeatureGate(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature1":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2":   {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
-		"deprecated": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}},
+		"feature1":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"feature2":   {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}},
+		"deprecated": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}},
 	}
 
 	var tests = []struct {
@@ -128,8 +128,8 @@ func TestNewFeatureGate(t *testing.T) {
 
 func TestValidateVersion(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}, MinimumVersion: constants.MinimumControlPlaneVersion.WithPreRelease("alpha.1")},
+		"feature1": {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"feature2": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Alpha}, MinimumVersion: constants.MinimumControlPlaneVersion.WithPreRelease("alpha.1")},
 	}
 
 	var tests = []struct {
@@ -187,8 +187,8 @@ func TestEnabledDefaults(t *testing.T) {
 func TestCheckDeprecatedFlags(t *testing.T) {
 	dummyMessage := "dummy message"
 	var someFeatures = FeatureList{
-		"feature1":   {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-		"deprecated": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, DeprecationMessage: dummyMessage},
+		"feature1":   {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Beta}},
+		"deprecated": {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}, DeprecationMessage: dummyMessage},
 	}
 
 	var tests = []struct {
