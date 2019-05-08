@@ -8,7 +8,6 @@ go 1.12
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
-	cloud.google.com/go v0.34.0
 	github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
 	github.com/Azure/go-autorest v11.1.2+incompatible
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100

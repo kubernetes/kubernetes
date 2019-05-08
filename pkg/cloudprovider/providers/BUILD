@@ -14,12 +14,12 @@ go_library(
     ],
     deps = [
         "//pkg/cloudprovider/providers/cloudstack:go_default_library",
-        "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//pkg/cloudprovider/providers/ovirt:go_default_library",
         "//pkg/cloudprovider/providers/photon:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
     ],
 )
@@ -37,7 +37,6 @@ filegroup(
         ":package-srcs",
         "//pkg/cloudprovider/providers/cloudstack:all-srcs",
         "//pkg/cloudprovider/providers/fake:all-srcs",
-        "//pkg/cloudprovider/providers/gce:all-srcs",
         "//pkg/cloudprovider/providers/openstack:all-srcs",
         "//pkg/cloudprovider/providers/ovirt:all-srcs",
         "//pkg/cloudprovider/providers/photon:all-srcs",
