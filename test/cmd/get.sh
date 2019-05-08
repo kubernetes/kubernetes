@@ -129,6 +129,13 @@ run_kubectl_get_tests() {
   # Post-condition: Check if we get a limit and continue
   kube::test::if_has_string "${output_message}" "/clusterroles?limit=500 200 OK"
 
+  ### Test kubectl get accumulates pages
+  output_message=$(kubectl get namespaces --chunk-size=1 --no-headers "${kube_flags[@]}")
+  # Post-condition: Check we got multiple pages worth of namespaces
+  kube::test::if_has_string "${output_message}" "default"
+  kube::test::if_has_string "${output_message}" "kube-public"
+  kube::test::if_has_string "${output_message}" "kube-system"
+
   ### Test kubectl get chunk size does not result in a --watch error when resource list is served in multiple chunks
   # Pre-condition: ConfigMap one two tree does not exist
   kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq $id_field \"one\" }}found{{end}}{{end}}:' ':'
