@@ -36,7 +36,7 @@ func (p *preferredPolicy) Name() string {
 	return string(PolicyPreferred)
 }
 
-func (p *preferredPolicy) CanAdmitPodResult(result TopologyHints) lifecycle.PodAdmitResult {
+func (p *preferredPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}

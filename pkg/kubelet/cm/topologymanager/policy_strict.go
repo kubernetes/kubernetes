@@ -36,9 +36,8 @@ func (p *strictPolicy) Name() string {
 	return string(PolicyStrict)
 }
 
-func (p *strictPolicy) CanAdmitPodResult(result TopologyHints) lifecycle.PodAdmitResult {
-	affinity := result.Affinity
-	if !affinity {
+func (p *strictPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
+	if !admit {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
 			Reason:  "Topology Affinity Error",
