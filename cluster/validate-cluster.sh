@@ -104,7 +104,7 @@ while true; do
   # which are important for line counting.
   # Use trick from https://unix.stackexchange.com/a/383411 to avoid
   # newline truncation.
-  node=$(kubectl_retry get nodes --no-headers; ret=$?; echo .; exit "$ret") && res="$?" || res="$?"
+  node=$(kubectl_retry get nodes --chunk-size=0 --no-headers; ret=$?; echo .; exit "$ret") && res="$?" || res="$?"
   node="${node%.}"
   if [ "${res}" -ne "0" ]; then
     if [[ "${attempt}" -gt "${last_run:-$MAX_ATTEMPTS}" ]]; then
