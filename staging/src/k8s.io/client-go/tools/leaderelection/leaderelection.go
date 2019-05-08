@@ -70,24 +70,21 @@ const (
 
 // NewLeaderElector creates a LeaderElector from a LeaderElectionConfig
 func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
-	if lec.LeaseDuration <= lec.RenewDeadline {
-		return nil, fmt.Errorf("leaseDuration must be greater than renewDeadline")
+	checks := []struct {
+		bad    bool
+		errMsg string
+	}{
+		{lec.LeaseDuration <= lec.RenewDeadline, "leaseDuration must be greater than renewDeadline"},
+		{lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)), "renewDeadline must be greater than retryPeriod*JitterFactor"},
+		{lec.LeaseDuration < 1, "leaseDuration must be greater than zero"},
+		{lec.RenewDeadline < 1, "renewDeadline must be greater than zero"},
+		{lec.RetryPeriod < 1, "retryPeriod must be greater than zero"},
+		{lec.Lock == nil, "lock must not be nil."},
 	}
-	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
-		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
-	}
-	if lec.LeaseDuration < 1 {
-		return nil, fmt.Errorf("leaseDuration must be greater than zero")
-	}
-	if lec.RenewDeadline < 1 {
-		return nil, fmt.Errorf("renewDeadline must be greater than zero")
-	}
-	if lec.RetryPeriod < 1 {
-		return nil, fmt.Errorf("retryPeriod must be greater than zero")
-	}
-
-	if lec.Lock == nil {
-		return nil, fmt.Errorf("Lock must not be nil.")
+	for _, check := range checks {
+		if check.bad {
+			return nil, fmt.Errorf(check.errMsg)
+		}
 	}
 	le := LeaderElector{
 		config:  lec,
