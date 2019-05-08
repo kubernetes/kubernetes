@@ -76,11 +76,9 @@ func (mc *metricsCsi) getCSIVolInfo(metrics *volume.Metrics) error {
 	// Check whether "GET_VOLUME_STATS" is set
 	volumeStatsSet, err := csiClient.NodeSupportsVolumeStats(ctx)
 	if err != nil {
-		klog.Error(log("metricsCsi.getCSIVolInfo failed to check GET_VOLUME_STATS capability: %v", err))
 		return err
 	}
 	if !volumeStatsSet {
-		klog.Infof(log("metricsCsi.getCSIVolInfo GET_VOLUME_STATS capability not set. Skipping NodeVolumeStats..."))
 		return nil
 	}
 

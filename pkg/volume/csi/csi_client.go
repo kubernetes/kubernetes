@@ -880,16 +880,15 @@ func (c *csiDriverClient) nodeSupportsVolumeStatsV1(ctx context.Context) (bool, 
 
 	capabilities := resp.GetCapabilities()
 
-	volumeStatsSet := false
 	if capabilities == nil {
 		return false, nil
 	}
 	for _, capability := range capabilities {
 		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_GET_VOLUME_STATS {
-			volumeStatsSet = true
+			return true, nil
 		}
 	}
-	return volumeStatsSet, nil
+	return false, nil
 }
 
 func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (map[string]usageCount, error) {
