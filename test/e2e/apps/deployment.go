@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutil "k8s.io/kubernetes/test/utils"
 	utilpointer "k8s.io/utils/pointer"
@@ -274,7 +275,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	_, err := c.AppsV1().ReplicaSets(ns).Create(rs)
 	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
-	err = framework.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
+	err = e2epod.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
@@ -352,7 +353,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
-	err = framework.VerifyPodsRunning(c, ns, "cleanup-pod", false, replicas)
+	err = e2epod.VerifyPodsRunning(c, ns, "cleanup-pod", false, replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
@@ -422,7 +423,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
 	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
-	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
+	err = e2epod.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Wait for replica set to become ready before adopting it.
@@ -859,7 +860,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 
 	// Verify that the required pods have come up.
 	e2elog.Logf("Waiting for all required pods to come up")
-	err = framework.VerifyPodsRunning(c, ns, NginxImageName, false, *(deployment.Spec.Replicas))
+	err = e2epod.VerifyPodsRunning(c, ns, NginxImageName, false, *(deployment.Spec.Replicas))
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	e2elog.Logf("Waiting for deployment %q to complete", deployment.Name)

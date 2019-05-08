@@ -32,6 +32,7 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -501,7 +502,7 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 // Test the pod's exit code to be zero.
 func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 	ginkgo.By("Pod should terminate with exitcode 0 (success)")
-	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
+	if err := e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
 	e2elog.Logf("Pod %v succeeded ", pod.Name)
@@ -856,7 +857,7 @@ func CreatePod(client clientset.Interface, namespace string, nodeSelector map[st
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	err = e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}
@@ -876,7 +877,7 @@ func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector m
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to be running
-	err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
+	err = e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}
@@ -907,7 +908,7 @@ func CreateSecPodWithNodeSelection(client clientset.Interface, namespace string,
 	}
 
 	// Waiting for pod to be running
-	err = WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(client, pod.Name, namespace, timeout)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
 	}
@@ -962,7 +963,7 @@ func CreateUnschedulablePod(client clientset.Interface, namespace string, nodeSe
 		return nil, fmt.Errorf("pod Create API error: %v", err)
 	}
 	// Waiting for pod to become Unschedulable
-	err = WaitForPodNameUnschedulableInNamespace(client, pod.Name, namespace)
+	err = e2epod.WaitForPodNameUnschedulableInNamespace(client, pod.Name, namespace)
 	if err != nil {
 		return pod, fmt.Errorf("pod %q is not Unschedulable: %v", pod.Name, err)
 	}

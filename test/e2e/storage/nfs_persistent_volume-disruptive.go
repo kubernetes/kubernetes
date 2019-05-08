@@ -22,6 +22,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -262,7 +264,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 			framework.DeletePodWithWait(f, c, pod)
 		}
 	}()
-	err = framework.WaitForPodRunningInNamespace(c, pod)
+	err = e2epod.WaitForPodRunningInNamespace(c, pod)
 	framework.ExpectNoError(err, fmt.Sprintf("Pod %q timed out waiting for phase: Running", pod.Name))
 	// Return created api objects
 	pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})

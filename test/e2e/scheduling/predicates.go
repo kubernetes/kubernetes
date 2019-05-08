@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -305,7 +306,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		// Wait for filler pods to schedule.
 		for _, pod := range fillerPods {
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 		ginkgo.By("Creating another pod that requires unavailable amount of CPU.")
 		// Create another pod that requires 50% of the largest node CPU resources.
@@ -379,7 +380,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
@@ -466,7 +467,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, labelPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
@@ -509,7 +510,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(cs, ns, tolerationPodName))
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
 		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		gomega.Expect(deployedPod.Spec.NodeName).To(gomega.Equal(nodeName))
@@ -652,7 +653,7 @@ func createPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 
 func runPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 	pod := createPausePod(f, conf)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(conf.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return pod
@@ -721,7 +722,7 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, n
 func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string) {
 	allPods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
-	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
+	scheduledPods, notScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -739,7 +740,7 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 // verifyReplicasResult is wrapper of verifyResult for a group pods with same "name: labelName" label, which means they belong to same RC
 func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expectedNotScheduled int, ns string, labelName string) {
 	allPods := getPodsByLabels(c, ns, map[string]string{"name": labelName})
-	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
+	scheduledPods, notScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -818,7 +819,7 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 		NodeSelector: nodeSelector,
 	})
 
-	err := framework.WaitForPodNotPending(f.ClientSet, ns, podName)
+	err := e2epod.WaitForPodNotPending(f.ClientSet, ns, podName)
 	if expectScheduled {
 		framework.ExpectNoError(err)
 	}

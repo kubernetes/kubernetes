@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -279,7 +280,7 @@ func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.Stateful
 		podList := s.GetPodList(ss)
 		statefulPodCount := len(podList.Items)
 		if statefulPodCount != count {
-			logPodStates(podList.Items)
+			e2epod.LogPodStates(podList.Items)
 			if hard {
 				Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
 			} else {

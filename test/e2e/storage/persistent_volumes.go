@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -281,7 +282,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod := framework.MakeWritePod(ns, pvc)
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
 				ginkgo.By("Deleting the claim")
 				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
@@ -299,7 +300,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 				e2elog.Logf("Pod exited without failure; the volume has been recycled.")
 			})

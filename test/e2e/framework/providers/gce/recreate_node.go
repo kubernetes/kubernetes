@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -57,13 +58,13 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 
 		ps, err = testutils.NewPodStore(f.ClientSet, systemNamespace, labels.Everything(), fields.Everything())
 		allPods := ps.List()
-		originalPods := framework.FilterNonRestartablePods(allPods)
+		originalPods := e2epod.FilterNonRestartablePods(allPods)
 		originalPodNames = make([]string, len(originalPods))
 		for i, p := range originalPods {
 			originalPodNames[i] = p.ObjectMeta.Name
 		}
 
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
+		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 
@@ -114,10 +115,10 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 
 	// Make sure the pods from before node recreation are running/completed
 	podCheckStart := time.Now()
-	podNamesAfter, err := framework.WaitForNRestartablePods(ps, len(podNames), framework.RestartPodReadyAgainTimeout)
+	podNamesAfter, err := e2epod.WaitForNRestartablePods(ps, len(podNames), framework.RestartPodReadyAgainTimeout)
 	framework.ExpectNoError(err)
 	remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, systemNamespace, podNamesAfter, remaining) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, systemNamespace, podNamesAfter, remaining) {
 		framework.Failf("At least one pod wasn't running and ready after the restart.")
 	}
 }

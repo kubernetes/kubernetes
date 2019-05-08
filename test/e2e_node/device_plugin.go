@@ -32,6 +32,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -265,7 +266,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 
 // parseLog returns the matching string for the specified regular expression parsed from the container logs.
 func parseLog(f *framework.Framework, podName string, contName string, re string) string {
-	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
+	logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
 	if err != nil {
 		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}

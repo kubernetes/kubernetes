@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -93,7 +94,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		Expect(pod.Status.Phase).To(Equal(v1.PodSucceeded))
 
 		By("Getting logs from the pod")
-		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		log, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err)
 
 		By("Checking that the sysctl is actually updated")
@@ -136,7 +137,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		Expect(pod.Status.Phase).To(Equal(v1.PodSucceeded))
 
 		By("Getting logs from the pod")
-		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		log, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err)
 
 		By("Checking that the sysctl is actually updated")

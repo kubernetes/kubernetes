@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -67,7 +68,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	}()
 
 	ginkgo.By("Waiting for pods to come up.")
-	err = framework.WaitForPodRunningInNamespace(c, podDescr)
+	err = e2epod.WaitForPodRunningInNamespace(c, podDescr)
 	framework.ExpectNoError(err, "waiting for server pod to start")
 
 	val := "{\"Source\": \"prestop\"}"
@@ -112,7 +113,7 @@ func testPreStop(c clientset.Interface, ns string) {
 		}
 	}()
 
-	err = framework.WaitForPodRunningInNamespace(c, preStopDescr)
+	err = e2epod.WaitForPodRunningInNamespace(c, preStopDescr)
 	framework.ExpectNoError(err, "waiting for tester pod to start")
 
 	// Delete the pod with the preStop handler.

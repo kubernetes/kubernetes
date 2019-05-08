@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
@@ -251,7 +252,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		It("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
 			// This test is marked LinuxOnly since it runs a Linux-specific command, and Windows does not support Windows escalation.
 			podName := createAndWaitUserPod(false)
-			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
 				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}

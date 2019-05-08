@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -106,7 +107,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 
 	// Wait for all of them to be scheduled
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"service": serviceName}))
-	pods, err := framework.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
+	pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones
@@ -215,12 +216,12 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	}()
 	// List the pods, making sure we observe all the replicas.
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicaCount)
+	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicaCount)
 	framework.ExpectNoError(err)
 
 	// Wait for all of them to be scheduled
 	ginkgo.By(fmt.Sprintf("Waiting for %d replicas of %s to be scheduled.  Selector: %v", replicaCount, name, selector))
-	pods, err = framework.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
+	pods, err = e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones

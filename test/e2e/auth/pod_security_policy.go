@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -90,7 +91,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		ginkgo.By("Running a restricted pod")
 		pod, err := c.CoreV1().Pods(ns).Create(restrictedPod("allowed"))
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, pod.Name, pod.Namespace))
 
 		testPrivilegedPods(func(pod *v1.Pod) {
 			_, err := c.CoreV1().Pods(ns).Create(pod)
@@ -109,7 +110,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		testPrivilegedPods(func(pod *v1.Pod) {
 			p, err := c.CoreV1().Pods(ns).Create(pod)
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(framework.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(c, p.Name, p.Namespace))
 
 			// Verify expected PSP was used.
 			p, err = c.CoreV1().Pods(ns).Get(p.Name, metav1.GetOptions{})

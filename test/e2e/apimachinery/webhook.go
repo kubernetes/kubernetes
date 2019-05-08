@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -826,7 +827,7 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	pod := toBeAttachedPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod.Name, f.Namespace.Name)
-	err = framework.WaitForPodNameRunningInNamespace(client, pod.Name, f.Namespace.Name)
+	err = e2epod.WaitForPodNameRunningInNamespace(client, pod.Name, f.Namespace.Name)
 	framework.ExpectNoError(err, "error while waiting for pod %s to go to Running phase in namespace: %s", pod.Name, f.Namespace.Name)
 
 	ginkgo.By("'kubectl attach' the pod, should be denied by the webhook")

@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -119,7 +120,7 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 
 // WaitForTerminatedContainer wait till a given container be terminated for a given pod.
 func WaitForTerminatedContainer(f *framework.Framework, pod *v1.Pod, containerName string) error {
-	return framework.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
+	return e2epod.WaitForPodCondition(f.ClientSet, f.Namespace.Name, pod.Name, "container terminated", framework.PodStartTimeout, func(pod *v1.Pod) (bool, error) {
 		if len(testutils.TerminatedContainers(pod)[containerName]) > 0 {
 			return true, nil
 		}
@@ -241,7 +242,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Done"),
@@ -278,7 +279,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Expected to read 3 bytes from client, but got 0 instead"),
@@ -336,7 +337,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Received expected client data"),
@@ -425,7 +426,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 
 	ginkgo.By("Verifying logs")
 	gomega.Eventually(func() (string, error) {
-		return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
+		return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, "portforwardtester")
 	}, postStartWaitTimeout, podCheckInterval).Should(gomega.SatisfyAll(
 		gomega.ContainSubstring("Accepted client connection"),
 		gomega.ContainSubstring("Received expected client data"),
