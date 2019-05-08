@@ -51,6 +51,7 @@ go_test(
         "csi_block_test.go",
         "csi_client_test.go",
         "csi_drivers_store_test.go",
+        "csi_metrics_test.go",
         "csi_mounter_test.go",
         "csi_plugin_test.go",
         "expander_test.go",
