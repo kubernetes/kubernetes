@@ -133,8 +133,10 @@ const (
 	// Poll is how often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
 
+	// PollShortTimeout is the short timeout value in polling.
 	PollShortTimeout = 1 * time.Minute
-	PollLongTimeout  = 5 * time.Minute
+	// PollLongTimeout is the long timeout value in polling.
+	PollLongTimeout = 5 * time.Minute
 
 	// ServiceAccountProvisionTimeout is how long to wait for a service account to be provisioned.
 	// service accounts are provisioned after namespace creation
