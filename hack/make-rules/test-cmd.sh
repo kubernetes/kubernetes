@@ -108,6 +108,10 @@ function create_node() {
 __EOF__
 }
 
+if [ -z "${ITERATION:-}" ]; then
+  ITERATIONS=1
+fi
+
 # Run it if:
 # 1) $WHAT is empty
 # 2) $WHAT is not empty and kubeadm is part of $WHAT
@@ -131,10 +135,6 @@ create_node
 
 
 export SUPPORTED_RESOURCES=("*")
-
-if [ -z "${ITERATION:-}" ]; then
-  ITERATIONS=1
-fi
 
 for i in $(seq 1 $ITERATION); do
   echo "Test Iteration $i"
