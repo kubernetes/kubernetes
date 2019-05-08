@@ -602,7 +602,6 @@ test/e2e
 test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
-test/e2e/framework
 test/e2e/lifecycle/bootstrap
 test/e2e/node
 test/e2e/scalability
