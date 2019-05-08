@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
@@ -311,7 +312,7 @@ var _ = SIGDescribe("Services", func() {
 
 	It("should be able to up and down services", func() {
 		// TODO: use the ServiceTestJig here
-		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
 		framework.SkipUnlessSSHKeyPresent()
@@ -326,7 +327,7 @@ var _ = SIGDescribe("Services", func() {
 		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service2"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
-		hosts, err := framework.NodeSSHHosts(cs)
+		hosts, err := e2essh.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred(), "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -390,7 +391,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
 
-		hosts, err := framework.NodeSSHHosts(cs)
+		hosts, err := e2essh.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred(), "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -408,12 +409,12 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceUp(cs, ns, host, podNames2, svc2IP, servicePort))
 
 		By("Removing iptable rules")
-		result, err := framework.SSH(`
+		result, err := e2essh.SSH(`
 			sudo iptables -t nat -F KUBE-SERVICES || true;
 			sudo iptables -t nat -F KUBE-PORTALS-HOST || true;
 			sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true`, host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
-			framework.LogSSHResult(result)
+			e2essh.LogResult(result)
 			framework.Failf("couldn't remove iptable rules: %v", err)
 		}
 		framework.ExpectNoError(framework.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))
@@ -433,7 +434,7 @@ var _ = SIGDescribe("Services", func() {
 		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service1"), ns, numPods)
 		Expect(err).NotTo(HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 
-		hosts, err := framework.NodeSSHHosts(cs)
+		hosts, err := e2essh.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred(), "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -1724,7 +1725,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	It("should implement service.kubernetes.io/service-proxy-name", func() {
-		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
 		framework.SkipUnlessSSHKeyPresent()
@@ -1751,7 +1752,7 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := framework.NewServiceTestJig(cs, svcToggled.ObjectMeta.Name)
 
-		hosts, err := framework.NodeSSHHosts(cs)
+		hosts, err := e2essh.NodeSSHHosts(cs)
 		Expect(err).NotTo(HaveOccurred(), "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")

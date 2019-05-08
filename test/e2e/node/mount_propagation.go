@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -103,7 +104,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		hostDir := "/var/lib/kubelet/" + f.Namespace.Name
 		defer func() {
 			cleanCmd := fmt.Sprintf("sudo rm -rf %q", hostDir)
-			framework.IssueSSHCommand(cleanCmd, framework.TestContext.Provider, node)
+			e2essh.IssueSSHCommand(cleanCmd, framework.TestContext.Provider, node)
 		}()
 
 		podClient := f.PodClient()
@@ -140,12 +141,12 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// The host mounts one tmpfs to testdir/host and puts a file there so we
 		// can check mount propagation from the host to pods.
 		cmd := fmt.Sprintf("sudo mkdir %[1]q/host; sudo mount -t tmpfs e2e-mount-propagation-host %[1]q/host; echo host > %[1]q/host/file", hostDir)
-		err := framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
+		err := e2essh.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
 		framework.ExpectNoError(err)
 
 		defer func() {
 			cmd := fmt.Sprintf("sudo umount %q/host", hostDir)
-			framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
+			e2essh.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
 		}()
 
 		// Now check that mounts are propagated to the right containers.
@@ -181,12 +182,12 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Check that the mounts are/are not propagated to the host.
 		// Host can see mount from master
 		cmd = fmt.Sprintf("test `cat %q/master/file` = master", hostDir)
-		err = framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
+		err = e2essh.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
 		framework.ExpectNoError(err, "host should see mount from master")
 
 		// Host can't see mount from slave
 		cmd = fmt.Sprintf("test ! -e %q/slave/file", hostDir)
-		err = framework.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
+		err = e2essh.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
 		framework.ExpectNoError(err, "host shouldn't see mount from slave")
 	})
 })
