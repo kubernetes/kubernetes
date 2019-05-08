@@ -83,8 +83,8 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
-	return newStore(c, pagingEnabled, codec, prefix, transformer)
+func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool, newFunc func() runtime.Object) storage.Interface {
+	return newStore(c, pagingEnabled, codec, prefix, transformer, newFunc)
 }
 
 func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
@@ -99,7 +99,7 @@ func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefi
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
 		pathPrefix:   path.Join("/", prefix),
-		watcher:      newWatcher(c, codec, versioner, transformer),
+		watcher:      newWatcher(c, codec, versioner, transformer, newFunc),
 		leaseManager: newDefaultLeaseManager(c),
 	}
 	return result

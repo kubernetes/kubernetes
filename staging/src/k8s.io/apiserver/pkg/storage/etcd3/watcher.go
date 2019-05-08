@@ -28,8 +28,10 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/coreos/etcd/clientv3"
 	"k8s.io/klog"
@@ -46,6 +48,9 @@ var fatalOnDecodeError = false
 
 // errTestingDecode is the only error that testingDeferOnDecodeError catches during a panic
 var errTestingDecode = errors.New("sentinel error only used during testing to indicate watch decoding error")
+
+// errCreateObject is the only error that newFunc is nil in test cases
+var errCreateObject = errors.New("failure to create obj as newFunc is nil")
 
 // testingDeferOnDecodeError is used during testing to recover from a panic caused by errTestingDecode, all other values continue to panic
 func testingDeferOnDecodeError() {
@@ -70,6 +75,10 @@ type watcher struct {
 	codec       runtime.Codec
 	versioner   storage.Versioner
 	transformer value.Transformer
+	// newFunc is a function that creates new empty object storing a object.
+	newFunc func() runtime.Object
+	// watchBookmark feature-gate
+	watchBookmarkEnabled bool
 }
 
 // watchChan implements watch.Interface.
@@ -86,12 +95,14 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer, newFunc func() runtime.Object) *watcher {
 	return &watcher{
-		client:      client,
-		codec:       codec,
-		versioner:   versioner,
-		transformer: transformer,
+		client:               client,
+		codec:                codec,
+		versioner:            versioner,
+		transformer:          transformer,
+		newFunc:              newFunc,
+		watchBookmarkEnabled: utilfeature.DefaultFeatureGate.Enabled(features.WatchBookmark),
 	}
 }
 
@@ -202,7 +213,11 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			return
 		}
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
+	opts := []clientv3.OpOption{
+		clientv3.WithRev(wc.initialRev + 1),
+		clientv3.WithPrevKV(),
+		clientv3.WithProgressNotify(),
+	}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
@@ -215,6 +230,13 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			wc.sendError(err)
 			return
 		}
+
+		// Send progress notify event when bookmark is enabled.
+		if wres.IsProgressNotify() && wc.watcher.watchBookmarkEnabled {
+			wc.sendEvent(progressNotifyEvent(wres.Header.GetRevision()))
+			continue
+		}
+
 		for _, e := range wres.Events {
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
@@ -299,6 +321,16 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Type:   watch.Added,
 			Object: curObj,
 		}
+	case e.isProgressNotify:
+		// Ignore the client internalPred.AllowWatchBookmarks, as etcd3 storage
+		// is used internally apiserver(bookmark is controlled by feature gate).
+		if !wc.watcher.watchBookmarkEnabled {
+			return nil
+		}
+		res = &watch.Event{
+			Type:   watch.Bookmark,
+			Object: curObj,
+		}
 	default:
 		if wc.acceptAll() {
 			res = &watch.Event{
@@ -362,6 +394,16 @@ func (wc *watchChan) sendEvent(e *event) {
 }
 
 func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtime.Object, err error) {
+	if e.isProgressNotify {
+		if wc.watcher.newFunc == nil {
+			return nil, nil, errCreateObject
+		}
+		obj := wc.watcher.newFunc()
+		if err := wc.watcher.versioner.UpdateObject(obj, uint64(e.rev)); err != nil {
+			return nil, nil, fmt.Errorf("failure to version api object (%d) %#v: %v", e.rev, obj, err)
+		}
+		return obj, nil, nil
+	}
 	if !e.isDeleted {
 		data, _, err := wc.watcher.transformer.TransformFromStorage(e.value, authenticatedDataString(e.key))
 		if err != nil {

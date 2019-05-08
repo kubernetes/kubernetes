@@ -93,9 +93,15 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
+<<<<<<< HEAD
 func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, value.IdentityTransformer, true)
+=======
+func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
+	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, value.IdentityTransformer, true, nil)
+>>>>>>> d67dc03f8c... enable progress notify event
 	return server, storage
 }
 

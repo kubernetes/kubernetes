@@ -43,13 +43,28 @@ func UndecoratedStorage(
 	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
+<<<<<<< HEAD
 	trigger storage.IndexerFuncs) (storage.Interface, factory.DestroyFunc, error) {
 	return NewRawStorage(config)
+=======
+	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
+	return NewRawStorage(config, newFunc)
+>>>>>>> d67dc03f8c... enable progress notify event
 }
 
 // NewRawStorage creates the low level kv storage. This is a work-around for current
 // two layer of same storage interface.
+//
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
+<<<<<<< HEAD
 func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc, error) {
 	return factory.Create(*config)
+=======
+func NewRawStorage(config *storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, factory.DestroyFunc) {
+	s, d, err := factory.Create(*config, newFunc)
+	if err != nil {
+		klog.Fatalf("Unable to create storage backend: config (%v), err (%v)", config, err)
+	}
+	return s, d
+>>>>>>> d67dc03f8c... enable progress notify event
 }

@@ -31,7 +31,11 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
+<<<<<<< HEAD
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+=======
+	"k8s.io/apimachinery/pkg/runtime"
+>>>>>>> d67dc03f8c... enable progress notify event
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
@@ -206,7 +210,18 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
+// Add a creator here to create a bookmark event if needed. etcd storage can be shared by different
+// types of storage theoretically. There are three methods to achieve this:
+// 1. add a creator(prevent it from being shared)
+// 2. save objects type in watch channel(suppose they are the same type)
+// 3. add a bookmark type instead of reusing the object type
+//    type Bookmark struct {
+//        metav1.TypeMeta
+//	      metav1.ObjectMeta
+//    }
+//    This will make things simple and clear, but need an api change.
+// TODO a better way to implement it
+func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
@@ -232,5 +247,5 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
+	return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging, newFunc), destroyFunc, nil
 }

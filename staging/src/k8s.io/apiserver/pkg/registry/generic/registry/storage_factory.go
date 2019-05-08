@@ -41,10 +41,14 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs) (storage.Interface, factory.DestroyFunc, error) {
 
+<<<<<<< HEAD
 		s, d, err := generic.NewRawStorage(storageConfig)
 		if err != nil {
 			return s, d, err
 		}
+=======
+		s, d := generic.NewRawStorage(storageConfig, newFunc)
+>>>>>>> d67dc03f8c... enable progress notify event
 		if capacity <= 0 {
 			klog.V(5).Infof("Storage caching is disabled for %T", newFunc())
 			return s, d, nil
