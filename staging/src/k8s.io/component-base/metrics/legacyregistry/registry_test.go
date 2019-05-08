@@ -27,7 +27,7 @@ import (
 )
 
 func init() {
-	SetRegistryFactoryVersion(&apimachineryversion.Info{
+	SetRegistryFactoryVersion(apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "15",
 		GitVersion: "v1.15.0-alpha-1.12345",
@@ -161,7 +161,7 @@ func TestDeferredRegister(t *testing.T) {
 		t.Errorf("Got err == %v, expected no error", err)
 	}
 	// set the global registry version
-	errs := SetRegistryFactoryVersion(&apimachineryversion.Info{
+	errs := SetRegistryFactoryVersion(apimachineryversion.Info{
 		Major:      "1",
 		Minor:      "15",
 		GitVersion: "v1.15.0-alpha-1.12345",
@@ -185,7 +185,7 @@ func TestDeferredMustRegister(t *testing.T) {
 	MustRegister(alphaDeprecatedCounter)
 	assert.Panics(t,
 		func() {
-			SetRegistryFactoryVersion(&apimachineryversion.Info{
+			SetRegistryFactoryVersion(apimachineryversion.Info{
 				Major:      "1",
 				Minor:      "15",
 				GitVersion: "v1.15.0-alpha-1.12345",

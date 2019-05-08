@@ -17,6 +17,7 @@ limitations under the License.
 package legacyregistry
 
 import (
+	"fmt"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
 	"sync"
@@ -38,15 +39,20 @@ type metricsRegistryFactory struct {
 // SetRegistryFactoryVersion sets the kubernetes version information for all
 // subsequent metrics registry initializations. Only the first call has an effect.
 // If a version is not set, then metrics registry creation will no-opt
-func SetRegistryFactoryVersion(ver *apimachineryversion.Info) []error {
+func SetRegistryFactoryVersion(ver apimachineryversion.Info) []error {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 	if globalRegistryFactory.kubeVersion != nil {
+		if globalRegistryFactory.kubeVersion.String() != ver.String() {
+			panic(fmt.Sprintf("Cannot load a global registry more than once, had %s tried to load %s",
+				globalRegistryFactory.kubeVersion.String(),
+				ver.String()))
+		}
 		return nil
 	}
 	registrationErrs := make([]error, 0)
 	globalRegistryFactory.globalRegistry = metrics.NewKubeRegistry(ver)
-	globalRegistryFactory.kubeVersion = ver
+	globalRegistryFactory.kubeVersion = &ver
 	for _, c := range globalRegistryFactory.registerQueue {
 		err := globalRegistryFactory.globalRegistry.Register(c)
 		if err != nil {
