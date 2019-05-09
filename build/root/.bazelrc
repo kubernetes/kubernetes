@@ -73,3 +73,5 @@ build:ci-instance --remote_instance_name=projects/k8s-prow-builds/instances/defa
 
 # The config we want to use in CI
 build:ci --config=remote --config=ci-instance
+
+build:erick DO NOT MERGE
