@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	certutil "k8s.io/client-go/util/cert"
 	keyutil "k8s.io/client-go/util/keyutil"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -57,7 +58,7 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	if err != nil {
 		return "", errors.Wrap(err, "error generating token to upload certs")
 	}
-	token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+	token, err := bootstraptokenapi.NewBootstrapTokenString(tokenStr)
 	if err != nil {
 		return "", errors.Wrap(err, "error creating upload certs token")
 	}

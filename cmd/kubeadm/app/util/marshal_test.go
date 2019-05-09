@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -121,7 +122,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		},
 		BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 			{
-				Token: &kubeadmapiv1beta2.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 			},
 		},
 		// NOTE: Using MarshalToYamlForCodecs and UnmarshalFromYamlForCodecs for ClusterConfiguration fields here won't work

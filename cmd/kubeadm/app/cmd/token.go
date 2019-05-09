@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	clientset "k8s.io/client-go/kubernetes"
-	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -192,7 +192,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern)
+				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstraptokenapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
@@ -375,7 +375,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 			// TODO: We hard-code "type" here until `field_constants.go` that is
 			// currently in `pkg/apis/core/` exists in the external API, i.e.
 			// k8s.io/api/v1. Should be v1.SecretTypeField
-			"type": string(bootstrapapi.SecretTypeBootstrapToken),
+			"type": string(bootstraptokenapi.SecretTypeBootstrapToken),
 		},
 	)
 	listOptions := metav1.ListOptions{
@@ -399,7 +399,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 		// Convert token into versioned output structure
 		outputToken := outputapiv1alpha1.BootstrapToken{
 			BootstrapToken: kubeadmapiv1beta2.BootstrapToken{
-				Token:       &kubeadmapiv1beta2.BootstrapTokenString{ID: token.Token.ID, Secret: token.Token.Secret},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: token.Token.ID, Secret: token.Token.Secret},
 				Description: token.Description,
 				TTL:         token.TTL,
 				Expires:     token.Expires,
@@ -423,10 +423,10 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		klog.V(1).Infof("[token] parsing token %q", tokenIDOrToken)
 		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
-			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tokenIDOrToken)
+			bts, err := bootstraptokenapi.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
 				return errors.Errorf("given token %q didn't match pattern %q or %q",
-					tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+					tokenIDOrToken, bootstraptokenapi.BootstrapTokenIDPattern, bootstraptokenapi.BootstrapTokenIDPattern)
 			}
 			tokenID = bts.ID
 		}

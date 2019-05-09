@@ -28,6 +28,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
+	bootstraptokenutil "k8s.io/cluster-bootstrap/util/tokens"
 )
 
 // ToSecret converts the given BootstrapToken object to its Secret representation that
@@ -101,7 +102,7 @@ func BootstrapTokenFromSecret(secret *v1.Secret) (*BootstrapToken, error) {
 	}
 
 	// Create the BootstrapTokenString object based on the ID and Secret
-	bts, err := NewBootstrapTokenStringFromIDAndSecret(tokenID, tokenSecret)
+	bts, err := bootstraptokenutil.NewBootstrapTokenStringFromIDAndSecret(tokenID, tokenSecret)
 	if err != nil {
 		return nil, errors.Wrap(err, "bootstrap Token Secret is invalid and couldn't be parsed")
 	}

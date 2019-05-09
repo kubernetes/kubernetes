@@ -19,6 +19,7 @@ package v1beta2
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -230,7 +231,7 @@ type Networking struct {
 type BootstrapToken struct {
 	// Token is used for establishing bidirectional trust between nodes and control-planes.
 	// Used for joining nodes in the cluster.
-	Token *BootstrapTokenString `json:"token"`
+	Token *bootstraptokenapi.BootstrapTokenString `json:"token"`
 	// Description sets a human-friendly message why this token exists and what it's used
 	// for, so other administrators can know its purpose.
 	Description string `json:"description,omitempty"`

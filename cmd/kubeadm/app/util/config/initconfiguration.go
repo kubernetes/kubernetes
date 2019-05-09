@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	netutil "k8s.io/apimachinery/pkg/util/net"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -72,7 +73,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 		if err != nil {
 			return errors.Wrap(err, "couldn't generate random token")
 		}
-		token, err := kubeadmapi.NewBootstrapTokenString(tokenStr)
+		token, err := bootstraptokenapi.NewBootstrapTokenString(tokenStr)
 		if err != nil {
 			return err
 		}

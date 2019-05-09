@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -75,7 +75,7 @@ func (bto *BootstrapTokenOptions) AddUsagesFlag(fs *pflag.FlagSet) {
 func (bto *BootstrapTokenOptions) AddGroupsFlag(fs *pflag.FlagSet) {
 	fs.StringSliceVar(
 		&bto.Groups, TokenGroups, bto.Groups,
-		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q", bootstrapapi.BootstrapGroupPattern),
+		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q", bootstraptokenapi.BootstrapGroupPattern),
 	)
 }
 
@@ -92,7 +92,7 @@ func (bto *BootstrapTokenOptions) AddDescriptionFlag(fs *pflag.FlagSet) {
 func (bto *BootstrapTokenOptions) ApplyTo(cfg *kubeadmapiv1beta2.InitConfiguration) error {
 	if len(bto.TokenStr) > 0 {
 		var err error
-		bto.Token, err = kubeadmapiv1beta2.NewBootstrapTokenString(bto.TokenStr)
+		bto.Token, err = bootstraptokenapi.NewBootstrapTokenString(bto.TokenStr)
 		if err != nil {
 			return err
 		}

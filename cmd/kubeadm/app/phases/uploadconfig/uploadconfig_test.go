@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -56,7 +57,7 @@ func TestUploadConfiguration(t *testing.T) {
 				},
 				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
-						Token: &kubeadmapiv1beta2.BootstrapTokenString{
+						Token: &bootstraptokenapi.BootstrapTokenString{
 							ID:     "abcdef",
 							Secret: "abcdef0123456789",
 						},

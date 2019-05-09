@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	bootstraptokenapi "k8s.io/cluster-bootstrap/token/api"
 )
 
 // This timestamp is used as the reference value when computing expiration dates based on TTLs in these unit tests
@@ -37,7 +38,7 @@ func TestToSecret(t *testing.T) {
 	}{
 		{
 			&BootstrapToken{ // all together
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 				Expires: &metav1.Time{
 					Time: refTime,
@@ -83,7 +84,7 @@ func TestBootstrapTokenToSecretRoundtrip(t *testing.T) {
 	}{
 		{
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 				Expires: &metav1.Time{
 					Time: refTime,
@@ -119,7 +120,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"the minimum amount of information needed to be specified",
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 			},
 			map[string][]byte{
 				"token-id":     []byte("abcdef"),
@@ -129,7 +130,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"adds description",
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 			},
 			map[string][]byte{
@@ -141,7 +142,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"adds ttl",
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				TTL: &metav1.Duration{
 					Duration: mustParseDuration("2h", t),
 				},
@@ -155,7 +156,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"adds expiration",
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Expires: &metav1.Time{
 					Time: refTime,
 				},
@@ -169,7 +170,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"adds ttl and expiration, should favor expiration",
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				TTL: &metav1.Duration{
 					Duration: mustParseDuration("2h", t),
 				},
@@ -186,7 +187,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"adds usages",
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Usages: []string{"authentication", "signing"},
 			},
 			map[string][]byte{
@@ -199,7 +200,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"adds groups",
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Groups: []string{"system:bootstrappers", "system:bootstrappers:foo"},
 			},
 			map[string][]byte{
@@ -211,7 +212,7 @@ func TestEncodeTokenSecretData(t *testing.T) {
 		{
 			"all together",
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 				TTL: &metav1.Duration{
 					Duration: mustParseDuration("2h", t),
@@ -271,7 +272,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"token-secret": []byte("abcdef0123456789"),
 			},
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 			},
 			false,
 		},
@@ -314,7 +315,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"description":  []byte("foo"),
 			},
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 			},
 			false,
@@ -328,7 +329,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"expiration":   []byte(refTime.Format(time.RFC3339)),
 			},
 			&BootstrapToken{
-				Token: &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token: &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Expires: &metav1.Time{
 					Time: refTime,
 				},
@@ -356,7 +357,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"usage-bootstrap-authentication": []byte("true"),
 			},
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Usages: []string{"authentication", "signing"},
 			},
 			false,
@@ -373,7 +374,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"usage-bootstrap-bar":            []byte(""),
 			},
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Usages: []string{"authentication", "signing"},
 			},
 			false,
@@ -387,7 +388,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"auth-extra-groups": []byte("system:bootstrappers,system:bootstrappers:foo"),
 			},
 			&BootstrapToken{
-				Token:  &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:  &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Groups: []string{"system:bootstrappers", "system:bootstrappers:foo"},
 			},
 			false,
@@ -405,7 +406,7 @@ func TestBootstrapTokenFromSecret(t *testing.T) {
 				"auth-extra-groups":              []byte("system:bootstrappers,system:bootstrappers:foo"),
 			},
 			&BootstrapToken{
-				Token:       &BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
+				Token:       &bootstraptokenapi.BootstrapTokenString{ID: "abcdef", Secret: "abcdef0123456789"},
 				Description: "foo",
 				Expires: &metav1.Time{
 					Time: refTime,

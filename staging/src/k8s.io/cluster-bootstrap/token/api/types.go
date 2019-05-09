@@ -17,6 +17,10 @@ limitations under the License.
 package api
 
 import (
+	"regexp"
+
+	"github.com/pkg/errors"
+
 	"k8s.io/api/core/v1"
 )
 
@@ -108,5 +112,33 @@ const (
 	BootstrapTokenSecretBytes = 16
 )
 
-// KnownTokenUsages specifies the known functions a token will get.
-var KnownTokenUsages = []string{"signing", "authentication"}
+var (
+	// KnownTokenUsages specifies the known functions a token will get.
+	KnownTokenUsages = []string{"signing", "authentication"}
+
+	// BootstrapTokenRe is a compiled regular expression for bootstrap token.
+	BootstrapTokenRe = regexp.MustCompile(BootstrapTokenPattern)
+)
+
+// BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
+// for both validation of the practically of the API server from a joining node's point
+// of view and as an authentication method for the node in the bootstrap phase of
+// "kubeadm join". This token is and should be short-lived
+type BootstrapTokenString struct {
+	ID     string
+	Secret string
+}
+
+// NewBootstrapTokenString converts the given Bootstrap Token as a string
+// to the BootstrapTokenString object used for serialization/deserialization
+// and internal usage. It also automatically validates that the given token
+// is of the right format
+func NewBootstrapTokenString(token string) (*BootstrapTokenString, error) {
+	substrs := BootstrapTokenRe.FindStringSubmatch(token)
+	// TODO: Add a constant for the 3 value here, and explain better why it's needed (other than because how the regexp parsin works)
+	if len(substrs) != 3 {
+		return nil, errors.Errorf("the bootstrap token %q was not of the form %q", token, BootstrapTokenPattern)
+	}
+
+	return &BootstrapTokenString{ID: substrs[1], Secret: substrs[2]}, nil
+}
