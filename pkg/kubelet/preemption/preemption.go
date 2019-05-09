@@ -118,23 +118,24 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
 	bestEffortPods, burstablePods, guaranteedPods := sortPodsByQOS(pod, pods)
 
+	cache := map[string]int64{}
 	// make sure that pods exist to reclaim the requirements
-	unableToMeetRequirements := requirements.subtract(append(append(bestEffortPods, burstablePods...), guaranteedPods...)...)
+	unableToMeetRequirements := requirements.subtract(cache, append(append(bestEffortPods, burstablePods...), guaranteedPods...)...)
 	if len(unableToMeetRequirements) > 0 {
 		return nil, fmt.Errorf("no set of running pods found to reclaim resources: %v", unableToMeetRequirements.toString())
 	}
 	// find the guaranteed pods we would need to evict if we already evicted ALL burstable and besteffort pods.
-	guarateedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(append(bestEffortPods, burstablePods...)...))
+	guarateedToEvict, err := getPodsToPreemptByDistance(guaranteedPods, requirements.subtract(cache, append(bestEffortPods, burstablePods...)...), cache)
 	if err != nil {
 		return nil, err
 	}
 	// Find the burstable pods we would need to evict if we already evicted ALL besteffort pods, and the required guaranteed pods.
-	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(append(bestEffortPods, guarateedToEvict...)...))
+	burstableToEvict, err := getPodsToPreemptByDistance(burstablePods, requirements.subtract(cache, append(bestEffortPods, guarateedToEvict...)...), cache)
 	if err != nil {
 		return nil, err
 	}
 	// Find the besteffort pods we would need to evict if we already evicted the required guaranteed and burstable pods.
-	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(append(burstableToEvict, guarateedToEvict...)...))
+	bestEffortToEvict, err := getPodsToPreemptByDistance(bestEffortPods, requirements.subtract(cache, append(burstableToEvict, guarateedToEvict...)...), cache)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func getPodsToPreempt(pod *v1.Pod, pods []*v1.Pod, requirements admissionRequire
 // it chooses the pod that has the "smaller resource request"
 // This method, by repeatedly choosing the pod that fulfills as much of the requirements as possible,
 // attempts to minimize the number of pods returned.
-func getPodsToPreemptByDistance(pods []*v1.Pod, requirements admissionRequirementList) ([]*v1.Pod, error) {
+func getPodsToPreemptByDistance(pods []*v1.Pod, requirements admissionRequirementList, cache map[string]int64) ([]*v1.Pod, error) {
 	podsToEvict := []*v1.Pod{}
 	// evict pods by shortest distance from remaining requirements, updating requirements every round.
 	for len(requirements) > 0 {
@@ -167,7 +168,7 @@ func getPodsToPreemptByDistance(pods []*v1.Pod, requirements admissionRequiremen
 			}
 		}
 		// subtract the pod from requirements, and transfer the pod from input-pods to pods-to-evicted
-		requirements = requirements.subtract(pods[bestPodIndex])
+		requirements = requirements.subtract(cache, pods[bestPodIndex])
 		podsToEvict = append(podsToEvict, pods[bestPodIndex])
 		pods[bestPodIndex] = pods[len(pods)-1]
 		pods = pods[:len(pods)-1]
@@ -199,12 +200,22 @@ func (a admissionRequirementList) distance(pod *v1.Pod) float64 {
 
 // subtract returns a new admissionRequirementList containing remaining requirements if the provided pod
 // were to be preempted
-func (a admissionRequirementList) subtract(pods ...*v1.Pod) admissionRequirementList {
+func (a admissionRequirementList) subtract(cache map[string]int64, pods ...*v1.Pod) admissionRequirementList {
 	newList := []*admissionRequirement{}
 	for _, req := range a {
 		newQuantity := req.quantity
 		for _, pod := range pods {
-			newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
+			if cache != nil {
+				key := pod.GetSelfLink() + "-" + string(req.resourceName)
+				if request, ok := cache[key]; ok {
+					newQuantity -= request
+				} else {
+					cache[key] = resource.GetResourceRequest(pod, req.resourceName)
+					newQuantity -= cache[key]
+				}
+			} else {
+				newQuantity -= resource.GetResourceRequest(pod, req.resourceName)
+			}
 		}
 		if newQuantity > 0 {
 			newList = append(newList, &admissionRequirement{
