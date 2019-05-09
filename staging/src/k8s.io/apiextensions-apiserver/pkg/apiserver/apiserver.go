@@ -219,7 +219,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go crdController.Run(context.StopCh)
 		go namingController.Run(context.StopCh)
 		go establishingController.Run(context.StopCh)
-		go nonStructuralSchemaController.Run(5, context.StopCh)
+		//go nonStructuralSchemaController.Run(5, context.StopCh)
 		go finalizingController.Run(5, context.StopCh)
 		return nil
 	})

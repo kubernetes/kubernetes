@@ -121,6 +121,28 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 	return cond
 }
 
+// UpdateCondition updates the NonStructuralCondition in the CRD.
+func UpdateCondition(crd *apiextensions.CustomResourceDefinition) {
+	// check old condition
+	cond := calculateCondition(crd)
+	old := apiextensions.FindCRDCondition(crd, apiextensions.NonStructuralSchema)
+
+	if cond == nil && old == nil {
+		return
+	}
+	if cond != nil && old != nil && old.Status == cond.Status && old.Reason == cond.Reason && old.Message == cond.Message {
+		return
+	}
+
+	// update condition
+	if cond == nil {
+		apiextensions.RemoveCRDCondition(crd, apiextensions.NonStructuralSchema)
+	} else {
+		cond.LastTransitionTime = metav1.NewTime(time.Now())
+		apiextensions.SetCRDCondition(crd, *cond)
+	}
+}
+
 func (c *ConditionController) sync(key string) error {
 	inCustomResourceDefinition, err := c.crdLister.Get(key)
 	if apierrors.IsNotFound(err) {

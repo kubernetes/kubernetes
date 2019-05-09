@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	"k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
@@ -55,6 +56,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	crd.Generation = 1
 
 	dropDisabledFields(&crd.Spec, nil)
+	nonstructuralschema.UpdateCondition(crd)
 
 	for _, v := range crd.Spec.Versions {
 		if v.Storage {
@@ -85,6 +87,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	}
 
 	dropDisabledFields(&newCRD.Spec, &oldCRD.Spec)
+	nonstructuralschema.UpdateCondition(newCRD)
 
 	for _, v := range newCRD.Spec.Versions {
 		if v.Storage {
