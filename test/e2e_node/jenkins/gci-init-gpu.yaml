@@ -2,7 +2,7 @@
 
 runcmd:
   - modprobe configs
-  - docker run -v /dev:/dev -v /home/kubernetes/bin/nvidia:/rootfs/nvidia -v /etc/os-release:/rootfs/etc/os-release -v /proc/sysrq-trigger:/sysrq -e BASE_DIR=/rootfs/nvidia --privileged gcr.io/google_containers/cos-nvidia-driver-install@sha256:cb55c7971c337fece62f2bfe858662522a01e43ac9984a2dd1dd5c71487d225c
+  - docker run -v /dev:/dev -v /home/kubernetes/bin/nvidia:/rootfs/nvidia -v /etc/os-release:/rootfs/etc/os-release -v /proc/sysrq-trigger:/sysrq -e BASE_DIR=/rootfs/nvidia --privileged k8s.gcr.io/cos-nvidia-driver-install@sha256:cb55c7971c337fece62f2bfe858662522a01e43ac9984a2dd1dd5c71487d225c
   - mount /tmp /tmp -o remount,exec,suid
   - usermod -a -G docker jenkins
   - mkdir -p /var/lib/kubelet

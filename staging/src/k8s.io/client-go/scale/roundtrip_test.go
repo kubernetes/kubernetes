@@ -19,11 +19,11 @@ package scale
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 )
 
 // NB: this can't be in the scheme package, because importing'
-// scheme/autoscalingv1 from scheme causes a depedency loop from
+// scheme/autoscalingv1 from scheme causes a dependency loop from
 // conversions
 
 func TestRoundTrip(t *testing.T) {

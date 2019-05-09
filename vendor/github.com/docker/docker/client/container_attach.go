@@ -1,10 +1,10 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // ContainerAttach attaches a connection to a container in the server.

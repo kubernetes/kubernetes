@@ -84,7 +84,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil
@@ -95,21 +95,26 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (er
 		return nil
 	}
 
-	deleteAttributes := authorizer.AttributesRecord{
-		User:            attributes.GetUserInfo(),
-		Verb:            "delete",
-		Namespace:       attributes.GetNamespace(),
-		APIGroup:        attributes.GetResource().Group,
-		APIVersion:      attributes.GetResource().Version,
-		Resource:        attributes.GetResource().Resource,
-		Subresource:     attributes.GetSubresource(),
-		Name:            attributes.GetName(),
-		ResourceRequest: true,
-		Path:            "",
-	}
-	decision, reason, err := a.authorizer.Authorize(deleteAttributes)
-	if decision != authorizer.DecisionAllow {
-		return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
+	// if you are creating a thing, you should always be allowed to set an owner ref since you logically had the power
+	// to never create it.  We still need to check block owner deletion below, because the power to delete does not
+	// imply the power to prevent deletion on other resources.
+	if attributes.GetOperation() != admission.Create {
+		deleteAttributes := authorizer.AttributesRecord{
+			User:            attributes.GetUserInfo(),
+			Verb:            "delete",
+			Namespace:       attributes.GetNamespace(),
+			APIGroup:        attributes.GetResource().Group,
+			APIVersion:      attributes.GetResource().Version,
+			Resource:        attributes.GetResource().Resource,
+			Subresource:     attributes.GetSubresource(),
+			Name:            attributes.GetName(),
+			ResourceRequest: true,
+			Path:            "",
+		}
+		decision, reason, err := a.authorizer.Authorize(deleteAttributes)
+		if decision != authorizer.DecisionAllow {
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set an ownerRef on a resource you can't delete: %v, %v", reason, err))
+		}
 	}
 
 	// Further check if the user is setting ownerReference.blockOwnerDeletion to
@@ -119,7 +124,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (er
 	for _, ref := range newBlockingRefs {
 		records, err := a.ownerRefToDeleteAttributeRecords(ref, attributes)
 		if err != nil {
-			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %v, %v", ref.APIVersion, ref.Kind, reason, err))
+			return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion in this case because cannot find RESTMapping for APIVersion %s Kind %s: %v", ref.APIVersion, ref.Kind, err))
 		}
 		// Multiple records are returned if ref.Kind could map to multiple
 		// resources. User needs to have delete permission on all the
@@ -181,19 +186,22 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 		return ret, err
 	}
 	for _, mapping := range mappings {
-		ret = append(ret, authorizer.AttributesRecord{
-			User: attributes.GetUserInfo(),
-			Verb: "update",
-			// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
-			Namespace:       attributes.GetNamespace(),
-			APIGroup:        groupVersion.Group,
-			APIVersion:      groupVersion.Version,
-			Resource:        mapping.Resource,
+		ar := authorizer.AttributesRecord{
+			User:            attributes.GetUserInfo(),
+			Verb:            "update",
+			APIGroup:        mapping.Resource.Group,
+			APIVersion:      mapping.Resource.Version,
+			Resource:        mapping.Resource.Resource,
 			Subresource:     "finalizers",
 			Name:            ref.Name,
 			ResourceRequest: true,
 			Path:            "",
-		})
+		}
+		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+			// if the owner is namespaced, it must be in the same namespace as the dependent is.
+			ar.Namespace = attributes.GetNamespace()
+		}
+		ret = append(ret, ar)
 	}
 	return ret, nil
 }

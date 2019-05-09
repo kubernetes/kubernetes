@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion"
-	listers "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -34,13 +34,13 @@ import (
 type ServiceHandler interface {
 	// OnServiceAdd is called whenever creation of new service object
 	// is observed.
-	OnServiceAdd(service *api.Service)
+	OnServiceAdd(service *v1.Service)
 	// OnServiceUpdate is called whenever modification of an existing
 	// service object is observed.
-	OnServiceUpdate(oldService, service *api.Service)
+	OnServiceUpdate(oldService, service *v1.Service)
 	// OnServiceDelete is called whenever deletion of an existing service
 	// object is observed.
-	OnServiceDelete(service *api.Service)
+	OnServiceDelete(service *v1.Service)
 	// OnServiceSynced is called once all the initial even handlers were
 	// called and the state is fully propagated to local cache.
 	OnServiceSynced()
@@ -51,13 +51,13 @@ type ServiceHandler interface {
 type EndpointsHandler interface {
 	// OnEndpointsAdd is called whenever creation of new endpoints object
 	// is observed.
-	OnEndpointsAdd(endpoints *api.Endpoints)
+	OnEndpointsAdd(endpoints *v1.Endpoints)
 	// OnEndpointsUpdate is called whenever modification of an existing
 	// endpoints object is observed.
-	OnEndpointsUpdate(oldEndpoints, endpoints *api.Endpoints)
+	OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints)
 	// OnEndpointsDelete is called whever deletion of an existing endpoints
 	// object is observed.
-	OnEndpointsDelete(endpoints *api.Endpoints)
+	OnEndpointsDelete(endpoints *v1.Endpoints)
 	// OnEndpointsSynced is called once all the initial event handlers were
 	// called and the state is fully propagated to local cache.
 	OnEndpointsSynced()
@@ -99,15 +99,15 @@ func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting endpoints config controller")
-	defer glog.Info("Shutting down endpoints config controller")
+	klog.Info("Starting endpoints config controller")
+	defer klog.Info("Shutting down endpoints config controller")
 
 	if !controller.WaitForCacheSync("endpoints config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		glog.V(3).Infof("Calling handler.OnEndpointsSynced()")
+		klog.V(3).Infof("Calling handler.OnEndpointsSynced()")
 		c.eventHandlers[i].OnEndpointsSynced()
 	}
 
@@ -115,49 +115,49 @@ func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 }
 
 func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
-	endpoints, ok := obj.(*api.Endpoints)
+	endpoints, ok := obj.(*v1.Endpoints)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsAdd")
+		klog.V(4).Infof("Calling handler.OnEndpointsAdd")
 		c.eventHandlers[i].OnEndpointsAdd(endpoints)
 	}
 }
 
 func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
-	oldEndpoints, ok := oldObj.(*api.Endpoints)
+	oldEndpoints, ok := oldObj.(*v1.Endpoints)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
 		return
 	}
-	endpoints, ok := newObj.(*api.Endpoints)
+	endpoints, ok := newObj.(*v1.Endpoints)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsUpdate")
+		klog.V(4).Infof("Calling handler.OnEndpointsUpdate")
 		c.eventHandlers[i].OnEndpointsUpdate(oldEndpoints, endpoints)
 	}
 }
 
 func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
-	endpoints, ok := obj.(*api.Endpoints)
+	endpoints, ok := obj.(*v1.Endpoints)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
-		if endpoints, ok = tombstone.Obj.(*api.Endpoints); !ok {
+		if endpoints, ok = tombstone.Obj.(*v1.Endpoints); !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnEndpointsDelete")
+		klog.V(4).Infof("Calling handler.OnEndpointsDelete")
 		c.eventHandlers[i].OnEndpointsDelete(endpoints)
 	}
 }
@@ -199,15 +199,15 @@ func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	glog.Info("Starting service config controller")
-	defer glog.Info("Shutting down service config controller")
+	klog.Info("Starting service config controller")
+	defer klog.Info("Shutting down service config controller")
 
 	if !controller.WaitForCacheSync("service config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		glog.V(3).Infof("Calling handler.OnServiceSynced()")
+		klog.V(3).Info("Calling handler.OnServiceSynced()")
 		c.eventHandlers[i].OnServiceSynced()
 	}
 
@@ -215,49 +215,49 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 }
 
 func (c *ServiceConfig) handleAddService(obj interface{}) {
-	service, ok := obj.(*api.Service)
+	service, ok := obj.(*v1.Service)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnServiceAdd")
+		klog.V(4).Info("Calling handler.OnServiceAdd")
 		c.eventHandlers[i].OnServiceAdd(service)
 	}
 }
 
 func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
-	oldService, ok := oldObj.(*api.Service)
+	oldService, ok := oldObj.(*v1.Service)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
 		return
 	}
-	service, ok := newObj.(*api.Service)
+	service, ok := newObj.(*v1.Service)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnServiceUpdate")
+		klog.V(4).Info("Calling handler.OnServiceUpdate")
 		c.eventHandlers[i].OnServiceUpdate(oldService, service)
 	}
 }
 
 func (c *ServiceConfig) handleDeleteService(obj interface{}) {
-	service, ok := obj.(*api.Service)
+	service, ok := obj.(*v1.Service)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
-		if service, ok = tombstone.Obj.(*api.Service); !ok {
+		if service, ok = tombstone.Obj.(*v1.Service); !ok {
 			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 			return
 		}
 	}
 	for i := range c.eventHandlers {
-		glog.V(4).Infof("Calling handler.OnServiceDelete")
+		klog.V(4).Info("Calling handler.OnServiceDelete")
 		c.eventHandlers[i].OnServiceDelete(service)
 	}
 }

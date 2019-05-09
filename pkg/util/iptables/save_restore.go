@@ -17,8 +17,13 @@ limitations under the License.
 package iptables
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
+)
+
+var (
+	commitBytes = []byte("COMMIT")
+	spaceBytes  = []byte(" ")
 )
 
 // MakeChainLine return an iptables-save/restore formatted chain line given a Chain
@@ -27,41 +32,43 @@ func MakeChainLine(chain Chain) string {
 }
 
 // GetChainLines parses a table's iptables-save data to find chains in the table.
-// It returns a map of iptables.Chain to string where the string is the chain line from the save (with counters etc).
-func GetChainLines(table Table, save []byte) map[Chain]string {
-	chainsMap := make(map[Chain]string)
-	tablePrefix := "*" + string(table)
+// It returns a map of iptables.Chain to []byte where the []byte is the chain line
+// from save (with counters etc.).
+// Note that to avoid allocations memory is SHARED with save.
+func GetChainLines(table Table, save []byte) map[Chain][]byte {
+	chainsMap := make(map[Chain][]byte)
+	tablePrefix := []byte("*" + string(table))
 	readIndex := 0
 	// find beginning of table
 	for readIndex < len(save) {
-		line, n := ReadLine(readIndex, save)
+		line, n := readLine(readIndex, save)
 		readIndex = n
-		if strings.HasPrefix(line, tablePrefix) {
+		if bytes.HasPrefix(line, tablePrefix) {
 			break
 		}
 	}
 	// parse table lines
 	for readIndex < len(save) {
-		line, n := ReadLine(readIndex, save)
+		line, n := readLine(readIndex, save)
 		readIndex = n
 		if len(line) == 0 {
 			continue
 		}
-		if strings.HasPrefix(line, "COMMIT") || strings.HasPrefix(line, "*") {
+		if bytes.HasPrefix(line, commitBytes) || line[0] == '*' {
 			break
-		} else if strings.HasPrefix(line, "#") {
+		} else if line[0] == '#' {
 			continue
-		} else if strings.HasPrefix(line, ":") && len(line) > 1 {
+		} else if line[0] == ':' && len(line) > 1 {
 			// We assume that the <line> contains space - chain lines have 3 fields,
 			// space delimited. If there is no space, this line will panic.
-			chain := Chain(line[1:strings.Index(line, " ")])
+			chain := Chain(line[1:bytes.Index(line, spaceBytes)])
 			chainsMap[chain] = line
 		}
 	}
 	return chainsMap
 }
 
-func ReadLine(readIndex int, byteArray []byte) (string, int) {
+func readLine(readIndex int, byteArray []byte) ([]byte, int) {
 	currentReadIndex := readIndex
 
 	// consume left spaces
@@ -89,7 +96,7 @@ func ReadLine(readIndex int, byteArray []byte) (string, int) {
 		} else if (byteArray[currentReadIndex] == '\n') || (currentReadIndex == (len(byteArray) - 1)) {
 			// end of line or byte buffer is reached
 			if currentReadIndex <= leftTrimIndex {
-				return "", currentReadIndex + 1
+				return nil, currentReadIndex + 1
 			}
 			// set the rightTrimIndex
 			if rightTrimIndex == -1 {
@@ -100,11 +107,12 @@ func ReadLine(readIndex int, byteArray []byte) (string, int) {
 					rightTrimIndex = currentReadIndex + 1
 				}
 			}
-			return string(byteArray[leftTrimIndex:rightTrimIndex]), currentReadIndex + 1
+			// Avoid unnecessary allocation.
+			return byteArray[leftTrimIndex:rightTrimIndex], currentReadIndex + 1
 		} else {
 			// unset rightTrimIndex
 			rightTrimIndex = -1
 		}
 	}
-	return "", currentReadIndex
+	return nil, currentReadIndex
 }

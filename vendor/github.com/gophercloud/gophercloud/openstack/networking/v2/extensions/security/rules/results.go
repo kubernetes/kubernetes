@@ -17,6 +17,9 @@ type SecGroupRule struct {
 	// instance. An egress rule is applied to traffic leaving the instance.
 	Direction string
 
+	// Descripton of the rule
+	Description string `json:"description"`
+
 	// Must be IPv4 or IPv6, and addresses represented in CIDR must match the
 	// ingress or egress rules.
 	EtherType string `json:"ethertype"`
@@ -48,8 +51,11 @@ type SecGroupRule struct {
 	// matches the specified IP prefix as the source IP address of the IP packet.
 	RemoteIPPrefix string `json:"remote_ip_prefix"`
 
-	// The owner of this security group rule.
+	// TenantID is the project owner of this security group rule.
 	TenantID string `json:"tenant_id"`
+
+	// ProjectID is the project owner of this security group rule.
+	ProjectID string `json:"project_id"`
 }
 
 // SecGroupRulePage is the page returned by a pager when traversing over a

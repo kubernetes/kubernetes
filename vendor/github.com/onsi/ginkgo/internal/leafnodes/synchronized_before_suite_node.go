@@ -3,12 +3,13 @@ package leafnodes
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/onsi/ginkgo/internal/failer"
-	"github.com/onsi/ginkgo/types"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"time"
+
+	"github.com/onsi/ginkgo/internal/failer"
+	"github.com/onsi/ginkgo/types"
 )
 
 type synchronizedBeforeSuiteNode struct {
@@ -109,8 +110,6 @@ func (node *synchronizedBeforeSuiteNode) waitForA(syncHost string) (types.SpecSt
 
 		time.Sleep(50 * time.Millisecond)
 	}
-
-	return types.SpecStateFailed, failure("Shouldn't get here!")
 }
 
 func (node *synchronizedBeforeSuiteNode) Passed() bool {

@@ -136,29 +136,29 @@ func validatePtr(x reflect.Value, v Constraint) error {
 
 func validateInt(x reflect.Value, v Constraint) error {
 	i := x.Int()
-	r, ok := v.Rule.(int)
+	r, ok := toInt64(v.Rule)
 	if !ok {
 		return createError(x, v, fmt.Sprintf("rule must be integer value for %v constraint; got: %v", v.Name, v.Rule))
 	}
 	switch v.Name {
 	case MultipleOf:
-		if i%int64(r) != 0 {
+		if i%r != 0 {
 			return createError(x, v, fmt.Sprintf("value must be a multiple of %v", r))
 		}
 	case ExclusiveMinimum:
-		if i <= int64(r) {
+		if i <= r {
 			return createError(x, v, fmt.Sprintf("value must be greater than %v", r))
 		}
 	case ExclusiveMaximum:
-		if i >= int64(r) {
+		if i >= r {
 			return createError(x, v, fmt.Sprintf("value must be less than %v", r))
 		}
 	case InclusiveMinimum:
-		if i < int64(r) {
+		if i < r {
 			return createError(x, v, fmt.Sprintf("value must be greater than or equal to %v", r))
 		}
 	case InclusiveMaximum:
-		if i > int64(r) {
+		if i > r {
 			return createError(x, v, fmt.Sprintf("value must be less than or equal to %v", r))
 		}
 	default:
@@ -388,8 +388,21 @@ func createError(x reflect.Value, v Constraint, err string) error {
 		v.Target, v.Name, getInterfaceValue(x), err)
 }
 
+func toInt64(v interface{}) (int64, bool) {
+	if i64, ok := v.(int64); ok {
+		return i64, true
+	}
+	// older generators emit max constants as int, so if int64 fails fall back to int
+	if i32, ok := v.(int); ok {
+		return int64(i32), true
+	}
+	return 0, false
+}
+
 // NewErrorWithValidationError appends package type and method name in
 // validation error.
+//
+// Deprecated: Please use validation.NewError() instead.
 func NewErrorWithValidationError(err error, packageType, method string) error {
-	return fmt.Errorf("%s#%s: Invalid input: %v", packageType, method, err)
+	return NewError(packageType, method, err.Error())
 }

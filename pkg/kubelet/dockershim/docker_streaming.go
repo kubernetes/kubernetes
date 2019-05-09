@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"math"
@@ -26,11 +27,10 @@ import (
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
+	"k8s.io/klog"
 
 	"k8s.io/client-go/tools/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -107,7 +107,7 @@ func (ds *dockerService) ExecSync(_ context.Context, req *runtimeapi.ExecSyncReq
 // Exec prepares a streaming endpoint to execute a command in the container, and returns the address.
 func (ds *dockerService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	if ds.streamingServer == nil {
-		return nil, streaming.ErrorStreamingDisabled("exec")
+		return nil, streaming.NewErrorStreamingDisabled("exec")
 	}
 	_, err := checkContainerStatus(ds.client, req.ContainerId)
 	if err != nil {
@@ -119,7 +119,7 @@ func (ds *dockerService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 func (ds *dockerService) Attach(_ context.Context, req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
 	if ds.streamingServer == nil {
-		return nil, streaming.ErrorStreamingDisabled("attach")
+		return nil, streaming.NewErrorStreamingDisabled("attach")
 	}
 	_, err := checkContainerStatus(ds.client, req.ContainerId)
 	if err != nil {
@@ -131,7 +131,7 @@ func (ds *dockerService) Attach(_ context.Context, req *runtimeapi.AttachRequest
 // PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 func (ds *dockerService) PortForward(_ context.Context, req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	if ds.streamingServer == nil {
-		return nil, streaming.ErrorStreamingDisabled("port forward")
+		return nil, streaming.NewErrorStreamingDisabled("port forward")
 	}
 	_, err := checkContainerStatus(ds.client, req.PodSandboxId)
 	if err != nil {
@@ -199,7 +199,7 @@ func portForward(client libdocker.Interface, podSandboxID string, port int32, st
 	}
 
 	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
-	glog.V(4).Infof("executing port forwarding command: %s", commandString)
+	klog.V(4).Infof("executing port forwarding command: %s", commandString)
 
 	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream

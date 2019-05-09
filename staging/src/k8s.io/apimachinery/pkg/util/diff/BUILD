@@ -10,16 +10,16 @@ go_test(
     name = "go_default_test",
     srcs = ["diff_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/diff",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["diff.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/diff",
     importpath = "k8s.io/apimachinery/pkg/util/diff",
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

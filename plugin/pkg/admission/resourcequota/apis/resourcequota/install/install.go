@@ -19,25 +19,17 @@ limitations under the License.
 package install
 
 import (
-	"k8s.io/apimachinery/pkg/apimachinery/announced"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	resourcequotav1alpha1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1"
+	resourcequotav1beta1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1"
 )
 
 // Install registers the API group and adds types to a scheme
-func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
-	if err := announced.NewGroupMetaFactory(
-		&announced.GroupMetaFactoryArgs{
-			GroupName:                  resourcequotaapi.GroupName,
-			VersionPreferenceOrder:     []string{resourcequotav1alpha1.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: resourcequotaapi.AddToScheme,
-		},
-		announced.VersionToSchemeFunc{
-			resourcequotav1alpha1.SchemeGroupVersion.Version: resourcequotav1alpha1.AddToScheme,
-		},
-	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
-		panic(err)
-	}
+func Install(scheme *runtime.Scheme) {
+	utilruntime.Must(resourcequotaapi.AddToScheme(scheme))
+	utilruntime.Must(resourcequotav1beta1.AddToScheme(scheme))
+	utilruntime.Must(resourcequotav1alpha1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(resourcequotav1beta1.SchemeGroupVersion, resourcequotav1alpha1.SchemeGroupVersion))
 }

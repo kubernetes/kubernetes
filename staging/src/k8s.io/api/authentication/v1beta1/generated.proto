@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ package k8s.io.api.authentication.v1beta1;
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -58,6 +57,14 @@ message TokenReviewSpec {
   // Token is the opaque bearer token.
   // +optional
   optional string token = 1;
+
+  // Audiences is a list of the identifiers that the resource server presented
+  // with the token identifies as. Audience-aware token authenticators will
+  // verify that the token was intended for at least one of the audiences in
+  // this list. If no audiences are provided, the audience will default to the
+  // audience of the Kubernetes apiserver.
+  // +optional
+  repeated string audiences = 2;
 }
 
 // TokenReviewStatus is the result of the token authentication request.
@@ -69,6 +76,18 @@ message TokenReviewStatus {
   // User is the UserInfo associated with the provided token.
   // +optional
   optional UserInfo user = 2;
+
+  // Audiences are audience identifiers chosen by the authenticator that are
+  // compatible with both the TokenReview and token. An identifier is any
+  // identifier in the intersection of the TokenReviewSpec audiences and the
+  // token's audiences. A client of the TokenReview API that sets the
+  // spec.audiences field should validate that a compatible audience identifier
+  // is returned in the status.audiences field to ensure that the TokenReview
+  // server is audience aware. If a TokenReview returns an empty
+  // status.audience field where status.authenticated is "true", the token is
+  // valid against the audience of the Kubernetes API server.
+  // +optional
+  repeated string audiences = 4;
 
   // Error indicates that the token couldn't be checked
   // +optional

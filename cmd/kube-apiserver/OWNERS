@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - caesarxuchao
 - deads2k
@@ -9,6 +11,7 @@ approvers:
 - sttts
 reviewers:
 - lavalamp
+- cheftako
 - smarterclayton
 - wojtek-t
 - deads2k
@@ -19,3 +22,9 @@ reviewers:
 - nikhiljindal
 - ncdc
 - sttts
+- hzxuzhonghu
+- CaoShuFeng
+- yue9944882
+labels:
+- sig/api-machinery
+- area/apiserver

@@ -15,41 +15,86 @@
 package etcdserver
 
 import (
+	"context"
 	"time"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"golang.org/x/net/context"
+	"github.com/coreos/etcd/store"
 )
 
-type v2API interface {
-	Post(ctx context.Context, r *pb.Request) (Response, error)
-	Put(ctx context.Context, r *pb.Request) (Response, error)
-	Delete(ctx context.Context, r *pb.Request) (Response, error)
-	QGet(ctx context.Context, r *pb.Request) (Response, error)
-	Get(ctx context.Context, r *pb.Request) (Response, error)
-	Head(ctx context.Context, r *pb.Request) (Response, error)
+type RequestV2 pb.Request
+
+type RequestV2Handler interface {
+	Post(ctx context.Context, r *RequestV2) (Response, error)
+	Put(ctx context.Context, r *RequestV2) (Response, error)
+	Delete(ctx context.Context, r *RequestV2) (Response, error)
+	QGet(ctx context.Context, r *RequestV2) (Response, error)
+	Get(ctx context.Context, r *RequestV2) (Response, error)
+	Head(ctx context.Context, r *RequestV2) (Response, error)
 }
 
-type v2apiStore struct{ s *EtcdServer }
+type reqV2HandlerEtcdServer struct {
+	reqV2HandlerStore
+	s *EtcdServer
+}
 
-func (a *v2apiStore) Post(ctx context.Context, r *pb.Request) (Response, error) {
+type reqV2HandlerStore struct {
+	store   store.Store
+	applier ApplierV2
+}
+
+func NewStoreRequestV2Handler(s store.Store, applier ApplierV2) RequestV2Handler {
+	return &reqV2HandlerStore{s, applier}
+}
+
+func (a *reqV2HandlerStore) Post(ctx context.Context, r *RequestV2) (Response, error) {
+	return a.applier.Post(r), nil
+}
+
+func (a *reqV2HandlerStore) Put(ctx context.Context, r *RequestV2) (Response, error) {
+	return a.applier.Put(r), nil
+}
+
+func (a *reqV2HandlerStore) Delete(ctx context.Context, r *RequestV2) (Response, error) {
+	return a.applier.Delete(r), nil
+}
+
+func (a *reqV2HandlerStore) QGet(ctx context.Context, r *RequestV2) (Response, error) {
+	return a.applier.QGet(r), nil
+}
+
+func (a *reqV2HandlerStore) Get(ctx context.Context, r *RequestV2) (Response, error) {
+	if r.Wait {
+		wc, err := a.store.Watch(r.Path, r.Recursive, r.Stream, r.Since)
+		return Response{Watcher: wc}, err
+	}
+	ev, err := a.store.Get(r.Path, r.Recursive, r.Sorted)
+	return Response{Event: ev}, err
+}
+
+func (a *reqV2HandlerStore) Head(ctx context.Context, r *RequestV2) (Response, error) {
+	ev, err := a.store.Get(r.Path, r.Recursive, r.Sorted)
+	return Response{Event: ev}, err
+}
+
+func (a *reqV2HandlerEtcdServer) Post(ctx context.Context, r *RequestV2) (Response, error) {
 	return a.processRaftRequest(ctx, r)
 }
 
-func (a *v2apiStore) Put(ctx context.Context, r *pb.Request) (Response, error) {
+func (a *reqV2HandlerEtcdServer) Put(ctx context.Context, r *RequestV2) (Response, error) {
 	return a.processRaftRequest(ctx, r)
 }
 
-func (a *v2apiStore) Delete(ctx context.Context, r *pb.Request) (Response, error) {
+func (a *reqV2HandlerEtcdServer) Delete(ctx context.Context, r *RequestV2) (Response, error) {
 	return a.processRaftRequest(ctx, r)
 }
 
-func (a *v2apiStore) QGet(ctx context.Context, r *pb.Request) (Response, error) {
+func (a *reqV2HandlerEtcdServer) QGet(ctx context.Context, r *RequestV2) (Response, error) {
 	return a.processRaftRequest(ctx, r)
 }
 
-func (a *v2apiStore) processRaftRequest(ctx context.Context, r *pb.Request) (Response, error) {
-	data, err := r.Marshal()
+func (a *reqV2HandlerEtcdServer) processRaftRequest(ctx context.Context, r *RequestV2) (Response, error) {
+	data, err := ((*pb.Request)(r)).Marshal()
 	if err != nil {
 		return Response{}, err
 	}
@@ -63,7 +108,7 @@ func (a *v2apiStore) processRaftRequest(ctx context.Context, r *pb.Request) (Res
 	select {
 	case x := <-ch:
 		resp := x.(Response)
-		return resp, resp.err
+		return resp, resp.Err
 	case <-ctx.Done():
 		proposalsFailed.Inc()
 		a.s.w.Trigger(r.ID, nil) // GC wait
@@ -73,53 +118,48 @@ func (a *v2apiStore) processRaftRequest(ctx context.Context, r *pb.Request) (Res
 	return Response{}, ErrStopped
 }
 
-func (a *v2apiStore) Get(ctx context.Context, r *pb.Request) (Response, error) {
-	if r.Wait {
-		wc, err := a.s.store.Watch(r.Path, r.Recursive, r.Stream, r.Since)
-		if err != nil {
-			return Response{}, err
-		}
-		return Response{Watcher: wc}, nil
+func (s *EtcdServer) Do(ctx context.Context, r pb.Request) (Response, error) {
+	r.ID = s.reqIDGen.Next()
+	h := &reqV2HandlerEtcdServer{
+		reqV2HandlerStore: reqV2HandlerStore{
+			store:   s.store,
+			applier: s.applyV2,
+		},
+		s: s,
 	}
-	ev, err := a.s.store.Get(r.Path, r.Recursive, r.Sorted)
-	if err != nil {
-		return Response{}, err
-	}
-	return Response{Event: ev}, nil
+	rp := &r
+	resp, err := ((*RequestV2)(rp)).Handle(ctx, h)
+	resp.Term, resp.Index = s.Term(), s.Index()
+	return resp, err
 }
 
-func (a *v2apiStore) Head(ctx context.Context, r *pb.Request) (Response, error) {
-	ev, err := a.s.store.Get(r.Path, r.Recursive, r.Sorted)
-	if err != nil {
-		return Response{}, err
-	}
-	return Response{Event: ev}, nil
-}
-
-// Do interprets r and performs an operation on s.store according to r.Method
+// Handle interprets r and performs an operation on s.store according to r.Method
 // and other fields. If r.Method is "POST", "PUT", "DELETE", or a "GET" with
 // Quorum == true, r will be sent through consensus before performing its
 // respective operation. Do will block until an action is performed or there is
 // an error.
-func (s *EtcdServer) Do(ctx context.Context, r pb.Request) (Response, error) {
-	r.ID = s.reqIDGen.Next()
+func (r *RequestV2) Handle(ctx context.Context, v2api RequestV2Handler) (Response, error) {
 	if r.Method == "GET" && r.Quorum {
 		r.Method = "QGET"
 	}
-	v2api := (v2API)(&v2apiStore{s})
 	switch r.Method {
 	case "POST":
-		return v2api.Post(ctx, &r)
+		return v2api.Post(ctx, r)
 	case "PUT":
-		return v2api.Put(ctx, &r)
+		return v2api.Put(ctx, r)
 	case "DELETE":
-		return v2api.Delete(ctx, &r)
+		return v2api.Delete(ctx, r)
 	case "QGET":
-		return v2api.QGet(ctx, &r)
+		return v2api.QGet(ctx, r)
 	case "GET":
-		return v2api.Get(ctx, &r)
+		return v2api.Get(ctx, r)
 	case "HEAD":
-		return v2api.Head(ctx, &r)
+		return v2api.Head(ctx, r)
 	}
 	return Response{}, ErrUnknownMethod
+}
+
+func (r *RequestV2) String() string {
+	rpb := pb.Request(*r)
+	return rpb.String()
 }

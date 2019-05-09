@@ -20,14 +20,27 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/pkg/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
+	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
+	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/util/version"
+	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+)
+
+const (
+	// UpgradeManifestTimeout is timeout of upgrading the static pod manifest
+	UpgradeManifestTimeout = 5 * time.Minute
 )
 
 // StaticPodPathManager is responsible for tracking the directories used in the static pod upgrade transition
@@ -48,6 +61,8 @@ type StaticPodPathManager interface {
 	BackupManifestDir() string
 	// BackupEtcdDir should point to the backup directory used for backuping manifests during the transition
 	BackupEtcdDir() string
+	// CleanupDirs cleans up all temporary directories
+	CleanupDirs() error
 }
 
 // KubeStaticPodPathManager is a real implementation of StaticPodPathManager that is used when upgrading a static pod cluster
@@ -56,34 +71,39 @@ type KubeStaticPodPathManager struct {
 	tempManifestDir   string
 	backupManifestDir string
 	backupEtcdDir     string
+
+	keepManifestDir bool
+	keepEtcdDir     bool
 }
 
 // NewKubeStaticPodPathManager creates a new instance of KubeStaticPodPathManager
-func NewKubeStaticPodPathManager(realDir, tempDir, backupDir, backupEtcdDir string) StaticPodPathManager {
+func NewKubeStaticPodPathManager(realDir, tempDir, backupDir, backupEtcdDir string, keepManifestDir, keepEtcdDir bool) StaticPodPathManager {
 	return &KubeStaticPodPathManager{
 		realManifestDir:   realDir,
 		tempManifestDir:   tempDir,
 		backupManifestDir: backupDir,
 		backupEtcdDir:     backupEtcdDir,
+		keepManifestDir:   keepManifestDir,
+		keepEtcdDir:       keepEtcdDir,
 	}
 }
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
-func NewKubeStaticPodPathManagerUsingTempDirs(realManifestDir string) (StaticPodPathManager, error) {
+func NewKubeStaticPodPathManagerUsingTempDirs(realManifestDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
 	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgraded-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupManifestsDir, err := constants.CreateTempDirForKubeadm("kubeadm-backup-manifests")
+	backupManifestsDir, err := constants.CreateTimestampDirForKubeadm("kubeadm-backup-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupEtcdDir, err := constants.CreateTempDirForKubeadm("kubeadm-backup-etcd")
+	backupEtcdDir, err := constants.CreateTimestampDirForKubeadm("kubeadm-backup-etcd")
 	if err != nil {
 		return nil, err
 	}
 
-	return NewKubeStaticPodPathManager(realManifestDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir), nil
+	return NewKubeStaticPodPathManager(realManifestDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir, saveManifestsDir, saveEtcdDir), nil
 }
 
 // MoveFile should move a file from oldPath to newPath
@@ -126,13 +146,38 @@ func (spm *KubeStaticPodPathManager) BackupEtcdDir() string {
 	return spm.backupEtcdDir
 }
 
-func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, beforePodHash string, recoverManifests map[string]string) error {
+// CleanupDirs cleans up all temporary directories except those the user has requested to keep around
+func (spm *KubeStaticPodPathManager) CleanupDirs() error {
+	var errlist []error
+	if err := os.RemoveAll(spm.TempManifestDir()); err != nil {
+		errlist = append(errlist, err)
+	}
+	if !spm.keepManifestDir {
+		if err := os.RemoveAll(spm.BackupManifestDir()); err != nil {
+			errlist = append(errlist, err)
+		}
+	}
+
+	if !spm.keepEtcdDir {
+		if err := os.RemoveAll(spm.BackupEtcdDir()); err != nil {
+			errlist = append(errlist, err)
+		}
+	}
+
+	return utilerrors.NewAggregate(errlist)
+}
+
+func upgradeComponent(component string, renewCerts bool, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, beforePodHash string, recoverManifests map[string]string) error {
 	// Special treatment is required for etcd case, when rollbackOldManifests should roll back etcd
 	// manifests only for the case when component is Etcd
 	recoverEtcd := false
+	waitForComponentRestart := true
 	if component == constants.Etcd {
 		recoverEtcd = true
 	}
+
+	fmt.Printf("[upgrade/staticpods] Preparing for %q upgrade\n", component)
+
 	// The old manifest is here; in the /etc/kubernetes/manifests/
 	currentManifestPath := pathMgr.RealManifestPath(component)
 	// The new, upgraded manifest will be written here
@@ -143,6 +188,24 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 
 	// Store the backup path in the recover list. If something goes wrong now, this component will be rolled back.
 	recoverManifests[component] = backupManifestPath
+
+	// Skip upgrade if current and new manifests are equal
+	equal, err := staticpod.ManifestFilesAreEqual(currentManifestPath, newManifestPath)
+	if err != nil {
+		return err
+	}
+	if equal {
+		fmt.Printf("[upgrade/staticpods] Current and new manifests of %s are equal, skipping upgrade\n", component)
+		return nil
+	}
+
+	// if certificate renewal should be performed
+	if renewCerts {
+		// renew all the certificates used by the current component
+		if err := renewCertsByComponent(cfg, constants.KubernetesDir, component); err != nil {
+			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to renew certificates for component %q", component), pathMgr, recoverEtcd)
+		}
+	}
 
 	// Move the old manifest into the old-manifests directory
 	if err := pathMgr.MoveFile(currentManifestPath, backupManifestPath); err != nil {
@@ -155,176 +218,258 @@ func upgradeComponent(component string, waiter apiclient.Waiter, pathMgr StaticP
 	}
 
 	fmt.Printf("[upgrade/staticpods] Moved new manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
-	fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
 
-	// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
-	// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
-	// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
-	// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
-	if err := waiter.WaitForStaticPodControlPlaneHashChange(cfg.NodeName, component, beforePodHash); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+	if waitForComponentRestart {
+		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
+		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
+
+		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
+		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
+		// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
+		// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
+		if err := waiter.WaitForStaticPodHashChange(cfg.NodeRegistration.Name, component, beforePodHash); err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
+
+		// Wait for the static pod component to come up and register itself as a mirror pod
+		if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
+			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+		}
+
+		fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
+	} else {
+		fmt.Printf("[upgrade/staticpods] Not waiting for pod-hash change for component %q\n", component)
 	}
 
-	// Wait for the static pod component to come up and register itself as a mirror pod
-	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-	}
-
-	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
 	return nil
 }
 
 // performEtcdStaticPodUpgrade performs upgrade of etcd, it returns bool which indicates fatal error or not and the actual error.
-func performEtcdStaticPodUpgrade(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, recoverManifests map[string]string) (bool, error) {
+func performEtcdStaticPodUpgrade(renewCerts bool, client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
-	if len(cfg.Etcd.Endpoints) != 0 {
-		return false, fmt.Errorf("external etcd detected, won't try to change any etcd state")
+	if cfg.Etcd.External != nil {
+		return false, errors.New("external etcd detected, won't try to change any etcd state")
 	}
-	// Checking health state of etcd before proceeding with the upgrtade
-	etcdCluster := util.LocalEtcdCluster{}
-	etcdStatus, err := etcdCluster.GetEtcdClusterStatus()
+
+	// Checking health state of etcd before proceeding with the upgrade
+	_, err := oldEtcdClient.GetClusterStatus()
 	if err != nil {
-		return true, fmt.Errorf("etcd cluster is not healthy: %v", err)
+		return true, errors.Wrap(err, "etcd cluster is not healthy")
 	}
 
 	// Backing up etcd data store
 	backupEtcdDir := pathMgr.BackupEtcdDir()
-	runningEtcdDir := cfg.Etcd.DataDir
+	runningEtcdDir := cfg.Etcd.Local.DataDir
 	if err := util.CopyDir(runningEtcdDir, backupEtcdDir); err != nil {
-		return true, fmt.Errorf("fail to back up etcd data: %v", err)
+		return true, errors.Wrap(err, "failed to back up etcd data")
 	}
 
 	// Need to check currently used version and version from constants, if differs then upgrade
 	desiredEtcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
 	if err != nil {
-		return true, fmt.Errorf("failed to parse the desired etcd version(%s): %v", desiredEtcdVersion.String(), err)
+		return true, errors.Wrap(err, "failed to retrieve an etcd version for the target Kubernetes version")
 	}
-	currentEtcdVersion, err := version.ParseSemantic(etcdStatus.Version)
+
+	// gets the etcd version of the local/stacked etcd member running on the current machine
+	currentEtcdVersions, err := oldEtcdClient.GetClusterVersions()
 	if err != nil {
-		return true, fmt.Errorf("failed to parse the current etcd version(%s): %v", currentEtcdVersion.String(), err)
+		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
+	}
+	currentEtcdVersionStr, ok := currentEtcdVersions[etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)]
+	if !ok {
+		return true, errors.Wrap(err, "failed to retrieve the current etcd version")
+	}
+
+	currentEtcdVersion, err := version.ParseSemantic(currentEtcdVersionStr)
+	if err != nil {
+		return true, errors.Wrapf(err, "failed to parse the current etcd version(%s)", currentEtcdVersionStr)
 	}
 
 	// Comparing current etcd version with desired to catch the same version or downgrade condition and fail on them.
 	if desiredEtcdVersion.LessThan(currentEtcdVersion) {
-		return false, fmt.Errorf("the desired etcd version for this Kubernetes version %q is %q, but the current etcd version is %q. Won't downgrade etcd, instead just continue", cfg.KubernetesVersion, desiredEtcdVersion.String(), currentEtcdVersion.String())
+		return false, errors.Errorf("the desired etcd version for this Kubernetes version %q is %q, but the current etcd version is %q. Won't downgrade etcd, instead just continue", cfg.KubernetesVersion, desiredEtcdVersion.String(), currentEtcdVersion.String())
 	}
 	// For the case when desired etcd version is the same as current etcd version
 	if strings.Compare(desiredEtcdVersion.String(), currentEtcdVersion.String()) == 0 {
 		return false, nil
 	}
 
-	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeName, constants.Etcd)
+	beforeEtcdPodHash, err := waiter.WaitForStaticPodSingleHash(cfg.NodeRegistration.Name, constants.Etcd)
 	if err != nil {
-		return true, fmt.Errorf("fail to get etcd pod's hash: %v", err)
+		return true, errors.Wrap(err, "failed to get etcd pod's hash")
 	}
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
-	// has occured in any aspects.
-	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg); err != nil {
-		return true, fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
+	// has occurred in any aspects.
+	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
+	retries := 10
+	retryInterval := 15 * time.Second
+
 	// Perform etcd upgrade using common to all control plane components function
-	if err := upgradeComponent(constants.Etcd, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
-		// Since etcd upgrade component failed, the old manifest has been restored
-		// now we need to check the heatlth of etcd cluster if it came back up with old manifest
-		if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
+	if err := upgradeComponent(constants.Etcd, renewCerts, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
+		fmt.Printf("[upgrade/etcd] Failed to upgrade etcd: %v\n", err)
+		// Since upgrade component failed, the old etcd manifest has either been restored or was never touched
+		// Now we need to check the health of etcd cluster if it is up with old manifest
+		fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
+		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
+			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
+
 			// At this point we know that etcd cluster is dead and it is safe to copy backup datastore and to rollback old etcd manifest
-			if err := rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr); err != nil {
+			fmt.Println("[upgrade/etcd] Rolling back etcd data")
+			if err := rollbackEtcdData(cfg, pathMgr); err != nil {
 				// Even copying back datastore failed, no options for recovery left, bailing out
-				return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+				return true, errors.Errorf("fatal error rolling back local etcd cluster datadir: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
 			}
-			// Old datastore has been copied, rolling back old manifests
-			if err := rollbackOldManifests(recoverManifests, err, pathMgr, true); err != nil {
-				// Rolling back to old manifests failed, no options for recovery left, bailing out
-				return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
-			}
-			// Since rollback of the old etcd manifest was successful, checking again the status of etcd cluster
-			if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
+			fmt.Println("[upgrade/etcd] Etcd data rollback successful")
+
+			// Now that we've rolled back the data, let's check if the cluster comes up
+			fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
+			if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
+				fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
 				// Nothing else left to try to recover etcd cluster
-				return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+				return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
 			}
 
-			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, rolled the state back to pre-upgrade state", err)
+			// We've recovered to the previous etcd from this case
 		}
+		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
+
 		// Since etcd cluster came back up with the old manifest
-		return true, fmt.Errorf("fatal error when trying to upgrade the etcd cluster: %v, rolled the state back to pre-upgrade state", err)
+		return true, errors.Wrap(err, "fatal error when trying to upgrade the etcd cluster, rolled the state back to pre-upgrade state")
+	}
+
+	// Initialize the new etcd client if it wasn't pre-initialized
+	if newEtcdClient == nil {
+		etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
+		if err != nil {
+			return true, errors.Wrap(err, "fatal error creating etcd client")
+		}
+		newEtcdClient = etcdClient
 	}
 
 	// Checking health state of etcd after the upgrade
-	if _, err = etcdCluster.GetEtcdClusterStatus(); err != nil {
-		// Despite the fact that upgradeComponent was sucessfull, there is something wrong with etcd cluster
+	fmt.Println("[upgrade/etcd] Waiting for etcd to become available")
+	if _, err = newEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
+		fmt.Printf("[upgrade/etcd] Failed to healthcheck etcd: %v\n", err)
+		// Despite the fact that upgradeComponent was successful, there is something wrong with the etcd cluster
 		// First step is to restore back up of datastore
-		if err := rollbackEtcdData(cfg, fmt.Errorf("etcd cluster is not healthy after upgrade: %v rolling back", err), pathMgr); err != nil {
+		fmt.Println("[upgrade/etcd] Rolling back etcd data")
+		if err := rollbackEtcdData(cfg, pathMgr); err != nil {
 			// Even copying back datastore failed, no options for recovery left, bailing out
-			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
+			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster datadir, the backup of etcd database is stored here:(%s)", backupEtcdDir)
 		}
-		// Old datastore has been copied, rolling back old manifests
-		if err := rollbackOldManifests(recoverManifests, err, pathMgr, true); err != nil {
-			// Rolling back to old manifests failed, no options for recovery left, bailing out
-			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
-		}
-		// Since rollback of the old etcd manifest was successful, checking again the status of etcd cluster
-		if _, err := etcdCluster.GetEtcdClusterStatus(); err != nil {
-			// Nothing else left to try to recover etcd cluster
-			return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, the backup of etcd database is stored here:(%s)", err, backupEtcdDir)
-		}
+		fmt.Println("[upgrade/etcd] Etcd data rollback successful")
 
-		return true, fmt.Errorf("fatal error upgrading local etcd cluster: %v, rolled the state back to pre-upgrade state", err)
+		// Old datastore has been copied, rolling back old manifests
+		fmt.Println("[upgrade/etcd] Rolling back etcd manifest")
+		rollbackOldManifests(recoverManifests, err, pathMgr, true)
+		// rollbackOldManifests() always returns an error -- ignore it and continue
+
+		// Assuming rollback of the old etcd manifest was successful, check the status of etcd cluster again
+		fmt.Println("[upgrade/etcd] Waiting for previous etcd to become available")
+		if _, err := oldEtcdClient.WaitForClusterAvailable(retries, retryInterval); err != nil {
+			fmt.Printf("[upgrade/etcd] Failed to healthcheck previous etcd: %v\n", err)
+			// Nothing else left to try to recover etcd cluster
+			return true, errors.Wrapf(err, "fatal error rolling back local etcd cluster manifest, the backup of etcd database is stored here:(%s)", backupEtcdDir)
+		}
+		fmt.Println("[upgrade/etcd] Etcd was rolled back and is now available")
+
+		// We've successfully rolled back etcd, and now return an error describing that the upgrade failed
+		return true, errors.Wrap(err, "fatal error upgrading local etcd cluster, rolled the state back to pre-upgrade state")
 	}
 
 	return false, nil
 }
 
 // StaticPodControlPlane upgrades a static pod-hosted control plane
-func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) error {
+func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, etcdUpgrade, renewCerts bool, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) error {
 	recoverManifests := map[string]string{}
+	var isExternalEtcd bool
 
-	// etcd upgrade is done prior to other control plane components
-	if etcdUpgrade {
-		// Perform etcd upgrade using common to all control plane components function
-		fatal, err := performEtcdStaticPodUpgrade(waiter, pathMgr, cfg, recoverManifests)
-		if err != nil {
-			if fatal {
-				return err
-			}
-			fmt.Printf("[upgrade/etcd] non fatal issue encountered during upgrade: %v\n", err)
-		}
-	}
-
-	beforePodHashMap, err := waiter.WaitForStaticPodControlPlaneHashes(cfg.NodeName)
+	beforePodHashMap, err := waiter.WaitForStaticPodControlPlaneHashes(cfg.NodeRegistration.Name)
 	if err != nil {
 		return err
 	}
 
-	// Write the updated static Pod manifests into the temporary directory
-	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
-	err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
-	if err != nil {
-		return fmt.Errorf("error creating init static pod manifest files: %v", err)
+	if oldEtcdClient == nil {
+		if cfg.Etcd.External != nil {
+			// External etcd
+			isExternalEtcd = true
+			etcdClient, err := etcdutil.New(
+				cfg.Etcd.External.Endpoints,
+				cfg.Etcd.External.CAFile,
+				cfg.Etcd.External.CertFile,
+				cfg.Etcd.External.KeyFile,
+			)
+			if err != nil {
+				return errors.Wrap(err, "failed to create etcd client for external etcd")
+			}
+			oldEtcdClient = etcdClient
+			// Since etcd is managed externally, the new etcd client will be the same as the old client
+			if newEtcdClient == nil {
+				newEtcdClient = etcdClient
+			}
+		} else {
+			// etcd Static Pod
+			etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
+			if err != nil {
+				return errors.Wrap(err, "failed to create etcd client")
+			}
+			oldEtcdClient = etcdClient
+		}
 	}
 
-	for _, component := range constants.MasterComponents {
-		if err = upgradeComponent(component, waiter, pathMgr, cfg, beforePodHashMap[component], recoverManifests); err != nil {
+	// etcd upgrade is done prior to other control plane components
+	if !isExternalEtcd && etcdUpgrade {
+		// set the TLS upgrade flag for all components
+		fmt.Printf("[upgrade/etcd] Upgrading to TLS for %s\n", constants.Etcd)
+
+		// Perform etcd upgrade using common to all control plane components function
+		fatal, err := performEtcdStaticPodUpgrade(renewCerts, client, waiter, pathMgr, cfg, recoverManifests, oldEtcdClient, newEtcdClient)
+		if err != nil {
+			if fatal {
+				return err
+			}
+			fmt.Printf("[upgrade/etcd] Non fatal issue encountered during upgrade: %v\n", err)
+		}
+	}
+
+	// Write the updated static Pod manifests into the temporary directory
+	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
+	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
+	if err != nil {
+		return errors.Wrap(err, "error creating init static pod manifest files")
+	}
+
+	for _, component := range constants.ControlPlaneComponents {
+		if err = upgradeComponent(component, renewCerts, waiter, pathMgr, cfg, beforePodHashMap[component], recoverManifests); err != nil {
 			return err
+		}
+	}
+
+	if renewCerts {
+		// renew the certificate embedded in the admin.conf file
+		err := renewEmbeddedCertsByName(cfg, constants.KubernetesDir, constants.AdminKubeConfigFileName)
+		if err != nil {
+			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.AdminKubeConfigFileName), pathMgr, false)
 		}
 	}
 
 	// Remove the temporary directories used on a best-effort (don't fail if the calls error out)
 	// The calls are set here by design; we should _not_ use "defer" above as that would remove the directories
 	// even in the "fail and rollback" case, where we want the directories preserved for the user.
-	os.RemoveAll(pathMgr.TempManifestDir())
-	os.RemoveAll(pathMgr.BackupManifestDir())
-	os.RemoveAll(pathMgr.BackupEtcdDir())
-
-	return nil
+	return pathMgr.CleanupDirs()
 }
 
-// rollbackOldManifests rolls back the backuped manifests if something went wrong
+// rollbackOldManifests rolls back the backed-up manifests if something went wrong.
+// It always returns an error to the caller.
 func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr StaticPodPathManager, restoreEtcd bool) error {
 	errs := []error{origErr}
 	for component, backupPath := range oldManifests {
-		// Will restore etcd manifest only if it was explicitely requested by setting restoreEtcd to True
+		// Will restore etcd manifest only if it was explicitly requested by setting restoreEtcd to True
 		if component == constants.Etcd && !restoreEtcd {
 			continue
 		}
@@ -338,20 +483,143 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 		}
 	}
 	// Let the user know there were problems, but we tried to recover
-	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
+	return errors.Wrap(utilerrors.NewAggregate(errs),
+		"couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced")
 }
 
-// rollbackEtcdData rolls back the the content of etcd folder if something went wrong
-func rollbackEtcdData(cfg *kubeadmapi.MasterConfiguration, origErr error, pathMgr StaticPodPathManager) error {
-	errs := []error{origErr}
+// rollbackEtcdData rolls back the content of etcd folder if something went wrong.
+// When the folder contents are successfully rolled back, nil is returned, otherwise an error is returned.
+func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathManager) error {
 	backupEtcdDir := pathMgr.BackupEtcdDir()
-	runningEtcdDir := cfg.Etcd.DataDir
-	err := util.CopyDir(backupEtcdDir, runningEtcdDir)
+	runningEtcdDir := cfg.Etcd.Local.DataDir
 
-	if err != nil {
-		errs = append(errs, err)
+	if err := util.CopyDir(backupEtcdDir, runningEtcdDir); err != nil {
+		// Let the user know there we're problems, but we tried to reçover
+		return errors.Wrapf(err, "couldn't recover etcd database with error, the location of etcd backup: %s ", backupEtcdDir)
 	}
 
-	// Let the user know there we're problems, but we tried to reçover
-	return fmt.Errorf("couldn't recover etcd database with error: %v, the location of etcd backup: %s ", errs, backupEtcdDir)
+	return nil
+}
+
+// renewCertsByComponent takes charge of renewing certificates used by a specific component before
+// the static pod of the component is upgraded
+func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, kubernetesDir, component string) error {
+	// if the cluster is using a local etcd
+	if cfg.Etcd.Local != nil {
+		if component == constants.Etcd || component == constants.KubeAPIServer {
+			// try to load the etcd CA
+			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertEtcdCA.BaseName)
+			if err != nil {
+				return errors.Wrapf(err, "failed to upgrade the %s CA certificate and key", constants.Etcd)
+			}
+			// create a renewer for certificates signed by etcd CA
+			renewer := renewal.NewFileRenewal(caCert, caKey)
+			// then, if upgrading the etcd component, renew all the certificates signed by etcd CA and used
+			// by etcd itself (the etcd-server, the etcd-peer and the etcd-healthcheck-client certificate)
+			if component == constants.Etcd {
+				for _, cert := range []*certsphase.KubeadmCert{
+					&certsphase.KubeadmCertEtcdServer,
+					&certsphase.KubeadmCertEtcdPeer,
+					&certsphase.KubeadmCertEtcdHealthcheck,
+				} {
+					fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
+					if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
+						return errors.Wrapf(err, "failed to renew %s certificates", cert.Name)
+					}
+				}
+			}
+			// if upgrading the apiserver component, renew the certificate signed by etcd CA and used
+			// by the apiserver (the apiserver-etcd-client certificate)
+			if component == constants.KubeAPIServer {
+				cert := certsphase.KubeadmCertEtcdAPIClient
+				fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
+				if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
+					return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
+				}
+			}
+		}
+	}
+	if component == constants.KubeAPIServer {
+		// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
+		// if not, then CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
+		// and used the apis server (the apiserver certificate and the apiserver-kubelet-client certificate)
+		externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
+		if !externalCA {
+			// try to load ca
+			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertRootCA.BaseName)
+			if err != nil {
+				return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.KubeAPIServer)
+			}
+			// create a renewer for certificates signed by CA
+			renewer := renewal.NewFileRenewal(caCert, caKey)
+			// renew the certificates
+			for _, cert := range []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertAPIServer,
+				&certsphase.KubeadmCertKubeletClient,
+			} {
+				fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
+				if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
+					return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
+				}
+			}
+		}
+
+		// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
+		// if not, then Front-Proxy CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
+		// and used the apis server (the front-proxy-client certificate)
+		externalFrontProxyCA, _ := certsphase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
+		if !externalFrontProxyCA {
+			// try to load front-proxy-ca
+			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertFrontProxyCA.BaseName)
+			if err != nil {
+				return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.KubeAPIServer)
+			}
+			// create a renewer for certificates signed by Front-Proxy CA
+			renewer := renewal.NewFileRenewal(caCert, caKey)
+			// renew the certificates
+			cert := certsphase.KubeadmCertFrontProxyClient
+			fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
+			if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
+				return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
+			}
+		}
+	}
+	if component == constants.KubeControllerManager {
+		// renew the certificate embedded in the controller-manager.conf file
+		err := renewEmbeddedCertsByName(cfg, kubernetesDir, constants.ControllerManagerKubeConfigFileName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.ControllerManagerKubeConfigFileName)
+		}
+	}
+	if component == constants.KubeScheduler {
+		// renew the certificate embedded in the scheduler.conf file
+		err := renewEmbeddedCertsByName(cfg, kubernetesDir, constants.SchedulerKubeConfigFileName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.SchedulerKubeConfigFileName)
+		}
+	}
+	return nil
+}
+
+func renewEmbeddedCertsByName(cfg *kubeadmapi.InitConfiguration, kubernetesDir, kubeConfigFile string) error {
+	// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
+	// if not, then CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
+	// and used by the apis server (the apiserver certificate and the apiserver-kubelet-client certificate)
+	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
+	if !externalCA {
+		// try to load ca
+		caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertRootCA.BaseName)
+		if err != nil {
+			return errors.Wrapf(err, "failed to upgrade the %s certificates", kubeConfigFile)
+		}
+		// create a renewer for certificates signed by CA
+		renewer := renewal.NewFileRenewal(caCert, caKey)
+		// renew the certificate embedded in the controller-manager.conf file
+		fmt.Printf("[upgrade/staticpods] Renewing certificate embedded in %q \n", kubeConfigFile)
+		if err := renewal.RenewEmbeddedClientCert(kubernetesDir, kubeConfigFile, renewer); err != nil {
+			return errors.Wrapf(err, "failed to renew certificate embedded in %s", kubeConfigFile)
+		}
+	}
+
+	return nil
 }

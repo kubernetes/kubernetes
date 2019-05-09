@@ -17,6 +17,7 @@ limitations under the License.
 package simulator
 
 import (
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,11 +28,21 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+var (
+	hostPortUnique = os.Getenv("VCSIM_HOST_PORT_UNIQUE") == "true"
+)
+
 type HostSystem struct {
 	mo.HostSystem
 }
 
 func NewHostSystem(host mo.HostSystem) *HostSystem {
+	if hostPortUnique { // configure unique port for each host
+		port := &esx.HostSystem.Summary.Config.Port
+		*port++
+		host.Summary.Config.Port = *port
+	}
+
 	now := time.Now()
 
 	hs := &HostSystem{
@@ -71,6 +82,32 @@ func NewHostSystem(host mo.HostSystem) *HostSystem {
 	return hs
 }
 
+func (h *HostSystem) event() types.HostEvent {
+	return types.HostEvent{
+		Event: types.Event{
+			Datacenter:      datacenterEventArgument(h),
+			ComputeResource: h.eventArgumentParent(),
+			Host:            h.eventArgument(),
+		},
+	}
+}
+
+func (h *HostSystem) eventArgument() *types.HostEventArgument {
+	return &types.HostEventArgument{
+		Host:                h.Self,
+		EntityEventArgument: types.EntityEventArgument{Name: h.Name},
+	}
+}
+
+func (h *HostSystem) eventArgumentParent() *types.ComputeResourceEventArgument {
+	parent := hostParent(&h.HostSystem)
+
+	return &types.ComputeResourceEventArgument{
+		ComputeResource:     parent.Self,
+		EntityEventArgument: types.EntityEventArgument{Name: parent.Name},
+	}
+}
+
 func hostParent(host *mo.HostSystem) *mo.ComputeResource {
 	switch parent := Map.Get(*host.Parent).(type) {
 	case *mo.ComputeResource:
@@ -97,9 +134,7 @@ func addComputeResource(s *types.ComputeResourceSummary, h *HostSystem) {
 // CreateDefaultESX creates a standalone ESX
 // Adds objects of type: Datacenter, Network, ComputeResource, ResourcePool and HostSystem
 func CreateDefaultESX(f *Folder) {
-	dc := &esx.Datacenter
-	f.putChild(dc)
-	createDatacenterFolders(dc, false)
+	dc := NewDatacenter(f)
 
 	host := NewHostSystem(esx.HostSystem)
 
@@ -107,6 +142,7 @@ func CreateDefaultESX(f *Folder) {
 	addComputeResource(summary, host)
 
 	cr := &mo.ComputeResource{Summary: summary}
+	cr.EnvironmentBrowser = newEnvironmentBrowser()
 	cr.Self = *host.Parent
 	cr.Name = host.Name
 	cr.Host = append(cr.Host, host.Reference())
@@ -137,9 +173,16 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 	summary := new(types.ComputeResourceSummary)
 	addComputeResource(summary, host)
 
-	cr := &mo.ComputeResource{Summary: summary}
+	cr := &mo.ComputeResource{
+		ConfigurationEx: &types.ComputeResourceConfigInfo{
+			VmSwapPlacement: string(types.VirtualMachineConfigInfoSwapPlacementTypeVmDirectory),
+		},
+		Summary:            summary,
+		EnvironmentBrowser: newEnvironmentBrowser(),
+	}
 
 	Map.PutEntity(cr, Map.NewEntity(host))
+	host.Summary.Host = &host.Self
 
 	Map.PutEntity(cr, Map.NewEntity(pool))
 
@@ -151,6 +194,27 @@ func CreateStandaloneHost(f *Folder, spec types.HostConnectSpec) (*HostSystem, t
 	pool.Owner = cr.Self
 
 	return host, nil
+}
+
+func (h *HostSystem) DestroyTask(ctx *Context, req *types.Destroy_Task) soap.HasFault {
+	task := CreateTask(h, "destroy", func(t *Task) (types.AnyType, types.BaseMethodFault) {
+		if len(h.Vm) > 0 {
+			return nil, &types.ResourceInUse{}
+		}
+
+		ctx.postEvent(&types.HostRemovedEvent{HostEvent: h.event()})
+
+		f := Map.getEntityParent(h, "Folder").(*Folder)
+		f.removeChild(h.Reference())
+
+		return nil, nil
+	})
+
+	return &methods.Destroy_TaskBody{
+		Res: &types.Destroy_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
 }
 
 func (h *HostSystem) EnterMaintenanceModeTask(spec *types.EnterMaintenanceMode_Task) soap.HasFault {

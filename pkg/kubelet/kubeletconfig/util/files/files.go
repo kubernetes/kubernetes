@@ -24,7 +24,10 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
-const defaultPerm = 0666
+const (
+	defaultPerm = 0755
+	tmptag      = "tmp_" // additional prefix to prevent accidental collisions
+)
 
 // FileExists returns true if a regular file exists at `path`, false if `path` does not exist, otherwise an error
 func FileExists(fs utilfs.Filesystem, path string) (bool, error) {
@@ -64,9 +67,10 @@ func EnsureFile(fs utilfs.Filesystem, path string) error {
 }
 
 // WriteTmpFile creates a temporary file at `path`, writes `data` into it, and fsyncs the file
+// Expects the parent directory to exist.
 func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath string, retErr error) {
 	dir := filepath.Dir(path)
-	prefix := filepath.Base(path)
+	prefix := tmptag + filepath.Base(path)
 
 	// create the tmp file
 	tmpFile, err := fs.TempFile(dir, prefix)
@@ -81,7 +85,7 @@ func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath strin
 		// if there was an error writing, syncing, or closing, delete the temporary file and return the error
 		if retErr != nil {
 			if err := fs.Remove(tmpPath); err != nil {
-				retErr = fmt.Errorf("attempted to remove temporary file %q after error %v, but failed due to error: %v", path, retErr, err)
+				retErr = fmt.Errorf("attempted to remove temporary file %q after error %v, but failed due to error: %v", tmpPath, retErr, err)
 			}
 			tmpPath = ""
 		}
@@ -100,7 +104,8 @@ func WriteTmpFile(fs utilfs.Filesystem, path string, data []byte) (tmpPath strin
 }
 
 // ReplaceFile replaces the contents of the file at `path` with `data` by writing to a tmp file in the same
-// dir as `path` and renaming the tmp file over `path`. The file does not have to exist to use ReplaceFile.
+// dir as `path` and renaming the tmp file over `path`. The file does not have to exist to use ReplaceFile,
+// but the parent directory must exist.
 // Note ReplaceFile calls fsync.
 func ReplaceFile(fs utilfs.Filesystem, path string, data []byte) error {
 	// write data to a temporary file
@@ -118,7 +123,7 @@ func DirExists(fs utilfs.Filesystem, path string) (bool, error) {
 		if info.IsDir() {
 			return true, nil
 		}
-		return false, fmt.Errorf("expected dir at %q, but mode is is %q", path, info.Mode().String())
+		return false, fmt.Errorf("expected dir at %q, but mode is %q", path, info.Mode().String())
 	} else if os.IsNotExist(err) {
 		return false, nil
 	} else {
@@ -136,4 +141,89 @@ func EnsureDir(fs utilfs.Filesystem, path string) error {
 
 	// create the dir
 	return fs.MkdirAll(path, defaultPerm)
+}
+
+// WriteTempDir creates a temporary dir at `path`, writes `files` into it, and fsyncs all the files
+// The keys of `files` represent file names. These names must not:
+// - be empty
+// - be a path that contains more than the base name of a file (e.g. foo/bar is invalid, as is /bar)
+// - match `.` or `..` exactly
+// - be longer than 255 characters
+// The above validation rules are based on atomic_writer.go, though in this case are more restrictive
+// because we only allow a flat hierarchy.
+func WriteTempDir(fs utilfs.Filesystem, path string, files map[string]string) (tmpPath string, retErr error) {
+	// validate the filename keys; for now we only allow a flat keyset
+	for name := range files {
+		// invalidate empty names
+		if name == "" {
+			return "", fmt.Errorf("invalid file key: must not be empty: %q", name)
+		}
+		// invalidate: foo/bar and /bar
+		if name != filepath.Base(name) {
+			return "", fmt.Errorf("invalid file key %q, only base names are allowed", name)
+		}
+		// invalidate `.` and `..`
+		if name == "." || name == ".." {
+			return "", fmt.Errorf("invalid file key, may not be '.' or '..'")
+		}
+		// invalidate length > 255 characters
+		if len(name) > 255 {
+			return "", fmt.Errorf("invalid file key %q, must be less than 255 characters", name)
+		}
+	}
+
+	// write the temp directory in parent dir and return path to the tmp directory
+	dir := filepath.Dir(path)
+	prefix := tmptag + filepath.Base(path)
+
+	// create the tmp dir
+	var err error
+	tmpPath, err = fs.TempDir(dir, prefix)
+	if err != nil {
+		return "", err
+	}
+	// be sure to clean up if there was an error
+	defer func() {
+		if retErr != nil {
+			if err := fs.RemoveAll(tmpPath); err != nil {
+				retErr = fmt.Errorf("attempted to remove temporary directory %q after error %v, but failed due to error: %v", tmpPath, retErr, err)
+			}
+		}
+	}()
+	// write data
+	for name, data := range files {
+		// create the file
+		file, err := fs.Create(filepath.Join(tmpPath, name))
+		if err != nil {
+			return tmpPath, err
+		}
+		// be sure to close the file when we're done
+		defer func() {
+			// close the file when we're done, don't overwrite primary retErr if close fails
+			if err := file.Close(); retErr == nil {
+				retErr = err
+			}
+		}()
+		// write the file
+		if _, err := file.Write([]byte(data)); err != nil {
+			return tmpPath, err
+		}
+		// sync the file, to ensure it's written in case a hard reset happens
+		if err := file.Sync(); err != nil {
+			return tmpPath, err
+		}
+	}
+	return tmpPath, nil
+}
+
+// ReplaceDir replaces the contents of the dir at `path` with `files` by writing to a tmp dir in the same
+// dir as `path` and renaming the tmp dir over `path`. The dir does not have to exist to use ReplaceDir.
+func ReplaceDir(fs utilfs.Filesystem, path string, files map[string]string) error {
+	// write data to a temporary directory
+	tmpPath, err := WriteTempDir(fs, path, files)
+	if err != nil {
+		return err
+	}
+	// rename over target directory
+	return fs.Rename(tmpPath, path)
 }

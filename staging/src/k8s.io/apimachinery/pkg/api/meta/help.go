@@ -17,30 +17,76 @@ limitations under the License.
 package meta
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// IsListType returns true if the provided Object has a slice called Items
+var (
+	// isListCache maintains a cache of types that are checked for lists
+	// which is used by IsListType.
+	// TODO: remove and replace with an interface check
+	isListCache = struct {
+		lock   sync.RWMutex
+		byType map[reflect.Type]bool
+	}{
+		byType: make(map[reflect.Type]bool, 1024),
+	}
+)
+
+// IsListType returns true if the provided Object has a slice called Items.
+// TODO: Replace the code in this check with an interface comparison by
+//   creating and enforcing that lists implement a list accessor.
 func IsListType(obj runtime.Object) bool {
-	// if we're a runtime.Unstructured, check whether this is a list.
-	// TODO: refactor GetItemsPtr to use an interface that returns []runtime.Object
-	if unstructured, ok := obj.(runtime.Unstructured); ok {
-		return unstructured.IsList()
+	switch t := obj.(type) {
+	case runtime.Unstructured:
+		return t.IsList()
+	}
+	t := reflect.TypeOf(obj)
+
+	isListCache.lock.RLock()
+	ok, exists := isListCache.byType[t]
+	isListCache.lock.RUnlock()
+
+	if !exists {
+		_, err := getItemsPtr(obj)
+		ok = err == nil
+
+		// cache only the first 1024 types
+		isListCache.lock.Lock()
+		if len(isListCache.byType) < 1024 {
+			isListCache.byType[t] = ok
+		}
+		isListCache.lock.Unlock()
 	}
 
-	_, err := GetItemsPtr(obj)
-	return err == nil
+	return ok
 }
+
+var (
+	errExpectFieldItems = errors.New("no Items field in this object")
+	errExpectSliceItems = errors.New("Items field must be a slice of objects")
+)
 
 // GetItemsPtr returns a pointer to the list object's Items member.
 // If 'list' doesn't have an Items member, it's not really a list type
 // and an error will be returned.
 // This function will either return a pointer to a slice, or an error, but not both.
+// TODO: this will be replaced with an interface in the future
 func GetItemsPtr(list runtime.Object) (interface{}, error) {
+	obj, err := getItemsPtr(list)
+	if err != nil {
+		return nil, fmt.Errorf("%T is not a list: %v", list, err)
+	}
+	return obj, nil
+}
+
+// getItemsPtr returns a pointer to the list object's Items member or an error.
+func getItemsPtr(list runtime.Object) (interface{}, error) {
 	v, err := conversion.EnforcePtr(list)
 	if err != nil {
 		return nil, err
@@ -48,19 +94,19 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 
 	items := v.FieldByName("Items")
 	if !items.IsValid() {
-		return nil, fmt.Errorf("no Items field in %#v", list)
+		return nil, errExpectFieldItems
 	}
 	switch items.Kind() {
 	case reflect.Interface, reflect.Ptr:
 		target := reflect.TypeOf(items.Interface()).Elem()
 		if target.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("items: Expected slice, got %s", target.Kind())
+			return nil, errExpectSliceItems
 		}
 		return items.Interface(), nil
 	case reflect.Slice:
 		return items.Addr().Interface(), nil
 	default:
-		return nil, fmt.Errorf("items: Expected slice, got %s", items.Kind())
+		return nil, errExpectSliceItems
 	}
 }
 
@@ -157,6 +203,19 @@ func ExtractList(obj runtime.Object) ([]runtime.Object, error) {
 
 // objectSliceType is the type of a slice of Objects
 var objectSliceType = reflect.TypeOf([]runtime.Object{})
+
+// LenList returns the length of this list or 0 if it is not a list.
+func LenList(list runtime.Object) int {
+	itemsPtr, err := GetItemsPtr(list)
+	if err != nil {
+		return 0
+	}
+	items, err := conversion.EnforcePtr(itemsPtr)
+	if err != nil {
+		return 0
+	}
+	return items.Len()
+}
 
 // SetList sets the given list object's Items member have the elements given in
 // objects.

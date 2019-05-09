@@ -20,6 +20,7 @@ import (
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -34,5 +35,32 @@ func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
 	if obj.NamespaceSelector == nil {
 		selector := metav1.LabelSelector{}
 		obj.NamespaceSelector = &selector
+	}
+	if obj.SideEffects == nil {
+		// TODO: revisit/remove this default and possibly make the field required when promoting to v1
+		unknown := admissionregistrationv1beta1.SideEffectClassUnknown
+		obj.SideEffects = &unknown
+	}
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = new(int32)
+		*obj.TimeoutSeconds = 30
+	}
+
+	if len(obj.AdmissionReviewVersions) == 0 {
+		obj.AdmissionReviewVersions = []string{admissionregistrationv1beta1.SchemeGroupVersion.Version}
+	}
+}
+
+func SetDefaults_Rule(obj *admissionregistrationv1beta1.Rule) {
+	if obj.Scope == nil {
+		s := admissionregistrationv1beta1.AllScopes
+		obj.Scope = &s
+	}
+}
+
+// SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
+func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
+	if obj.Port == nil {
+		obj.Port = utilpointer.Int32Ptr(443)
 	}
 }

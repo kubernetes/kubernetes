@@ -224,7 +224,7 @@ func (l *Lease) Upload(ctx context.Context, item FileItem, f io.Reader, opts soa
 		opts.Type = "application/x-vnd.vmware-streamVmdk"
 	}
 
-	return l.c.Upload(f, item.URL, &opts)
+	return l.c.Upload(ctx, f, item.URL, &opts)
 }
 
 func (l *Lease) DownloadFile(ctx context.Context, file string, item FileItem, opts soap.Download) error {
@@ -234,5 +234,5 @@ func (l *Lease) DownloadFile(ctx context.Context, file string, item FileItem, op
 		opts.Progress = progress.Tee(item, opts.Progress)
 	}
 
-	return l.c.DownloadFile(file, item.URL, &opts)
+	return l.c.DownloadFile(ctx, file, item.URL, &opts)
 }

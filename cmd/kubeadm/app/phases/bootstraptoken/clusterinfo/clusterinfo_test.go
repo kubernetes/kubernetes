@@ -95,19 +95,21 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 		}
 
 		for _, tc := range tests {
-			client := clientsetfake.NewSimpleClientset()
-			if tc.createErr != nil {
-				client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
-					return true, nil, tc.createErr
-				})
-			}
+			t.Run(tc.name, func(t *testing.T) {
+				client := clientsetfake.NewSimpleClientset()
+				if tc.createErr != nil {
+					client.PrependReactor("create", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+						return true, nil, tc.createErr
+					})
+				}
 
-			err := CreateBootstrapConfigMapIfNotExists(client, file.Name())
-			if tc.expectErr && err == nil {
-				t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
-			} else if !tc.expectErr && err != nil {
-				t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
-			}
+				err := CreateBootstrapConfigMapIfNotExists(client, file.Name())
+				if tc.expectErr && err == nil {
+					t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
+				} else if !tc.expectErr && err != nil {
+					t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) returned unexpected error: %v", tc.name, err)
+				}
+			})
 		}
 	}
 }

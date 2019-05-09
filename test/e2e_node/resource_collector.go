@@ -86,9 +86,9 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 // then repeatedly runs collectStats.
 func (r *ResourceCollector) Start() {
 	// Get the cgroup container names for kubelet and runtime
-	kubeletContainer, err := getContainerNameForProcess(kubeletProcessName, "")
-	runtimeContainer, err := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
-	if err == nil {
+	kubeletContainer, err1 := getContainerNameForProcess(kubeletProcessName, "")
+	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
+	if err1 == nil && err2 == nil {
 		systemContainers = map[string]string{
 			stats.SystemContainerKubelet: kubeletContainer,
 			stats.SystemContainerRuntime: runtimeContainer,
@@ -165,9 +165,6 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 		newStats := cStats.Stats[0]
 
 		if oldStats, ok := oldStatsMap[name]; ok && oldStats.Timestamp.Before(newStats.Timestamp) {
-			if oldStats.Timestamp.Equal(newStats.Timestamp) {
-				continue
-			}
 			r.buffers[name] = append(r.buffers[name], computeContainerResourceUsage(name, oldStats, newStats))
 		}
 		oldStatsMap[name] = newStats
@@ -220,9 +217,7 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 
 	// We must make a copy of array, otherwise the timeseries order is changed.
 	usages := make([]*framework.ContainerResourceUsage, 0)
-	for _, usage := range r.buffers[containerName] {
-		usages = append(usages, usage)
-	}
+	usages = append(usages, r.buffers[containerName]...)
 
 	sort.Sort(resourceUsageByCPU(usages))
 	for _, q := range percentiles {

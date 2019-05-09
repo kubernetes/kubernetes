@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "etcdtest.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd/etcdtest",
     importpath = "k8s.io/apiserver/pkg/storage/etcd/etcdtest",
 )
 

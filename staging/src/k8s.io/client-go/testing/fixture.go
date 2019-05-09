@@ -20,19 +20,18 @@ import (
 	"fmt"
 	"sync"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 )
-
-// FakeWatchBufferSize is the max num of watch event can be buffered in the
-// watch channel. Note that when watch event overflows or exceed this buffer
-// size, manipulations via fake client may be blocked.
-const FakeWatchBufferSize = 128
 
 // ObjectTracker keeps track of objects. It is intended to be used to
 // fake calls to a server by returning objects based on their kind,
@@ -77,7 +76,6 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
 		ns := action.GetNamespace()
 		gvr := action.GetResource()
-
 		// Here and below we need to switch on implementation types,
 		// not on interfaces, as some interfaces are identical
 		// (e.g. UpdateAction and CreateAction), so if we use them,
@@ -130,6 +128,57 @@ func ObjectReaction(tracker ObjectTracker) ReactionFunc {
 			}
 			return true, nil, nil
 
+		case PatchActionImpl:
+			obj, err := tracker.Get(gvr, ns, action.GetName())
+			if err != nil {
+				return true, nil, err
+			}
+
+			old, err := json.Marshal(obj)
+			if err != nil {
+				return true, nil, err
+			}
+
+			switch action.GetPatchType() {
+			case types.JSONPatchType:
+				patch, err := jsonpatch.DecodePatch(action.GetPatch())
+				if err != nil {
+					return true, nil, err
+				}
+				modified, err := patch.Apply(old)
+				if err != nil {
+					return true, nil, err
+				}
+				if err = json.Unmarshal(modified, obj); err != nil {
+					return true, nil, err
+				}
+			case types.MergePatchType:
+				modified, err := jsonpatch.MergePatch(old, action.GetPatch())
+				if err != nil {
+					return true, nil, err
+				}
+
+				if err := json.Unmarshal(modified, obj); err != nil {
+					return true, nil, err
+				}
+			case types.StrategicMergePatchType:
+				mergedByte, err := strategicpatch.StrategicMergePatch(old, action.GetPatch(), obj)
+				if err != nil {
+					return true, nil, err
+				}
+				if err = json.Unmarshal(mergedByte, obj); err != nil {
+					return true, nil, err
+				}
+			default:
+				return true, nil, fmt.Errorf("PatchType is not supported")
+			}
+
+			if err = tracker.Update(gvr, obj, ns); err != nil {
+				return true, nil, err
+			}
+
+			return true, obj, nil
+
 		default:
 			return false, nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
@@ -142,12 +191,11 @@ type tracker struct {
 	lock    sync.RWMutex
 	objects map[schema.GroupVersionResource][]runtime.Object
 	// The value type of watchers is a map of which the key is either a namespace or
-	// all/non namespace aka "" and its value is list of fake watchers. Each of
-	// fake watcher holds a buffered channel of size "FakeWatchBufferSize" which
-	// is default to 128. Manipulations on resources will broadcast the notification
-	// events into the watchers' channel and note that too many unhandled event may
-	// potentially block the tracker.
-	watchers map[schema.GroupVersionResource]map[string][]*watch.FakeWatcher
+	// all/non namespace aka "" and its value is list of fake watchers.
+	// Manipulations on resources will broadcast the notification events into the
+	// watchers' channel. Note that too many unhandled events (currently 100,
+	// see apimachinery/pkg/watch.DefaultChanSize) will cause a panic.
+	watchers map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher
 }
 
 var _ ObjectTracker = &tracker{}
@@ -159,7 +207,7 @@ func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracke
 		scheme:   scheme,
 		decoder:  decoder,
 		objects:  make(map[schema.GroupVersionResource][]runtime.Object),
-		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.FakeWatcher),
+		watchers: make(map[schema.GroupVersionResource]map[string][]*watch.RaceFreeFakeWatcher),
 	}
 }
 
@@ -206,10 +254,10 @@ func (t *tracker) Watch(gvr schema.GroupVersionResource, ns string) (watch.Inter
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	fakewatcher := watch.NewFakeWithChanSize(FakeWatchBufferSize, true)
+	fakewatcher := watch.NewRaceFreeFake()
 
 	if _, exists := t.watchers[gvr]; !exists {
-		t.watchers[gvr] = make(map[string][]*watch.FakeWatcher)
+		t.watchers[gvr] = make(map[string][]*watch.RaceFreeFakeWatcher)
 	}
 	t.watchers[gvr][ns] = append(t.watchers[gvr][ns], fakewatcher)
 	return fakewatcher, nil
@@ -293,14 +341,16 @@ func (t *tracker) Update(gvr schema.GroupVersionResource, obj runtime.Object, ns
 	return t.add(gvr, obj, ns, true)
 }
 
-func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watch.FakeWatcher {
-	watches := []*watch.FakeWatcher{}
+func (t *tracker) getWatches(gvr schema.GroupVersionResource, ns string) []*watch.RaceFreeFakeWatcher {
+	watches := []*watch.RaceFreeFakeWatcher{}
 	if t.watchers[gvr] != nil {
 		if w := t.watchers[gvr][ns]; w != nil {
 			watches = append(watches, w...)
 		}
-		if w := t.watchers[gvr][""]; w != nil {
-			watches = append(watches, w...)
+		if ns != metav1.NamespaceAll {
+			if w := t.watchers[gvr][metav1.NamespaceAll]; w != nil {
+				watches = append(watches, w...)
+			}
 		}
 	}
 	return watches

@@ -21,17 +21,31 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// NOTE(claudiub): These constants should NOT be used as Pod Container Images.
 const (
 	NginxImageName = "nginx"
 	RedisImageName = "redis"
 )
 
 var (
+	// CronJobGroupVersionResourceAlpha unambiguously identifies a resource of cronjob with alpha status
 	CronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
-	CronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
-	NautilusImage                    = imageutils.GetE2EImage(imageutils.Nautilus)
-	KittenImage                      = imageutils.GetE2EImage(imageutils.Kitten)
-	NginxImage                       = imageutils.GetE2EImage(imageutils.NginxSlim)
-	NewNginxImage                    = imageutils.GetE2EImage(imageutils.NginxSlimNew)
-	RedisImage                       = imageutils.GetE2EImage(imageutils.Redis)
+
+	// CronJobGroupVersionResourceBeta unambiguously identifies a resource of cronjob with beta status
+	CronJobGroupVersionResourceBeta = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
+
+	// NautilusImage is the fully qualified URI to the Nautilus image
+	NautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
+
+	// KittenImage is the fully qualified URI to the Kitten image
+	KittenImage = imageutils.GetE2EImage(imageutils.Kitten)
+
+	// NginxImage is the fully qualified URI to the Nginx image
+	NginxImage = imageutils.GetE2EImage(imageutils.Nginx)
+
+	// NewNginxImage is the fully qualified URI to the NginxNew image
+	NewNginxImage = imageutils.GetE2EImage(imageutils.NginxNew)
+
+	// RedisImage is the fully qualified URI to the Redis image
+	RedisImage = imageutils.GetE2EImage(imageutils.Redis)
 )

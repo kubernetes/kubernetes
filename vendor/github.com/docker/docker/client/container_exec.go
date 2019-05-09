@@ -1,10 +1,10 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
-	"golang.org/x/net/context"
 )
 
 // ContainerExecCreate creates a new exec configuration to run an exec process.
@@ -16,11 +16,11 @@ func (cli *Client) ContainerExecCreate(ctx context.Context, container string, co
 	}
 
 	resp, err := cli.post(ctx, "/containers/"+container+"/exec", nil, config, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 	err = json.NewDecoder(resp.body).Decode(&response)
-	ensureReaderClosed(resp)
 	return response, err
 }
 
@@ -35,7 +35,7 @@ func (cli *Client) ContainerExecStart(ctx context.Context, execID string, config
 // It returns a types.HijackedConnection with the hijacked connection
 // and the a reader to get output. It's up to the called to close
 // the hijacked connection by calling types.HijackedResponse.Close.
-func (cli *Client) ContainerExecAttach(ctx context.Context, execID string, config types.ExecConfig) (types.HijackedResponse, error) {
+func (cli *Client) ContainerExecAttach(ctx context.Context, execID string, config types.ExecStartCheck) (types.HijackedResponse, error) {
 	headers := map[string][]string{"Content-Type": {"application/json"}}
 	return cli.postHijacked(ctx, "/exec/"+execID+"/start", nil, config, headers)
 }

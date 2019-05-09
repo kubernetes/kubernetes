@@ -4,6 +4,7 @@ load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
 )
+load("//build:bindata.bzl", "go_bindata")
 
 go_library(
     name = "go_default_library",
@@ -14,29 +15,21 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/generated",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
-genrule(
+# IMPORTANT: if you make any changes here, you must also update hack/generate-bindata.sh.
+go_bindata(
     name = "bindata",
     srcs = [
-        "//examples:all-srcs",
-        "//test/images:all-srcs",
-        "//test/fixtures:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
+        "//test/fixtures:all-srcs",
+        "//test/images:all-srcs",
     ],
     outs = ["bindata.go"],
-    cmd = """
-$(location //vendor/github.com/jteeuwen/go-bindata/go-bindata:go-bindata) \
-  -nometadata -o "$(OUTS)" -pkg generated \
-  -prefix $$(pwd) \
-  -ignore .jpg -ignore .png -ignore .md \
-  $(SRCS)
-""",
-    tools = [
-        "//vendor/github.com/jteeuwen/go-bindata/go-bindata",
-    ],
+    compress = True,
+    include_metadata = False,
 )
 
 filegroup(

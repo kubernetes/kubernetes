@@ -21,12 +21,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/test/utils/harness"
 )
 
-func TestTearDownAt(t *testing.T) {
+func TestTearDownAt(tt *testing.T) {
+	t := harness.For(tt)
+	defer t.Close()
+
 	mounter := &mount.FakeMounter{}
 
-	plugin, rootDir := testPlugin()
+	plugin, rootDir := testPlugin(t)
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), unmountCmd,
 			rootDir+"/mount-dir"),

@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["httpstream_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/httpstream",
 )
 
 go_library(
@@ -19,6 +18,7 @@ go_library(
         "doc.go",
         "httpstream.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/httpstream",
     importpath = "k8s.io/apimachinery/pkg/util/httpstream",
 )
 

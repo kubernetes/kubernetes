@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2018 The Kubernetes Authors.
 #
@@ -21,34 +21,40 @@ set -o xtrace
 
 retry() {
   for i in {1..5}; do
-    "$@" && return 0 || sleep $i
+    if "$@"
+    then      
+      return 0
+    else
+      sleep "${i}"
+    fi
   done
   "$@"
 }
 
-# Runs benchmark integration tests, producing JUnit-style XML test
-# reports in ${WORKSPACE}/artifacts. This script is intended to be run from
+# Runs benchmark integration tests, producing pretty-printed results
+# in ${WORKSPACE}/artifacts. This script can also be run within a
 # kubekins-test container with a kubernetes repo mounted (at the path
-# /go/src/k8s.io/kubernetes). See k8s.io/test-infra/scenarios/kubernetes_verify.py.
+# /go/src/k8s.io/kubernetes).
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/jstemmer/go-junit-report
-retry go get github.com/cespare/prettybench
+go install k8s.io/kubernetes/vendor/github.com/cespare/prettybench
+go install k8s.io/kubernetes/vendor/github.com/jstemmer/go-junit-report
 
 # Disable the Go race detector.
 export KUBE_RACE=" "
 # Disable coverage report
 export KUBE_COVER="n"
-# Produce a JUnit-style XML test report.
-export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
-export ARTIFACTS_DIR=${WORKSPACE}/artifacts
+export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
+export FULL_LOG="true"
 
-mkdir -p "${ARTIFACTS_DIR}"
+mkdir -p "${ARTIFACTS}"
 cd /go/src/k8s.io/kubernetes
 
 ./hack/install-etcd.sh
 
 # Run the benchmark tests and pretty-print the results into a separate file.
 make test-integration WHAT="$*" KUBE_TEST_ARGS="-run='XXX' -bench=. -benchmem" \
-  | tee >(prettybench -no-passthrough > ${ARTIFACTS_DIR}/BenchmarkResults.txt)
+  | tee \
+   >(prettybench -no-passthrough > "${ARTIFACTS}/BenchmarkResults.txt") \
+   >(go run test/integration/benchmark/jsonify/main.go "${ARTIFACTS}/BenchmarkResults_benchmark_$(date -u +%Y-%m-%dT%H:%M:%SZ).json" || cat > /dev/null)

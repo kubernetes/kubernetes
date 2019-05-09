@@ -65,6 +65,10 @@ type Provider struct {
 	//
 	// If ExpiryWindow is 0 or less it will be ignored.
 	ExpiryWindow time.Duration
+
+	// Optional authorization token value if set will be used as the value of
+	// the Authorization header of the endpoint credential request.
+	AuthorizationToken string
 }
 
 // NewProviderClient returns a credentials Provider for retrieving AWS credentials
@@ -152,6 +156,9 @@ func (p *Provider) getCredentials() (*getCredentialsOutput, error) {
 	out := &getCredentialsOutput{}
 	req := p.Client.NewRequest(op, nil, out)
 	req.HTTPRequest.Header.Set("Accept", "application/json")
+	if authToken := p.AuthorizationToken; len(authToken) != 0 {
+		req.HTTPRequest.Header.Set("Authorization", authToken)
+	}
 
 	return out, req.Send()
 }

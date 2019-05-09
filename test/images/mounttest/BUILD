@@ -28,5 +28,4 @@ filegroup(
 go_binary(
     name = "mounttest",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/mounttest",
 )

@@ -19,22 +19,24 @@ package storage
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // verifyGCEDiskAttached performs a sanity check to verify the PD attached to the node
 func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
-	gceCloud, err := framework.GetGCECloud()
-	Expect(err).NotTo(HaveOccurred())
+	gceCloud, err := gce.GetGCECloud()
+	framework.ExpectNoError(err)
 	isAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return isAttached
 }
 
@@ -42,12 +44,12 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.PersistentVolumeConfig, pvcConfig framework.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	By("Creating the PV and PVC")
 	pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 	By("Creating the Client Pod")
 	clientPod, err := framework.CreateClientPod(c, ns, pvc)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	return clientPod, pv, pvc
 }
 
@@ -80,7 +82,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		By("Initializing Test Spec")
 		diskName, err = framework.CreatePDWithRetry()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		pvConfig = framework.PersistentVolumeConfig{
 			NamePrefix: "gce-",
 			Labels:     volLabel,
@@ -93,18 +95,17 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 			},
 			Prebind: nil,
 		}
+		emptyStorageClass := ""
 		pvcConfig = framework.PersistentVolumeClaimConfig{
-			Annotations: map[string]string{
-				v1.BetaStorageClassAnnotation: "",
-			},
-			Selector: selector,
+			Selector:         selector,
+			StorageClassName: &emptyStorageClass,
 		}
 		clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, pvcConfig, false)
 		node = types.NodeName(clientPod.Spec.NodeName)
 	})
 
 	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources")
+		e2elog.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
 			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
@@ -152,10 +153,10 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 
 		By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(ns, nil)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, framework.DefaultNamespaceDeletionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Verifying Persistent Disk detaches")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")

@@ -15,19 +15,23 @@
 package validate
 
 import (
+	"encoding/json"
 	"reflect"
 
+	"github.com/go-openapi/errors"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/swag"
 )
 
-var specSchemaType = reflect.TypeOf(&spec.Schema{})
-var specParameterType = reflect.TypeOf(&spec.Parameter{})
-var specItemsType = reflect.TypeOf(&spec.Items{})
-var specHeaderType = reflect.TypeOf(&spec.Header{})
+var (
+	specSchemaType    = reflect.TypeOf(&spec.Schema{})
+	specParameterType = reflect.TypeOf(&spec.Parameter{})
+	specItemsType     = reflect.TypeOf(&spec.Items{})
+	specHeaderType    = reflect.TypeOf(&spec.Header{})
+)
 
-// SchemaValidator like param validator but for a full json schema
+// SchemaValidator validates data against a JSON schema
 type SchemaValidator struct {
 	Path         string
 	in           string
@@ -37,7 +41,20 @@ type SchemaValidator struct {
 	KnownFormats strfmt.Registry
 }
 
-// NewSchemaValidator creates a new schema validator
+// AgainstSchema validates the specified data against the provided schema, using a registry of supported formats.
+//
+// When no pre-parsed *spec.Schema structure is provided, it uses a JSON schema as default. See example.
+func AgainstSchema(schema *spec.Schema, data interface{}, formats strfmt.Registry) error {
+	res := NewSchemaValidator(schema, nil, "", formats).Validate(data)
+	if res.HasErrors() {
+		return errors.CompositeValidationError(res.Errors...)
+	}
+	return nil
+}
+
+// NewSchemaValidator creates a new schema validator.
+//
+// Panics if the provided schema is invalid.
 func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string, formats strfmt.Registry) *SchemaValidator {
 	if schema == nil {
 		return nil
@@ -50,7 +67,8 @@ func NewSchemaValidator(schema *spec.Schema, rootSchema interface{}, root string
 	if schema.ID != "" || schema.Ref.String() != "" || schema.Ref.IsRoot() {
 		err := spec.ExpandSchema(schema, rootSchema, nil)
 		if err != nil {
-			panic(err)
+			msg := invalidSchemaProvidedMsg(err).Error()
+			panic(msg)
 		}
 	}
 	s := SchemaValidator{Path: root, in: "body", Schema: schema, Root: rootSchema, KnownFormats: formats}
@@ -80,12 +98,19 @@ func (s *SchemaValidator) Applies(source interface{}, kind reflect.Kind) bool {
 
 // Validate validates the data against the schema
 func (s *SchemaValidator) Validate(data interface{}) *Result {
-	if data == nil {
-		v := s.validators[0].Validate(data)
-		v.Merge(s.validators[6].Validate(data))
-		return v
+	result := &Result{data: data}
+	if s == nil {
+		return result
 	}
-	result := new(Result)
+	if s.Schema != nil {
+		result.addRootObjectSchemata(s.Schema)
+	}
+
+	if data == nil {
+		result.Merge(s.validators[0].Validate(data)) // type validator
+		result.Merge(s.validators[6].Validate(data)) // common validator
+		return result
+	}
 
 	tpe := reflect.TypeOf(data)
 	kind := tpe.Kind()
@@ -94,12 +119,44 @@ func (s *SchemaValidator) Validate(data interface{}) *Result {
 		kind = tpe.Kind()
 	}
 	d := data
+
 	if kind == reflect.Struct {
+		// NOTE: since reflect retrieves the true nature of types
+		// this means that all strfmt types passed here (e.g. strfmt.Datetime, etc..)
+		// are converted here to strings, and structs are systematically converted
+		// to map[string]interface{}.
 		d = swag.ToDynamicJSON(data)
+	}
+
+	// TODO: this part should be handed over to type validator
+	// Handle special case of json.Number data (number marshalled as string)
+	isnumber := s.Schema.Type.Contains("number") || s.Schema.Type.Contains("integer")
+	if num, ok := data.(json.Number); ok && isnumber {
+		if s.Schema.Type.Contains("integer") { // avoid lossy conversion
+			in, erri := num.Int64()
+			if erri != nil {
+				result.AddErrors(invalidTypeConversionMsg(s.Path, erri))
+				result.Inc()
+				return result
+			}
+			d = in
+		} else {
+			nf, errf := num.Float64()
+			if errf != nil {
+				result.AddErrors(invalidTypeConversionMsg(s.Path, errf))
+				result.Inc()
+				return result
+			}
+			d = nf
+		}
+
+		tpe = reflect.TypeOf(d)
+		kind = tpe.Kind()
 	}
 
 	for _, v := range s.validators {
 		if !v.Applies(s.Schema, kind) {
+			debugLog("%T does not apply for %v", v, kind)
 			continue
 		}
 
@@ -108,6 +165,7 @@ func (s *SchemaValidator) Validate(data interface{}) *Result {
 		result.Inc()
 	}
 	result.Inc()
+
 	return result
 }
 
@@ -117,10 +175,9 @@ func (s *SchemaValidator) typeValidator() valueValidator {
 
 func (s *SchemaValidator) commonValidator() valueValidator {
 	return &basicCommonValidator{
-		Path:    s.Path,
-		In:      s.in,
-		Default: s.Schema.Default,
-		Enum:    s.Schema.Enum,
+		Path: s.Path,
+		In:   s.in,
+		Enum: s.Schema.Enum,
 	}
 }
 
@@ -155,7 +212,6 @@ func (s *SchemaValidator) stringValidator() valueValidator {
 	return &stringValidator{
 		Path:      s.Path,
 		In:        s.in,
-		Default:   s.Schema.Default,
 		MaxLength: s.Schema.MaxLength,
 		MinLength: s.Schema.MinLength,
 		Pattern:   s.Schema.Pattern,
@@ -164,9 +220,8 @@ func (s *SchemaValidator) stringValidator() valueValidator {
 
 func (s *SchemaValidator) formatValidator() valueValidator {
 	return &formatValidator{
-		Path: s.Path,
-		In:   s.in,
-		//Default:      s.Schema.Default,
+		Path:         s.Path,
+		In:           s.in,
 		Format:       s.Schema.Format,
 		KnownFormats: s.KnownFormats,
 	}

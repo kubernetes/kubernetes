@@ -5,16 +5,14 @@
 package uuid
 
 import (
-	"net"
 	"sync"
 )
 
 var (
-	nodeMu     sync.Mutex
-	interfaces []net.Interface // cached list of interfaces
-	ifname     string          // name of interface being used
-	nodeID     [6]byte         // hardware for version 1 UUIDs
-	zeroID     [6]byte         // nodeID with only 0's
+	nodeMu sync.Mutex
+	ifname string  // name of interface being used
+	nodeID [6]byte // hardware for version 1 UUIDs
+	zeroID [6]byte // nodeID with only 0's
 )
 
 // NodeInterface returns the name of the interface from which the NodeID was
@@ -39,20 +37,11 @@ func SetNodeInterface(name string) bool {
 }
 
 func setNodeInterface(name string) bool {
-	if interfaces == nil {
-		var err error
-		interfaces, err = net.Interfaces()
-		if err != nil && name != "" {
-			return false
-		}
-	}
-
-	for _, ifs := range interfaces {
-		if len(ifs.HardwareAddr) >= 6 && (name == "" || name == ifs.Name) {
-			copy(nodeID[:], ifs.HardwareAddr)
-			ifname = ifs.Name
-			return true
-		}
+	iname, addr := getHardwareInterface(name) // null implementation for js
+	if iname != "" && addr != nil {
+		ifname = iname
+		copy(nodeID[:], addr)
+		return true
 	}
 
 	// We found no interfaces with a valid hardware address.  If name

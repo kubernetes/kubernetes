@@ -10,13 +10,13 @@ go_test(
     name = "go_default_test",
     srcs = ["pubkeypin_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["pubkeypin.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

@@ -10,12 +10,12 @@ go_test(
     name = "go_default_test",
     srcs = ["rand_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/rand",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["rand.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/rand",
     importpath = "k8s.io/apimachinery/pkg/util/rand",
 )
 

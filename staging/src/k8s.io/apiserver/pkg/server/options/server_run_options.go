@@ -27,7 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	// add the generic feature gates
-	_ "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -42,7 +42,16 @@ type ServerRunOptions struct {
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
 	MinRequestTimeout           int
-	TargetRAMMB                 int
+	// We intentionally did not add a flag for this option. Users of the
+	// apiserver library can wire it to a flag.
+	JSONPatchMaxCopyBytes int64
+	// The limit on the request body size that would be accepted and
+	// decoded in a write request. 0 means no limit.
+	// We intentionally did not add a flag for this option. Users of the
+	// apiserver library can wire it to a flag.
+	MaxRequestBodyBytes       int64
+	TargetRAMMB               int
+	EnableInfightQuotaHandler bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -52,6 +61,8 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		RequestTimeout:              defaults.RequestTimeout,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
+		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
+		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
 	}
 }
 
@@ -63,6 +74,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
 	c.RequestTimeout = s.RequestTimeout
 	c.MinRequestTimeout = s.MinRequestTimeout
+	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
+	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
 
 	return nil
@@ -92,21 +105,49 @@ func (s *ServerRunOptions) Validate() []error {
 	if s.TargetRAMMB < 0 {
 		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
 	}
-	if s.MaxRequestsInFlight < 0 {
-		errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
-	}
-	if s.MaxMutatingRequestsInFlight < 0 {
-		errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
+
+	if s.EnableInfightQuotaHandler {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
+			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
+				"gate RequestManagement is disabled"))
+		}
+		if s.MaxMutatingRequestsInFlight != 0 {
+			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight=%v "+
+				"can not be set if enabled inflight quota handler", s.MaxMutatingRequestsInFlight))
+		}
+		if s.MaxRequestsInFlight != 0 {
+			errors = append(errors, fmt.Errorf("--max-requests-inflight=%v "+
+				"can not be set if enabled inflight quota handler", s.MaxRequestsInFlight))
+		}
+	} else {
+		if s.MaxRequestsInFlight < 0 {
+			errors = append(errors, fmt.Errorf("--max-requests-inflight can not be negative value"))
+		}
+		if s.MaxMutatingRequestsInFlight < 0 {
+			errors = append(errors, fmt.Errorf("--max-mutating-requests-inflight can not be negative value"))
+		}
 	}
 
 	if s.RequestTimeout.Nanoseconds() < 0 {
 		errors = append(errors, fmt.Errorf("--request-timeout can not be negative value"))
 	}
 
+	if s.MinRequestTimeout < 0 {
+		errors = append(errors, fmt.Errorf("--min-request-timeout can not be negative value"))
+	}
+
+	if s.JSONPatchMaxCopyBytes < 0 {
+		errors = append(errors, fmt.Errorf("--json-patch-max-copy-bytes can not be negative value"))
+	}
+
+	if s.MaxRequestBodyBytes < 0 {
+		errors = append(errors, fmt.Errorf("--max-resource-write-bytes can not be negative value"))
+	}
+
 	return errors
 }
 
-// AddFlags adds flags for a specific APIServer to the specified FlagSet
+// AddUniversalFlags adds flags for a specific APIServer to the specified FlagSet
 func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
@@ -150,5 +191,8 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	fs.BoolVar(&s.EnableInfightQuotaHandler, "enable-inflight-quota-handler", s.EnableInfightQuotaHandler, ""+
+		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
+
+	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

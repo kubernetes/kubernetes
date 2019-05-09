@@ -21,11 +21,13 @@ package util
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/sys/unix"
+	"k8s.io/klog"
 )
 
 const (
@@ -33,6 +35,7 @@ const (
 	unixProtocol = "unix"
 )
 
+// CreateListener creates a listener on the specified endpoint.
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -51,6 +54,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	return net.Listen(protocol, addr)
 }
 
+// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
 func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -72,8 +76,38 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			glog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
 		}
 	}
 	return
+}
+
+func parseEndpoint(endpoint string) (string, string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", "", err
+	}
+
+	switch u.Scheme {
+	case "tcp":
+		return "tcp", u.Host, nil
+
+	case "unix":
+		return "unix", u.Path, nil
+
+	case "":
+		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+
+	default:
+		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
+	}
+}
+
+// LocalEndpoint returns the full path to a unix socket at the given endpoint
+func LocalEndpoint(path, file string) string {
+	u := url.URL{
+		Scheme: unixProtocol,
+		Path:   path,
+	}
+	return filepath.Join(u.String(), file+".sock")
 }

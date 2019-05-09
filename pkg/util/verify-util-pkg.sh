@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-BASH_DIR=$(dirname "${BASH_SOURCE}")
+BASH_DIR=$(dirname "${BASH_SOURCE[0]}")
 
 find_go_files() {
   find . -maxdepth 1 -not \( \
@@ -34,14 +34,14 @@ find_go_files() {
 ret=0
 
 pushd "${BASH_DIR}" > /dev/null
-  for path in `find_go_files`; do
-    file=$(basename $path)
+  for path in $(find_go_files); do
+    file=$(basename "$path")
     echo "Found pkg/util/${file}, but should be moved into util sub-pkgs." 1>&2
     ret=1
   done
 popd > /dev/null
 
-if [[ ${ret} > 0 ]]; then
+if [[ ${ret} -gt 0 ]]; then
   exit ${ret}
 fi
 

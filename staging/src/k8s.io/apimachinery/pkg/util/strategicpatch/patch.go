@@ -423,7 +423,7 @@ func normalizeElementOrder(patch, serverOnly, patchOrder, serverOrder []interfac
 // scan from the place of last insertion in `right` to the end of `right`,
 // the place is before the first item that is greater than the item we want to insert.
 // example usage: using server-only items as left and patch items as right. We insert server-only items
-// to patch list. We use the order of live object as record for comparision.
+// to patch list. We use the order of live object as record for comparison.
 func mergeSortedSlice(left, right, serverOrder []interface{}, mergeKey string, kind reflect.Kind) []interface{} {
 	// Returns if l is less than r, and if both have been found.
 	// If l and r both present and l is in front of r, l is less than r.
@@ -878,6 +878,29 @@ func StrategicMergeMapPatchUsingLookupPatchMeta(original, patch JSONMap, schema 
 		IgnoreUnmatchedNulls: true,
 	}
 	return mergeMap(original, patch, schema, mergeOptions)
+}
+
+// MergeStrategicMergeMapPatchUsingLookupPatchMeta merges strategic merge
+// patches retaining `null` fields and parallel lists. If 2 patches change the
+// same fields and the latter one will override the former one. If you don't
+// want that happen, you need to run func MergingMapsHaveConflicts before
+// merging these patches. Applying the resulting merged merge patch to a JSONMap
+// yields the same as merging each strategic merge patch to the JSONMap in
+// succession.
+func MergeStrategicMergeMapPatchUsingLookupPatchMeta(schema LookupPatchMeta, patches ...JSONMap) (JSONMap, error) {
+	mergeOptions := MergeOptions{
+		MergeParallelList:    false,
+		IgnoreUnmatchedNulls: false,
+	}
+	merged := JSONMap{}
+	var err error
+	for _, patch := range patches {
+		merged, err = mergeMap(merged, patch, schema, mergeOptions)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return merged, nil
 }
 
 // handleDirectiveInMergeMap handles the patch directive when merging 2 maps.
@@ -1853,7 +1876,7 @@ func mergingMapFieldsHaveConflicts(
 			return true, nil
 		}
 		return slicesHaveConflicts(leftType, rightType, schema, fieldPatchStrategy, fieldPatchMergeKey)
-	case string, float64, bool, int, int64, nil:
+	case string, float64, bool, int64, nil:
 		return !reflect.DeepEqual(left, right), nil
 	default:
 		return true, fmt.Errorf("unknown type: %v", reflect.TypeOf(left))
@@ -2109,7 +2132,7 @@ func sliceTypeAssertion(original, patch interface{}) ([]interface{}, []interface
 }
 
 // extractRetainKeysPatchStrategy process patch strategy, which is a string may contains multiple
-// patch strategies seperated by ",". It returns a boolean var indicating if it has
+// patch strategies separated by ",". It returns a boolean var indicating if it has
 // retainKeys strategies and a string for the other strategy.
 func extractRetainKeysPatchStrategy(strategies []string) (bool, string, error) {
 	switch len(strategies) {

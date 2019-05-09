@@ -38,7 +38,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "serviceaccounts",
 	}
-	return NewREST(restOptions), server
+	return NewREST(restOptions, nil, nil, 0, nil, nil), server
 }
 
 func validNewServiceAccount(name string) *api.ServiceAccount {

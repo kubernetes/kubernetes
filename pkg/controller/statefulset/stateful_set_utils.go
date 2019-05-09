@@ -149,7 +149,13 @@ func getPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) map[string]v1
 		claim := templates[i]
 		claim.Name = getPersistentVolumeClaimName(set, &claim, ordinal)
 		claim.Namespace = set.Namespace
-		claim.Labels = set.Spec.Selector.MatchLabels
+		if claim.Labels != nil {
+			for key, value := range set.Spec.Selector.MatchLabels {
+				claim.Labels[key] = value
+			}
+		} else {
+			claim.Labels = set.Spec.Selector.MatchLabels
+		}
 		claims[templates[i].Name] = claim
 	}
 	return claims
@@ -312,13 +318,9 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 	if err != nil {
 		return nil, err
 	}
-	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
 	cr, err := history.NewControllerRevision(set,
 		controllerKind,
-		selector,
+		set.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},
 		revision,
 		collisionCount)

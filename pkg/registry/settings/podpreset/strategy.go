@@ -17,12 +17,12 @@ limitations under the License.
 package podpreset
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/settings/validation"
 )
@@ -42,27 +42,22 @@ func (podPresetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a Pod Preset before creation.
-func (podPresetStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (podPresetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pip := obj.(*settings.PodPreset)
 	pip.Generation = 1
-
-	pod.DropDisabledVolumeMountsAlphaFields(pip.Spec.VolumeMounts)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podPresetStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (podPresetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPodPreset := obj.(*settings.PodPreset)
 	oldPodPreset := old.(*settings.PodPreset)
-
-	pod.DropDisabledVolumeMountsAlphaFields(oldPodPreset.Spec.VolumeMounts)
-	pod.DropDisabledVolumeMountsAlphaFields(newPodPreset.Spec.VolumeMounts)
 
 	// Update is not allowed
 	newPodPreset.Spec = oldPodPreset.Spec
 }
 
 // Validate validates a new PodPreset.
-func (podPresetStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (podPresetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pip := obj.(*settings.PodPreset)
 	return validation.ValidatePodPreset(pip)
 }
@@ -76,7 +71,7 @@ func (podPresetStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podPresetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (podPresetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	validationErrorList := validation.ValidatePodPreset(obj.(*settings.PodPreset))
 	updateErrorList := validation.ValidatePodPresetUpdate(obj.(*settings.PodPreset), old.(*settings.PodPreset))
 	return append(validationErrorList, updateErrorList...)

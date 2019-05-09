@@ -15,11 +15,10 @@
 package concurrency
 
 import (
+	"context"
 	"math"
 
 	v3 "github.com/coreos/etcd/clientv3"
-
-	"golang.org/x/net/context"
 )
 
 // STM is an interface for software transactional memory.

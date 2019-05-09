@@ -23,8 +23,8 @@ import (
 
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
+	"k8s.io/klog"
 )
 
 var (
@@ -37,7 +37,7 @@ func main() {
 	flag.Parse()
 
 	if *typeSrc == "" {
-		glog.Fatalf("Please define -s flag as it is the source file")
+		klog.Fatalf("Please define -s flag as it is the source file")
 	}
 
 	var funcOut io.Writer
@@ -46,7 +46,7 @@ func main() {
 	} else {
 		file, err := os.Create(*functionDest)
 		if err != nil {
-			glog.Fatalf("Couldn't open %v: %v", *functionDest, err)
+			klog.Fatalf("Couldn't open %v: %v", *functionDest, err)
 		}
 		defer file.Close()
 		funcOut = file
@@ -54,7 +54,7 @@ func main() {
 
 	docsForTypes := kruntime.ParseDocumentationFrom(*typeSrc)
 
-	if *verify == true {
+	if *verify {
 		rc, err := kruntime.VerifySwaggerDocsExist(docsForTypes, funcOut)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error in verification process: %s\n", err)
@@ -62,7 +62,7 @@ func main() {
 		os.Exit(rc)
 	}
 
-	if docsForTypes != nil && len(docsForTypes) > 0 {
+	if len(docsForTypes) > 0 {
 		if err := kruntime.WriteSwaggerDocFunc(docsForTypes, funcOut); err != nil {
 			fmt.Fprintf(os.Stderr, "Error when writing swagger documentation functions: %s\n", err)
 			os.Exit(-1)

@@ -6,6 +6,7 @@ go_library(
         "uritemplates.go",
         "utils.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/google.golang.org/api/googleapi/internal/uritemplates",
     importpath = "google.golang.org/api/googleapi/internal/uritemplates",
     visibility = ["//vendor/google.golang.org/api/googleapi:__subpackages__"],
 )

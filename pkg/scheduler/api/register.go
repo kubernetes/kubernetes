@@ -31,8 +31,10 @@ var Scheme = runtime.NewScheme()
 var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
 
 var (
+	// SchemeBuilder defines a SchemeBuilder object.
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// AddToScheme is used to add stored functions to scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 func init() {

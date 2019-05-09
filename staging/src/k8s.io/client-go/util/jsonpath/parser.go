@@ -46,7 +46,7 @@ type Parser struct {
 var (
 	ErrSyntax        = errors.New("invalid syntax")
 	dictKeyRex       = regexp.MustCompile(`^'([^']*)'$`)
-	sliceOperatorRex = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:[\d]*)?$`)
+	sliceOperatorRex = regexp.MustCompile(`^(-?[\d]*)(:-?[\d]*)?(:-?[\d]*)?$`)
 )
 
 // Parse parsed the given text and return a node Parser.
@@ -94,7 +94,7 @@ func (p *Parser) consumeText() string {
 
 // next returns the next rune in the input.
 func (p *Parser) next() rune {
-	if int(p.pos) >= len(p.input) {
+	if p.pos >= len(p.input) {
 		p.width = 0
 		return eof
 	}
@@ -266,7 +266,7 @@ Loop:
 		}
 	}
 	text := p.consumeText()
-	text = string(text[1 : len(text)-1])
+	text = text[1 : len(text)-1]
 	if text == "*" {
 		text = ":"
 	}
@@ -325,6 +325,7 @@ Loop:
 			if i == 1 {
 				params[i].Known = true
 				params[i].Value = params[0].Value + 1
+				params[i].Derived = true
 			} else {
 				params[i].Known = false
 				params[i].Value = 0
@@ -373,7 +374,7 @@ Loop:
 	}
 	reg := regexp.MustCompile(`^([^!<>=]+)([!<>=]+)(.+?)$`)
 	text := p.consumeText()
-	text = string(text[:len(text)-2])
+	text = text[:len(text)-2]
 	value := reg.FindStringSubmatch(text)
 	if value == nil {
 		parser, err := parseAction("text", text)

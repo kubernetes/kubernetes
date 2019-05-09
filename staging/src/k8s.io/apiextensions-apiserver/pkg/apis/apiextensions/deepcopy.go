@@ -16,6 +16,8 @@ limitations under the License.
 
 package apiextensions
 
+import "k8s.io/apimachinery/pkg/runtime"
+
 // TODO: Update this after a tag is created for interface fields in DeepCopy
 func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 	if in == nil {
@@ -26,14 +28,14 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 	*out = *in
 
 	if in.Default != nil {
-		defaultJSON := JSON(deepCopyJSON(*(in.Default)))
+		defaultJSON := JSON(runtime.DeepCopyJSONValue(*(in.Default)))
 		out.Default = &(defaultJSON)
 	} else {
 		out.Default = nil
 	}
 
 	if in.Example != nil {
-		exampleJSON := JSON(deepCopyJSON(*(in.Example)))
+		exampleJSON := JSON(runtime.DeepCopyJSONValue(*(in.Example)))
 		out.Example = &(exampleJSON)
 	} else {
 		out.Example = nil
@@ -121,7 +123,7 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 	if in.Enum != nil {
 		out.Enum = make([]JSON, len(in.Enum))
 		for i := range in.Enum {
-			out.Enum[i] = deepCopyJSON(in.Enum[i])
+			out.Enum[i] = runtime.DeepCopyJSONValue(in.Enum[i])
 		}
 	}
 
@@ -257,23 +259,4 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 	}
 
 	return out
-}
-
-func deepCopyJSON(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		clone := make(map[string]interface{}, len(x))
-		for k, v := range x {
-			clone[k] = deepCopyJSON(v)
-		}
-		return clone
-	case []interface{}:
-		clone := make([]interface{}, len(x))
-		for i := range x {
-			clone[i] = deepCopyJSON(x[i])
-		}
-		return clone
-	default:
-		return x
-	}
 }

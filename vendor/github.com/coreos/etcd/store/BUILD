@@ -16,6 +16,7 @@ go_library(
         "watcher.go",
         "watcher_hub.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/store",
     importpath = "github.com/coreos/etcd/store",
     visibility = ["//visibility:public"],
     deps = [

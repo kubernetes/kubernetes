@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc"
 
 	csipb "github.com/container-storage-interface/spec/lib/go/csi"
-	grpctx "golang.org/x/net/context"
 )
 
 // IdentityClient is a CSI identity client used for testing
@@ -42,39 +41,56 @@ func (f *IdentityClient) SetNextError(err error) {
 	f.nextErr = err
 }
 
-// GetSupportedVersions returns supported version
-func (f *IdentityClient) GetSupportedVersions(ctx grpctx.Context, req *csipb.GetSupportedVersionsRequest, opts ...grpc.CallOption) (*csipb.GetSupportedVersionsResponse, error) {
-	// short circuit with an error
-	if f.nextErr != nil {
-		return nil, f.nextErr
-	}
-
-	rsp := &csipb.GetSupportedVersionsResponse{
-		SupportedVersions: []*csipb.Version{
-			{Major: 0, Minor: 0, Patch: 1},
-			{Major: 0, Minor: 1, Patch: 0},
-			{Major: 1, Minor: 0, Patch: 0},
-			{Major: 1, Minor: 0, Patch: 1},
-			{Major: 1, Minor: 1, Patch: 1},
-		},
-	}
-	return rsp, nil
-}
-
 // GetPluginInfo returns plugin info
 func (f *IdentityClient) GetPluginInfo(ctx context.Context, in *csipb.GetPluginInfoRequest, opts ...grpc.CallOption) (*csipb.GetPluginInfoResponse, error) {
 	return nil, nil
 }
 
+// GetPluginCapabilities implements csi method
+func (f *IdentityClient) GetPluginCapabilities(ctx context.Context, in *csipb.GetPluginCapabilitiesRequest, opts ...grpc.CallOption) (*csipb.GetPluginCapabilitiesResponse, error) {
+	return nil, nil
+}
+
+// Probe implements csi method
+func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts ...grpc.CallOption) (*csipb.ProbeResponse, error) {
+	return nil, nil
+}
+
+type CSIVolume struct {
+	VolumeHandle    string
+	VolumeContext   map[string]string
+	Path            string
+	DeviceMountPath string
+	FSType          string
+	MountFlags      []string
+}
+
 // NodeClient returns CSI node client
 type NodeClient struct {
-	nodePublishedVolumes map[string]string
+	nodePublishedVolumes map[string]CSIVolume
+	nodeStagedVolumes    map[string]CSIVolume
+	stageUnstageSet      bool
+	expansionSet         bool
+	nodeGetInfoResp      *csipb.NodeGetInfoResponse
 	nextErr              error
 }
 
 // NewNodeClient returns fake node client
-func NewNodeClient() *NodeClient {
-	return &NodeClient{nodePublishedVolumes: make(map[string]string)}
+func NewNodeClient(stageUnstageSet bool) *NodeClient {
+	return &NodeClient{
+		nodePublishedVolumes: make(map[string]CSIVolume),
+		nodeStagedVolumes:    make(map[string]CSIVolume),
+		stageUnstageSet:      stageUnstageSet,
+	}
+}
+
+func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeClient {
+	return &NodeClient{
+		nodePublishedVolumes: make(map[string]CSIVolume),
+		nodeStagedVolumes:    make(map[string]CSIVolume),
+		stageUnstageSet:      stageUnstageSet,
+		expansionSet:         expansionSet,
+	}
 }
 
 // SetNextError injects next expected error
@@ -82,14 +98,29 @@ func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
 }
 
+func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
+	f.nodeGetInfoResp = resp
+}
+
 // GetNodePublishedVolumes returns node published volumes
-func (f *NodeClient) GetNodePublishedVolumes() map[string]string {
+func (f *NodeClient) GetNodePublishedVolumes() map[string]CSIVolume {
 	return f.nodePublishedVolumes
 }
 
-// NodePublishVolume implements CSI NodePublishVolume
-func (f *NodeClient) NodePublishVolume(ctx grpctx.Context, req *csipb.NodePublishVolumeRequest, opts ...grpc.CallOption) (*csipb.NodePublishVolumeResponse, error) {
+// GetNodeStagedVolumes returns node staged volumes
+func (f *NodeClient) GetNodeStagedVolumes() map[string]CSIVolume {
+	return f.nodeStagedVolumes
+}
 
+func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
+	f.nodeStagedVolumes[volID] = CSIVolume{
+		Path:          deviceMountPath,
+		VolumeContext: volumeContext,
+	}
+}
+
+// NodePublishVolume implements CSI NodePublishVolume
+func (f *NodeClient) NodePublishVolume(ctx context.Context, req *csipb.NodePublishVolumeRequest, opts ...grpc.CallOption) (*csipb.NodePublishVolumeResponse, error) {
 	if f.nextErr != nil {
 		return nil, f.nextErr
 	}
@@ -100,24 +131,20 @@ func (f *NodeClient) NodePublishVolume(ctx grpctx.Context, req *csipb.NodePublis
 	if req.GetTargetPath() == "" {
 		return nil, errors.New("missing target path")
 	}
-	fsTypes := "ext4|xfs|zfs"
+	fsTypes := "block|ext4|xfs|zfs"
 	fsType := req.GetVolumeCapability().GetMount().GetFsType()
 	if !strings.Contains(fsTypes, fsType) {
-		return nil, errors.New("invlid fstype")
+		return nil, errors.New("invalid fstype")
 	}
-	f.nodePublishedVolumes[req.GetVolumeId()] = req.GetTargetPath()
+	f.nodePublishedVolumes[req.GetVolumeId()] = CSIVolume{
+		VolumeHandle:    req.GetVolumeId(),
+		Path:            req.GetTargetPath(),
+		DeviceMountPath: req.GetStagingTargetPath(),
+		VolumeContext:   req.GetVolumeContext(),
+		FSType:          req.GetVolumeCapability().GetMount().GetFsType(),
+		MountFlags:      req.GetVolumeCapability().GetMount().MountFlags,
+	}
 	return &csipb.NodePublishVolumeResponse{}, nil
-}
-
-// NodeProbe implements csi NodeProbe
-func (f *NodeClient) NodeProbe(ctx context.Context, req *csipb.NodeProbeRequest, opts ...grpc.CallOption) (*csipb.NodeProbeResponse, error) {
-	if f.nextErr != nil {
-		return nil, f.nextErr
-	}
-	if req.Version == nil {
-		return nil, errors.New("missing version")
-	}
-	return &csipb.NodeProbeResponse{}, nil
 }
 
 // NodeUnpublishVolume implements csi method
@@ -136,13 +163,112 @@ func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnp
 	return &csipb.NodeUnpublishVolumeResponse{}, nil
 }
 
-// GetNodeID implements method
-func (f *NodeClient) GetNodeID(ctx context.Context, in *csipb.GetNodeIDRequest, opts ...grpc.CallOption) (*csipb.GetNodeIDResponse, error) {
-	return nil, nil
+// NodeStagevolume implements csi method
+func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeStageVolumeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetStagingTargetPath() == "" {
+		return nil, errors.New("missing staging target path")
+	}
+
+	fsType := ""
+	fsTypes := "block|ext4|xfs|zfs"
+	mounted := req.GetVolumeCapability().GetMount()
+	if mounted != nil {
+		fsType = mounted.GetFsType()
+	}
+	if !strings.Contains(fsTypes, fsType) {
+		return nil, errors.New("invalid fstype")
+	}
+
+	f.nodeStagedVolumes[req.GetVolumeId()] = CSIVolume{
+		Path:          req.GetStagingTargetPath(),
+		VolumeContext: req.GetVolumeContext(),
+	}
+	return &csipb.NodeStageVolumeResponse{}, nil
+}
+
+// NodeUnstageVolume implements csi method
+func (f *NodeClient) NodeUnstageVolume(ctx context.Context, req *csipb.NodeUnstageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeUnstageVolumeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetStagingTargetPath() == "" {
+		return nil, errors.New("missing staging target path")
+	}
+
+	delete(f.nodeStagedVolumes, req.GetVolumeId())
+	return &csipb.NodeUnstageVolumeResponse{}, nil
+}
+
+// NodeExpandVolume implements csi method
+func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpandVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeExpandVolumeResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetVolumePath() == "" {
+		return nil, errors.New("missing volume path")
+	}
+
+	if req.GetCapacityRange().RequiredBytes <= 0 {
+		return nil, errors.New("required bytes should be greater than 0")
+	}
+
+	resp := &csipb.NodeExpandVolumeResponse{
+		CapacityBytes: req.GetCapacityRange().RequiredBytes,
+	}
+	return resp, nil
+}
+
+// NodeGetId implements csi method
+func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoRequest, opts ...grpc.CallOption) (*csipb.NodeGetInfoResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+	return f.nodeGetInfoResp, nil
 }
 
 // NodeGetCapabilities implements csi method
 func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetCapabilitiesRequest, opts ...grpc.CallOption) (*csipb.NodeGetCapabilitiesResponse, error) {
+	resp := &csipb.NodeGetCapabilitiesResponse{
+		Capabilities: []*csipb.NodeServiceCapability{},
+	}
+	if f.stageUnstageSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+				},
+			},
+		})
+	}
+	if f.expansionSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_EXPAND_VOLUME,
+				},
+			},
+		})
+	}
+	return resp, nil
+}
+
+// NodeGetVolumeStats implements csi method
+func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, in *csipb.NodeGetVolumeStatsRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeStatsResponse, error) {
 	return nil, nil
 }
 
@@ -221,10 +347,5 @@ func (f *ControllerClient) ListVolumes(ctx context.Context, in *csipb.ListVolume
 
 // GetCapacity implements csi method
 func (f *ControllerClient) GetCapacity(ctx context.Context, in *csipb.GetCapacityRequest, opts ...grpc.CallOption) (*csipb.GetCapacityResponse, error) {
-	return nil, nil
-}
-
-// ControllerProbe implements csi method
-func (f *ControllerClient) ControllerProbe(ctx context.Context, in *csipb.ControllerProbeRequest, opts ...grpc.CallOption) (*csipb.ControllerProbeResponse, error) {
 	return nil, nil
 }

@@ -48,7 +48,7 @@ func (v *Error) ErrorBody() string {
 	var s string
 	switch v.Type {
 	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
-		s = fmt.Sprintf("%s", v.Type)
+		s = v.Type.String()
 	default:
 		value := v.BadValue
 		valueType := reflect.TypeOf(value)

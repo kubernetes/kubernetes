@@ -24,23 +24,49 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/golang/glog"
-	"golang.org/x/exp/inotify"
+	"github.com/fsnotify/fsnotify"
+	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/flowcontrol"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-type podEventType int
-
 const (
-	podAdd podEventType = iota
-	podModify
-	podDelete
+	retryPeriod    = 1 * time.Second
+	maxRetryPeriod = 20 * time.Second
 )
 
-func (s *sourceFile) watch() error {
+type retryableError struct {
+	message string
+}
+
+func (e *retryableError) Error() string {
+	return e.message
+}
+
+func (s *sourceFile) startWatch() {
+	backOff := flowcontrol.NewBackOff(retryPeriod, maxRetryPeriod)
+	backOffId := "watch"
+
+	go wait.Forever(func() {
+		if backOff.IsInBackOffSinceUpdate(backOffId, time.Now()) {
+			return
+		}
+
+		if err := s.doWatch(); err != nil {
+			klog.Errorf("Unable to read config path %q: %v", s.path, err)
+			if _, retryable := err.(*retryableError); !retryable {
+				backOff.Next(backOffId, time.Now())
+			}
+		}
+	}, retryPeriod)
+}
+
+func (s *sourceFile) doWatch() error {
 	_, err := os.Stat(s.path)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -48,82 +74,80 @@ func (s *sourceFile) watch() error {
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
 		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
-		return fmt.Errorf("path does not exist, ignoring")
+		return &retryableError{"path does not exist, ignoring"}
 	}
 
-	w, err := inotify.NewWatcher()
+	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("unable to create inotify: %v", err)
 	}
 	defer w.Close()
 
-	err = w.AddWatch(s.path, inotify.IN_DELETE_SELF|inotify.IN_CREATE|inotify.IN_MOVED_TO|inotify.IN_MODIFY|inotify.IN_MOVED_FROM|inotify.IN_DELETE)
+	err = w.Add(s.path)
 	if err != nil {
 		return fmt.Errorf("unable to create inotify for path %q: %v", s.path, err)
 	}
 
-	// Reset store with manifest files already existing when starting
-	if err := s.resetStoreFromPath(); err != nil {
-		return fmt.Errorf("unable to read manifest path %q: %v", s.path, err)
-	}
-
 	for {
 		select {
-		case event := <-w.Event:
-			err = s.processEvent(event)
-			if err != nil {
-				return fmt.Errorf("error while processing event (%+v): %v", event, err)
+		case event := <-w.Events:
+			if err = s.produceWatchEvent(&event); err != nil {
+				return fmt.Errorf("error while processing inotify event (%+v): %v", event, err)
 			}
-		case err = <-w.Error:
+		case err = <-w.Errors:
 			return fmt.Errorf("error while watching %q: %v", s.path, err)
 		}
 	}
 }
 
-func (s *sourceFile) processEvent(e *inotify.Event) error {
+func (s *sourceFile) produceWatchEvent(e *fsnotify.Event) error {
 	// Ignore file start with dots
 	if strings.HasPrefix(filepath.Base(e.Name), ".") {
-		glog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
+		klog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
 		return nil
 	}
 	var eventType podEventType
 	switch {
-	case (e.Mask & inotify.IN_ISDIR) > 0:
-		glog.Errorf("Not recursing into manifest path %q", s.path)
-		return nil
-	case (e.Mask & inotify.IN_CREATE) > 0:
+	case (e.Op & fsnotify.Create) > 0:
 		eventType = podAdd
-	case (e.Mask & inotify.IN_MOVED_TO) > 0:
-		eventType = podAdd
-	case (e.Mask & inotify.IN_MODIFY) > 0:
+	case (e.Op & fsnotify.Write) > 0:
 		eventType = podModify
-	case (e.Mask & inotify.IN_DELETE) > 0:
+	case (e.Op & fsnotify.Chmod) > 0:
+		eventType = podModify
+	case (e.Op & fsnotify.Remove) > 0:
 		eventType = podDelete
-	case (e.Mask & inotify.IN_MOVED_FROM) > 0:
+	case (e.Op & fsnotify.Rename) > 0:
 		eventType = podDelete
-	case (e.Mask & inotify.IN_DELETE_SELF) > 0:
-		return fmt.Errorf("the watched path is deleted")
 	default:
 		// Ignore rest events
 		return nil
 	}
 
-	switch eventType {
+	s.watchEvents <- &watchEvent{e.Name, eventType}
+	return nil
+}
+
+func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
+	switch e.eventType {
 	case podAdd, podModify:
-		if pod, err := s.extractFromFile(e.Name); err != nil {
-			glog.Errorf("Can't process manifest file %q: %v", e.Name, err)
+		if pod, err := s.extractFromFile(e.fileName); err != nil {
+			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
 		} else {
 			return s.store.Add(pod)
 		}
 	case podDelete:
-		if objKey, keyExist := s.fileKeyMapping[e.Name]; keyExist {
+		if objKey, keyExist := s.fileKeyMapping[e.fileName]; keyExist {
 			pod, podExist, err := s.store.GetByKey(objKey)
 			if err != nil {
 				return err
 			} else if !podExist {
 				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
 			} else {
-				return s.store.Delete(pod)
+				if err = s.store.Delete(pod); err != nil {
+					return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
+				} else {
+					delete(s.fileKeyMapping, e.fileName)
+				}
 			}
 		}
 	}

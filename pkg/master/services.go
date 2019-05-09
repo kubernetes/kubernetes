@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/golang/glog"
-
+	"k8s.io/klog"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -30,13 +30,8 @@ import (
 func DefaultServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
-		defaultNet := "10.0.0.0/24"
-		glog.Infof("Network range for service cluster IPs is unspecified. Defaulting to %v.", defaultNet)
-		_, defaultServiceClusterIPRange, err := net.ParseCIDR(defaultNet)
-		if err != nil {
-			return net.IPNet{}, net.IP{}, err
-		}
-		serviceClusterIPRange = *defaultServiceClusterIPRange
+		klog.Infof("Network range for service cluster IPs is unspecified. Defaulting to %v.", kubeoptions.DefaultServiceIPCIDR)
+		serviceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
 	}
 	if size := ipallocator.RangeSize(&serviceClusterIPRange); size < 8 {
 		return net.IPNet{}, net.IP{}, fmt.Errorf("The service cluster IP range must be at least %d IP addresses", 8)
@@ -47,7 +42,7 @@ func DefaultServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, ne
 	if err != nil {
 		return net.IPNet{}, net.IP{}, err
 	}
-	glog.V(4).Infof("Setting service IP to %q (read-write).", apiServerServiceIP)
+	klog.V(4).Infof("Setting service IP to %q (read-write).", apiServerServiceIP)
 
 	return serviceClusterIPRange, apiServerServiceIP, nil
 }

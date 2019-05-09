@@ -36,7 +36,7 @@ func TestString(t *testing.T) {
 		}
 		for _, c := range s {
 			if !strings.ContainsRune(valid, c) {
-				t.Errorf("expected valid charaters, got %v", c)
+				t.Errorf("expected valid characters, got %v", c)
 			}
 		}
 	}

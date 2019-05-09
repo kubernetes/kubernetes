@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - thockin
 - matchstick
@@ -11,3 +13,6 @@ reviewers:
 - freehan
 - dcbw
 - m1093782566
+- danwinship
+labels:
+- sig/network

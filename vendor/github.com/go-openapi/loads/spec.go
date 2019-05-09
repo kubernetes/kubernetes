@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"path/filepath"
-
 	"github.com/go-openapi/analysis"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/swag"
@@ -90,6 +88,22 @@ type Document struct {
 	origSpec     *spec.Swagger
 	schema       *spec.Schema
 	raw          json.RawMessage
+}
+
+// Embedded returns a Document based on embedded specs. No analysis is required
+func Embedded(orig, flat json.RawMessage) (*Document, error) {
+	var origSpec, flatSpec spec.Swagger
+	if err := json.Unmarshal(orig, &origSpec); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(flat, &flatSpec); err != nil {
+		return nil, err
+	}
+	return &Document{
+		raw:      orig,
+		origSpec: &origSpec,
+		spec:     &flatSpec,
+	}, nil
 }
 
 // Spec loads a new spec document
@@ -186,10 +200,10 @@ func (d *Document) Expanded(options ...*spec.ExpandOptions) (*Document, error) {
 
 	var expandOptions *spec.ExpandOptions
 	if len(options) > 0 {
-		expandOptions = options[1]
+		expandOptions = options[0]
 	} else {
 		expandOptions = &spec.ExpandOptions{
-			RelativeBase: filepath.Dir(d.specFilePath),
+			RelativeBase: d.specFilePath,
 		}
 	}
 
@@ -198,11 +212,12 @@ func (d *Document) Expanded(options ...*spec.ExpandOptions) (*Document, error) {
 	}
 
 	dd := &Document{
-		Analyzer: analysis.New(swspec),
-		spec:     swspec,
-		schema:   spec.MustLoadSwagger20Schema(),
-		raw:      d.raw,
-		origSpec: d.origSpec,
+		Analyzer:     analysis.New(swspec),
+		spec:         swspec,
+		specFilePath: d.specFilePath,
+		schema:       spec.MustLoadSwagger20Schema(),
+		raw:          d.raw,
+		origSpec:     d.origSpec,
 	}
 	return dd, nil
 }

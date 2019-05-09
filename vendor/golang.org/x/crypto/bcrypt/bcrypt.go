@@ -4,7 +4,7 @@
 
 // Package bcrypt implements Provos and Mazières's bcrypt adaptive hashing
 // algorithm. See http://www.usenix.org/event/usenix99/provos/provos.pdf
-package bcrypt
+package bcrypt // import "golang.org/x/crypto/bcrypt"
 
 // The code is a port of Provos and Mazières's C implementation.
 import (
@@ -241,11 +241,11 @@ func (p *hashed) Hash() []byte {
 		n = 3
 	}
 	arr[n] = '$'
-	n += 1
+	n++
 	copy(arr[n:], []byte(fmt.Sprintf("%02d", p.cost)))
 	n += 2
 	arr[n] = '$'
-	n += 1
+	n++
 	copy(arr[n:], p.salt)
 	n += encodedSaltSize
 	copy(arr[n:], p.hash)

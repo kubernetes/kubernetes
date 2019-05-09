@@ -20,9 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient
-// +genclient:nonNamespaced
-// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ImageReview checks if the set of images in a pod are allowed.
@@ -56,7 +53,7 @@ type ImageReviewContainerSpec struct {
 	// In future, we may add command line overrides, exec health check command lines, and so on.
 }
 
-// ImageReviewStatus is the result of the token authentication request.
+// ImageReviewStatus is the result of the review for the pod creation request.
 type ImageReviewStatus struct {
 	// Allowed indicates that all images were allowed to be run.
 	Allowed bool
@@ -64,4 +61,9 @@ type ImageReviewStatus struct {
 	// may contain a short description of what is wrong.  Kubernetes
 	// may truncate excessively long errors when displaying to the user.
 	Reason string
+	// AuditAnnotations will be added to the attributes object of the
+	// admission controller request using 'AddAnnotation'.  The keys should
+	// be prefix-less (i.e., the admission controller will add an
+	// appropriate prefix).
+	AuditAnnotations map[string]string
 }

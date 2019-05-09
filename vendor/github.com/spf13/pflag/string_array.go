@@ -52,7 +52,7 @@ func (f *FlagSet) GetStringArray(name string) ([]string, error) {
 
 // StringArrayVar defines a string flag with specified name, default value, and usage string.
 // The argument p points to a []string variable in which to store the values of the multiple flags.
-// The value of each argument will not try to be separated by comma
+// The value of each argument will not try to be separated by comma. Use a StringSlice for that.
 func (f *FlagSet) StringArrayVar(p *[]string, name string, value []string, usage string) {
 	f.VarP(newStringArrayValue(value, p), name, "", usage)
 }
@@ -64,7 +64,7 @@ func (f *FlagSet) StringArrayVarP(p *[]string, name, shorthand string, value []s
 
 // StringArrayVar defines a string flag with specified name, default value, and usage string.
 // The argument p points to a []string variable in which to store the value of the flag.
-// The value of each argument will not try to be separated by comma
+// The value of each argument will not try to be separated by comma. Use a StringSlice for that.
 func StringArrayVar(p *[]string, name string, value []string, usage string) {
 	CommandLine.VarP(newStringArrayValue(value, p), name, "", usage)
 }
@@ -76,7 +76,7 @@ func StringArrayVarP(p *[]string, name, shorthand string, value []string, usage 
 
 // StringArray defines a string flag with specified name, default value, and usage string.
 // The return value is the address of a []string variable that stores the value of the flag.
-// The value of each argument will not try to be separated by comma
+// The value of each argument will not try to be separated by comma. Use a StringSlice for that.
 func (f *FlagSet) StringArray(name string, value []string, usage string) *[]string {
 	p := []string{}
 	f.StringArrayVarP(&p, name, "", value, usage)
@@ -92,7 +92,7 @@ func (f *FlagSet) StringArrayP(name, shorthand string, value []string, usage str
 
 // StringArray defines a string flag with specified name, default value, and usage string.
 // The return value is the address of a []string variable that stores the value of the flag.
-// The value of each argument will not try to be separated by comma
+// The value of each argument will not try to be separated by comma. Use a StringSlice for that.
 func StringArray(name string, value []string, usage string) *[]string {
 	return CommandLine.StringArrayP(name, "", value, usage)
 }

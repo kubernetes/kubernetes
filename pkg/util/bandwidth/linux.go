@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/exec"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // tcShaper provides an implementation of the BandwidthShaper interface on Linux using the 'tc' tool.
@@ -53,10 +53,10 @@ func NewTCShaper(iface string) BandwidthShaper {
 }
 
 func (t *tcShaper) execAndLog(cmdStr string, args ...string) error {
-	glog.V(6).Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
+	klog.V(6).Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
 	cmd := t.e.Command(cmdStr, args...)
 	out, err := cmd.CombinedOutput()
-	glog.V(6).Infof("Output from tc: %s", string(out))
+	klog.V(6).Infof("Output from tc: %s", string(out))
 	return err
 }
 
@@ -128,15 +128,15 @@ func asciiCIDR(cidr string) (string, error) {
 	return fmt.Sprintf("%s/%d", ip.String(), size), nil
 }
 
-func (t *tcShaper) findCIDRClass(cidr string) (class, handle string, found bool, err error) {
+func (t *tcShaper) findCIDRClass(cidr string) (classAndHandleList [][]string, found bool, err error) {
 	data, err := t.e.Command("tc", "filter", "show", "dev", t.iface).CombinedOutput()
 	if err != nil {
-		return "", "", false, err
+		return classAndHandleList, false, err
 	}
 
 	hex, err := hexCIDR(cidr)
 	if err != nil {
-		return "", "", false, err
+		return classAndHandleList, false, err
 	}
 	spec := fmt.Sprintf("match %s", hex)
 
@@ -156,12 +156,17 @@ func (t *tcShaper) findCIDRClass(cidr string) (class, handle string, found bool,
 			// expected tc line:
 			// filter parent 1: protocol ip pref 1 u32 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:1
 			if len(parts) != 19 {
-				return "", "", false, fmt.Errorf("unexpected output from tc: %s %d (%v)", filter, len(parts), parts)
+				return classAndHandleList, false, fmt.Errorf("unexpected output from tc: %s %d (%v)", filter, len(parts), parts)
+			} else {
+				resultTmp := []string{parts[18], parts[9]}
+				classAndHandleList = append(classAndHandleList, resultTmp)
 			}
-			return parts[18], parts[9], true, nil
 		}
 	}
-	return "", "", false, nil
+	if len(classAndHandleList) > 0 {
+		return classAndHandleList, true, nil
+	}
+	return classAndHandleList, false, nil
 }
 
 func makeKBitString(rsrc *resource.Quantity) string {
@@ -237,7 +242,7 @@ func (t *tcShaper) interfaceExists() (bool, string, error) {
 }
 
 func (t *tcShaper) ReconcileCIDR(cidr string, upload, download *resource.Quantity) error {
-	_, _, found, err := t.findCIDRClass(cidr)
+	_, found, err := t.findCIDRClass(cidr)
 	if err != nil {
 		return err
 	}
@@ -254,7 +259,7 @@ func (t *tcShaper) ReconcileInterface() error {
 		return err
 	}
 	if !exists {
-		glog.V(4).Info("Didn't find bandwidth interface, creating")
+		klog.V(4).Info("Didn't find bandwidth interface, creating")
 		return t.initializeInterface()
 	}
 	fields := strings.Split(output, " ")
@@ -272,22 +277,31 @@ func (t *tcShaper) initializeInterface() error {
 }
 
 func (t *tcShaper) Reset(cidr string) error {
-	class, handle, found, err := t.findCIDRClass(cidr)
+	classAndHandle, found, err := t.findCIDRClass(cidr)
 	if err != nil {
 		return err
 	}
 	if !found {
 		return fmt.Errorf("Failed to find cidr: %s on interface: %s", cidr, t.iface)
 	}
-	if err := t.execAndLog("tc", "filter", "del",
-		"dev", t.iface,
-		"parent", "1:",
-		"proto", "ip",
-		"prio", "1",
-		"handle", handle, "u32"); err != nil {
-		return err
+	for i := 0; i < len(classAndHandle); i++ {
+		if err := t.execAndLog("tc", "filter", "del",
+			"dev", t.iface,
+			"parent", "1:",
+			"proto", "ip",
+			"prio", "1",
+			"handle", classAndHandle[i][1], "u32"); err != nil {
+			return err
+		}
+		if err := t.execAndLog("tc", "class", "del",
+			"dev", t.iface,
+			"parent", "1:",
+			"classid", classAndHandle[i][0]); err != nil {
+			return err
+		}
 	}
-	return t.execAndLog("tc", "class", "del", "dev", t.iface, "parent", "1:", "classid", class)
+	return nil
+
 }
 
 func (t *tcShaper) deleteInterface(class string) error {

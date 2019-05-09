@@ -17,11 +17,12 @@ limitations under the License.
 package network
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"fmt"
@@ -134,7 +135,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Create Server with Service in NS-B
-			framework.Logf("Waiting for server to come up.")
+			e2elog.Logf("Waiting for server to come up.")
 			err = framework.WaitForPodRunningInNamespace(f.ClientSet, podServer)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -365,11 +366,11 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 		}
 	}()
 
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
+	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
 	err := framework.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	Expect(err).NotTo(HaveOccurred(), "Pod did not finish as expected.")
 
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
+	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Collect pod logs when we see a failure.
@@ -381,13 +382,13 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 		// Collect current NetworkPolicies applied in the test namespace.
 		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
-			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
+			e2elog.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		// Collect the list of pods running in the test namespace.
 		podsInNS, err := framework.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 		if err != nil {
-			framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
+			e2elog.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		pods := []string{}
@@ -412,7 +413,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 		}
 	}()
 
-	framework.Logf("Waiting for %s to complete.", podClient.Name)
+	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
 	err := framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 
 	// We expect an error here since it's a cannot connect test.
@@ -427,13 +428,13 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 		// Collect current NetworkPolicies applied in the test namespace.
 		policies, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
-			framework.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
+			e2elog.Logf("error getting current NetworkPolicies for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		// Collect the list of pods running in the test namespace.
 		podsInNS, err := framework.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 		if err != nil {
-			framework.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
+			e2elog.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 		}
 
 		pods := []string{}
@@ -508,7 +509,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Created pod %v", pod.ObjectMeta.Name)
+	e2elog.Logf("Created pod %v", pod.ObjectMeta.Name)
 
 	svcName := fmt.Sprintf("svc-%s", podName)
 	By(fmt.Sprintf("Creating a service %s for pod %s in namespace %s", svcName, podName, namespace.Name))
@@ -524,7 +525,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Created service %s", svc.Name)
+	e2elog.Logf("Created service %s", svc.Name)
 
 	return pod, svc
 }
@@ -556,11 +557,11 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("%s-container", podName),
-					Image: "busybox",
+					Image: imageutils.GetE2EImage(imageutils.BusyBox),
 					Args: []string{
 						"/bin/sh",
 						"-c",
-						fmt.Sprintf("for i in $(seq 1 5); do wget -T 8 %s.%s:%d -O - && exit 0 || sleep 1; done; exit 1",
+						fmt.Sprintf("for i in $(seq 1 5); do nc -vz -w 8 %s.%s %d && exit 0 || sleep 1; done; exit 1",
 							targetService.Name, targetService.Namespace, targetPort),
 					},
 				},

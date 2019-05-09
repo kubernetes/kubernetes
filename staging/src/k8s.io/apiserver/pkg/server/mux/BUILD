@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["pathrecorder_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apiserver/pkg/server/mux",
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 
@@ -20,11 +19,12 @@ go_library(
         "doc.go",
         "pathrecorder.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/mux",
     importpath = "k8s.io/apiserver/pkg/server/mux",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

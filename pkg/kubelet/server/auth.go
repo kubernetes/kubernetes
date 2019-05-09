@@ -20,11 +20,11 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/klog"
 )
 
 // KubeletAuth implements AuthInterface
@@ -42,6 +42,7 @@ func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGett
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
 }
 
+// NewNodeAuthorizerAttributesGetter creates a new authorizer.RequestAttributesGetter for the node.
 func NewNodeAuthorizerAttributesGetter(nodeName types.NodeName) authorizer.RequestAttributesGetter {
 	return nodeAuthorizerAttributesGetter{nodeName: nodeName}
 }
@@ -108,7 +109,7 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 		attrs.Subresource = "spec"
 	}
 
-	glog.V(5).Infof("Node request attributes: attrs=%#v", attrs)
+	klog.V(5).Infof("Node request attributes: user=%#v attrs=%#v", attrs.GetUser(), attrs)
 
 	return attrs
 }

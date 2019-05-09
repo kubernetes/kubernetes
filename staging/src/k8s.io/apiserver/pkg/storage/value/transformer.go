@@ -21,7 +21,12 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+	"time"
 )
+
+func init() {
+	RegisterMetrics()
+}
 
 // Context is additional information that a storage transformation may need to verify the data at rest.
 type Context interface {
@@ -80,12 +85,18 @@ func (t *MutableTransformer) Set(transformer Transformer) {
 }
 
 func (t *MutableTransformer) TransformFromStorage(data []byte, context Context) (out []byte, stale bool, err error) {
+	defer func(start time.Time) {
+		RecordTransformation("from_storage", start, err)
+	}(time.Now())
 	t.lock.RLock()
 	transformer := t.transformer
 	t.lock.RUnlock()
 	return transformer.TransformFromStorage(data, context)
 }
 func (t *MutableTransformer) TransformToStorage(data []byte, context Context) (out []byte, err error) {
+	defer func(start time.Time) {
+		RecordTransformation("to_storage", start, err)
+	}(time.Now())
 	t.lock.RLock()
 	transformer := t.transformer
 	t.lock.RUnlock()

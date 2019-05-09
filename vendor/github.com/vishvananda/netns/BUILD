@@ -4,42 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "netns.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "netns_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "netns_unspecified.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "netns_unspecified.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "netns_linux.go",
+        "netns_unspecified.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vishvananda/netns",
     importpath = "github.com/vishvananda/netns",
     visibility = ["//visibility:public"],
 )

@@ -21,6 +21,18 @@ import (
 	"time"
 )
 
+var (
+	_ = Clock(RealClock{})
+	_ = Clock(&FakeClock{})
+	_ = Clock(&IntervalClock{})
+
+	_ = Timer(&realTimer{})
+	_ = Timer(&fakeTimer{})
+
+	_ = Ticker(&realTicker{})
+	_ = Ticker(&fakeTicker{})
+)
+
 func TestFakeClock(t *testing.T) {
 	startTime := time.Now()
 	tc := NewFakeClock(startTime)
@@ -32,8 +44,8 @@ func TestFakeClock(t *testing.T) {
 
 	tt := tc.Now()
 	tc.SetTime(tt.Add(time.Hour))
-	if tc.Now().Sub(tt) != time.Hour {
-		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Now().Sub(tt), time.Hour)
+	if tc.Since(tt) != time.Hour {
+		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Since(tt), time.Hour)
 	}
 }
 
@@ -110,13 +122,13 @@ func TestFakeTick(t *testing.T) {
 	if tc.HasWaiters() {
 		t.Errorf("unexpected waiter?")
 	}
-	oneSec := tc.Tick(time.Second)
+	oneSec := tc.NewTicker(time.Second).C()
 	if !tc.HasWaiters() {
 		t.Errorf("unexpected lack of waiter?")
 	}
 
-	oneOhOneSec := tc.Tick(time.Second + time.Millisecond)
-	twoSec := tc.Tick(2 * time.Second)
+	oneOhOneSec := tc.NewTicker(time.Second + time.Millisecond).C()
+	twoSec := tc.NewTicker(2 * time.Second).C()
 	select {
 	case <-oneSec:
 		t.Errorf("unexpected channel read")

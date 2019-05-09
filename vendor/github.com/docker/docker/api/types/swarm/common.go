@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/docker/api/types/swarm"
 
 import "time"
 
@@ -20,7 +20,7 @@ type Annotations struct {
 	Labels map[string]string `json:"Labels"`
 }
 
-// Driver represents a driver (network, logging).
+// Driver represents a driver (network, logging, secrets backend).
 type Driver struct {
 	Name    string            `json:",omitempty"`
 	Options map[string]string `json:",omitempty"`

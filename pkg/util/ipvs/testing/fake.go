@@ -193,4 +193,13 @@ func (f *FakeIPVS) DeleteRealServer(serv *utilipvs.VirtualServer, dest *utilipvs
 	return nil
 }
 
+// UpdateRealServer is a fake implementation, it deletes the old real server then add new real server
+func (f *FakeIPVS) UpdateRealServer(serv *utilipvs.VirtualServer, dest *utilipvs.RealServer) error {
+	err := f.DeleteRealServer(serv, dest)
+	if err != nil {
+		return err
+	}
+	return f.AddRealServer(serv, dest)
+}
+
 var _ = utilipvs.Interface(&FakeIPVS{})

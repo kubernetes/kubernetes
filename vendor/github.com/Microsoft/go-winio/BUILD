@@ -3,21 +3,18 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "backup.go",
         "ea.go",
+        "file.go",
+        "fileinfo.go",
+        "pipe.go",
+        "privilege.go",
         "reparse.go",
+        "sd.go",
         "syscall.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows": [
-            "backup.go",
-            "file.go",
-            "fileinfo.go",
-            "pipe.go",
-            "privilege.go",
-            "sd.go",
-            "zsyscall_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "zsyscall_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/Microsoft/go-winio",
     importpath = "github.com/Microsoft/go-winio",
     visibility = ["//visibility:public"],
     deps = select({

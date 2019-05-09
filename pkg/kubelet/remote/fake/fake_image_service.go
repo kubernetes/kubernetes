@@ -17,8 +17,9 @@ limitations under the License.
 package fake
 
 import (
-	"golang.org/x/net/context"
-	kubeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"context"
+
+	kubeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ListImages lists existing images.
@@ -47,7 +48,7 @@ func (f *RemoteRuntime) ImageStatus(ctx context.Context, req *kubeapi.ImageStatu
 
 // PullImage pulls an image with authentication config.
 func (f *RemoteRuntime) PullImage(ctx context.Context, req *kubeapi.PullImageRequest) (*kubeapi.PullImageResponse, error) {
-	image, err := f.ImageService.PullImage(req.Image, req.Auth)
+	image, err := f.ImageService.PullImage(req.Image, req.Auth, req.SandboxConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -46,8 +46,8 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 var (
@@ -133,7 +133,7 @@ func (s *State) serveWrite(w http.ResponseWriter, r *http.Request) {
 		if s.Received == nil {
 			s.Received = map[string]int{}
 		}
-		s.Received[wp.Source] += 1
+		s.Received[wp.Source]++
 	}
 	s.appendErr(json.NewEncoder(w).Encode(&WriteResp{Hostname: s.Hostname}))
 }
@@ -164,7 +164,7 @@ func (s *State) appendSuccessfulSend(toHostname string) {
 	if s.Sent == nil {
 		s.Sent = map[string]int{}
 	}
-	s.Sent[toHostname] += 1
+	s.Sent[toHostname]++
 }
 
 var (
@@ -210,7 +210,7 @@ func main() {
 	http.HandleFunc("/write", state.serveWrite)
 	http.HandleFunc("/status", state.serveStatus)
 
-	go log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", *port), nil))
+	go log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
 
 	select {}
 }
@@ -241,7 +241,7 @@ func contactOthers(state *State) {
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
-	// Double check that that worked by getting the server version.
+	// Double check that worked by getting the server version.
 	if v, err := client.Discovery().ServerVersion(); err != nil {
 		log.Fatalf("Unable to get server version: %v\n", err)
 	} else {
@@ -270,7 +270,7 @@ func contactOthers(state *State) {
 
 //getWebserverEndpoints returns the webserver endpoints as a set of String, each in the format like "http://{ip}:{port}"
 func getWebserverEndpoints(client clientset.Interface) sets.String {
-	endpoints, err := client.Core().Endpoints(*namespace).Get(*service, v1.GetOptions{})
+	endpoints, err := client.CoreV1().Endpoints(*namespace).Get(*service, v1.GetOptions{})
 	eps := sets.String{}
 	if err != nil {
 		state.Logf("Unable to read the endpoints for %v/%v: %v.", *namespace, *service, err)

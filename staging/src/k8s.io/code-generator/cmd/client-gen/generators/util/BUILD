@@ -10,12 +10,12 @@ go_test(
     name = "go_default_test",
     srcs = ["tags_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/code-generator/cmd/client-gen/generators/util",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["tags.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/generators/util",
     importpath = "k8s.io/code-generator/cmd/client-gen/generators/util",
     deps = ["//vendor/k8s.io/gengo/types:go_default_library"],
 )

@@ -15,11 +15,10 @@
 package namespace
 
 import (
+	"context"
 	"sync"
 
 	"github.com/coreos/etcd/clientv3"
-
-	"golang.org/x/net/context"
 )
 
 type watcherPrefix struct {

@@ -5,12 +5,15 @@
 package gensupport
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"strings"
+	"sync"
 
 	"google.golang.org/api/googleapi"
 )
@@ -103,12 +106,13 @@ type typeReader struct {
 	typ string
 }
 
-// multipartReader combines the contents of multiple readers to creat a multipart/related HTTP body.
+// multipartReader combines the contents of multiple readers to create a multipart/related HTTP body.
 // Close must be called if reads from the multipartReader are abandoned before reaching EOF.
 type multipartReader struct {
 	pr       *io.PipeReader
-	pipeOpen bool
 	ctype    string
+	mu       sync.Mutex
+	pipeOpen bool
 }
 
 func newMultipartReader(parts []typeReader) *multipartReader {
@@ -144,10 +148,13 @@ func (mp *multipartReader) Read(data []byte) (n int, err error) {
 }
 
 func (mp *multipartReader) Close() error {
+	mp.mu.Lock()
 	if !mp.pipeOpen {
+		mp.mu.Unlock()
 		return nil
 	}
 	mp.pipeOpen = false
+	mp.mu.Unlock()
 	return mp.pr.Close()
 }
 
@@ -235,6 +242,7 @@ func NewInfoFromResumableMedia(r io.ReaderAt, size int64, mediaType string) *Med
 	}
 }
 
+// SetProgressUpdater sets the progress updater for the media info.
 func (mi *MediaInfo) SetProgressUpdater(pu googleapi.ProgressUpdater) {
 	if mi != nil {
 		mi.progressUpdater = pu
@@ -251,11 +259,11 @@ func (mi *MediaInfo) UploadType() string {
 }
 
 // UploadRequest sets up an HTTP request for media upload. It adds headers
-// as necessary, and returns a replacement for the body.
-func (mi *MediaInfo) UploadRequest(reqHeaders http.Header, body io.Reader) (newBody io.Reader, cleanup func()) {
+// as necessary, and returns a replacement for the body and a function for http.Request.GetBody.
+func (mi *MediaInfo) UploadRequest(reqHeaders http.Header, body io.Reader) (newBody io.Reader, getBody func() (io.ReadCloser, error), cleanup func()) {
 	cleanup = func() {}
 	if mi == nil {
-		return body, cleanup
+		return body, nil, cleanup
 	}
 	var media io.Reader
 	if mi.media != nil {
@@ -269,7 +277,17 @@ func (mi *MediaInfo) UploadRequest(reqHeaders http.Header, body io.Reader) (newB
 		media, _, _, _ = mi.buffer.Chunk()
 	}
 	if media != nil {
+		fb := readerFunc(body)
+		fm := readerFunc(media)
 		combined, ctype := CombineBodyMedia(body, "application/json", media, mi.mType)
+		if fb != nil && fm != nil {
+			getBody = func() (io.ReadCloser, error) {
+				rb := ioutil.NopCloser(fb())
+				rm := ioutil.NopCloser(fm())
+				r, _ := CombineBodyMedia(rb, "application/json", rm, mi.mType)
+				return r, nil
+			}
+		}
 		cleanup = func() { combined.Close() }
 		reqHeaders.Set("Content-Type", ctype)
 		body = combined
@@ -277,7 +295,27 @@ func (mi *MediaInfo) UploadRequest(reqHeaders http.Header, body io.Reader) (newB
 	if mi.buffer != nil && mi.mType != "" && !mi.singleChunk {
 		reqHeaders.Set("X-Upload-Content-Type", mi.mType)
 	}
-	return body, cleanup
+	return body, getBody, cleanup
+}
+
+// readerFunc returns a function that always returns an io.Reader that has the same
+// contents as r, provided that can be done without consuming r. Otherwise, it
+// returns nil.
+// See http.NewRequest (in net/http/request.go).
+func readerFunc(r io.Reader) func() io.Reader {
+	switch r := r.(type) {
+	case *bytes.Buffer:
+		buf := r.Bytes()
+		return func() io.Reader { return bytes.NewReader(buf) }
+	case *bytes.Reader:
+		snapshot := *r
+		return func() io.Reader { r := snapshot; return &r }
+	case *strings.Reader:
+		snapshot := *r
+		return func() io.Reader { r := snapshot; return &r }
+	default:
+		return nil
+	}
 }
 
 // ResumableUpload returns an appropriately configured ResumableUpload value if the
@@ -296,4 +334,9 @@ func (mi *MediaInfo) ResumableUpload(locURI string) *ResumableUpload {
 			}
 		},
 	}
+}
+
+// SetGetBody sets the GetBody field of req to f.
+func SetGetBody(req *http.Request, f func() (io.ReadCloser, error)) {
+	req.GetBody = f
 }

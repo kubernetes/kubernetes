@@ -15,14 +15,13 @@
 package v3client
 
 import (
+	"context"
 	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc"
 	"github.com/coreos/etcd/proxy/grpcproxy/adapter"
-
-	"golang.org/x/net/context"
 )
 
 // New creates a clientv3 client that wraps an in-process EtcdServer. Instead

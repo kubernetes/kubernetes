@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -21,6 +21,11 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# If KUBE_JUNIT_REPORT_DIR is unset, and ARTIFACTS is set, then have them match.
+if [[ -z "${KUBE_JUNIT_REPORT_DIR:-}" && -n "${ARTIFACTS:-}" ]]; then
+    export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
+fi
+
 # include shell2junit library
 source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 
@@ -32,30 +37,57 @@ EXCLUDED_PATTERNS=(
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   )
 
+# Exclude typecheck in certain cases, if they're running in a separate job.
+if [[ ${EXCLUDE_TYPECHECK:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-typecheck.sh"          # runs in separate typecheck job
+    )
+fi
+
+
+# Exclude vendor checks in certain cases, if they're running in a separate job.
+if [[ ${EXCLUDE_GODEP:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-vendor.sh"             # runs in separate godeps job
+    "verify-vendor-licenses.sh"    # runs in separate godeps job
+    )
+fi
+
+# Exclude readonly package check in certain cases, aka, in periodic jobs we don't care and a readonly package won't be touched
+if [[ ${EXCLUDE_READONLY_PACKAGE:-} =~ ^[yY]$ ]]; then
+  EXCLUDED_PATTERNS+=(
+    "verify-readonly-packages.sh"  # skip in CI, if env is set
+    )
+fi
+
 # Only run whitelisted fast checks in quick mode.
 # These run in <10s each on enisoc's workstation, assuming that
-# `make` and `hack/godep-restore.sh` had already been run.
+# `make` had already been run.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
   "verify-bazel.sh"
   "verify-boilerplate.sh"
-  "verify-generated-files-remake"
-  "verify-godep-licenses.sh"
+  "verify-vendor-licenses.sh"
   "verify-gofmt.sh"
   "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
+  "verify-spelling.sh"
   "verify-staging-client-go.sh"
+  "verify-staging-meta-files.sh"
+  "verify-test-featuregates.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
 )
 
 EXCLUDED_CHECKS=$(ls ${EXCLUDED_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
 QUICK_CHECKS=$(ls ${QUICK_PATTERNS[@]/#/${KUBE_ROOT}\/hack\/} 2>/dev/null || true)
+TARGET_LIST=()
+IFS=" " read -r -a TARGET_LIST <<< "${WHAT:-}"
 
 function is-excluded {
   for e in ${EXCLUDED_CHECKS[@]}; do
-    if [[ $1 -ef "$e" ]]; then
+    if [[ $1 -ef "${e}" ]]; then
       return
     fi
   done
@@ -64,9 +96,23 @@ function is-excluded {
 
 function is-quick {
   for e in ${QUICK_CHECKS[@]}; do
-    if [[ $1 -ef "$e" ]]; then
+    if [[ $1 -ef "${e}" ]]; then
       return
     fi
+  done
+  return 1
+}
+
+function is-explicitly-chosen {
+  local name="${1#verify-}"
+  name="${name%.*}"
+  index=0
+  for e in "${TARGET_LIST[@]}"; do
+    if [[ "${e}" == "${name}" ]]; then
+      TARGET_LIST[${index}]=""
+      return
+    fi
+    index=$((index + 1))
   done
   return 1
 }
@@ -87,7 +133,7 @@ function run-cmd {
   return ${tr}
 }
 
-# Collect Failed tests in this Array , initalize it to nil
+# Collect Failed tests in this Array , initialize it to nil
 FAILED_TESTS=()
 
 function print-failed-tests {
@@ -107,13 +153,19 @@ function run-checks {
   for t in $(ls ${pattern})
   do
     local check_name="$(basename "${t}")"
-    if is-excluded "${t}" ; then
-      echo "Skipping ${check_name}"
-      continue
-    fi
-    if ${QUICK} && ! is-quick "${t}" ; then
-      echo "Skipping ${check_name} in quick mode"
-      continue
+    if [[ ! -z ${WHAT:-} ]]; then
+      if ! is-explicitly-chosen "${check_name}"; then
+        continue
+      fi
+    else
+      if is-excluded "${t}" ; then
+        echo "Skipping ${check_name}"
+        continue
+      fi
+      if ${QUICK} && ! is-quick "${t}" ; then
+        echo "Skipping ${check_name} in quick mode"
+        continue
+      fi
     fi
     echo -e "Verifying ${check_name}"
     local start=$(date +%s)
@@ -126,6 +178,20 @@ function run-checks {
       ret=1
       FAILED_TESTS+=(${t})
     fi
+  done
+}
+
+# Check invalid targets specified in "WHAT" and mark them as failure cases
+function missing-target-checks {
+  # In case WHAT is not specified
+  [[ ${#TARGET_LIST[@]} -eq 0 ]] && return
+
+  for v in "${TARGET_LIST[@]}"
+  do
+    [[ -z "${v}" ]] && continue
+      
+    FAILED_TESTS+=(${v})
+    ret=1
   done
 }
 
@@ -143,6 +209,7 @@ fi
 ret=0
 run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
 run-checks "${KUBE_ROOT}/hack/verify-*.py" python
+missing-target-checks
 
 if [[ ${ret} -eq 1 ]]; then
     print-failed-tests

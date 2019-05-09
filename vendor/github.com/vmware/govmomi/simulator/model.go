@@ -30,17 +30,32 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+type DelayConfig struct {
+	// Delay specifies the number of milliseconds to delay serving a SOAP call. 0 means no delay.
+	// This can be used to simulate a poorly performing vCenter or network lag.
+	Delay int
+
+	// Delay specifies the number of milliseconds to delay serving a specific method.
+	// Each entry in the map represents the name of a method and its associated delay in milliseconds,
+	// This can be used to simulate a poorly performing vCenter or network lag.
+	MethodDelay map[string]int
+
+	// DelayJitter defines the delay jitter as a coefficient of variation (stddev/mean).
+	// This can be used to simulate unpredictable delay. 0 means no jitter, i.e. all invocations get the same delay.
+	DelayJitter float64
+}
+
 // Model is used to populate a Model with an initial set of managed entities.
 // This is a simple helper for tests running against a simulator, to populate an inventory
 // with commonly used models.
 type Model struct {
-	Service *Service
+	Service *Service `json:"-"`
 
-	ServiceContent types.ServiceContent
-	RootFolder     mo.Folder
+	ServiceContent types.ServiceContent `json:"-"`
+	RootFolder     mo.Folder            `json:"-"`
 
 	// Autostart will power on Model created VMs when true
-	Autostart bool
+	Autostart bool `json:"-"`
 
 	// Datacenter specifies the number of Datacenter entities to create
 	Datacenter int
@@ -49,13 +64,13 @@ type Model struct {
 	Portgroup int
 
 	// Host specifies the number of standalone HostSystems entities to create per Datacenter
-	Host int
+	Host int `json:",omitempty"`
 
 	// Cluster specifies the number of ClusterComputeResource entities to create per Datacenter
 	Cluster int
 
 	// ClusterHost specifies the number of HostSystems entities to create within a Cluster
-	ClusterHost int
+	ClusterHost int `json:",omitempty"`
 
 	// Pool specifies the number of ResourcePool entities to create per Cluster
 	Pool int
@@ -79,6 +94,9 @@ type Model struct {
 	// Pod specifies the number of StoragePod to create per Cluster
 	Pod int
 
+	// Delay configurations
+	DelayConfig DelayConfig
+
 	// total number of inventory objects, set by Count()
 	total int
 
@@ -93,6 +111,11 @@ func ESX() *Model {
 		Autostart:      true,
 		Datastore:      1,
 		Machine:        2,
+		DelayConfig: DelayConfig{
+			Delay:       0,
+			DelayJitter: 0,
+			MethodDelay: nil,
+		},
 	}
 }
 
@@ -109,6 +132,11 @@ func VPX() *Model {
 		ClusterHost:    3,
 		Datastore:      1,
 		Machine:        2,
+		DelayConfig: DelayConfig{
+			Delay:       0,
+			DelayJitter: 0,
+			MethodDelay: nil,
+		},
 	}
 }
 
@@ -164,6 +192,8 @@ func (m *Model) Create() error {
 
 	// After all hosts are created, this var is used to mount the host datastores.
 	var hosts []*object.HostSystem
+	hostMap := make(map[string][]*object.HostSystem)
+
 	// We need to defer VM creation until after the datastores are created.
 	var vms []func() error
 	// 1 DVS per DC, added to all hosts
@@ -233,6 +263,7 @@ func (m *Model) Create() error {
 				cdrom, _ := devices.CreateCdrom(ide.(*types.VirtualIDEController))
 				disk := devices.CreateDisk(scsi.(types.BaseVirtualController), ds,
 					config.Files.VmPathName+" "+path.Join(name, "disk1.vmdk"))
+				disk.CapacityInKB = 1024
 
 				devices = append(devices, scsi, cdrom, disk, &nic)
 
@@ -415,12 +446,14 @@ func (m *Model) Create() error {
 				addMachine(name, nil, vapp.ResourcePool, folders)
 			}
 		}
+
+		hostMap[dcName] = hosts
+		hosts = nil
 	}
 
 	if m.ServiceContent.RootFolder == esx.RootFolder.Reference() {
 		// ESX model
 		host := object.NewHostSystem(client, esx.HostSystem.Reference())
-		hosts = append(hosts, host)
 
 		dc := object.NewDatacenter(client, esx.Datacenter.Reference())
 		folders, err := dc.Folders(ctx)
@@ -428,13 +461,17 @@ func (m *Model) Create() error {
 			return err
 		}
 
+		hostMap[dc.Reference().Value] = append(hosts, host)
+
 		addMachine(host.Reference().Value, host, nil, folders)
 	}
 
-	for i := 0; i < m.Datastore; i++ {
-		err := m.createLocalDatastore(m.fmtName("LocalDS_", i), hosts)
-		if err != nil {
-			return err
+	for dc, dchosts := range hostMap {
+		for i := 0; i < m.Datastore; i++ {
+			err := m.createLocalDatastore(dc, m.fmtName("LocalDS_", i), dchosts)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -445,16 +482,15 @@ func (m *Model) Create() error {
 		}
 	}
 
+	// Turn on delay AFTER we're done building the service content
+	m.Service.delay = &m.DelayConfig
+
 	return nil
 }
 
-var tempDir = func() (string, error) {
-	return ioutil.TempDir("", "govcsim-")
-}
-
-func (m *Model) createLocalDatastore(name string, hosts []*object.HostSystem) error {
+func (m *Model) createLocalDatastore(dc string, name string, hosts []*object.HostSystem) error {
 	ctx := context.Background()
-	dir, err := tempDir()
+	dir, err := ioutil.TempDir("", fmt.Sprintf("govcsim-%s-%s-", dc, name))
 	if err != nil {
 		return err
 	}

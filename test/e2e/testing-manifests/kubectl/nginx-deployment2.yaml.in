@@ -1,8 +1,11 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-deployment
 spec:
+  selector:
+    matchLabels:
+      app: nginx
   template:
     metadata:
       labels:
@@ -10,6 +13,6 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: {{.NginxSlimNewImage}}
+        image: {{.NginxNewImage}}
         ports:
         - containerPort: 80

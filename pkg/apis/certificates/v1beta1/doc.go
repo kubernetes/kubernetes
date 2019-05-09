@@ -20,4 +20,5 @@ limitations under the License.
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/certificates/v1beta1
 
 // +groupName=certificates.k8s.io
+
 package v1beta1 // import "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"

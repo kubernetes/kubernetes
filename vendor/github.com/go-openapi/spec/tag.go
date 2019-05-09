@@ -21,6 +21,7 @@ import (
 	"github.com/go-openapi/swag"
 )
 
+// TagProps describe a tag entry in the top level tags section of a swagger spec
 type TagProps struct {
 	Description  string                 `json:"description,omitempty"`
 	Name         string                 `json:"name,omitempty"`

@@ -19,7 +19,7 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"reflect"
 	"sort"
 	"strconv"
@@ -147,6 +147,22 @@ func (s CPUSet) Union(s2 CPUSet) CPUSet {
 	return b.Result()
 }
 
+// UnionAll returns a new CPU set that contains all of the elements from this
+// set and all of the elements from the supplied sets, without mutating
+// either source set.
+func (s CPUSet) UnionAll(s2 []CPUSet) CPUSet {
+	b := NewBuilder()
+	for cpu := range s.elems {
+		b.Add(cpu)
+	}
+	for _, cs := range s2 {
+		for cpu := range cs.elems {
+			b.Add(cpu)
+		}
+	}
+	return b.Result()
+}
+
 // Intersection returns a new CPU set that contains all of the elements
 // that are present in both this set and the supplied set, without mutating
 // either source set.
@@ -221,7 +237,7 @@ func (s CPUSet) String() string {
 func MustParse(s string) CPUSet {
 	res, err := Parse(s)
 	if err != nil {
-		glog.Fatalf("unable to parse [%s] as CPUSet: %v", s, err)
+		klog.Fatalf("unable to parse [%s] as CPUSet: %v", s, err)
 	}
 	return res
 }

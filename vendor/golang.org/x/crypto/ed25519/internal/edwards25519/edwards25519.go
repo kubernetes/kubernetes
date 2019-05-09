@@ -4,6 +4,8 @@
 
 package edwards25519
 
+import "encoding/binary"
+
 // This code is a port of the public domain, “ref10” implementation of ed25519
 // from SUPERCOP.
 
@@ -1768,4 +1770,24 @@ func ScReduce(out *[32]byte, s *[64]byte) {
 	out[29] = byte(s11 >> 1)
 	out[30] = byte(s11 >> 9)
 	out[31] = byte(s11 >> 17)
+}
+
+// order is the order of Curve25519 in little-endian form.
+var order = [4]uint64{0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0, 0x1000000000000000}
+
+// ScMinimal returns true if the given scalar is less than the order of the
+// curve.
+func ScMinimal(scalar *[32]byte) bool {
+	for i := 3; ; i-- {
+		v := binary.LittleEndian.Uint64(scalar[i*8:])
+		if v > order[i] {
+			return false
+		} else if v < order[i] {
+			break
+		} else if i == 0 {
+			return false
+		}
+	}
+
+	return true
 }

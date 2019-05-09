@@ -1,5 +1,14 @@
-reviewers:
-- bowei 
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- bowei
 - MrHohn
 - thockin
 - matchstick
+reviewers:
+- bowei
+- MrHohn
+- thockin
+- matchstick
+labels:
+- sig/network

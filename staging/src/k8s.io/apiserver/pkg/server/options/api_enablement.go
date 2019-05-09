@@ -25,18 +25,18 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // APIEnablementOptions contains the options for which resources to turn on and off.
 // Given small aggregated API servers, this option isn't required for "normal" API servers
 type APIEnablementOptions struct {
-	RuntimeConfig utilflag.ConfigurationMap
+	RuntimeConfig cliflag.ConfigurationMap
 }
 
 func NewAPIEnablementOptions() *APIEnablementOptions {
 	return &APIEnablementOptions{
-		RuntimeConfig: make(utilflag.ConfigurationMap),
+		RuntimeConfig: make(cliflag.ConfigurationMap),
 	}
 }
 
@@ -63,7 +63,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 	errors := []error{}
 	if s.RuntimeConfig["api/all"] == "false" && len(s.RuntimeConfig) == 1 {
 		// Do not allow only set api/all=false, in such case apiserver startup has no meaning.
-		return append(errors, fmt.Errorf("invliad key with only api/all=false"))
+		return append(errors, fmt.Errorf("invalid key with only api/all=false"))
 	}
 
 	groups, err := resourceconfig.ParseGroups(s.RuntimeConfig)
@@ -84,6 +84,7 @@ func (s *APIEnablementOptions) Validate(registries ...GroupRegisty) []error {
 
 // ApplyTo override MergedResourceConfig with defaults and registry
 func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *serverstore.ResourceConfig, registry resourceconfig.GroupVersionRegistry) error {
+
 	if s == nil {
 		return nil
 	}
@@ -97,7 +98,7 @@ func (s *APIEnablementOptions) ApplyTo(c *server.Config, defaultResourceConfig *
 func unknownGroups(groups []string, registry GroupRegisty) []string {
 	unknownGroups := []string{}
 	for _, group := range groups {
-		if !registry.IsRegistered(group) {
+		if !registry.IsGroupRegistered(group) {
 			unknownGroups = append(unknownGroups, group)
 		}
 	}
@@ -107,5 +108,5 @@ func unknownGroups(groups []string, registry GroupRegisty) []string {
 // GroupRegisty provides a method to check whether given group is registered.
 type GroupRegisty interface {
 	// IsRegistered returns true if given group is registered.
-	IsRegistered(group string) bool
+	IsGroupRegistered(group string) bool
 }

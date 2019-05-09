@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: hostname
   annotations:
-    alpha.cloud.google.com/load-balancer-neg: "true"
+    cloud.google.com/neg: '{"ingress":true}'
 spec:
   ports:
   - port: 80

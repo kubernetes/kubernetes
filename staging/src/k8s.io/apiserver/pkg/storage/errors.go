@@ -166,5 +166,5 @@ func NewInternalError(reason string) InternalError {
 }
 
 func NewInternalErrorf(format string, a ...interface{}) InternalError {
-	return InternalError{fmt.Sprintf(format, a)}
+	return InternalError{fmt.Sprintf(format, a...)}
 }

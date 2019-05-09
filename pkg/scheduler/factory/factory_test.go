@@ -17,8 +17,8 @@ limitations under the License.
 package factory
 
 import (
-	"net/http"
-	"net/http/httptest"
+	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -26,50 +26,35 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes/fake"
+	fakeV1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
+	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/pkg/scheduler/util"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-const enableEquivalenceCache = true
+const (
+	disablePodPreemption = false
+	bindTimeoutSeconds   = 600
+)
 
 func TestCreate(t *testing.T) {
-	handler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-		T:            t,
-	}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	factory := NewConfigFactory(
-		v1.DefaultSchedulerName,
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 	factory.Create()
 }
 
@@ -79,31 +64,10 @@ func TestCreateFromConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-		T:            t,
-	}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	factory := NewConfigFactory(
-		v1.DefaultSchedulerName,
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -140,31 +104,10 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-		T:            t,
-	}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	factory := NewConfigFactory(
-		v1.DefaultSchedulerName,
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateOne)
@@ -202,31 +145,10 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	var configData []byte
 	var policy schedulerapi.Policy
 
-	handler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-		T:            t,
-	}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	factory := NewConfigFactory(
-		v1.DefaultSchedulerName,
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
@@ -236,19 +158,91 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory.CreateFromConfig(policy)
 }
 
-func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+// Test configures a scheduler from a policy that does not specify any
+// predicate/priority.
+// The predicate/priority from DefaultProvider will be used.
+func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+
+	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+
+	configData := []byte(`{
+		"kind" : "Policy",
+		"apiVersion" : "v1"
+	}`)
+	var policy schedulerapi.Policy
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+		t.Fatalf("Invalid configuration: %v", err)
+	}
+
+	config, err := factory.CreateFromConfig(policy)
+	if err != nil {
+		t.Fatalf("Failed to create scheduler from configuration: %v", err)
+	}
+	if _, found := config.Algorithm.Predicates()["PredicateOne"]; !found {
+		t.Errorf("Expected predicate PredicateOne from %q", DefaultProvider)
+	}
+	if len(config.Algorithm.Prioritizers()) != 1 || config.Algorithm.Prioritizers()[0].Name != "PriorityOne" {
+		t.Errorf("Expected priority PriorityOne from %q", DefaultProvider)
+	}
+}
+
+// Test configures a scheduler from a policy that contains empty
+// predicate/priority.
+// Empty predicate/priority sets will be used.
+func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+
+	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+
+	configData := []byte(`{
+		"kind" : "Policy",
+		"apiVersion" : "v1",
+		"predicates" : [],
+		"priorities" : []
+	}`)
+	var policy schedulerapi.Policy
+	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+		t.Fatalf("Invalid configuration: %v", err)
+	}
+
+	config, err := factory.CreateFromConfig(policy)
+	if err != nil {
+		t.Fatalf("Failed to create scheduler from configuration: %v", err)
+	}
+	if len(config.Algorithm.Predicates()) != 0 {
+		t.Error("Expected empty predicate sets")
+	}
+	if len(config.Algorithm.Prioritizers()) != 0 {
+		t.Error("Expected empty priority sets")
+	}
+}
+
+func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+func PredicateTwo(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
@@ -257,145 +251,190 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
-	handler := utiltesting.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: runtime.EncodeOrDie(util.Test.Codec(), testPod),
-		T:            t,
-	}
-	mux := http.NewServeMux()
+	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
 
-	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle(util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), &handler)
-	server := httptest.NewServer(mux)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	factory := NewConfigFactory(
-		v1.DefaultSchedulerName,
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		v1.DefaultHardPodAffinitySymmetricWeight,
-		enableEquivalenceCache,
-	)
-	queue := &core.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
-	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
-	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
+	timestamp := time.Now()
+	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
 
+	// Trigger error handling again to put the pod in unschedulable queue
 	errFunc(testPod, nil)
-	for {
-		// This is a terrible way to do this but I plan on replacing this
-		// whole error handling system in the future. The test will time
-		// out if something doesn't work.
-		time.Sleep(10 * time.Millisecond)
-		got, exists, _ := queue.Get(testPod)
-		if !exists {
+
+	// Try up to a minute to retrieve the error pod from priority queue
+	foundPodFlag := false
+	maxIterations := 10 * 60
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
 			continue
 		}
-		handler.ValidateRequest(t, util.Test.ResourcePath(string(v1.ResourcePods), "bar", "foo"), "GET", nil)
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+
+		foundPodFlag = true
 		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
+	}
+
+	// Remove the pod from priority queue to test putting error
+	// pod in backoff queue.
+	queue.Delete(testPod)
+
+	// Trigger a move request
+	queue.MoveAllToActiveQueue()
+
+	// Trigger error handling again to put the pod in backoff queue
+	errFunc(testPod, nil)
+
+	foundPodFlag = false
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		// The pod should be found from backoff queue at this time
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
+			continue
+		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
+		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+
+		foundPodFlag = true
+		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the backoff queue after waiting for a minute: %v", testPod)
 	}
 }
 
-func TestNodeEnumerator(t *testing.T) {
-	testList := &v1.NodeList{
-		Items: []v1.Node{
-			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
-		},
+// getPodfromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
+// the specific pod from the given priority queue. It returns the found pod in the priority queue.
+func getPodfromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
+	podList := queue.PendingPods()
+	if len(podList) == 0 {
+		return nil
 	}
-	me := nodeEnumerator{testList}
 
-	if e, a := 3, me.Len(); e != a {
-		t.Fatalf("expected %v, got %v", e, a)
+	queryPodKey, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		return nil
 	}
-	for i := range testList.Items {
-		gotObj := me.Get(i)
-		if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
+
+	for _, foundPod := range podList {
+		foundPodKey, err := cache.MetaNamespaceKeyFunc(foundPod)
+		if err != nil {
+			return nil
 		}
-		if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-			t.Errorf("Expected %#v, got %v#", e, a)
+
+		if foundPodKey == queryPodKey {
+			return foundPod
 		}
+	}
+
+	return nil
+}
+
+// testClientGetPodRequest function provides a routine used by TestDefaultErrorFunc test.
+// It tests whether the fake client can receive request and correctly "get" the namespace
+// and name of the error pod.
+func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string, podName string) {
+	requestReceived := false
+	actions := client.Actions()
+	for _, a := range actions {
+		if a.GetVerb() == "get" {
+			getAction, ok := a.(clienttesting.GetAction)
+			if !ok {
+				t.Errorf("Can't cast action object to GetAction interface")
+				break
+			}
+			name := getAction.GetName()
+			ns := a.GetNamespace()
+			if name != podName || ns != podNs {
+				t.Errorf("Expected name %s namespace %s, got %s %s",
+					podName, podNs, name, ns)
+			}
+			requestReceived = true
+		}
+	}
+	if !requestReceived {
+		t.Errorf("Get pod request not received")
 	}
 }
 
 func TestBind(t *testing.T) {
 	table := []struct {
+		name    string
 		binding *v1.Binding
 	}{
-		{binding: &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: metav1.NamespaceDefault,
-				Name:      "foo",
+		{
+			name: "binding can bind and validate request",
+			binding: &v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: metav1.NamespaceDefault,
+					Name:      "foo",
+				},
+				Target: v1.ObjectReference{
+					Name: "foohost.kubernetes.mydomain.com",
+				},
 			},
-			Target: v1.ObjectReference{
-				Name: "foohost.kubernetes.mydomain.com",
-			},
-		}},
+		},
 	}
 
-	for _, item := range table {
-		handler := utiltesting.FakeHandler{
-			StatusCode:   200,
-			ResponseBody: "",
-			T:            t,
-		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
-		b := binder{client}
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			testBind(test.binding, t)
+		})
+	}
+}
 
-		if err := b.Bind(item.binding); err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		expectedBody := runtime.EncodeOrDie(util.Test.Codec(), item.binding)
-		handler.ValidateRequest(t,
-			util.Test.SubResourcePath(string(v1.ResourcePods), metav1.NamespaceDefault, "foo", "binding"),
-			"POST", &expectedBody)
+func testBind(binding *v1.Binding, t *testing.T) {
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: binding.GetName(), Namespace: metav1.NamespaceDefault},
+		Spec:       apitesting.V1DeepEqualSafePodSpec(),
+	}
+	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+
+	b := binder{client}
+
+	if err := b.Bind(binding); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+
+	pod := client.CoreV1().Pods(metav1.NamespaceDefault).(*fakeV1.FakePods)
+
+	actualBinding, err := pod.GetBinding(binding.GetName())
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+		return
+	}
+	if !reflect.DeepEqual(binding, actualBinding) {
+		t.Errorf("Binding did not match expectation")
+		t.Logf("Expected: %v", binding)
+		t.Logf("Actual:   %v", actualBinding)
 	}
 }
 
 func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
-	handler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-		T:            t,
-	}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := fake.NewSimpleClientset()
 	// factory of "default-scheduler"
-	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	factory := NewConfigFactory(
-		v1.DefaultSchedulerName,
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		-1,
-		enableEquivalenceCache,
-	)
+	stopCh := make(chan struct{})
+	factory := newConfigFactory(client, -1, stopCh)
+	defer close(stopCh)
 	_, err := factory.Create()
 	if err == nil {
 		t.Errorf("expected err: invalid hardPodAffinitySymmetricWeight, got nothing")
@@ -403,141 +442,174 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 }
 
 func TestInvalidFactoryArgs(t *testing.T) {
-	handler := utiltesting.FakeHandler{
-		StatusCode:   500,
-		ResponseBody: "",
-		T:            t,
-	}
-	server := httptest.NewServer(&handler)
-	defer server.Close()
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion}})
+	client := fake.NewSimpleClientset()
 
 	testCases := []struct {
+		name                           string
 		hardPodAffinitySymmetricWeight int32
 		expectErr                      string
 	}{
 		{
+			name:                           "symmetric weight below range",
 			hardPodAffinitySymmetricWeight: -1,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range 0-100",
 		},
 		{
+			name:                           "symmetric weight above range",
 			hardPodAffinitySymmetricWeight: 101,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range 0-100",
 		},
 	}
 
 	for _, test := range testCases {
-		informerFactory := informers.NewSharedInformerFactory(client, 0)
-		factory := NewConfigFactory(
-			v1.DefaultSchedulerName,
-			client,
-			informerFactory.Core().V1().Nodes(),
-			informerFactory.Core().V1().Pods(),
-			informerFactory.Core().V1().PersistentVolumes(),
-			informerFactory.Core().V1().PersistentVolumeClaims(),
-			informerFactory.Core().V1().ReplicationControllers(),
-			informerFactory.Extensions().V1beta1().ReplicaSets(),
-			informerFactory.Apps().V1beta1().StatefulSets(),
-			informerFactory.Core().V1().Services(),
-			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			informerFactory.Storage().V1().StorageClasses(),
-			test.hardPodAffinitySymmetricWeight,
-			enableEquivalenceCache,
-		)
-		_, err := factory.Create()
-		if err == nil {
-			t.Errorf("expected err: %s, got nothing", test.expectErr)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
+			defer close(stopCh)
+			_, err := factory.Create()
+			if err == nil {
+				t.Errorf("expected err: %s, got nothing", test.expectErr)
+			}
+		})
 	}
 
 }
 
-func TestSkipPodUpdate(t *testing.T) {
-	for _, test := range []struct {
-		pod              *v1.Pod
-		isAssumedPodFunc func(*v1.Pod) bool
-		getPodFunc       func(*v1.Pod) *v1.Pod
-		expected         bool
+func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) Configurator {
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	return NewConfigFactory(&ConfigFactoryArgs{
+		v1.DefaultSchedulerName,
+		client,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+		hardPodAffinitySymmetricWeight,
+		disablePodPreemption,
+		schedulerapi.DefaultPercentageOfNodesToScore,
+		bindTimeoutSeconds,
+		stopCh,
+		framework.NewRegistry(),
+	})
+}
+
+type fakeExtender struct {
+	isBinder          bool
+	interestedPodName string
+	ignorable         bool
+}
+
+func (f *fakeExtender) Name() string {
+	return "fakeExtender"
+}
+
+func (f *fakeExtender) IsIgnorable() bool {
+	return f.ignorable
+}
+
+func (f *fakeExtender) ProcessPreemption(
+	pod *v1.Pod,
+	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
+) (map[*v1.Node]*schedulerapi.Victims, error) {
+	return nil, nil
+}
+
+func (f *fakeExtender) SupportsPreemption() bool {
+	return false
+}
+
+func (f *fakeExtender) Filter(
+	pod *v1.Pod,
+	nodes []*v1.Node,
+	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
+) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
+	return nil, nil, nil
+}
+
+func (f *fakeExtender) Prioritize(
+	pod *v1.Pod,
+	nodes []*v1.Node,
+) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error) {
+	return nil, 0, nil
+}
+
+func (f *fakeExtender) Bind(binding *v1.Binding) error {
+	if f.isBinder {
+		return nil
+	}
+	return errors.New("not a binder")
+}
+
+func (f *fakeExtender) IsBinder() bool {
+	return f.isBinder
+}
+
+func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
+	return pod != nil && pod.Name == f.interestedPodName
+}
+
+func TestGetBinderFunc(t *testing.T) {
+	table := []struct {
+		podName            string
+		extenders          []algorithm.SchedulerExtender
+		expectedBinderType string
+		name               string
 	}{
-		// Non-assumed pod should not be skipped.
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-0",
-				},
+			name:    "the extender is not a binder",
+			podName: "pod0",
+			extenders: []algorithm.SchedulerExtender{
+				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
-			isAssumedPodFunc: func(*v1.Pod) bool { return false },
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod-0",
-					},
-				}
-			},
-			expected: false,
+			expectedBinderType: "*factory.binder",
 		},
-		// Pod update (with changes on ResourceVersion, Spec.NodeName and/or
-		// Annotations) for an already assumed pod should be skipped.
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "pod-0",
-					Annotations:     map[string]string{"a": "b"},
-					ResourceVersion: "0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "node-0",
-				},
+			name:    "one of the extenders is a binder and interested in pod",
+			podName: "pod0",
+			extenders: []algorithm.SchedulerExtender{
+				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
+				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "pod-0",
-						Annotations:     map[string]string{"c": "d"},
-						ResourceVersion: "1",
-					},
-					Spec: v1.PodSpec{
-						NodeName: "node-1",
-					},
-				}
-			},
-			expected: true,
+			expectedBinderType: "*factory.fakeExtender",
 		},
-		// Pod update (with changes on Labels) for an already assumed pod
-		// should not be skipped.
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "pod-0",
-					Labels: map[string]string{"a": "b"},
-				},
+			name:    "one of the extenders is a binder, but not interested in pod",
+			podName: "pod1",
+			extenders: []algorithm.SchedulerExtender{
+				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
+				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "pod-0",
-						Labels: map[string]string{"c": "d"},
-					},
-				}
-			},
-			expected: false,
+			expectedBinderType: "*factory.binder",
 		},
-	} {
-		c := &configFactory{
-			schedulerCache: &schedulertesting.FakeCache{
-				IsAssumedPodFunc: test.isAssumedPodFunc,
-				GetPodFunc:       test.getPodFunc,
-			},
-		}
-		got := c.skipPodUpdate(test.pod)
-		if got != test.expected {
-			t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-		}
+	}
+
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			testGetBinderFunc(test.expectedBinderType, test.podName, test.extenders, t)
+		})
+	}
+}
+
+func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm.SchedulerExtender, t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+	}
+
+	f := &configFactory{}
+	binderFunc := getBinderFunc(f.client, extenders)
+	binder := binderFunc(pod)
+
+	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
+	if binderType != expectedBinderType {
+		t.Errorf("Expected binder %q but got %q", expectedBinderType, binderType)
 	}
 }

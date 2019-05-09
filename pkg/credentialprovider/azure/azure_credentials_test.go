@@ -18,17 +18,18 @@ package azure
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
+	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
 type fakeClient struct {
-	results containerregistry.RegistryListResult
+	results []containerregistry.Registry
 }
 
-func (f *fakeClient) List() (containerregistry.RegistryListResult, error) {
+func (f *fakeClient) List(ctx context.Context) ([]containerregistry.Registry, error) {
 	return f.results, nil
 }
 
@@ -38,25 +39,29 @@ func Test(t *testing.T) {
         "aadClientId": "foo",
         "aadClientSecret": "bar"
     }`
-	result := containerregistry.RegistryListResult{
-		Value: &[]containerregistry.Registry{
-			{
-				Name: to.StringPtr("foo"),
-				RegistryProperties: &containerregistry.RegistryProperties{
-					LoginServer: to.StringPtr("foo-microsoft.azurecr.io"),
-				},
+	result := []containerregistry.Registry{
+		{
+			Name: to.StringPtr("foo"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.io"),
 			},
-			{
-				Name: to.StringPtr("bar"),
-				RegistryProperties: &containerregistry.RegistryProperties{
-					LoginServer: to.StringPtr("bar-microsoft.azurecr.io"),
-				},
+		},
+		{
+			Name: to.StringPtr("bar"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.cn"),
 			},
-			{
-				Name: to.StringPtr("baz"),
-				RegistryProperties: &containerregistry.RegistryProperties{
-					LoginServer: to.StringPtr("baz-microsoft.azurecr.io"),
-				},
+		},
+		{
+			Name: to.StringPtr("baz"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.de"),
+			},
+		},
+		{
+			Name: to.StringPtr("bus"),
+			RegistryProperties: &containerregistry.RegistryProperties{
+				LoginServer: to.StringPtr("*.azurecr.us"),
 			},
 		},
 	}
@@ -69,23 +74,60 @@ func Test(t *testing.T) {
 	}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 
-	creds := provider.Provide()
+	creds := provider.Provide("")
 
-	if len(creds) != len(*result.Value) {
-		t.Errorf("Unexpected list: %v, expected length %d", creds, len(*result.Value))
+	if len(creds) != len(result)+1 {
+		t.Errorf("Unexpected list: %v, expected length %d", creds, len(result)+1)
 	}
 	for _, cred := range creds {
-		if cred.Username != "foo" {
+		if cred.Username != "" && cred.Username != "foo" {
 			t.Errorf("expected 'foo' for username, saw: %v", cred.Username)
 		}
-		if cred.Password != "bar" {
+		if cred.Password != "" && cred.Password != "bar" {
 			t.Errorf("expected 'bar' for password, saw: %v", cred.Username)
 		}
 	}
-	for _, val := range *result.Value {
+	for _, val := range result {
 		registryName := getLoginServer(val)
 		if _, found := creds[registryName]; !found {
 			t.Errorf("Missing expected registry: %s", registryName)
+		}
+	}
+}
+
+func TestParseACRLoginServerFromImage(t *testing.T) {
+	tests := []struct {
+		image    string
+		expected string
+	}{
+		{
+			image:    "invalidImage",
+			expected: "",
+		},
+		{
+			image:    "docker.io/library/busybox:latest",
+			expected: "",
+		},
+		{
+			image:    "foo.azurecr.io/bar/image:version",
+			expected: "foo.azurecr.io",
+		},
+		{
+			image:    "foo.azurecr.cn/bar/image:version",
+			expected: "foo.azurecr.cn",
+		},
+		{
+			image:    "foo.azurecr.de/bar/image:version",
+			expected: "foo.azurecr.de",
+		},
+		{
+			image:    "foo.azurecr.us/bar/image:version",
+			expected: "foo.azurecr.us",
+		},
+	}
+	for _, test := range tests {
+		if loginServer := parseACRLoginServerFromImage(test.image); loginServer != test.expected {
+			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
 		}
 	}
 }

@@ -25,30 +25,30 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 type createClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
-	server                flag.StringFlag
-	insecureSkipTLSVerify flag.Tristate
-	certificateAuthority  flag.StringFlag
-	embedCAData           flag.Tristate
+	server                cliflag.StringFlag
+	insecureSkipTLSVerify cliflag.Tristate
+	certificateAuthority  cliflag.StringFlag
+	embedCAData           cliflag.Tristate
 }
 
 var (
-	create_cluster_long = templates.LongDesc(`
+	createClusterLong = templates.LongDesc(`
 		Sets a cluster entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
 
-	create_cluster_example = templates.Examples(`
+	createClusterExample = templates.Examples(`
 		# Set only the server field on the e2e cluster entry without touching other values.
 		kubectl config set-cluster e2e --server=https://1.2.3.4
 
@@ -59,15 +59,16 @@ var (
 		kubectl config set-cluster e2e --insecure-skip-tls-verify=true`)
 )
 
+// NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
 func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
+		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure),
 		DisableFlagsInUseLine: true,
-		Short:   i18n.T("Sets a cluster entry in kubeconfig"),
-		Long:    create_cluster_long,
-		Example: create_cluster_example,
+		Short:                 i18n.T("Sets a cluster entry in kubeconfig"),
+		Long:                  createClusterLong,
+		Example:               createClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())

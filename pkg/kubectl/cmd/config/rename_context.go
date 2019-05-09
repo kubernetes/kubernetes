@@ -24,8 +24,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // RenameContextOptions contains the options for running the rename-context cli command.
@@ -48,7 +48,7 @@ var (
 		CONTEXT_NAME is the context name that you wish change.
 
 		NEW_NAME is the new name you wish to set.
-		
+
 		Note: In case the context being renamed is the 'current-context', this field will also be updated.`)
 
 	renameContextExample = templates.Examples(`
@@ -61,21 +61,15 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 	options := &RenameContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use: renameContextUse,
+		Use:                   renameContextUse,
 		DisableFlagsInUseLine: true,
-		Short:   renameContextShort,
-		Long:    renameContextLong,
-		Example: renameContextExample,
+		Short:                 renameContextShort,
+		Long:                  renameContextLong,
+		Example:               renameContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := options.Complete(cmd, args, out); err != nil {
-				cmdutil.CheckErr(err)
-			}
-			if err := options.Validate(); err != nil {
-				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
-			}
-			if err := options.RunRenameContext(out); err != nil {
-				cmdutil.CheckErr(err)
-			}
+			cmdutil.CheckErr(options.Complete(cmd, args, out))
+			cmdutil.CheckErr(options.Validate())
+			cmdutil.CheckErr(options.RunRenameContext(out))
 		},
 	}
 	return cmd
@@ -92,6 +86,7 @@ func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out i
 	return nil
 }
 
+// Validate makes sure that provided values for command-line options are valid
 func (o RenameContextOptions) Validate() error {
 	if len(o.newName) == 0 {
 		return errors.New("You must specify a new non-empty context name")
@@ -99,6 +94,7 @@ func (o RenameContextOptions) Validate() error {
 	return nil
 }
 
+// RunRenameContext performs the execution for 'config rename-context' sub command
 func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {

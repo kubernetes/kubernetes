@@ -1,6 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
 - thockin
 - smarterclayton
 - justinsb
 - freehan
 - dcbw
+- danwinship
+labels:
+- sig/network

@@ -21,13 +21,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -42,11 +41,11 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		clientPod  *v1.Pod
 		pvConfig   framework.PersistentVolumeConfig
 		pvcConfig  framework.PersistentVolumeClaimConfig
-		vsp        *vsphere.VSphere
 		err        error
-		node       types.NodeName
+		node       string
 		volLabel   labels.Set
 		selector   *metav1.LabelSelector
+		nodeInfo   *NodeInfo
 	)
 
 	f := framework.NewDefaultFramework("pv")
@@ -61,22 +60,24 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	*/
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		clientPod = nil
 		pvc = nil
 		pv = nil
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
+		if len(nodes.Items) < 1 {
+			framework.Skipf("Requires at least %d node", 1)
+		}
+		nodeInfo = TestContext.NodeMapper.GetNodeInfo(nodes.Items[0].Name)
 
 		volLabel = labels.Set{framework.VolumeSelectorKey: ns}
 		selector = metav1.SetAsLabelSelector(volLabel)
 
-		if vsp == nil {
-			vsp, err = getVSphere(c)
-			Expect(err).NotTo(HaveOccurred())
-		}
 		if volumePath == "" {
-			volumePath, err = createVSphereVolume(vsp, nil)
-			Expect(err).NotTo(HaveOccurred())
+			volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
+			framework.ExpectNoError(err)
 			pvConfig = framework.PersistentVolumeConfig{
 				NamePrefix: "vspherepv-",
 				Labels:     volLabel,
@@ -88,31 +89,30 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 				},
 				Prebind: nil,
 			}
+			emptyStorageClass := ""
 			pvcConfig = framework.PersistentVolumeClaimConfig{
-				Annotations: map[string]string{
-					v1.BetaStorageClassAnnotation: "",
-				},
-				Selector: selector,
+				Selector:         selector,
+				StorageClassName: &emptyStorageClass,
 			}
 		}
 		By("Creating the PV and PVC")
 		pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, false)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 		By("Creating the Client Pod")
 		clientPod, err = framework.CreateClientPod(c, ns, pvc)
-		Expect(err).NotTo(HaveOccurred())
-		node = types.NodeName(clientPod.Spec.NodeName)
+		framework.ExpectNoError(err)
+		node = clientPod.Spec.NodeName
 
 		By("Verify disk should be attached to the node")
-		isAttached, err := verifyVSphereDiskAttached(c, vsp, volumePath, node)
-		Expect(err).NotTo(HaveOccurred())
+		isAttached, err := diskIsAttached(volumePath, node)
+		framework.ExpectNoError(err)
 		Expect(isAttached).To(BeTrue(), "disk is not attached with the node")
 	})
 
 	AfterEach(func() {
-		framework.Logf("AfterEach: Cleaning up test resources")
+		e2elog.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 
@@ -134,12 +134,8 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	framework.AddCleanupAction(func() {
 		// Cleanup actions will be called even when the tests are skipped and leaves namespace unset.
 		if len(ns) > 0 && len(volumePath) > 0 {
-			client, err := framework.LoadClientset()
-			if err != nil {
-				return
-			}
-			framework.ExpectNoError(waitForVSphereDiskToDetach(client, vsp, volumePath, node))
-			vsp.DeleteVolume(volumePath)
+			framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node))
+			nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 		}
 	})
 
@@ -183,7 +179,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		3. Verify that written file is accessible after kubelet restart
 	*/
 	It("should test that a file written to the vspehre volume mount before kubelet restart can be read after restart [Disruptive]", func() {
-		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod, pvc, pv)
+		utils.TestKubeletRestartsAndRestoresMount(c, f, clientPod)
 	})
 
 	/*
@@ -198,7 +194,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		5. Verify that volume mount not to be found.
 	*/
 	It("should test that a vspehre volume mounted to a pod that is deleted while the kubelet is down unmounts when the kubelet returns [Disruptive]", func() {
-		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod, pvc, pv)
+		utils.TestVolumeUnmountsFromDeletedPod(c, f, clientPod)
 	})
 
 	/*
@@ -212,12 +208,12 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	It("should test that deleting the Namespace of a PVC and Pod causes the successful detach of vsphere volume", func() {
 		By("Deleting the Namespace")
 		err := c.CoreV1().Namespaces().Delete(ns, nil)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		err = framework.WaitForNamespacesDeleted(c, []string{ns}, 3*time.Minute)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Verifying Persistent Disk detaches")
-		waitForVSphereDiskToDetach(c, vsp, volumePath, node)
+		waitForVSphereDiskToDetach(volumePath, node)
 	})
 })

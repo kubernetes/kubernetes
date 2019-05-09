@@ -1,4 +1,4 @@
-package mount
+package mount // import "github.com/docker/docker/api/types/mount"
 
 import (
 	"os"
@@ -15,6 +15,8 @@ const (
 	TypeVolume Type = "volume"
 	// TypeTmpfs is the type for mounting tmpfs
 	TypeTmpfs Type = "tmpfs"
+	// TypeNamedPipe is the type for mounting Windows named pipes
+	TypeNamedPipe Type = "npipe"
 )
 
 // Mount represents a mount (volume).
@@ -65,7 +67,7 @@ var Propagations = []Propagation{
 type Consistency string
 
 const (
-	// ConsistencyFull guarantees bind-mount-like consistency
+	// ConsistencyFull guarantees bind mount-like consistency
 	ConsistencyFull Consistency = "consistent"
 	// ConsistencyCached mounts can cache read data and FS structure
 	ConsistencyCached Consistency = "cached"
@@ -77,7 +79,8 @@ const (
 
 // BindOptions defines options specific to mounts of type "bind".
 type BindOptions struct {
-	Propagation Propagation `json:",omitempty"`
+	Propagation  Propagation `json:",omitempty"`
+	NonRecursive bool        `json:",omitempty"`
 }
 
 // VolumeOptions represents the options for a mount of type volume.

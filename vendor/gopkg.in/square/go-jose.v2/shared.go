@@ -18,6 +18,8 @@ package jose
 
 import (
 	"crypto/elliptic"
+	"crypto/x509"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -141,6 +143,7 @@ const (
 	headerEPK = "epk" // *JSONWebKey
 	headerIV  = "iv"  // *byteBuffer
 	headerTag = "tag" // *byteBuffer
+	headerX5c = "x5c" // []*x509.Certificate
 
 	headerJWK   = "jwk"   // *JSONWebKey
 	headerKeyID = "kid"   // string
@@ -162,9 +165,32 @@ type Header struct {
 	Algorithm  string
 	Nonce      string
 
-	// Any headers not recognised above get unmarshaled from JSON in a generic
-	// manner and placed in this map.
+	// Unverified certificate chain parsed from x5c header.
+	certificates []*x509.Certificate
+
+	// Any headers not recognised above get unmarshaled
+	// from JSON in a generic manner and placed in this map.
 	ExtraHeaders map[HeaderKey]interface{}
+}
+
+// Certificates verifies & returns the certificate chain present
+// in the x5c header field of a message, if one was present. Returns
+// an error if there was no x5c header present or the chain could
+// not be validated with the given verify options.
+func (h Header) Certificates(opts x509.VerifyOptions) ([][]*x509.Certificate, error) {
+	if len(h.certificates) == 0 {
+		return nil, errors.New("square/go-jose: no x5c header present in message")
+	}
+
+	leaf := h.certificates[0]
+	if opts.Intermediates == nil {
+		opts.Intermediates = x509.NewCertPool()
+		for _, intermediate := range h.certificates[1:] {
+			opts.Intermediates.AddCert(intermediate)
+		}
+	}
+
+	return leaf.Verify(opts)
 }
 
 func (parsed rawHeader) set(k HeaderKey, v interface{}) error {
@@ -333,6 +359,18 @@ func (parsed rawHeader) sanitized() (h Header, err error) {
 				return
 			}
 			h.Nonce = s
+		case headerX5c:
+			c := []string{}
+			err = json.Unmarshal(*v, &c)
+			if err != nil {
+				err = fmt.Errorf("failed to unmarshal x5c header: %v: %#v", err, string(*v))
+				return
+			}
+			h.certificates, err = parseCertificateChain(c)
+			if err != nil {
+				err = fmt.Errorf("failed to unmarshal x5c header: %v: %#v", err, string(*v))
+				return
+			}
 		default:
 			if h.ExtraHeaders == nil {
 				h.ExtraHeaders = map[HeaderKey]interface{}{}
@@ -347,6 +385,21 @@ func (parsed rawHeader) sanitized() (h Header, err error) {
 		}
 	}
 	return
+}
+
+func parseCertificateChain(chain []string) ([]*x509.Certificate, error) {
+	out := make([]*x509.Certificate, len(chain))
+	for i, cert := range chain {
+		raw, err := base64.StdEncoding.DecodeString(cert)
+		if err != nil {
+			return nil, err
+		}
+		out[i], err = x509.ParseCertificate(raw)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 func (dst rawHeader) isSet(k HeaderKey) bool {

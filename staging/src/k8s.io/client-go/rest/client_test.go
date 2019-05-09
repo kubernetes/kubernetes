@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -55,7 +54,7 @@ func TestSerializer(t *testing.T) {
 	contentConfig := ContentConfig{
 		ContentType:          "application/json",
 		GroupVersion:         &gv,
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 	}
 
 	serializer, err := createSerializers(contentConfig)
@@ -302,7 +301,7 @@ func TestCreateBackoffManager(t *testing.T) {
 	backoff.UpdateBackoff(theUrl, nil, 500)
 	backoff = readExpBackoffConfig()
 	if backoff.CalculateBackoff(theUrl)/time.Second != 0 {
-		t.Errorf("Zero backoff duration, but backoff still occuring.")
+		t.Errorf("Zero backoff duration, but backoff still occurring.")
 	}
 
 	// No env -> No backoff.
@@ -334,7 +333,7 @@ func restClient(testServer *httptest.Server) (*RESTClient, error) {
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
 			GroupVersion:         &v1.SchemeGroupVersion,
-			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+			NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 		},
 		Username: "user",
 		Password: "pass",

@@ -98,11 +98,12 @@ package gostring
 
 import (
 	"fmt"
-	"github.com/gogo/protobuf/gogoproto"
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/gogo/protobuf/gogoproto"
+	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 )
 
 type gostring struct {
@@ -229,8 +230,22 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 					p.P(`if this.`, fieldname, ` != nil {`)
 					p.In()
 				}
-				if nullable || repeated {
+				if nullable {
 					p.P(`s = append(s, "`, fieldname, `: " + `, fmtPkg.Use(), `.Sprintf("%#v", this.`, fieldname, `) + ",\n")`)
+				} else if repeated {
+					if nullable {
+						p.P(`s = append(s, "`, fieldname, `: " + `, fmtPkg.Use(), `.Sprintf("%#v", this.`, fieldname, `) + ",\n")`)
+					} else {
+						goTyp, _ := p.GoType(message, field)
+						goTyp = strings.Replace(goTyp, "[]", "", 1)
+						p.P("vs := make([]*", goTyp, ", len(this.", fieldname, "))")
+						p.P("for i := range vs {")
+						p.In()
+						p.P("vs[i] = &this.", fieldname, "[i]")
+						p.Out()
+						p.P("}")
+						p.P(`s = append(s, "`, fieldname, `: " + `, fmtPkg.Use(), `.Sprintf("%#v", vs) + ",\n")`)
+					}
 				} else {
 					p.P(`s = append(s, "`, fieldname, `: " + `, stringsPkg.Use(), `.Replace(this.`, fieldname, `.GoString()`, ",`&`,``,1)", ` + ",\n")`)
 				}
@@ -246,7 +261,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 				if field.IsEnum() {
 					if nullable && !repeated && !proto3 {
 						goTyp, _ := p.GoType(message, field)
-						p.P(`s = append(s, "`, fieldname, `: " + valueToGoString`, p.localName, `(this.`, fieldname, `,"`, packageName, ".", generator.GoTypeToName(goTyp), `"`, `) + ",\n")`)
+						p.P(`s = append(s, "`, fieldname, `: " + valueToGoString`, p.localName, `(this.`, fieldname, `,"`, generator.GoTypeToName(goTyp), `"`, `) + ",\n")`)
 					} else {
 						p.P(`s = append(s, "`, fieldname, `: " + `, fmtPkg.Use(), `.Sprintf("%#v", this.`, fieldname, `) + ",\n")`)
 					}
@@ -285,7 +300,6 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 		}
 
 		p.P(`s = append(s, "}")`)
-		//outStr += strings.Join([]string{" + `}`", `}`, `,", "`, ")"}, "")
 		p.P(`return `, stringsPkg.Use(), `.Join(s, "")`)
 		p.Out()
 		p.P(`}`)
@@ -304,20 +318,15 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 			p.P(`return "nil"`)
 			p.Out()
 			p.P(`}`)
-			outFlds := []string{}
 			fieldname := p.GetOneOfFieldName(message, field)
-			if field.IsMessage() || p.IsGroup(field) {
-				tmp := strings.Join([]string{"`", fieldname, ":` + "}, "")
-				tmp += strings.Join([]string{fmtPkg.Use(), `.Sprintf("%#v", this.`, fieldname, `)`}, "")
-				outFlds = append(outFlds, tmp)
-			} else {
-				tmp := strings.Join([]string{"`", fieldname, ":` + "}, "")
-				tmp += strings.Join([]string{fmtPkg.Use(), `.Sprintf("%#v", this.`, fieldname, ")"}, "")
-				outFlds = append(outFlds, tmp)
-			}
-			outStr := strings.Join([]string{"s := ", stringsPkg.Use(), ".Join([]string{`&", packageName, ".", ccTypeName, "{` + \n"}, "")
-			outStr += strings.Join(outFlds, ",\n")
-			outStr += strings.Join([]string{" + `}`", `}`, `,", "`, ")"}, "")
+			outStr := strings.Join([]string{
+				"s := ",
+				stringsPkg.Use(), ".Join([]string{`&", packageName, ".", ccTypeName, "{` + \n",
+				"`", fieldname, ":` + ", fmtPkg.Use(), `.Sprintf("%#v", this.`, fieldname, `)`,
+				" + `}`",
+				`}`,
+				`,", "`,
+				`)`}, "")
 			p.P(outStr)
 			p.P(`return s`)
 			p.Out()

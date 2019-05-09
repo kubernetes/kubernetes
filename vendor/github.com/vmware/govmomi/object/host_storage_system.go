@@ -97,6 +97,15 @@ func (s HostStorageSystem) Refresh(ctx context.Context) error {
 	return err
 }
 
+func (s HostStorageSystem) RescanVmfs(ctx context.Context) error {
+	req := types.RescanVmfs{
+		This: s.Reference(),
+	}
+
+	_, err := methods.RescanVmfs(ctx, s.c, &req)
+	return err
+}
+
 func (s HostStorageSystem) MarkAsSsd(ctx context.Context, uuid string) (*Task, error) {
 	req := types.MarkAsSsd_Task{
 		This:         s.Reference(),
@@ -151,4 +160,15 @@ func (s HostStorageSystem) MarkAsNonLocal(ctx context.Context, uuid string) (*Ta
 	}
 
 	return NewTask(s.c, res.Returnval), nil
+}
+
+func (s HostStorageSystem) AttachScsiLun(ctx context.Context, uuid string) error {
+	req := types.AttachScsiLun{
+		This:    s.Reference(),
+		LunUuid: uuid,
+	}
+
+	_, err := methods.AttachScsiLun(ctx, s.c, &req)
+
+	return err
 }

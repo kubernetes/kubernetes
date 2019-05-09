@@ -19,7 +19,7 @@ package deployment
 import (
 	"testing"
 
-	extensions "k8s.io/api/extensions/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -82,7 +82,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		t.Logf("executing scenario %d", i)
 		newRS := rs("foo-v2", test.newReplicas, nil, noTimestamp)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
-		allRSs := []*extensions.ReplicaSet{newRS, oldRS}
+		allRSs := []*apps.ReplicaSet{newRS, oldRS}
 		maxUnavailable := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &test.maxSurge, &maxUnavailable, map[string]string{"foo": "bar"})
 		fake := fake.Clientset{}
@@ -109,7 +109,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 			t.Errorf("expected 1 action during scale, got: %v", fake.Actions())
 			continue
 		}
-		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*extensions.ReplicaSet)
+		updated := fake.Actions()[0].(core.UpdateAction).GetObject().(*apps.ReplicaSet)
 		if e, a := test.expectedNewReplicas, int(*(updated.Spec.Replicas)); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}
@@ -187,8 +187,8 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		newRS.Status.AvailableReplicas = int32(test.readyPodsFromNewRS)
 		oldRS := rs("foo-old", test.oldReplicas, oldSelector, noTimestamp)
 		oldRS.Status.AvailableReplicas = int32(test.readyPodsFromOldRS)
-		oldRSs := []*extensions.ReplicaSet{oldRS}
-		allRSs := []*extensions.ReplicaSet{oldRS, newRS}
+		oldRSs := []*apps.ReplicaSet{oldRS}
+		allRSs := []*apps.ReplicaSet{oldRS, newRS}
 		maxSurge := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, newSelector)
 		fakeClientset := fake.Clientset{}
@@ -255,7 +255,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		oldRS.Status.AvailableReplicas = int32(test.readyPods)
-		oldRSs := []*extensions.ReplicaSet{oldRS}
+		oldRSs := []*apps.ReplicaSet{oldRS}
 		maxSurge := intstr.FromInt(2)
 		maxUnavailable := intstr.FromInt(2)
 		deployment := newDeployment("foo", 10, nil, &maxSurge, &maxUnavailable, nil)
@@ -330,8 +330,8 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		t.Logf("executing scenario %d", i)
 		oldRS := rs("foo-v2", test.oldReplicas, nil, noTimestamp)
 		oldRS.Status.AvailableReplicas = int32(test.readyPods)
-		allRSs := []*extensions.ReplicaSet{oldRS}
-		oldRSs := []*extensions.ReplicaSet{oldRS}
+		allRSs := []*apps.ReplicaSet{oldRS}
+		oldRSs := []*apps.ReplicaSet{oldRS}
 		maxSurge := intstr.FromInt(0)
 		deployment := newDeployment("foo", test.deploymentReplicas, nil, &maxSurge, &test.maxUnavailable, map[string]string{"foo": "bar"})
 		fakeClientset := fake.Clientset{}
@@ -371,7 +371,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			t.Errorf("expected an update action")
 			continue
 		}
-		updated := updateAction.GetObject().(*extensions.ReplicaSet)
+		updated := updateAction.GetObject().(*apps.ReplicaSet)
 		if e, a := test.expectedOldReplicas, int(*(updated.Spec.Replicas)); e != a {
 			t.Errorf("expected update to %d replicas, got %d", e, a)
 		}

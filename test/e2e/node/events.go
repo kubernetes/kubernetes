@@ -17,17 +17,17 @@ limitations under the License.
 package node
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -36,6 +36,11 @@ import (
 var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 
+	/*
+		Release : v1.9
+		Testname: Pod events, verify event from Scheduler and Kubelet
+		Description: Create a Pod, make sure that the Pod can be queried. Create a event selector for the kind=Pod and the source is the Scheduler. List of the events MUST be at least one. Create a event selector for kind=Pod and the source is the Kubelet. List of the events MUST be at least one. Both Scheduler and Kubelet MUST send events when scheduling and running a Pod.
+	*/
 	framework.ConformanceIt("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
 
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
@@ -84,7 +89,7 @@ var _ = SIGDescribe("Events", func() {
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		fmt.Printf("%+v\n", podWithUid)
+		e2elog.Logf("%+v\n", podWithUid)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		By("checking for scheduler event about the pod")
@@ -101,7 +106,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				fmt.Println("Saw scheduler event for our pod.")
+				e2elog.Logf("Saw scheduler event for our pod.")
 				return true, nil
 			}
 			return false, nil
@@ -121,7 +126,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				fmt.Println("Saw kubelet event for our pod.")
+				e2elog.Logf("Saw kubelet event for our pod.")
 				return true, nil
 			}
 			return false, nil

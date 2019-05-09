@@ -128,7 +128,6 @@ func drainWorkers(podWorkers *podWorkers, numPods int) {
 func TestUpdatePod(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 
-	// Check whether all pod updates will be processed.
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
@@ -151,6 +150,7 @@ func TestUpdatePod(t *testing.T) {
 			continue
 		}
 
+		// PodWorker guarantees the first and the last event will be processed
 		first := 0
 		last := len(processed[uid]) - 1
 		if processed[uid][first].name != string(0) {
@@ -255,19 +255,6 @@ func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error 
 	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
 	kl.wg.Done()
 	return nil
-}
-
-// byContainerName sort the containers in a running pod by their names.
-type byContainerName kubecontainer.Pod
-
-func (b byContainerName) Len() int { return len(b.Containers) }
-
-func (b byContainerName) Swap(i, j int) {
-	b.Containers[i], b.Containers[j] = b.Containers[j], b.Containers[i]
-}
-
-func (b byContainerName) Less(i, j int) bool {
-	return b.Containers[i].Name < b.Containers[j].Name
 }
 
 // TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers

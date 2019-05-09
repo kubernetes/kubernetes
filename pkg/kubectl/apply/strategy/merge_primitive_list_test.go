@@ -26,7 +26,7 @@ var _ = Describe("Merging fields of type list-of-primitive with openapi", func()
 	Context("where one of the items has been deleted", func() {
 		It("should delete the deleted item", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -35,7 +35,7 @@ metadata:
   - "c"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -43,7 +43,7 @@ metadata:
   - "c"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -52,7 +52,7 @@ metadata:
   - "c"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -66,7 +66,7 @@ metadata:
 	Context("where one of the items is only on the remote", func() {
 		It("should move the remote-only item to the end but keep it", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -74,7 +74,7 @@ metadata:
   - "b"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -82,7 +82,7 @@ metadata:
   - "b"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -91,7 +91,7 @@ metadata:
   - "a"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -106,7 +106,7 @@ metadata:
 	Context("where one of the items is repeated", func() {
 		It("should de-duplicate the repeated items", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -114,7 +114,7 @@ metadata:
   - "b"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -123,7 +123,7 @@ metadata:
   - "a"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -131,7 +131,7 @@ metadata:
   - "b"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -145,7 +145,7 @@ metadata:
 	Context("where some items are deleted and others are on remote only", func() {
 		It("should retain the correct items in the correct order", func() {
 			recorded := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -154,7 +154,7 @@ metadata:
   - "c"
 `)
 			local := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -163,7 +163,7 @@ metadata:
   - "a"
 `)
 			remote := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:
@@ -174,7 +174,7 @@ metadata:
   - "e"
 `)
 			expected := create(`
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   finalizers:

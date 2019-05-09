@@ -29,13 +29,15 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type Resource struct {
@@ -62,9 +64,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	var nodeList *v1.NodeList
 	var systemPodsNo int
 	var ns string
-	var masterNodes sets.String
 	f := framework.NewDefaultFramework("sched-priority")
-	ignoreLabels := framework.ImagePullerLabels
 
 	AfterEach(func() {
 	})
@@ -75,15 +75,15 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		nodeList = &v1.NodeList{}
 
 		framework.WaitForAllNodesHealthy(cs, time.Minute)
-		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
+		_, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, ignoreLabels)
+		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("Pod should be schedule to node that don't match the PodAntiAffinity terms", func() {
+	It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		pod := runPausePod(f, pausePodConfig{
 			Name:   "pod-with-label-security-s1",
@@ -144,7 +144,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		Expect(labelPod.Spec.NodeName).NotTo(Equal(nodeName))
 	})
 
-	It("Pod should avoid to schedule to node that have avoidPod annotation", func() {
+	It("Pod should avoid nodes that have avoidPod annotation", func() {
 		nodeName := nodeList.Items[0].Name
 		// make the nodes have balanced cpu,mem usage
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
@@ -154,8 +154,8 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		// Cleanup the replication controller when we are done.
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
-			if err := framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, rc.Name); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
+			if err := framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
+				e2elog.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
 			}
 		}()
 
@@ -196,7 +196,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		By(fmt.Sprintf("Scale the RC: %s to len(nodeList.Item)-1 : %v.", rc.Name, len(nodeList.Items)-1))
 
-		framework.ScaleRC(f.ClientSet, f.InternalClientset, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
+		framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, rc.Name, uint(len(nodeList.Items)-1), true)
 		testPods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{
 			LabelSelector: "name=scheduler-priority-avoid-pod",
 		})
@@ -207,7 +207,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	It("Pod should perfer to scheduled to nodes pod can tolerate", func() {
+	It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
 		// make the nodes have balanced cpu,mem usage ratio
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
@@ -302,7 +302,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 					Requests: needCreateResource,
 				},
 				NodeName: node.Name,
-			}), true, framework.Logf)
+			}), true, e2elog.Logf)
 
 		if err != nil {
 			return err
@@ -318,7 +318,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 }
 
 func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
-	framework.Logf("ComputeCpuMemFraction for node: %v", node.Name)
+	e2elog.Logf("ComputeCpuMemFraction for node: %v", node.Name)
 	totalRequestedCpuResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
 	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
@@ -327,7 +327,11 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	}
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {
-			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
+			e2elog.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
+			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
+			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
+				continue
+			}
 			totalRequestedCpuResource += getNonZeroRequests(&pod).MilliCPU
 			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
 		}
@@ -336,14 +340,21 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	Expect(found).To(Equal(true))
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
+	floatOne := float64(1)
 	cpuFraction := float64(totalRequestedCpuResource) / float64(cpuAllocatableMil)
+	if cpuFraction > floatOne {
+		cpuFraction = floatOne
+	}
 	memAllocatable, found := node.Status.Allocatable[v1.ResourceMemory]
 	Expect(found).To(Equal(true))
 	memAllocatableVal := memAllocatable.Value()
 	memFraction := float64(totalRequestedMemResource) / float64(memAllocatableVal)
+	if memFraction > floatOne {
+		memFraction = floatOne
+	}
 
-	framework.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
-	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
+	e2elog.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
+	e2elog.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
 
 	return cpuFraction, memFraction
 }
@@ -378,7 +389,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 					Containers: []v1.Container{
 						{
 							Name:      rsName,
-							Image:     framework.GetPauseImageName(f.ClientSet),
+							Image:     imageutils.GetPauseImageName(),
 							Resources: *resource,
 						},
 					},

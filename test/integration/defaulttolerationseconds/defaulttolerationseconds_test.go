@@ -21,11 +21,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -33,12 +33,11 @@ import (
 func TestAdmission(t *testing.T) {
 	masterConfig := framework.NewMasterConfig()
 	masterConfig.GenericConfig.EnableProfiling = true
-	masterConfig.GenericConfig.EnableMetrics = true
 	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
-	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 
 	ns := framework.CreateTestingNamespace("default-toleration-seconds", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -58,21 +57,21 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	updatedPod, err := client.Core().Pods(pod.Namespace).Create(&pod)
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(&pod)
 	if err != nil {
 		t.Fatalf("error creating pod: %v", err)
 	}
 
 	var defaultSeconds int64 = 300
 	nodeNotReady := v1.Toleration{
-		Key:               algorithm.TaintNodeNotReady,
+		Key:               schedulerapi.TaintNodeNotReady,
 		Operator:          v1.TolerationOpExists,
 		Effect:            v1.TaintEffectNoExecute,
 		TolerationSeconds: &defaultSeconds,
 	}
 
 	nodeUnreachable := v1.Toleration{
-		Key:               algorithm.TaintNodeUnreachable,
+		Key:               schedulerapi.TaintNodeUnreachable,
 		Operator:          v1.TolerationOpExists,
 		Effect:            v1.TaintEffectNoExecute,
 		TolerationSeconds: &defaultSeconds,

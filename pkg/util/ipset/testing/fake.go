@@ -93,15 +93,15 @@ func (f *FakeIPSet) CreateSet(set *ipset.IPSet, ignoreExistErr bool) error {
 }
 
 // AddEntry is part of interface.
-func (f *FakeIPSet) AddEntry(entry string, set string, ignoreExistErr bool) error {
-	if f.Entries[set].Has(entry) {
+func (f *FakeIPSet) AddEntry(entry string, set *ipset.IPSet, ignoreExistErr bool) error {
+	if f.Entries[set.Name].Has(entry) {
 		if !ignoreExistErr {
 			// already exists
 			return fmt.Errorf("Element cannot be added to the set: it's already added")
 		}
 		return nil
 	}
-	f.Entries[set].Insert(entry)
+	f.Entries[set.Name].Insert(entry)
 	return nil
 }
 

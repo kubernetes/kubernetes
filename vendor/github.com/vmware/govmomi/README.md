@@ -15,9 +15,9 @@ In addition to the vSphere API client, this repository includes:
 
 ## Compatibility
 
-This library is built for and tested against ESXi and vCenter 6.0 and 6.5.
+This library is built for and tested against ESXi and vCenter 6.0, 6.5 and 6.7.
 
-It should work with versions 5.5 and 5.1, but neither are officially supported.
+It may work with versions 5.5 and 5.1, but neither are officially supported.
 
 ## Documentation
 
@@ -59,6 +59,10 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 
 * [Kubernetes](https://github.com/kubernetes/kubernetes/tree/master/pkg/cloudprovider/providers/vsphere)
 
+* [Kubernetes Cloud Provider](https://github.com/kubernetes/cloud-provider-vsphere)
+
+* [Kubernetes Cluster API](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere)
+
 * [Kubernetes kops](https://github.com/kubernetes/kops/tree/master/upup/pkg/fi/cloudup/vsphere)
 
 * [Terraform](https://github.com/terraform-providers/terraform-provider-vsphere)
@@ -75,6 +79,10 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 
 * [Libretto](https://github.com/apcera/libretto/tree/master/virtualmachine/vsphere)
 
+* [Telegraf](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/vsphere)
+
+* [Open Storage](https://github.com/libopenstorage/openstorage/tree/master/pkg/storageops/vsphere)
+
 ## Related projects
 
 * [rbvmomi](https://github.com/vmware/rbvmomi)
@@ -83,4 +91,4 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 
 ## License
 
-govmomi is available under the [Apache 2 license](LICENSE).
+govmomi is available under the [Apache 2 license](LICENSE.txt).

@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "resource-consumer",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/resource-consumer",
 )
 
 go_library(
@@ -36,7 +35,6 @@ filegroup(
         ":package-srcs",
         "//test/images/resource-consumer/common:all-srcs",
         "//test/images/resource-consumer/consume-cpu:all-srcs",
-        "//test/images/resource-consumer/controller:all-srcs",
     ],
     tags = ["automanaged"],
 )

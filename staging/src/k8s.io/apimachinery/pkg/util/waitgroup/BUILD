@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "waitgroup.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/waitgroup",
     importpath = "k8s.io/apimachinery/pkg/util/waitgroup",
     visibility = ["//visibility:public"],
 )
@@ -14,7 +15,6 @@ go_test(
     name = "go_default_test",
     srcs = ["waitgroup_test.go"],
     embed = [":go_default_library"],
-    importpath = "k8s.io/apimachinery/pkg/util/waitgroup",
 )
 
 filegroup(

@@ -28,16 +28,16 @@ import (
 func TestGroupAdder(t *testing.T) {
 	adder := authenticator.Request(
 		NewGroupAdder(
-			authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-				return &user.DefaultInfo{Name: "user", Groups: []string{"original"}}, true, nil
+			authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
 			}),
 			[]string{"added"},
 		),
 	)
 
-	user, _, _ := adder.AuthenticateRequest(nil)
-	if !reflect.DeepEqual(user.GetGroups(), []string{"original", "added"}) {
-		t.Errorf("Expected original,added groups, got %#v", user.GetGroups())
+	r, _, _ := adder.AuthenticateRequest(nil)
+	if want := []string{"original", "added"}; !reflect.DeepEqual(r.User.GetGroups(), want) {
+		t.Errorf("Unexpected groups\ngot:\t%#v\nwant:\t%#v", r.User.GetGroups(), want)
 	}
 }
 
@@ -96,15 +96,15 @@ func TestAuthenticatedGroupAdder(t *testing.T) {
 	for _, test := range tests {
 		adder := authenticator.Request(
 			NewAuthenticatedGroupAdder(
-				authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
-					return test.inputUser, true, nil
+				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+					return &authenticator.Response{User: test.inputUser}, true, nil
 				}),
 			),
 		)
 
-		user, _, _ := adder.AuthenticateRequest(nil)
-		if !reflect.DeepEqual(user, test.expectedUser) {
-			t.Errorf("got %#v", user)
+		r, _, _ := adder.AuthenticateRequest(nil)
+		if !reflect.DeepEqual(r.User, test.expectedUser) {
+			t.Errorf("Unexpected user\ngot:\t%#v\nwant:\t%#v", r.User, test.expectedUser)
 		}
 	}
 

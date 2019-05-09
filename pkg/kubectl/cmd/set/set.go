@@ -17,37 +17,37 @@ limitations under the License.
 package set
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
-	set_long = templates.LongDesc(`
+	setLong = templates.LongDesc(`
 		Configure application resources
 
 		These commands help you make changes to existing application resources.`)
 )
 
-func NewCmdSet(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+// NewCmdSet returns an initialized Command instance for 'set' sub command
+func NewCmdSet(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "set SUBCOMMAND",
+		Use:                   "set SUBCOMMAND",
 		DisableFlagsInUseLine: true,
-		Short: i18n.T("Set specific features on objects"),
-		Long:  set_long,
-		Run:   cmdutil.DefaultSubCommandRun(err),
+		Short:                 i18n.T("Set specific features on objects"),
+		Long:                  setLong,
+		Run:                   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
 	// add subcommands
-	cmd.AddCommand(NewCmdImage(f, out, err))
-	cmd.AddCommand(NewCmdResources(f, out, err))
-	cmd.AddCommand(NewCmdSelector(f, out))
-	cmd.AddCommand(NewCmdSubject(f, out, err))
-	cmd.AddCommand(NewCmdServiceAccount(f, out, err))
-	cmd.AddCommand(NewCmdEnv(f, in, out, err))
+	cmd.AddCommand(NewCmdImage(f, streams))
+	cmd.AddCommand(NewCmdResources(f, streams))
+	cmd.AddCommand(NewCmdSelector(f, streams))
+	cmd.AddCommand(NewCmdSubject(f, streams))
+	cmd.AddCommand(NewCmdServiceAccount(f, streams))
+	cmd.AddCommand(NewCmdEnv(f, streams))
 
 	return cmd
 }

@@ -18,13 +18,14 @@ package vsphere
 
 import (
 	"fmt"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -60,9 +61,10 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		namespace = f.Namespace.Name
 		client = f.ClientSet
+		Bootstrap(f)
 	})
 	AfterEach(func() {
-		framework.Logf("Deleting all statefulset in namespace: %v", namespace)
+		e2elog.Logf("Deleting all statefulset in namespace: %v", namespace)
 		framework.DeleteAllStatefulSets(client, namespace)
 	})
 
@@ -70,9 +72,9 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		By("Creating StorageClass for Statefulset")
 		scParameters := make(map[string]string)
 		scParameters["diskformat"] = "thin"
-		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters)
+		scSpec := getVSphereStorageClassSpec(storageclassname, scParameters, nil)
 		sc, err := client.StorageV1().StorageClasses().Create(scSpec)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer client.StorageV1().StorageClasses().Delete(sc.Name, nil)
 
 		By("Creating statefulset")
@@ -81,7 +83,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		replicas := *(statefulset.Spec.Replicas)
 		// Waiting for pods status to be Ready
 		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas)
-		Expect(statefulsetTester.CheckMount(statefulset, mountPath)).NotTo(HaveOccurred())
+		framework.ExpectNoError(statefulsetTester.CheckMount(statefulset, mountPath))
 		ssPodsBeforeScaleDown := statefulsetTester.GetPodList(statefulset)
 		Expect(ssPodsBeforeScaleDown.Items).NotTo(BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
 		Expect(len(ssPodsBeforeScaleDown.Items) == int(replicas)).To(BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
@@ -90,7 +92,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		volumesBeforeScaleDown := make(map[string]string)
 		for _, sspod := range ssPodsBeforeScaleDown.Items {
 			_, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			for _, volumespec := range sspod.Spec.Volumes {
 				if volumespec.PersistentVolumeClaim != nil {
 					volumePath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
@@ -101,11 +103,8 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 
 		By(fmt.Sprintf("Scaling down statefulsets to number of Replica: %v", replicas-1))
 		_, scaledownErr := statefulsetTester.Scale(statefulset, replicas-1)
-		Expect(scaledownErr).NotTo(HaveOccurred())
+		framework.ExpectNoError(scaledownErr)
 		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas-1)
-
-		vsp, err := getVSphere(client)
-		Expect(err).NotTo(HaveOccurred())
 
 		// After scale down, verify vsphere volumes are detached from deleted pods
 		By("Verify Volumes are detached from Nodes after Statefulsets is scaled down")
@@ -116,8 +115,8 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 				for _, volumespec := range sspod.Spec.Volumes {
 					if volumespec.PersistentVolumeClaim != nil {
 						vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
-						framework.Logf("Waiting for Volume: %q to detach from Node: %q", vSpherediskPath, sspod.Spec.NodeName)
-						Expect(waitForVSphereDiskToDetach(client, vsp, vSpherediskPath, types.NodeName(sspod.Spec.NodeName))).NotTo(HaveOccurred())
+						e2elog.Logf("Waiting for Volume: %q to detach from Node: %q", vSpherediskPath, sspod.Spec.NodeName)
+						framework.ExpectNoError(waitForVSphereDiskToDetach(vSpherediskPath, sspod.Spec.NodeName))
 					}
 				}
 			}
@@ -125,7 +124,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 
 		By(fmt.Sprintf("Scaling up statefulsets to number of Replica: %v", replicas))
 		_, scaleupErr := statefulsetTester.Scale(statefulset, replicas)
-		Expect(scaleupErr).NotTo(HaveOccurred())
+		framework.ExpectNoError(scaleupErr)
 		statefulsetTester.WaitForStatusReplicas(statefulset, replicas)
 		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas)
 
@@ -137,18 +136,18 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		By("Verify all volumes are attached to Nodes after Statefulsets is scaled up")
 		for _, sspod := range ssPodsAfterScaleUp.Items {
 			err := framework.WaitForPodsReady(client, statefulset.Namespace, sspod.Name, 0)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			pod, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			for _, volumespec := range pod.Spec.Volumes {
 				if volumespec.PersistentVolumeClaim != nil {
 					vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
-					framework.Logf("Verify Volume: %q is attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
+					e2elog.Logf("Verify Volume: %q is attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
 					// Verify scale up has re-attached the same volumes and not introduced new volume
 					Expect(volumesBeforeScaleDown[vSpherediskPath] == "").To(BeFalse())
-					isVolumeAttached, verifyDiskAttachedError := verifyVSphereDiskAttached(client, vsp, vSpherediskPath, types.NodeName(sspod.Spec.NodeName))
+					isVolumeAttached, verifyDiskAttachedError := diskIsAttached(vSpherediskPath, sspod.Spec.NodeName)
 					Expect(isVolumeAttached).To(BeTrue())
-					Expect(verifyDiskAttachedError).NotTo(HaveOccurred())
+					framework.ExpectNoError(verifyDiskAttachedError)
 				}
 			}
 		}

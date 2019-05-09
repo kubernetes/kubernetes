@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 )
@@ -28,6 +29,28 @@ type User struct {
 	Shell string
 }
 
+// userFromOS converts an os/user.(*User) to local User
+//
+// (This does not include Pass, Shell or Gecos)
+func userFromOS(u *user.User) (User, error) {
+	newUser := User{
+		Name: u.Username,
+		Home: u.HomeDir,
+	}
+	id, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return newUser, err
+	}
+	newUser.Uid = id
+
+	id, err = strconv.Atoi(u.Gid)
+	if err != nil {
+		return newUser, err
+	}
+	newUser.Gid = id
+	return newUser, nil
+}
+
 type Group struct {
 	Name string
 	Pass string
@@ -35,12 +58,46 @@ type Group struct {
 	List []string
 }
 
+// groupFromOS converts an os/user.(*Group) to local Group
+//
+// (This does not include Pass, Shell or Gecos)
+func groupFromOS(g *user.Group) (Group, error) {
+	newGroup := Group{
+		Name: g.Name,
+	}
+
+	id, err := strconv.Atoi(g.Gid)
+	if err != nil {
+		return newGroup, err
+	}
+	newGroup.Gid = id
+
+	return newGroup, nil
+}
+
+// SubID represents an entry in /etc/sub{u,g}id
+type SubID struct {
+	Name  string
+	SubID int64
+	Count int64
+}
+
+// IDMap represents an entry in /proc/PID/{u,g}id_map
+type IDMap struct {
+	ID       int64
+	ParentID int64
+	Count    int64
+}
+
 func parseLine(line string, v ...interface{}) {
-	if line == "" {
+	parseParts(strings.Split(line, ":"), v...)
+}
+
+func parseParts(parts []string, v ...interface{}) {
+	if len(parts) == 0 {
 		return
 	}
 
-	parts := strings.Split(line, ":")
 	for i, p := range parts {
 		// Ignore cases where we don't have enough fields to populate the arguments.
 		// Some configuration files like to misbehave.
@@ -56,6 +113,8 @@ func parseLine(line string, v ...interface{}) {
 		case *int:
 			// "numbers", with conversion errors ignored because of some misbehaving configuration files.
 			*e, _ = strconv.Atoi(p)
+		case *int64:
+			*e, _ = strconv.ParseInt(p, 10, 64)
 		case *[]string:
 			// Comma-separated lists.
 			if p != "" {
@@ -65,7 +124,7 @@ func parseLine(line string, v ...interface{}) {
 			}
 		default:
 			// Someone goof'd when writing code using this function. Scream so they can hear us.
-			panic(fmt.Sprintf("parseLine only accepts {*string, *int, *[]string} as arguments! %#v is not a pointer!", e))
+			panic(fmt.Sprintf("parseLine only accepts {*string, *int, *int64, *[]string} as arguments! %#v is not a pointer!", e))
 		}
 	}
 }
@@ -438,4 +497,112 @@ func GetAdditionalGroupsPath(additionalGroups []string, groupPath string) ([]int
 		defer groupFile.Close()
 	}
 	return GetAdditionalGroups(additionalGroups, group)
+}
+
+func ParseSubIDFile(path string) ([]SubID, error) {
+	subid, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer subid.Close()
+	return ParseSubID(subid)
+}
+
+func ParseSubID(subid io.Reader) ([]SubID, error) {
+	return ParseSubIDFilter(subid, nil)
+}
+
+func ParseSubIDFileFilter(path string, filter func(SubID) bool) ([]SubID, error) {
+	subid, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer subid.Close()
+	return ParseSubIDFilter(subid, filter)
+}
+
+func ParseSubIDFilter(r io.Reader, filter func(SubID) bool) ([]SubID, error) {
+	if r == nil {
+		return nil, fmt.Errorf("nil source for subid-formatted data")
+	}
+
+	var (
+		s   = bufio.NewScanner(r)
+		out = []SubID{}
+	)
+
+	for s.Scan() {
+		if err := s.Err(); err != nil {
+			return nil, err
+		}
+
+		line := strings.TrimSpace(s.Text())
+		if line == "" {
+			continue
+		}
+
+		// see: man 5 subuid
+		p := SubID{}
+		parseLine(line, &p.Name, &p.SubID, &p.Count)
+
+		if filter == nil || filter(p) {
+			out = append(out, p)
+		}
+	}
+
+	return out, nil
+}
+
+func ParseIDMapFile(path string) ([]IDMap, error) {
+	r, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return ParseIDMap(r)
+}
+
+func ParseIDMap(r io.Reader) ([]IDMap, error) {
+	return ParseIDMapFilter(r, nil)
+}
+
+func ParseIDMapFileFilter(path string, filter func(IDMap) bool) ([]IDMap, error) {
+	r, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return ParseIDMapFilter(r, filter)
+}
+
+func ParseIDMapFilter(r io.Reader, filter func(IDMap) bool) ([]IDMap, error) {
+	if r == nil {
+		return nil, fmt.Errorf("nil source for idmap-formatted data")
+	}
+
+	var (
+		s   = bufio.NewScanner(r)
+		out = []IDMap{}
+	)
+
+	for s.Scan() {
+		if err := s.Err(); err != nil {
+			return nil, err
+		}
+
+		line := strings.TrimSpace(s.Text())
+		if line == "" {
+			continue
+		}
+
+		// see: man 7 user_namespaces
+		p := IDMap{}
+		parseParts(strings.Fields(line), &p.ID, &p.ParentID, &p.Count)
+
+		if filter == nil || filter(p) {
+			out = append(out, p)
+		}
+	}
+
+	return out, nil
 }

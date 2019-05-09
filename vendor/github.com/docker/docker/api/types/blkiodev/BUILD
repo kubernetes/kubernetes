@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["blkio.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/blkiodev",
     importpath = "github.com/docker/docker/api/types/blkiodev",
     visibility = ["//visibility:public"],
 )

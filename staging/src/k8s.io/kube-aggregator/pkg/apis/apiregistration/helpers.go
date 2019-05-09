@@ -22,8 +22,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 )
 
+// SortedByGroupAndVersion sorts APIServices into their different groups, and then sorts them based on their versions.
+// For example, the first element of the first array contains the APIService with the highest version number, in the
+// group with the highest priority; while the last element of the last array contains the APIService with the lowest
+// version number, in the group with the lowest priority.
 func SortedByGroupAndVersion(servers []*APIService) [][]*APIService {
 	serversByGroupPriorityMinimum := ByGroupPriorityMinimum(servers)
 	sort.Sort(serversByGroupPriorityMinimum)
@@ -76,7 +81,7 @@ func (s ByVersionPriority) Less(i, j int) bool {
 	if s[i].Spec.VersionPriority != s[j].Spec.VersionPriority {
 		return s[i].Spec.VersionPriority > s[j].Spec.VersionPriority
 	}
-	return s[i].Name < s[j].Name
+	return version.CompareKubeAwareVersionStrings(s[i].Spec.Version, s[j].Spec.Version) > 0
 }
 
 // APIServiceNameToGroupVersion returns the GroupVersion for a given apiServiceName.  The name
@@ -97,16 +102,20 @@ func NewLocalAvailableAPIServiceCondition() APIServiceCondition {
 	}
 }
 
+// GetAPIServiceConditionByType gets an *APIServiceCondition by APIServiceConditionType if present
+func GetAPIServiceConditionByType(apiService *APIService, conditionType APIServiceConditionType) *APIServiceCondition {
+	for i := range apiService.Status.Conditions {
+		if apiService.Status.Conditions[i].Type == conditionType {
+			return &apiService.Status.Conditions[i]
+		}
+	}
+	return nil
+}
+
 // SetAPIServiceCondition sets the status condition.  It either overwrites the existing one or
 // creates a new one
 func SetAPIServiceCondition(apiService *APIService, newCondition APIServiceCondition) {
-	var existingCondition *APIServiceCondition
-	for i := range apiService.Status.Conditions {
-		if apiService.Status.Conditions[i].Type == newCondition.Type {
-			existingCondition = &apiService.Status.Conditions[i]
-			break
-		}
-	}
+	existingCondition := GetAPIServiceConditionByType(apiService, newCondition.Type)
 	if existingCondition == nil {
 		apiService.Status.Conditions = append(apiService.Status.Conditions, newCondition)
 		return
@@ -123,10 +132,6 @@ func SetAPIServiceCondition(apiService *APIService, newCondition APIServiceCondi
 
 // IsAPIServiceConditionTrue indicates if the condition is present and strictly true
 func IsAPIServiceConditionTrue(apiService *APIService, conditionType APIServiceConditionType) bool {
-	for _, condition := range apiService.Status.Conditions {
-		if condition.Type == conditionType && condition.Status == ConditionTrue {
-			return true
-		}
-	}
-	return false
+	condition := GetAPIServiceConditionByType(apiService, conditionType)
+	return condition != nil && condition.Status == ConditionTrue
 }

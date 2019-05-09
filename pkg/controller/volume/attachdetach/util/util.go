@@ -19,20 +19,20 @@ package util
 import (
 	"fmt"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 // CreateVolumeSpec creates and returns a mutatable volume.Spec object for the
 // specified volume. It dereference any PVC to get PV objects, if needed.
 func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister corelisters.PersistentVolumeClaimLister, pvLister corelisters.PersistentVolumeLister) (*volume.Spec, error) {
 	if pvcSource := podVolume.VolumeSource.PersistentVolumeClaim; pvcSource != nil {
-		glog.V(10).Infof(
+		klog.V(10).Infof(
 			"Found PVC, ClaimName: %q/%q",
 			podNamespace,
 			pvcSource.ClaimName)
@@ -48,7 +48,7 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 				err)
 		}
 
-		glog.V(10).Infof(
+		klog.V(10).Infof(
 			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
 			podNamespace,
 			pvcSource.ClaimName,
@@ -66,9 +66,9 @@ func CreateVolumeSpec(podVolume v1.Volume, podNamespace string, pvcLister coreli
 				err)
 		}
 
-		glog.V(10).Infof(
+		klog.V(10).Infof(
 			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
-			volumeSpec.Name,
+			volumeSpec.Name(),
 			pvName,
 			podNamespace,
 			pvcSource.ClaimName,
@@ -150,7 +150,7 @@ func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOf
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	keepTerminatedPodVolume := desiredStateOfWorld.GetKeepTerminatedPodVolumesForNode(nodeName)
 
-	if volumehelper.IsPodTerminated(pod, pod.Status) {
+	if util.IsPodTerminated(pod, pod.Status) {
 		// if pod is terminate we let kubelet policy dictate if volume
 		// should be detached or not
 		return keepTerminatedPodVolume
@@ -166,7 +166,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 	}
 
 	if len(pod.Spec.Volumes) <= 0 {
-		glog.V(10).Infof("Skipping processing of pod %q/%q: it has no volumes.",
+		klog.V(10).Infof("Skipping processing of pod %q/%q: it has no volumes.",
 			pod.Namespace,
 			pod.Name)
 		return
@@ -174,7 +174,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	if nodeName == "" {
-		glog.V(10).Infof(
+		klog.V(10).Infof(
 			"Skipping processing of pod %q/%q: it is not scheduled to a node.",
 			pod.Namespace,
 			pod.Name)
@@ -183,7 +183,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
-		glog.V(4).Infof(
+		klog.V(4).Infof(
 			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
 			pod.Namespace,
 			pod.Name,
@@ -195,7 +195,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, err := CreateVolumeSpec(podVolume, pod.Namespace, pvcLister, pvLister)
 		if err != nil {
-			glog.V(10).Infof(
+			klog.V(10).Infof(
 				"Error processing volume %q for pod %q/%q: %v",
 				podVolume.Name,
 				pod.Namespace,
@@ -207,7 +207,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 		attachableVolumePlugin, err :=
 			volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
-			glog.V(10).Infof(
+			klog.V(10).Infof(
 				"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
 				podVolume.Name,
 				pod.Namespace,
@@ -216,13 +216,13 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 			continue
 		}
 
-		uniquePodName := volumehelper.GetUniquePodName(pod)
+		uniquePodName := util.GetUniquePodName(pod)
 		if addVolumes {
 			// Add volume to desired state of world
 			_, err := desiredStateOfWorld.AddPod(
 				uniquePodName, pod, volumeSpec, nodeName)
 			if err != nil {
-				glog.V(10).Infof(
+				klog.V(10).Infof(
 					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
 					podVolume.Name,
 					pod.Namespace,
@@ -232,10 +232,10 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 
 		} else {
 			// Remove volume from desired state of world
-			uniqueVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
+			uniqueVolumeName, err := util.GetUniqueVolumeNameFromSpec(
 				attachableVolumePlugin, volumeSpec)
 			if err != nil {
-				glog.V(10).Infof(
+				klog.V(10).Infof(
 					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed with %v",
 					podVolume.Name,
 					pod.Namespace,

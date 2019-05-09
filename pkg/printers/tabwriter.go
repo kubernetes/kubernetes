@@ -18,15 +18,16 @@ package printers
 
 import (
 	"io"
-	"text/tabwriter"
+
+	"github.com/liggitt/tabwriter"
 )
 
 const (
-	tabwriterMinWidth = 10
+	tabwriterMinWidth = 6
 	tabwriterWidth    = 4
 	tabwriterPadding  = 3
 	tabwriterPadChar  = ' '
-	tabwriterFlags    = 0
+	tabwriterFlags    = tabwriter.RememberWidths
 )
 
 // GetNewTabWriter returns a tabwriter that translates tabbed columns in input into properly aligned text.

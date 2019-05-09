@@ -25,11 +25,10 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/apiserver"
@@ -88,7 +87,6 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 		}
 		return configProvider{
 			config: decodedConfig,
-			scheme: configScheme,
 		}, nil
 	}
 	// we got an error where the decode wasn't related to a missing type
@@ -128,13 +126,11 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	}
 	return configProvider{
 		config: internalConfig,
-		scheme: configScheme,
 	}, nil
 }
 
 type configProvider struct {
 	config *apiserver.AdmissionConfiguration
-	scheme *runtime.Scheme
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.
@@ -147,7 +143,7 @@ func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfi
 	if pluginCfg.Path != "" {
 		content, err := ioutil.ReadFile(pluginCfg.Path)
 		if err != nil {
-			glog.Fatalf("Couldn't open admission plugin configuration %s: %#v", pluginCfg.Path, err)
+			klog.Fatalf("Couldn't open admission plugin configuration %s: %#v", pluginCfg.Path, err)
 			return nil, err
 		}
 		return bytes.NewBuffer(content), nil
@@ -176,27 +172,4 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 	}
 	// there is no registered config that matches on plugin name.
 	return nil, nil
-}
-
-// writeYAML writes the specified object to a byte array as yaml.
-func writeYAML(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {
-	gvks, _, err := scheme.ObjectKinds(obj)
-	if err != nil {
-		return nil, err
-	}
-	gvs := []schema.GroupVersion{}
-	for _, gvk := range gvks {
-		gvs = append(gvs, gvk.GroupVersion())
-	}
-	codecs := serializer.NewCodecFactory(scheme)
-	json, err := runtime.Encode(codecs.LegacyCodec(gvs...), obj)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := yaml.JSONToYAML(json)
-	if err != nil {
-		return nil, err
-	}
-	return content, err
 }

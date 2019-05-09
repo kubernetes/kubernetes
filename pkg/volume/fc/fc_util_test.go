@@ -18,6 +18,7 @@ package fc
 
 import (
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -114,5 +115,70 @@ func TestSearchDiskWWID(t *testing.T) {
 	// if no disk matches input wwid, exit
 	if devicePath == "" || error != nil {
 		t.Errorf("no fc disk found")
+	}
+}
+
+func TestParsePDName(t *testing.T) {
+	tests := []struct {
+		name        string
+		path        string
+		wwns        []string
+		lun         int32
+		wwids       []string
+		expectError bool
+	}{
+		{
+			name:  "single WWID",
+			path:  "/var/lib/kubelet/plugins/kubernetes.io/fc/60050763008084e6e0000000000001ae",
+			wwids: []string{"60050763008084e6e0000000000001ae"},
+		},
+		{
+			name:  "multiple WWID",
+			path:  "/var/lib/kubelet/plugins/kubernetes.io/fc/60050763008084e6e0000000000001ae-60050763008084e6e0000000000001af",
+			wwids: []string{"60050763008084e6e0000000000001ae", "60050763008084e6e0000000000001af"},
+		},
+		{
+			name: "single WWN",
+			path: "/var/lib/kubelet/plugins/kubernetes.io/fc/50050768030539b6-lun-0",
+			wwns: []string{"50050768030539b6"},
+			lun:  0,
+		},
+		{
+			name: "multiple WWNs",
+			path: "/var/lib/kubelet/plugins/kubernetes.io/fc/50050768030539b6-50050768030539b7-lun-0",
+			wwns: []string{"50050768030539b6", "50050768030539b7"},
+			lun:  0,
+		},
+		{
+			name:        "no WWNs",
+			path:        "/var/lib/kubelet/plugins/kubernetes.io/fc/lun-0",
+			expectError: true,
+		},
+		{
+			name:        "invalid lun",
+			path:        "/var/lib/kubelet/plugins/kubernetes.io/fc/50050768030539b6-lun-x",
+			expectError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			wwns, lun, wwids, err := parsePDName(test.path)
+			if test.expectError && err == nil {
+				t.Errorf("expected error but got none")
+			}
+			if !test.expectError && err != nil {
+				t.Errorf("got unexpected error: %s", err)
+			}
+			if !reflect.DeepEqual(wwns, test.wwns) {
+				t.Errorf("expected WWNs %+v, got %+v", test.wwns, wwns)
+			}
+			if lun != test.lun {
+				t.Errorf("expected lun %d, got %d", test.lun, lun)
+			}
+			if !reflect.DeepEqual(wwids, test.wwids) {
+				t.Errorf("expected WWIDs %+v, got %+v", test.wwids, wwids)
+			}
+		})
 	}
 }

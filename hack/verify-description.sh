@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -49,7 +49,7 @@ find_files() {
 }
 
 if [[ $# -eq 0 ]]; then
-  versioned_api_files=$(find_files | egrep "pkg/.[^/]*/((v.[^/]*)|unversioned)/types\.go")
+  versioned_api_files=$(find_files | grep -E "pkg/.[^/]*/((v.[^/]*)|unversioned)/types\.go") || true
 else
   versioned_api_files="${*}"
 fi

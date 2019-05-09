@@ -332,7 +332,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.1
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3.0/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -483,7 +483,7 @@ binary | sha1 hash | md5 hash
 ### Action Required
 
 * [kubelet] Allow opting out of automatic cloud provider detection in kubelet. By default kubelet will auto-detect cloud providers ([#28258](https://github.com/kubernetes/kubernetes/pull/28258), [@vishh](https://github.com/vishh))
-* If you use one of the kube-dns replication controller manifest in `cluster/saltbase/salt/kube-dns`, i.e. `cluster/saltbase/salt/kube-dns/{skydns-rc.yaml.base,skydns-rc.yaml.in}`, either substitute one of `__PILLAR__FEDERATIONS__DOMAIN__MAP__` or `{{ pillar['federations_domain_map'] }}` with the corresponding federation name to domain name value or remove them if you do not support cluster federation at this time. If you plan to substitute the parameter with its value, here is an example for `{{ pillar['federations_domain_map'] }` ([#28132](https://github.com/kubernetes/kubernetes/pull/28132), [@madhusudancs](https://github.com/madhusudancs))
+* If you use one of the kube-dns replication controller manifest in `cluster/saltbase/salt/kube-dns`, i.e. `cluster/saltbase/salt/kube-dns/{skydns-rc.yaml.base,skydns-rc.yaml.in}`, either substitute one of `__PILLAR__FEDERATIONS__DOMAIN__MAP__` or `{{ pillar['federations_domain_map'] }}` with the corresponding federation name to domain name value or remove them if you do not support cluster federation at this time. If you plan to substitute the parameter with its value, here is an example for `{{ pillar['federations_domain_map'] }}` ([#28132](https://github.com/kubernetes/kubernetes/pull/28132), [@madhusudancs](https://github.com/madhusudancs))
     * pillar['federations_domain_map'] = "- --federations=myfederation=federation.test"
     * where `myfederation` is the name of the federation and `federation.test` is the domain name registered for the federation.
 * federation: Upgrading the groupversion to v1beta1 ([#28186](https://github.com/kubernetes/kubernetes/pull/28186), [@nikhiljindal](https://github.com/nikhiljindal))
@@ -628,7 +628,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.5
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -731,7 +731,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.4
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -820,7 +820,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.3
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -873,7 +873,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.2
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/master/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 
@@ -917,7 +917,7 @@ binary | sha1 hash | md5 hash
 
 # v1.3.0-alpha.1
 
-[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/HEAD/examples)
+[Documentation](http://kubernetes.github.io) & [Examples](http://releases.k8s.io/release-1.3/examples)
 
 ## Downloads
 

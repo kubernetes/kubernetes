@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/google/cadvisor/info/v1"
+	"k8s.io/klog"
 )
 
 func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
@@ -70,7 +70,7 @@ func MachineStatsFromV1(cont *v1.ContainerInfo) []MachineStats {
 			stat.Cpu = &val.Cpu
 			cpuInst, err := InstCpuStats(last, val)
 			if err != nil {
-				glog.Warningf("Could not get instant cpu stats: %v", err)
+				klog.Warningf("Could not get instant cpu stats: %v", err)
 			} else {
 				stat.CpuInst = cpuInst
 			}
@@ -107,7 +107,7 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 			stat.Cpu = &val.Cpu
 			cpuInst, err := InstCpuStats(last, val)
 			if err != nil {
-				glog.Warningf("Could not get instant cpu stats: %v", err)
+				klog.Warningf("Could not get instant cpu stats: %v", err)
 			} else {
 				stat.CpuInst = cpuInst
 			}
@@ -133,7 +133,7 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 				}
 			} else if len(val.Filesystem) > 1 && containerName != "/" {
 				// Cannot handle multiple devices per container.
-				glog.V(4).Infof("failed to handle multiple devices for container %s. Skipping Filesystem stats", containerName)
+				klog.V(4).Infof("failed to handle multiple devices for container %s. Skipping Filesystem stats", containerName)
 			}
 		}
 		if spec.HasDiskIo {
@@ -168,7 +168,7 @@ func DeprecatedStatsFromV1(cont *v1.ContainerInfo) []DeprecatedContainerStats {
 			stat.Cpu = val.Cpu
 			cpuInst, err := InstCpuStats(last, val)
 			if err != nil {
-				glog.Warningf("Could not get instant cpu stats: %v", err)
+				klog.Warningf("Could not get instant cpu stats: %v", err)
 			} else {
 				stat.CpuInst = cpuInst
 			}

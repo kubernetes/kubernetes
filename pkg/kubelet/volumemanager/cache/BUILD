@@ -14,13 +14,15 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/cache",
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -31,14 +33,13 @@ go_test(
         "desired_state_of_world_test.go",
     ],
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/volumemanager/cache",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/types:go_default_library",
-        "//pkg/volume/util/volumehelper:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

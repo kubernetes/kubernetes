@@ -24,15 +24,22 @@ import (
 	"os"
 	"path/filepath"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
-	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
+	//
+	// Uncomment to load all auth plugins
+	// _ "k8s.io/client-go/plugin/pkg/client/auth
+	//
+	// Or uncomment to load specific auth plugins
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/azure"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )
 
 func main() {
@@ -53,14 +60,19 @@ func main() {
 		panic(err)
 	}
 
-	deploymentsClient := clientset.AppsV1beta1().Deployments(apiv1.NamespaceDefault)
+	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
 
-	deployment := &appsv1beta1.Deployment{
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "demo-deployment",
 		},
-		Spec: appsv1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": "demo",
+				},
+			},
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -108,7 +120,7 @@ func main() {
 	//			 using the retry utility package included with client-go. (RECOMMENDED)
 	//
 	// More Info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
@@ -127,27 +139,6 @@ func main() {
 		panic(fmt.Errorf("Update failed: %v", retryErr))
 	}
 	fmt.Println("Updated deployment...")
-
-	// Rollback Deployment
-	prompt()
-	fmt.Println("Rolling back deployment...")
-	// Once again use RetryOnConflict to avoid update conflicts
-	retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
-		if getErr != nil {
-			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
-		}
-
-		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
-			Revision: 0, // can be specific revision number, or 0 for last revision
-		}
-		_, updateErr := deploymentsClient.Update(result)
-		return updateErr
-	})
-	if retryErr != nil {
-		panic(fmt.Errorf("Rollback failed: %v", retryErr))
-	}
-	fmt.Println("Rolled back deployment...")
 
 	// List Deployments
 	prompt()

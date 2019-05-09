@@ -38,6 +38,8 @@ func TestLocalPortString(t *testing.T) {
 		{"IPv4 UDP", "1.2.3.4", 9999, "udp", "\"IPv4 UDP\" (1.2.3.4:9999/udp)"},
 		{"IPv4 TCP", "5.6.7.8", 1053, "tcp", "\"IPv4 TCP\" (5.6.7.8:1053/tcp)"},
 		{"IPv6 TCP", "2001:db8::1", 80, "tcp", "\"IPv6 TCP\" ([2001:db8::1]:80/tcp)"},
+		{"IPv4 SCTP", "9.10.11.12", 7777, "sctp", "\"IPv4 SCTP\" (9.10.11.12:7777/sctp)"},
+		{"IPv6 SCTP", "2001:db8::2", 80, "sctp", "\"IPv6 SCTP\" ([2001:db8::2]:80/sctp)"},
 	}
 
 	for _, tc := range testCases {

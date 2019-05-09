@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
 
 func TestSplitAndParseResourceRequest(t *testing.T) {
@@ -57,25 +57,21 @@ func TestSplitAndParseResourceRequest(t *testing.T) {
 		},
 	}
 
-	mapper := getMapper()
-	for _, test := range tests {
-		gotInResource, gotFieldsPath, err := SplitAndParseResourceRequest(test.inresource, mapper)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+	mapper := testrestmapper.TestOnlyStaticRESTMapper(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotInResource, gotFieldsPath, err := SplitAndParseResourceRequest(tt.inresource, mapper)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-		if !reflect.DeepEqual(test.expectedInResource, gotInResource) && !test.expectedErr {
-			t.Errorf("%s: expected inresource: %s, got: %s", test.name, test.expectedInResource, gotInResource)
-		}
+			if !reflect.DeepEqual(tt.expectedInResource, gotInResource) && !tt.expectedErr {
+				t.Errorf("%s: expected inresource: %s, got: %s", tt.name, tt.expectedInResource, gotInResource)
+			}
 
-		if !reflect.DeepEqual(test.expectedFieldsPath, gotFieldsPath) && !test.expectedErr {
-			t.Errorf("%s: expected fieldsPath: %s, got: %s", test.name, test.expectedFieldsPath, gotFieldsPath)
-		}
+			if !reflect.DeepEqual(tt.expectedFieldsPath, gotFieldsPath) && !tt.expectedErr {
+				t.Errorf("%s: expected fieldsPath: %s, got: %s", tt.name, tt.expectedFieldsPath, gotFieldsPath)
+			}
+		})
 	}
-}
-
-func getMapper() meta.RESTMapper {
-	f, _, _, _ := cmdtesting.NewTestFactory()
-	mapper, _ := f.Object()
-	return mapper
 }

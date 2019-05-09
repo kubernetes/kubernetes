@@ -22,11 +22,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -63,6 +63,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
+		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 
@@ -103,11 +104,11 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		}
 
 		iterations64 := float64(iterations)
-		framework.Logf("Average latency for below operations")
-		framework.Logf("Creating %d PVCs and waiting for bound phase: %v seconds", volumeCount, sumLatency[CreateOp]/iterations64)
-		framework.Logf("Creating %v Pod: %v seconds", volumeCount/volumesPerPod, sumLatency[AttachOp]/iterations64)
-		framework.Logf("Deleting %v Pod and waiting for disk to be detached: %v seconds", volumeCount/volumesPerPod, sumLatency[DetachOp]/iterations64)
-		framework.Logf("Deleting %v PVCs: %v seconds", volumeCount, sumLatency[DeleteOp]/iterations64)
+		e2elog.Logf("Average latency for below operations")
+		e2elog.Logf("Creating %d PVCs and waiting for bound phase: %v seconds", volumeCount, sumLatency[CreateOp]/iterations64)
+		e2elog.Logf("Creating %v Pod: %v seconds", volumeCount/volumesPerPod, sumLatency[AttachOp]/iterations64)
+		e2elog.Logf("Deleting %v Pod and waiting for disk to be detached: %v seconds", volumeCount/volumesPerPod, sumLatency[DetachOp]/iterations64)
+		e2elog.Logf("Deleting %v PVCs: %v seconds", volumeCount, sumLatency[DeleteOp]/iterations64)
 
 	})
 })
@@ -128,26 +129,26 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 		var err error
 		switch scname {
 		case storageclass1:
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil))
+			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil, nil))
 		case storageclass2:
 			var scVSanParameters map[string]string
 			scVSanParameters = make(map[string]string)
 			scVSanParameters[Policy_HostFailuresToTolerate] = "1"
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters))
+			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil))
 		case storageclass3:
 			var scSPBMPolicyParameters map[string]string
 			scSPBMPolicyParameters = make(map[string]string)
 			scSPBMPolicyParameters[SpbmStoragePolicy] = policyName
-			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters))
+			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil))
 		case storageclass4:
 			var scWithDSParameters map[string]string
 			scWithDSParameters = make(map[string]string)
 			scWithDSParameters[Datastore] = datastoreName
-			scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters)
+			scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters, nil)
 			sc, err = client.StorageV1().StorageClasses().Create(scWithDatastoreSpec)
 		}
 		Expect(sc).NotTo(BeNil())
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		scArrays[index] = sc
 	}
 	return scArrays
@@ -160,7 +161,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		totalpvs      [][]*v1.PersistentVolume
 		totalpods     []*v1.Pod
 	)
-	nodeVolumeMap := make(map[types.NodeName][]string)
+	nodeVolumeMap := make(map[string][]string)
 	latency = make(map[string]float64)
 	numPods := volumeCount / volumesPerPod
 
@@ -170,15 +171,15 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		var pvclaims []*v1.PersistentVolumeClaim
 		for j := 0; j < volumesPerPod; j++ {
 			currsc := sc[((i*numPods)+j)%len(sc)]
-			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", currsc))
-			Expect(err).NotTo(HaveOccurred())
+			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", currsc))
+			framework.ExpectNoError(err)
 			pvclaims = append(pvclaims, pvclaim)
 		}
 		totalpvclaims = append(totalpvclaims, pvclaims)
 	}
 	for _, pvclaims := range totalpvclaims {
 		persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		totalpvs = append(totalpvs, persistentvolumes)
 	}
 	elapsed := time.Since(start)
@@ -189,7 +190,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	for i, pvclaims := range totalpvclaims {
 		nodeSelector := nodeSelectorList[i%len(nodeSelectorList)]
 		pod, err := framework.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		totalpods = append(totalpods, pod)
 
 		defer framework.DeletePodWithWait(f, client, pod)
@@ -197,39 +198,34 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	elapsed = time.Since(start)
 	latency[AttachOp] = elapsed.Seconds()
 
-	// Verify access to the volumes
-	vsp, err := getVSphere(client)
-	Expect(err).NotTo(HaveOccurred())
-
 	for i, pod := range totalpods {
-		verifyVSphereVolumesAccessible(client, pod, totalpvs[i], vsp)
+		verifyVSphereVolumesAccessible(client, pod, totalpvs[i])
 	}
 
 	By("Deleting pods")
 	start = time.Now()
 	for _, pod := range totalpods {
-		err = framework.DeletePodWithWait(f, client, pod)
-		Expect(err).NotTo(HaveOccurred())
+		err := framework.DeletePodWithWait(f, client, pod)
+		framework.ExpectNoError(err)
 	}
 	elapsed = time.Since(start)
 	latency[DetachOp] = elapsed.Seconds()
 
 	for i, pod := range totalpods {
 		for _, pv := range totalpvs[i] {
-			nodeName := types.NodeName(pod.Spec.NodeName)
-			nodeVolumeMap[nodeName] = append(nodeVolumeMap[nodeName], pv.Spec.VsphereVolume.VolumePath)
+			nodeVolumeMap[pod.Spec.NodeName] = append(nodeVolumeMap[pod.Spec.NodeName], pv.Spec.VsphereVolume.VolumePath)
 		}
 	}
 
-	err = waitForVSphereDisksToDetach(client, vsp, nodeVolumeMap)
-	Expect(err).NotTo(HaveOccurred())
+	err := waitForVSphereDisksToDetach(nodeVolumeMap)
+	framework.ExpectNoError(err)
 
 	By("Deleting the PVCs")
 	start = time.Now()
 	for _, pvclaims := range totalpvclaims {
 		for _, pvc := range pvclaims {
 			err = framework.DeletePersistentVolumeClaim(client, pvc.Name, namespace)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		}
 	}
 	elapsed = time.Since(start)

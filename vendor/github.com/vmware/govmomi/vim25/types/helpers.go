@@ -17,6 +17,7 @@ limitations under the License.
 package types
 
 import (
+	"reflect"
 	"strings"
 	"time"
 )
@@ -70,7 +71,7 @@ func defaultResourceAllocationInfo() ResourceAllocationInfo {
 	return ResourceAllocationInfo{
 		Reservation:           NewInt64(0),
 		ExpandableReservation: NewBool(true),
-		Limit: NewInt64(-1),
+		Limit:                 NewInt64(-1),
 		Shares: &SharesInfo{
 			Level: SharesLevelNormal,
 		},
@@ -85,4 +86,10 @@ func DefaultResourceConfigSpec() ResourceConfigSpec {
 		CpuAllocation:    defaultResourceAllocationInfo(),
 		MemoryAllocation: defaultResourceAllocationInfo(),
 	}
+}
+
+func init() {
+	// Known 6.5 issue where this event type is sent even though it is internal.
+	// This workaround allows us to unmarshal and avoid NPEs.
+	t["HostSubSpecificationUpdateEvent"] = reflect.TypeOf((*HostEvent)(nil)).Elem()
 }

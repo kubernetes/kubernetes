@@ -31,9 +31,17 @@ type Transport struct {
 }
 
 // RoundTrip authorizes and authenticates the request with an
-// access token. If no token exists or token is expired,
-// tries to refresh/fetch a new token.
+// access token from Transport's Source.
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqBodyClosed := false
+	if req.Body != nil {
+		defer func() {
+			if !reqBodyClosed {
+				req.Body.Close()
+			}
+		}()
+	}
+
 	if t.Source == nil {
 		return nil, errors.New("oauth2: Transport's Source is nil")
 	}
@@ -46,6 +54,10 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	token.SetAuthHeader(req2)
 	t.setModReq(req, req2)
 	res, err := t.base().RoundTrip(req2)
+
+	// req.Body is assumed to have been closed by the base RoundTripper.
+	reqBodyClosed = true
+
 	if err != nil {
 		t.setModReq(req, nil)
 		return nil, err

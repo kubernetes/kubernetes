@@ -29,6 +29,9 @@ type InitSystem interface {
 	// ServiceStop tries to stop a specific service
 	ServiceStop(service string) error
 
+	// ServiceRestart tries to reload the environment and restart the specific service
+	ServiceRestart(service string) error
+
 	// ServiceExists ensures the service is defined for this init system.
 	ServiceExists(service string) bool
 
@@ -41,16 +44,34 @@ type InitSystem interface {
 
 type SystemdInitSystem struct{}
 
+func (sysd SystemdInitSystem) reloadSystemd() error {
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		return fmt.Errorf("failed to reload systemd: %v", err)
+	}
+	return nil
+}
+
 func (sysd SystemdInitSystem) ServiceStart(service string) error {
+	// Before we try to start any service, make sure that systemd is ready
+	if err := sysd.reloadSystemd(); err != nil {
+		return err
+	}
 	args := []string{"start", service}
-	err := exec.Command("systemctl", args...).Run()
-	return err
+	return exec.Command("systemctl", args...).Run()
+}
+
+func (sysd SystemdInitSystem) ServiceRestart(service string) error {
+	// Before we try to restart any service, make sure that systemd is ready
+	if err := sysd.reloadSystemd(); err != nil {
+		return err
+	}
+	args := []string{"restart", service}
+	return exec.Command("systemctl", args...).Run()
 }
 
 func (sysd SystemdInitSystem) ServiceStop(service string) error {
 	args := []string{"stop", service}
-	err := exec.Command("systemctl", args...).Run()
-	return err
+	return exec.Command("systemctl", args...).Run()
 }
 
 func (sysd SystemdInitSystem) ServiceExists(service string) bool {
@@ -93,6 +114,16 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	args := []string{"Start-Service", service}
 	err := exec.Command("powershell", args...).Run()
 	return err
+}
+
+func (sysd WindowsInitSystem) ServiceRestart(service string) error {
+	if err := sysd.ServiceStop(service); err != nil {
+		return fmt.Errorf("couldn't stop service: %v", err)
+	}
+	if err := sysd.ServiceStart(service); err != nil {
+		return fmt.Errorf("couldn't start service: %v", err)
+	}
+	return nil
 }
 
 func (sysd WindowsInitSystem) ServiceStop(service string) error {

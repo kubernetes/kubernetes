@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -38,11 +38,9 @@ const (
 	maxPerPodContainer = 1
 	maxTotalContainers = -1
 
-	defaultRuntimeRequestTimeoutDuration = 1 * time.Minute
-	defaultImagePullProgressDeadline     = 1 * time.Minute
-	garbageCollectDuration               = 3 * time.Minute
-	setupDuration                        = 10 * time.Minute
-	runtimePollInterval                  = 10 * time.Second
+	garbageCollectDuration = 3 * time.Minute
+	setupDuration          = 10 * time.Minute
+	runtimePollInterval    = 10 * time.Second
 )
 
 type testPodSpec struct {
@@ -71,7 +69,7 @@ type testRun struct {
 
 // GarbageCollect tests that the Kubelet conforms to the Kubelet Garbage Collection Policy, found here:
 // http://kubernetes.io/docs/admin/garbage-collection/
-var _ = framework.KubeDescribe("GarbageCollect [Serial]", func() {
+var _ = framework.KubeDescribe("GarbageCollect [Serial][NodeFeature:GarbageCollect]", func() {
 	f := framework.NewDefaultFramework("garbage-collect-test")
 	containerNamePrefix := "gc-test-container-"
 	podNamePrefix := "gc-test-pod-"
@@ -137,7 +135,7 @@ var _ = framework.KubeDescribe("GarbageCollect [Serial]", func() {
 
 // Tests the following:
 // 	pods are created, and all containers restart the specified number of times
-// 	while contianers are running, the number of copies of a single container does not exceed maxPerPodContainer
+// 	while containers are running, the number of copies of a single container does not exceed maxPerPodContainer
 // 	while containers are running, the total number of containers does not exceed maxTotalContainers
 // 	while containers are running, if not constrained by maxPerPodContainer or maxTotalContainers, keep an extra copy of each container
 // 	once pods are killed, all containers are eventually cleaned up
@@ -202,7 +200,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 						containerCount := 0
 						for _, containerName := range containerNames {
 							if containerName == pod.getContainerName(i) {
-								containerCount += 1
+								containerCount++
 							}
 						}
 						if containerCount > maxPerPodContainer+1 {
@@ -230,7 +228,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 							containerCount := 0
 							for _, containerName := range containerNames {
 								if containerName == pod.getContainerName(i) {
-									containerCount += 1
+									containerCount++
 								}
 							}
 							if pod.restartCount > 0 && containerCount < maxPerPodContainer+1 {

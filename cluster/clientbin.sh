@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
 
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
@@ -47,6 +47,9 @@ case "$(uname -m)" in
   arm*)
     host_arch=arm
     ;;
+  aarch64*)
+    host_arch=arm64
+    ;;
   i?86*)
     host_arch=386
     ;;
@@ -62,12 +65,6 @@ case "$(uname -m)" in
     ;;
 esac
 
-# Get the absolute path of the directory component of a file, i.e. the
-# absolute path of the dirname of $1.
-get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
-}
-
 function get_bin() {
   bin="${1:-}"
   srcdir="${2:-}"
@@ -79,7 +76,7 @@ function get_bin() {
     echo "Source directory path is required"
     exit 1
   fi
-  
+
   locations=(
     "${KUBE_ROOT}/_output/bin/${bin}"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/${bin}"
@@ -90,9 +87,12 @@ function get_bin() {
   # The bazel go rules place binaries in subtrees like
   # "bazel-bin/source/path/linux_amd64_pure_stripped/binaryname", so make sure
   # the platform name is matched in the path.
-  locations+=($(find "${KUBE_ROOT}/bazel-bin/${srcdir}" -type f -executable \
-    -path "*/${host_os}_${host_arch}*/${bin}" 2>/dev/null || true) )
-  echo $( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  while IFS=$'\n' read -r line; do
+    locations+=( "${line}" )
+  done < <(find "${KUBE_ROOT}/bazel-bin/${srcdir}" -type f -executable \
+    -path "*/${host_os}_${host_arch}*/${bin}" 2>/dev/null || true)
+  
+  (ls -t "${locations[@]}" 2>/dev/null || true) | head -1
 }
 
 function print_error() {

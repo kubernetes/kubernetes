@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -235,7 +234,7 @@ func TestPathsToRemove(t *testing.T) {
 			continue
 		}
 
-		dataDirPath := path.Join(targetDir, dataDirName)
+		dataDirPath := filepath.Join(targetDir, dataDirName)
 		oldTsDir, err := os.Readlink(dataDirPath)
 		if err != nil && os.IsNotExist(err) {
 			t.Errorf("Data symlink does not exist: %v", dataDirPath)
@@ -245,7 +244,7 @@ func TestPathsToRemove(t *testing.T) {
 			continue
 		}
 
-		actual, err := writer.pathsToRemove(tc.payload2, path.Join(targetDir, oldTsDir))
+		actual, err := writer.pathsToRemove(tc.payload2, filepath.Join(targetDir, oldTsDir))
 		if err != nil {
 			t.Errorf("%v: unexpected error determining paths to remove: %v", tc.name, err)
 			continue
@@ -751,7 +750,7 @@ func TestMultipleUpdates(t *testing.T) {
 }
 
 func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjection, t *testing.T) {
-	dataDirPath := path.Join(targetDir, dataDirName)
+	dataDirPath := filepath.Join(targetDir, dataDirName)
 	// use filepath.Walk to reconstruct the payload, then deep equal
 	observedPayload := make(map[string]FileProjection)
 	visitor := func(path string, info os.FileInfo, err error) error {
@@ -790,13 +789,13 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 			continue
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			p := path.Join(targetDir, info.Name())
+			p := filepath.Join(targetDir, info.Name())
 			actual, err := os.Readlink(p)
 			if err != nil {
 				t.Errorf("Unable to read symlink %v: %v", p, err)
 				continue
 			}
-			if err := filepath.Walk(path.Join(targetDir, actual), visitor); err != nil {
+			if err := filepath.Walk(filepath.Join(targetDir, actual), visitor); err != nil {
 				t.Errorf("%v: unexpected error walking directory: %v", tcName, err)
 			}
 		}
@@ -804,10 +803,183 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 
 	cleanPathPayload := make(map[string]FileProjection, len(payload))
 	for k, v := range payload {
-		cleanPathPayload[path.Clean(k)] = v
+		cleanPathPayload[filepath.Clean(k)] = v
 	}
 
 	if !reflect.DeepEqual(cleanPathPayload, observedPayload) {
 		t.Errorf("%v: payload and observed payload do not match.", tcName)
+	}
+}
+
+func TestValidatePayload(t *testing.T) {
+	maxPath := strings.Repeat("a", maxPathLength+1)
+
+	cases := []struct {
+		name     string
+		payload  map[string]FileProjection
+		expected sets.String
+		valid    bool
+	}{
+		{
+			name: "valid payload",
+			payload: map[string]FileProjection{
+				"foo": {},
+				"bar": {},
+			},
+			valid:    true,
+			expected: sets.NewString("foo", "bar"),
+		},
+		{
+			name: "payload with path length > 4096 is invalid",
+			payload: map[string]FileProjection{
+				maxPath: {},
+			},
+			valid: false,
+		},
+		{
+			name: "payload with absolute path is invalid",
+			payload: map[string]FileProjection{
+				"/dev/null": {},
+			},
+			valid: false,
+		},
+		{
+			name: "payload with reserved path is invalid",
+			payload: map[string]FileProjection{
+				"..sneaky.txt": {},
+			},
+			valid: false,
+		},
+		{
+			name: "payload with doubledot path is invalid",
+			payload: map[string]FileProjection{
+				"foo/../etc/password": {},
+			},
+			valid: false,
+		},
+		{
+			name: "payload with empty path is invalid",
+			payload: map[string]FileProjection{
+				"": {},
+			},
+			valid: false,
+		},
+		{
+			name: "payload with unclean path should be cleaned",
+			payload: map[string]FileProjection{
+				"foo////bar": {},
+			},
+			valid:    true,
+			expected: sets.NewString("foo/bar"),
+		},
+	}
+	getPayloadPaths := func(payload map[string]FileProjection) sets.String {
+		paths := sets.NewString()
+		for path := range payload {
+			paths.Insert(path)
+		}
+		return paths
+	}
+
+	for _, tc := range cases {
+		real, err := validatePayload(tc.payload)
+		if !tc.valid && err == nil {
+			t.Errorf("%v: unexpected success", tc.name)
+		}
+
+		if tc.valid {
+			if err != nil {
+				t.Errorf("%v: unexpected failure: %v", tc.name, err)
+				continue
+			}
+
+			realPaths := getPayloadPaths(real)
+			if !realPaths.Equal(tc.expected) {
+				t.Errorf("%v: unexpected payload paths: %v is not equal to %v", tc.name, realPaths, tc.expected)
+			}
+		}
+
+	}
+}
+
+func TestCreateUserVisibleFiles(t *testing.T) {
+	cases := []struct {
+		name     string
+		payload  map[string]FileProjection
+		expected map[string]string
+	}{
+		{
+			name: "simple path",
+			payload: map[string]FileProjection{
+				"foo": {},
+				"bar": {},
+			},
+			expected: map[string]string{
+				"foo": "..data/foo",
+				"bar": "..data/bar",
+			},
+		},
+		{
+			name: "simple nested path",
+			payload: map[string]FileProjection{
+				"foo/bar":     {},
+				"foo/bar/txt": {},
+				"bar/txt":     {},
+			},
+			expected: map[string]string{
+				"foo": "..data/foo",
+				"bar": "..data/bar",
+			},
+		},
+		{
+			name: "unclean nested path",
+			payload: map[string]FileProjection{
+				"./bar":     {},
+				"foo///bar": {},
+			},
+			expected: map[string]string{
+				"bar": "..data/bar",
+				"foo": "..data/foo",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		targetDir, err := utiltesting.MkTmpdir("atomic-write")
+		if err != nil {
+			t.Errorf("%v: unexpected error creating tmp dir: %v", tc.name, err)
+			continue
+		}
+		defer os.RemoveAll(targetDir)
+
+		dataDirPath := filepath.Join(targetDir, dataDirName)
+		err = os.MkdirAll(dataDirPath, 0755)
+		if err != nil {
+			t.Fatalf("%v: unexpected error creating data path: %v", tc.name, err)
+		}
+
+		writer := &AtomicWriter{targetDir: targetDir, logContext: "-test-"}
+		payload, err := validatePayload(tc.payload)
+		if err != nil {
+			t.Fatalf("%v: unexpected error validating payload: %v", tc.name, err)
+		}
+		err = writer.createUserVisibleFiles(payload)
+		if err != nil {
+			t.Fatalf("%v: unexpected error creating visible files: %v", tc.name, err)
+		}
+
+		for subpath, expectedDest := range tc.expected {
+			visiblePath := filepath.Join(targetDir, subpath)
+			destination, err := os.Readlink(visiblePath)
+			if err != nil && os.IsNotExist(err) {
+				t.Fatalf("%v: visible symlink does not exist: %v", tc.name, visiblePath)
+			} else if err != nil {
+				t.Fatalf("%v: unable to read symlink %v: %v", tc.name, dataDirPath, err)
+			}
+
+			if expectedDest != destination {
+				t.Fatalf("%v: symlink destination %q not same with expected data dir %q", tc.name, destination, expectedDest)
+			}
+		}
 	}
 }

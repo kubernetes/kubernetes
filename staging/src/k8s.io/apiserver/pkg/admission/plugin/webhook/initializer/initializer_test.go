@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 type doNothingAdmission struct{}
@@ -30,7 +30,7 @@ func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
 
 type fakeServiceResolver struct{}
 
-func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return nil, nil
 }
 
@@ -39,7 +39,7 @@ type serviceWanter struct {
 	got ServiceResolver
 }
 
-func (s *serviceWanter) SetServiceResolver(sr config.ServiceResolver) { s.got = sr }
+func (s *serviceWanter) SetServiceResolver(sr webhook.ServiceResolver) { s.got = sr }
 
 func TestWantsServiceResolver(t *testing.T) {
 	sw := &serviceWanter{}

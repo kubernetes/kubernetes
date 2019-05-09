@@ -2,10 +2,11 @@ package netlink
 
 import (
 	"fmt"
+	"syscall"
+
+	"github.com/vishvananda/netns"
 
 	"github.com/vishvananda/netlink/nl"
-	"github.com/vishvananda/netns"
-	"golang.org/x/sys/unix"
 )
 
 type XfrmMsg interface {
@@ -38,7 +39,7 @@ func XfrmMonitor(ch chan<- XfrmMsg, done <-chan struct{}, errorChan chan<- error
 	if err != nil {
 		return nil
 	}
-	s, err := nl.SubscribeAt(netns.None(), netns.None(), unix.NETLINK_XFRM, groups...)
+	s, err := nl.SubscribeAt(netns.None(), netns.None(), syscall.NETLINK_XFRM, groups...)
 	if err != nil {
 		return err
 	}

@@ -19,7 +19,7 @@ package scaleio
 import (
 	"encoding/gob"
 	"os"
-	"path"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -152,18 +152,18 @@ func TestUtilSaveConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	config := path.Join(tmpDir, testConfigFile)
+	config := filepath.Join(tmpDir, testConfigFile)
 	data := map[string]string{
 		confKey.gateway:    "https://test-gateway/",
 		confKey.secretName: "sio-secret",
 		confKey.sslEnabled: "false",
 	}
 	if err := saveConfig(config, data); err != nil {
-		t.Fatal("failed while saving data", err)
+		t.Fatalf("failed while saving data: %v", err)
 	}
 	file, err := os.Open(config)
 	if err != nil {
-		t.Fatal("failed to open conf file: ", file)
+		t.Fatalf("failed to open conf file %s: %v", config, err)
 	}
 	defer file.Close()
 	dataRcvd := map[string]string{}
@@ -207,7 +207,7 @@ func TestUtilLoadConfig(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	configFile := path.Join(tmpDir, sioConfigFileName)
+	configFile := filepath.Join(tmpDir, sioConfigFileName)
 
 	if err := saveConfig(configFile, config); err != nil {
 		t.Fatalf("failed to save configFile %s error:%v", configFile, err)

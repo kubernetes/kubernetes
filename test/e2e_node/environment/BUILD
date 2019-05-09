@@ -9,7 +9,6 @@ load(
 go_binary(
     name = "environment",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/e2e_node/environment",
 )
 
 go_library(

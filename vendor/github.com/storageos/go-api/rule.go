@@ -3,7 +3,6 @@ package storageos
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 
@@ -72,10 +71,15 @@ func (c *Client) Rule(namespace string, ref string) (*types.Rule, error) {
 
 // RuleCreate creates a rule on the server and returns the new object.
 func (c *Client) RuleCreate(opts types.RuleCreateOptions) (*types.Rule, error) {
-	resp, err := c.do("POST", RuleAPIPrefix, doOptions{
-		data:      opts,
-		namespace: opts.Namespace,
-		context:   opts.Context,
+	path, err := namespacedPath(opts.Namespace, RuleAPIPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.do("POST", path, doOptions{
+		data: opts,
+		// namespace: opts.Namespace,
+		context: opts.Context,
 	})
 	if err != nil {
 		return nil, err
@@ -93,7 +97,7 @@ func (c *Client) RuleUpdate(opts types.RuleUpdateOptions) (*types.Rule, error) {
 	if IsUUID(opts.ID) {
 		ref = opts.ID
 	}
-	fmt.Printf("%#v\n", opts)
+
 	path, err := namespacedRefPath(opts.Namespace, RuleAPIPrefix, ref)
 	if err != nil {
 		return nil, err

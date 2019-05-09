@@ -28,5 +28,4 @@ filegroup(
 go_binary(
     name = "serve-hostname",
     embed = [":go_default_library"],
-    importpath = "k8s.io/kubernetes/test/images/serve-hostname",
 )

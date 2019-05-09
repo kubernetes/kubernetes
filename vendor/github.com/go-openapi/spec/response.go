@@ -39,15 +39,15 @@ type Response struct {
 }
 
 // JSONLookup look up a value by the json property name
-func (p Response) JSONLookup(token string) (interface{}, error) {
-	if ex, ok := p.Extensions[token]; ok {
+func (r Response) JSONLookup(token string) (interface{}, error) {
+	if ex, ok := r.Extensions[token]; ok {
 		return &ex, nil
 	}
 	if token == "$ref" {
-		return &p.Ref, nil
+		return &r.Ref, nil
 	}
-	r, _, err := jsonpointer.GetForToken(p.ResponseProps, token)
-	return r, err
+	ptr, _, err := jsonpointer.GetForToken(r.ResponseProps, token)
+	return ptr, err
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON

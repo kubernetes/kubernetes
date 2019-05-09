@@ -57,15 +57,18 @@ func (s *SearchIndex) FindByDatastorePath(r *types.FindByDatastorePath) soap.Has
 func (s *SearchIndex) FindByInventoryPath(req *types.FindByInventoryPath) soap.HasFault {
 	body := &methods.FindByInventoryPathBody{Res: new(types.FindByInventoryPathResponse)}
 
-	path := strings.Split(req.InventoryPath, "/")
-	if len(path) <= 1 {
+	split := func(c rune) bool {
+		return c == '/'
+	}
+	path := strings.FieldsFunc(req.InventoryPath, split)
+	if len(path) < 1 {
 		return body
 	}
 
 	root := Map.content().RootFolder
 	o := &root
 
-	for _, name := range path[1:] {
+	for _, name := range path {
 		f := s.FindChild(&types.FindChild{Entity: *o, Name: name})
 
 		o = f.(*methods.FindChildBody).Res.Returnval
@@ -94,7 +97,7 @@ func (s *SearchIndex) FindChild(req *types.FindChild) soap.HasFault {
 	var children []types.ManagedObjectReference
 
 	switch e := obj.(type) {
-	case *mo.Datacenter:
+	case *Datacenter:
 		children = []types.ManagedObjectReference{e.VmFolder, e.HostFolder, e.DatastoreFolder, e.NetworkFolder}
 	case *Folder:
 		children = e.ChildEntity
@@ -132,9 +135,16 @@ func (s *SearchIndex) FindByUuid(req *types.FindByUuid) soap.HasFault {
 			if !ok {
 				continue
 			}
-			if vm.Config.Uuid == req.Uuid {
-				body.Res.Returnval = &ref
-				break
+			if req.InstanceUuid != nil && *req.InstanceUuid {
+				if vm.Config.InstanceUuid == req.Uuid {
+					body.Res.Returnval = &ref
+					break
+				}
+			} else {
+				if vm.Config.Uuid == req.Uuid {
+					body.Res.Returnval = &ref
+					break
+				}
 			}
 		}
 	} else {
@@ -147,6 +157,104 @@ func (s *SearchIndex) FindByUuid(req *types.FindByUuid) soap.HasFault {
 			if host.Summary.Hardware.Uuid == req.Uuid {
 				body.Res.Returnval = &ref
 				break
+			}
+		}
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindByDnsName(req *types.FindByDnsName) soap.HasFault {
+	body := &methods.FindByDnsNameBody{Res: new(types.FindByDnsNameResponse)}
+
+	all := types.FindAllByDnsName(*req)
+
+	switch r := s.FindAllByDnsName(&all).(type) {
+	case *methods.FindAllByDnsNameBody:
+		if len(r.Res.Returnval) > 0 {
+			body.Res.Returnval = &r.Res.Returnval[0]
+		}
+	default:
+		// no need until FindAllByDnsName below returns a Fault
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindAllByDnsName(req *types.FindAllByDnsName) soap.HasFault {
+	body := &methods.FindAllByDnsNameBody{Res: new(types.FindAllByDnsNameResponse)}
+
+	if req.VmSearch {
+		// Find Virtual Machine using DNS name
+		for ref, obj := range Map.objects {
+			vm, ok := obj.(*VirtualMachine)
+			if !ok {
+				continue
+			}
+			if vm.Guest.HostName == req.DnsName {
+				body.Res.Returnval = append(body.Res.Returnval, ref)
+			}
+		}
+	} else {
+		// Find Host System using DNS name
+		for ref, obj := range Map.objects {
+			host, ok := obj.(*HostSystem)
+			if !ok {
+				continue
+			}
+			for _, net := range host.Config.Network.NetStackInstance {
+				if net.DnsConfig.GetHostDnsConfig().HostName == req.DnsName {
+					body.Res.Returnval = append(body.Res.Returnval, ref)
+				}
+			}
+		}
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindByIp(req *types.FindByIp) soap.HasFault {
+	body := &methods.FindByIpBody{Res: new(types.FindByIpResponse)}
+
+	all := types.FindAllByIp(*req)
+
+	switch r := s.FindAllByIp(&all).(type) {
+	case *methods.FindAllByIpBody:
+		if len(r.Res.Returnval) > 0 {
+			body.Res.Returnval = &r.Res.Returnval[0]
+		}
+	default:
+		// no need until FindAllByIp below returns a Fault
+	}
+
+	return body
+}
+
+func (s *SearchIndex) FindAllByIp(req *types.FindAllByIp) soap.HasFault {
+	body := &methods.FindAllByIpBody{Res: new(types.FindAllByIpResponse)}
+
+	if req.VmSearch {
+		// Find Virtual Machine using IP
+		for ref, obj := range Map.objects {
+			vm, ok := obj.(*VirtualMachine)
+			if !ok {
+				continue
+			}
+			if vm.Guest.IpAddress == req.Ip {
+				body.Res.Returnval = append(body.Res.Returnval, ref)
+			}
+		}
+	} else {
+		// Find Host System using IP
+		for ref, obj := range Map.objects {
+			host, ok := obj.(*HostSystem)
+			if !ok {
+				continue
+			}
+			for _, net := range host.Config.Network.Vnic {
+				if net.Spec.Ip.IpAddress == req.Ip {
+					body.Res.Returnval = append(body.Res.Returnval, ref)
+				}
 			}
 		}
 	}
