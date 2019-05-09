@@ -1367,14 +1367,23 @@ func validatePublicIP(t *testing.T, publicIP *network.PublicIPAddress, service *
 		t.Errorf("Expected publicIP resource exists, when it is not an internal service")
 	}
 
-	if publicIP.Tags == nil || publicIP.Tags["service"] == nil {
-		t.Errorf("Expected publicIP resource has tags[service]")
+	if publicIP.Tags == nil || publicIP.Tags[serviceTagKey] == nil {
+		t.Errorf("Expected publicIP resource has tags[%s]", serviceTagKey)
 	}
 
 	serviceName := getServiceName(service)
-	if serviceName != *(publicIP.Tags["service"]) {
-		t.Errorf("Expected publicIP resource has matching tags[service]")
+	if serviceName != *(publicIP.Tags[serviceTagKey]) {
+		t.Errorf("Expected publicIP resource has matching tags[%s]", serviceTagKey)
 	}
+
+	if publicIP.Tags[clusterNameKey] == nil {
+		t.Errorf("Expected publicIP resource has tags[%s]", clusterNameKey)
+	}
+
+	if *(publicIP.Tags[clusterNameKey]) != testClusterName {
+		t.Errorf("Expected publicIP resource has matching tags[%s]", clusterNameKey)
+	}
+
 	// We cannot use service.Spec.LoadBalancerIP to compare with
 	// Public IP's IPAddress
 	// Because service properties are updated outside of cloudprovider code
