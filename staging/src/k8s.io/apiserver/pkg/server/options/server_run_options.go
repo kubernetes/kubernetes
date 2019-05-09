@@ -18,9 +18,10 @@ package options
 
 import (
 	"fmt"
-	"k8s.io/apiserver/pkg/features"
 	"net"
 	"time"
+
+	"k8s.io/apiserver/pkg/features"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -78,7 +79,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
-
+	c.EnableInfightQuotaHandler = s.EnableInfightQuotaHandler
 	return nil
 }
 

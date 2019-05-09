@@ -170,6 +170,8 @@ type Config struct {
 	MaxMutatingRequestsInFlight int
 	// Predicate which is true for paths of long-running http requests
 	LongRunningFunc apirequest.LongRunningRequestCheck
+	// TODO(aaron-prindle) better comment
+	EnableInfightQuotaHandler bool
 
 	// EnableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding
@@ -264,6 +266,7 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		EnableMetrics:               true,
 		MaxRequestsInFlight:         400,
 		MaxMutatingRequestsInFlight: 200,
+		EnableInfightQuotaHandler:   false,
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
 		// 10MB is the recommended maximum client request size in bytes
@@ -542,7 +545,13 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := genericapifilters.WithAuthorization(apiHandler, c.Authorization.Authorizer, c.Serializer)
-	handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+	// TODO(aaron-prindle) added handler
+	if c.EnableInfightQuotaHandler {
+		handler = genericfilters.WithFlowSchema(handler)
+	} else {
+		handler = genericfilters.WithMaxInFlightLimit(handler, c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight, c.LongRunningFunc)
+
+	}
 	handler = genericapifilters.WithImpersonation(handler, c.Authorization.Authorizer, c.Serializer)
 	handler = genericapifilters.WithAudit(handler, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	failedHandler := genericapifilters.Unauthorized(c.Serializer, c.Authentication.SupportsBasicAuth)
