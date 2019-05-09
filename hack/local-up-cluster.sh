@@ -516,6 +516,11 @@ function start_apiserver {
     if [[ -n "${RUNTIME_CONFIG}" ]]; then
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
+    enable_inflight_quota_handler=""
+    if [[ -n "${ENABLE_INFLIGH_QUOTA_HANDLER}" ]]; then
+      enable_inflight_quota_handler="--enable-inflight-quota-handler"
+    fi
+
 
     # Let the API server pick a default address when API_HOST_IP
     # is set to 127.0.0.1
@@ -562,7 +567,7 @@ EOF
       --audit-policy-file="${AUDIT_POLICY_FILE}" \
       --audit-log-path="${LOG_DIR}/kube-apiserver-audit.log" \
       --cert-dir="${CERT_DIR}" \
-      --enable-inflight-quota-handler \
+      "${enable_inflight_quota_handler}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
