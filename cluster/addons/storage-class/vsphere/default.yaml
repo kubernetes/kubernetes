@@ -5,6 +5,7 @@ metadata:
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
   labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
 provisioner: kubernetes.io/vsphere-volume
 parameters:
-    diskformat: thin
+  diskformat: thin

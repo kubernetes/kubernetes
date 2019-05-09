@@ -11,7 +11,6 @@ metadata:
     apparmor.security.beta.kubernetes.io/defaultProfileName:  'runtime/default'
     apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
   labels:
-    kubernetes.io/cluster-service: 'true'
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   privileged: false

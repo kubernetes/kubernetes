@@ -6,7 +6,6 @@ metadata:
   name: coredns
   namespace: kube-system
   labels:
-      kubernetes.io/cluster-service: "true"
       addonmanager.kubernetes.io/mode: Reconcile
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -89,7 +88,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "CoreDNS"
 spec:

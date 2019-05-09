@@ -45,7 +45,6 @@ metadata:
   name: kube-dns
   namespace: kube-system
   labels:
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 apiVersion: v1
@@ -63,7 +62,6 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kube-dns
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   # replicas: not specified here:
