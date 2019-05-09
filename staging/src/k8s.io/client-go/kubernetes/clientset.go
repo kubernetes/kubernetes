@@ -41,6 +41,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	flowregistrationv1alpha1 "k8s.io/client-go/kubernetes/typed/flowregistration/v1alpha1"
 	networkingv1 "k8s.io/client-go/kubernetes/typed/networking/v1"
 	networkingv1beta1 "k8s.io/client-go/kubernetes/typed/networking/v1beta1"
 	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
@@ -83,6 +84,7 @@ type Interface interface {
 	CoreV1() corev1.CoreV1Interface
 	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
 	ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface
+	FlowregistrationV1alpha1() flowregistrationv1alpha1.FlowregistrationV1alpha1Interface
 	NetworkingV1() networkingv1.NetworkingV1Interface
 	NetworkingV1beta1() networkingv1beta1.NetworkingV1beta1Interface
 	NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface
@@ -125,6 +127,7 @@ type Clientset struct {
 	coreV1                       *corev1.CoreV1Client
 	eventsV1beta1                *eventsv1beta1.EventsV1beta1Client
 	extensionsV1beta1            *extensionsv1beta1.ExtensionsV1beta1Client
+	flowregistrationV1alpha1     *flowregistrationv1alpha1.FlowregistrationV1alpha1Client
 	networkingV1                 *networkingv1.NetworkingV1Client
 	networkingV1beta1            *networkingv1beta1.NetworkingV1beta1Client
 	nodeV1alpha1                 *nodev1alpha1.NodeV1alpha1Client
@@ -245,6 +248,11 @@ func (c *Clientset) EventsV1beta1() eventsv1beta1.EventsV1beta1Interface {
 // ExtensionsV1beta1 retrieves the ExtensionsV1beta1Client
 func (c *Clientset) ExtensionsV1beta1() extensionsv1beta1.ExtensionsV1beta1Interface {
 	return c.extensionsV1beta1
+}
+
+// FlowregistrationV1alpha1 retrieves the FlowregistrationV1alpha1Client
+func (c *Clientset) FlowregistrationV1alpha1() flowregistrationv1alpha1.FlowregistrationV1alpha1Interface {
+	return c.flowregistrationV1alpha1
 }
 
 // NetworkingV1 retrieves the NetworkingV1Client
@@ -422,6 +430,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.flowregistrationV1alpha1, err = flowregistrationv1alpha1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	cs.networkingV1, err = networkingv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -515,6 +527,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.NewForConfigOrDie(c)
+	cs.flowregistrationV1alpha1 = flowregistrationv1alpha1.NewForConfigOrDie(c)
 	cs.networkingV1 = networkingv1.NewForConfigOrDie(c)
 	cs.networkingV1beta1 = networkingv1beta1.NewForConfigOrDie(c)
 	cs.nodeV1alpha1 = nodev1alpha1.NewForConfigOrDie(c)
@@ -559,6 +572,7 @@ func New(c rest.Interface) *Clientset {
 	cs.coreV1 = corev1.New(c)
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
 	cs.extensionsV1beta1 = extensionsv1beta1.New(c)
+	cs.flowregistrationV1alpha1 = flowregistrationv1alpha1.New(c)
 	cs.networkingV1 = networkingv1.New(c)
 	cs.networkingV1beta1 = networkingv1beta1.New(c)
 	cs.nodeV1alpha1 = nodev1alpha1.New(c)
