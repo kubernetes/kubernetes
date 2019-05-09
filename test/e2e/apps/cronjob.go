@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -423,7 +424,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
 		} else if len(aliveJobs) == 0 {
-			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
+			e2elog.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
 		return aliveJobs[0].Name != previousJobName, nil

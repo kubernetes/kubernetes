@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -133,7 +134,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
+	e2elog.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
@@ -149,7 +150,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 			}
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		e2elog.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
@@ -159,7 +160,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	}
 
 	// Verify that something is listening.
-	framework.Logf("Trying to dial the pod")
+	e2elog.Logf("Trying to dial the pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
@@ -178,7 +179,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	namespace := f.Namespace.Name
 	name := "condition-test"
 
-	framework.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
+	e2elog.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
 	quota := newPodQuota(name, "2")
 	_, err := c.CoreV1().ResourceQuotas(namespace).Create(quota)
 	framework.ExpectNoError(err)
