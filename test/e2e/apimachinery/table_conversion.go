@@ -165,7 +165,8 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 func printTable(table *metav1beta1.Table) string {
 	buf := &bytes.Buffer{}
 	tw := tabwriter.NewWriter(buf, 5, 8, 1, ' ', 0)
-	err := printers.PrintTable(table, tw, printers.PrintOptions{})
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	err := printer.PrintObj(table, tw)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to print table: %+v", table)
 	tw.Flush()
 	return buf.String()
