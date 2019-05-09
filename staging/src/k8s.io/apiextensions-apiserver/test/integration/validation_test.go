@@ -1049,6 +1049,16 @@ properties:
 			},
 		},
 		{
+			desc: "forbidden additionalProperties at the root",
+			globalSchema: `
+type: object
+additionalProperties: false
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.additionalProperties: Forbidden: must not be used at the root",
+			},
+		},
+		{
 			desc: "structural incomplete",
 			globalSchema: `
 type: object
