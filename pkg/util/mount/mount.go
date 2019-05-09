@@ -55,6 +55,13 @@ type Interface interface {
 	// IsLikelyNotMountPoint does NOT properly detect all mountpoint types
 	// most notably linux bind mounts and symbolic link.
 	IsLikelyNotMountPoint(file string) (bool, error)
+	// GetMountRefs finds all mount references to the path, returns a
+	// list of paths. Path could be a mountpoint path, device or a normal
+	// directory (for bind mount).
+	GetMountRefs(pathname string) ([]string, error)
+}
+
+type HostUtils interface {
 	// DeviceOpened determines if the device is in use elsewhere
 	// on the system, i.e. still mounted.
 	DeviceOpened(pathname string) (bool, error)
@@ -62,7 +69,7 @@ type Interface interface {
 	PathIsDevice(pathname string) (bool, error)
 	// GetDeviceNameFromMount finds the device name by checking the mount path
 	// to get the global mount path within its plugin directory
-	GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error)
+	GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error)
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error
@@ -81,10 +88,6 @@ type Interface interface {
 	// EvalHostSymlinks returns the path name after evaluating symlinks.
 	// Will operate in the host mount namespace if kubelet is running in a container.
 	EvalHostSymlinks(pathname string) (string, error)
-	// GetMountRefs finds all mount references to the path, returns a
-	// list of paths. Path could be a mountpoint path, device or a normal
-	// directory (for bind mount).
-	GetMountRefs(pathname string) ([]string, error)
 	// GetFSGroup returns FSGroup of the path.
 	GetFSGroup(pathname string) (int64, error)
 	// GetSELinuxSupport returns true if given path is on a mount that supports
@@ -122,6 +125,10 @@ type Exec interface {
 // Compile-time check to ensure all Mounter implementations satisfy
 // the mount interface
 var _ Interface = &Mounter{}
+
+// Compile-time check to ensure all HostUtil implementations satisfy
+// the HostUtils Interface
+var _ HostUtils = &hostUtil{}
 
 // This represents a single line in /proc/mounts or /etc/fstab.
 type MountPoint struct {
@@ -239,7 +246,8 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	}
 
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
-	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	hu := NewHostUtil()
+	resolvedFile, err := hu.EvalHostSymlinks(file)
 	if err != nil {
 		return true, err
 	}

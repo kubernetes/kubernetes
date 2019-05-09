@@ -64,7 +64,7 @@ func (f *fakeOGCounter) GenerateVolumesAreAttachedFunc(attachedVolumes []Attache
 	return f.recordFuncCall("GenerateVolumesAreAttachedFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hu mount.HostUtils) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateUnmountDeviceFunc"), nil
 }
 
@@ -80,7 +80,7 @@ func (f *fakeOGCounter) GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, a
 	return f.recordFuncCall("GenerateUnmapVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hu mount.HostUtils) (volumetypes.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateUnmapDeviceFunc"), nil
 }
 

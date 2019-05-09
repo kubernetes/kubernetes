@@ -69,6 +69,7 @@ type csiMountMgr struct {
 	podUID         types.UID
 	options        volume.VolumeOptions
 	publishContext map[string]string
+	kubeVolHost    volume.KubeletVolumeHost
 	volume.MetricsProvider
 }
 
@@ -328,9 +329,9 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
-	mounter := c.plugin.host.GetMounter(c.plugin.GetPluginName())
 	path := c.GetPath()
-	supportSelinux, err := mounter.GetSELinuxSupport(path)
+	hu := c.kubeVolHost.GetHostUtil()
+	supportSelinux, err := hu.GetSELinuxSupport(path)
 	if err != nil {
 		klog.V(2).Info(log("error checking for SELinux support: %s", err))
 		// Best guess

@@ -661,7 +661,7 @@ func createSocketFile(socketDir string) (string, error) {
 }
 
 func TestGetFileType(t *testing.T) {
-	mounter := Mounter{"fake/path", false}
+	hu := NewHostUtil()
 
 	testCase := []struct {
 		name         string
@@ -750,7 +750,7 @@ func TestGetFileType(t *testing.T) {
 			defer os.RemoveAll(cleanUpPath)
 		}
 
-		fileType, err := mounter.GetFileType(path)
+		fileType, err := hu.GetFileType(path)
 		if err != nil {
 			t.Fatalf("[%d-%s] unexpected error : %v", idx, tc.name, err)
 		}

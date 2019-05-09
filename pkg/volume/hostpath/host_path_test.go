@@ -386,7 +386,7 @@ func TestOSFileTypeChecker(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		fakeFTC := &utilmount.FakeMounter{
+		fakeFTC := &utilmount.FakeHostUtil{
 			Filesystem: map[string]utilmount.FileType{
 				tc.path: utilmount.FileType(tc.desiredType),
 			},

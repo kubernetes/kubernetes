@@ -201,7 +201,12 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	klog.V(4).Info(log("dir %s unmounted successfully", dir))
 
 	// detach/unmap
-	deviceBusy, err := mounter.DeviceOpened(dev)
+	kvh, ok := v.plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
+	deviceBusy, err := hu.DeviceOpened(dev)
 	if err != nil {
 		klog.Error(log("teardown unable to get status for device %s: %v", dev, err))
 		return err

@@ -249,179 +249,21 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
-// If pathname is not a device, log and return false with nil error.
-// If open returns errno EBUSY, return true with nil error.
-// If open returns nil, return false with nil error.
-// Otherwise, return false with error
-func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return ExclusiveOpenFailsOnDevice(pathname)
-}
-
-// PathIsDevice uses FileInfo returned from os.Stat to check if path refers
-// to a device.
-func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	pathType, err := mounter.GetFileType(pathname)
-	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
-	return isDevice, err
-}
-
-// ExclusiveOpenFailsOnDevice is shared with NsEnterMounter
-func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
-	var isDevice bool
-	finfo, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		isDevice = false
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	pathExists, pathErr := PathExists(pathname)
+	if !pathExists {
+		return []string{}, nil
+	} else if IsCorruptedMnt(pathErr) {
+		klog.Warningf("GetMountRefs found corrupted mount at %s, treating as unmounted path", pathname)
+		return []string{}, nil
+	} else if pathErr != nil {
+		return nil, fmt.Errorf("error checking path %s: %v", pathname, pathErr)
 	}
-	// err in call to os.Stat
-	if err != nil {
-		return false, fmt.Errorf(
-			"PathIsDevice failed for path %q: %v",
-			pathname,
-			err)
-	}
-	// path refers to a device
-	if finfo.Mode()&os.ModeDevice != 0 {
-		isDevice = true
-	}
-
-	if !isDevice {
-		klog.Errorf("Path %q is not referring to a device.", pathname)
-		return false, nil
-	}
-	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
-	// If the device is in use, open will return an invalid fd.
-	// When this happens, it is expected that Close will fail and throw an error.
-	defer unix.Close(fd)
-	if errno == nil {
-		// device not in use
-		return false, nil
-	} else if errno == unix.EBUSY {
-		// device is in use
-		return true, nil
-	}
-	// error during call to Open
-	return false, errno
-}
-
-//GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
-}
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
-}
-
-// GetDeviceNameFromMountLinux find the device name from /proc/mounts in which
-// the mount path reference should match the given plugin mount directory. In case no mount path reference
-// matches, returns the volume name taken from its given mountPath
-// This implementation is shared with NsEnterMounter
-func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	refs, err := mounter.GetMountRefs(mountPath)
-	if err != nil {
-		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
-		return "", err
-	}
-	if len(refs) == 0 {
-		klog.V(4).Infof("Directory %s is not mounted", mountPath)
-		return "", fmt.Errorf("directory %s is not mounted", mountPath)
-	}
-	for _, ref := range refs {
-		if strings.HasPrefix(ref, pluginMountDir) {
-			volumeID, err := filepath.Rel(pluginMountDir, ref)
-			if err != nil {
-				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
-				return "", err
-			}
-			return volumeID, nil
-		}
-	}
-
-	return path.Base(mountPath), nil
-}
-
-// ListProcMounts is shared with NsEnterMounter
-func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
-	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
+	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
 		return nil, err
 	}
-	return parseProcMounts(content)
-}
-
-func parseProcMounts(content []byte) ([]MountPoint, error) {
-	out := []MountPoint{}
-	lines := strings.Split(string(content), "\n")
-	for _, line := range lines {
-		if line == "" {
-			// the last split() item is empty string following the last \n
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) != expectedNumFieldsPerLine {
-			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d): %s", expectedNumFieldsPerLine, len(fields), line)
-		}
-
-		mp := MountPoint{
-			Device: fields[0],
-			Path:   fields[1],
-			Type:   fields[2],
-			Opts:   strings.Split(fields[3], ","),
-		}
-
-		freq, err := strconv.Atoi(fields[4])
-		if err != nil {
-			return nil, err
-		}
-		mp.Freq = freq
-
-		pass, err := strconv.Atoi(fields[5])
-		if err != nil {
-			return nil, err
-		}
-		mp.Pass = pass
-
-		out = append(out, mp)
-	}
-	return out, nil
-}
-
-func (mounter *Mounter) MakeRShared(path string) error {
-	return DoMakeRShared(path, procMountInfoPath)
-}
-
-func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	return getFileType(pathname)
-}
-
-func (mounter *Mounter) MakeDir(pathname string) error {
-	err := os.MkdirAll(pathname, os.FileMode(0755))
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (mounter *Mounter) MakeFile(pathname string) error {
-	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
-}
-
-func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
-	return filepath.EvalSymlinks(pathname)
+	return SearchMountPoints(realpath, procMountInfoPath)
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
@@ -560,6 +402,188 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	}
 
 	return fstype, nil
+}
+
+// ListProcMounts is shared with NsEnterMounter
+func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
+	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
+	if err != nil {
+		return nil, err
+	}
+	return parseProcMounts(content)
+}
+
+func parseProcMounts(content []byte) ([]MountPoint, error) {
+	out := []MountPoint{}
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		if line == "" {
+			// the last split() item is empty string following the last \n
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) != expectedNumFieldsPerLine {
+			return nil, fmt.Errorf("wrong number of fields (expected %d, got %d): %s", expectedNumFieldsPerLine, len(fields), line)
+		}
+
+		mp := MountPoint{
+			Device: fields[0],
+			Path:   fields[1],
+			Type:   fields[2],
+			Opts:   strings.Split(fields[3], ","),
+		}
+
+		freq, err := strconv.Atoi(fields[4])
+		if err != nil {
+			return nil, err
+		}
+		mp.Freq = freq
+
+		pass, err := strconv.Atoi(fields[5])
+		if err != nil {
+			return nil, err
+		}
+		mp.Pass = pass
+
+		out = append(out, mp)
+	}
+	return out, nil
+}
+
+type hostUtil struct {
+}
+
+func NewHostUtil() HostUtils {
+	return &hostUtil{}
+}
+
+// DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
+// If pathname is not a device, log and return false with nil error.
+// If open returns errno EBUSY, return true with nil error.
+// If open returns nil, return false with nil error.
+// Otherwise, return false with error
+func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
+	return ExclusiveOpenFailsOnDevice(pathname)
+}
+
+// PathIsDevice uses FileInfo returned from os.Stat to check if path refers
+// to a device.
+func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+	pathType, err := hu.GetFileType(pathname)
+	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
+	return isDevice, err
+}
+
+// ExclusiveOpenFailsOnDevice is shared with NsEnterMounter
+func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
+	var isDevice bool
+	finfo, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		isDevice = false
+	}
+	// err in call to os.Stat
+	if err != nil {
+		return false, fmt.Errorf(
+			"PathIsDevice failed for path %q: %v",
+			pathname,
+			err)
+	}
+	// path refers to a device
+	if finfo.Mode()&os.ModeDevice != 0 {
+		isDevice = true
+	}
+
+	if !isDevice {
+		klog.Errorf("Path %q is not referring to a device.", pathname)
+		return false, nil
+	}
+	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL, 0)
+	// If the device is in use, open will return an invalid fd.
+	// When this happens, it is expected that Close will fail and throw an error.
+	defer unix.Close(fd)
+	if errno == nil {
+		// device not in use
+		return false, nil
+	} else if errno == unix.EBUSY {
+		// device is in use
+		return true, nil
+	}
+	// error during call to Open
+	return false, errno
+}
+
+//GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
+func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
+}
+
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
+}
+
+// GetDeviceNameFromMountLinux find the device name from /proc/mounts in which
+// the mount path reference should match the given plugin mount directory. In case no mount path reference
+// matches, returns the volume name taken from its given mountPath
+// This implementation is shared with NsEnterMounter
+func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	refs, err := mounter.GetMountRefs(mountPath)
+	if err != nil {
+		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		return "", err
+	}
+	if len(refs) == 0 {
+		klog.V(4).Infof("Directory %s is not mounted", mountPath)
+		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+	}
+	for _, ref := range refs {
+		if strings.HasPrefix(ref, pluginMountDir) {
+			volumeID, err := filepath.Rel(pluginMountDir, ref)
+			if err != nil {
+				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			return volumeID, nil
+		}
+	}
+
+	return path.Base(mountPath), nil
+}
+
+func (hu *hostUtil) MakeRShared(path string) error {
+	return DoMakeRShared(path, procMountInfoPath)
+}
+
+func (hu *hostUtil) GetFileType(pathname string) (FileType, error) {
+	return getFileType(pathname)
+}
+
+func (hu *hostUtil) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (hu *hostUtil) MakeFile(pathname string) error {
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+	return utilpath.Exists(utilpath.CheckFollowSymlink, pathname)
+}
+
+func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return filepath.EvalSymlinks(pathname)
 }
 
 // isShared returns true, if given path is on a mount point that has shared
@@ -726,28 +750,11 @@ func GetSELinux(path string, mountInfoFilename string) (bool, error) {
 	return false, nil
 }
 
-func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	pathExists, pathErr := PathExists(pathname)
-	if !pathExists {
-		return []string{}, nil
-	} else if IsCorruptedMnt(pathErr) {
-		klog.Warningf("GetMountRefs found corrupted mount at %s, treating as unmounted path", pathname)
-		return []string{}, nil
-	} else if pathErr != nil {
-		return nil, fmt.Errorf("error checking path %s: %v", pathname, pathErr)
-	}
-	realpath, err := filepath.EvalSymlinks(pathname)
-	if err != nil {
-		return nil, err
-	}
-	return SearchMountPoints(realpath, procMountInfoPath)
-}
-
-func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return GetSELinux(pathname, procMountInfoPath)
 }
 
-func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
+func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
 		return 0, err
@@ -755,7 +762,7 @@ func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	return GetFSGroupLinux(realpath)
 }
 
-func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
+func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return GetModeLinux(pathname)
 }
 

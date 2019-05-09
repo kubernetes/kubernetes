@@ -33,8 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
@@ -68,11 +70,13 @@ type fakeVolumeHost struct {
 	pluginMgr       VolumePluginMgr
 	cloud           cloudprovider.Interface
 	mounter         mount.Interface
+	hostUtil        mount.HostUtils
 	exec            mount.Exec
 	nodeLabels      map[string]string
 	nodeName        string
 	subpather       subpath.Interface
 	csiDriverLister storagelisters.CSIDriverLister
+	informerFactory informers.SharedInformerFactory
 }
 
 var _ VolumeHost = &fakeVolumeHost{}
@@ -103,12 +107,14 @@ func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Inter
 
 func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]mount.FileType) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
-	host.mounter = &mount.FakeMounter{
+	host.mounter = &mount.FakeMounter{}
+	host.hostUtil = &mount.FakeHostUtil{
 		Filesystem: pathToTypeMap,
 	}
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	host.subpather = &subpath.FakeSubpath{}
+	host.informerFactory = informers.NewSharedInformerFactory(kubeClient, time.Minute)
 	return host
 }
 
@@ -151,6 +157,10 @@ func (f *fakeVolumeHost) GetCloudProvider() cloudprovider.Interface {
 
 func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
+}
+
+func (f *fakeVolumeHost) GetHostUtil() mount.HostUtils {
+	return f.hostUtil
 }
 
 func (f *fakeVolumeHost) GetSubpather() subpath.Interface {
@@ -1495,11 +1505,28 @@ func (f *fakeVolumeHost) CSIDriverLister() storagelisters.CSIDriverLister {
 	return f.csiDriverLister
 }
 
+func (f *fakeVolumeHost) CSIDriversSynced() cache.InformerSynced {
+	// not needed for testing
+	return nil
+}
+
 func (f *fakeVolumeHost) CSINodeLister() storagelisters.CSINodeLister {
 	// not needed for testing
 	return nil
 }
 
+func (f *fakeVolumeHost) GetInformerFactory() informers.SharedInformerFactory {
+	return f.informerFactory
+}
+
 func (f *fakeVolumeHost) IsAttachDetachController() bool {
 	return true
+}
+
+func (f *fakeVolumeHost) SetKubeletError(err error) {
+	return
+}
+
+func (f *fakeVolumeHost) WaitForCacheSync() error {
+	return nil
 }

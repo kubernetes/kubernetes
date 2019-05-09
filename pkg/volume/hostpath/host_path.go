@@ -118,10 +118,15 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 	} else {
 		pathType = hostPathVolumeSource.Type
 	}
+	kvh, ok := plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
 	return &hostPathMounter{
 		hostPath: &hostPath{path: path, pathType: pathType},
 		readOnly: readOnly,
 		mounter:  plugin.host.GetMounter(plugin.GetPluginName()),
+		hu:       kvh.GetHostUtil(),
 	}, nil
 }
 
@@ -202,6 +207,7 @@ type hostPathMounter struct {
 	*hostPath
 	readOnly bool
 	mounter  mount.Interface
+	hu       mount.HostUtils
 }
 
 var _ volume.Mounter = &hostPathMounter{}
@@ -231,7 +237,7 @@ func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	if *b.pathType == v1.HostPathUnset {
 		return nil
 	}
-	return checkType(b.GetPath(), b.pathType, b.mounter)
+	return checkType(b.GetPath(), b.pathType, b.hu)
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
@@ -352,13 +358,13 @@ type hostPathTypeChecker interface {
 }
 
 type fileTypeChecker struct {
-	path    string
-	exists  bool
-	mounter mount.Interface
+	path   string
+	exists bool
+	hu     mount.HostUtils
 }
 
 func (ftc *fileTypeChecker) Exists() bool {
-	exists, err := ftc.mounter.ExistsPath(ftc.path)
+	exists, err := ftc.hu.ExistsPath(ftc.path)
 	return exists && err == nil
 }
 
@@ -370,14 +376,14 @@ func (ftc *fileTypeChecker) IsFile() bool {
 }
 
 func (ftc *fileTypeChecker) MakeFile() error {
-	return ftc.mounter.MakeFile(ftc.path)
+	return ftc.hu.MakeFile(ftc.path)
 }
 
 func (ftc *fileTypeChecker) IsDir() bool {
 	if !ftc.Exists() {
 		return false
 	}
-	pathType, err := ftc.mounter.GetFileType(ftc.path)
+	pathType, err := ftc.hu.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
@@ -385,11 +391,11 @@ func (ftc *fileTypeChecker) IsDir() bool {
 }
 
 func (ftc *fileTypeChecker) MakeDir() error {
-	return ftc.mounter.MakeDir(ftc.path)
+	return ftc.hu.MakeDir(ftc.path)
 }
 
 func (ftc *fileTypeChecker) IsBlock() bool {
-	blkDevType, err := ftc.mounter.GetFileType(ftc.path)
+	blkDevType, err := ftc.hu.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
@@ -397,7 +403,7 @@ func (ftc *fileTypeChecker) IsBlock() bool {
 }
 
 func (ftc *fileTypeChecker) IsChar() bool {
-	charDevType, err := ftc.mounter.GetFileType(ftc.path)
+	charDevType, err := ftc.hu.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
@@ -405,7 +411,7 @@ func (ftc *fileTypeChecker) IsChar() bool {
 }
 
 func (ftc *fileTypeChecker) IsSocket() bool {
-	socketType, err := ftc.mounter.GetFileType(ftc.path)
+	socketType, err := ftc.hu.GetFileType(ftc.path)
 	if err != nil {
 		return false
 	}
@@ -416,13 +422,13 @@ func (ftc *fileTypeChecker) GetPath() string {
 	return ftc.path
 }
 
-func newFileTypeChecker(path string, mounter mount.Interface) hostPathTypeChecker {
-	return &fileTypeChecker{path: path, mounter: mounter}
+func newFileTypeChecker(path string, hu mount.HostUtils) hostPathTypeChecker {
+	return &fileTypeChecker{path: path, hu: hu}
 }
 
 // checkType checks whether the given path is the exact pathType
-func checkType(path string, pathType *v1.HostPathType, mounter mount.Interface) error {
-	return checkTypeInternal(newFileTypeChecker(path, mounter), pathType)
+func checkType(path string, pathType *v1.HostPathType, hu mount.HostUtils) error {
+	return checkTypeInternal(newFileTypeChecker(path, hu), pathType)
 }
 
 func checkTypeInternal(ftc hostPathTypeChecker, pathType *v1.HostPathType) error {

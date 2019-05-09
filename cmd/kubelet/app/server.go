@@ -372,6 +372,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 
 	mounter := mount.New(s.ExperimentalMounterPath)
 	subpather := subpath.New(mounter)
+	hu := mount.NewHostUtil()
 	var pluginRunner = exec.New()
 	if s.Containerized {
 		klog.V(2).Info("Running kubelet in containerized mode")
@@ -382,6 +383,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		mounter = nsutil.NewMounter(s.RootDirectory, ne)
 		// NSenter only valid on Linux
 		subpather = subpath.NewNSEnter(mounter, ne, s.RootDirectory)
+		hu = nsutil.NewHostUtil(ne, s.RootDirectory)
 		// an exec interface which can use nsenter for flex plugin calls
 		pluginRunner, err = nsenter.NewNsenter(nsenter.DefaultHostRootFsPath, exec.New())
 		if err != nil {
@@ -407,6 +409,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
 		EventClient:         nil,
+		HostUtil:            hu,
 		Mounter:             mounter,
 		Subpather:           subpather,
 		OOMAdjuster:         oom.NewOOMAdjuster(),

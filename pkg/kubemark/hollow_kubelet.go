@@ -80,6 +80,7 @@ func NewHollowKubelet(
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
 		Mounter:            mount.New("" /* default mount path */),
 		Subpather:          &subpath.FakeSubpath{},
+		HostUtil:           &mount.FakeHostUtil{},
 	}
 
 	return &HollowKubelet{
