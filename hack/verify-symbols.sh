@@ -30,6 +30,7 @@ BADSYMBOLS=(
   "httptest"
   "testify"
   "testing[.]"
+  "TestOnlySetFatalOnDecodeError"
 )
 
 # b/c hyperkube binds everything simply check that for bad symbols
