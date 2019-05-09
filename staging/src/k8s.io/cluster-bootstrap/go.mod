@@ -5,6 +5,7 @@ module k8s.io/cluster-bootstrap
 go 1.14
 
 require (
+	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.4.0
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975 // indirect
 	gopkg.in/square/go-jose.v2 v2.2.2
