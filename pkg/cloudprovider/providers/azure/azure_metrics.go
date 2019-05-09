@@ -50,12 +50,14 @@ func newMetricContext(prefix, request, resourceGroup, subscriptionID string) *me
 	}
 }
 
-func (mc *metricContext) Observe(err error) {
+func (mc *metricContext) Observe(err error) error {
 	apiMetrics.latency.WithLabelValues(mc.attributes...).Observe(
 		time.Since(mc.start).Seconds())
 	if err != nil {
 		apiMetrics.errors.WithLabelValues(mc.attributes...).Inc()
 	}
+
+	return err
 }
 
 func registerAPIMetrics(attributes ...string) *apiCallMetrics {
