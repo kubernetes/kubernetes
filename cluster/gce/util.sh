@@ -1407,6 +1407,11 @@ EOF
 API_SERVER_TEST_LOG_LEVEL: $(yaml-quote ${API_SERVER_TEST_LOG_LEVEL})
 EOF
     fi
+    if [ -n "${ETCD_LISTEN_CLIENT_IP:-}" ]; then
+      cat >>$file <<EOF
+ETCD_LISTEN_CLIENT_IP: $(yaml-quote ${ETCD_LISTEN_CLIENT_IP})
+EOF
+    fi
 
   else
     # Node-only env vars.
