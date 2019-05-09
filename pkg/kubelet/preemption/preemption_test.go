@@ -363,7 +363,7 @@ func TestAdmissionRequirementsSubtract(t *testing.T) {
 		},
 	}
 	for _, run := range runs {
-		output := run.initial.subtract(run.inputPod)
+		output := run.initial.subtract(nil, run.inputPod)
 		if !admissionRequirementListEqual(output, run.expectedOutput) {
 			t.Errorf("expected: %s, got: %s for %s test", run.expectedOutput.toString(), output.toString(), run.testName)
 		}
