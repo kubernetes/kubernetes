@@ -101,7 +101,7 @@ kube::test::find_dirs() {
   )
 }
 
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout 120s}
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 # How many 'go test' instances to run simultaneously when running tests in
@@ -211,10 +211,6 @@ if [[ -n "${KUBE_RACE}" ]] ; then
   goflags+=("${KUBE_RACE}")
 fi
 
-if [[ -n "${KUBE_TIMEOUT}" ]] ; then
-  while IFS='' read -r line; do goflags+=("$line"); done < <(echo "${KUBE_TIMEOUT}" | tr ' ' '\n')
-fi
-
 junitFilenamePrefix() {
   if [[ -z "${KUBE_JUNIT_REPORT_DIR}" ]]; then
     echo ""
@@ -304,7 +300,7 @@ runTests() {
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
-     "${@}" \
+     "${KUBE_TIMEOUT}" "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
@@ -344,6 +340,7 @@ runTests() {
     | xargs -I{} -n 1 -P "${KUBE_COVERPROCS}" \
     bash -c "set -o pipefail; _pkg=\"\$0\"; _pkg_out=\${_pkg//\//_}; \
       go test ${goflags[*]:+${goflags[*]}} \
+        ${KUBE_TIMEOUT} \
         -cover -covermode=\"${KUBE_COVERMODE}\" \
         -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
         \"\${_pkg}\" \
