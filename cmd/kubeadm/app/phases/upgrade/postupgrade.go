@@ -180,7 +180,7 @@ func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitCon
 // GetKubeletDir gets the kubelet directory based on whether the user is dry-running this command or not.
 func GetKubeletDir(dryRun bool) (string, error) {
 	if dryRun {
-		return kubeadmconstants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
+		return kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	}
 	return kubeadmconstants.KubeletRunDirectory, nil
 }
