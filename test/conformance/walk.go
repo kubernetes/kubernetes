@@ -166,8 +166,26 @@ func (v *visitor) failf(expr ast.Expr, format string, a ...interface{}) {
 func (v *visitor) comment(x *ast.BasicLit) string {
 	for _, comm := range v.cMap.Comments() {
 		testOffset := int(x.Pos()-comm.End()) - len("framework.ConformanceIt(\"")
-		if 0 < testOffset && testOffset < 3 {
-			return comm.Text()
+		//Cannot assume the offset is within three or four tabs from the test block itself.
+		//It is better to trim the newlines, tabs, etc and then we if the comment is followed
+		//by the test block itself so that we can associate the comment with it properly.
+		if 0 <= testOffset && testOffset <= 10 {
+			b1 := make([]byte, x.Pos()-comm.End())
+			//if we fail to open the file to compare the content we just assume the
+			//proximity of the comment and apply it.
+			myf, err := os.Open(v.FileSet.File(x.Pos()).Name())
+			if err == nil {
+				if _, err := myf.Seek(int64(comm.End()), 0); err == nil {
+					if _, err := myf.Read(b1); err == nil {
+						if strings.Compare(strings.Trim(string(b1), "\t \r\n"), "framework.ConformanceIt(\"") == 0 {
+							return comm.Text()
+						}
+					}
+				}
+			} else {
+				//comment section's end is noticed within 10 characters from framework.ConformanceIt block
+				return comm.Text()
+			}
 		}
 	}
 	return ""
