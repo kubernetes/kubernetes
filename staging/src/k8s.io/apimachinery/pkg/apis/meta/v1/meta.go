@@ -107,6 +107,8 @@ type Type interface {
 	SetKind(kind string)
 }
 
+var _ ListInterface = &ListMeta{}
+
 func (meta *ListMeta) GetResourceVersion() string        { return meta.ResourceVersion }
 func (meta *ListMeta) SetResourceVersion(version string) { meta.ResourceVersion = version }
 func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink }
