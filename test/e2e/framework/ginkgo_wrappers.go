@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
+)
 
 // FailurePanic is the value that will be panicked from Fail.
 type FailurePanic struct {

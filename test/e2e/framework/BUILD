@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
@@ -33,6 +31,7 @@ go_library(
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -40,7 +39,6 @@ go_library(
         "//pkg/client/conditions:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/service:go_default_library",
-        "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/dockershim/metrics:go_default_library",
@@ -82,7 +80,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
         "//staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
@@ -141,7 +138,6 @@ filegroup(
         "//test/e2e/framework/deployment:all-srcs",
         "//test/e2e/framework/deviceplugin:all-srcs",
         "//test/e2e/framework/endpoints:all-srcs",
-        "//test/e2e/framework/ginkgowrapper:all-srcs",
         "//test/e2e/framework/gpu:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
         "//test/e2e/framework/job:all-srcs",
@@ -166,4 +162,5 @@ filegroup(
         "//test/e2e/framework/volume:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
