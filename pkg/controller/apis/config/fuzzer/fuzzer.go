@@ -35,7 +35,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.Generic.LeaderElection.ResourceLock == "" {
 				obj.Generic.LeaderElection.ResourceLock = "endpoints"
 			}
-			obj.Generic.Controllers = []string{fmt.Sprintf("%s", c.RandString())}
+			obj.Generic.Controllers = []string{c.RandString()}
 			if obj.KubeCloudShared.ClusterName == "" {
 				obj.KubeCloudShared.ClusterName = "kubernetes"
 			}
