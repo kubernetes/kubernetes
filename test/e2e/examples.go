@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -78,7 +77,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
 				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
 					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
@@ -124,11 +123,11 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			framework.RunKubectlOrDieInput(secretYaml, "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			By("checking if secret was read correctly")
 			_, err = framework.LookForStringInLog(ns, "secret-test-pod", "test-container", "value-1", serverStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 	})
 
@@ -142,13 +141,13 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			By("creating the pod")
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
 			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			By("checking if name and namespace were passed correctly")
 			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAMESPACE=%v", ns), serverStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			_, err = framework.LookForStringInLog(ns, podName, "test-container", fmt.Sprintf("MY_POD_NAME=%v", podName), serverStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 	})
 })
