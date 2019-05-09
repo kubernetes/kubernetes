@@ -106,7 +106,7 @@ function log() {
 
 # Generate kubectl prune-whitelist flags from provided resource list.
 function generate_prune_whitelist_flags() {
-  local -r resources=($@)
+  local -r resources=("$@")
   for resource in "${resources[@]}"; do
     printf "%s" "--prune-whitelist ${resource} "
   done
@@ -151,9 +151,9 @@ function create_resource_from_string() {
     echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} --namespace="${namespace}" apply -f - && \
       log INFO "== Successfully started ${config_name} in namespace ${namespace} at $(date -Is)" && \
       return 0;
-    let tries=tries-1;
+    (( tries=tries-1 ));
     log WRN "== Failed to start ${config_name} in namespace ${namespace} at $(date -Is). ${tries} tries remaining. =="
-    sleep ${delay};
+    sleep "${delay}";
   done
   return 1;
 }
@@ -244,10 +244,10 @@ while true; do
     log INFO "Not elected leader, going back to sleep."
   fi
   end_sec=$(date +"%s")
-  len_sec=$((${end_sec}-${start_sec}))
+  len_sec=$((end_sec-start_sec))
   # subtract the time passed from the sleep time
   if [[ ${len_sec} -lt ${ADDON_CHECK_INTERVAL_SEC} ]]; then
-    sleep_time=$((${ADDON_CHECK_INTERVAL_SEC}-${len_sec}))
+    sleep_time=$((ADDON_CHECK_INTERVAL_SEC-len_sec))
     sleep ${sleep_time}
   fi
 done
