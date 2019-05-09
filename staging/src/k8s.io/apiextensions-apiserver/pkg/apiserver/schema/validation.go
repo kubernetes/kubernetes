@@ -55,6 +55,7 @@ const (
 //	    - ... zero or more
 //
 // * every specified field or array in s is also specified outside of value validation.
+// * additionalProperties at the root is not allowed.
 func ValidateStructural(s *Structural, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -76,7 +77,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	for k, v := range s.Properties {
 		allErrs = append(allErrs, validateStructuralInvariants(&v, fieldLevel, fldPath.Child("properties").Key(k))...)
 	}
-	allErrs = append(allErrs, validateGeneric(&s.Generic, fldPath)...)
+	allErrs = append(allErrs, validateGeneric(&s.Generic, lvl, fldPath)...)
 	allErrs = append(allErrs, validateExtensions(&s.Extensions, fldPath)...)
 
 	// detect the two IntOrString exceptions:
@@ -129,7 +130,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 }
 
 // validateGeneric checks the generic fields of a structural schema.
-func validateGeneric(g *Generic, fldPath *field.Path) field.ErrorList {
+func validateGeneric(g *Generic, lvl level, fldPath *field.Path) field.ErrorList {
 	if g == nil {
 		return nil
 	}
@@ -137,6 +138,9 @@ func validateGeneric(g *Generic, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if g.AdditionalProperties != nil {
+		if lvl == rootLevel {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must not be used at the root"))
+		}
 		if g.AdditionalProperties.Structural != nil {
 			allErrs = append(allErrs, validateStructuralInvariants(g.AdditionalProperties.Structural, fieldLevel, fldPath.Child("additionalProperties"))...)
 		}
