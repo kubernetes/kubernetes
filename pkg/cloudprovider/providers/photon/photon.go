@@ -221,7 +221,7 @@ func getPhotonClient(pc *PCCloud) (*photon.Client, error) {
 	}
 
 	pc.photonClient = photon.NewClient(pc.cfg.Global.CloudTarget, options, pc.logger)
-	if pc.cfg.Global.AuthEnabled == true {
+	if pc.cfg.Global.AuthEnabled {
 		// work around before metadata is available
 		file, err := os.Open("/etc/kubernetes/pc_login_info")
 		if err != nil {
@@ -442,7 +442,7 @@ func getInstanceID(pc *PCCloud, name string) (string, error) {
 	var vmID string
 	var err error
 
-	if overrideIP == true {
+	if overrideIP {
 		vmID, err = getVMIDbyIP(pc, name)
 	} else {
 		vmID, err = getVMIDbyNodename(pc, name)
