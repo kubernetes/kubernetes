@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
@@ -82,23 +81,14 @@ func (mc *metricsCsi) getCSIVolInfo(metrics *volume.Metrics) error {
 		return nil
 	}
 
-	var resUsageMap map[string]usageCount
-	resUsageMap, err = csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
-
+	resUsageMap, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
 	if err != nil {
 		return err
 	}
 
-	for k, v := range resUsageMap {
-		if k == "BYTES" {
-			metrics.Used = resource.NewQuantity(v.used, resource.BinarySI)
-			metrics.Available = resource.NewQuantity(v.available, resource.BinarySI)
-			metrics.Capacity = resource.NewQuantity(v.total, resource.BinarySI)
-		} else if k == "INODES" {
-			metrics.InodesUsed = resource.NewQuantity(v.used, resource.BinarySI)
-			metrics.InodesFree = resource.NewQuantity(v.available, resource.BinarySI)
-			metrics.Inodes = resource.NewQuantity(v.total, resource.BinarySI)
-		}
+	if resUsageMap == nil {
+		return fmt.Errorf("metrics is nil")
 	}
+
 	return nil
 }

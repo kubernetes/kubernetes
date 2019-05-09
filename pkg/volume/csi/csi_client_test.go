@@ -26,6 +26,7 @@ import (
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 )
 
@@ -69,7 +70,7 @@ func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 }
 
 func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (
-	usageCountMap map[string]usageCount, err error) {
+	usageCountMap *volume.Metrics, err error) {
 
 	c.t.Log("calling fake.NodeGetVolumeStats...")
 	req := &csipbv1.NodeGetVolumeStatsRequest{

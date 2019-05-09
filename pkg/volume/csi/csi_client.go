@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume"
 	csipbv0 "k8s.io/kubernetes/pkg/volume/csi/csiv0"
 )
 
@@ -77,7 +78,7 @@ type csiClient interface {
 		ctx context.Context,
 		volID string,
 		targetPath string,
-	) (map[string]usageCount, error)
+	) (*volume.Metrics, error)
 	NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
@@ -117,12 +118,6 @@ const (
 	factor          = 2.0
 	steps           = 5
 )
-
-type usageCount struct {
-	total     int64
-	available int64
-	used      int64
-}
 
 // newV1NodeClient creates a new NodeClient with the internally used gRPC
 // connection set up. It also returns a closer which must to be called to close
@@ -891,7 +886,7 @@ func (c *csiDriverClient) nodeSupportsVolumeStatsV1(ctx context.Context) (bool, 
 	return false, nil
 }
 
-func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (map[string]usageCount, error) {
+func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (*volume.Metrics, error) {
 	klog.V(4).Info(log("calling NodeGetVolumeStats rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return nil, errors.New("missing volume id")
@@ -911,7 +906,7 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 	ctx context.Context,
 	volID string,
 	targetPath string,
-) (map[string]usageCount, error) {
+) (*volume.Metrics, error) {
 
 	var unit csipbv1.VolumeUsage_Unit
 	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
@@ -930,7 +925,7 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 		return nil, err
 	}
 	usages := resp.GetUsage()
-	usageMap := make(map[string]usageCount, 2)
+	var ucb *volume.Metrics
 	if usages == nil {
 		return nil, nil
 	}
@@ -938,21 +933,17 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 		unit = usage.GetUnit()
 		switch unit.String() {
 		case "BYTES":
-			var ucb usageCount
-			ucb.available = usage.GetAvailable()
-			ucb.total = usage.GetTotal()
-			ucb.used = usage.GetUsed()
-			usageMap["BYTES"] = ucb
+			ucb.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			ucb.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			ucb.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
 		case "INODES":
-			var uci usageCount
-			uci.available = usage.GetAvailable()
-			uci.total = usage.GetTotal()
-			uci.used = usage.GetUsed()
-			usageMap["INODES"] = uci
+			ucb.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			ucb.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			ucb.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
 		default:
-			klog.Errorf("unknown key %s in usagemap", unit.String())
+			klog.Errorf("unknown key %s in usage", unit.String())
 		}
 
 	}
-	return usageMap, nil
+	return ucb, nil
 }
