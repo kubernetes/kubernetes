@@ -1222,6 +1222,114 @@ not:
 				"spec.version[v1].schema.openAPIV3Schema.properties[d]: Required value: because it is defined in spec.version[v1].schema.openAPIV3Schema.not.properties[d]",
 			},
 		},
+		{
+			desc: "metadata with non-properties",
+			globalSchema: `
+type: object
+properties:
+  metadata:
+    minimum: 42.0
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[metadata]: Forbidden: must not specify anything other than name and generateName, but metadata is implicitly specified",
+				"spec.validation.openAPIV3Schema.properties[metadata].type: Required value: must not be empty for specified object fields",
+			},
+		},
+		{
+			desc: "metadata with other properties",
+			globalSchema: `
+type: object
+properties:
+  metadata:
+    properties:
+      name:
+        pattern: "^[a-z]+$"
+      labels:
+        type: object
+        maxLength: 4
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[metadata]: Forbidden: must not specify anything other than name and generateName, but metadata is implicitly specified",
+				"spec.validation.openAPIV3Schema.properties[metadata].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[metadata].properties[name].type: Required value: must not be empty for specified object fields",
+			},
+		},
+		{
+			desc: "metadata with name property",
+			globalSchema: `
+type: object
+properties:
+  metadata:
+    type: object
+    properties:
+      name:
+        type: string
+        pattern: "^[a-z]+$"
+`,
+			expectedViolations: []string{},
+		},
+		{
+			desc: "metadata with generateName property",
+			globalSchema: `
+type: object
+properties:
+  metadata:
+    type: object
+    properties:
+      generateName:
+        type: string
+        pattern: "^[a-z]+$"
+`,
+			expectedViolations: []string{},
+		},
+		{
+			desc: "metadata with name and generateName property",
+			globalSchema: `
+type: object
+properties:
+  metadata:
+    type: object
+    properties:
+      name:
+        type: string
+        pattern: "^[a-z]+$"
+      generateName:
+        type: string
+        pattern: "^[a-z]+$"
+`,
+			expectedViolations: []string{},
+		},
+		{
+			desc: "metadata under junctors",
+			globalSchema: `
+type: object
+properties:
+  metadata:
+    type: object
+    properties:
+      name:
+        type: string
+        pattern: "^[a-z]+$"
+allOf:
+- properties:
+    metadata: {}
+anyOf:
+- properties:
+    metadata: {}
+oneOf:
+- properties:
+    metadata: {}
+not:
+  properties:
+    metadata: {}
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.anyOf[0].properties[metadata]: Forbidden: must not be specified in a nested context",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[metadata]: Forbidden: must not be specified in a nested context",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[metadata]: Forbidden: must not be specified in a nested context",
+				"spec.validation.openAPIV3Schema.not.properties[metadata]: Forbidden: must not be specified in a nested context",
+			},
+		},
 	}
 
 	for i := range tests {

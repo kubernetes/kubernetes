@@ -56,6 +56,7 @@ const (
 //	    - ... zero or more
 //
 // * every specified field or array in s is also specified outside of value validation.
+// * metadata at the root can only restrict the name and generateName, and not be specified at all in nested contexts.
 // * additionalProperties at the root is not allowed.
 func ValidateStructural(s *Structural, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -106,7 +107,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 		}
 	}
 
-	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, fldPath)...)
+	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, lvl, fldPath)...)
 
 	if s.XEmbeddedResource && s.Type != "object" {
 		if len(s.Type) == 0 {
@@ -127,6 +128,26 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 
 	if lvl == rootLevel && len(s.Type) > 0 && s.Type != "object" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), s.Type, "must be object at the root"))
+	}
+
+	// restrict metadata schemas to name and generateName only
+	if metadata, found := s.Properties["metadata"]; found && lvl == rootLevel {
+		// metadata is a shallow copy. We can mutate it.
+		_, foundName := metadata.Properties["name"]
+		_, foundGenerateName := metadata.Properties["generateName"]
+		if foundName && foundGenerateName && len(metadata.Properties) == 2 {
+			metadata.Properties = nil
+		} else if (foundName || foundGenerateName) && len(metadata.Properties) == 1 {
+			metadata.Properties = nil
+		}
+		metadata.Type = ""
+		if metadata.ValueValidation == nil {
+			metadata.ValueValidation = &ValueValidation{}
+		}
+		if !reflect.DeepEqual(metadata, Structural{ValueValidation: &ValueValidation{}}) {
+			// TODO: this is actually a field.Invalid error, but we cannot do JSON serialization of metadata here to get a proper message
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("properties").Key("metadata"), "must not specify anything other than name and generateName, but metadata is implicitly specified"))
+		}
 	}
 
 	if s.XEmbeddedResource && !s.XPreserveUnknownFields && s.Properties == nil {
@@ -171,7 +192,7 @@ func validateExtensions(x *Extensions, fldPath *field.Path) field.ErrorList {
 }
 
 // validateValueValidation checks the value validation in a structural schema.
-func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf bool, fldPath *field.Path) field.ErrorList {
+func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf bool, lvl level, fldPath *field.Path) field.ErrorList {
 	if v == nil {
 		return nil
 	}
@@ -180,7 +201,7 @@ func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf 
 
 	if !skipAnyOf {
 		for i := range v.AnyOf {
-			allErrs = append(allErrs, validateNestedValueValidation(&v.AnyOf[i], false, false, fldPath.Child("anyOf").Index(i))...)
+			allErrs = append(allErrs, validateNestedValueValidation(&v.AnyOf[i], false, false, lvl, fldPath.Child("anyOf").Index(i))...)
 		}
 	}
 
@@ -189,31 +210,31 @@ func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf 
 		if skipFirstAllOfAnyOf && i == 0 {
 			skipAnyOf = true
 		}
-		allErrs = append(allErrs, validateNestedValueValidation(&v.AllOf[i], skipAnyOf, false, fldPath.Child("allOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidation(&v.AllOf[i], skipAnyOf, false, lvl, fldPath.Child("allOf").Index(i))...)
 	}
 
 	for i := range v.OneOf {
-		allErrs = append(allErrs, validateNestedValueValidation(&v.OneOf[i], false, false, fldPath.Child("oneOf").Index(i))...)
+		allErrs = append(allErrs, validateNestedValueValidation(&v.OneOf[i], false, false, lvl, fldPath.Child("oneOf").Index(i))...)
 	}
 
-	allErrs = append(allErrs, validateNestedValueValidation(v.Not, false, false, fldPath.Child("not"))...)
+	allErrs = append(allErrs, validateNestedValueValidation(v.Not, false, false, lvl, fldPath.Child("not"))...)
 
 	return allErrs
 }
 
 // validateNestedValueValidation checks the nested value validation under a logic junctor in a structural schema.
-func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllOfAnyOf bool, fldPath *field.Path) field.ErrorList {
+func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllOfAnyOf bool, lvl level, fldPath *field.Path) field.ErrorList {
 	if v == nil {
 		return nil
 	}
 
 	allErrs := field.ErrorList{}
 
-	allErrs = append(allErrs, validateValueValidation(&v.ValueValidation, skipAnyOf, skipAllOfAnyOf, fldPath)...)
-	allErrs = append(allErrs, validateNestedValueValidation(v.Items, false, false, fldPath.Child("items"))...)
+	allErrs = append(allErrs, validateValueValidation(&v.ValueValidation, skipAnyOf, skipAllOfAnyOf, lvl, fldPath)...)
+	allErrs = append(allErrs, validateNestedValueValidation(v.Items, false, false, lvl, fldPath.Child("items"))...)
 
 	for k, fld := range v.Properties {
-		allErrs = append(allErrs, validateNestedValueValidation(&fld, false, false, fldPath.Child("properties").Key(k))...)
+		allErrs = append(allErrs, validateNestedValueValidation(&fld, false, false, fieldLevel, fldPath.Child("properties").Key(k))...)
 	}
 
 	if len(v.ForbiddenGenerics.Type) > 0 {
@@ -243,6 +264,11 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 	}
 	if v.ForbiddenExtensions.XIntOrString {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-int-or-string"), "must be false to be structural"))
+	}
+
+	// forbid reasoning about metadata because it can lead to metadata restriction we don't want
+	if _, found := v.Properties["metadata"]; found {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("properties").Key("metadata"), "must not be specified in a nested context"))
 	}
 
 	return allErrs
