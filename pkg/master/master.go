@@ -45,6 +45,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowregistrationv1alpha1 "k8s.io/api/flowregistration/v1alpha1"
 	networkingapiv1 "k8s.io/api/networking/v1"
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -95,6 +96,7 @@ import (
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
+	flowregistrationrest "k8s.io/kubernetes/pkg/registry/flowregistration/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
@@ -359,6 +361,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		appsrest.RESTStorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{},
 		eventsrest.RESTStorageProvider{TTL: c.ExtraConfig.EventTTL},
+		flowregistrationrest.RESTStorageProvider{},
 	}
 	m.InstallAPIs(c.ExtraConfig.APIResourceConfigSource, c.GenericConfig.RESTOptionsGetter, restStorageProviders...)
 
@@ -529,6 +532,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
+		flowregistrationv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,

@@ -31,6 +31,7 @@ import (
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowregv1alpha1 "k8s.io/api/flowregistration/v1alpha1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1"
@@ -136,6 +137,7 @@ var missingHanlders = sets.NewString(
 	"AuditSink",
 	"CSINode",
 	"CSIDriver",
+	"FlowSchema",
 )
 
 func TestServerSidePrint(t *testing.T) {
@@ -151,6 +153,7 @@ func TestServerSidePrint(t *testing.T) {
 			appsv1beta1.SchemeGroupVersion,
 			appsv1beta2.SchemeGroupVersion,
 			extensionsv1beta1.SchemeGroupVersion,
+			flowregv1alpha1.SchemeGroupVersion,
 			nodev1alpha1.SchemeGroupVersion,
 		},
 		[]schema.GroupVersionResource{

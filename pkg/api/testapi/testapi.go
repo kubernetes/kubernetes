@@ -46,6 +46,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/flowregistration"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/node"
@@ -69,6 +70,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/events/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/kubernetes/pkg/apis/flowregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
 	_ "k8s.io/kubernetes/pkg/apis/node/install"
@@ -280,6 +282,12 @@ func init() {
 	if _, ok := Groups[auditregistration.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: auditregistration.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(auditregistration.GroupName)[0].Version}
 		Groups[auditregistration.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
+	if _, ok := Groups[flowregistration.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: flowregistration.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(flowregistration.GroupName)[0].Version}
+		Groups[flowregistration.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}
