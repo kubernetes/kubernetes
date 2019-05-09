@@ -152,7 +152,8 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 		return nil, err
 	}
 
-	if _, err := az.reconcilePublicIP(clusterName, updateService, lb, true /* wantLb */); err != nil {
+	// lb is not reused here because the ETAG may be changed in above operations, hence reconcilePublicIP() would get lb again from cache.
+	if _, err := az.reconcilePublicIP(clusterName, updateService, to.String(lb.Name), true /* wantLb */); err != nil {
 		return nil, err
 	}
 
@@ -208,7 +209,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName stri
 		}
 	}
 
-	if _, err := az.reconcilePublicIP(clusterName, service, nil, false /* wantLb */); err != nil {
+	if _, err := az.reconcilePublicIP(clusterName, service, "", false /* wantLb */); err != nil {
 		if ignoreErrors(err) != nil {
 			return err
 		}
@@ -1331,9 +1332,10 @@ func deduplicate(collection *[]string) *[]string {
 }
 
 // This reconciles the PublicIP resources similar to how the LB is reconciled.
-func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *network.LoadBalancer, wantLb bool) (*network.PublicIPAddress, error) {
+func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbName string, wantLb bool) (*network.PublicIPAddress, error) {
 	isInternal := requiresInternalLoadBalancer(service)
 	serviceName := getServiceName(service)
+	var lb *network.LoadBalancer
 	var desiredPipName string
 	var err error
 	if !isInternal && wantLb {
@@ -1341,6 +1343,14 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lb *
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if lbName != "" {
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName)
+		if err != nil {
+			return nil, err
+		}
+		lb = &loadBalancer
 	}
 
 	pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
