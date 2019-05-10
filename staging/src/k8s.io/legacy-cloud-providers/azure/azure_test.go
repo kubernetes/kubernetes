@@ -1108,7 +1108,7 @@ func getClusterResources(az *Cloud, vmCount int, availabilitySetCount int) (clus
 
 		vmCtx, vmCancel := getContextWithCancel()
 		defer vmCancel()
-		_, err := az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM)
+		_, err := az.VirtualMachinesClient.CreateOrUpdate(vmCtx, az.Config.ResourceGroup, vmName, newVM, "")
 		if err != nil {
 		}
 		// add to kubernetes
