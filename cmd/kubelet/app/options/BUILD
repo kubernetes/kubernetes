@@ -14,6 +14,8 @@ go_library(
         "globalflags_linux.go",
         "globalflags_other.go",
         "options.go",
+        "options_other.go",
+        "options_windows.go",
         "osflags_others.go",
         "osflags_windows.go",
     ],

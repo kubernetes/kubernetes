@@ -21,7 +21,6 @@ import (
 	"fmt"
 	_ "net/http/pprof" // Enable pprof HTTP handlers.
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -44,8 +43,6 @@ import (
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
-
-const defaultRootDir = "/var/lib/kubelet"
 
 // KubeletFlags contains configuration flags for the Kubelet.
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
@@ -88,7 +85,7 @@ type KubeletFlags struct {
 	config.ContainerRuntimeOptions
 
 	// certDirectory is the directory where the TLS certs are located (by
-	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
+	// default /var/lib/kubelet/pki). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string
 
@@ -212,17 +209,11 @@ type KubeletFlags struct {
 
 // NewKubeletFlags will create a new KubeletFlags with default values
 func NewKubeletFlags() *KubeletFlags {
-	remoteRuntimeEndpoint := ""
-	if runtime.GOOS == "linux" {
-		remoteRuntimeEndpoint = "unix:///var/run/dockershim.sock"
-	} else if runtime.GOOS == "windows" {
-		remoteRuntimeEndpoint = "npipe:////./pipe/dockershim"
-	}
-
+	initOptions()
 	return &KubeletFlags{
 		EnableServer:                        true,
 		ContainerRuntimeOptions:             *NewContainerRuntimeOptions(),
-		CertDirectory:                       "/var/lib/kubelet/pki",
+		CertDirectory:                       defaultCertDir,
 		RootDirectory:                       defaultRootDir,
 		MasterServiceNamespace:              metav1.NamespaceDefault,
 		MaxContainerCount:                   -1,
@@ -231,9 +222,9 @@ func NewKubeletFlags() *KubeletFlags {
 		NonMasqueradeCIDR:                   "10.0.0.0/8",
 		RegisterSchedulable:                 true,
 		ExperimentalKernelMemcgNotification: false,
-		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
+		RemoteRuntimeEndpoint:               defaultRemoteRuntimeEndpoint,
 		NodeLabels:                          make(map[string]string),
-		VolumePluginDir:                     "/usr/libexec/kubernetes/kubelet-plugins/volume/exec/",
+		VolumePluginDir:                     defaultVolumePluginDir,
 		RegisterNode:                        true,
 		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
 		HostNetworkSources:                  []string{kubetypes.AllSource},
