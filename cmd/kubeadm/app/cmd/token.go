@@ -36,16 +36,13 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
@@ -87,11 +84,6 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		options.DryRun, dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := &kubeadmapiv1beta2.InitConfiguration{}
-
-	// Default values for the cobra help text
-	kubeadmscheme.Scheme.Default(cfg)
-
 	var cfgPath string
 	var printJoinCommand bool
 	bto := options.NewBootstrapTokenOptions()
@@ -111,12 +103,16 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		Run: func(tokenCmd *cobra.Command, args []string) {
 			if len(args) > 0 {
 				bto.TokenStr = args[0]
+			} else {
+				var err error
+				bto.TokenStr, err = bootstraputil.GenerateBootstrapToken()
+				kubeadmutil.CheckErr(err)
 			}
 			klog.V(1).Infoln("[token] validating mixed arguments")
 			err := validation.ValidateMixedArguments(tokenCmd.Flags())
 			kubeadmutil.CheckErr(err)
 
-			err = bto.ApplyTo(cfg)
+			bootstrapToken, err := kubeadmapi.NewBootstrapTokenString(bto.TokenStr)
 			kubeadmutil.CheckErr(err)
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
@@ -124,7 +120,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
-			err = RunCreateToken(out, client, cfgPath, cfg, printJoinCommand, kubeConfigFile)
+			err = RunCreateToken(out, client, cfgPath, bootstrapToken, printJoinCommand, kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 		},
 	}
@@ -208,30 +204,14 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1beta2.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
-	// ClusterConfiguration is needed just for the call to LoadOrDefaultInitConfiguration
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		// KubernetesVersion is not used, but we set this explicitly to avoid
-		// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
-		KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
-	}
-	kubeadmscheme.Scheme.Default(clusterCfg)
-
-	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-	klog.V(1).Infoln("[token] loading configurations")
-
-	// In fact, we don't do any CRI ops at all.
-	// This is just to force skipping the CRI detection.
-	// Ref: https://github.com/kubernetes/kubeadm/issues/1559
-	initCfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultDockerCRISocket
-
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
-	if err != nil {
-		return err
-	}
-
+func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, bootstrapToken *kubeadmapi.BootstrapTokenString, printJoinCommand bool, kubeConfigFile string) error {
 	klog.V(1).Infoln("[token] creating token")
-	if err := tokenphase.CreateNewTokens(client, internalcfg.BootstrapTokens); err != nil {
+	err := tokenphase.CreateNewTokens(client, []kubeadmapi.BootstrapToken{
+		{
+			Token: bootstrapToken,
+		},
+	})
+	if err != nil {
 		return err
 	}
 
@@ -239,7 +219,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	// otherwise, just print the token
 	if printJoinCommand {
 		skipTokenPrint := false
-		joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
+		joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, bootstrapToken.String(), skipTokenPrint)
 		if err != nil {
 			return errors.Wrap(err, "failed to get join command")
 		}
@@ -247,7 +227,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 		joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
 		fmt.Fprintln(out, joinCommand)
 	} else {
-		fmt.Fprintln(out, internalcfg.BootstrapTokens[0].Token.String())
+		fmt.Fprintln(out, bootstrapToken.String())
 	}
 
 	return nil
