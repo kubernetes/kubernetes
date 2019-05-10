@@ -411,7 +411,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
 					err := framework.DeletePodWithWait(f, c, pod)
-					gomega.Expect(err).To(gomega.HaveOccurred())
+					framework.ExpectError(err)
 					// pod object is now stale, but is intentionally not nil
 
 					ginkgo.By("Check if pod's host has been cleaned up -- expect not")
