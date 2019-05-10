@@ -21,20 +21,23 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 var _ volume.MetricsProvider = &metricsCsi{}
 
-// metricsCsi represents a MetricsProvider that calculates the used and
-// available Volume space for the Volume path.
+// metricsCsi represents a MetricsProvider that calculates the used,free and
+// capacity information for volume using volume path.
 
 type metricsCsi struct {
 	// the directory path the volume is mounted to.
 	targetPath string
-	csiClientGetter
+
+	// Volume handle or id
 	volumeID string
+
+	//csiClient with cache
+	csiClientGetter
 }
 
 // NewMetricsCsi creates a new metricsCsi with the Volume ID and path.
@@ -43,52 +46,38 @@ func NewMetricsCsi(volumeID string, targetPath string) volume.MetricsProvider {
 }
 
 func (mc *metricsCsi) GetMetrics() (*volume.Metrics, error) {
-	metrics := &volume.Metrics{Time: metav1.Now()}
-
-	if mc.volumeID == "" {
-		return nil, fmt.Errorf("VolumeID is nil")
-	}
-
-	if mc.targetPath == "" {
-		return nil, fmt.Errorf("targetpath is nil")
-	}
-
-	err := mc.getCSIVolInfo(metrics)
-	if err != nil {
-		return metrics, err
-	}
-
-	return metrics, nil
-}
-
-func (mc *metricsCsi) getCSIVolInfo(metrics *volume.Metrics) error {
-
+	currentTime := metav1.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
 	defer cancel()
 
+	// Get CSI client
 	csiClient, err := mc.csiClientGetter.Get()
 	if err != nil {
-		klog.Error(log("metricsCsi.getCSIVolInfo failed to get CSI client: %v", err))
-		return err
+		return nil, err
 	}
 
 	// Check whether "GET_VOLUME_STATS" is set
 	volumeStatsSet, err := csiClient.NodeSupportsVolumeStats(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	// if plugin doesnot support volume status, return.
 	if !volumeStatsSet {
-		return nil
+		return nil, nil
 	}
 
-	resUsageMap, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
+	// Get Volumestatus
+	metrics, err := csiClient.NodeGetVolumeStats(ctx, mc.volumeID, mc.targetPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if resUsageMap == nil {
-		return fmt.Errorf("metrics is nil")
+	if metrics == nil {
+		return nil, fmt.Errorf("metrics is nil")
 	}
 
-	return nil
+	//set recorded time
+	metrics.Time = currentTime
+	return metrics, nil
 }
