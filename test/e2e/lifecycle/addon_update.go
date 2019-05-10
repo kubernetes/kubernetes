@@ -335,7 +335,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		ginkgo.By("verify invalid addons weren't created")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get("invalid-addon-test", metav1.GetOptions{})
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.
 	})

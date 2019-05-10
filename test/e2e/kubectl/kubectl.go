@@ -711,7 +711,7 @@ metadata:
 			ginkgo.By("trying to use kubectl with invalid token")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
 			e2elog.Logf("got err %v", err)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Authorization: Bearer invalid"))
@@ -720,7 +720,7 @@ metadata:
 			ginkgo.By("trying to use kubectl with invalid server")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 			e2elog.Logf("got err %v", err)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
 			gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
 
@@ -1714,7 +1714,7 @@ metadata:
 
 			ginkgo.By("verifying the job " + jobName + " was deleted")
 			_, err = c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			gomega.Expect(apierrs.IsNotFound(err)).To(gomega.BeTrue())
 		})
 	})
