@@ -40,7 +40,7 @@ import (
 	"math/rand"
 	"strconv"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -127,7 +127,7 @@ func (h *hostpathCSIDriver) GetClaimSize() string {
 }
 
 func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
+	ginkgo.By(fmt.Sprintf("deploying %s driver", h.driverInfo.Name))
 	cancelLogging := testsuites.StartPodLogs(f)
 	cs := f.ClientSet
 
@@ -161,7 +161,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	}
 
 	return config, func() {
-		By(fmt.Sprintf("uninstalling %s driver", h.driverInfo.Name))
+		ginkgo.By(fmt.Sprintf("uninstalling %s driver", h.driverInfo.Name))
 		cleanup()
 		cancelLogging()
 	}
@@ -258,7 +258,7 @@ func (m *mockCSIDriver) GetClaimSize() string {
 }
 
 func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	By("deploying csi mock driver")
+	ginkgo.By("deploying csi mock driver")
 	cancelLogging := testsuites.StartPodLogs(f)
 	cs := f.ClientSet
 
@@ -306,7 +306,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	}
 
 	return config, func() {
-		By("uninstalling csi mock driver")
+		ginkgo.By("uninstalling csi mock driver")
 		cleanup()
 		cancelLogging()
 	}
@@ -391,7 +391,7 @@ func (g *gcePDCSIDriver) GetClaimSize() string {
 }
 
 func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	By("deploying csi gce-pd driver")
+	ginkgo.By("deploying csi gce-pd driver")
 	cancelLogging := testsuites.StartPodLogs(f)
 	// It would be safer to rename the gcePD driver, but that
 	// hasn't been done before either and attempts to do so now led to
@@ -426,7 +426,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 			Prefix:    "gcepd",
 			Framework: f,
 		}, func() {
-			By("uninstalling gce-pd driver")
+			ginkgo.By("uninstalling gce-pd driver")
 			cleanup()
 			cancelLogging()
 		}
