@@ -74,6 +74,7 @@ const (
 
 	// ServiceAnnotationAllowedServiceTag is the annotation used on the service
 	// to specify a list of allowed service tags separated by comma
+	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for all supported service tags.
 	ServiceAnnotationAllowedServiceTag = "service.beta.kubernetes.io/azure-allowed-service-tags"
 
 	// ServiceAnnotationLoadBalancerIdleTimeout is the annotation used on the service
@@ -88,13 +89,6 @@ const (
 	serviceTagKey = "service"
 	// clusterNameKey is the cluster name key applied for public IP tags.
 	clusterNameKey = "kubernetes-cluster-name"
-)
-
-var (
-	// supportedServiceTags holds a list of supported service tags on Azure.
-	// Refer https://docs.microsoft.com/en-us/azure/virtual-network/security-overview#service-tags for more information.
-	supportedServiceTags = sets.NewString("VirtualNetwork", "VIRTUAL_NETWORK", "AzureLoadBalancer", "AZURE_LOADBALANCER",
-		"Internet", "INTERNET", "AzureTrafficManager", "Storage", "Sql")
 )
 
 // GetLoadBalancer returns whether the specified load balancer exists, and
@@ -1028,10 +1022,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 	if err != nil {
 		return nil, err
 	}
-	serviceTags, err := getServiceTags(service)
-	if err != nil {
-		return nil, err
-	}
+	serviceTags := getServiceTags(service)
 	var sourceAddressPrefixes []string
 	if (sourceRanges == nil || servicehelpers.IsAllowAll(sourceRanges)) && len(serviceTags) == 0 {
 		if !requiresInternalLoadBalancer(service) {
@@ -1609,24 +1600,25 @@ func useSharedSecurityRule(service *v1.Service) bool {
 	return false
 }
 
-func getServiceTags(service *v1.Service) ([]string, error) {
+func getServiceTags(service *v1.Service) []string {
+	if service == nil {
+		return nil
+	}
+
 	if serviceTags, found := service.Annotations[ServiceAnnotationAllowedServiceTag]; found {
+		result := []string{}
 		tags := strings.Split(strings.TrimSpace(serviceTags), ",")
 		for _, tag := range tags {
-			// Storage and Sql service tags support setting regions with suffix ".Region"
-			if strings.HasPrefix(tag, "Storage.") || strings.HasPrefix(tag, "Sql.") {
-				continue
-			}
-
-			if !supportedServiceTags.Has(tag) {
-				return nil, fmt.Errorf("only %q are allowed in service tags", supportedServiceTags.List())
+			serviceTag := strings.TrimSpace(tag)
+			if serviceTag != "" {
+				result = append(result, serviceTag)
 			}
 		}
 
-		return tags, nil
+		return result
 	}
 
-	return nil, nil
+	return nil
 }
 
 func serviceOwnsPublicIP(pip *network.PublicIPAddress, clusterName, serviceName string) bool {
