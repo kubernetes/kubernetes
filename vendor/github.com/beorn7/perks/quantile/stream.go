@@ -133,7 +133,7 @@ func (s *Stream) Query(q float64) float64 {
 		if l == 0 {
 			return 0
 		}
-		i := int(float64(l) * q)
+		i := int(math.Ceil(float64(l) * q))
 		if i > 0 {
 			i -= 1
 		}
