@@ -447,3 +447,60 @@ func TestServiceOwnsPublicIP(t *testing.T) {
 		assert.Equal(t, owns, c.expected, "TestCase[%d]: %s", i, c.desc)
 	}
 }
+
+func TestGetServiceTags(t *testing.T) {
+	tests := []struct {
+		desc     string
+		service  *v1.Service
+		expected []string
+	}{
+		{
+			desc:     "nil should be returned when service is nil",
+			service:  nil,
+			expected: nil,
+		},
+		{
+			desc:     "nil should be returned when service has no annotations",
+			service:  &v1.Service{},
+			expected: nil,
+		},
+		{
+			desc: "single tag should be returned when service has set one annotations",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationAllowedServiceTag: "tag1",
+					},
+				},
+			},
+			expected: []string{"tag1"},
+		},
+		{
+			desc: "multiple tags should be returned when service has set multi-annotations",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationAllowedServiceTag: "tag1, tag2",
+					},
+				},
+			},
+			expected: []string{"tag1", "tag2"},
+		},
+		{
+			desc: "correct tags should be returned when comma or spaces are included in the annotations",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						ServiceAnnotationAllowedServiceTag: ", tag1, ",
+					},
+				},
+			},
+			expected: []string{"tag1"},
+		},
+	}
+
+	for i, c := range tests {
+		tags := getServiceTags(c.service)
+		assert.Equal(t, tags, c.expected, "TestCase[%d]: %s", i, c.desc)
+	}
+}
