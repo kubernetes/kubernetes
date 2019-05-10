@@ -568,3 +568,94 @@ func TestNodeExpandVolume(t *testing.T) {
 		}
 	}
 }
+
+
+
+type VolumeStatsOptions struct {
+	VolumeSpec *volume.Spec
+
+	// this just could be volumeID
+	VolumeID string
+
+	// DeviceMountPath location where device is mounted on the node. If volume type
+	// is attachable - this would be global mount path otherwise
+	// it would be location where volume was mounted for the pod
+	DeviceMountPath string
+}
+
+func TestVolumeStats(t *testing.T) {
+	spec := volume.NewSpecFromPersistentVolume(makeTestPV("test-pv", 10, "metrics", "test-vol"), false)
+	tests := []struct {
+		name           string
+		volumeStatsSet bool
+		volumeData     VolumeStatsOptions
+		success        bool
+	}{
+
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=on",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: true,
+		},
+
+		{
+			name:           "when nodeVolumeStats=off, VolumeID=on, DeviceMountPath=on",
+			volumeStatsSet: false,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: false,
+		},
+
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=off, DeviceMountPath=on",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "",
+				DeviceMountPath: "/foo/bar",
+			},
+			success: false,
+		},
+
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=off",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "volume1",
+				DeviceMountPath: "",
+			},
+			success: false,
+		},
+		{
+			name:           "when nodeVolumeStats=on, VolumeID=on, DeviceMountPath=off",
+			volumeStatsSet: true,
+			volumeData: VolumeStatsOptions{
+				VolumeSpec:      spec,
+				VolumeID:        "",
+				DeviceMountPath: "",
+			},
+			success: false,
+		},
+	}
+	for _, tc := range tests {
+		ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+		defer cancel()
+		csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+		csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
+		_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+		if err != nil && tc.success {
+			t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
+		}
+
+	}
+
+}
