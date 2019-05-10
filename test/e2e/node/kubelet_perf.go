@@ -30,8 +30,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -66,23 +66,23 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	expectedCPU map[string]map[float64]float64, expectedMemory framework.ResourceUsagePerContainer) {
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
-	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
+	ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
-	Expect(framework.RunRC(testutils.RCConfig{
+	gomega.Expect(framework.RunRC(testutils.RCConfig{
 		Client:    f.ClientSet,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
 		Image:     imageutils.GetPauseImageName(),
 		Replicas:  totalPods,
-	})).NotTo(HaveOccurred())
+	})).NotTo(gomega.HaveOccurred())
 
 	// Log once and flush the stats.
 	rm.LogLatest()
 	rm.Reset()
 
-	By("Start monitoring resource usage")
+	ginkgo.By("Start monitoring resource usage")
 	// Periodically dump the cpu summary until the deadline is met.
 	// Note that without calling framework.ResourceMonitor.Reset(), the stats
 	// would occupy increasingly more memory. This should be fine
@@ -100,10 +100,10 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 		logPodsOnNodes(f.ClientSet, nodeNames.List())
 	}
 
-	By("Reporting overall resource usage")
+	ginkgo.By("Reporting overall resource usage")
 	logPodsOnNodes(f.ClientSet, nodeNames.List())
 	usageSummary, err := rm.GetLatest()
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	e2elog.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
@@ -116,7 +116,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	framework.PrintPerfData(framework.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
 	verifyCPULimits(expectedCPU, cpuSummary)
 
-	By("Deleting the RC")
+	ginkgo.By("Deleting the RC")
 	framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
 }
 
@@ -197,7 +197,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var om *framework.RuntimeOperationMonitor
 	var rm *framework.ResourceMonitor
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
@@ -208,7 +208,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 		rm.Start()
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		rm.Stop()
 		result := om.GetLatestRuntimeOperationErrorRate()
 		e2elog.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
@@ -260,7 +260,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 			podsPerNode := itArg.podsPerNode
 			name := fmt.Sprintf(
 				"resource tracking for %d pods per node", podsPerNode)
-			It(name, func() {
+			ginkgo.It(name, func() {
 				runResourceTrackingTest(f, podsPerNode, nodeNames, rm, itArg.cpuLimits, itArg.memLimits)
 			})
 		}
@@ -271,7 +271,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 			podsPerNode := density[i]
 			name := fmt.Sprintf(
 				"resource tracking for %d pods per node", podsPerNode)
-			It(name, func() {
+			ginkgo.It(name, func() {
 				runResourceTrackingTest(f, podsPerNode, nodeNames, rm, nil, nil)
 			})
 		}
