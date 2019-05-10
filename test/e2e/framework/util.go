@@ -538,6 +538,23 @@ func logPodStates(pods []v1.Pod) {
 	Logf("") // Final empty line helps for readability.
 }
 
+// logPodTerminationMessages logs termination messages for failing pods.  It's a short snippet (much smaller than full logs), but it often shows
+// why pods crashed and since it is in the API, it's fast to retrieve.
+func logPodTerminationMessages(pods []v1.Pod) {
+	for _, pod := range pods {
+		for _, status := range pod.Status.InitContainerStatuses {
+			if status.LastTerminationState.Terminated != nil && len(status.LastTerminationState.Terminated.Message) > 0 {
+				Logf("%s[%s].initContainer[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastTerminationState.Terminated.Message)
+			}
+		}
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.LastTerminationState.Terminated != nil && len(status.LastTerminationState.Terminated.Message) > 0 {
+				Logf("%s[%s].container[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastTerminationState.Terminated.Message)
+			}
+		}
+	}
+}
+
 // errorBadPodsStates create error message of basic info of bad pods for debugging.
 func errorBadPodsStates(badPods []v1.Pod, desiredPods int, ns, desiredState string, timeout time.Duration) string {
 	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in %s state in %v\n", len(badPods), desiredPods, ns, desiredState, timeout)
@@ -2422,6 +2439,8 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 		return c.CoreV1().Events(ns).List(opts)
 	}, namespace)
 
+	dumpAllPodInfoForNamespace(c, namespace)
+
 	// If cluster is large, then the following logs are basically useless, because:
 	// 1. it takes tens of minutes or hours to grab all of them
 	// 2. there are so many of them that working with them are mostly impossible
@@ -2429,7 +2448,6 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	maxNodesForDump := TestContext.MaxNodesToGather
 	if nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{}); err == nil {
 		if len(nodes.Items) <= maxNodesForDump {
-			dumpAllPodInfo(c)
 			dumpAllNodeInfo(c)
 		} else {
 			Logf("skipping dumping cluster info - cluster too large")
@@ -2452,12 +2470,13 @@ func (o byFirstTimestamp) Less(i, j int) bool {
 	return o[i].FirstTimestamp.Before(&o[j].FirstTimestamp)
 }
 
-func dumpAllPodInfo(c clientset.Interface) {
-	pods, err := c.CoreV1().Pods("").List(metav1.ListOptions{})
+func dumpAllPodInfoForNamespace(c clientset.Interface, namespace string) {
+	pods, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		Logf("unable to fetch pod debug info: %v", err)
 	}
 	logPodStates(pods.Items)
+	logPodTerminationMessages(pods.Items)
 }
 
 func dumpAllNodeInfo(c clientset.Interface) {
