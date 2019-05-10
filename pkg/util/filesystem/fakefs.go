@@ -97,7 +97,7 @@ func (fs *fakeFs) RemoveAll(path string) error {
 	return fs.a.RemoveAll(path)
 }
 
-// Remove via afero.RemoveAll
+// Remove via afero.Remove
 func (fs *fakeFs) Remove(name string) error {
 	return fs.a.Remove(name)
 }
