@@ -36,7 +36,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-// partially cloned from webserver.go
+// State partially cloned from webserver.go
 type State struct {
 	Received map[string]int
 }
