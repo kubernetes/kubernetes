@@ -126,7 +126,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	pvclaims = append(pvclaims, pvclaim)
 	// Create pod to attach Volume to Node
 	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
-	gomega.Expect(err).To(gomega.HaveOccurred())
+	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
 

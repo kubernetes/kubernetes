@@ -573,7 +573,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			e2elog.Logf(err.Error())
 		})
 
@@ -800,7 +800,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			e2elog.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -834,7 +834,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			e2elog.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

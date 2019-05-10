@@ -132,7 +132,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		ginkgo.By(fmt.Sprintf("Creating storage class with unknown zone : %s", zoneD))
 		zones = append(zones, zoneD)
 		err := verifyPVCCreationFails(client, namespace, nil, zones)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "Failed to find a shared datastore matching zone [" + zoneD + "]"
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -357,7 +357,7 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	gomega.Expect(err).To(gomega.HaveOccurred())
+	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
 	e2elog.Logf("Failure message : %+q", eventList.Items[0].Message)

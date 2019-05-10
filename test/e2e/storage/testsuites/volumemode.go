@@ -193,7 +193,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
-				gomega.Expect(err).To(gomega.HaveOccurred())
+				framework.ExpectError(err)
 			})
 		} else {
 			ginkgo.It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
@@ -251,7 +251,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				framework.ExpectNoError(err)
 
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-				gomega.Expect(err).To(gomega.HaveOccurred())
+				framework.ExpectError(err)
 			})
 		} else {
 			ginkgo.It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {

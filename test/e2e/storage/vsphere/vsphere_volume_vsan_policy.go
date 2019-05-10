@@ -159,7 +159,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_DiskStripes] = StripeWidthCapabilityVal
 		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "invalid option \\\"objectSpaceReserve\\\" for volume plugin kubernetes.io/vsphere-volume"
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_CacheReservation] = CacheReservationCapabilityVal
 		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "Invalid value for " + Policy_DiskStripes + "."
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -188,7 +188,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_HostFailuresToTolerate] = HostFailuresToTolerateCapabilityInvalidVal
 		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -204,7 +204,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Datastore] = VmfsDatastore
 		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "The specified datastore: \\\"" + VmfsDatastore + "\\\" is not a VSAN datastore. " +
 			"The policy parameters will work only with VSAN Datastore."
 		if !strings.Contains(err.Error(), errorMsg) {
@@ -236,7 +236,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[DiskFormat] = ThinDisk
 		e2elog.Logf("Invoking test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + tagPolicy + "\\\""
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -249,7 +249,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[DiskFormat] = ThinDisk
 		e2elog.Logf("Invoking test for non-existing SPBM storage policy: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "no pbm profile found with name: \\\"" + BronzeStoragePolicy + "\\"
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -264,7 +264,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[DiskFormat] = ThinDisk
 		e2elog.Logf("Invoking test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -317,7 +317,7 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 
 	ginkgo.By("Waiting for claim to be in bound phase")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	gomega.Expect(err).To(gomega.HaveOccurred())
+	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
@@ -337,7 +337,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, masterN
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Expect claim to fail provisioning volume")
 	_, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, 2*time.Minute)
-	gomega.Expect(err).To(gomega.HaveOccurred())
+	framework.ExpectError(err)
 
 	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(pvclaim.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)

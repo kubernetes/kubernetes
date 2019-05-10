@@ -313,9 +313,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			ginkgo.By("Creating local PVC and PV")
 			createLocalPVCsPVs(config, []*localTestVolume{testVol}, immediateMode)
 			pod, err := createLocalPod(config, testVol, nil)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 		})
 
@@ -332,7 +332,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			framework.ExpectNoError(err)
 
 			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 
 			cleanupLocalVolumes(config, []*localTestVolume{testVol})
 		})
@@ -932,7 +932,7 @@ func createLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume, mod
 			}
 			return false, nil
 		})
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 	}
 }
 

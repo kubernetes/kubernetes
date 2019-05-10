@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -69,7 +68,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		scParameters[Datastore] = InvalidDatastore
 		scParameters[DiskFormat] = ThinDisk
 		err := invokeInvalidDatastoreTestNeg(client, namespace, scParameters)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := `Failed to provision volume with StorageClass \"` + DatastoreSCName + `\": Datastore ` + InvalidDatastore + ` not found`
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -90,7 +89,7 @@ func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string,
 
 	ginkgo.By("Expect claim to fail provisioning volume")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	gomega.Expect(err).To(gomega.HaveOccurred())
+	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
