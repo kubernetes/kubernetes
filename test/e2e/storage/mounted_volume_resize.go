@@ -19,8 +19,8 @@ package storage
 import (
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -52,7 +52,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 	)
 
 	f := framework.NewDefaultFramework("mounted-volume-expand")
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
@@ -83,7 +83,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 		resizableSc, err = createStorageClass(test, ns, "resizing", c)
 		framework.ExpectNoError(err, "Error creating resizable storage class")
-		Expect(*resizableSc.AllowVolumeExpansion).To(BeTrue())
+		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
 
 		pvc = newClaim(test, ns, "default")
 		pvc.Spec.StorageClassName = &resizableSc.Name
@@ -97,7 +97,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		e2elog.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 
 		if c != nil {
@@ -109,57 +109,57 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 	})
 
-	It("Should verify mounted devices can be resized", func() {
+	ginkgo.It("Should verify mounted devices can be resized", func() {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 
 		// The reason we use a node selector is because we do not want pod to move to different node when pod is deleted.
 		// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
 		// We should consider adding a unit test that exercises this better.
-		By("Creating a deployment with selected PVC")
+		ginkgo.By("Creating a deployment with selected PVC")
 		deployment, err := e2edeploy.CreateDeployment(c, int32(1), map[string]string{"test": "app"}, nodeKeyValueLabel, ns, pvcClaims, "")
 		framework.ExpectNoError(err, "Failed creating deployment %v", err)
 		defer c.AppsV1().Deployments(ns).Delete(deployment.Name, &metav1.DeleteOptions{})
 
 		// PVC should be bound at this point
-		By("Checking for bound PVC")
+		ginkgo.By("Checking for bound PVC")
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		Expect(len(pvs)).To(Equal(1))
+		gomega.Expect(len(pvs)).To(gomega.Equal(1))
 
-		By("Expanding current pvc")
+		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
 		pvc, err = expandPVCSize(pvc, newSize, c)
 		framework.ExpectNoError(err, "While updating pvc for more size")
-		Expect(pvc).NotTo(BeNil())
+		gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 		if pvcSize.Cmp(newSize) != 0 {
 			framework.Failf("error updating pvc size %q", pvc.Name)
 		}
 
-		By("Waiting for cloudprovider resize to finish")
+		ginkgo.By("Waiting for cloudprovider resize to finish")
 		err = waitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
-		By("Getting a pod from deployment")
+		ginkgo.By("Getting a pod from deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(c, deployment)
-		Expect(podList.Items).NotTo(BeEmpty())
+		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 
-		By("Deleting the pod from deployment")
+		ginkgo.By("Deleting the pod from deployment")
 		err = framework.DeletePodWithWait(f, c, &pod)
 		framework.ExpectNoError(err, "while deleting pod for resizing")
 
-		By("Waiting for deployment to create new pod")
+		ginkgo.By("Waiting for deployment to create new pod")
 		pod, err = waitForDeploymentToRecreatePod(c, deployment)
 		framework.ExpectNoError(err, "While waiting for pod to be recreated")
 
-		By("Waiting for file system resize to finish")
+		ginkgo.By("Waiting for file system resize to finish")
 		pvc, err = waitForFSResize(pvc, c)
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		Expect(len(pvcConditions)).To(Equal(0), "pvc should not have conditions")
+		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
 	})
 })
 
