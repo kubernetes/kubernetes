@@ -30,26 +30,24 @@ type Manager interface {
 	//wants to be consoluted when making topology hints
 	AddHintProvider(HintProvider)
 	//Adds pod to Manager for tracking
-	AddPod(pod *v1.Pod, containerID string) error
+	AddContainer(pod *v1.Pod, containerID string) error
 	//Removes pod from Manager tracking
-	RemovePod(containerID string) error
+	RemoveContainer(containerID string) error
 	//Interface for storing pod topology hints
 	Store
 }
 
 //HintProvider interface is to be implemented by Hint Providers
 type HintProvider interface {
-	GetTopologyHints(pod v1.Pod, container v1.Container) TopologyHints
+	GetTopologyHints(pod v1.Pod, container v1.Container) ([]TopologyHint, bool)
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
 type Store interface {
-	GetAffinity(podUID string, containerName string) TopologyHints
+	GetAffinity(podUID string, containerName string) TopologyHint
 }
 
-//TopologyHints is a struct containing Sokcet Affinity for a Pod
-//and whether Affinity is true or false
-type TopologyHints struct {
-	SocketAffinity []socketmask.SocketMask
-	Affinity bool
+// TopologyHint is a struct containing Socket Mask for a Pod
+type TopologyHint struct {
+	SocketAffinity socketmask.SocketMask
 }

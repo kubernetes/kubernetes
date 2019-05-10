@@ -25,5 +25,5 @@ type Policy interface {
 	//Returns Policy Name
 	Name() string
 	//Returns Pod Admit Handler Response based on hints and policy type
-	CanAdmitPodResult(result TopologyHints) lifecycle.PodAdmitResult
+	CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult
 }
