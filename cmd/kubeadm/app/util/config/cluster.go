@@ -32,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -79,7 +80,12 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 
 	// gets the component configs from the corresponding config maps
 	if err := getComponentConfigs(client, &initcfg.ClusterConfiguration); err != nil {
-		return nil, errors.Wrap(err, "failed to get component configs")
+		// Show a warning but don't throw an error in case the kube-proxy ConfigMap cannot be fetched.
+		// This is a special case when the user skipped the kube-proxy addon phase.
+		if !componentconfigs.IsKubeProxyConfigMapError(err) {
+			return nil, err
+		}
+		klog.Warningf("unable to fetch the kube-proxy component configuration. The cluster is in a unsupported state: %v", err)
 	}
 
 	// if this isn't a new controlplane instance (e.g. in case of kubeadm upgrades)

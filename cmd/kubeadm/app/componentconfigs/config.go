@@ -19,6 +19,7 @@ package componentconfigs
 import (
 	"github.com/pkg/errors"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -55,6 +56,25 @@ func GetFromKubeletConfigMap(client clientset.Interface, version *version.Versio
 	return obj, nil
 }
 
+// Custom error for handling kube-proxy ConfigMap errors
+type kubeProxyConfigMapError struct {
+	originalError error
+}
+
+func (e *kubeProxyConfigMapError) Error() string {
+	return e.originalError.Error()
+}
+
+func newKubeProxyConfigMapError(err error) *kubeProxyConfigMapError {
+	return &kubeProxyConfigMapError{err}
+}
+
+// IsKubeProxyConfigMapError returns true if the given error is of type kubeProxyConfigMapError
+func IsKubeProxyConfigMapError(err error) bool {
+	_, ok := err.(*kubeProxyConfigMapError)
+	return ok
+}
+
 // GetFromKubeProxyConfigMap returns the pointer to the ComponentConfig API object read from the kube-proxy
 // ConfigMap map stored in the cluster
 func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Version) (runtime.Object, error) {
@@ -62,6 +82,10 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 	// Read the ConfigMap from the cluster
 	kubeproxyCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(kubeadmconstants.KubeProxyConfigMap, metav1.GetOptions{})
 	if err != nil {
+		// in case the ConfigMap is not found, return the custom kubeProxyConfigMapError
+		if apierrors.IsNotFound(err) {
+			return nil, newKubeProxyConfigMapError(err)
+		}
 		return nil, err
 	}
 

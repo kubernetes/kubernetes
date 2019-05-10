@@ -27,6 +27,7 @@ import (
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
@@ -103,8 +104,14 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
-		errs = append(errs, err)
+	// Upgrade kube-proxy only if the component config is present.
+	// TODO: consider removing this check once upgrade phases are supported.
+	if cfg.ComponentConfigs.KubeProxy != nil {
+		if err := proxy.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client); err != nil {
+			errs = append(errs, err)
+		}
+	} else {
+		klog.Warning("skipping kube-proxy upgrade due to an empty component configuration. Without kube-proxy the cluster is in a unsupported state")
 	}
 	return errorsutil.NewAggregate(errs)
 }
