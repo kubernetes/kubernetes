@@ -130,12 +130,12 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By("Failing to create a Pod with less than min resources")
 		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi", "50Gi"), v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Failing to create a Pod with more than max resources")
 		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Updating a LimitRange")
 		newMin := getResourceList("9m", "49Mi", "49Gi")
@@ -158,7 +158,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By("Failing to create a Pod with more than max resources")
 		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi", "600Gi"), v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Deleting a LimitRange")
 		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(limitRange.Name, metav1.NewDeleteOptions(30))
