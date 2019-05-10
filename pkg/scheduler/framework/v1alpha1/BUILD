@@ -7,6 +7,7 @@ go_library(
         "framework.go",
         "interface.go",
         "registry.go",
+        "waiting_pods_map.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1",
     visibility = ["//visibility:public"],
@@ -14,6 +15,7 @@ go_library(
         "//pkg/scheduler/internal/cache:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
