@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 // sortablePods lets us to sort pods.
@@ -352,16 +352,16 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			allPodLister := schedulertesting.FakePodLister(append(test.existingPods, test.addedPod))
+			allPodLister := st.FakePodLister(append(test.existingPods, test.addedPod))
 			// getMeta creates predicate meta data given the list of pods.
-			getMeta := func(lister schedulertesting.FakePodLister) (*predicateMetadata, map[string]*schedulernodeinfo.NodeInfo) {
+			getMeta := func(lister st.FakePodLister) (*predicateMetadata, map[string]*schedulernodeinfo.NodeInfo) {
 				nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(lister, test.nodes)
 				// nodeList is a list of non-pointer nodes to feed to FakeNodeListInfo.
 				nodeList := []v1.Node{}
 				for _, n := range test.nodes {
 					nodeList = append(nodeList, *n)
 				}
-				_, precompute := NewServiceAffinityPredicate(lister, schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
+				_, precompute := NewServiceAffinityPredicate(lister, st.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
 				pmf := PredicateMetadataFactory{lister}
 				meta := pmf.GetMetadata(test.pendingPod, nodeInfoMap)
@@ -372,7 +372,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			// are given to the metadata producer.
 			allPodsMeta, _ := getMeta(allPodLister)
 			// existingPodsMeta1 is meta data produced for test.existingPods (without test.addedPod).
-			existingPodsMeta1, nodeInfoMap := getMeta(schedulertesting.FakePodLister(test.existingPods))
+			existingPodsMeta1, nodeInfoMap := getMeta(st.FakePodLister(test.existingPods))
 			// Add test.addedPod to existingPodsMeta1 and make sure meta is equal to allPodsMeta
 			nodeInfo := nodeInfoMap[test.addedPod.Spec.NodeName]
 			if err := existingPodsMeta1.AddPod(test.addedPod, nodeInfo); err != nil {
@@ -383,7 +383,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			}
 			// Remove the added pod and from existingPodsMeta1 an make sure it is equal
 			// to meta generated for existing pods.
-			existingPodsMeta2, _ := getMeta(schedulertesting.FakePodLister(test.existingPods))
+			existingPodsMeta2, _ := getMeta(st.FakePodLister(test.existingPods))
 			if err := existingPodsMeta1.RemovePod(test.addedPod); err != nil {
 				t.Errorf("error removing pod from meta: %v", err)
 			}
@@ -936,14 +936,14 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 	}{
 		{
 			name: "clean cluster with one spreadConstraint",
-			pod: makePod().name("p").label("foo", "").spreadConstraint(
-				1, "zone", hardSpread, makeLabelSelector().exists("foo").obj(),
-			).obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				// denotes no existing pod is matched on this zone pair, but still needed to be
@@ -960,21 +960,21 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "normal case with one spreadConstraint",
-			pod: makePod().name("p").label("foo", "").spreadConstraint(
-				1, "zone", hardSpread, makeLabelSelector().exists("foo").obj(),
-			).obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
-				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
-				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
-				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				// denotes existingPods[0,1,2]
@@ -997,21 +997,21 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "namespace mis-match doesn't count",
-			pod: makePod().name("p").label("foo", "").spreadConstraint(
-				1, "zone", hardSpread, makeLabelSelector().exists("foo").obj(),
-			).obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
-				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-a2").namespace("ns1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
-				makePod().name("p-y1").namespace("ns2").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Namespace("ns1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Namespace("ns2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				{key: "zone", value: "zone1"}: {0, 2},
@@ -1030,24 +1030,24 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "normal case with two spreadConstraints",
-			pod: makePod().name("p").label("foo", "").
-				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
-				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
-				obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
-				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
-				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
-				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				{key: "zone", value: "zone1"}:  {0, 1, 2},
@@ -1074,25 +1074,25 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "soft spreadConstraints should be bypassed",
-			pod: makePod().name("p").label("foo", "").
-				spreadConstraint(1, "zone", softSpread, makeLabelSelector().exists("foo").obj()).
-				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
-				spreadConstraint(1, "zone", softSpread, makeLabelSelector().exists("foo").obj()).
-				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
-				obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
-				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
-				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
-				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				{key: "zone", value: "zone1"}:  {0, 1, 2},
@@ -1118,23 +1118,23 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "different labelSelectors",
-			pod: makePod().name("p").label("foo", "").label("bar", "").
-				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
-				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("bar").obj()).
-				obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("bar").Obj()).
+				Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
-				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-a2").node("node-a").label("foo", "").label("bar", "").obj(),
-				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
-				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y2").node("node-y").label("foo", "").label("bar", "").obj(),
-				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y4").node("node-y").label("foo", "").label("bar", "").obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				{key: "zone", value: "zone1"}:  {1},
@@ -1156,25 +1156,25 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		},
 		{
 			name: "two spreadConstraints, and with podAffinity",
-			pod: makePod().name("p").label("foo", "").
-				nodeAffinityNotIn("node", []string{"node-x"}). // exclude node-x
-				spreadConstraint(1, "zone", hardSpread, makeLabelSelector().exists("foo").obj()).
-				spreadConstraint(1, "node", hardSpread, makeLabelSelector().exists("foo").obj()).
-				obj(),
+			pod: st.MakePod().Name("p").Label("foo", "").
+				NodeAffinityNotIn("node", []string{"node-x"}). // exclude node-x
+				SpreadConstraint(1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", hardSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				Obj(),
 			nodes: []*v1.Node{
-				makeNode().name("node-a").label("zone", "zone1").label("node", "node-a").obj(),
-				makeNode().name("node-b").label("zone", "zone1").label("node", "node-b").obj(),
-				makeNode().name("node-x").label("zone", "zone2").label("node", "node-x").obj(),
-				makeNode().name("node-y").label("zone", "zone2").label("node", "node-y").obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			existingPods: []*v1.Pod{
-				makePod().name("p-a1").node("node-a").label("foo", "").obj(),
-				makePod().name("p-a2").node("node-a").label("foo", "").obj(),
-				makePod().name("p-b1").node("node-b").label("foo", "").obj(),
-				makePod().name("p-y1").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y2").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y3").node("node-y").label("foo", "").obj(),
-				makePod().name("p-y4").node("node-y").label("foo", "").obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
 			injectPodPointers: map[topologyPair][]int{
 				{key: "zone", value: "zone1"}:  {0, 1, 2},
