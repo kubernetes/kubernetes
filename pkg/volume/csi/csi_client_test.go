@@ -21,11 +21,14 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"strconv"
 	"testing"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog"
+	//"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/fake"
 )
@@ -71,15 +74,40 @@ func (c *fakeCsiDriverClient) NodeGetInfo(ctx context.Context) (
 
 func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (
 	usageCountMap *volume.Metrics, err error) {
-
+	var unit csipbv1.VolumeUsage_Unit
 	c.t.Log("calling fake.NodeGetVolumeStats...")
 	req := &csipbv1.NodeGetVolumeStatsRequest{
 		VolumeId:   volID,
 		VolumePath: targetPath,
 	}
 
-	_, err = c.nodeClient.NodeGetVolumeStats(ctx, req)
-	return nil, err
+	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
+	c.t.Logf("Response: %v", resp)
+
+	usages := resp.GetUsage()
+	var ucb *volume.Metrics
+	if usages == nil {
+		return nil, nil
+	}
+	for _, usage := range usages {
+		unit = usage.GetUnit()
+		switch unit.String() {
+		case "BYTES":
+			ucb.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			ucb.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			ucb.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+		case "INODES":
+			ucb.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			ucb.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
+			ucb.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+		default:
+			klog.Errorf("unknown key %s in usage", unit.String())
+		}
+
+	}
+	return ucb, nil
+
+	//return resp, err
 }
 
 func (c *fakeCsiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, error) {
@@ -653,7 +681,65 @@ func TestVolumeStats(t *testing.T) {
 		if err != nil && tc.success {
 			t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
 		}
-
 	}
 
+}
+
+func TestClientNodeGetVolumeStats(t *testing.T) {
+
+	var unit csipbv1.VolumeUsage_Unit
+	unit = csipbv1.VolumeUsage_BYTES
+
+	available, _ := strconv.ParseInt("10", 10, 32)
+	total, _ := strconv.ParseInt("100", 10, 32)
+	used, _ := strconv.ParseInt("50", 10, 32)
+
+	usageArr := []csipbv1.VolumeUsage{
+		csipbv1.VolumeUsage{
+			Unit:      unit,
+			Available: available,
+			Total:     total,
+			Used:      used},
+	}
+
+	usagePtrArr := make([]*csipbv1.VolumeUsage, len(usageArr))
+
+	for i := 0; i < len(usageArr); i++ {
+		usagePtrArr[i] = &usageArr[i]
+	}
+
+	testCases := []struct {
+		name          string
+		expectedUsage []*csipbv1.VolumeUsage
+		mustFail      bool
+		err           error
+	}{
+		{
+			name:          "test ok",
+			expectedUsage: usagePtrArr,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("test case: %s", tc.name)
+		fakeCloser := fake.NewCloser(t)
+		client := &csiDriverClient{
+			driverName: "Fake Driver Name",
+			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
+				nodeClient := fake.NewNodeClientWithVolumeStats(true /* VolumeStatsCapable */)
+				nodeClient.SetNextError(tc.err)
+				nodeClient.SetNodeVolumeStatsResp(&csipbv1.NodeGetVolumeStatsResponse{
+					Usage: usagePtrArr,
+				})
+				return nodeClient, fakeCloser, nil
+			},
+		}
+
+		_, err := client.NodeGetVolumeStats(context.Background(), "fakeVolume", "/bar")
+		checkErr(t, tc.mustFail, err)
+
+		if !tc.mustFail {
+			fakeCloser.Check()
+		}
+	}
 }
