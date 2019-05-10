@@ -55,9 +55,8 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 func (t *JobUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
 	<-done
 	ginkgo.By("Ensuring active pods == parallelism")
-	running, err := jobutil.CheckForAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
+	err := jobutil.EnsureAllJobPodsRunning(f.ClientSet, t.namespace, t.job.Name, 2)
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	gomega.Expect(running).To(gomega.BeTrue())
 }
 
 // Teardown cleans up any remaining resources.
