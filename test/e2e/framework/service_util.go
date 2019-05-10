@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1236,104 +1235,6 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 		}
 	}
 	return service, err
-}
-
-// GetContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
-func GetContainerPortsByPodUID(endpoints *v1.Endpoints) PortsByPodUID {
-	m := PortsByPodUID{}
-	for _, ss := range endpoints.Subsets {
-		for _, port := range ss.Ports {
-			for _, addr := range ss.Addresses {
-				containerPort := port.Port
-				if _, ok := m[addr.TargetRef.UID]; !ok {
-					m[addr.TargetRef.UID] = make([]int, 0)
-				}
-				m[addr.TargetRef.UID] = append(m[addr.TargetRef.UID], int(containerPort))
-			}
-		}
-	}
-	return m
-}
-
-// PortsByPodName maps pod name to ports.
-type PortsByPodName map[string][]int
-
-// PortsByPodUID maps UID to ports.
-type PortsByPodUID map[types.UID][]int
-
-func translatePodNameToUIDOrFail(c clientset.Interface, ns string, expectedEndpoints PortsByPodName) PortsByPodUID {
-	portsByUID := make(PortsByPodUID)
-
-	for name, portList := range expectedEndpoints {
-		pod, err := c.CoreV1().Pods(ns).Get(name, metav1.GetOptions{})
-		if err != nil {
-			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
-		}
-		portsByUID[pod.ObjectMeta.UID] = portList
-	}
-	// Logf("successfully translated pod names to UIDs: %v -> %v on namespace %s", expectedEndpoints, portsByUID, ns)
-	return portsByUID
-}
-
-func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUID) {
-	if len(endpoints) != len(expectedEndpoints) {
-		// should not happen because we check this condition before
-		Failf("invalid number of endpoints got %v, expected %v", endpoints, expectedEndpoints)
-	}
-	for podUID := range expectedEndpoints {
-		if _, ok := endpoints[podUID]; !ok {
-			Failf("endpoint %v not found", podUID)
-		}
-		if len(endpoints[podUID]) != len(expectedEndpoints[podUID]) {
-			Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
-		}
-		sort.Ints(endpoints[podUID])
-		sort.Ints(expectedEndpoints[podUID])
-		for index := range endpoints[podUID] {
-			if endpoints[podUID][index] != expectedEndpoints[podUID][index] {
-				Failf("invalid list of ports for uid %v. Got %v, expected %v", podUID, endpoints[podUID], expectedEndpoints[podUID])
-			}
-		}
-	}
-}
-
-// ValidateEndpointsOrFail validates that the given service exists and is served by the given expectedEndpoints.
-func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName string, expectedEndpoints PortsByPodName) {
-	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
-	i := 1
-	for start := time.Now(); time.Since(start) < ServiceStartTimeout; time.Sleep(1 * time.Second) {
-		endpoints, err := c.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
-		if err != nil {
-			Logf("Get endpoints failed (%v elapsed, ignoring for 5s): %v", time.Since(start), err)
-			continue
-		}
-		// Logf("Found endpoints %v", endpoints)
-
-		portsByPodUID := GetContainerPortsByPodUID(endpoints)
-		// Logf("Found port by pod UID %v", portsByPodUID)
-
-		expectedPortsByPodUID := translatePodNameToUIDOrFail(c, namespace, expectedEndpoints)
-		if len(portsByPodUID) == len(expectedEndpoints) {
-			validatePortsOrFail(portsByPodUID, expectedPortsByPodUID)
-			Logf("successfully validated that service %s in namespace %s exposes endpoints %v (%v elapsed)",
-				serviceName, namespace, expectedEndpoints, time.Since(start))
-			return
-		}
-
-		if i%5 == 0 {
-			Logf("Unexpected endpoints: found %v, expected %v (%v elapsed, will retry)", portsByPodUID, expectedEndpoints, time.Since(start))
-		}
-		i++
-	}
-
-	if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{}); err == nil {
-		for _, pod := range pods.Items {
-			Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-		}
-	} else {
-		Logf("Can't list pod debug info: %v", err)
-	}
-	Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, ServiceStartTimeout)
 }
 
 // StartServeHostnameService creates a replication controller that serves its
