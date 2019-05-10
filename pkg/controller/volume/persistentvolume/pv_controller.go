@@ -247,7 +247,7 @@ type PersistentVolumeController struct {
 	// with the key = claimKey + "-provision" of the claim if there is no existing PV.
 	// Following "syncClaim" calls to bind a PV to the PVC takes the previously inserted
 	// record upon successful/failed binding to record metrics.
-	// If an operation has been successfully executed, i.e., recordCSIMetric has been called
+	// If an operation has been successfully executed, i.e., recordMetric has been called
 	// with err == nil, the corresponding record will be removed from the cache
 	operationTimestamps cache.ThreadSafeStore
 }
@@ -343,38 +343,34 @@ func (ctrl *PersistentVolumeController) createOperationTimestampCacheKey(opName,
 	return claimKey + "-" + opName
 }
 
-func (ctrl *PersistentVolumeController) recordCSIMetric(opName, claimKey string, err error) {
+func (ctrl *PersistentVolumeController) recordMetric(opName, claimKey string, err error) {
 	operationTsKey := ctrl.createOperationTimestampCacheKey(opName, claimKey)
 	obj, exists := ctrl.operationTimestamps.Get(operationTsKey)
 	if !exists {
-		// in this case, an entry has not been created yet by either provisionClaim or deleteVolume
+		// in this case, an entry has not been created by either provisionClaim or reclaimVolume
 		// there are two scenarios:
 		// 1. volume already existed, thus syncUnboundClaim will *NOT* call provisionClaim
 		//    rather just bind it to a PVC, in this case, as the latency will not be reported
 		//    as it does not make much sense (will be 0). For this situation, a possible improvement
 		//    could be instead using claim's creationTimestamp in metadata, however will bring
 		//    in-consistency. Ignoring here for now
-		// 2. the plugin.IsMigratedToCSI() == false, thus provisionClaim will *NOT* create
-		//    an entry for metric recording, in this case, return directly
-		//
+		// 2. A PVC is not bound to any PV, when a PVC is deleted from apiserver, the only thing
+		//    left for the controller is to clean up locally cached PVC
+		// for both cases, return without recording any metric
 		return
 	}
 	operationTs, ok := obj.(operationTimestamp)
 	if !ok {
+		// remove the invalid cache
+		ctrl.operationTimestamps.Delete(operationTsKey)
 		klog.V(2).Infof("Cannot convert object from operationTimestamps cache to operationTimeStamp for volume claim key[%s], operation[%s]: %#v", claimKey, opName, obj)
 		return
 	}
-	// in case of error, report count instead of latency, handled by RecordVolumeOperationMetric
-	if err != nil {
-		// no timeTaken is needed
-		metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, 0.0, err)
-		util.RecordOperationMetric(operationTs.provisionerName, opName, operationTs.startTs, err)
-	} else {
-		util.RecordOperationMetric(operationTs.provisionerName, opName, operationTs.startTs, nil)
+	timeTaken := time.Since(operationTs.startTs).Seconds()
+	metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, timeTaken, err)
+	if err == nil {
 		// this is safe as the idempotency nature of storage operations
-		timeTaken := time.Since(operationTs.startTs).Seconds()
-		metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, timeTaken, nil)
-		// remove
+		// clean the cache as now the claim is bound to a PV
 		ctrl.operationTimestamps.Delete(operationTsKey)
 	}
 }
@@ -427,13 +423,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// On any error saving the volume or the claim, subsequent
 				// syncClaim will finish the binding.
 				// record count error for provisioning
-				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
+				ctrl.recordMetric("provision", claimToClaimKey(claim), err)
 				return err
 			}
 			// OBSERVATION: claim is "Bound", pv is "Bound"
 			// record end to end provisioning latency
 			// [Unit test 12-4]
-			ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
+			ctrl.recordMetric("provision", claimToClaimKey(claim), nil)
 			return nil
 		}
 	} else /* pvc.Spec.VolumeName != nil */ {
@@ -476,13 +472,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					// On any error saving the volume or the claim, subsequent
 					// syncClaim will finish the binding.
 					// record count error for provisioning
-					ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
+					ctrl.recordMetric("provision", claimToClaimKey(claim), err)
 					return err
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
 				// record end to end provisioning latency
 				// [Unit test 11-22]
-				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
+				ctrl.recordMetric("provision", claimToClaimKey(claim), nil)
 				return nil
 			} else if pvutil.IsVolumeBoundToClaim(volume, claim) {
 				// User asked for a PV that is claimed by this PVC
@@ -492,13 +488,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				// Finish the volume binding by adding claim UID.
 				if err = ctrl.bind(volume, claim); err != nil {
 					// record count error for provisioning
-					ctrl.recordCSIMetric("provision", claimToClaimKey(claim), err)
+					ctrl.recordMetric("provision", claimToClaimKey(claim), err)
 					return err
 				}
 				// OBSERVATION: pvc is "Bound", pv is "Bound"
 				// record end to end provisioning latency
 				// [Unit test 12-4]
-				ctrl.recordCSIMetric("provision", claimToClaimKey(claim), nil)
+				ctrl.recordMetric("provision", claimToClaimKey(claim), nil)
 				return nil
 			} else {
 				// User asked for a PV that is claimed by someone else
@@ -1110,11 +1106,21 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 // reclaimVolume implements volume.Spec.PersistentVolumeReclaimPolicy and
 // starts appropriate reclaim action.
 func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolume) error {
+	opKey := ctrl.createOperationTimestampCacheKey("delete", volume.Name)
+	_, exists := ctrl.operationTimestamps.Get(opKey)
 	switch volume.Spec.PersistentVolumeReclaimPolicy {
 	case v1.PersistentVolumeReclaimRetain:
+		if exists {
+			// do not record latency metric for deletion if policy is reclaim
+			ctrl.operationTimestamps.Delete(opKey)
+		}
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Retain, nothing to do", volume.Name)
 
 	case v1.PersistentVolumeReclaimRecycle:
+		if exists {
+			// do not record latency metric for deletion if policy is recycle
+			ctrl.operationTimestamps.Delete(opKey)
+		}
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Recycle", volume.Name)
 		opName := fmt.Sprintf("recycle-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
@@ -1125,11 +1131,12 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 	case v1.PersistentVolumeReclaimDelete:
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Delete", volume.Name)
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
-		startTime := time.Now()
 		ctrl.scheduleOperation(opName, func() error {
 			pluginName, err := ctrl.deleteVolumeOperation(volume)
-			timeTaken := time.Since(startTime).Seconds()
-			metrics.RecordVolumeOperationMetric(pluginName, "delete", timeTaken, err)
+			if err != nil {
+				// only report error count to "volume_operation_total_errors"
+				metrics.RecordVolumeOperationMetric(pluginName, "delete", 0.0, err)
+			}
 			return err
 		})
 
@@ -1403,6 +1410,12 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 		return pluginName, false, fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
 	}
 
+	// This metric recording is no longer necessary as a more accurate end
+	// to end latency should have been captured by "volume_operation_total_seconds"
+	// recorded when apiserver issues an "VolumeDeleted" event
+	// meanwhile, doDeleteVolume could be called from "provisionClaimOperation"
+	// when intree plugin faces error, which is not really a deletion operation
+	// leave it here for now for backward compatibility
 	opComplete := util.OperationCompleteHook(pluginName, "volume_delete")
 	err = deleter.Delete()
 	opComplete(&err)
@@ -1432,36 +1445,31 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		// retain the original behavior of returning nil from provisionClaim call
 		return nil
 	}
-	// for CSI provisioning, latency metric will be reported after final binding happened
-	if plugin == nil || plugin.IsMigratedToCSI() {
-		// TEST case [12-2] [12-3] [12-4] [11-22]
-		ctrl.scheduleOperation(opName, func() error {
-			// create an opTimestamps without assigning provisionerName to get the current timestamp
-			opTimestamps := newOperationTimestamp("")
-			provisionerName, err := ctrl.provisionClaimOperationCSI(claim, plugin, storageClass)
-			opTimestamps.provisionerName = provisionerName
-			// adding an entry into operationTimestamps for metrics reporting if there exists no
-			// such record for current claim regardless whether the operation returned error or not
-			// add an entry to mark the provisioning request start time
-			claimKey := claimToClaimKey(claim)
-			provisionStartTsKey := ctrl.createOperationTimestampCacheKey("provision", claimKey)
-			if _, exists := ctrl.operationTimestamps.Get(provisionStartTsKey); !exists {
-				ctrl.operationTimestamps.Add(provisionStartTsKey, opTimestamps)
-			}
-			return err
-		})
-	} else /* plugin != nil && !plugin.IsMigratedToCSI() */ {
-		// record provision start time for operation metric reporting
-		startTime := time.Now()
-		ctrl.scheduleOperation(opName, func() error {
-			pluginName, err := ctrl.provisionClaimOperation(claim, plugin, storageClass)
-			// TODO: timeTaken here ONLY counts the first-try time and may not necessarily
-			//       represent the real end to end latency of provisioning
-			timeTaken := time.Since(startTime).Seconds()
-			metrics.RecordVolumeOperationMetric(pluginName, "provision", timeTaken, err)
-			return err
-		})
-	}
+	ctrl.scheduleOperation(opName, func() error {
+		// create an opTimestamps without assigning provisionerName/pluginName to get the current timestamp
+		opTimestamps := newOperationTimestamp("")
+		var provisionerName string
+		var err error
+		if plugin == nil || plugin.IsMigratedToCSI() {
+			provisionerName, err = ctrl.provisionClaimOperationCSI(claim, plugin, storageClass)
+		} else {
+			provisionerName, err = ctrl.provisionClaimOperation(claim, plugin, storageClass)
+		}
+		// adding an entry into operationTimestamps for metrics reporting if there exists no
+		// such record for current claim regardless whether the operation returned error or not
+		// add an entry to mark the provisioning request start time
+		opTimestamps.provisionerName = provisionerName
+		claimKey := claimToClaimKey(claim)
+		provisionStartTsKey := ctrl.createOperationTimestampCacheKey("provision", claimKey)
+		if _, exists := ctrl.operationTimestamps.Get(provisionStartTsKey); !exists {
+			ctrl.operationTimestamps.Add(provisionStartTsKey, opTimestamps)
+		}
+		// if error happened, record an error count metric
+		if err != nil {
+			ctrl.recordMetric("provision", claimKey, err)
+		}
+		return err
+	})
 	return nil
 }
 
@@ -1566,6 +1574,12 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	}
 	allowedTopologies := storageClass.AllowedTopologies
 
+	// This metric recording is no longer necessary as a more accurate end
+	// to end latency should have been captured by "volume_operation_total_seconds"
+	// recorded when apiserver issues an "VolumeDeleted" event
+	// meanwhile, doDeleteVolume could be called from "provisionClaimOperation"
+	// when intree plugin faces error, which is not really a deletion operation
+	// leave it here for now for backward compatibility
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
 	volume, err = provisioner.Provision(selectedNode, allowedTopologies)
 	opComplete(&err)

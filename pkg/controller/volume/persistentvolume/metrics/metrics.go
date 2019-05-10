@@ -19,10 +19,10 @@ package metrics
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
-
 	"github.com/prometheus/client_golang/prometheus"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -56,7 +56,6 @@ type PVCLister interface {
 func Register(pvLister PVLister, pvcLister PVCLister) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
-		prometheus.MustRegister(volumeOperationMetric)
 		prometheus.MustRegister(volumeOperationErrorsMetric)
 	})
 }
@@ -92,12 +91,6 @@ var (
 		"Gauge measuring number of persistent volume claim currently unbound",
 		[]string{namespaceLabel}, nil)
 
-	volumeOperationMetric = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "volume_operation_total_seconds",
-			Help: "Total volume operation time",
-		},
-		[]string{"plugin_name", "operation_name"})
 	volumeOperationErrorsMetric = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "volume_operation_total_errors",
@@ -204,8 +197,10 @@ func RecordVolumeOperationMetric(pluginName, opName string, timeTaken float64, e
 		pluginName = "N/A"
 	}
 	if err != nil {
+		// record provisioning/deletion error count
 		volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
 		return
 	}
-	volumeOperationMetric.WithLabelValues(pluginName, opName).Observe(timeTaken)
+	// record operation end to end latency
+	util.RecordOperationMetric(pluginName, opName, timeTaken, err)
 }

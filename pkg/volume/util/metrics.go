@@ -56,7 +56,7 @@ var storageOperationStatusMetric = prometheus.NewCounterVec(
 
 var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Name:    "storage_operation_total_duration_seconds",
+		Name:    "volume_operation_total_seconds",
 		Help:    "Storage operation end to end duration in seconds",
 		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
 	},
@@ -74,15 +74,15 @@ func registerMetrics() {
 	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
-func RecordOperationMetric(plugin, operationName string, requestStartTime time.Time, err error) {
+func RecordOperationMetric(plugin, operationName string, secondsTaken float64, err error) {
+	status := statusSuccess
 	if err != nil {
 		storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
-		storageOperationStatusMetric.WithLabelValues(plugin, operationName, statusFailUnknown).Inc()
+		status = statusFailUnknown
 	} else {
-		totalTimeTaken := time.Since(requestStartTime).Seconds()
-		storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(totalTimeTaken)
-		storageOperationStatusMetric.WithLabelValues(plugin, operationName, statusSuccess).Inc()
+		storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
 	}
+	storageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
