@@ -513,21 +513,26 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 func (p *PriorityQueue) MoveAllToActiveQueue() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+	moved := false
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		pod := pInfo.pod
 		if p.isPodBackingOff(pod) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
 			}
-		} else {
-			if err := p.activeQ.Add(pInfo); err != nil {
-				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
-			}
+			continue
 		}
+		if err := p.activeQ.Add(pInfo); err != nil {
+			klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+			continue
+		}
+		moved = true
 	}
 	p.unschedulableQ.clear()
 	p.moveRequestCycle = p.schedulingCycle
-	p.cond.Broadcast()
+	if moved {
+		p.cond.Broadcast()
+	}
 }
 
 // NOTE: this function assumes lock has been acquired in caller
