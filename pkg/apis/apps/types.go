@@ -198,6 +198,7 @@ type StatefulSetStatus struct {
 	Conditions []StatefulSetCondition
 }
 
+// StatefulSetConditionType represents the type of state of a given StatefulSet.
 type StatefulSetConditionType string
 
 // TODO: Add valid condition types for Statefulsets.
@@ -262,6 +263,7 @@ type ControllerRevisionList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Deployment describes a Deployment object.
 type Deployment struct {
 	metav1.TypeMeta
 	// +optional
@@ -276,6 +278,7 @@ type Deployment struct {
 	Status DeploymentStatus
 }
 
+// DeploymentSpec specifies the desired behavior of a Deployment
 type DeploymentSpec struct {
 	// Number of desired pods. This is a pointer to distinguish between explicit
 	// zero and not specified. Defaults to 1.
@@ -329,8 +332,8 @@ type DeploymentSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
+// DEPRECATED.
 type DeploymentRollback struct {
 	metav1.TypeMeta
 	// Required: This must match the Name of a deployment.
@@ -342,7 +345,7 @@ type DeploymentRollback struct {
 	RollbackTo RollbackConfig
 }
 
-// DEPRECATED.
+// RollbackConfig is DEPRECATED.
 type RollbackConfig struct {
 	// The revision to rollback to. If set to 0, rollback to the last revision.
 	// +optional
@@ -356,6 +359,7 @@ const (
 	DefaultDeploymentUniqueLabelKey string = "pod-template-hash"
 )
 
+// DeploymentStrategy describes the strategy used for a Deployment.
 type DeploymentStrategy struct {
 	// Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
 	// +optional
@@ -370,6 +374,7 @@ type DeploymentStrategy struct {
 	RollingUpdate *RollingUpdateDeployment
 }
 
+// DeploymentStrategyType describes a type of deployment strategy.
 type DeploymentStrategyType string
 
 const (
@@ -409,6 +414,7 @@ type RollingUpdateDeployment struct {
 	MaxSurge intstr.IntOrString
 }
 
+// DeploymentStatus is the current status of a given Deployment.
 type DeploymentStatus struct {
 	// The generation observed by the deployment controller.
 	// +optional
@@ -446,6 +452,7 @@ type DeploymentStatus struct {
 	CollisionCount *int32
 }
 
+// DeploymentConditionType describes a type of deployment condition.
 type DeploymentConditionType string
 
 // These are valid conditions of a deployment.
@@ -481,6 +488,7 @@ type DeploymentCondition struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DeploymentList holds a list of deployments.
 type DeploymentList struct {
 	metav1.TypeMeta
 	// +optional
@@ -490,8 +498,9 @@ type DeploymentList struct {
 	Items []Deployment
 }
 
+// DaemonSetUpdateStrategy describes the strategy for updating a DaemonSet.
 type DaemonSetUpdateStrategy struct {
-	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
+	// Type  . Can be "RollingUpdate" or "OnDelete".
 	// Default is OnDelete.
 	// +optional
 	Type DaemonSetUpdateStrategyType
@@ -505,6 +514,7 @@ type DaemonSetUpdateStrategy struct {
 	RollingUpdate *RollingUpdateDaemonSet
 }
 
+// DaemonSetUpdateStrategyType is the type of dameonset update.
 type DaemonSetUpdateStrategyType string
 
 const (
@@ -623,6 +633,7 @@ type DaemonSetStatus struct {
 	Conditions []DaemonSetCondition
 }
 
+// DaemonSetConditionType is the type of DaemonSet condition
 type DaemonSetConditionType string
 
 // TODO: Add valid condition types of a DaemonSet.
@@ -667,6 +678,7 @@ type DaemonSet struct {
 
 const (
 	// DEPRECATED: DefaultDaemonSetUniqueLabelKey is used instead.
+
 	// DaemonSetTemplateGenerationKey is the key of the labels that is added
 	// to daemon set pods to distinguish between old and new pod templates
 	// during DaemonSet template update.
@@ -768,6 +780,7 @@ type ReplicaSetStatus struct {
 	Conditions []ReplicaSetCondition
 }
 
+// ReplicaSetConditionType is a type of replica set condition.
 type ReplicaSetConditionType string
 
 // These are valid conditions of a replica set.
