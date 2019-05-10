@@ -206,7 +206,11 @@ func (a admissionRequirementList) subtract(cache map[string]int64, pods ...*v1.P
 		newQuantity := req.quantity
 		for _, pod := range pods {
 			if cache != nil {
-				key := pod.GetGenerateName() + "-" + string(req.resourceName)
+				key := pod.GetSelfLink()
+				if len(key) == 0 {
+					key = pod.GetGenerateName()
+				}
+				key = key + "-" + string(req.resourceName)
 				if request, ok := cache[key]; ok {
 					newQuantity -= request
 				} else {
