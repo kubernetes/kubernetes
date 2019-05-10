@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 
@@ -229,6 +232,9 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 			if err := validateConvertedObject(original, unstructConverted); err != nil {
 				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
 			}
+			if err := restoreObjectMeta(original, unstructConverted); err != nil {
+				return nil, fmt.Errorf("invalid metadata in object at index %v: %v", convertedIndex, err)
+			}
 			convertedList.Items[i] = *unstructConverted
 		}
 		convertedList.SetAPIVersion(toGV.String())
@@ -262,22 +268,100 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	if err := validateConvertedObject(unstructIn, unstructConverted); err != nil {
 		return nil, fmt.Errorf("invalid converted object: %v", err)
 	}
+	if err := restoreObjectMeta(unstructIn, unstructConverted); err != nil {
+		return nil, fmt.Errorf("invalid metadata in converted object: %v", err)
+	}
 	return converted, nil
 }
 
-func validateConvertedObject(unstructIn, unstructOut *unstructured.Unstructured) error {
-	if e, a := unstructIn.GetKind(), unstructOut.GetKind(); e != a {
+// validateConvertedObject checks that ObjectMeta fields match, with the exception of
+// labels and annotations.
+func validateConvertedObject(in, out *unstructured.Unstructured) error {
+	if e, a := in.GetKind(), out.GetKind(); e != a {
 		return fmt.Errorf("must have the same kind: %v != %v", e, a)
 	}
-	if e, a := unstructIn.GetName(), unstructOut.GetName(); e != a {
+	if e, a := in.GetName(), out.GetName(); e != a {
 		return fmt.Errorf("must have the same name: %v != %v", e, a)
 	}
-	if e, a := unstructIn.GetNamespace(), unstructOut.GetNamespace(); e != a {
+	if e, a := in.GetNamespace(), out.GetNamespace(); e != a {
 		return fmt.Errorf("must have the same namespace: %v != %v", e, a)
 	}
-	if e, a := unstructIn.GetUID(), unstructOut.GetUID(); e != a {
+	if e, a := in.GetUID(), out.GetUID(); e != a {
 		return fmt.Errorf("must have the same UID: %v != %v", e, a)
 	}
+	return nil
+}
+
+// restoreObjectMeta deep-copies metadata from original into converted, while preserving labels and annotations from converted.
+func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
+	obj, found := converted.Object["metadata"]
+	if !found {
+		return fmt.Errorf("missing metadata in converted object")
+	}
+	responseMetaData, ok := obj.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid metadata of type %T in converted object", obj)
+	}
+
+	if _, ok := original.Object["metadata"]; !ok {
+		// the original will always have metadata. But just to be safe, let's clear in converted
+		// with an empty object instead of nil, to be able to add labels and annotations below.
+		converted.Object["metadata"] = map[string]interface{}{}
+	} else {
+		converted.Object["metadata"] = runtime.DeepCopyJSONValue(original.Object["metadata"])
+	}
+
+	obj = converted.Object["metadata"]
+	convertedMetaData, ok := obj.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid metadata of type %T in input object", obj)
+	}
+
+	for _, fld := range []string{"labels", "annotations"} {
+		obj, found := responseMetaData[fld]
+		if !found || obj == nil {
+			delete(convertedMetaData, fld)
+			continue
+		}
+		responseField, ok := obj.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid metadata.%s of type %T in converted object", fld, obj)
+		}
+
+		originalField, ok := convertedMetaData[fld].(map[string]interface{})
+		if !ok && convertedMetaData[fld] != nil {
+			return fmt.Errorf("invalid metadata.%s of type %T in original object", fld, convertedMetaData[fld])
+		}
+
+		somethingChanged := len(originalField) != len(responseField)
+		for k, v := range responseField {
+			if _, ok := v.(string); !ok {
+				return fmt.Errorf("metadata.%s[%s] must be a string, but is %T in converted object", fld, k, v)
+			}
+			if originalField[k] != interface{}(v) {
+				somethingChanged = true
+			}
+		}
+
+		if somethingChanged {
+			stringMap := make(map[string]string, len(responseField))
+			for k, v := range responseField {
+				stringMap[k] = v.(string)
+			}
+			var errs field.ErrorList
+			if fld == "labels" {
+				errs = metav1validation.ValidateLabels(stringMap, field.NewPath("metadata", "labels"))
+			} else {
+				errs = apivalidation.ValidateAnnotations(stringMap, field.NewPath("metadata", "annotation"))
+			}
+			if len(errs) > 0 {
+				return errs.ToAggregate()
+			}
+		}
+
+		convertedMetaData[fld] = responseField
+	}
+
 	return nil
 }
 
