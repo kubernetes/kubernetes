@@ -85,18 +85,18 @@ var _ = SIGDescribe("Events", func() {
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
 		ginkgo.By("retrieving the pod")
-		podWithUid, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		podWithUID, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		e2elog.Logf("%+v\n", podWithUid)
+		e2elog.Logf("%+v\n", podWithUID)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
 		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
-				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
@@ -115,7 +115,7 @@ var _ = SIGDescribe("Events", func() {
 		ginkgo.By("checking for kubelet event about the pod")
 		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
-				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
