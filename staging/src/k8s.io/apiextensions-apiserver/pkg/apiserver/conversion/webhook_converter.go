@@ -115,7 +115,7 @@ func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.Conv
 	listObj, isList := obj.(*unstructured.UnstructuredList)
 	var objects []runtime.RawExtension
 	if isList {
-		for i := 0; i < len(listObj.Items); i++ {
+		for i := range listObj.Items {
 			// Only sent item for conversion, if the apiVersion is different
 			if listObj.Items[i].GetAPIVersion() != apiVersion {
 				objects = append(objects, runtime.RawExtension{Object: &listObj.Items[i]})
@@ -199,33 +199,34 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	}
 
 	if isList {
+		// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
+		// The response list might be sparse because objects had the right version already.
 		convertedList := listObj.DeepCopy()
-		// Collection of items sent for conversion is different than list items
-		// because only items that needed conversion has been sent.
 		convertedIndex := 0
-		for i := 0; i < len(listObj.Items); i++ {
-			if listObj.Items[i].GetAPIVersion() == toGV.String() {
-				// This item has not been sent for conversion, skip it.
+		for i := range convertedList.Items {
+			original := &convertedList.Items[i]
+			if original.GetAPIVersion() == toGV.String() {
+				// This item has not been sent for conversion, and therefore does not show up in the response.
+				// convertedList has the right item already.
 				continue
 			}
 			converted, err := getRawExtensionObject(response.Response.ConvertedObjects[convertedIndex])
-			convertedIndex++
-			original := listObj.Items[i]
 			if err != nil {
 				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
 			}
-			if e, a := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); e != a {
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid groupVersion, e=%v, a=%v", convertedIndex, e, a)
+			convertedIndex++
+			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
+				return nil, fmt.Errorf("invalid converted object at index %v: invalid groupVersion, expected=%v, got=%v", convertedIndex, expected, got)
 			}
-			if e, a := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; e != a {
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid kind, e=%v, a=%v", convertedIndex, e, a)
+			if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
+				return nil, fmt.Errorf("invalid converted object at index %v: invalid kind, expected=%v, got=%v", convertedIndex, expected, got)
 			}
 			unstructConverted, ok := converted.(*unstructured.Unstructured)
 			if !ok {
 				// this should not happened
-				return nil, fmt.Errorf("CR conversion failed")
+				return nil, fmt.Errorf("invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", convertedIndex, converted)
 			}
-			if err := validateConvertedObject(&listObj.Items[i], unstructConverted); err != nil {
+			if err := validateConvertedObject(original, unstructConverted); err != nil {
 				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
 			}
 			convertedList.Items[i] = *unstructConverted
