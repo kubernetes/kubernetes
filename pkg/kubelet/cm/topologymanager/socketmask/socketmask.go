@@ -38,7 +38,7 @@ func (sm SocketMask) GetSocketMask(socketMaskInt64 [][]int64, maskHolder []strin
 		maskHolder = buildMaskHolder(socketMaskInt64)
 	}
 	klog.V(4).Infof("[socketmask] MaskHolder : %v", maskHolder)
-	klog.V(4).Infof("[socketmask] %v is passed into arrange function", socketMask)
+	klog.V(4).Infof("[socketmask] %v is passed into arrange function", socketMaskInt64)
 	arrangedMask := arrangeMask(socketMaskInt64)
 	newMask := getTopologyAffinity(arrangedMask, maskHolder)
 	klog.V(4).Infof("[socketmask] New Mask after getTopologyAffinity (new mask) : %v ", newMask)

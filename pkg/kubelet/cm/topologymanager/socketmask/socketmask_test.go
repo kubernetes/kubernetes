@@ -24,7 +24,7 @@ import (
 func TestGetSocketmask(t *testing.T) {
 	tcases := []struct {
 		name                    string
-		socketmask              []SocketMask
+		socketmask              [][]int64
 		maskholder              []string
 		count                   int
 		expectedMaskHolder      []string
@@ -32,7 +32,7 @@ func TestGetSocketmask(t *testing.T) {
 	}{
 		{
 			name:                    "Empty MaskHolder and count set as 0",
-			socketmask:              []SocketMask{{1, 0}, {0, 1}, {1, 1}},
+			socketmask:              [][]int64{{1, 0}, {0, 1}, {1, 1}},
 			maskholder:              []string{""},
 			count:                   0,
 			expectedMaskHolder:      []string{"10", "01", "11"},
@@ -40,7 +40,7 @@ func TestGetSocketmask(t *testing.T) {
 		},
 		{
 			name:                    "MaskHolder non zero, count set as 1",
-			socketmask:              []SocketMask{{1, 0}, {0, 1}, {1, 1}},
+			socketmask:              [][]int64{{1, 0}, {0, 1}, {1, 1}},
 			maskholder:              []string{"10", "01", "11"},
 			count:                   1,
 			expectedMaskHolder:      []string{"10", "01", "11"},
@@ -49,7 +49,7 @@ func TestGetSocketmask(t *testing.T) {
 
 		{
 			name:                    "Empty MaskHolder and count set as 0",
-			socketmask:              []SocketMask{{0, 1}, {1, 1}},
+			socketmask:              [][]int64{{0, 1}, {1, 1}},
 			maskholder:              []string{""},
 			count:                   0,
 			expectedMaskHolder:      []string{"01", "11"},
@@ -57,7 +57,7 @@ func TestGetSocketmask(t *testing.T) {
 		},
 		{
 			name:                    "MaskHolder non zero, count set as 1",
-			socketmask:              []SocketMask{{0, 1}, {1, 1}},
+			socketmask:              [][]int64{{0, 1}, {1, 1}},
 			maskholder:              []string{"01", "11"},
 			count:                   1,
 			expectedMaskHolder:      []string{"01", "11"},
