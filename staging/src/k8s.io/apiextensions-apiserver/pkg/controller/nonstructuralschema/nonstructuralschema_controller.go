@@ -18,7 +18,6 @@ package nonstructuralschema
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -114,12 +113,6 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 	if len(allErrs) == 0 {
 		return nil
 	}
-
-	// sort error messages. Otherwise, the condition message will change every sync due to
-	// randomized map iteration.
-	sort.Slice(allErrs, func(i, j int) bool {
-		return allErrs[i].Error() < allErrs[j].Error()
-	})
 
 	cond.Status = apiextensions.ConditionTrue
 	cond.Reason = "Violations"

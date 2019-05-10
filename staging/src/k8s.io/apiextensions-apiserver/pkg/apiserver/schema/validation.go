@@ -18,6 +18,7 @@ package schema
 
 import (
 	"reflect"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -61,6 +62,12 @@ func ValidateStructural(s *Structural, fldPath *field.Path) field.ErrorList {
 
 	allErrs = append(allErrs, validateStructuralInvariants(s, rootLevel, fldPath)...)
 	allErrs = append(allErrs, validateStructuralCompleteness(s, fldPath)...)
+
+	// sort error messages. Otherwise, the errors slice will change every time due to
+	// maps in the types and randomized iteration.
+	sort.Slice(allErrs, func(i, j int) bool {
+		return allErrs[i].Error() < allErrs[j].Error()
+	})
 
 	return allErrs
 }
