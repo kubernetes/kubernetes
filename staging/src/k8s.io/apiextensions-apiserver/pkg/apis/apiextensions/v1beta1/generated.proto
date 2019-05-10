@@ -449,6 +449,7 @@ message JSONSchemaProps {
   // in the validation schema. This affects fields recursively,
   // but switches back to normal pruning behaviour if nested
   // properties or additionalProperties are specified in the schema.
+  // This can either be true or undefined. False is forbidden.
   optional bool xKubernetesPreserveUnknownFields = 38;
 
   // x-kubernetes-embedded-resource defines that the value is an

@@ -241,11 +241,19 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 		return nil, nil
 	}
 
-	return &Extensions{
-		XPreserveUnknownFields: s.XPreserveUnknownFields,
-		XEmbeddedResource:      s.XEmbeddedResource,
-		XIntOrString:           s.XIntOrString,
-	}, nil
+	ret := &Extensions{
+		XEmbeddedResource: s.XEmbeddedResource,
+		XIntOrString:      s.XIntOrString,
+	}
+
+	if s.XPreserveUnknownFields != nil {
+		if !*s.XPreserveUnknownFields {
+			return nil, fmt.Errorf("'x-kubernetes-preserve-unknown-fields' must be true or undefined")
+		}
+		ret.XPreserveUnknownFields = true
+	}
+
+	return ret, nil
 }
 
 // validateUnsupportedFields checks that those fields rejected by validation are actually unset.

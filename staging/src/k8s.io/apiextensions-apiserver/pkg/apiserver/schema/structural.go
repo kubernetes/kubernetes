@@ -66,6 +66,8 @@ type Extensions struct {
 	// in the validation schema. This affects fields recursively,
 	// but switches back to normal pruning behaviour if nested
 	// properties or additionalProperties are specified in the schema.
+	// False means that the pruning behaviour is inherited from the parent.
+	// False does not mean to activate pruning.
 	XPreserveUnknownFields bool
 
 	// x-kubernetes-embedded-resource defines that the value is an
