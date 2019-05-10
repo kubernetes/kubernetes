@@ -1479,6 +1479,19 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		}
 	}
 
+	if csi.ControllerExpandSecretRef != nil {
+		if len(csi.ControllerExpandSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.ControllerExpandSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
 	if csi.NodePublishSecretRef != nil {
 		if len(csi.NodePublishSecretRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
@@ -1772,12 +1785,17 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.ErrorList {
 	allErrs := ValidatePersistentVolume(newPv)
 
+	// if oldPV does not have ControllerExpandSecretRef then allow it to be set
+	if (oldPv.Spec.CSI != nil && oldPv.Spec.CSI.ControllerExpandSecretRef == nil) &&
+		(newPv.Spec.CSI != nil && newPv.Spec.CSI.ControllerExpandSecretRef != nil) {
+		newPv = newPv.DeepCopy()
+		newPv.Spec.CSI.ControllerExpandSecretRef = nil
+	}
+
 	// PersistentVolumeSource should be immutable after creation.
 	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
 	}
-	newPv.Status = oldPv.Status
-
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
