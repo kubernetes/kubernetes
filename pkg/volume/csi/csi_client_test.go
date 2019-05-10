@@ -264,7 +264,7 @@ func setupClientWithExpansion(t *testing.T, stageUnstageSet bool, expansionSet b
 }
 
 func setupClientWithVolumeStats(t *testing.T, volumeStatsSet bool) csiClient {
-	return newFakeCsiDriverClient(t, volumeStatsSet)
+	return newFakeCsiDriverClientWithVolumeStats(t, volumeStatsSet)
 }
 
 func checkErr(t *testing.T, expectedAnError bool, actualError error) {
@@ -568,8 +568,6 @@ func TestNodeExpandVolume(t *testing.T) {
 		}
 	}
 }
-
-
 
 type VolumeStatsOptions struct {
 	VolumeSpec *volume.Spec
