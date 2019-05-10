@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -3560,8 +3560,24 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 	if restartPolicy == core.RestartPolicyAlways {
 		return allErrs
 	}
+
+	// container statuses for a given container should never go away
+	for _, oldStatus := range oldStatuses {
+		found := false
+		for _, newStatus := range newStatuses {
+			if oldStatus.Name == newStatus.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			allErrs = append(allErrs, field.Forbidden(fldpath, fmt.Sprintf("missing status for %q", oldStatus.Name)))
+		}
+	}
+
 	for i, oldStatus := range oldStatuses {
 		// Skip any container that is not terminated
+		// this allows us to transition from waiting to running and running to waiting.  Do we want to go from running back to waiting?
 		if oldStatus.State.Terminated == nil {
 			continue
 		}
@@ -3570,9 +3586,22 @@ func ValidateContainerStateTransition(newStatuses, oldStatuses []core.ContainerS
 			continue
 		}
 		for _, newStatus := range newStatuses {
-			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
+			if oldStatus.Name != newStatus.Name {
+				continue
+			}
+			if newStatus.State.Terminated == nil {
 				allErrs = append(allErrs, field.Forbidden(fldpath.Index(i).Child("state"), "may not be transitioned to non-terminated state"))
 			}
+			if newStatus.State.Waiting != nil {
+				allErrs = append(allErrs, field.Forbidden(fldpath.Index(i).Child("state"), "may not go back to waiting"))
+			}
+			if newStatus.State.Running != nil {
+				allErrs = append(allErrs, field.Forbidden(fldpath.Index(i).Child("state"), "may not go back to running"))
+			}
+
+			// TODO this allows us to set Image, ImageID, and ContainerID back to empty after they had a value.  Is this intentional?  Should it accompanied by a state change?
+			// TODO this allows restartCount to move backwards.  Is this intentional?
+			// TODO this allows us to be waiting, terminated, and running all at the same time.  Is this expected?
 		}
 	}
 	return allErrs
