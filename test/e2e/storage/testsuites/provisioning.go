@@ -483,7 +483,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	// Wait for ClaimProvisionTimeout (across all PVCs in parallel) and make sure the phase did not become Bound i.e. the Wait errors out
 	By("checking the claims are in pending state")
 	err = framework.WaitForPersistentVolumeClaimsPhase(v1.ClaimBound, t.Client, namespace, claimNames, 2*time.Second /* Poll */, framework.ClaimProvisionShortTimeout, true)
-	Expect(err).To(HaveOccurred())
+	framework.ExpectError(err)
 	verifyPVCsPending(t.Client, createdClaims)
 
 	By("creating a pod referring to the claims")

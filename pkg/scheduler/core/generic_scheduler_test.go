@@ -217,7 +217,7 @@ func TestSelectHost(t *testing.T) {
 }
 
 func TestGenericScheduler(t *testing.T) {
-	algorithmpredicates.SetPredicatesOrdering(order)
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	tests := []struct {
 		name                     string
 		predicates               map[string]algorithmpredicates.FitPredicate
@@ -479,7 +479,6 @@ func TestGenericScheduler(t *testing.T) {
 
 // makeScheduler makes a simple genericScheduler for testing.
 func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes []*v1.Node) *genericScheduler {
-	algorithmpredicates.SetPredicatesOrdering(order)
 	cache := internalcache.New(time.Duration(0), wait.NeverStop)
 	fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 	for _, n := range nodes {
@@ -503,6 +502,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 }
 
 func TestFindFitAllError(t *testing.T) {
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	predicates := map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
@@ -531,6 +531,7 @@ func TestFindFitAllError(t *testing.T) {
 }
 
 func TestFindFitSomeError(t *testing.T) {
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	predicates := map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate}
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
@@ -846,7 +847,7 @@ var startTime20190107 = metav1.Date(2019, 1, 7, 1, 1, 1, 0, time.UTC)
 // TestSelectNodesForPreemption tests selectNodesForPreemption. This test assumes
 // that podsFitsOnNode works correctly and is tested separately.
 func TestSelectNodesForPreemption(t *testing.T) {
-	algorithmpredicates.SetPredicatesOrdering(order)
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	tests := []struct {
 		name                 string
 		predicates           map[string]algorithmpredicates.FitPredicate
@@ -1005,7 +1006,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 // TestPickOneNodeForPreemption tests pickOneNodeForPreemption.
 func TestPickOneNodeForPreemption(t *testing.T) {
-	algorithmpredicates.SetPredicatesOrdering(order)
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	tests := []struct {
 		name       string
 		predicates map[string]algorithmpredicates.FitPredicate
@@ -1321,6 +1322,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 }
 
 func TestPreempt(t *testing.T) {
+	defer algorithmpredicates.SetPredicatesOrderingDuringTest(order)()
 	failedPredMap := FailedPredicateMap{
 		"machine1": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.NewInsufficientResourceError(v1.ResourceMemory, 1000, 500, 300)},
 		"machine2": []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrDiskConflict},

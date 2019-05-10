@@ -125,13 +125,13 @@ func (rl *respLogger) StacktraceWhen(pred StacktracePred) *respLogger {
 // StatusIsNot returns a StacktracePred which will cause stacktraces to be logged
 // for any status *not* in the given list.
 func StatusIsNot(statuses ...int) StacktracePred {
+	statusesNoTrace := map[int]bool{}
+	for _, s := range statuses {
+		statusesNoTrace[s] = true
+	}
 	return func(status int) bool {
-		for _, s := range statuses {
-			if status == s {
-				return false
-			}
-		}
-		return true
+		_, ok := statusesNoTrace[status]
+		return !ok
 	}
 }
 

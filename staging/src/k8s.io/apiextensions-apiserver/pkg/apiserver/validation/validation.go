@@ -194,6 +194,16 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		}
 	}
 
+	if in.XPreserveUnknownFields {
+		out.VendorExtensible.AddExtension("x-kubernetes-preserve-unknown-fields", true)
+	}
+	if in.XEmbeddedResource {
+		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
+	}
+	if in.XIntOrString {
+		out.VendorExtensible.AddExtension("x-kubernetes-int-or-string", true)
+	}
+
 	return nil
 }
 

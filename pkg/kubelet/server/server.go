@@ -837,19 +837,19 @@ func isLongRunningRequest(path string) bool {
 	return ok
 }
 
+var statusesNoTracePred = httplog.StatusIsNot(
+	http.StatusOK,
+	http.StatusFound,
+	http.StatusMovedPermanently,
+	http.StatusTemporaryRedirect,
+	http.StatusBadRequest,
+	http.StatusNotFound,
+	http.StatusSwitchingProtocols,
+)
+
 // ServeHTTP responds to HTTP requests on the Kubelet.
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	defer httplog.NewLogged(req, &w).StacktraceWhen(
-		httplog.StatusIsNot(
-			http.StatusOK,
-			http.StatusFound,
-			http.StatusMovedPermanently,
-			http.StatusTemporaryRedirect,
-			http.StatusBadRequest,
-			http.StatusNotFound,
-			http.StatusSwitchingProtocols,
-		),
-	).Log()
+	defer httplog.NewLogged(req, &w).StacktraceWhen(statusesNoTracePred).Log()
 
 	// monitor http requests
 	var serverType string

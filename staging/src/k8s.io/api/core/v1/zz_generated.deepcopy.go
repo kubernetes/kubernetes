@@ -237,6 +237,11 @@ func (in *CSIPersistentVolumeSource) DeepCopyInto(out *CSIPersistentVolumeSource
 		*out = new(SecretReference)
 		**out = **in
 	}
+	if in.ControllerExpandSecretRef != nil {
+		in, out := &in.ControllerExpandSecretRef, &out.ControllerExpandSecretRef
+		*out = new(SecretReference)
+		**out = **in
+	}
 	return
 }
 
