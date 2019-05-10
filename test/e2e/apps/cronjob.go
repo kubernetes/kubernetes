@@ -91,7 +91,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no jobs are scheduled")
 		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, false)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
@@ -128,7 +128,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no more jobs are scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 2)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -183,7 +183,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no unexpected event has happened")
 		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -213,7 +213,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 
 		ginkgo.By("Ensuring the job is not in the cronjob active list")
