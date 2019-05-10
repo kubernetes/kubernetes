@@ -127,7 +127,7 @@ github.com/bazelbuild/buildtools/file
 github.com/bazelbuild/buildtools/lang
 github.com/bazelbuild/buildtools/tables
 github.com/bazelbuild/buildtools/wspace
-# github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 => github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1
+# github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 => github.com/beorn7/perks v0.0.0-20160804104726-4c0e84591b9a
 github.com/beorn7/perks/quantile
 # github.com/blang/semver v3.5.0+incompatible => github.com/blang/semver v3.5.0+incompatible
 github.com/blang/semver
