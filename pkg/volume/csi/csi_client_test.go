@@ -82,10 +82,10 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 	}
 
 	resp, err := c.nodeClient.NodeGetVolumeStats(ctx, req)
-	c.t.Logf("Response: %v", resp)
+	c.t.Logf("Response asdasd: %v", resp)
 
 	usages := resp.GetUsage()
-	var ucb *volume.Metrics
+	 ucb := &volume.Metrics{}
 	if usages == nil {
 		return nil, nil
 	}
@@ -93,7 +93,7 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		unit = usage.GetUnit()
 		switch unit.String() {
 		case "BYTES":
-			ucb.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
+			ucb.Available = resource.NewQuantity(usage.Available, resource.BinarySI)
 			ucb.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
 			ucb.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
 		case "INODES":
@@ -105,6 +105,8 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		}
 
 	}
+
+	c.t.Logf("ucb: %v", ucb)
 	return ucb, nil
 
 	//return resp, err
@@ -723,20 +725,28 @@ func TestClientNodeGetVolumeStats(t *testing.T) {
 	for _, tc := range testCases {
 		t.Logf("test case: %s", tc.name)
 		fakeCloser := fake.NewCloser(t)
-		client := &csiDriverClient{
+		/*client := &csiDriverClient{
 			driverName: "Fake Driver Name",
 			nodeV1ClientCreator: func(addr csiAddr) (csipbv1.NodeClient, io.Closer, error) {
-				nodeClient := fake.NewNodeClientWithVolumeStats(true /* VolumeStatsCapable */)
+				nodeClient := fake.NewNodeClientWithVolumeStats(true )
 				nodeClient.SetNextError(tc.err)
 				nodeClient.SetNodeVolumeStatsResp(&csipbv1.NodeGetVolumeStatsResponse{
 					Usage: usagePtrArr,
 				})
 				return nodeClient, fakeCloser, nil
 			},
-		}
+		} */
+		client := newFakeCsiDriverClientWithVolumeStats(t, true)
+		client.nodeClient = fake.NewNodeClientWithVolumeStats(true)
+		client.nodeClient.SetNodeVolumeStatsResp(&csipbv1.NodeGetVolumeStatsResponse{
+			Usage: usagePtrArr,
+		})
+		res, err := client.NodeGetVolumeStats(context.Background(), "volume", "/bar")
 
-		_, err := client.NodeGetVolumeStats(context.Background(), "fakeVolume", "/bar")
+		t.Errorf("Final response: %+v", res)
 		checkErr(t, tc.mustFail, err)
+
+	
 
 		if !tc.mustFail {
 			fakeCloser.Check()
