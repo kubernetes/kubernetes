@@ -274,7 +274,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %s", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-rolling-update-deployment"
@@ -350,14 +350,14 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, "cleanup-pod", false, replicas)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %v", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-cleanup-deployment"
 	e2elog.Logf("Creating deployment %s", deploymentName)
 
 	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to query for pods: %v", err)
+	framework.ExpectNoError(err, "Failed to query for pods: %v", err)
 
 	options := metav1.ListOptions{
 		ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -420,7 +420,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %v", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Wait for replica set to become ready before adopting it.
 	e2elog.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
@@ -803,7 +803,7 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 
 	ginkgo.By("Wait for the ReplicaSet to be orphaned")
 	err = wait.Poll(dRetryPeriod, dRetryTimeout, waitDeploymentReplicaSetsOrphaned(c, ns, podLabels))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for Deployment ReplicaSet to be orphaned")
+	framework.ExpectNoError(err, "error waiting for Deployment ReplicaSet to be orphaned")
 
 	deploymentName = "test-adopt-deployment"
 	e2elog.Logf("Creating Deployment %q to adopt the ReplicaSet", deploymentName)
@@ -852,7 +852,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	// Verify that the required pods have come up.
 	e2elog.Logf("Waiting for all required pods to come up")
 	err = framework.VerifyPodsRunning(c, ns, NginxImageName, false, *(deployment.Spec.Replicas))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %v", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	e2elog.Logf("Waiting for deployment %q to complete", deployment.Name)
 	gomega.Expect(e2edeploy.WaitForDeploymentComplete(c, deployment)).NotTo(gomega.HaveOccurred())
