@@ -346,7 +346,7 @@ func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework)
 
 func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	config, err := framework.LoadConfig()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "unable to get base config")
+	framework.ExpectNoError(err, "unable to get base config")
 
 	ginkgo.By("Creating the pod")
 	pod := pfPod("def", "10", "10", "100", fmt.Sprintf("%s", bindAddress))

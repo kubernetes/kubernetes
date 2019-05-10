@@ -69,13 +69,13 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	ginkgo.AfterEach(func() {
 		// Clean up
 		daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "unable to dump DaemonSets")
+		framework.ExpectNoError(err, "unable to dump DaemonSets")
 		if daemonsets != nil && len(daemonsets.Items) > 0 {
 			for _, ds := range daemonsets.Items {
 				ginkgo.By(fmt.Sprintf("Deleting DaemonSet %q", ds.Name))
 				framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, extensionsinternal.Kind("DaemonSet"), f.Namespace.Name, ds.Name))
 				err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, &ds))
-				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to be reaped")
+				framework.ExpectNoError(err, "error waiting for daemon pod to be reaped")
 			}
 		}
 		if daemonsets, err := f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
@@ -128,7 +128,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 		err = checkDaemonStatus(f, dsName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -138,7 +138,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to revive")
+		framework.ExpectNoError(err, "error waiting for daemon pod to revive")
 	})
 
 	/*
@@ -157,24 +157,24 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Initially, daemon pods should not be running on any nodes.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
+		framework.ExpectNoError(err, "error waiting for daemon pods to be running on no nodes")
 
 		ginkgo.By("Change node label to blue, check that daemon pod is launched.")
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error setting labels on node")
+		framework.ExpectNoError(err, "error setting labels on node")
 		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
 		gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, ds, []string{newNode.Name}))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
 		err = checkDaemonStatus(f, dsName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Update the node label to green, and wait for daemons to be unscheduled")
 		nodeSelector[daemonsetColorLabel] = "green"
 		greenNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error removing labels on node")
+		framework.ExpectNoError(err, "error removing labels on node")
 		gomega.Expect(wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, ds))).
 			NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 
@@ -182,11 +182,11 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"nodeSelector":{"%s":"%s"}}},"updateStrategy":{"type":"RollingUpdate"}}}`,
 			daemonsetColorLabel, greenNode.Labels[daemonsetColorLabel])
 		ds, err = c.AppsV1().DaemonSets(ns).Patch(dsName, types.StrategicMergePatchType, []byte(patch))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error patching daemon set")
+		framework.ExpectNoError(err, "error patching daemon set")
 		daemonSetLabels, _ = separateDaemonSetNodeLabels(greenNode.Labels)
 		gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, ds, []string{greenNode.Name}))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
 		err = checkDaemonStatus(f, dsName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	})
@@ -220,23 +220,23 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Initially, daemon pods should not be running on any nodes.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
+		framework.ExpectNoError(err, "error waiting for daemon pods to be running on no nodes")
 
 		ginkgo.By("Change node label to blue, check that daemon pod is launched.")
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">", 0))
 		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error setting labels on node")
+		framework.ExpectNoError(err, "error setting labels on node")
 		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
 		gomega.Expect(len(daemonSetLabels)).To(gomega.Equal(1))
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, ds, []string{newNode.Name}))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+		framework.ExpectNoError(err, "error waiting for daemon pods to be running on new nodes")
 		err = checkDaemonStatus(f, dsName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		ginkgo.By("Remove the node label and wait for daemons to be unscheduled")
 		_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error removing labels on node")
+		framework.ExpectNoError(err, "error removing labels on node")
 		gomega.Expect(wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, ds))).
 			NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
 	})
@@ -254,7 +254,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 		err = checkDaemonStatus(f, dsName)
 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -264,13 +264,13 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		pod.ResourceVersion = ""
 		pod.Status.Phase = v1.PodFailed
 		_, err = c.CoreV1().Pods(ns).UpdateStatus(&pod)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error failing a daemon pod")
+		framework.ExpectNoError(err, "error failing a daemon pod")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to revive")
+		framework.ExpectNoError(err, "error waiting for daemon pod to revive")
 
 		ginkgo.By("Wait for the failed daemon pod to be completely deleted.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, waitFailedDaemonPodDeleted(c, &pod))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for the failed daemon pod to be completely deleted")
+		framework.ExpectNoError(err, "error waiting for the failed daemon pod to be completely deleted")
 	})
 
 	// This test should not be added to conformance. We will consider deprecating OnDelete when the
@@ -286,7 +286,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 
 		// Check history and labels
 		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
@@ -308,7 +308,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Check that daemon pods are still running on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 
 		// Check history and labels
 		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
@@ -335,7 +335,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 
 		// Check history and labels
 		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
@@ -364,7 +364,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Check that daemon pods are still running on every node of the cluster.")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 
 		// Check history and labels
 		ds, err = c.AppsV1().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
@@ -393,7 +393,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		e2elog.Logf("Check that daemon pods launch on every node of the cluster")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for daemon pod to start")
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
 
 		e2elog.Logf("Update the DaemonSet to trigger a rollout")
 		// We use a nonexistent image here, so that we make sure it won't finish
@@ -741,7 +741,7 @@ func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]st
 		return false, nil
 	}
 	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, listHistoryFn)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for controllerrevisions to be created")
+	framework.ExpectNoError(err, "error waiting for controllerrevisions to be created")
 }
 
 func listDaemonHistories(c clientset.Interface, ns string, label map[string]string) *apps.ControllerRevisionList {

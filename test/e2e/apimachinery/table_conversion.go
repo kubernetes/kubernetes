@@ -56,11 +56,11 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		e2elog.Logf("Creating pod %s", podName)
 
 		_, err := c.CoreV1().Pods(ns).Create(newTablePod(podName))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod %s in namespace: %s", podName, ns)
+		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, ns)
 
 		table := &metav1beta1.Table{}
 		err = c.CoreV1().RESTClient().Get().Resource("pods").Namespace(ns).Name(podName).SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get pod %s in Table form in namespace: %s", podName, ns)
+		framework.ExpectNoError(err, "failed to get pod %s in Table form in namespace: %s", podName, ns)
 		e2elog.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">", 2))
@@ -108,7 +108,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			VersionedParams(&metav1.ListOptions{Limit: 2}, metav1.ParameterCodec).
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get pod templates in Table form in namespace: %s", ns)
+		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		gomega.Expect(len(pagedTable.Rows)).To(gomega.Equal(2))
 		gomega.Expect(pagedTable.ResourceVersion).ToNot(gomega.Equal(""))
 		gomega.Expect(pagedTable.SelfLink).ToNot(gomega.Equal(""))
@@ -120,7 +120,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			VersionedParams(&metav1.ListOptions{Continue: pagedTable.Continue}, metav1.ParameterCodec).
 			SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").
 			Do().Into(pagedTable)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get pod templates in Table form in namespace: %s", ns)
+		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		gomega.Expect(len(pagedTable.Rows)).To(gomega.BeNumerically(">", 0))
 		gomega.Expect(pagedTable.Rows[0].Cells[0]).To(gomega.Equal("template-0002"))
 	})
@@ -130,7 +130,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 
 		table := &metav1beta1.Table{}
 		err := c.CoreV1().RESTClient().Get().Resource("nodes").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Do().Into(table)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get nodes in Table form across all namespaces")
+		framework.ExpectNoError(err, "failed to get nodes in Table form across all namespaces")
 		e2elog.Logf("Table: %#v", table)
 
 		gomega.Expect(len(table.ColumnDefinitions)).To(gomega.BeNumerically(">=", 2))
@@ -168,7 +168,7 @@ func printTable(table *metav1beta1.Table) string {
 	tw := tabwriter.NewWriter(buf, 5, 8, 1, ' ', 0)
 	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	err := printer.PrintObj(table, tw)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to print table: %+v", table)
+	framework.ExpectNoError(err, "failed to print table: %+v", table)
 	tw.Flush()
 	return buf.String()
 }
