@@ -29,6 +29,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
+		// WARNING: do not replace this with Structural.ToGoOpenAPI until it supports nullable.
 		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
 			return nil, nil, err
 		}
