@@ -413,12 +413,6 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 	return nil
 }
 
-// clean prevents path traversals by stripping them out.
-// This is adapted from https://golang.org/src/net/http/fs.go#L74
-func clean(fileName string) string {
-	return path.Clean(string(os.PathSeparator) + fileName)
-}
-
 func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)

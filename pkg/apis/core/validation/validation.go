@@ -1479,6 +1479,19 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 		}
 	}
 
+	if csi.ControllerExpandSecretRef != nil {
+		if len(csi.ControllerExpandSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.ControllerExpandSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
 	if csi.NodePublishSecretRef != nil {
 		if len(csi.NodePublishSecretRef.Name) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("nodePublishSecretRef ", "name"), ""))
@@ -1770,15 +1783,19 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 // ValidatePersistentVolumeUpdate tests to see if the update is legal for an end user to make.
 // newPv is updated with fields that cannot be changed.
 func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = ValidatePersistentVolume(newPv)
+	allErrs := ValidatePersistentVolume(newPv)
+
+	// if oldPV does not have ControllerExpandSecretRef then allow it to be set
+	if (oldPv.Spec.CSI != nil && oldPv.Spec.CSI.ControllerExpandSecretRef == nil) &&
+		(newPv.Spec.CSI != nil && newPv.Spec.CSI.ControllerExpandSecretRef != nil) {
+		newPv = newPv.DeepCopy()
+		newPv.Spec.CSI.ControllerExpandSecretRef = nil
+	}
 
 	// PersistentVolumeSource should be immutable after creation.
 	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
 	}
-	newPv.Status = oldPv.Status
-
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
@@ -2293,46 +2310,44 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	devicepath := sets.NewString()
 	devicename := sets.NewString()
 
-	if devices != nil {
-		for i, dev := range devices {
-			idxPath := fldPath.Index(i)
-			devName := dev.Name
-			devPath := dev.DevicePath
-			didMatch, isPVC := isMatchedDevice(devName, volumes)
-			if len(devName) == 0 {
-				allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
-			}
-			if devicename.Has(devName) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must be unique"))
-			}
-			// Must be PersistentVolumeClaim volume source
-			if didMatch && !isPVC {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "can only use volume source type of PersistentVolumeClaim for block mode"))
-			}
-			if !didMatch {
-				allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), devName))
-			}
-			if len(devPath) == 0 {
-				allErrs = append(allErrs, field.Required(idxPath.Child("devicePath"), ""))
-			}
-			if devicepath.Has(devPath) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must be unique"))
-			}
-			if len(devPath) > 0 && len(validatePathNoBacksteps(devPath, fldPath.Child("devicePath"))) > 0 {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "can not contain backsteps ('..')"))
-			} else {
-				devicepath.Insert(devPath)
-			}
-			// check for overlap with VolumeMount
-			if deviceNameAlreadyExists(devName, volmounts) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must not already exist in volumeMounts"))
-			}
-			if devicePathAlreadyExists(devPath, volmounts) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must not already exist as a path in volumeMounts"))
-			}
-			if len(devName) > 0 {
-				devicename.Insert(devName)
-			}
+	for i, dev := range devices {
+		idxPath := fldPath.Index(i)
+		devName := dev.Name
+		devPath := dev.DevicePath
+		didMatch, isPVC := isMatchedDevice(devName, volumes)
+		if len(devName) == 0 {
+			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
+		}
+		if devicename.Has(devName) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must be unique"))
+		}
+		// Must be PersistentVolumeClaim volume source
+		if didMatch && !isPVC {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "can only use volume source type of PersistentVolumeClaim for block mode"))
+		}
+		if !didMatch {
+			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), devName))
+		}
+		if len(devPath) == 0 {
+			allErrs = append(allErrs, field.Required(idxPath.Child("devicePath"), ""))
+		}
+		if devicepath.Has(devPath) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must be unique"))
+		}
+		if len(devPath) > 0 && len(validatePathNoBacksteps(devPath, fldPath.Child("devicePath"))) > 0 {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "can not contain backsteps ('..')"))
+		} else {
+			devicepath.Insert(devPath)
+		}
+		// check for overlap with VolumeMount
+		if deviceNameAlreadyExists(devName, volmounts) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must not already exist in volumeMounts"))
+		}
+		if devicePathAlreadyExists(devPath, volmounts) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must not already exist as a path in volumeMounts"))
+		}
+		if len(devName) > 0 {
+			devicename.Insert(devName)
 		}
 	}
 	return allErrs
@@ -3186,7 +3201,7 @@ func validatePreferAvoidPodsEntry(avoidPodEntry core.PreferAvoidPodsEntry, fldPa
 	if avoidPodEntry.PodSignature.PodController == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("PodSignature"), ""))
 	} else {
-		if *(avoidPodEntry.PodSignature.PodController.Controller) != true {
+		if !*(avoidPodEntry.PodSignature.PodController.Controller) {
 			allErrors = append(allErrors,
 				field.Invalid(fldPath.Child("PodSignature").Child("PodController").Child("Controller"),
 					*(avoidPodEntry.PodSignature.PodController.Controller), "must point to a controller"))

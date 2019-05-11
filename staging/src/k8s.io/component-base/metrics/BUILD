@@ -10,9 +10,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "counter.go",
+        "gauge.go",
+        "histogram.go",
         "metric.go",
         "opts.go",
         "registry.go",
+        "summary.go",
         "version_parser.go",
         "wrappers.go",
     ],
@@ -31,7 +34,10 @@ go_test(
     name = "go_default_test",
     srcs = [
         "counter_test.go",
+        "gauge_test.go",
+        "histogram_test.go",
         "registry_test.go",
+        "summary_test.go",
         "version_parser_test.go",
     ],
     embed = [":go_default_library"],

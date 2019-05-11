@@ -194,9 +194,7 @@ pkg/master/tunneler
 pkg/proxy
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
-pkg/proxy/iptables
 pkg/proxy/userspace
-pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
