@@ -72,7 +72,6 @@ func TestRoundTrip(t *testing.T) {
 		if err := json.Unmarshal(openAPIJSON, &j); err != nil {
 			t.Fatal(err)
 		}
-		j = convertNullTypeToNullable(j)
 		j = stripIntOrStringType(j)
 		openAPIJSON, err = json.Marshal(j)
 		if err != nil {
@@ -94,49 +93,6 @@ func TestRoundTrip(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(internal, internalRoundTripped) {
 			t.Fatalf("%d: expected\n\t%#v, got \n\t%#v", i, internal, internalRoundTripped)
 		}
-	}
-}
-
-func convertNullTypeToNullable(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		if t, found := x["type"]; found {
-			switch t := t.(type) {
-			case []interface{}:
-				for i, typ := range t {
-					if s, ok := typ.(string); !ok || s != "null" {
-						continue
-					}
-					t = append(t[:i], t[i+1:]...)
-					switch len(t) {
-					case 0:
-						delete(x, "type")
-					case 1:
-						x["type"] = t[0]
-					default:
-						x["type"] = t
-					}
-					x["nullable"] = true
-					break
-				}
-			case string:
-				if t == "null" {
-					delete(x, "type")
-					x["nullable"] = true
-				}
-			}
-		}
-		for k := range x {
-			x[k] = convertNullTypeToNullable(x[k])
-		}
-		return x
-	case []interface{}:
-		for i := range x {
-			x[i] = convertNullTypeToNullable(x[i])
-		}
-		return x
-	default:
-		return x
 	}
 }
 
