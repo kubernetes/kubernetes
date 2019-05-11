@@ -945,9 +945,6 @@ metadata:
 			Description: Deploy a redis controller and a redis service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
-			kv, err := framework.KubectlVersion()
-			framework.ExpectNoError(err)
-			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			serviceJSON := readTestFileOrDie(redisServiceFilename)
 
