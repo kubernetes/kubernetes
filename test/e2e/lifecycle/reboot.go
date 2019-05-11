@@ -35,7 +35,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -70,7 +69,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			namespaceName := metav1.NamespaceSystem
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
 			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
 				e2elog.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)

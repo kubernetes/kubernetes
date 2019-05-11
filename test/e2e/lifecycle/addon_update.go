@@ -227,7 +227,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		var err error
 		sshClient, err = getMasterSSHClient()
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get the master SSH client.")
+		framework.ExpectNoError(err, "Failed to get the master SSH client.")
 	})
 
 	ginkgo.AfterEach(func() {
@@ -275,7 +275,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		for _, p := range remoteFiles {
 			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0644)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
+			framework.ExpectNoError(err, "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
 		}
 
 		// directory on kubernetes-master
@@ -284,7 +284,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		// cleanup from previous tests
 		_, _, _, err := sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
+		framework.ExpectNoError(err, "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
 
 		defer sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix)) // ignore result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo mkdir -p %s", destinationDir))
@@ -300,7 +300,8 @@ var _ = SIGDescribe("Addon update", func() {
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
 			e2elog.Logf("Cleaning up ensure exist class addon.")
-			gomega.Expect(f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)).NotTo(gomega.HaveOccurred())
+			err := f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)
+			framework.ExpectNoError(err)
 		}()
 
 		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", true)
@@ -386,7 +387,7 @@ func getMasterSSHClient() (*ssh.Client, error) {
 
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to execute %q with ssh client %+v", cmd, client)
+	framework.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
 	gomega.Expect(rc).To(gomega.Equal(0), "error return code from executing command on the cluster: %s", cmd)
 }
 
