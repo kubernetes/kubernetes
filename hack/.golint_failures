@@ -609,7 +609,6 @@ test/e2e/lifecycle/bootstrap
 test/e2e/node
 test/e2e/scalability
 test/e2e/scheduling
-test/e2e/storage
 test/e2e/storage/drivers
 test/e2e/storage/testsuites
 test/e2e/storage/utils
