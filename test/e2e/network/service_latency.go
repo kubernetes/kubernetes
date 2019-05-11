@@ -35,7 +35,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 type durations []time.Duration
@@ -161,7 +161,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	blocker := make(chan struct{}, inParallel)
 	for i := 0; i < total; i++ {
 		go func() {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
 			defer func() { <-blocker }()
 			if d, err := singleServiceLatency(f, cfg.Name, endpointQueries); err != nil {
