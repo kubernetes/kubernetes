@@ -61,7 +61,7 @@ func TestCreatePodSandbox(t *testing.T) {
 func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
 
-	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	rcm, _ := runtimeclass.NewManager(rctest.NewPopulatedClient())
 	defer rctest.StartManagerSync(rcm)()
 
 	fakeRuntime, _, m, err := createTestRuntimeManager()

@@ -32,16 +32,22 @@ type Manager struct {
 }
 
 // NewManager returns a new RuntimeClass Manager. Run must be called before the manager can be used.
-func NewManager(client clientset.Interface) *Manager {
+func NewManager(client clientset.Interface) (*Manager, error) {
+	if client == nil {
+		return nil, fmt.Errorf("cannot create Manager because client is nil")
+	}
+
 	const resyncPeriod = 0
 
 	factory := informers.NewSharedInformerFactory(client, resyncPeriod)
 	lister := factory.Node().V1beta1().RuntimeClasses().Lister()
 
-	return &Manager{
+	manager := &Manager{
 		informerFactory: factory,
 		lister:          lister,
 	}
+
+	return manager, nil
 }
 
 // Start starts syncing the RuntimeClass cache with the apiserver.

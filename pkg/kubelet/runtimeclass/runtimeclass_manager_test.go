@@ -39,7 +39,7 @@ func TestLookupRuntimeHandler(t *testing.T) {
 		{rcn: pointer.StringPtr("phantom"), expectError: true},
 	}
 
-	manager := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	manager, _ := runtimeclass.NewManager(rctest.NewPopulatedClient())
 	defer rctest.StartManagerSync(manager)()
 
 	for _, test := range tests {

@@ -657,7 +657,13 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.runtimeService = runtimeService
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
-		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
+		runtimeClassManager, err := runtimeclass.NewManager(kubeDeps.KubeClient)
+
+		if err != nil {
+			return nil, err
+		}
+
+		klet.runtimeClassManager = runtimeClassManager
 	}
 
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
