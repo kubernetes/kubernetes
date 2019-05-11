@@ -1,0 +1,69 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "diff.go",
+        "fix.go",
+        "fix-update.go",
+        "gazelle.go",
+        "langs.go",
+        "print.go",
+        "update-repos.go",
+        "version.go",
+    ],
+    importpath = "github.com/bazelbuild/bazel-gazelle/cmd/gazelle",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/flag:go_default_library",
+        "//internal/label:go_default_library",
+        "//internal/language:go_default_library",
+        "//internal/language/go:go_default_library",
+        "//internal/language/proto:go_default_library",
+        "//internal/merger:go_default_library",
+        "//internal/repos:go_default_library",
+        "//internal/resolve:go_default_library",
+        "//internal/rule:go_default_library",
+        "//internal/version:go_default_library",
+        "//internal/walk:go_default_library",
+        "//vendor/github.com/pmezard/go-difflib/difflib:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "gazelle",
+    embed = [":go_default_library"],
+    msan = "off",
+    pure = "off",
+    race = "off",
+    static = "off",
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "gazelle_pure",
+    embed = [":go_default_library"],
+    msan = "off",
+    pure = "on",
+    race = "off",
+    static = "off",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    size = "small",
+    srcs = [
+        "diff_test.go",
+        "fix_test.go",
+        "integration_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/testtools:go_default_library",
+        "//internal/wspace:go_default_library",
+    ],
+)

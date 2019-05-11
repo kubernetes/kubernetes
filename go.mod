@@ -121,7 +121,7 @@ require (
 	github.com/opencontainers/selinux v0.0.0-20170621221121-4a2974bf1ee9
 	github.com/pborman/uuid v1.2.0
 	github.com/pelletier/go-toml v1.2.0 // indirect
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6 // indirect
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20 // indirect
@@ -356,7 +356,7 @@ replace (
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/philhofer/fwd => github.com/philhofer/fwd v1.0.0
-	github.com/pkg/errors => github.com/pkg/errors v0.8.0
+	github.com/pkg/errors => github.com/pkg/errors v0.8.1
 	github.com/pkg/sftp => github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021

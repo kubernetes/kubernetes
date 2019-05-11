@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "buildozer.go",
+        "edit.go",
+        "fix.go",
+        "types.go",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api_proto:go_default_library",
+        "//build:go_default_library",
+        "//build_proto:go_default_library",
+        "//file:go_default_library",
+        "//lang:go_default_library",
+        "//tables:go_default_library",
+        "//wspace:go_default_library",
+        "@com_github_golang_protobuf//proto:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["edit_test.go"],
+    library = ":go_default_library",
+    deps = ["//build:go_default_library"],
+)

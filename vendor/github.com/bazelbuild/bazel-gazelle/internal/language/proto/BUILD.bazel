@@ -1,0 +1,62 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+# gazelle:exclude testdata
+
+genrule(
+    name = "known_imports",
+    srcs = ["proto.csv"],
+    outs = ["known_imports.go"],
+    cmd = "$(location //internal/language/proto/gen:gen_known_imports) -proto_csv $< -known_imports $@ -package proto -var knownImports -key 0 -value 1",
+    tools = ["//internal/language/proto/gen:gen_known_imports"],
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "config.go",
+        "constants.go",
+        "fileinfo.go",
+        "fix.go",
+        "generate.go",
+        "kinds.go",
+        "known_imports.go",
+        "lang.go",
+        "package.go",
+        "resolve.go",
+    ],
+    importpath = "github.com/bazelbuild/bazel-gazelle/internal/language/proto",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/label:go_default_library",
+        "//internal/language:go_default_library",
+        "//internal/repos:go_default_library",
+        "//internal/resolve:go_default_library",
+        "//internal/rule:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "fileinfo_test.go",
+        "generate_test.go",
+        "resolve_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/label:go_default_library",
+        "//internal/language:go_default_library",
+        "//internal/merger:go_default_library",
+        "//internal/repos:go_default_library",
+        "//internal/resolve:go_default_library",
+        "//internal/rule:go_default_library",
+        "//internal/testtools:go_default_library",
+        "//internal/walk:go_default_library",
+        "//vendor/github.com/bazelbuild/buildtools/build:go_default_library",
+    ],
+)
+
+exports_files(["proto.csv"])

@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "fix.go",
+        "merger.go",
+    ],
+    importpath = "github.com/bazelbuild/bazel-gazelle/internal/merger",
+    visibility = ["//visibility:public"],
+    deps = ["//internal/rule:go_default_library"],
+)
+
+go_test(
+    name = "go_default_test",
+    size = "small",
+    srcs = ["merger_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/language:go_default_library",
+        "//internal/language/go:go_default_library",
+        "//internal/language/proto:go_default_library",
+        "//internal/rule:go_default_library",
+    ],
+)

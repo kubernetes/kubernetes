@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["lang.go"],
+    importpath = "github.com/bazelbuild/bazel-gazelle/internal/language",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/resolve:go_default_library",
+        "//internal/rule:go_default_library",
+    ],
+)

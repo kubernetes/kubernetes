@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "config.go",
+        "walk.go",
+    ],
+    importpath = "github.com/bazelbuild/bazel-gazelle/internal/walk",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/pathtools:go_default_library",
+        "//internal/rule:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["walk_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//internal/config:go_default_library",
+        "//internal/rule:go_default_library",
+        "//internal/testtools:go_default_library",
+    ],
+)
