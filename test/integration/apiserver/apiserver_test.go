@@ -547,7 +547,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 	}
 }
 
-func TestTransformOnWatch(t *testing.T) {
+func TestTransform(t *testing.T) {
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -591,23 +591,23 @@ func TestTransformOnWatch(t *testing.T) {
 	testcases := []struct {
 		name          string
 		accept        string
-		includeObject metav1beta1.IncludeObjectPolicy
+		includeObject metav1.IncludeObjectPolicy
 		object        func(*testing.T) (metav1.Object, string, string)
 		wantErr       func(*testing.T, error)
 		wantBody      func(*testing.T, io.Reader)
 	}{
 		{
-			name:   "verify columns on cluster scoped resources",
+			name:   "v1beta1 verify columns on cluster scoped resources",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "default", Namespace: ""}, "", "namespaces"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
-				expectTableWatchEvents(t, 1, 3, metav1beta1.IncludeMetadata, json.NewDecoder(w))
+				expectTableWatchEvents(t, 1, 3, metav1.IncludeMetadata, json.NewDecoder(w))
 			},
 		},
 		{
-			name:   "verify columns on CRDs in json",
+			name:   "v1beta1 verify columns on CRDs in json",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-1"}}}, metav1.CreateOptions{})
@@ -620,11 +620,11 @@ func TestTransformOnWatch(t *testing.T) {
 				return cr, crdGVR.Group, "foos"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
-				expectTableWatchEvents(t, 2, 2, metav1beta1.IncludeMetadata, json.NewDecoder(w))
+				expectTableWatchEvents(t, 2, 2, metav1.IncludeMetadata, json.NewDecoder(w))
 			},
 		},
 		{
-			name:   "verify columns on CRDs in json;stream=watch",
+			name:   "v1beta1 verify columns on CRDs in json;stream=watch",
 			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-2"}}}, metav1.CreateOptions{})
@@ -637,11 +637,11 @@ func TestTransformOnWatch(t *testing.T) {
 				return cr, crdGVR.Group, "foos"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
-				expectTableWatchEvents(t, 2, 2, metav1beta1.IncludeMetadata, json.NewDecoder(w))
+				expectTableWatchEvents(t, 2, 2, metav1.IncludeMetadata, json.NewDecoder(w))
 			},
 		},
 		{
-			name:   "verify columns on CRDs in yaml",
+			name:   "v1beta1 verify columns on CRDs in yaml",
 			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
@@ -664,7 +664,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify columns on services",
+			name:   "v1beta1 verify columns on services",
 			accept: "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
@@ -678,13 +678,13 @@ func TestTransformOnWatch(t *testing.T) {
 				return svc, "", "services"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
-				expectTableWatchEvents(t, 2, 7, metav1beta1.IncludeMetadata, json.NewDecoder(w))
+				expectTableWatchEvents(t, 2, 7, metav1.IncludeMetadata, json.NewDecoder(w))
 			},
 		},
 		{
-			name:          "verify columns on services with no object",
+			name:          "v1beta1 verify columns on services with no object",
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
-			includeObject: metav1beta1.IncludeNone,
+			includeObject: metav1.IncludeNone,
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
 				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-2"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
@@ -697,13 +697,13 @@ func TestTransformOnWatch(t *testing.T) {
 				return obj, "", "services"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
-				expectTableWatchEvents(t, 2, 7, metav1beta1.IncludeNone, json.NewDecoder(w))
+				expectTableWatchEvents(t, 2, 7, metav1.IncludeNone, json.NewDecoder(w))
 			},
 		},
 		{
-			name:          "verify columns on services with full object",
+			name:          "v1beta1 verify columns on services with full object",
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
-			includeObject: metav1beta1.IncludeObject,
+			includeObject: metav1.IncludeObject,
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
 				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-3"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
@@ -716,7 +716,7 @@ func TestTransformOnWatch(t *testing.T) {
 				return obj, "", "services"
 			},
 			wantBody: func(t *testing.T, w io.Reader) {
-				objects := expectTableWatchEvents(t, 2, 7, metav1beta1.IncludeObject, json.NewDecoder(w))
+				objects := expectTableWatchEvents(t, 2, 7, metav1.IncludeObject, json.NewDecoder(w))
 				var svc v1.Service
 				if err := json.Unmarshal(objects[1], &svc); err != nil {
 					t.Fatal(err)
@@ -727,7 +727,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify partial metadata object on config maps",
+			name:   "v1beta1 verify partial metadata object on config maps",
 			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
@@ -745,7 +745,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify partial metadata object on config maps in protobuf",
+			name:   "v1beta1 verify partial metadata object on config maps in protobuf",
 			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				ns := "default"
@@ -763,7 +763,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify error on unsupported mimetype protobuf for table conversion",
+			name:   "v1beta1 verify error on unsupported mimetype protobuf for table conversion",
 			accept: "application/vnd.kubernetes.protobuf;as=Table;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
@@ -780,7 +780,7 @@ func TestTransformOnWatch(t *testing.T) {
 		},
 		{
 			name:   "verify error on invalid mimetype - bad version",
-			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
+			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1alpha1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
 			},
@@ -791,7 +791,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify error on invalid mimetype - bad group",
+			name:   "v1beta1 verify error on invalid mimetype - bad group",
 			accept: "application/json;as=PartialObjectMetadata;g=k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
@@ -803,7 +803,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify error on invalid mimetype - bad kind",
+			name:   "v1beta1 verify error on invalid mimetype - bad kind",
 			accept: "application/json;as=PartialObject;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
@@ -815,7 +815,7 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:   "verify error on invalid mimetype - missing kind",
+			name:   "v1beta1 verify error on invalid mimetype - missing kind",
 			accept: "application/json;g=meta.k8s.io;v=v1beta1",
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
@@ -827,9 +827,241 @@ func TestTransformOnWatch(t *testing.T) {
 			},
 		},
 		{
-			name:          "verify error on invalid transform parameter",
+			name:          "v1beta1 verify error on invalid transform parameter",
 			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1beta1",
-			includeObject: metav1beta1.IncludeObjectPolicy("unrecognized"),
+			includeObject: metav1.IncludeObjectPolicy("unrecognized"),
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsBadRequest(err) || !strings.Contains(err.Error(), `Invalid value: "unrecognized": must be 'Metadata', 'Object', 'None', or empty`) {
+					t.Fatal(err)
+				}
+			},
+		},
+
+		{
+			name:   "v1 verify columns on cluster scoped resources",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "default", Namespace: ""}, "", "namespaces"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectTableV1WatchEvents(t, 1, 3, metav1.IncludeMetadata, json.NewDecoder(w))
+			},
+		},
+		{
+			name:   "v1 verify columns on CRDs in json",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectTableV1WatchEvents(t, 2, 2, metav1.IncludeMetadata, json.NewDecoder(w))
+			},
+		},
+		{
+			name:   "v1 verify columns on CRDs in json;stream=watch",
+			accept: "application/json;stream=watch;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-5"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-5", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectTableV1WatchEvents(t, 2, 2, metav1.IncludeMetadata, json.NewDecoder(w))
+			},
+		},
+		{
+			name:   "v1 verify columns on CRDs in yaml",
+			accept: "application/yaml;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-6"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-6", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+				// TODO: this should be a more specific error
+				if err.Error() != "only the following media types are accepted: application/json;stream=watch" {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "v1 verify columns on services",
+			accept: "application/json;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				ns := "default"
+				svc, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-4"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				if err != nil {
+					t.Fatalf("unable to create service: %v", err)
+				}
+				if _, err := clientset.CoreV1().Services(ns).Patch(svc.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+					t.Fatalf("unable to update service: %v", err)
+				}
+				return svc, "", "services"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectTableV1WatchEvents(t, 2, 7, metav1.IncludeMetadata, json.NewDecoder(w))
+			},
+		},
+		{
+			name:          "v1 verify columns on services with no object",
+			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
+			includeObject: metav1.IncludeNone,
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				ns := "default"
+				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-5"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				if err != nil {
+					t.Fatalf("unable to create object: %v", err)
+				}
+				if _, err := clientset.CoreV1().Services(ns).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+					t.Fatalf("unable to update object: %v", err)
+				}
+				return obj, "", "services"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectTableV1WatchEvents(t, 2, 7, metav1.IncludeNone, json.NewDecoder(w))
+			},
+		},
+		{
+			name:          "v1 verify columns on services with full object",
+			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
+			includeObject: metav1.IncludeObject,
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				ns := "default"
+				obj, err := clientset.CoreV1().Services(ns).Create(&v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "test-6"}, Spec: v1.ServiceSpec{Ports: []v1.ServicePort{{Port: 1000}}}})
+				if err != nil {
+					t.Fatalf("unable to create object: %v", err)
+				}
+				if _, err := clientset.CoreV1().Services(ns).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+					t.Fatalf("unable to update object: %v", err)
+				}
+				return obj, "", "services"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				objects := expectTableV1WatchEvents(t, 2, 7, metav1.IncludeObject, json.NewDecoder(w))
+				var svc v1.Service
+				if err := json.Unmarshal(objects[1], &svc); err != nil {
+					t.Fatal(err)
+				}
+				if svc.Annotations["test"] != "1" || svc.Spec.Ports[0].Port != 1000 {
+					t.Fatalf("unexpected object: %#v", svc)
+				}
+			},
+		},
+		{
+			name:   "v1 verify partial metadata object on config maps",
+			accept: "application/json;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				ns := "default"
+				obj, err := clientset.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-3", Annotations: map[string]string{"test": "0"}}})
+				if err != nil {
+					t.Fatalf("unable to create object: %v", err)
+				}
+				if _, err := clientset.CoreV1().ConfigMaps(ns).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+					t.Fatalf("unable to update object: %v", err)
+				}
+				return obj, "", "configmaps"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectPartialObjectMetaV1Events(t, json.NewDecoder(w), "0", "1")
+			},
+		},
+		{
+			name:   "v1 verify partial metadata object on config maps in protobuf",
+			accept: "application/vnd.kubernetes.protobuf;as=PartialObjectMetadata;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				ns := "default"
+				obj, err := clientset.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "test-4", Annotations: map[string]string{"test": "0"}}})
+				if err != nil {
+					t.Fatalf("unable to create object: %v", err)
+				}
+				if _, err := clientset.CoreV1().ConfigMaps(ns).Patch(obj.Name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"1"}}}`)); err != nil {
+					t.Fatalf("unable to update object: %v", err)
+				}
+				return obj, "", "configmaps"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				expectPartialObjectMetaV1EventsProtobuf(t, w, "0", "1")
+			},
+		},
+		{
+			name:   "v1 verify error on unsupported mimetype protobuf for table conversion",
+			accept: "application/vnd.kubernetes.protobuf;as=Table;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+				// TODO: this should be a more specific error
+				if err.Error() != "only the following media types are accepted: application/json, application/yaml, application/vnd.kubernetes.protobuf" {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "v1 verify error on invalid mimetype - bad group",
+			accept: "application/json;as=PartialObjectMetadata;g=k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "v1 verify error on invalid mimetype - bad kind",
+			accept: "application/json;as=PartialObject;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:   "v1 verify error on invalid mimetype - missing kind",
+			accept: "application/json;g=meta.k8s.io;v=v1",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+			},
+		},
+		{
+			name:          "v1 verify error on invalid transform parameter",
+			accept:        "application/json;as=Table;g=meta.k8s.io;v=v1",
+			includeObject: metav1.IncludeObjectPolicy("unrecognized"),
 			object: func(t *testing.T) (metav1.Object, string, string) {
 				return &metav1.ObjectMeta{Name: "kubernetes", Namespace: "default"}, "", "services"
 			},
@@ -891,7 +1123,7 @@ func TestTransformOnWatch(t *testing.T) {
 	}
 }
 
-func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1beta1.IncludeObjectPolicy, d *json.Decoder) [][]byte {
+func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1.IncludeObjectPolicy, d *json.Decoder) [][]byte {
 	t.Helper()
 
 	var objects [][]byte
@@ -922,7 +1154,7 @@ func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1beta1
 			t.Fatalf("Invalid row width: %#v", row.Cells)
 		}
 		switch policy {
-		case metav1beta1.IncludeMetadata:
+		case metav1.IncludeMetadata:
 			var meta metav1beta1.PartialObjectMetadata
 			if err := json.Unmarshal(row.Object.Raw, &meta); err != nil {
 				t.Fatalf("expected partial object: %v", err)
@@ -931,11 +1163,11 @@ func expectTableWatchEvents(t *testing.T, count, columns int, policy metav1beta1
 			if meta.TypeMeta != partialObj {
 				t.Fatalf("expected partial object: %#v", meta)
 			}
-		case metav1beta1.IncludeNone:
+		case metav1.IncludeNone:
 			if len(row.Object.Raw) != 0 {
 				t.Fatalf("Expected no object: %s", string(row.Object.Raw))
 			}
-		case metav1beta1.IncludeObject:
+		case metav1.IncludeObject:
 			if len(row.Object.Raw) == 0 {
 				t.Fatalf("Expected object: %s", string(row.Object.Raw))
 			}
@@ -991,6 +1223,115 @@ func expectPartialObjectMetaEventsProtobuf(t *testing.T, r io.Reader, values ...
 			t.Fatalf("unexpected watch object %T", obj)
 		}
 		expected := &schema.GroupVersionKind{Kind: "PartialObjectMetadata", Version: "v1beta1", Group: "meta.k8s.io"}
+		if !reflect.DeepEqual(expected, gvk) {
+			t.Fatalf("expected partial object: %#v", meta)
+		}
+		if meta.Annotations["test"] != value {
+			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
+		}
+	}
+}
+
+func expectTableV1WatchEvents(t *testing.T, count, columns int, policy metav1.IncludeObjectPolicy, d *json.Decoder) [][]byte {
+	t.Helper()
+
+	var objects [][]byte
+
+	for i := 0; i < count; i++ {
+		var evt metav1.WatchEvent
+		if err := d.Decode(&evt); err != nil {
+			t.Fatal(err)
+		}
+		var table metav1.Table
+		if err := json.Unmarshal(evt.Object.Raw, &table); err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			if len(table.ColumnDefinitions) != columns {
+				t.Fatalf("Got unexpected columns on first watch event: %d vs %#v", columns, table.ColumnDefinitions)
+			}
+		} else {
+			if len(table.ColumnDefinitions) != 0 {
+				t.Fatalf("Expected no columns on second watch event: %#v", table.ColumnDefinitions)
+			}
+		}
+		if len(table.Rows) != 1 {
+			t.Fatalf("Invalid rows: %#v", table.Rows)
+		}
+		row := table.Rows[0]
+		if len(row.Cells) != columns {
+			t.Fatalf("Invalid row width: %#v", row.Cells)
+		}
+		switch policy {
+		case metav1.IncludeMetadata:
+			var meta metav1.PartialObjectMetadata
+			if err := json.Unmarshal(row.Object.Raw, &meta); err != nil {
+				t.Fatalf("expected partial object: %v", err)
+			}
+			partialObj := metav1.TypeMeta{Kind: "PartialObjectMetadata", APIVersion: "meta.k8s.io/v1"}
+			if meta.TypeMeta != partialObj {
+				t.Fatalf("expected partial object: %#v", meta)
+			}
+		case metav1.IncludeNone:
+			if len(row.Object.Raw) != 0 {
+				t.Fatalf("Expected no object: %s", string(row.Object.Raw))
+			}
+		case metav1.IncludeObject:
+			if len(row.Object.Raw) == 0 {
+				t.Fatalf("Expected object: %s", string(row.Object.Raw))
+			}
+			objects = append(objects, row.Object.Raw)
+		}
+	}
+	return objects
+}
+
+func expectPartialObjectMetaV1Events(t *testing.T, d *json.Decoder, values ...string) {
+	t.Helper()
+
+	for i, value := range values {
+		var evt metav1.WatchEvent
+		if err := d.Decode(&evt); err != nil {
+			t.Fatal(err)
+		}
+		var meta metav1.PartialObjectMetadata
+		if err := json.Unmarshal(evt.Object.Raw, &meta); err != nil {
+			t.Fatal(err)
+		}
+		typeMeta := metav1.TypeMeta{Kind: "PartialObjectMetadata", APIVersion: "meta.k8s.io/v1"}
+		if meta.TypeMeta != typeMeta {
+			t.Fatalf("expected partial object: %#v", meta)
+		}
+		if meta.Annotations["test"] != value {
+			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
+		}
+	}
+}
+
+func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values ...string) {
+	scheme := runtime.NewScheme()
+	metav1.AddToGroupVersion(scheme, schema.GroupVersion{Version: "v1"})
+	rs := protobuf.NewRawSerializer(scheme, scheme)
+	d := streaming.NewDecoder(
+		protobuf.LengthDelimitedFramer.NewFrameReader(ioutil.NopCloser(r)),
+		rs,
+	)
+	ds := metainternalversion.Codecs.UniversalDeserializer()
+
+	for i, value := range values {
+		var evt metav1.WatchEvent
+		if _, _, err := d.Decode(nil, &evt); err != nil {
+			t.Fatal(err)
+		}
+		obj, gvk, err := ds.Decode(evt.Object.Raw, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		meta, ok := obj.(*metav1.PartialObjectMetadata)
+		if !ok {
+			t.Fatalf("unexpected watch object %T", obj)
+		}
+		expected := &schema.GroupVersionKind{Kind: "PartialObjectMetadata", Version: "v1", Group: "meta.k8s.io"}
 		if !reflect.DeepEqual(expected, gvk) {
 			t.Fatalf("expected partial object: %#v", meta)
 		}
