@@ -1443,7 +1443,7 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1466,7 +1466,7 @@ type ConfigMapProjection struct {
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1793,7 +1793,7 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference
 	// The key to select.
 	Key string
-	// Specify whether the ConfigMap or it's key must be defined
+	// Specify whether the ConfigMap or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -1804,7 +1804,7 @@ type SecretKeySelector struct {
 	LocalObjectReference
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string
-	// Specify whether the Secret or it's key must be defined
+	// Specify whether the Secret or its key must be defined
 	// +optional
 	Optional *bool
 }
