@@ -483,6 +483,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+
 			queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 			scache := internalcache.New(test.CacheTTL, stop)
 
@@ -492,17 +493,16 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset(&node)
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			predicateMap := map[string]predicates.FitPredicate{"PodFitsHostPorts": predicates.PodFitsHostPorts}
-
 			scheduler, bindingChan := setupTestSchedulerLongBindingWithRetry(
 				queuedPodStore, scache, informerFactory, predicateMap, stop, test.BindingDuration)
-
+			scheduler.mu.Lock()
 			informerFactory.Start(stop)
 			informerFactory.WaitForCacheSync(stop)
-
 			scheduler.Run()
+
 			queuedPodStore.Add(firstPod)
 			queuedPodStore.Add(conflictPod)
-
+			scheduler.mu.Unlock()
 			resultBindings := map[string]bool{}
 			waitChan := time.After(5 * time.Second)
 			for finished := false; !finished; {
@@ -516,6 +516,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 					finished = true
 				}
 			}
+
 			if !reflect.DeepEqual(resultBindings, test.Expected) {
 				t.Errorf("Result binding are not equal to expected. %v != %v", resultBindings, test.Expected)
 			}

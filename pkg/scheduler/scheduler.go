@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 	"time"
 
 	"k8s.io/klog"
@@ -55,6 +56,7 @@ const (
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
+	mu     sync.Mutex
 	config *factory.Config
 }
 
@@ -252,7 +254,11 @@ func (sched *Scheduler) Run() {
 		return
 	}
 
-	go wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
+	go func() {
+		sched.mu.Lock()
+		wait.Until(sched.scheduleOne, 0, sched.config.StopEverything)
+		sched.mu.Unlock()
+	}()
 }
 
 // Config returns scheduler's config pointer. It is exposed for testing purposes.
