@@ -756,12 +756,11 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 			return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
 		}
 		return nil
-	} else {
-		if foundAttributes.Len() != 0 {
-			return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
-		}
-		return nil
 	}
+	if foundAttributes.Len() != 0 {
+		return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
+	}
+	return nil
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
@@ -774,7 +773,7 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 			return err
 		}
 	}
-	return fmt.Errorf("gave up after waiting %v for CSIDriver %q.", timeout, driverName)
+	return fmt.Errorf("gave up after waiting %v for CSIDriver %q", timeout, driverName)
 }
 
 func destroyCSIDriver(cs clientset.Interface, driverName string) {
