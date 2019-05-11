@@ -235,12 +235,12 @@ const (
 	createTagFactor       = 2.0
 	createTagSteps        = 9
 
-	// encryptedCheck* is configuration of poll for created volume to check
+	// createEBSCheck* is configuration of poll for created volume to check
 	// it has not been silently removed by AWS.
 	// On a random AWS account (shared among several developers) it took 4s on
 	// average.
-	encryptedCheckInterval = 1 * time.Second
-	encryptedCheckTimeout  = 30 * time.Second
+	createEBSCheckInterval = 5 * time.Second
+	createEBSCheckTimeout  = 30 * time.Second
 
 	// Number of node names that can be added to a filter. The AWS limit is 200
 	// but we are using a lower limit on purpose
@@ -2418,7 +2418,7 @@ func (c *Cloud) waitUntilVolumeAvailable(volumeName KubernetesVolumeID) error {
 		return err
 	}
 
-	err = wait.Poll(encryptedCheckInterval, encryptedCheckTimeout, func() (done bool, err error) {
+	err = wait.Poll(createEBSCheckInterval, createEBSCheckTimeout, func() (done bool, err error) {
 		vol, err := disk.describeVolume()
 		if err != nil {
 			return true, err
