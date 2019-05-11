@@ -31,7 +31,7 @@ func removeItemsWithSchema(value *value.Value, toRemove *fieldpath.Set, schema *
 		schema:   schema,
 		toRemove: toRemove,
 	}
-	resolveSchema(schema, typeRef, w)
+	resolveSchema(schema, typeRef, value, w)
 }
 
 // doLeaf should be called on leaves before descending into children, if there
@@ -53,7 +53,7 @@ func (w *removingWalker) doStruct(t schema.Struct) ValidationErrors {
 		fieldTypes[structField.Name] = structField.Type
 	}
 
-	for i, _ := range s.Items {
+	for i := range s.Items {
 		item := s.Items[i]
 		pe := fieldpath.PathElement{FieldName: &item.Name}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
@@ -72,7 +72,7 @@ func (w *removingWalker) doList(t schema.List) (errs ValidationErrors) {
 	}
 
 	newItems := []value.Value{}
-	for i, _ := range l.Items {
+	for i := range l.Items {
 		item := l.Items[i]
 		// Ignore error because we have already validated this list
 		pe, _ := listItemToPathElement(t, i, item)
@@ -102,7 +102,7 @@ func (w *removingWalker) doMap(t schema.Map) ValidationErrors {
 	}
 
 	newMap := &value.Map{}
-	for i, _ := range m.Items {
+	for i := range m.Items {
 		item := m.Items[i]
 		pe := fieldpath.PathElement{FieldName: &item.Name}
 		path, _ := fieldpath.MakePath(pe)
@@ -121,7 +121,5 @@ func (w *removingWalker) doMap(t schema.Map) ValidationErrors {
 	}
 	return nil
 }
-
-func (*removingWalker) doUntyped(_ schema.Untyped) ValidationErrors { return nil }
 
 func (*removingWalker) errorf(_ string, _ ...interface{}) ValidationErrors { return nil }

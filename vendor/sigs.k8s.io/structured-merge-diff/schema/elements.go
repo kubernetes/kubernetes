@@ -43,13 +43,15 @@ type TypeRef struct {
 }
 
 // Atom represents the smallest possible pieces of the type system.
+// Each set field in the Atom represents a possible type for the object.
+// If none of the fields are set, any object will fail validation against the atom.
 type Atom struct {
-	// Exactly one of the below must be set.
-	*Scalar  `yaml:"scalar,omitempty"`
-	*Struct  `yaml:"struct,omitempty"`
-	*List    `yaml:"list,omitempty"`
-	*Map     `yaml:"map,omitempty"`
-	*Untyped `yaml:"untyped,omitempty"`
+	*Scalar `yaml:"scalar,omitempty"`
+	*List   `yaml:"list,omitempty"`
+
+	// At most, one of the below must be set, since both look the same when serialized
+	*Struct `yaml:"struct,omitempty"`
+	*Map    `yaml:"map,omitempty"`
 }
 
 // Scalar (AKA "primitive") represents a type which has a single value which is
@@ -65,14 +67,14 @@ const (
 )
 
 // ElementRelationship is an enum of the different possible relationships
-// between the elements of container types (maps, lists, structs, untyped).
+// between the elements of container types (maps, lists, structs).
 type ElementRelationship string
 
 const (
 	// Associative only applies to lists (see the documentation there).
 	Associative = ElementRelationship("associative")
-	// Atomic makes container types (lists, maps, structs, untyped) behave
-	// as scalars / leaf fields (which is the default for untyped data).
+	// Atomic makes container types (lists, maps, structs) behave
+	// as scalars / leaf fields
 	Atomic = ElementRelationship("atomic")
 	// Separable means the items of the container type have no particular
 	// relationship (default behavior for maps and structs).
@@ -81,18 +83,17 @@ const (
 
 // Struct represents a type which is composed of a number of different fields.
 // Each field has a name and a type.
-//
-// TODO: in the future, we will add one-of groups (sometimes called unions).
 type Struct struct {
 	// Each struct field appears exactly once in this list. The order in
 	// this list defines the canonical field ordering.
 	Fields []StructField `yaml:"fields,omitempty"`
 
-	// TODO: Implement unions, either this way or by inlining.
-	// Unions are groupings of fields with special rules. They may refer to
+	// A Union is a grouping of fields with special rules. It may refer to
 	// one or more fields in the above list. A given field from the above
 	// list may be referenced in exactly 0 or 1 places in the below list.
-	// Unions []Union `yaml:"unions,omitempty"`
+	// One can have multiple unions in the same struct, but the fields can't
+	// overlap between unions.
+	Unions []Union `yaml:"unions,omitempty"`
 
 	// ElementRelationship states the relationship between the struct's items.
 	// * `separable` (or unset) implies that each element is 100% independent.
@@ -104,6 +105,45 @@ type Struct struct {
 	// The default behavior for structs is `separable`; it's permitted to
 	// leave this unset to get the default behavior.
 	ElementRelationship ElementRelationship `yaml:"elementRelationship,omitempty"`
+}
+
+// UnionFields are mapping between the fields that are part of the union and
+// their discriminated value. The discriminated value has to be set, and
+// should not conflict with other discriminated value in the list.
+type UnionField struct {
+	// FieldName is the name of the field that is part of the union. This
+	// is the serialized form of the field.
+	FieldName string `yaml:"fieldName"`
+	// DiscriminatedBy is the value of the discriminator to select that
+	// field. If the union doesn't have a discriminator, this field is
+	// ignored.
+	DiscriminatedBy string `yaml:"discriminatedBy"`
+}
+
+// Union, or oneof, means that only one of multiple fields of a structure can be
+// set at a time. For backward compatibility reasons, and to help "dumb clients"
+// which are not aware of the union (or can't be aware of it because they
+// don't know what fields are part of the union), the code tolerates multiple
+// fields to be set but will try to detect which fields must be cleared (there
+// should never be more than two though):
+// - If there is a discriminator and its value has changed, clear all fields
+// but the one specified by the discriminator
+// - If there is no discriminator, or it hasn't changed, if new has two of the
+// fields set, remove the one that was set in old.
+// - If there is a discriminator, set it to the value we've kept (if it changed)
+type Union struct {
+	// Discriminator, if present, is the name of the field that
+	// discriminates fields in the union. The mapping between the value of
+	// the discriminator and the field is done by using the Fields list
+	// below.
+	Discriminator *string `yaml:"discriminator,omitempty"`
+
+	// This is the list of fields that belong to this union. All the
+	// fields present in here have to be part of the parent
+	// structure. Discriminator (if oneOf has one), is NOT included in
+	// this list. The value for field is how we map the name of the field
+	// to actual value for discriminator.
+	Fields []UnionField `yaml:"fields,omitempty"`
 }
 
 // StructField pairs a field name with a field type.
@@ -171,22 +211,6 @@ type Map struct {
 	//   separate actors to set the elements.
 	//   TODO: find a simple example.
 	// The default behavior for maps is `separable`; it's permitted to
-	// leave this unset to get the default behavior.
-	ElementRelationship ElementRelationship `yaml:"elementRelationship,omitempty"`
-}
-
-// Untyped represents types that allow arbitrary content. (Think: plugin
-// objects.)
-type Untyped struct {
-	// ElementRelationship states the relationship between the items, if
-	// container-typed data happens to be present here.
-	// * `atomic` implies that all elements depend on each other, and this
-	//   is effectively a scalar / leaf field; it doesn't make sense for
-	//   separate actors to set the elements.
-	// TODO: support "guess" (guesses at associative list keys)
-	// TODO: support "lookup" (calls a lookup function to figure out the
-	//       schema based on the data)
-	// The default behavior for untyped data is `atomic`; it's permitted to
 	// leave this unset to get the default behavior.
 	ElementRelationship ElementRelationship `yaml:"elementRelationship,omitempty"`
 }

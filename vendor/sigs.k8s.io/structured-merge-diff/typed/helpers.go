@@ -93,28 +93,43 @@ type atomHandler interface {
 	doStruct(schema.Struct) ValidationErrors
 	doList(schema.List) ValidationErrors
 	doMap(schema.Map) ValidationErrors
-	doUntyped(schema.Untyped) ValidationErrors
 
 	errorf(msg string, args ...interface{}) ValidationErrors
 }
 
-func resolveSchema(s *schema.Schema, tr schema.TypeRef, ah atomHandler) ValidationErrors {
+func resolveSchema(s *schema.Schema, tr schema.TypeRef, v *value.Value, ah atomHandler) ValidationErrors {
 	a, ok := s.Resolve(tr)
 	if !ok {
 		return ah.errorf("schema error: no type found matching: %v", *tr.NamedType)
 	}
 
+	a = deduceAtom(a, v)
+	return handleAtom(a, tr, ah)
+}
+
+func deduceAtom(a schema.Atom, v *value.Value) schema.Atom {
 	switch {
-	case a.Scalar != nil:
-		return ah.doScalar(*a.Scalar)
-	case a.Struct != nil:
-		return ah.doStruct(*a.Struct)
-	case a.List != nil:
-		return ah.doList(*a.List)
+	case v == nil:
+	case v.FloatValue != nil, v.IntValue != nil, v.StringValue != nil, v.BooleanValue != nil:
+		return schema.Atom{Scalar: a.Scalar}
+	case v.ListValue != nil:
+		return schema.Atom{List: a.List}
+	case v.MapValue != nil:
+		return schema.Atom{Struct: a.Struct, Map: a.Map}
+	}
+	return a
+}
+
+func handleAtom(a schema.Atom, tr schema.TypeRef, ah atomHandler) ValidationErrors {
+	switch {
 	case a.Map != nil:
 		return ah.doMap(*a.Map)
-	case a.Untyped != nil:
-		return ah.doUntyped(*a.Untyped)
+	case a.Struct != nil:
+		return ah.doStruct(*a.Struct)
+	case a.Scalar != nil:
+		return ah.doScalar(*a.Scalar)
+	case a.List != nil:
+		return ah.doList(*a.List)
 	}
 
 	name := "inlined"
