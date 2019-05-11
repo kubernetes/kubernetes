@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	u "k8s.io/kubernetes/pkg/scheduler/util"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 func Test_topologySpreadConstrantsMap_initialize(t *testing.T) {
@@ -35,14 +35,14 @@ func Test_topologySpreadConstrantsMap_initialize(t *testing.T) {
 	}{
 		{
 			name: "normal case",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
-				u.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
 			want: map[topologyPair][]string{
 				{key: "zone", value: "zone1"}:  {"node-a", "node-b"},
@@ -83,12 +83,12 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 		{
 			// if there is only one candidate node, it should be scored to 10
 			name: "one constraint on node, no existing pods",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 10},
@@ -98,19 +98,19 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 		{
 			// if there is only one candidate node, it should be scored to 10
 			name: "one constraint on node, only one node is candidate",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
-				u.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 			},
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
 			},
 			failedNodes: []*v1.Node{
-				u.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 10},
@@ -121,22 +121,22 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			// after reversing, it's 4/5/6/3
 			// so scores = 40/6, 50/6, 60/6, 30/6
 			name: "one constraint on node, all 4 nodes are candidates",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
-				u.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
-				u.MakePod().Name("p-d2").Node("node-d").Label("foo", "").Obj(),
-				u.MakePod().Name("p-d3").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d2").Node("node-d").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d3").Node("node-d").Label("foo", "").Obj(),
 			},
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
-				u.MakeNode().Name("node-c").Label("node", "node-c").Obj(),
-				u.MakeNode().Name("node-d").Label("node", "node-d").Obj(),
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label("node", "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label("node", "node-d").Obj(),
 			},
 			failedNodes: []*v1.Node{},
 			want: []schedulerapi.HostPriority{
@@ -151,28 +151,28 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			// after reversing, it's 3/5/6
 			// so scores = 30/6, 50/6, 60/6
 			name: "one constraint on node, 3 out of 4 nodes are candidates",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
-				u.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
-				u.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
 			failedNodes: []*v1.Node{
-				u.MakeNode().Name("node-y").Label("node", "node-y").Obj(),
+				st.MakeNode().Name("node-y").Label("node", "node-y").Obj(),
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 5},
@@ -185,28 +185,28 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			// after reversing, it's 1/?/4
 			// so scores = 10/4, 0, 40/4
 			name: "one constraint on node, 3 out of 4 nodes are candidates",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
-				u.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-b").Label("n", "node-b").Obj(), // label `n` doesn't match topologyKey
-				u.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("n", "node-b").Obj(), // label `n` doesn't match topologyKey
+				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
 			failedNodes: []*v1.Node{
-				u.MakeNode().Name("node-y").Label("node", "node-y").Obj(),
+				st.MakeNode().Name("node-y").Label("node", "node-y").Obj(),
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 2},
@@ -219,28 +219,28 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			// after reversing, it's 10/10/12
 			// so scores = 100/12, 100/12, 120/12
 			name: "one constraint on zone, 3 out of 4 nodes are candidates",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
-				u.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
-				u.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
 			failedNodes: []*v1.Node{
-				u.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 8},
@@ -253,28 +253,28 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			// after reversing, it's 8/5
 			// so scores = 80/8, 50/8
 			name: "two constraint on zone and node, 2 out of 4 nodes are candidates",
-			pod: u.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, "zone", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
-				SpreadConstraint(1, "node", softSpread, u.MakeLabelSelector().Exists("foo").Obj()).
+			pod: st.MakePod().Name("p").Label("foo", "").
+				SpreadConstraint(1, "zone", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, "node", softSpread, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPods: []*v1.Pod{
-				u.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
-				u.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
-				u.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
-				u.MakePod().Name("p-x2").Node("node-x").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
-				u.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-x2").Node("node-x").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
+				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
 			nodes: []*v1.Node{
-				u.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
-				u.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
 			failedNodes: []*v1.Node{
-				u.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
-				u.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
+				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
+				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			want: []schedulerapi.HostPriority{
 				{Host: "node-a", Score: 10},

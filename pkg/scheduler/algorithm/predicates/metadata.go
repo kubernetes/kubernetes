@@ -229,12 +229,12 @@ func getTPMapMatchingSpreadConstraints(pod *v1.Pod, nodeInfoMap map[string]*sche
 		}
 		// In accordance to design, if NodeAffinity or NodeSelector is defined,
 		// spreading is applied to nodes that pass those filters.
-		if !podMatchesNodeSelectorAndAffinityTerms(pod, node) {
+		if !PodMatchesNodeSelectorAndAffinityTerms(pod, node) {
 			return
 		}
 
 		// Ensure current node's labels contains all topologyKeys in 'constraints'.
-		if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+		if !NodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 			return
 		}
 		nodeTopologyMaps := newTopologyPairsMaps()
@@ -319,7 +319,7 @@ func podMatchesSpreadConstraint(podLabelSet labels.Set, constraint v1.TopologySp
 }
 
 // check if ALL topology keys in spread constraints are present in node labels
-func nodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []v1.TopologySpreadConstraint) bool {
+func NodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints []v1.TopologySpreadConstraint) bool {
 	for _, constraint := range constraints {
 		if _, ok := nodeLabels[constraint.TopologyKey]; !ok {
 			return false
@@ -388,7 +388,7 @@ func (m *topologyPairsPodSpreadMap) addPod(addedPod, preemptorPod *v1.Pod, node 
 		return nil
 	}
 	constraints := getHardTopologySpreadConstraints(preemptorPod)
-	if !nodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
+	if !NodeLabelsMatchSpreadConstraints(node.Labels, constraints) {
 		return nil
 	}
 
