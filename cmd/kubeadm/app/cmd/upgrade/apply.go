@@ -238,14 +238,14 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 }
 
 // GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
-func GetPathManagerForUpgrade(internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
+func GetPathManagerForUpgrade(kubernetesDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
 	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
-	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory(), true, etcdUpgrade && !isHAEtcd)
+	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, true, etcdUpgrade && !isHAEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
 func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade, renewCerts bool) error {
-	pathManager, err := GetPathManagerForUpgrade(internalcfg, etcdUpgrade)
+	pathManager, err := GetPathManagerForUpgrade(constants.KubernetesDir, internalcfg, etcdUpgrade)
 	if err != nil {
 		return err
 	}
@@ -257,7 +257,7 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
 func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
 
-	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
+	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	if err != nil {
 		return err
 	}
