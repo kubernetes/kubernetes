@@ -604,8 +604,7 @@ func TestUpdatePodCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var resultStatus bool
-		resultStatus = UpdatePodCondition(test.status, &test.conditions)
+		resultStatus := UpdatePodCondition(test.status, &test.conditions)
 
 		assert.Equal(t, test.expected, resultStatus, test.desc)
 	}
