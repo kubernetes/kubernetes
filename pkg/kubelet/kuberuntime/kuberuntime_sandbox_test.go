@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -95,12 +96,50 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	}
 }
 
+// TestGeneratePodSandbox tests generating sandbox configuration.
+func TestGeneratePodSandbox(t *testing.T) {
+	pod := newTestPod()
+	_, _, m, err := createTestRuntimeManager()
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, 1)
+	assert.NoError(t, err, "generatePodSandboxConfig for test pod")
+	expected := &runtimeapi.PodSandboxConfig{
+		Metadata:    &runtimeapi.PodSandboxMetadata{Name: "bar", Uid: "12345678", Namespace: "new", Attempt: 1},
+		Labels:      map[string]string{"foo": "bar", "io.kubernetes.pod.name": "bar", "io.kubernetes.pod.namespace": "new", "io.kubernetes.pod.uid": "12345678"},
+		Annotations: map[string]string{"foo": "bar", "kubernetes.io/ingress-bandwidth": "5000"},
+		IpRanges: []*runtimeapi.IpRanges{
+			&runtimeapi.IpRanges{
+				IpRange: []*runtimeapi.IpRange{
+					&runtimeapi.IpRange{Subnet: "10.244.0.0/24"},
+				},
+			},
+		},
+		Bandwidth: &runtimeapi.Bandwidth{IngressRate: 5000, IngressBurst: 2147483647, EgressRate: 0, EgressBurst: 0},
+	}
+	if !reflect.DeepEqual(sandboxConfig.Metadata, expected.Metadata) {
+		t.Errorf("expected %v, got %v", expected.Metadata, sandboxConfig.Metadata)
+	}
+	if !reflect.DeepEqual(sandboxConfig.Labels, expected.Labels) {
+		t.Errorf("expected %v, got %v", expected.Labels, sandboxConfig.Labels)
+	}
+	if !reflect.DeepEqual(sandboxConfig.Annotations, expected.Annotations) {
+		t.Errorf("expected %v, got %v", expected.Annotations, sandboxConfig.Annotations)
+	}
+	if !reflect.DeepEqual(sandboxConfig.IpRanges, expected.IpRanges) {
+		t.Errorf("expected %v, got %v", expected.IpRanges, sandboxConfig.IpRanges)
+	}
+	if !reflect.DeepEqual(sandboxConfig.Bandwidth, expected.Bandwidth) {
+		t.Errorf("expected %v, got %v", expected.Bandwidth, sandboxConfig.Bandwidth)
+	}
+}
+
 func newTestPod() *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345678",
-			Name:      "bar",
-			Namespace: "new",
+			UID:         "12345678",
+			Name:        "bar",
+			Namespace:   "new",
+			Labels:      map[string]string{"foo": "bar"},
+			Annotations: map[string]string{"foo": "bar", "kubernetes.io/ingress-bandwidth": "5000"},
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
