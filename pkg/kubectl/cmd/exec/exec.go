@@ -24,7 +24,6 @@ import (
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -32,6 +31,7 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -203,7 +203,7 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		p.FullCmdName = cmdParent.CommandPath()
 	}
 	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe %s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.ResourceName, p.Namespace)
+		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%%s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.Namespace)
 	}
 
 	p.Config, err = f.ToRESTConfig()
@@ -324,7 +324,8 @@ func (p *ExecOptions) Run() error {
 		if len(pod.Spec.Containers) > 1 {
 			usageString := fmt.Sprintf("Defaulting container name to %s.", pod.Spec.Containers[0].Name)
 			if len(p.SuggestedCmdUsage) > 0 {
-				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+				suggestedCmdUsage := fmt.Sprintf(p.SuggestedCmdUsage, pod.Name)
+				usageString = fmt.Sprintf("%s\n%s", usageString, suggestedCmdUsage)
 			}
 			fmt.Fprintf(p.ErrOut, "%s\n", usageString)
 		}
