@@ -150,7 +150,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		podSandboxConfig.Bandwidth = bandwidthParam
 	}
 
-	// TODO(dual-stack) there can be mulitple PodCIDR per node and per IP family
+	// TODO(dual-stack) there can be multiple PodCIDR per node and per IP family
 	if podCIDR := m.runtimeHelper.GetPodCIDR(); podCIDR != "" {
 		ipRange := &runtimeapi.IpRange{
 			Subnet: podCIDR,
@@ -159,7 +159,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		ranges = append(ranges, ipRange)
 
 		ipRanges := []*runtimeapi.IpRanges{}
-		ipRanges = append(ipRanges, &runtimeapi.IpRanges{ranges})
+		ipRanges = append(ipRanges, &runtimeapi.IpRanges{IpRange: ranges})
 
 		podSandboxConfig.IpRanges = ipRanges
 	}
