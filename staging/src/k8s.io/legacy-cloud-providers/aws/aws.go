@@ -239,7 +239,7 @@ const (
 	// it has not been silently removed by AWS.
 	// On a random AWS account (shared among several developers) it took 4s on
 	// average.
-	createEBSCheckInterval = 5 * time.Second
+	createEBSCheckInterval = 3 * time.Second
 	createEBSCheckTimeout  = 30 * time.Second
 
 	// Number of node names that can be added to a filter. The AWS limit is 200
