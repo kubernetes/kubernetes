@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	apiv1 "k8s.io/api/core/v1"
@@ -44,10 +44,10 @@ import (
 var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 	f := framework.NewDefaultFramework("audit")
 
-	It("should dynamically audit API calls", func() {
+	ginkgo.It("should dynamically audit API calls", func() {
 		namespace := f.Namespace.Name
 
-		By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
+		ginkgo.By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "failed to fetch config")
 
