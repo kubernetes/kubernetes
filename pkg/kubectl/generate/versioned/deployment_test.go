@@ -41,16 +41,16 @@ func TestDeploymentBasicGenerate(t *testing.T) {
 			expected: &appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "images-name-ok",
-					Labels: map[string]string{"app": "images-name-ok"},
+					Labels: map[string]string{"app.kubernetes.io/name": "images-name-ok"},
 				},
 				Spec: appsv1.DeploymentSpec{
 					Replicas: &one,
 					Selector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"app": "images-name-ok"},
+						MatchLabels: map[string]string{"app.kubernetes.io/name": "images-name-ok"},
 					},
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{"app": "images-name-ok"},
+							Labels: map[string]string{"app.kubernetes.io/name": "images-name-ok"},
 						},
 						Spec: v1.PodSpec{
 							Containers: []v1.Container{

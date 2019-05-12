@@ -43,12 +43,12 @@ func TestServiceBasicGenerate(t *testing.T) {
 			expected: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-ok",
-					Labels: map[string]string{"app": "clusterip-ok"},
+					Labels: map[string]string{"app.kubernetes.io/name": "clusterip-ok"},
 				},
 				Spec: v1.ServiceSpec{Type: "ClusterIP",
 					Ports: []v1.ServicePort{{Name: "456", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 456, StrVal: ""}, NodePort: 0},
 						{Name: "321-908", Protocol: "TCP", Port: 321, TargetPort: intstr.IntOrString{Type: 0, IntVal: 908, StrVal: ""}, NodePort: 0}},
-					Selector:  map[string]string{"app": "clusterip-ok"},
+					Selector:  map[string]string{"app.kubernetes.io/name": "clusterip-ok"},
 					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
 			},
 			expectErr: false,
@@ -73,11 +73,11 @@ func TestServiceBasicGenerate(t *testing.T) {
 			expected: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-none-ok",
-					Labels: map[string]string{"app": "clusterip-none-ok"},
+					Labels: map[string]string{"app.kubernetes.io/name": "clusterip-none-ok"},
 				},
 				Spec: v1.ServiceSpec{Type: "ClusterIP",
 					Ports:     []v1.ServicePort{},
-					Selector:  map[string]string{"app": "clusterip-none-ok"},
+					Selector:  map[string]string{"app.kubernetes.io/name": "clusterip-none-ok"},
 					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: ""},
 			},
 			expectErr: false,
@@ -90,11 +90,11 @@ func TestServiceBasicGenerate(t *testing.T) {
 			expected: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "clusterip-none-and-port-mapping",
-					Labels: map[string]string{"app": "clusterip-none-and-port-mapping"},
+					Labels: map[string]string{"app.kubernetes.io/name": "clusterip-none-and-port-mapping"},
 				},
 				Spec: v1.ServiceSpec{Type: "ClusterIP",
 					Ports:     []v1.ServicePort{{Name: "456-9898", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 9898, StrVal: ""}, NodePort: 0}},
-					Selector:  map[string]string{"app": "clusterip-none-and-port-mapping"},
+					Selector:  map[string]string{"app.kubernetes.io/name": "clusterip-none-and-port-mapping"},
 					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: ""},
 			},
 			expectErr: false,
@@ -107,11 +107,11 @@ func TestServiceBasicGenerate(t *testing.T) {
 			expected: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "loadbalancer-ok",
-					Labels: map[string]string{"app": "loadbalancer-ok"},
+					Labels: map[string]string{"app.kubernetes.io/name": "loadbalancer-ok"},
 				},
 				Spec: v1.ServiceSpec{Type: "LoadBalancer",
 					Ports:     []v1.ServicePort{{Name: "456-9898", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 9898, StrVal: ""}, NodePort: 0}},
-					Selector:  map[string]string{"app": "loadbalancer-ok"},
+					Selector:  map[string]string{"app.kubernetes.io/name": "loadbalancer-ok"},
 					ClusterIP: "", ExternalIPs: []string(nil), LoadBalancerIP: ""},
 			},
 			expectErr: false,
