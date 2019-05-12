@@ -64,7 +64,7 @@ func (b BaseDeploymentGenerator) structuredGenerate() (
 	}
 	podSpec = buildPodSpec(b.Images)
 	labels = map[string]string{}
-	labels["app"] = b.Name
+	labels["app.kubernetes.io/name"] = b.Name
 	selector = metav1.LabelSelector{MatchLabels: labels}
 	return
 }

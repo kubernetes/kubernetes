@@ -237,9 +237,9 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 
 	// setup default label and selector
 	labels := map[string]string{}
-	labels["app"] = s.Name
+	labels["app.kubernetes.io/name"] = s.Name
 	selector := map[string]string{}
-	selector["app"] = s.Name
+	selector["app.kubernetes.io/name"] = s.Name
 
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
