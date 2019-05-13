@@ -88,11 +88,11 @@ func PokeHTTP(host string, port int, path string, params *HTTPPokeParams) HTTPPo
 	// Sanity check inputs, because it has happened.  These are the only things
 	// that should hard fail the test - they are basically ASSERT()s.
 	if host == "" {
-		Failf("Got empty host for HTTP poke (%s)", url)
+		e2elog.Failf("Got empty host for HTTP poke (%s)", url)
 		return ret
 	}
 	if port == 0 {
-		Failf("Got port==0 for HTTP poke (%s)", url)
+		e2elog.Failf("Got port==0 for HTTP poke (%s)", url)
 		return ret
 	}
 

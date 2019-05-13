@@ -7,6 +7,7 @@ go_library(
     srcs = [
         "fixtures.go",
         "http.go",
+        "test.go",
         "udp.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/networking",

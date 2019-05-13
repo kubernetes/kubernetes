@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enet "k8s.io/kubernetes/test/e2e/framework/networking"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1446,23 +1447,23 @@ var _ = SIGDescribe("Services", func() {
 		svcIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		// Wait longer as this is our first request after creation.  We can't check using a separate method,
 		// because the LB should only be reachable from the "accept" pod
-		framework.CheckReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPodName, svcIP)
-		framework.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPodName, svcIP)
+		e2enet.CheckReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPodName, svcIP)
+		e2enet.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 
 		ginkgo.By("Update service LoadBalancerSourceRange and check reachability")
 		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			// only allow access from dropPod
 			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
 		})
-		framework.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPodName, svcIP)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
+		e2enet.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPodName, svcIP)
+		e2enet.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 
 		ginkgo.By("Delete LoadBalancerSourceRange field and check reachability")
 		jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.LoadBalancerSourceRanges = nil
 		})
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPodName, svcIP)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
+		e2enet.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPodName, svcIP)
+		e2enet.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPodName, svcIP)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.

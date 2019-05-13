@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package networking
 
 import (
 	"fmt"
@@ -26,7 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	e2enet "k8s.io/kubernetes/test/e2e/framework/networking"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // CheckReachabilityFromPod checks reachability from the specified pod.
@@ -35,17 +36,17 @@ func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		_, err := RunHostCmd(namespace, pod, cmd)
 		if expectToBeReachable && err != nil {
-			Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
+			e2elog.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
 			return false, nil
 		}
 
 		if !expectToBeReachable && err == nil {
-			Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
+			e2elog.Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
 			return false, nil
 		}
 		return true, nil
 	})
-	ExpectNoError(err)
+	framework.ExpectNoError(err)
 }
 
 // TestHitNodesFromOutside checkes HTTP connectivity from outside.
@@ -56,24 +57,24 @@ func TestHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Dur
 // TestHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
 func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
 	countToSucceed int) error {
-	Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
+	e2elog.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
 	hittedHosts := sets.NewString()
 	count := 0
 	condition := func() (bool, error) {
-		result := e2enet.PokeHTTP(externalIP, int(httpPort), "/hostname", &HTTPPokeParams{Timeout: 1 * time.Second})
+		result := PokeHTTP(externalIP, int(httpPort), "/hostname", &HTTPPokeParams{Timeout: 1 * time.Second})
 		if result.Status != HTTPSuccess {
 			return false, nil
 		}
 
 		hittedHost := strings.TrimSpace(string(result.Body))
 		if !expectedHosts.Has(hittedHost) {
-			Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
+			e2elog.Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
 			count = 0
 			return false, nil
 		}
 		if !hittedHosts.Has(hittedHost) {
 			hittedHosts.Insert(hittedHost)
-			Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
+			e2log.Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
 		}
 		if hittedHosts.Equal(expectedHosts) {
 			count++
@@ -96,11 +97,11 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 // This function executes commands on a node so it will work only for some
 // environments.
 func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host, err := GetNodeExternalIP(node)
+	host, err := framework.GetNodeExternalIP(node)
 	if err != nil {
-		Failf("Error getting node external ip : %v", err)
+		e2elog.Failf("Error getting node external ip : %v", err)
 	}
-	masterAddresses := GetAllMasterAddresses(c)
+	masterAddresses := framework.GetAllMasterAddresses(c)
 	ginkgo.By(fmt.Sprintf("block network traffic from node %s to the master", node.Name))
 	defer func() {
 		// This code will execute even if setting the iptables rule failed.
@@ -109,21 +110,21 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 		// separately, but I prefer to stay on the safe side).
 		ginkgo.By(fmt.Sprintf("Unblock network traffic from node %s to the master", node.Name))
 		for _, masterAddress := range masterAddresses {
-			UnblockNetwork(host, masterAddress)
+			framework.UnblockNetwork(host, masterAddress)
 		}
 	}()
 
-	Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
-		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
+	e2elog.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
+	if !framework.WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
+		e2elog.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	for _, masterAddress := range masterAddresses {
-		BlockNetwork(host, masterAddress)
+		fraemwork.BlockNetwork(host, masterAddress)
 	}
 
-	Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
-		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
+	e2elog.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
+	if !framework.WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
+		e2elog.Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 
 	testFunc()

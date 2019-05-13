@@ -15,7 +15,6 @@ go_library(
         "kubelet_stats.go",
         "log_size_monitoring.go",
         "metrics_util.go",
-        "networking_utils.go",
         "nodes_util.go",
         "perf_util.go",
         "pods.go",

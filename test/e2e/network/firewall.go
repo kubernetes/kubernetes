@@ -138,7 +138,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		gomega.Expect(framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(gomega.HaveOccurred())
+		gomega.Expect(e2enet.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(gomega.HaveOccurred())
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
 		// by removing the tag on one vm and make sure it doesn't get any traffic. This is an imperfect
@@ -158,11 +158,11 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			gomega.Expect(framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(gomega.HaveOccurred())
+			gomega.Expect(e2enet.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet)).NotTo(gomega.HaveOccurred())
 		}()
 
 		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		gomega.Expect(framework.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet, 15)).NotTo(gomega.HaveOccurred())
+		gomega.Expect(e2enet.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, framework.LoadBalancerCreateTimeoutDefault, nodesSet, 15)).NotTo(gomega.HaveOccurred())
 	})
 
 	ginkgo.It("should have correct firewall rules for e2e cluster", func() {

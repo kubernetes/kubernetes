@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	schedulerapi "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +44,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enet "k8s.io/kubernetes/test/e2e/framework/networking"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -324,7 +325,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("should increase cluster size if pending pods are small and one node is broken [Feature:ClusterSizeAutoscalingScaleUp]",
 		func() {
-			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleUpTest(1) })
+			e2enet.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleUpTest(1) })
 		})
 
 	It("shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -684,7 +685,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	It("should correctly scale down after a node is not needed and one node is broken [Feature:ClusterSizeAutoscalingScaleDown]",
 		func() {
-			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
+			e2enet.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
 		})
 
 	It("should correctly scale down after a node is not needed when there is non autoscaled pool[Feature:ClusterSizeAutoscalingScaleDown]", func() {
@@ -910,7 +911,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			if len(nodesToBreak) > 0 {
 				ntb := &nodesToBreak[0]
 				nodesToBreak = nodesToBreak[1:]
-				framework.TestUnderTemporaryNetworkFailure(c, "default", ntb, testFunction)
+				e2enet.TestUnderTemporaryNetworkFailure(c, "default", ntb, testFunction)
 			} else {
 				ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, defaultTimeout)
 				defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "memory-reservation")
