@@ -159,17 +159,20 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 	}
 	minPodsPerZone := math.MaxInt32
 	maxPodsPerZone := 0
-	for _, podCount := range podsPerZone {
+	var minZone, maxZone string
+	for podZone, podCount := range podsPerZone {
 		if podCount < minPodsPerZone {
 			minPodsPerZone = podCount
+			minZone = podZone
 		}
 		if podCount > maxPodsPerZone {
 			maxPodsPerZone = podCount
+			maxZone = podZone
 		}
 	}
 	Expect(minPodsPerZone).To(BeNumerically("~", maxPodsPerZone, 1),
-		"Pods were not evenly spread across zones.  %d in one zone and %d in another zone",
-		minPodsPerZone, maxPodsPerZone)
+		"Pods were not evenly spread across zones.  %d in %s and %d in %s",
+		minPodsPerZone, minZone, maxPodsPerZone, maxZone)
 	return true, nil
 }
 
