@@ -64,6 +64,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -972,6 +973,10 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	}
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
+
+	capabilities.Initialize(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
 
 	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
 	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)
