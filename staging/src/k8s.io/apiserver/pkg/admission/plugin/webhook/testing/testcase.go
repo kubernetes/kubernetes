@@ -702,5 +702,5 @@ func newMatchEverythingRules() []registrationv1beta1.RuleWithOperations {
 func NewObjectInterfacesForTest() admission.ObjectInterfaces {
 	scheme := runtime.NewScheme()
 	corev1.AddToScheme(scheme)
-	return &admission.SchemeBasedObjectInterfaces{scheme}
+	return admission.NewObjectInterfacesFromScheme(scheme)
 }

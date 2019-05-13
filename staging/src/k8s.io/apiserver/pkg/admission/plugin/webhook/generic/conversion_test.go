@@ -42,7 +42,7 @@ func initiateScheme(t *testing.T) *runtime.Scheme {
 
 func TestConvertToGVK(t *testing.T) {
 	scheme := initiateScheme(t)
-	o := &admission.SchemeBasedObjectInterfaces{scheme}
+	o := admission.NewObjectInterfacesFromScheme(scheme)
 	table := map[string]struct {
 		obj         runtime.Object
 		gvk         schema.GroupVersionKind

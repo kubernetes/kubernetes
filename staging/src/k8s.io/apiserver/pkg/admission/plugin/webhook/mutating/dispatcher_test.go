@@ -49,7 +49,7 @@ func TestDispatch(t *testing.T) {
 	require.NoError(t, example.AddToScheme(scheme))
 	require.NoError(t, examplev1.AddToScheme(scheme))
 	require.NoError(t, example2v1.AddToScheme(scheme))
-	objectInterfaces := &admission.SchemeBasedObjectInterfaces{scheme}
+	objectInterfaces := admission.NewObjectInterfacesFromScheme(scheme)
 
 	tests := []struct {
 		name        string
