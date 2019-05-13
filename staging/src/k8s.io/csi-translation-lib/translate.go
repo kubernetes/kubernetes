@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/csi-translation-lib/plugins"
 )
 
@@ -32,15 +33,15 @@ var (
 	}
 )
 
-// TranslateInTreeStorageClassParametersToCSI takes in-tree storage class
-// parameters and translates them to a set of parameters consumable by CSI plugin
-func TranslateInTreeStorageClassParametersToCSI(inTreePluginName string, scParameters map[string]string) (map[string]string, error) {
+// TranslateInTreeVolumeOptionsToCSI takes in-tree volume options
+// and translates them to a set of parameters consumable by CSI plugin
+func TranslateInTreeVolumeOptionsToCSI(inTreePluginName string, sc storage.StorageClass) (storage.StorageClass, error) {
 	for _, curPlugin := range inTreePlugins {
 		if inTreePluginName == curPlugin.GetInTreePluginName() {
-			return curPlugin.TranslateInTreeStorageClassParametersToCSI(scParameters)
+			return curPlugin.TranslateInTreeVolumeOptionsToCSI(sc)
 		}
 	}
-	return nil, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)
+	return storage.StorageClass{}, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)
 }
 
 // TranslateInTreePVToCSI takes a persistent volume and will translate

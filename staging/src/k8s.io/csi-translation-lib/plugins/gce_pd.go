@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudvolume "k8s.io/cloud-provider/volume"
 )
@@ -56,8 +57,21 @@ func NewGCEPersistentDiskCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
-func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
-	return scParameters, nil
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeVolumeOptionsToCSI(sc storage.StorageClass) (storage.StorageClass, error) {
+	np := map[string]string{}
+	for k, v := range sc.Parameters {
+		switch strings.ToLower(k) {
+		case "fstype":
+			np["csi.storage.k8s.io/fstype"] = v
+		default:
+			np[k] = v
+		}
+	}
+	sc.Parameters = np
+
+	// TODO(#77235): Translate AccessModes and zone/zones to AccessibleTopologies
+
+	return sc, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
