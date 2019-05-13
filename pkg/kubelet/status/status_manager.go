@@ -102,7 +102,7 @@ type Manager interface {
 
 	// TerminatePod resets the container status for the provided pod to terminated and triggers
 	// a status update.
-	TerminatePod(pod *v1.Pod)
+	TerminatePod(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 
 	// RemoveOrphanedStatuses scans the status cache and removes any entries for pods not included in
 	// the provided podUIDs.
@@ -265,7 +265,7 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 
 }
 
-func (m *manager) TerminatePod(pod *v1.Pod) {
+func (m *manager) TerminatePod(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	oldStatus := &pod.Status
@@ -274,8 +274,27 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	}
 	status := *oldStatus.DeepCopy()
 	for i := range status.ContainerStatuses {
-		status.ContainerStatuses[i].State = v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+		if podStatus != nil {
+			for j := range podStatus.ContainerStatuses {
+				cs := podStatus.ContainerStatuses[j]
+				if cs.Name == status.ContainerStatuses[i].Name {
+					status.ContainerStatuses[i].State = v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							ExitCode:    int32(cs.ExitCode),
+							Reason:      cs.Reason,
+							Message:     cs.Message,
+							StartedAt:   metav1.NewTime(cs.StartedAt),
+							FinishedAt:  metav1.NewTime(cs.FinishedAt),
+							ContainerID: cs.ID.String(),
+						},
+					}
+					break
+				}
+			}
+		} else {
+			status.ContainerStatuses[i].State = v1.ContainerState{
+				Terminated: &v1.ContainerStateTerminated{},
+			}
 		}
 	}
 	for i := range status.InitContainerStatuses {
@@ -334,6 +353,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
 		klog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
 		return false
+	}
+	if pod.Spec.RestartPolicy != v1.RestartPolicyAlways && oldStatus.Phase == v1.PodFailed && status.Phase != v1.PodFailed {
+		klog.Errorf("terminated pod %v attempted illegal transition to non-terminated state", pod.Name)
+		return false;
 	}
 
 	// Set ContainersReadyCondition.LastTransitionTime.

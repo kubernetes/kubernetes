@@ -1984,7 +1984,11 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 			// handle the work item. Check if the DeletionTimestamp has been
 			// set, and force a status update to trigger a pod deletion request
 			// to the apiserver.
-			kl.statusManager.TerminatePod(pod)
+			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
+				kl.statusManager.TerminatePod(pod, podStatus)
+			} else {
+				kl.statusManager.TerminatePod(pod, nil)
+			}
 		}
 		return
 	}
