@@ -546,7 +546,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		pod, containerSpec = restoredPod, restoredContainer
 	}
 
-	// From this point , pod and container must be non-nil.
+	// From this point, pod and container must be non-nil.
 	gracePeriod := int64(minimumGracePeriodInSeconds)
 	switch {
 	case pod.DeletionGracePeriodSeconds != nil:
