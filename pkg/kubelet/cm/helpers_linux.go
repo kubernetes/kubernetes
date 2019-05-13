@@ -18,10 +18,13 @@ package cm
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
@@ -269,4 +272,17 @@ func GetRuntimeContainer(containerRuntime, runtimeCgroups string) (string, error
 		return cont, nil
 	}
 	return runtimeCgroups, nil
+}
+
+func getSwapIsOn() (bool, error) {
+	swapData, err := ioutil.ReadFile("/proc/swaps")
+	if err != nil {
+		return false, err
+	}
+
+	swapData = bytes.TrimSpace(swapData) // extra trailing \n
+	swapLines := strings.Split(string(swapData), "\n")
+
+	swapIsOn := len(swapLines) > 1
+	return swapIsOn, nil
 }

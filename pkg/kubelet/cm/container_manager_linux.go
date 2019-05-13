@@ -19,13 +19,11 @@ limitations under the License.
 package cm
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -206,18 +204,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	if failSwapOn {
-		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
-		swapData, err := ioutil.ReadFile("/proc/swaps")
+		swapIsOn, err := getSwapIsOn()
+
 		if err != nil {
 			return nil, err
 		}
-		swapData = bytes.TrimSpace(swapData) // extra trailing \n
-		swapLines := strings.Split(string(swapData), "\n")
 
-		// If there is more than one line (table headers) in /proc/swaps, swap is enabled and we should
-		// error out unless --fail-swap-on is set to false.
-		if len(swapLines) > 1 {
-			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false. /proc/swaps contained: %v", swapLines)
+		if swapIsOn {
+			return nil, fmt.Errorf("Running with swap on is not supported, please disable swap! or set --fail-swap-on flag to false.")
 		}
 	}
 
