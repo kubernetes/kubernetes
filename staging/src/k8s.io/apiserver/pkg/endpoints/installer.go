@@ -806,6 +806,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
 				Returns(http.StatusOK, "OK", versionedStatus)
+			if isCollectionDeleter {
+				route.Reads(versionedDeleterObject)
+				route.ParameterNamed("body").Required(false)
+				if err := AddObjectParams(ws, route, versionedDeleteOptions); err != nil {
+					return nil, err
+				}
+			}
 			if err := AddObjectParams(ws, route, versionedListOptions); err != nil {
 				return nil, err
 			}
