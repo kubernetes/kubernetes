@@ -647,19 +647,16 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		return nil, fmt.Errorf("Could not find plugin because volume spec is nil")
 	}
 
-	matchedPluginNames := []string{}
 	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
+	for _, v := range pm.plugins {
 		if v.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, k)
 			matches = append(matches, v)
 		}
 	}
 
 	pm.refreshProbedPlugins()
-	for pluginName, plugin := range pm.probedPlugins {
+	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, pluginName)
 			matches = append(matches, plugin)
 		}
 	}
@@ -668,6 +665,10 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
 	if len(matches) > 1 {
+		matchedPluginNames := []string{}
+		for _, plugin := range matches {
+			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 	return matches[0], nil
@@ -684,11 +685,9 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 		return false, fmt.Errorf("could not find if plugin is migratable because volume spec is nil")
 	}
 
-	matchedPluginNames := []string{}
 	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
+	for _, v := range pm.plugins {
 		if v.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, k)
 			matches = append(matches, v)
 		}
 	}
@@ -698,6 +697,10 @@ func (pm *VolumePluginMgr) IsPluginMigratableBySpec(spec *Spec) (bool, error) {
 		return false, nil
 	}
 	if len(matches) > 1 {
+		matchedPluginNames := []string{}
+		for _, plugin := range matches {
+			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+		}
 		return false, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 
@@ -711,16 +714,13 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	defer pm.mutex.Unlock()
 
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
-	matchedPluginNames := []string{}
 	matches := []VolumePlugin{}
 	if v, found := pm.plugins[name]; found {
-		matchedPluginNames = append(matchedPluginNames, name)
 		matches = append(matches, v)
 	}
 
 	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
-		matchedPluginNames = append(matchedPluginNames, name)
 		matches = append(matches, plugin)
 	}
 
@@ -728,6 +728,10 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 		return nil, fmt.Errorf("no volume plugin matched")
 	}
 	if len(matches) > 1 {
+		matchedPluginNames := []string{}
+		for _, plugin := range matches {
+			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+		}
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matchedPluginNames, ","))
 	}
 	return matches[0], nil
