@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -39,7 +40,7 @@ var _ = SIGDescribe("crictl", func() {
 	It("should be able to run crictl on the node", func() {
 		// Get all nodes' external IPs.
 		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := framework.NodeSSHHosts(f.ClientSet)
+		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}
@@ -56,7 +57,7 @@ var _ = SIGDescribe("crictl", func() {
 			host := hosts[0]
 			By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
 
-			result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
+			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
 				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)

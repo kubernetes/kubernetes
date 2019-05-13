@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,7 +275,7 @@ func extractNSTolerations(ns *corev1.Namespace, key string) ([]api.Toleration, e
 		return []api.Toleration{}, nil
 	}
 
-	var v1Tolerations []v1.Toleration
+	var v1Tolerations []corev1.Toleration
 	err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
 	if err != nil {
 		return nil, err

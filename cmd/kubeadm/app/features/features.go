@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/version"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 )
 
 const (
@@ -38,12 +38,12 @@ var coreDNSMessage = "featureGates:CoreDNS has been removed in v1.13\n" +
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	CoreDNS: {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
+	CoreDNS: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Deprecated}, HiddenInHelpText: true, DeprecationMessage: coreDNSMessage},
 }
 
 // Feature represents a feature being gated
 type Feature struct {
-	utilfeature.FeatureSpec
+	featuregate.FeatureSpec
 	MinimumVersion     *version.Version
 	HiddenInHelpText   bool
 	DeprecationMessage string
@@ -86,7 +86,7 @@ func Enabled(featureList map[string]bool, featureName string) bool {
 func Supports(featureList FeatureList, featureName string) bool {
 	for k, v := range featureList {
 		if featureName == string(k) {
-			return v.PreRelease != utilfeature.Deprecated
+			return v.PreRelease != featuregate.Deprecated
 		}
 	}
 	return false
@@ -110,7 +110,7 @@ func KnownFeatures(f *FeatureList) []string {
 		}
 
 		pre := ""
-		if v.PreRelease != utilfeature.GA {
+		if v.PreRelease != featuregate.GA {
 			pre = fmt.Sprintf("%s - ", v.PreRelease)
 		}
 		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.Default))
@@ -141,7 +141,7 @@ func NewFeatureGate(f *FeatureList, value string) (map[string]bool, error) {
 			return nil, errors.Errorf("unrecognized feature-gate key: %s", k)
 		}
 
-		if featureSpec.PreRelease == utilfeature.Deprecated {
+		if featureSpec.PreRelease == featuregate.Deprecated {
 			return nil, errors.Errorf("feature-gate key is deprecated: %s", k)
 		}
 
@@ -168,7 +168,7 @@ func CheckDeprecatedFlags(f *FeatureList, features map[string]bool) map[string]s
 			deprecatedMsg[k] = fmt.Sprintf("Unknown feature gate flag: %s", k)
 		}
 
-		if featureSpec.PreRelease == utilfeature.Deprecated {
+		if featureSpec.PreRelease == featuregate.Deprecated {
 			if _, ok := deprecatedMsg[k]; !ok {
 				deprecatedMsg[k] = featureSpec.DeprecationMessage
 			}

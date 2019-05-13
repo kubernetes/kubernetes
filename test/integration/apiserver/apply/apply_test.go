@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -59,7 +59,7 @@ func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server
 // will create the object if it doesn't already exist
 // TODO: make a set of test cases in an easy-to-consume place (separate package?) so it's easy to test in both integration and e2e.
 func TestApplyAlsoCreates(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -140,7 +140,7 @@ func TestApplyAlsoCreates(t *testing.T) {
 // TestCreateOnApplyFailsWithUID makes sure that PATCH requests with the apply content type
 // will not create the object if it doesn't already exist and it specifies a UID
 func TestCreateOnApplyFailsWithUID(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -172,7 +172,7 @@ func TestCreateOnApplyFailsWithUID(t *testing.T) {
 }
 
 func TestApplyUpdateApplyConflictForced(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -261,7 +261,7 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 
 // TestApplyManagedFields makes sure that managedFields api does not change
 func TestApplyManagedFields(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -365,7 +365,7 @@ func TestApplyManagedFields(t *testing.T) {
 
 // TestApplyRemovesEmptyManagedFields there are no empty managers in managedFields
 func TestApplyRemovesEmptyManagedFields(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -417,7 +417,7 @@ func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 }
 
 func TestApplyRequiresFieldManager(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -457,7 +457,7 @@ func TestApplyRequiresFieldManager(t *testing.T) {
 
 // TestApplyRemoveContainerPort removes a container port from a deployment
 func TestApplyRemoveContainerPort(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -561,7 +561,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 // TestApplyFailsWithVersionMismatch ensures that a version mismatch between the
 // patch object and the live object will error
 func TestApplyFailsWithVersionMismatch(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()
@@ -658,7 +658,7 @@ func TestApplyFailsWithVersionMismatch(t *testing.T) {
 // TestApplyConvertsManagedFieldsVersion checks that the apply
 // converts the API group-version in the field manager
 func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(t)
 	defer closeFn()

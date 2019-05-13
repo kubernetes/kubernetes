@@ -28,11 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -40,15 +40,15 @@ import (
 )
 
 var (
-	deprecationDisabledFeature = utilfeature.NewFeatureGate()
-	deprecationEnabledFeature  = utilfeature.NewFeatureGate()
+	deprecationDisabledFeature = featuregate.NewFeatureGate()
+	deprecationEnabledFeature  = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := deprecationDisabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: false}}); err != nil {
+	if err := deprecationDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: false}}); err != nil {
 		panic(err)
 	}
-	if err := deprecationEnabledFeature.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: true}}); err != nil {
+	if err := deprecationEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{kubefeatures.BoundServiceAccountTokenVolume: {Default: true}}); err != nil {
 		panic(err)
 	}
 }

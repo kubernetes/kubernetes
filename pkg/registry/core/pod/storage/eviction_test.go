@@ -251,7 +251,7 @@ func TestEvictionDryRun(t *testing.T) {
 				t.Error(err)
 			}
 
-			client := fake.NewSimpleClientset()
+			client := fake.NewSimpleClientset(tc.pdbs...)
 			evictionRest := newEvictionStorage(storage.Store, client.PolicyV1beta1())
 			eviction := &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}, DeleteOptions: tc.evictionOptions}
 			_, err := evictionRest.Create(testContext, eviction, nil, tc.requestOptions)

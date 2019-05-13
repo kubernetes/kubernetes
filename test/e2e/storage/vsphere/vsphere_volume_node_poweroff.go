@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/object"
 	vimtypes "github.com/vmware/govmomi/vim25/types"
 
@@ -49,15 +49,15 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		namespace string
 	)
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
-		Expect(len(nodeList.Items) > 1).To(BeTrue(), "At least 2 nodes are required for this test")
+		gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty(), "Unable to find ready and schedulable Node")
+		gomega.Expect(len(nodeList.Items) > 1).To(gomega.BeTrue(), "At least 2 nodes are required for this test")
 	})
 
 	/*
@@ -75,43 +75,43 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		11. Delete the PVC
 		12. Delete the StorageClass
 	*/
-	It("verify volume status after node power off", func() {
-		By("Creating a Storage Class")
+	ginkgo.It("verify volume status after node power off", func() {
+		ginkgo.By("Creating a Storage Class")
 		storageClassSpec := getVSphereStorageClassSpec("test-sc", nil, nil)
 		storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 		defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
-		By("Creating PVC using the Storage Class")
+		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
 		pvclaim, err := framework.CreatePVC(client, namespace, pvclaimSpec)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create PVC with err: %v", err))
 		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
-		By("Waiting for PVC to be in bound phase")
+		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
 		pvs, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to wait until PVC phase set to bound: %v", err))
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 
-		By("Creating a Deployment")
+		ginkgo.By("Creating a Deployment")
 		deployment, err := e2edeploy.CreateDeployment(client, int32(1), map[string]string{"test": "app"}, nil, namespace, pvclaims, "")
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
-		By("Get pod from the deployement")
+		ginkgo.By("Get pod from the deployement")
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
-		Expect(podList.Items).NotTo(BeEmpty())
+		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 		node1 := pod.Spec.NodeName
 
-		By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
+		ginkgo.By(fmt.Sprintf("Verify disk is attached to the node: %v", node1))
 		isAttached, err := diskIsAttached(volumePath, node1)
 		framework.ExpectNoError(err)
-		Expect(isAttached).To(BeTrue(), "Disk is not attached to the node")
+		gomega.Expect(isAttached).To(gomega.BeTrue(), "Disk is not attached to the node")
 
-		By(fmt.Sprintf("Power off the node: %v", node1))
+		ginkgo.By(fmt.Sprintf("Power off the node: %v", node1))
 
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node1)
 		vm := object.NewVirtualMachine(nodeInfo.VSphere.Client.Client, nodeInfo.VirtualMachineRef)
@@ -128,15 +128,15 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		node2, err := waitForPodToFailover(client, deployment, node1)
 		framework.ExpectNoError(err, "Pod did not fail over to a different node")
 
-		By(fmt.Sprintf("Waiting for disk to be attached to the new node: %v", node2))
+		ginkgo.By(fmt.Sprintf("Waiting for disk to be attached to the new node: %v", node2))
 		err = waitForVSphereDiskToAttach(volumePath, node2)
 		framework.ExpectNoError(err, "Disk is not attached to the node")
 
-		By(fmt.Sprintf("Waiting for disk to be detached from the previous node: %v", node1))
+		ginkgo.By(fmt.Sprintf("Waiting for disk to be detached from the previous node: %v", node1))
 		err = waitForVSphereDiskToDetach(volumePath, node1)
 		framework.ExpectNoError(err, "Disk is not detached from the node")
 
-		By(fmt.Sprintf("Power on the previous node: %v", node1))
+		ginkgo.By(fmt.Sprintf("Power on the previous node: %v", node1))
 		vm.PowerOn(ctx)
 		err = vm.WaitForPowerState(ctx, vimtypes.VirtualMachinePowerStatePoweredOn)
 		framework.ExpectNoError(err, "Unable to power on the node")

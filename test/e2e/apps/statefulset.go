@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -86,7 +87,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
-			framework.Logf("Deleting all statefulset in ns %v", ns)
+			e2elog.Logf("Deleting all statefulset in ns %v", ns)
 			framework.DeleteAllStatefulSets(c, ns)
 		})
 
@@ -753,13 +754,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 				pod := event.Object.(*v1.Pod)
 				switch event.Type {
 				case watch.Deleted:
-					framework.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
+					e2elog.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
 					if initialStatefulPodUID == "" {
 						return false, nil
 					}
 					return true, nil
 				}
-				framework.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
+				e2elog.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
 					pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
 				initialStatefulPodUID = pod.UID
 				return false, nil
@@ -836,7 +837,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
-			framework.Logf("Deleting all statefulset in ns %v", ns)
+			e2elog.Logf("Deleting all statefulset in ns %v", ns)
 			framework.DeleteAllStatefulSets(c, ns)
 		})
 
@@ -876,7 +877,7 @@ func kubectlExecWithRetries(args ...string) (out string) {
 		if out, err = framework.RunKubectl(args...); err == nil {
 			return
 		}
-		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
+		e2elog.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
 	}
 	framework.Failf("Failed to execute \"%v\" with retries: %v", args, err)
 	return
@@ -938,7 +939,7 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+		e2elog.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
@@ -969,12 +970,12 @@ func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
 func (m *mysqlGaleraTester) deploy(ns string) *apps.StatefulSet {
 	m.ss = m.tester.CreateStatefulSet(mysqlGaleraManifestPath, ns)
 
-	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
+	e2elog.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
 	for _, cmd := range []string{
 		"create database statefulset;",
 		"use statefulset; create table foo (k varchar(20), v varchar(20));",
 	} {
-		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
+		e2elog.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
 	}
 	return m.ss
 }
@@ -983,7 +984,7 @@ func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
+		e2elog.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }
 
@@ -1014,7 +1015,7 @@ func (m *redisTester) deploy(ns string) *apps.StatefulSet {
 func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
-		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
+		e2elog.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
 	}
 }
 
@@ -1039,12 +1040,12 @@ func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 
 func (c *cockroachDBTester) deploy(ns string) *apps.StatefulSet {
 	c.ss = c.tester.CreateStatefulSet(cockroachDBManifestPath, ns)
-	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
+	e2elog.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
 	for _, cmd := range []string{
 		"CREATE DATABASE IF NOT EXISTS foo;",
 		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
 	} {
-		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
+		e2elog.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
 	}
 	return c.ss
 }
@@ -1053,7 +1054,7 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
+		e2elog.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {

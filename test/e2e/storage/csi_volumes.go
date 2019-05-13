@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/rand"
 )
 
@@ -55,52 +55,52 @@ var _ = utils.SIGDescribe("CSI Volumes", func() {
 	for _, initDriver := range csiTestDrivers {
 		curDriver := initDriver()
 
-		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
+		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
 			testsuites.DefineTestSuite(curDriver, csiTestSuites)
 		})
 	}
 
 	// TODO: PD CSI driver needs to be serial because it uses a fixed name. Address as part of #71289
-	Context("CSI Topology test using GCE PD driver [Serial]", func() {
+	ginkgo.Context("CSI Topology test using GCE PD driver [Serial]", func() {
 		f := framework.NewDefaultFramework("csitopology")
 		driver := drivers.InitGcePDCSIDriver().(testsuites.DynamicPVTestDriver) // TODO (#71289) eliminate by moving this test to common test suite.
 		var (
 			config      *testsuites.PerTestConfig
 			testCleanup func()
 		)
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			driver.SkipUnsupportedTest(testpatterns.TestPattern{})
 			config, testCleanup = driver.PrepareTest(f)
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			if testCleanup != nil {
 				testCleanup()
 			}
 		})
 
-		It("should provision zonal PD with immediate volume binding and AllowedTopologies set and mount the volume to a pod", func() {
+		ginkgo.It("should provision zonal PD with immediate volume binding and AllowedTopologies set and mount the volume to a pod", func() {
 			suffix := "topology-positive"
 			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */, true /* allowedTopologies */)
 		})
 
-		It("should provision zonal PD with delayed volume binding and mount the volume to a pod", func() {
+		ginkgo.It("should provision zonal PD with delayed volume binding and mount the volume to a pod", func() {
 			suffix := "delayed"
 			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, false /* allowedTopologies */)
 		})
 
-		It("should provision zonal PD with delayed volume binding and AllowedTopologies set and mount the volume to a pod", func() {
+		ginkgo.It("should provision zonal PD with delayed volume binding and AllowedTopologies set and mount the volume to a pod", func() {
 			suffix := "delayed-topology-positive"
 			testTopologyPositive(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */, true /* allowedTopologies */)
 		})
 
-		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with immediate volume binding", func() {
+		ginkgo.It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with immediate volume binding", func() {
 			framework.SkipUnlessMultizone(config.Framework.ClientSet)
 			suffix := "topology-negative"
 			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), false /* delayBinding */)
 		})
 
-		It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with delayed volume binding", func() {
+		ginkgo.It("should fail to schedule a pod with a zone missing from AllowedTopologies; PD is provisioned with delayed volume binding", func() {
 			framework.SkipUnlessMultizone(config.Framework.ClientSet)
 			suffix := "delayed-topology-negative"
 			testTopologyNegative(config.Framework.ClientSet, suffix, config.Framework.Namespace.GetName(), true /* delayBinding */)
@@ -124,7 +124,7 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 
 	if delayBinding {
 		_, node := test.TestBindingWaitForFirstConsumer(nil /* node selector */, false /* expect unschedulable */)
-		Expect(node).ToNot(BeNil(), "Unexpected nil node found")
+		gomega.Expect(node).ToNot(gomega.BeNil(), "Unexpected nil node found")
 	} else {
 		test.TestDynamicProvisioning()
 	}
@@ -136,7 +136,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	// Use different zones for pod and PV
 	zones, err := framework.GetClusterZones(cs)
 	framework.ExpectNoError(err)
-	Expect(zones.Len()).To(BeNumerically(">=", 2))
+	gomega.Expect(zones.Len()).To(gomega.BeNumerically(">=", 2))
 	zonesList := zones.UnsortedList()
 	podZoneIndex := rand.Intn(zones.Len())
 	podZone := zonesList[podZoneIndex]

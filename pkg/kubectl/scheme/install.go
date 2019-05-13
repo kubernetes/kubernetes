@@ -57,7 +57,8 @@ import (
 func init() {
 	// Register external types for Scheme
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-	utilruntime.Must(metav1beta1.AddToScheme(Scheme))
+	utilruntime.Must(metav1beta1.AddMetaToScheme(Scheme))
+	utilruntime.Must(metav1.AddMetaToScheme(Scheme))
 	utilruntime.Must(scheme.AddToScheme(Scheme))
 
 	utilruntime.Must(Scheme.SetVersionPriority(corev1.SchemeGroupVersion))

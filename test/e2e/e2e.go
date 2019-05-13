@@ -38,6 +38,7 @@ import (
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -119,26 +120,26 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// number equal to the number of allowed not-ready nodes).
 	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
-		framework.LogFailedContainers(c, metav1.NamespaceSystem, framework.Logf)
+		framework.LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
 	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
-		framework.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
+		e2elog.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
 	// Log the version of the server and this client.
-	framework.Logf("e2e test version: %s", version.Get().GitVersion)
+	e2elog.Logf("e2e test version: %s", version.Get().GitVersion)
 
 	dc := c.DiscoveryClient
 
 	serverVersion, serverErr := dc.ServerVersion()
 	if serverErr != nil {
-		framework.Logf("Unexpected server error retrieving version: %v", serverErr)
+		e2elog.Logf("Unexpected server error retrieving version: %v", serverErr)
 	}
 	if serverVersion != nil {
-		framework.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
+		e2elog.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
 	}
 
 	// Reference common test to make the import valid.
@@ -160,17 +161,17 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 // and then the function that only runs on the first Ginkgo node.
 var _ = ginkgo.SynchronizedAfterSuite(func() {
 	// Run on all Ginkgo nodes
-	framework.Logf("Running AfterSuite actions on all nodes")
+	e2elog.Logf("Running AfterSuite actions on all nodes")
 	framework.RunCleanupActions()
 }, func() {
 	// Run only Ginkgo on node 1
-	framework.Logf("Running AfterSuite actions on node 1")
+	e2elog.Logf("Running AfterSuite actions on node 1")
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 	}
 	if framework.TestContext.GatherSuiteMetricsAfterTest {
 		if err := gatherTestSuiteMetrics(); err != nil {
-			framework.Logf("Error gathering metrics: %v", err)
+			e2elog.Logf("Error gathering metrics: %v", err)
 		}
 	}
 	if framework.TestContext.NodeKiller.Enabled {
@@ -179,7 +180,7 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 })
 
 func gatherTestSuiteMetrics() error {
-	framework.Logf("Gathering metrics")
+	e2elog.Logf("Gathering metrics")
 	c, err := framework.LoadClientset()
 	if err != nil {
 		return fmt.Errorf("error loading client: %v", err)
@@ -204,7 +205,7 @@ func gatherTestSuiteMetrics() error {
 			return fmt.Errorf("error writing to %q: %v", filePath, err)
 		}
 	} else {
-		framework.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
+		e2elog.Logf("\n\nTest Suite Metrics:\n%s\n", metricsJSON)
 	}
 
 	return nil
@@ -246,31 +247,31 @@ func RunE2ETests(t *testing.T) {
 // to flip to Ready, log its output and delete it.
 func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 	path := "test/images/clusterapi-tester/pod.yaml"
-	framework.Logf("Parsing pod from %v", path)
+	e2elog.Logf("Parsing pod from %v", path)
 	p, err := manifest.PodFromManifest(path)
 	if err != nil {
-		framework.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
+		e2elog.Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
 		return
 	}
 	p.Namespace = ns
 	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
-		framework.Logf("Failed to create %v: %v", p.Name, err)
+		e2elog.Logf("Failed to create %v: %v", p.Name, err)
 		return
 	}
 	defer func() {
 		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
-			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
+			e2elog.Logf("Failed to delete pod %v: %v", p.Name, err)
 		}
 	}()
 	timeout := 5 * time.Minute
 	if err := framework.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
-		framework.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
+		e2elog.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
 		return
 	}
 	logs, err := framework.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
 	if err != nil {
-		framework.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
+		e2elog.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
 	} else {
-		framework.Logf("Output of clusterapi-tester:\n%v", logs)
+		e2elog.Logf("Output of clusterapi-tester:\n%v", logs)
 	}
 }

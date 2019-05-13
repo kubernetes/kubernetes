@@ -53,13 +53,11 @@
       "timeoutSeconds": 15
     },
     "ports":[
+      {{insecure_port_mapping}}
       { "name": "https",
-        "containerPort": {{secure_port}},
-        "hostPort": {{secure_port}}},{
-       "name": "local",
-        "containerPort": 8080,
-        "hostPort": 8080}
-        ],
+      "containerPort": {{secure_port}},
+      "hostPort": {{secure_port}}}
+    ],
     "volumeMounts": [
         {{kms_socket_mount}}
         {{encryption_provider_mount}}

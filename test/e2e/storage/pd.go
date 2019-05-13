@@ -27,8 +27,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 	)
 	f := framework.NewDefaultFramework("pod-disks")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessNodeCountIsAtLeast(minNodes)
 		cs = f.ClientSet
 		ns = f.Namespace.Name
@@ -77,14 +77,14 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		podClient = cs.CoreV1().Pods(ns)
 		nodeClient = cs.CoreV1().Nodes()
 		nodes = framework.GetReadySchedulableNodesOrDie(cs)
-		Expect(len(nodes.Items)).To(BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
+		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
 
 		mathrand.Seed(time.Now().UnixNano())
 	})
 
-	Context("schedule pods each with a PD, delete pod and verify detach [Slow]", func() {
+	ginkgo.Context("schedule pods each with a PD, delete pod and verify detach [Slow]", func() {
 		const (
 			podDefaultGrace   = "default (30s)"
 			podImmediateGrace = "immediate (0s)"
@@ -126,29 +126,29 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			readOnly := t.readOnly
 			readOnlyTxt := readOnlyMap[readOnly]
 
-			It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func() {
+			ginkgo.It(fmt.Sprintf("for %s PD with pod delete grace period of %q", readOnlyTxt, t.descr), func() {
 				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				if readOnly {
 					framework.SkipIfProviderIs("aws")
 				}
 
-				By("creating PD")
+				ginkgo.By("creating PD")
 				diskName, err := framework.CreatePDWithRetry()
 				framework.ExpectNoError(err, "Error creating PD")
 
 				var fmtPod *v1.Pod
 				if readOnly {
 					// if all test pods are RO then need a RW pod to format pd
-					By("creating RW fmt Pod to ensure PD is formatted")
+					ginkgo.By("creating RW fmt Pod to ensure PD is formatted")
 					fmtPod = testPDPod([]string{diskName}, host0Name, false, 1)
 					_, err = podClient.Create(fmtPod)
 					framework.ExpectNoError(err, "Failed to create fmtPod")
 					framework.ExpectNoError(f.WaitForPodRunningSlow(fmtPod.Name))
 
-					By("deleting the fmtPod")
+					ginkgo.By("deleting the fmtPod")
 					framework.ExpectNoError(podClient.Delete(fmtPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete fmtPod")
 					e2elog.Logf("deleted fmtPod %q", fmtPod.Name)
-					By("waiting for PD to detach")
+					ginkgo.By("waiting for PD to detach")
 					framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
 				}
 
@@ -158,7 +158,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				defer func() {
 					// Teardown should do nothing unless test failed
-					By("defer: cleaning up PD-RW test environment")
+					ginkgo.By("defer: cleaning up PD-RW test environment")
 					e2elog.Logf("defer cleanup errors can usually be ignored")
 					if fmtPod != nil {
 						podClient.Delete(fmtPod.Name, podDelOpt)
@@ -168,7 +168,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 				}()
 
-				By("creating host0Pod on node0")
+				ginkgo.By("creating host0Pod on node0")
 				_, err = podClient.Create(host0Pod)
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
@@ -176,50 +176,50 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				var containerName, testFile, testFileContents string
 				if !readOnly {
-					By("writing content to host0Pod on node0")
+					ginkgo.By("writing content to host0Pod on node0")
 					containerName = "mycontainer"
 					testFile = "/testpd1/tracker"
 					testFileContents = fmt.Sprintf("%v", mathrand.Int())
 					framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 					e2elog.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
-					By("verifying PD is present in node0's VolumeInUse list")
+					ginkgo.By("verifying PD is present in node0's VolumeInUse list")
 					framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
-					By("deleting host0Pod") // delete this pod before creating next pod
+					ginkgo.By("deleting host0Pod") // delete this pod before creating next pod
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					e2elog.Logf("deleted host0Pod %q", host0Pod.Name)
 				}
 
-				By("creating host1Pod on node1")
+				ginkgo.By("creating host1Pod on node1")
 				_, err = podClient.Create(host1Pod)
 				framework.ExpectNoError(err, "Failed to create host1Pod")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
 				e2elog.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
 
 				if readOnly {
-					By("deleting host0Pod")
+					ginkgo.By("deleting host0Pod")
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
 					e2elog.Logf("deleted host0Pod %q", host0Pod.Name)
 				} else {
-					By("verifying PD contents in host1Pod")
+					ginkgo.By("verifying PD contents in host1Pod")
 					verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
 					e2elog.Logf("verified PD contents in pod %q", host1Pod.Name)
-					By("verifying PD is removed from node0")
+					ginkgo.By("verifying PD is removed from node0")
 					framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
 					e2elog.Logf("PD %q removed from node %q's VolumeInUse list", diskName, host1Pod.Name)
 				}
 
-				By("deleting host1Pod")
+				ginkgo.By("deleting host1Pod")
 				framework.ExpectNoError(podClient.Delete(host1Pod.Name, podDelOpt), "Failed to delete host1Pod")
 				e2elog.Logf("deleted host1Pod %q", host1Pod.Name)
 
-				By("Test completed successfully, waiting for PD to detach from both nodes")
+				ginkgo.By("Test completed successfully, waiting for PD to detach from both nodes")
 				waitForPDDetach(diskName, host0Name)
 				waitForPDDetach(diskName, host1Name)
 			})
 		}
 	})
 
-	Context("schedule a pod w/ RW PD(s) mounted to 1 or more containers, write to PD, verify content, delete pod, and repeat in rapid succession [Slow]", func() {
+	ginkgo.Context("schedule a pod w/ RW PD(s) mounted to 1 or more containers, write to PD, verify content, delete pod, and repeat in rapid succession [Slow]", func() {
 		type testT struct {
 			numContainers int
 			numPDs        int
@@ -242,14 +242,14 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 			numPDs := t.numPDs
 			numContainers := t.numContainers
 
-			It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
+			ginkgo.It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
 				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 				var host0Pod *v1.Pod
 				var err error
 				fileAndContentToVerify := make(map[string]string)
 				diskNames := make([]string, 0, numPDs)
 
-				By(fmt.Sprintf("creating %d PD(s)", numPDs))
+				ginkgo.By(fmt.Sprintf("creating %d PD(s)", numPDs))
 				for i := 0; i < numPDs; i++ {
 					name, err := framework.CreatePDWithRetry()
 					framework.ExpectNoError(err, fmt.Sprintf("Error creating PD %d", i))
@@ -258,7 +258,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				defer func() {
 					// Teardown should do nothing unless test failed.
-					By("defer: cleaning up PD-RW test environment")
+					ginkgo.By("defer: cleaning up PD-RW test environment")
 					e2elog.Logf("defer cleanup errors can usually be ignored")
 					if host0Pod != nil {
 						podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
@@ -270,13 +270,13 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				for i := 0; i < t.repeatCnt; i++ { // "rapid" repeat loop
 					e2elog.Logf("PD Read/Writer Iteration #%v", i)
-					By(fmt.Sprintf("creating host0Pod with %d containers on node0", numContainers))
+					ginkgo.By(fmt.Sprintf("creating host0Pod with %d containers on node0", numContainers))
 					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
 					_, err = podClient.Create(host0Pod)
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 					framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
-					By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
+					ginkgo.By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
 					containerName := "mycontainer"
 					if numContainers > 1 {
 						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
@@ -289,16 +289,16 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 						e2elog.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
 					}
 
-					By("verifying PD contents via a container")
+					ginkgo.By("verifying PD contents via a container")
 					if numContainers > 1 {
 						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
 					}
 					verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
-					By("deleting host0Pod")
+					ginkgo.By("deleting host0Pod")
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
 				}
-				By(fmt.Sprintf("Test completed successfully, waiting for %d PD(s) to detach from node0", numPDs))
+				ginkgo.By(fmt.Sprintf("Test completed successfully, waiting for %d PD(s) to detach from node0", numPDs))
 				for _, diskName := range diskNames {
 					waitForPDDetach(diskName, host0Name)
 				}
@@ -306,7 +306,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		}
 	})
 
-	Context("detach in a disrupted environment [Slow] [Disruptive]", func() {
+	ginkgo.Context("detach in a disrupted environment [Slow] [Disruptive]", func() {
 		const (
 			deleteNode    = 1 // delete physical node
 			deleteNodeObj = 2 // delete node's api object only
@@ -333,11 +333,11 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 		for _, t := range tests {
 			disruptOp := t.disruptOp
-			It(fmt.Sprintf("when %s", t.descr), func() {
+			ginkgo.It(fmt.Sprintf("when %s", t.descr), func() {
 				framework.SkipUnlessProviderIs("gce")
 				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
 
-				By("creating a pd")
+				ginkgo.By("creating a pd")
 				diskName, err := framework.CreatePDWithRetry()
 				framework.ExpectNoError(err, "Error creating a pd")
 
@@ -346,21 +346,21 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				containerName := "mycontainer"
 
 				defer func() {
-					By("defer: cleaning up PD-RW test env")
+					ginkgo.By("defer: cleaning up PD-RW test env")
 					e2elog.Logf("defer cleanup errors can usually be ignored")
-					By("defer: delete host0Pod")
+					ginkgo.By("defer: delete host0Pod")
 					podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
-					By("defer: detach and delete PDs")
+					ginkgo.By("defer: detach and delete PDs")
 					detachAndDeletePDs(diskName, []types.NodeName{host0Name})
 					if disruptOp == deleteNode || disruptOp == deleteNodeObj {
 						if disruptOp == deleteNodeObj {
 							targetNode.ObjectMeta.SetResourceVersion("0")
 							// need to set the resource version or else the Create() fails
-							By("defer: re-create host0 node object")
+							ginkgo.By("defer: re-create host0 node object")
 							_, err := nodeClient.Create(targetNode)
 							framework.ExpectNoError(err, fmt.Sprintf("defer: Unable to re-create the deleted node object %q", targetNode.Name))
 						}
-						By("defer: verify the number of ready nodes")
+						ginkgo.By("defer: verify the number of ready nodes")
 						numNodes := countReadyNodes(cs, host0Name)
 						// if this defer is reached due to an Expect then nested
 						// Expects are lost, so use Failf here
@@ -370,43 +370,43 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					}
 				}()
 
-				By("creating host0Pod on node0")
+				ginkgo.By("creating host0Pod on node0")
 				_, err = podClient.Create(host0Pod)
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-				By("waiting for host0Pod to be running")
+				ginkgo.By("waiting for host0Pod to be running")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
-				By("writing content to host0Pod")
+				ginkgo.By("writing content to host0Pod")
 				testFile := "/testpd1/tracker"
 				testFileContents := fmt.Sprintf("%v", mathrand.Int())
 				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 				e2elog.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
-				By("verifying PD is present in node0's VolumeInUse list")
+				ginkgo.By("verifying PD is present in node0's VolumeInUse list")
 				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
 
 				if disruptOp == deleteNode {
-					By("getting gce instances")
+					ginkgo.By("getting gce instances")
 					gceCloud, err := gce.GetGCECloud()
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
 					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					Expect(true, strings.Contains(string(output), string(host0Name)))
+					gomega.Expect(true, strings.Contains(string(output), string(host0Name)))
 
-					By("deleting host0")
+					ginkgo.By("deleting host0")
 					err = gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
-					By("expecting host0 node to be re-created")
+					ginkgo.By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(cs, host0Name)
-					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
+					gomega.Expect(numNodes).To(gomega.Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-					Expect(false, strings.Contains(string(output), string(host0Name)))
+					gomega.Expect(false, strings.Contains(string(output), string(host0Name)))
 
 				} else if disruptOp == deleteNodeObj {
-					By("deleting host0's node api object")
+					ginkgo.By("deleting host0's node api object")
 					framework.ExpectNoError(nodeClient.Delete(string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0's node object")
-					By("deleting host0Pod")
+					ginkgo.By("deleting host0Pod")
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
 
 				} else if disruptOp == evictPod {
@@ -416,28 +416,27 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 							Namespace: ns,
 						},
 					}
-					By("evicting host0Pod")
+					ginkgo.By("evicting host0Pod")
 					err = wait.PollImmediate(framework.Poll, podEvictTimeout, func() (bool, error) {
 						err = cs.CoreV1().Pods(ns).Evict(evictTarget)
 						if err != nil {
 							return false, nil
-						} else {
-							return true, nil
 						}
+						return true, nil
 					})
 					framework.ExpectNoError(err, fmt.Sprintf("failed to evict host0Pod after %v", podEvictTimeout))
 				}
 
-				By("waiting for pd to detach from host0")
+				ginkgo.By("waiting for pd to detach from host0")
 				waitForPDDetach(diskName, host0Name)
 			})
 		}
 	})
 
-	It("should be able to delete a non-existent PD without error", func() {
+	ginkgo.It("should be able to delete a non-existent PD without error", func() {
 		framework.SkipUnlessProviderIs("gce")
 
-		By("delete a PD")
+		ginkgo.By("delete a PD")
 		framework.ExpectNoError(framework.DeletePDWithRetry("non-exist"))
 	})
 })
@@ -472,7 +471,7 @@ func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName
 				break
 			}
 		}
-		Expect(strings.TrimSpace(value)).To(Equal(strings.TrimSpace(expectedContents)))
+		gomega.Expect(strings.TrimSpace(value)).To(gomega.Equal(strings.TrimSpace(expectedContents)))
 	}
 }
 
@@ -608,10 +607,10 @@ func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
 	for _, host := range hosts {
 		e2elog.Logf("Detaching GCE PD %q from node %q.", diskName, host)
 		detachPD(host, diskName)
-		By(fmt.Sprintf("Waiting for PD %q to detach from %q", diskName, host))
+		ginkgo.By(fmt.Sprintf("Waiting for PD %q to detach from %q", diskName, host))
 		waitForPDDetach(diskName, host)
 	}
-	By(fmt.Sprintf("Deleting PD %q", diskName))
+	ginkgo.By(fmt.Sprintf("Deleting PD %q", diskName))
 	framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
 }
 

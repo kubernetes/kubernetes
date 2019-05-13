@@ -31,10 +31,10 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -56,7 +56,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// These tests requires SSH to nodes, so the provider check should be identical to there
-		// (the limiting factor is the implementation of util.go's framework.GetSigner(...)).
+		// (the limiting factor is the implementation of util.go's e2essh.GetSigner(...)).
 
 		// Cluster must support node reboot
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
@@ -69,7 +69,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			namespaceName := metav1.NamespaceSystem
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
 			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
 				e2elog.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
@@ -266,7 +266,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	}
 
 	// Reboot the node.
-	if err = framework.IssueSSHCommand(rebootCmd, provider, node); err != nil {
+	if err = e2essh.IssueSSHCommand(rebootCmd, provider, node); err != nil {
 		e2elog.Logf("Error while issuing ssh command: %v", err)
 		return false
 	}
@@ -299,7 +299,7 @@ func catLogHook(logPath string) terminationHook {
 	return func(provider string, nodes *v1.NodeList) {
 		for _, n := range nodes.Items {
 			cmd := fmt.Sprintf("cat %v && rm %v", logPath, logPath)
-			if _, err := framework.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
+			if _, err := e2essh.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
 				e2elog.Logf("Error while issuing ssh command: %v", err)
 			}
 		}

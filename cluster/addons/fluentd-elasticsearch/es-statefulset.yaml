@@ -59,12 +59,12 @@ spec:
   selector:
     matchLabels:
       k8s-app: elasticsearch-logging
-      version: v6.6.1
+      version: v6.7.2
   template:
     metadata:
       labels:
         k8s-app: elasticsearch-logging
-        version: v6.6.1
+        version: v6.7.2
     spec:
       serviceAccountName: elasticsearch-logging
       containers:

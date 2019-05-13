@@ -97,7 +97,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		if err := decorateTable(table, localOptions); err != nil {
 			return err
 		}
-		return PrintTable(table, output, localOptions)
+		return printTable(table, output, localOptions)
 	}
 
 	// Case 2: Parameter "obj" is not a table; search for a handler to print it.
@@ -133,10 +133,10 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	return nil
 }
 
-// PrintTable prints a table to the provided output respecting the filtering rules for options
+// printTable prints a table to the provided output respecting the filtering rules for options
 // for wide columns and filtered rows. It filters out rows that are Completed. You should call
-// decorateTable if you receive a table from a remote server before calling PrintTable.
-func PrintTable(table *metav1beta1.Table, output io.Writer, options PrintOptions) error {
+// decorateTable if you receive a table from a remote server before calling printTable.
+func printTable(table *metav1beta1.Table, output io.Writer, options PrintOptions) error {
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
 		if len(table.Rows) == 0 {

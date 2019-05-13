@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	"github.com/onsi/ginkgo"
@@ -122,7 +123,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	// Create a ReplicaSet for a service that serves its hostname.
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
-	framework.Logf("Creating ReplicaSet %s", name)
+	e2elog.Logf("Creating ReplicaSet %s", name)
 	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image)
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(newRS)
@@ -135,7 +136,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	framework.Logf("Ensuring a pod for ReplicaSet %q is running", name)
+	e2elog.Logf("Ensuring a pod for ReplicaSet %q is running", name)
 	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
@@ -151,7 +152,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 			}
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		e2elog.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
@@ -161,7 +162,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	}
 
 	// Verify that something is listening.
-	framework.Logf("Trying to dial the pod")
+	e2elog.Logf("Trying to dial the pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))

@@ -89,7 +89,7 @@ func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, 
 	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "error decoding certificate key")
 	}
 	tokenID, err := createShortLivedBootstrapToken(client)
 	if err != nil {

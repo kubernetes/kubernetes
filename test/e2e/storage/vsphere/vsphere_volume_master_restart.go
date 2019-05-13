@@ -19,8 +19,8 @@ package vsphere
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +55,7 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		nodeNameList          []string
 		nodeInfo              *NodeInfo
 	)
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
@@ -79,22 +79,22 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 		}
 	})
 
-	It("verify volume remains attached after master kubelet restart", func() {
+	ginkgo.It("verify volume remains attached after master kubelet restart", func() {
 		// Create pod on each node
 		for i := 0; i < numNodes; i++ {
-			By(fmt.Sprintf("%d: Creating a test vsphere volume", i))
+			ginkgo.By(fmt.Sprintf("%d: Creating a test vsphere volume", i))
 			volumePath, err := nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 			framework.ExpectNoError(err)
 			volumePaths = append(volumePaths, volumePath)
 
-			By(fmt.Sprintf("Creating pod %d on node %v", i, nodeNameList[i]))
+			ginkgo.By(fmt.Sprintf("Creating pod %d on node %v", i, nodeNameList[i]))
 			podspec := getVSpherePodSpecWithVolumePaths([]string{volumePath}, nodeKeyValueLabelList[i], nil)
 			pod, err := client.CoreV1().Pods(namespace).Create(podspec)
 			framework.ExpectNoError(err)
 			defer framework.DeletePodWithWait(f, client, pod)
 
-			By("Waiting for pod to be ready")
-			Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
+			ginkgo.By("Waiting for pod to be ready")
+			gomega.Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
 			pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -102,16 +102,16 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			pods = append(pods, pod)
 
 			nodeName := pod.Spec.NodeName
-			By(fmt.Sprintf("Verify volume %s is attached to the node %s", volumePath, nodeName))
+			ginkgo.By(fmt.Sprintf("Verify volume %s is attached to the node %s", volumePath, nodeName))
 			expectVolumeToBeAttached(nodeName, volumePath)
 		}
 
-		By("Restarting kubelet on master node")
+		ginkgo.By("Restarting kubelet on master node")
 		masterAddress := framework.GetMasterHost() + ":22"
 		err := framework.RestartKubelet(masterAddress)
 		framework.ExpectNoError(err, "Unable to restart kubelet on master node")
 
-		By("Verifying the kubelet on master node is up")
+		ginkgo.By("Verifying the kubelet on master node is up")
 		err = framework.WaitForKubeletUp(masterAddress)
 		framework.ExpectNoError(err)
 
@@ -119,18 +119,18 @@ var _ = utils.SIGDescribe("Volume Attach Verify [Feature:vsphere][Serial][Disrup
 			volumePath := volumePaths[i]
 			nodeName := pod.Spec.NodeName
 
-			By(fmt.Sprintf("After master restart, verify volume %v is attached to the node %v", volumePath, nodeName))
+			ginkgo.By(fmt.Sprintf("After master restart, verify volume %v is attached to the node %v", volumePath, nodeName))
 			expectVolumeToBeAttached(nodeName, volumePath)
 
-			By(fmt.Sprintf("Deleting pod on node %s", nodeName))
+			ginkgo.By(fmt.Sprintf("Deleting pod on node %s", nodeName))
 			err = framework.DeletePodWithWait(f, client, pod)
 			framework.ExpectNoError(err)
 
-			By(fmt.Sprintf("Waiting for volume %s to be detached from the node %s", volumePath, nodeName))
+			ginkgo.By(fmt.Sprintf("Waiting for volume %s to be detached from the node %s", volumePath, nodeName))
 			err = waitForVSphereDiskToDetach(volumePath, nodeName)
 			framework.ExpectNoError(err)
 
-			By(fmt.Sprintf("Deleting volume %s", volumePath))
+			ginkgo.By(fmt.Sprintf("Deleting volume %s", volumePath))
 			err = nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 			framework.ExpectNoError(err)
 		}

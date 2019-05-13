@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -88,8 +88,8 @@ func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 		suite := testSuiteInit()
 		for _, pattern := range suite.getTestSuiteInfo().testPatterns {
 			p := pattern
-			Context(getTestNameStr(suite, p), func() {
-				BeforeEach(func() {
+			ginkgo.Context(getTestNameStr(suite, p), func() {
+				ginkgo.BeforeEach(func() {
 					// Skip unsupported tests to avoid unnecessary resource initialization
 					skipUnsupportedTest(driver, p)
 				})
@@ -214,7 +214,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			claimSize := dDriver.GetClaimSize()
 			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
 
-			By("creating a StorageClass " + r.sc.Name)
+			ginkgo.By("creating a StorageClass " + r.sc.Name)
 			var err error
 			r.sc, err = cs.StorageV1().StorageClasses().Create(r.sc)
 			framework.ExpectNoError(err)
@@ -244,12 +244,12 @@ func (r *genericVolumeTestResource) cleanupResource() {
 	if r.pvc != nil || r.pv != nil {
 		switch volType {
 		case testpatterns.PreprovisionedPV:
-			By("Deleting pv and pvc")
+			ginkgo.By("Deleting pv and pvc")
 			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
 				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 			}
 		case testpatterns.DynamicPV:
-			By("Deleting pvc")
+			ginkgo.By("Deleting pvc")
 			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
 			if r.pv != nil && r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
 				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
@@ -269,7 +269,7 @@ func (r *genericVolumeTestResource) cleanupResource() {
 	}
 
 	if r.sc != nil {
-		By("Deleting sc")
+		ginkgo.By("Deleting sc")
 		deleteStorageClass(f.ClientSet, r.sc.Name)
 	}
 
@@ -330,7 +330,7 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 	cs := f.ClientSet
 	ns := f.Namespace.Name
 
-	By("creating a claim")
+	ginkgo.By("creating a claim")
 	pvc := getClaim(claimSize, ns)
 	pvc.Spec.StorageClassName = &sc.Name
 	if volMode != "" {
@@ -455,12 +455,12 @@ func StartPodLogs(f *framework.Framework) func() {
 	ns := f.Namespace
 
 	to := podlogs.LogOutput{
-		StatusWriter: GinkgoWriter,
+		StatusWriter: ginkgo.GinkgoWriter,
 	}
 	if framework.TestContext.ReportDir == "" {
-		to.LogWriter = GinkgoWriter
+		to.LogWriter = ginkgo.GinkgoWriter
 	} else {
-		test := CurrentGinkgoTestDescription()
+		test := ginkgo.CurrentGinkgoTestDescription()
 		reg := regexp.MustCompile("[^a-zA-Z0-9_-]+")
 		// We end the prefix with a slash to ensure that all logs
 		// end up in a directory named after the current test.
@@ -476,7 +476,7 @@ func StartPodLogs(f *framework.Framework) func() {
 	// after a failed test. Logging them live is only useful for interactive
 	// debugging, not when we collect reports.
 	if framework.TestContext.ReportDir == "" {
-		podlogs.WatchPods(ctx, cs, ns.Name, GinkgoWriter)
+		podlogs.WatchPods(ctx, cs, ns.Name, ginkgo.GinkgoWriter)
 	}
 
 	return cancel

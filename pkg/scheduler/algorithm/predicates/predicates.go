@@ -173,11 +173,6 @@ func Ordering() []string {
 	return predicatesOrdering
 }
 
-// SetPredicatesOrdering sets the ordering of predicates.
-func SetPredicatesOrdering(names []string) {
-	predicatesOrdering = names
-}
-
 // GetPersistentVolumeInfo returns a persistent volume object by PV ID.
 func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
 	return c.Get(pvID)

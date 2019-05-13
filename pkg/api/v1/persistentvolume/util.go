@@ -119,6 +119,12 @@ func VisitPVSecretNames(pv *corev1.PersistentVolume, visitor Visitor) bool {
 				return false
 			}
 		}
+		if source.CSI.ControllerExpandSecretRef != nil {
+			if !visitor(source.CSI.ControllerExpandSecretRef.Namespace, source.CSI.ControllerExpandSecretRef.Name, false /* kubeletVisible */) {
+				return false
+			}
+		}
+
 		if source.CSI.NodePublishSecretRef != nil {
 			if !visitor(source.CSI.NodePublishSecretRef.Namespace, source.CSI.NodePublishSecretRef.Name, true /* kubeletVisible */) {
 				return false

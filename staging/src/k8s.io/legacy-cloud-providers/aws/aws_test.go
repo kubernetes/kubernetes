@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/fake"
 	cloudvolume "k8s.io/cloud-provider/volume"
 )
 
@@ -1832,6 +1833,118 @@ func TestCreateDisk(t *testing.T) {
 	assert.Nil(t, err, "Error creating disk: %v", err)
 	assert.Equal(t, volumeID, KubernetesVolumeID("aws://us-east-1a/vol-volumeId0"))
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
+}
+
+func TestGetCandidateZonesForDynamicVolume(t *testing.T) {
+	tests := []struct {
+		name          string
+		labels        map[string]string
+		ready         bool
+		expectedZones sets.String
+	}{
+		{
+			name:          "master node with role label",
+			labels:        map[string]string{labelKeyNodeRole: nodeMasterRole, v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString(),
+		},
+		{
+			name:          "master node with master label empty",
+			labels:        map[string]string{labelKeyNodeMaster: "", v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString(),
+		},
+		{
+			name:          "master node with master label true",
+			labels:        map[string]string{labelKeyNodeMaster: "true", v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString(),
+		},
+		{
+			name:          "master node with master label false",
+			labels:        map[string]string{labelKeyNodeMaster: "false", v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString("us-east-1a"),
+		},
+		{
+			name:          "minion node with role label",
+			labels:        map[string]string{labelKeyNodeRole: nodeMinionRole, v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString("us-east-1a"),
+		},
+		{
+			name:          "minion node with minion label",
+			labels:        map[string]string{labelKeyNodeMinion: "", v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString("us-east-1a"),
+		},
+		{
+			name:          "minion node with compute label",
+			labels:        map[string]string{labelKeyNodeCompute: "true", v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString("us-east-1a"),
+		},
+		{
+			name:          "master and minion node",
+			labels:        map[string]string{labelKeyNodeMaster: "true", labelKeyNodeCompute: "true", v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString("us-east-1a"),
+		},
+		{
+			name:          "node not ready",
+			labels:        map[string]string{v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         false,
+			expectedZones: sets.NewString(),
+		},
+		{
+			name:          "node has no zone",
+			labels:        map[string]string{},
+			ready:         true,
+			expectedZones: sets.NewString(),
+		},
+		{
+			name:          "node with no label",
+			labels:        map[string]string{v1.LabelZoneFailureDomain: "us-east-1a"},
+			ready:         true,
+			expectedZones: sets.NewString("us-east-1a"),
+		},
+	}
+
+	for i, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			awsServices := newMockedFakeAWSServices(TestClusterID)
+			c, _ := newAWSCloud(CloudConfig{}, awsServices)
+			c.kubeClient = fake.NewSimpleClientset()
+			nodeName := fmt.Sprintf("node-%d", i)
+			_, err := c.kubeClient.CoreV1().Nodes().Create(&v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   nodeName,
+					Labels: test.labels,
+				},
+				Status: genNodeStatus(test.ready),
+			})
+			assert.Nil(t, err)
+			zones, err := c.GetCandidateZonesForDynamicVolume()
+			assert.Nil(t, err)
+			assert.Equal(t, test.expectedZones, zones)
+		})
+	}
+}
+
+func genNodeStatus(ready bool) v1.NodeStatus {
+	status := v1.ConditionFalse
+	if ready {
+		status = v1.ConditionTrue
+	}
+	ret := v1.NodeStatus{
+		Conditions: []v1.NodeCondition{
+			{
+				Type:   v1.NodeReady,
+				Status: status,
+			},
+		},
+	}
+	return ret
 }
 
 func newMockedFakeAWSServices(id string) *FakeAWSServices {

@@ -329,11 +329,9 @@ func (o *Options) runLoop() error {
 	}()
 
 	for {
-		select {
-		case err := <-o.errCh:
-			if err != nil {
-				return err
-			}
+		err := <-o.errCh
+		if err != nil {
+			return err
 		}
 	}
 }

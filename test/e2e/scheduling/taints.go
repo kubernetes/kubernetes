@@ -19,20 +19,19 @@ package scheduling
 import (
 	"time"
 
+	. "github.com/onsi/ginkgo"
+	_ "github.com/stretchr/testify/assert"
+
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-
-	"k8s.io/client-go/tools/cache"
-
-	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	. "github.com/onsi/ginkgo"
-	_ "github.com/stretchr/testify/assert"
 )
 
 func getTestTaint() v1.Taint {
@@ -137,7 +136,7 @@ func createTestController(cs clientset.Interface, observedDeletions chan string,
 			},
 		},
 	)
-	framework.Logf("Starting informer...")
+	e2elog.Logf("Starting informer...")
 	go controller.Run(stopCh)
 }
 
@@ -179,7 +178,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
+		e2elog.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
@@ -194,7 +193,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-timeoutChannel:
 			framework.Failf("Failed to evict Pod")
 		case <-observedDeletions:
-			framework.Logf("Noticed Pod eviction. Test successful")
+			e2elog.Logf("Noticed Pod eviction. Test successful")
 		}
 	})
 
@@ -211,7 +210,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
+		e2elog.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
@@ -224,7 +223,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
-			framework.Logf("Pod wasn't evicted. Test successful")
+			e2elog.Logf("Pod wasn't evicted. Test successful")
 		case <-observedDeletions:
 			framework.Failf("Pod was evicted despite toleration")
 		}
@@ -244,7 +243,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
+		e2elog.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
@@ -257,7 +256,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		timeoutChannel := time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
-			framework.Logf("Pod wasn't evicted")
+			e2elog.Logf("Pod wasn't evicted")
 		case <-observedDeletions:
 			framework.Failf("Pod was evicted despite toleration")
 			return
@@ -268,7 +267,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-timeoutChannel:
 			framework.Failf("Pod wasn't evicted")
 		case <-observedDeletions:
-			framework.Logf("Pod was evicted after toleration time run out. Test successful")
+			e2elog.Logf("Pod was evicted after toleration time run out. Test successful")
 			return
 		}
 	})
@@ -288,7 +287,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		By("Starting pod...")
 		nodeName, err := testutils.RunPodAndGetNodeName(cs, pod, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod is running on %v. Tainting Node", nodeName)
+		e2elog.Logf("Pod is running on %v. Tainting Node", nodeName)
 
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
@@ -306,19 +305,19 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		timeoutChannel := time.NewTimer(AdditionalWaitPerDeleteSeconds).C
 		select {
 		case <-timeoutChannel:
-			framework.Logf("Pod wasn't evicted. Proceeding")
+			e2elog.Logf("Pod wasn't evicted. Proceeding")
 		case <-observedDeletions:
 			framework.Failf("Pod was evicted despite toleration")
 			return
 		}
-		framework.Logf("Removing taint from Node")
+		e2elog.Logf("Removing taint from Node")
 		framework.RemoveTaintOffNode(cs, nodeName, testTaint)
 		taintRemoved = true
 		By("Waiting some time to make sure that toleration time passed.")
 		timeoutChannel = time.NewTimer(time.Duration(KubeletPodDeletionDelaySeconds+3*AdditionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
-			framework.Logf("Pod wasn't evicted. Test successful")
+			e2elog.Logf("Pod wasn't evicted. Test successful")
 		case <-observedDeletions:
 			framework.Failf("Pod was evicted despite toleration")
 		}
@@ -355,10 +354,10 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		By("Starting pods...")
 		nodeName1, err := testutils.RunPodAndGetNodeName(cs, pod1, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName1)
+		e2elog.Logf("Pod1 is running on %v. Tainting Node", nodeName1)
 		nodeName2, err := testutils.RunPodAndGetNodeName(cs, pod2, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName2)
+		e2elog.Logf("Pod2 is running on %v. Tainting Node", nodeName2)
 
 		By("Trying to apply a taint on the Nodes")
 		testTaint := getTestTaint()
@@ -387,7 +386,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 			case podName := <-observedDeletions:
 				evicted++
 				if podName == podGroup+"1" {
-					framework.Logf("Noticed Pod %q gets evicted.", podName)
+					e2elog.Logf("Noticed Pod %q gets evicted.", podName)
 				} else if podName == podGroup+"2" {
 					framework.Failf("Unexepected Pod %q gets evicted.", podName)
 					return
@@ -417,12 +416,12 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
 		}
 		framework.ExpectNoError(err)
-		framework.Logf("Pod1 is running on %v. Tainting Node", nodeName)
+		e2elog.Logf("Pod1 is running on %v. Tainting Node", nodeName)
 		// ensure pod2 lands on the same node as pod1
 		pod2.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nodeHostNameLabel}
 		_, err = testutils.RunPodAndGetNodeName(cs, pod2, 2*time.Minute)
 		framework.ExpectNoError(err)
-		framework.Logf("Pod2 is running on %v. Tainting Node", nodeName)
+		e2elog.Logf("Pod2 is running on %v. Tainting Node", nodeName)
 
 		By("Trying to apply a taint on the Node")
 		testTaint := getTestTaint()
@@ -440,7 +439,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 				framework.Failf("Failed to evict all Pods. %d pod(s) is not evicted.", 2-evicted)
 				return
 			case podName := <-observedDeletions:
-				framework.Logf("Noticed Pod %q gets evicted.", podName)
+				e2elog.Logf("Noticed Pod %q gets evicted.", podName)
 				evicted++
 			}
 		}

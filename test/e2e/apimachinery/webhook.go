@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -267,7 +268,7 @@ func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
 		},
 	})
 	if err != nil && errors.IsAlreadyExists(err) {
-		framework.Logf("role binding %s already exists", roleBindingName)
+		e2elog.Logf("role binding %s already exists", roleBindingName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
 	}
@@ -717,7 +718,7 @@ func testWebhook(f *framework.Framework) {
 		},
 	}
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("update (PUT) the admitted configmap to a non-compliant one should be rejected by the webhook")
 	toNonCompliantFn := func(cm *v1.ConfigMap) {
@@ -754,7 +755,7 @@ func testWebhook(f *framework.Framework) {
 	ginkgo.By("create a configmap that violates the webhook policy but is in a whitelisted namespace")
 	configmap = nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(skippedNamespaceName).Create(configmap)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
+	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, skippedNamespaceName)
 }
 
 func testAttachingPodWebhook(f *framework.Framework) {
@@ -762,9 +763,9 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	client := f.ClientSet
 	pod := toBeAttachedPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod %s in namespace: %s", pod.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 	err = framework.WaitForPodNameRunningInNamespace(client, pod.Name, f.Namespace.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error while waiting for pod %s to go to Running phase in namespace: %s", pod.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "error while waiting for pod %s to go to Running phase in namespace: %s", pod.Name, f.Namespace.Name)
 
 	ginkgo.By("'kubectl attach' the pod, should be denied by the webhook")
 	timer := time.NewTimer(30 * time.Second)
@@ -1344,7 +1345,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 		},
 	}
 	mutatedCR, err := customResourceClient.Create(cr, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
@@ -1373,17 +1374,17 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 		},
 	}
 	_, err := customResourceClient.Create(cr, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crName, f.Namespace.Name)
 
 	ginkgo.By("Patching Custom Resource Definition to set v2 as storage")
 	apiVersionWithV2StoragePatch := fmt.Sprint(`{"spec": {"versions": [{"name": "v1", "storage": false, "served": true},{"name": "v2", "storage": true, "served": true}]}}`)
 	_, err = testcrd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(testcrd.Crd.Name, types.StrategicMergePatchType, []byte(apiVersionWithV2StoragePatch))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to patch custom resource definition %s in namespace: %s", testcrd.Crd.Name, f.Namespace.Name)
 
 	ginkgo.By("Patching the custom resource while v2 is storage version")
 	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
 	_, err = testcrd.DynamicClients["v2"].Patch(crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
 }
 
 func registerValidatingWebhookForCRD(f *framework.Framework, context *certContext) func() {

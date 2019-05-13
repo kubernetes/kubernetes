@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const dnsTestPodHostName = "dns-querier-1"
@@ -60,16 +60,16 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should resolve DNS of partial qualified names for the cluster ", func() {
+	ginkgo.It("should resolve DNS of partial qualified names for the cluster ", func() {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
@@ -89,11 +89,11 @@ var _ = SIGDescribe("DNS", func() {
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
@@ -108,11 +108,11 @@ var _ = SIGDescribe("DNS", func() {
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes /etc/hosts and exposes the results by HTTP.
-		By("creating a pod to probe /etc/hosts")
+		ginkgo.By("creating a pod to probe /etc/hosts")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
@@ -125,27 +125,27 @@ var _ = SIGDescribe("DNS", func() {
 	framework.ConformanceIt("should provide DNS for services ", func() {
 		// NOTE: This only contains the FQDN and the Host name, for testing partial name, see the test below
 		// Create a test headless service.
-		By("Creating a test headless service")
+		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
 		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create headless service: %s", dnsTestServiceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
-			By("deleting the test headless service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test headless service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		regularServiceName := "test-service-2"
 		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create regular service: %s", regularServiceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create regular service: %s", regularServiceName)
 
 		defer func() {
-			By("deleting the test service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(regularService.Name, nil)
 		}()
 
@@ -160,39 +160,39 @@ var _ = SIGDescribe("DNS", func() {
 
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should resolve DNS of partial qualified names for services ", func() {
+	ginkgo.It("should resolve DNS of partial qualified names for services ", func() {
 		// Create a test headless service.
-		By("Creating a test headless service")
+		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
 		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create headless service: %s", dnsTestServiceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
-			By("deleting the test headless service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test headless service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		regularServiceName := "test-service-2"
 		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create regular service: %s", regularServiceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create regular service: %s", regularServiceName)
 		defer func() {
-			By("deleting the test service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(regularService.Name, nil)
 		}()
 
@@ -209,20 +209,20 @@ var _ = SIGDescribe("DNS", func() {
 
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod.ObjectMeta.Labels = testServiceSelector
 
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for pods for Hostname [LinuxOnly]", func() {
+	ginkgo.It("should provide DNS for pods for Hostname [LinuxOnly]", func() {
 		// Create a test headless service.
-		By("Creating a test headless service")
+		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
 			"dns-test-hostname-attribute": "true",
 		}
@@ -230,11 +230,11 @@ var _ = SIGDescribe("DNS", func() {
 		podHostname := "dns-querier-2"
 		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create headless service: %s", serviceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create headless service: %s", serviceName)
 
 		defer func() {
-			By("deleting the test headless service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test headless service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
@@ -242,11 +242,11 @@ var _ = SIGDescribe("DNS", func() {
 		hostNames := []string{hostFQDN, podHostname}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod1.ObjectMeta.Labels = testServiceSelector
 		pod1.Spec.Hostname = podHostname
@@ -255,9 +255,9 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for pods for Subdomain", func() {
+	ginkgo.It("should provide DNS for pods for Subdomain", func() {
 		// Create a test headless service.
-		By("Creating a test headless service")
+		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
 			"dns-test-hostname-attribute": "true",
 		}
@@ -265,11 +265,11 @@ var _ = SIGDescribe("DNS", func() {
 		podHostname := "dns-querier-2"
 		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create headless service: %s", serviceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create headless service: %s", serviceName)
 
 		defer func() {
-			By("deleting the test headless service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test headless service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
@@ -277,11 +277,11 @@ var _ = SIGDescribe("DNS", func() {
 		namesToResolve := []string{hostFQDN}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 		pod1.ObjectMeta.Labels = testServiceSelector
 		pod1.Spec.Hostname = podHostname
@@ -298,72 +298,72 @@ var _ = SIGDescribe("DNS", func() {
 	*/
 	framework.ConformanceIt("should provide DNS for ExternalName services", func() {
 		// Create a test ExternalName service.
-		By("Creating a test externalName service")
+		ginkgo.By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
 		externalNameService := framework.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService)
-		Expect(err).NotTo(HaveOccurred(), "failed to create ExternalName service: %s", serviceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create ExternalName service: %s", serviceName)
 
 		defer func() {
-			By("deleting the test externalName service")
-			defer GinkgoRecover()
+			ginkgo.By("deleting the test externalName service")
+			defer ginkgo.GinkgoRecover()
 			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
 		}()
 		hostFQDN := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		wheezyProbeCmd, wheezyFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
 		jessieProbeCmd, jessieFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		ginkgo.By("creating a pod to probe DNS")
 		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
 		validateTargetedProbeOutput(f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
 
 		// Test changing the externalName field
-		By("changing the externalName to bar.example.com")
+		ginkgo.By("changing the externalName to bar.example.com")
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
-		Expect(err).NotTo(HaveOccurred(), "failed to change externalName of service: %s", serviceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to change externalName of service: %s", serviceName)
 		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
 		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a second pod to probe DNS")
+		ginkgo.By("creating a second pod to probe DNS")
 		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
 		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
 
 		// Test changing type from ExternalName to ClusterIP
-		By("changing the service to type=ClusterIP")
+		ginkgo.By("changing the service to type=ClusterIP")
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},
 			}
 		})
-		Expect(err).NotTo(HaveOccurred(), "failed to change service type to ClusterIP for service: %s", serviceName)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to change service type to ClusterIP for service: %s", serviceName)
 		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "A", "wheezy")
 		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "A", "jessie")
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a third pod to probe DNS")
+		ginkgo.By("creating a third pod to probe DNS")
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, dnsTestPodHostName, dnsTestServiceName)
 
 		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(externalNameService.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to get service: %s", externalNameService.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get service: %s", externalNameService.Name)
 
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
-	It("should support configurable pod DNS nameservers", func() {
-		By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
+	ginkgo.It("should support configurable pod DNS nameservers", func() {
+		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testServerIP := "1.1.1.1"
 		testSearchPath := "resolv.conf.local"
 		testAgnhostPod := f.NewAgnhostPod(f.Namespace.Name, "pause")
@@ -373,15 +373,15 @@ var _ = SIGDescribe("DNS", func() {
 			Searches:    []string{testSearchPath},
 		}
 		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testAgnhostPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testAgnhostPod.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod: %s", testAgnhostPod.Name)
 		framework.Logf("Created pod %v", testAgnhostPod)
 		defer func() {
 			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testAgnhostPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testAgnhostPod.Name, err)
+				framework.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
 			}
 		}()
-		Expect(f.WaitForPodRunning(testAgnhostPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testAgnhostPod.Name)
+		gomega.Expect(f.WaitForPodRunning(testAgnhostPod.Name)).NotTo(gomega.HaveOccurred(), "failed to wait for pod %s to be running", testAgnhostPod.Name)
 
 		runCommand := func(arg string) string {
 			cmd := []string{"/agnhost", arg}
@@ -393,25 +393,25 @@ var _ = SIGDescribe("DNS", func() {
 				CaptureStdout: true,
 				CaptureStderr: true,
 			})
-			Expect(err).NotTo(HaveOccurred(), "failed to run command '/agnhost %s' on pod, stdout: %v, stderr: %v, err: %v", arg, stdout, stderr, err)
+			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to run command '/agnhost %s' on pod, stdout: %v, stderr: %v, err: %v", arg, stdout, stderr, err)
 			return stdout
 		}
 
-		By("Verifying customized DNS suffix list is configured on pod...")
+		ginkgo.By("Verifying customized DNS suffix list is configured on pod...")
 		stdout := runCommand("dns-suffix")
 		if !strings.Contains(stdout, testSearchPath) {
 			framework.Failf("customized DNS suffix list not found configured in pod, expected to contain: %s, got: %s", testSearchPath, stdout)
 		}
 
-		By("Verifying customized DNS server is configured on pod...")
+		ginkgo.By("Verifying customized DNS server is configured on pod...")
 		stdout = runCommand("dns-server-list")
 		if !strings.Contains(stdout, testServerIP) {
 			framework.Failf("customized DNS server not found in configured in pod, expected to contain: %s, got: %s", testServerIP, stdout)
 		}
 	})
 
-	It("should support configurable pod resolv.conf", func() {
-		By("Preparing a test DNS service with injected DNS names...")
+	ginkgo.It("should support configurable pod resolv.conf", func() {
+		ginkgo.By("Preparing a test DNS service with injected DNS names...")
 		testInjectedIP := "1.1.1.1"
 		testDNSNameShort := "notexistname"
 		testSearchPath := "resolv.conf.local"
@@ -421,23 +421,23 @@ var _ = SIGDescribe("DNS", func() {
 			testDNSNameFull: testInjectedIP,
 		})
 		testServerPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testServerPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testServerPod.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod: %s", testServerPod.Name)
 		e2elog.Logf("Created pod %v", testServerPod)
 		defer func() {
 			e2elog.Logf("Deleting pod %s...", testServerPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testServerPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testServerPod.Name, err)
+				framework.Failf("ginkgo.Failed to delete pod %s: %v", testServerPod.Name, err)
 			}
 		}()
-		Expect(f.WaitForPodRunning(testServerPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testServerPod.Name)
+		gomega.Expect(f.WaitForPodRunning(testServerPod.Name)).NotTo(gomega.HaveOccurred(), "failed to wait for pod %s to be running", testServerPod.Name)
 
 		// Retrieve server pod IP.
 		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(testServerPod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to get pod %v", testServerPod.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get pod %v", testServerPod.Name)
 		testServerIP := testServerPod.Status.PodIP
 		e2elog.Logf("testServerIP is %s", testServerIP)
 
-		By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
+		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testUtilsPod := generateDNSUtilsPod()
 		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
 		testNdotsValue := "2"
@@ -452,17 +452,17 @@ var _ = SIGDescribe("DNS", func() {
 			},
 		}
 		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
-		Expect(err).NotTo(HaveOccurred(), "failed to create pod: %s", testUtilsPod.Name)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod: %s", testUtilsPod.Name)
 		e2elog.Logf("Created pod %v", testUtilsPod)
 		defer func() {
 			e2elog.Logf("Deleting pod %s...", testUtilsPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
+				framework.Failf("ginkgo.Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
 		}()
-		Expect(f.WaitForPodRunning(testUtilsPod.Name)).NotTo(HaveOccurred(), "failed to wait for pod %s to be running", testUtilsPod.Name)
+		gomega.Expect(f.WaitForPodRunning(testUtilsPod.Name)).NotTo(gomega.HaveOccurred(), "failed to wait for pod %s to be running", testUtilsPod.Name)
 
-		By("Verifying customized DNS option is configured on pod...")
+		ginkgo.By("Verifying customized DNS option is configured on pod...")
 		// TODO: Figure out a better way other than checking the actual resolv,conf file.
 		cmd := []string{"cat", "/etc/resolv.conf"}
 		stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
@@ -473,12 +473,12 @@ var _ = SIGDescribe("DNS", func() {
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
-		Expect(err).NotTo(HaveOccurred(), "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
 		if !strings.Contains(stdout, "ndots:2") {
 			framework.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
 		}
 
-		By("Verifying customized name server and search path are working...")
+		ginkgo.By("Verifying customized name server and search path are working...")
 		// Do dig on not-exist-dns-name and see if the injected DNS record is returned.
 		// This verifies both:
 		// - Custom search path is appended.
@@ -494,7 +494,7 @@ var _ = SIGDescribe("DNS", func() {
 				CaptureStderr: true,
 			})
 			if err != nil {
-				e2elog.Logf("Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
+				e2elog.Logf("ginkgo.Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
 				return false, nil
 			}
 			res := strings.Split(stdout, "\n")
@@ -505,7 +505,7 @@ var _ = SIGDescribe("DNS", func() {
 			return true, nil
 		}
 		err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
-		Expect(err).NotTo(HaveOccurred(), "failed to verify customized name server and search path")
+		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to verify customized name server and search path")
 
 		// TODO: Add more test cases for other DNSPolicies.
 	})

@@ -23,7 +23,6 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -99,7 +98,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
 	}
 
-	sortBy := func(pods []*v1.Pod) sort.Interface { return podutils.ByLogging(pods) }
+	sortBy := func(pods []*corev1.Pod) sort.Interface { return podutils.ByLogging(pods) }
 	pod, numPods, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err
