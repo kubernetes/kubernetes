@@ -125,6 +125,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *apps.Deploym
 }
 
 const (
+	// limit revision history length to 100 element (~2000 chars)
 	maxRevHistoryLengthInChars = 2000
 )
 
