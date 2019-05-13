@@ -210,9 +210,14 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 					Type: "object",
 					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"mutation-start":   {Type: "string"},
-						"mutation-stage-1": {Type: "string"},
-						// mutation-stage-2 is intentionally missing such that it is pruned
+						"data": {
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"mutation-start":   {Type: "string"},
+								"mutation-stage-1": {Type: "string"},
+								// mutation-stage-2 is intentionally missing such that it is pruned
+							},
+						},
 					},
 				},
 			}
