@@ -11,7 +11,8 @@ go_library(
         "doc.go",
         "fake.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/fake",
+    importpath = "k8s.io/cloud-provider/fake",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
