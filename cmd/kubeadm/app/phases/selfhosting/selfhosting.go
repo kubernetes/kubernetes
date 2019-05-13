@@ -75,7 +75,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 		}
 	}
 
-	for _, componentName := range kubeadmconstants.MasterComponents {
+	for _, componentName := range kubeadmconstants.ControlPlaneComponents {
 		start := time.Now()
 		manifestPath := kubeadmconstants.GetStaticPodFilepath(componentName, manifestsDir)
 

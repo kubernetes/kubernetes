@@ -7,6 +7,8 @@ docs/man
 docs/user-guide
 generated.pb.go
 generated.proto
+go.mod
+go.sum
 pkg/client/clientset_generated
 pkg/client/informers/informers_generated/
 pkg/generated

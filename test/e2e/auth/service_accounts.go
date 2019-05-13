@@ -22,7 +22,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,10 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
@@ -41,26 +42,26 @@ var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
-	It("should ensure a single API token exists", func() {
+	ginkgo.It("should ensure a single API token exists", func() {
 		// wait for the service account to reference a single secret
 		var secrets []v1.ObjectReference
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*10, func() (bool, error) {
-			By("waiting for a single token reference")
+			ginkgo.By("waiting for a single token reference")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				framework.Logf("default service account was not found")
+				e2elog.Logf("default service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
+				e2elog.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				framework.Logf("default service account has no secret references")
+				e2elog.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
-				framework.Logf("default service account has a single secret reference")
+				e2elog.Logf("default service account has a single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -70,35 +71,35 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// make sure the reference doesn't flutter
 		{
-			By("ensuring the single token reference persists")
+			ginkgo.By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(sa.Secrets).To(Equal(secrets))
+			gomega.Expect(sa.Secrets).To(gomega.Equal(secrets))
 		}
 
 		// delete the referenced secret
-		By("deleting the service account token")
+		ginkgo.By("deleting the service account token")
 		framework.ExpectNoError(f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secrets[0].Name, nil))
 
 		// wait for the referenced secret to be removed, and another one autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("waiting for a new token reference")
+			ginkgo.By("waiting for a new token reference")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
+				e2elog.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				framework.Logf("default service account has no secret references")
+				e2elog.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
 				if sa.Secrets[0] == secrets[0] {
-					framework.Logf("default service account still has the deleted secret reference")
+					e2elog.Logf("default service account still has the deleted secret reference")
 					return false, nil
 				}
-				framework.Logf("default service account has a new single secret reference")
+				e2elog.Logf("default service account has a new single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -108,15 +109,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// make sure the reference doesn't flutter
 		{
-			By("ensuring the single token reference persists")
+			ginkgo.By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(sa.Secrets).To(Equal(secrets))
+			gomega.Expect(sa.Secrets).To(gomega.Equal(secrets))
 		}
 
 		// delete the reference from the service account
-		By("deleting the reference to the service account token")
+		ginkgo.By("deleting the reference to the service account token")
 		{
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -127,18 +128,18 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// wait for another one to be autocreated
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("waiting for a new token to be created and added")
+			ginkgo.By("waiting for a new token to be created and added")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			if err != nil {
-				framework.Logf("error getting default service account: %v", err)
+				e2elog.Logf("error getting default service account: %v", err)
 				return false, err
 			}
 			switch len(sa.Secrets) {
 			case 0:
-				framework.Logf("default service account has no secret references")
+				e2elog.Logf("default service account has no secret references")
 				return false, nil
 			case 1:
-				framework.Logf("default service account has a new single secret reference")
+				e2elog.Logf("default service account has a new single secret reference")
 				secrets = sa.Secrets
 				return true, nil
 			default:
@@ -148,11 +149,11 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// make sure the reference doesn't flutter
 		{
-			By("ensuring the single token reference persists")
+			ginkgo.By("ensuring the single token reference persists")
 			time.Sleep(2 * time.Second)
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("default", metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(sa.Secrets).To(Equal(secrets))
+			gomega.Expect(sa.Secrets).To(gomega.Equal(secrets))
 		}
 	})
 
@@ -173,24 +174,24 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("getting the auto-created API token")
+			ginkgo.By("getting the auto-created API token")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get("mount-test", metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				framework.Logf("mount-test service account was not found")
+				e2elog.Logf("mount-test service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				framework.Logf("error getting mount-test service account: %v", err)
+				e2elog.Logf("error getting mount-test service account: %v", err)
 				return false, err
 			}
 			if len(sa.Secrets) == 0 {
-				framework.Logf("mount-test service account has no secret references")
+				e2elog.Logf("mount-test service account has no secret references")
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
 				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
-					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
+					e2elog.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
 				}
 				if secret.Type == v1.SecretTypeServiceAccountToken {
@@ -199,7 +200,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}
 			}
 
-			framework.Logf("default service account has no secret references to valid service account tokens")
+			e2elog.Logf("default service account has no secret references to valid service account tokens")
 			return false, nil
 		}))
 
@@ -230,19 +231,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectNoError(err)
 
 		// CA and namespace should be identical
-		Expect(mountedCA).To(Equal(rootCAContent))
-		Expect(mountedNamespace).To(Equal(f.Namespace.Name))
+		gomega.Expect(mountedCA).To(gomega.Equal(rootCAContent))
+		gomega.Expect(mountedNamespace).To(gomega.Equal(f.Namespace.Name))
 		// Token should be a valid credential that identifies the pod's service account
 		tokenReview := &authenticationv1.TokenReview{Spec: authenticationv1.TokenReviewSpec{Token: mountedToken}}
 		tokenReview, err = f.ClientSet.AuthenticationV1().TokenReviews().Create(tokenReview)
 		framework.ExpectNoError(err)
-		Expect(tokenReview.Status.Authenticated).To(Equal(true))
-		Expect(tokenReview.Status.Error).To(Equal(""))
-		Expect(tokenReview.Status.User.Username).To(Equal("system:serviceaccount:" + f.Namespace.Name + ":" + sa.Name))
+		gomega.Expect(tokenReview.Status.Authenticated).To(gomega.Equal(true))
+		gomega.Expect(tokenReview.Status.Error).To(gomega.Equal(""))
+		gomega.Expect(tokenReview.Status.User.Username).To(gomega.Equal("system:serviceaccount:" + f.Namespace.Name + ":" + sa.Name))
 		groups := sets.NewString(tokenReview.Status.User.Groups...)
-		Expect(groups.Has("system:authenticated")).To(Equal(true), fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
-		Expect(groups.Has("system:serviceaccounts")).To(Equal(true), fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
-		Expect(groups.Has("system:serviceaccounts:"+f.Namespace.Name)).To(Equal(true), fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
+		gomega.Expect(groups.Has("system:authenticated")).To(gomega.Equal(true), fmt.Sprintf("expected system:authenticated group, had %v", groups.List()))
+		gomega.Expect(groups.Has("system:serviceaccounts")).To(gomega.Equal(true), fmt.Sprintf("expected system:serviceaccounts group, had %v", groups.List()))
+		gomega.Expect(groups.Has("system:serviceaccounts:"+f.Namespace.Name)).To(gomega.Equal(true), fmt.Sprintf("expected system:serviceaccounts:"+f.Namespace.Name+" group, had %v", groups.List()))
 	})
 
 	/*
@@ -284,24 +285,24 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		// Standard get, update retry loop
 		framework.ExpectNoError(wait.Poll(time.Millisecond*500, framework.ServiceAccountProvisionTimeout, func() (bool, error) {
-			By("getting the auto-created API token")
+			ginkgo.By("getting the auto-created API token")
 			sa, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Get(mountSA.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
-				framework.Logf("mount service account was not found")
+				e2elog.Logf("mount service account was not found")
 				return false, nil
 			}
 			if err != nil {
-				framework.Logf("error getting mount service account: %v", err)
+				e2elog.Logf("error getting mount service account: %v", err)
 				return false, err
 			}
 			if len(sa.Secrets) == 0 {
-				framework.Logf("mount service account has no secret references")
+				e2elog.Logf("mount service account has no secret references")
 				return false, nil
 			}
 			for _, secretRef := range sa.Secrets {
 				secret, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Get(secretRef.Name, metav1.GetOptions{})
 				if err != nil {
-					framework.Logf("Error getting secret %s: %v", secretRef.Name, err)
+					e2elog.Logf("Error getting secret %s: %v", secretRef.Name, err)
 					continue
 				}
 				if secret.Type == v1.SecretTypeServiceAccountToken {
@@ -309,7 +310,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				}
 			}
 
-			framework.Logf("default service account has no secret references to valid service account tokens")
+			e2elog.Logf("default service account has no secret references to valid service account tokens")
 			return false, nil
 		}))
 
@@ -391,7 +392,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			createdPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			framework.ExpectNoError(err)
-			framework.Logf("created pod %s", tc.PodName)
+			e2elog.Logf("created pod %s", tc.PodName)
 
 			hasServiceAccountTokenVolume := false
 			for _, c := range createdPod.Spec.Containers {
@@ -405,7 +406,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			if hasServiceAccountTokenVolume != tc.ExpectTokenVolume {
 				framework.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
 			} else {
-				framework.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
+				e2elog.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
 		}
 	})

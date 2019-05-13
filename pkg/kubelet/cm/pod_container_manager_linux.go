@@ -87,7 +87,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 			ResourceParameters: ResourceConfigForPod(pod, m.enforceCPULimits, m.cpuCFSQuotaPeriod),
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) && m.podPidsLimit > 0 {
-			containerConfig.ResourceParameters.PodPidsLimit = &m.podPidsLimit
+			containerConfig.ResourceParameters.PidsLimit = &m.podPidsLimit
 		}
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)

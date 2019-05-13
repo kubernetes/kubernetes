@@ -18,13 +18,13 @@ package disruption
 
 import (
 	"fmt"
-	"reflect"
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -119,7 +119,7 @@ func NewDisruptionController(
 	dc := &DisruptionController{
 		kubeClient:   kubeClient,
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "disruption"),
-		recheckQueue: workqueue.NewNamedDelayingQueue("disruption-recheck"),
+		recheckQueue: workqueue.NewNamedDelayingQueue("disruption_recheck"),
 		broadcaster:  record.NewBroadcaster(),
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
@@ -695,7 +695,7 @@ func (dc *DisruptionController) updatePdbStatus(pdb *policy.PodDisruptionBudget,
 		pdb.Status.DesiredHealthy == desiredHealthy &&
 		pdb.Status.ExpectedPods == expectedCount &&
 		pdb.Status.PodDisruptionsAllowed == disruptionsAllowed &&
-		reflect.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
+		apiequality.Semantic.DeepEqual(pdb.Status.DisruptedPods, disruptedPods) &&
 		pdb.Status.ObservedGeneration == pdb.Generation {
 		return nil
 	}

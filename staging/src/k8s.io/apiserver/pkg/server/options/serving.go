@@ -29,8 +29,9 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 type SecureServingOptions struct {
@@ -54,7 +55,7 @@ type SecureServingOptions struct {
 	// ServerCert is the TLS cert info for serving secure traffic
 	ServerCert GeneratableKeyCert
 	// SNICertKeys are named CertKeys for serving secure traffic with SNI support.
-	SNICertKeys []utilflag.NamedCertKey
+	SNICertKeys []cliflag.NamedCertKey
 	// CipherSuites is the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	CipherSuites []string
@@ -165,18 +166,18 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
 
-	tlsCipherPossibleValues := utilflag.TLSCipherPossibleValues()
+	tlsCipherPossibleValues := cliflag.TLSCipherPossibleValues()
 	fs.StringSliceVar(&s.CipherSuites, "tls-cipher-suites", s.CipherSuites,
 		"Comma-separated list of cipher suites for the server. "+
 			"If omitted, the default Go cipher suites will be use.  "+
 			"Possible values: "+strings.Join(tlsCipherPossibleValues, ","))
 
-	tlsPossibleVersions := utilflag.TLSPossibleVersions()
+	tlsPossibleVersions := cliflag.TLSPossibleVersions()
 	fs.StringVar(&s.MinTLSVersion, "tls-min-version", s.MinTLSVersion,
 		"Minimum TLS version supported. "+
 			"Possible values: "+strings.Join(tlsPossibleVersions, ", "))
 
-	fs.Var(utilflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
+	fs.Var(cliflag.NewNamedCertKeyArray(&s.SNICertKeys), "tls-sni-cert-key", ""+
 		"A pair of x509 certificate and private key file paths, optionally suffixed with a list of "+
 		"domain patterns which are fully qualified domain names, possibly with prefixed wildcard "+
 		"segments. If no domain patterns are provided, the names of the certificate are "+
@@ -234,7 +235,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	if len(s.CipherSuites) != 0 {
-		cipherSuites, err := utilflag.TLSCipherSuites(s.CipherSuites)
+		cipherSuites, err := cliflag.TLSCipherSuites(s.CipherSuites)
 		if err != nil {
 			return err
 		}
@@ -242,7 +243,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	var err error
-	c.MinTLSVersion, err = utilflag.TLSVersion(s.MinTLSVersion)
+	c.MinTLSVersion, err = cliflag.TLSVersion(s.MinTLSVersion)
 	if err != nil {
 		return err
 	}
@@ -305,7 +306,7 @@ func (s *SecureServingOptions) MaybeDefaultWithSelfSignedCerts(publicAddress str
 			if err := certutil.WriteCert(keyCert.CertFile, cert); err != nil {
 				return err
 			}
-			if err := certutil.WriteKey(keyCert.KeyFile, key); err != nil {
+			if err := keyutil.WriteKey(keyCert.KeyFile, key); err != nil {
 				return err
 			}
 			klog.Infof("Generated self-signed cert (%s, %s)", keyCert.CertFile, keyCert.KeyFile)

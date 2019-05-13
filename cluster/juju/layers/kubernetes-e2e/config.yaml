@@ -1,6 +1,0 @@
-options:
-  channel:
-    type: string
-    default: "1.11/stable"
-    description: |
-      Snap channel to install Kubernetes snaps from

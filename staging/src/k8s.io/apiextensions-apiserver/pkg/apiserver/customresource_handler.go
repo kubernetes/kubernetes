@@ -28,8 +28,17 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
-	"k8s.io/klog"
-
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
+	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
+	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
+	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -44,30 +53,22 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
-	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
-	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
-	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
-	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
-	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
-	"k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor"
-	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/klog"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -96,6 +97,9 @@ type crdHandler struct {
 	masterCount int
 
 	converterFactory *conversion.CRConverterFactory
+
+	// so that we can do create on update.
+	authorizer authorizer.Authorizer
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -109,13 +113,13 @@ type crdInfo struct {
 	storages map[string]customresource.CustomResourceStorage
 
 	// Request scope per version
-	requestScopes map[string]handlers.RequestScope
+	requestScopes map[string]*handlers.RequestScope
 
 	// Scale scope per version
-	scaleRequestScopes map[string]handlers.RequestScope
+	scaleRequestScopes map[string]*handlers.RequestScope
 
 	// Status scope per version
-	statusRequestScopes map[string]handlers.RequestScope
+	statusRequestScopes map[string]*handlers.RequestScope
 
 	// storageVersion is the CRD version used when storing the object in etcd.
 	storageVersion string
@@ -134,7 +138,8 @@ func NewCustomResourceDefinitionHandler(
 	establishingController *establish.EstablishingController,
 	serviceResolver webhook.ServiceResolver,
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
-	masterCount int) (*crdHandler, error) {
+	masterCount int,
+	authorizer authorizer.Authorizer) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -145,6 +150,7 @@ func NewCustomResourceDefinitionHandler(
 		admission:               admission,
 		establishingController:  establishingController,
 		masterCount:             masterCount,
+		authorizer:              authorizer,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
@@ -228,9 +234,12 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		string(types.JSONPatchType),
 		string(types.MergePatchType),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+	}
 
 	var handler http.HandlerFunc
-	subresources, err := getSubresourcesForVersion(crd, requestInfo.APIVersion)
+	subresources, err := apiextensions.GetSubresourcesForVersion(crd, requestInfo.APIVersion)
 	if err != nil {
 		utilruntime.HandleError(err)
 		http.Error(w, "the server could not properly serve the CR subresources", http.StatusInternalServerError)
@@ -415,8 +424,6 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
-
 func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
@@ -437,10 +444,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	}
 
 	// Scope/Storages per version.
-	requestScopes := map[string]handlers.RequestScope{}
+	requestScopes := map[string]*handlers.RequestScope{}
 	storages := map[string]customresource.CustomResourceStorage{}
-	statusScopes := map[string]handlers.RequestScope{}
-	scaleScopes := map[string]handlers.RequestScope{}
+	statusScopes := map[string]*handlers.RequestScope{}
+	scaleScopes := map[string]*handlers.RequestScope{}
 
 	for _, v := range crd.Spec.Versions {
 		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
@@ -462,7 +469,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
-		validationSchema, err := getSchemaForVersion(crd, v.Name)
+		validationSchema, err := apiextensions.GetSchemaForVersion(crd, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR schema")
@@ -474,7 +481,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		var statusSpec *apiextensions.CustomResourceSubresourceStatus
 		var statusValidator *validate.SchemaValidator
-		subresources, err := getSubresourcesForVersion(crd, v.Name)
+		subresources, err := apiextensions.GetSubresourcesForVersion(crd, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
@@ -498,7 +505,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			scaleSpec = subresources.Scale
 		}
 
-		columns, err := getColumnsForVersion(crd, v.Name)
+		columns, err := apiextensions.GetColumnsForVersion(crd, v.Name)
 		if err != nil {
 			utilruntime.HandleError(err)
 			return nil, fmt.Errorf("the server could not properly serve the CR columns")
@@ -541,7 +548,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 
-		requestScopes[v.Name] = handlers.RequestScope{
+		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
 				SelfLinker:         meta.NewAccessor(),
 				ClusterScoped:      clusterScoped,
@@ -565,11 +572,23 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			MetaGroupVersion: metav1.SchemeGroupVersion,
 
 			TableConvertor: storages[v.Name].CustomResource,
+
+			Authorizer: r.authorizer,
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			reqScope := *requestScopes[v.Name]
+			reqScope.FieldManager = fieldmanager.NewCRDFieldManager(
+				reqScope.Convertor,
+				reqScope.Defaulter,
+				reqScope.Kind.GroupVersion(),
+				reqScope.HubGroupVersion,
+			)
+			requestScopes[v.Name] = &reqScope
 		}
 
 		// override scaleSpec subresource values
 		// shallow copy
-		scaleScope := requestScopes[v.Name]
+		scaleScope := *requestScopes[v.Name]
 		scaleConverter := scale.NewScaleConverter()
 		scaleScope.Subresource = "scale"
 		scaleScope.Serializer = serializer.NewCodecFactory(scaleConverter.Scheme())
@@ -580,11 +599,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
 		}
-		scaleScopes[v.Name] = scaleScope
+		scaleScopes[v.Name] = &scaleScope
 
 		// override status subresource values
 		// shallow copy
-		statusScope := requestScopes[v.Name]
+		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
@@ -592,7 +611,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/status",
 		}
-		statusScopes[v.Name] = statusScope
+		statusScopes[v.Name] = &statusScope
 	}
 
 	ret := &crdInfo{
@@ -625,6 +644,8 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 	return []runtime.SerializerInfo{
 		{
 			MediaType:        "application/json",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "json",
 			EncodesAsText:    true,
 			Serializer:       json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, false),
 			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, true),
@@ -635,9 +656,11 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 			},
 		},
 		{
-			MediaType:     "application/yaml",
-			EncodesAsText: true,
-			Serializer:    json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
+			MediaType:        "application/yaml",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "yaml",
+			EncodesAsText:    true,
+			Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
 		},
 	}
 }

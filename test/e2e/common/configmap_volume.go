@@ -45,8 +45,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, without mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of ‘0x400’
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -60,8 +61,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, without mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
+		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root [LinuxOnly] [NodeConformance]", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
@@ -82,8 +84,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, with mapping, volume mode set
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. File mode is changed to a custom value of '0x400'. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The data content of the file MUST be readable and verified and file modes MUST be set to the custom value of ‘0x400’
+		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
@@ -92,8 +95,9 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Release : v1.9
 		Testname: ConfigMap Volume, with mapping, non-root user
 		Description: Create a ConfigMap, create a Pod that mounts a volume and populates the volume with data stored in the ConfigMap. Files are mapped to a path in the volume. Pod is run as a non-root user with uid=1000. The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount. The file on the volume MUST have file mode set to default value of 0x644.
+		This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [LinuxOnly] [NodeConformance]", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 

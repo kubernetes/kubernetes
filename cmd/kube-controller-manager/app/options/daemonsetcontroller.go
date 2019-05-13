@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 )
 
 // DaemonSetControllerOptions holds the DaemonSetController options.
 type DaemonSetControllerOptions struct {
-	*kubectrlmgrconfig.DaemonSetControllerConfiguration
+	*daemonconfig.DaemonSetControllerConfiguration
 }
 
 // AddFlags adds flags related to DaemonSetController for controller manager to the specified FlagSet.
@@ -35,7 +35,7 @@ func (o *DaemonSetControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up DaemonSetController config with options.
-func (o *DaemonSetControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.DaemonSetControllerConfiguration) error {
+func (o *DaemonSetControllerOptions) ApplyTo(cfg *daemonconfig.DaemonSetControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

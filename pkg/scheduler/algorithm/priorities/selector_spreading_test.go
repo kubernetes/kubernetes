@@ -24,7 +24,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -392,7 +391,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	buildNodeLabels := func(failureDomain string) map[string]string {
 		labels := map[string]string{
-			kubeletapis.LabelZoneFailureDomain: failureDomain,
+			v1.LabelZoneFailureDomain: failureDomain,
 		}
 		return labels
 	}

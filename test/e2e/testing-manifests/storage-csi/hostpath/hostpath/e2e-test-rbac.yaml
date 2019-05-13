@@ -13,6 +13,9 @@ subjects:
   - kind: ServiceAccount
     name: csi-provisioner
     namespace: default
+  - kind: ServiceAccount
+    name: csi-snapshotter
+    namespace: default
 roleRef:
   kind: ClusterRole
   name: e2e-test-privileged-psp

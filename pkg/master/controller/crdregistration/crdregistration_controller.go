@@ -60,15 +60,15 @@ type crdRegistrationController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewAutoRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
+// NewCRDRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
 // controller so they automatically stay in sync.
-func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
+func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
 	c := &crdRegistrationController{
 		crdLister:              crdinformer.Lister(),
 		crdSynced:              crdinformer.Informer().HasSynced,
 		apiServiceRegistration: apiServiceRegistration,
 		syncedInitialSet:       make(chan struct{}),
-		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd-autoregister"),
+		queue:                  workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_autoregistration_controller"),
 	}
 	c.syncHandler = c.handleVersionUpdate
 

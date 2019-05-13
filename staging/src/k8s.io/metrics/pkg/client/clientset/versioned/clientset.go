@@ -30,8 +30,6 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface
 	MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Metrics() metricsv1beta1.MetricsV1beta1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -49,12 +47,6 @@ func (c *Clientset) MetricsV1alpha1() metricsv1alpha1.MetricsV1alpha1Interface {
 
 // MetricsV1beta1 retrieves the MetricsV1beta1Client
 func (c *Clientset) MetricsV1beta1() metricsv1beta1.MetricsV1beta1Interface {
-	return c.metricsV1beta1
-}
-
-// Deprecated: Metrics retrieves the default version of MetricsClient.
-// Please explicitly pick a version.
-func (c *Clientset) Metrics() metricsv1beta1.MetricsV1beta1Interface {
 	return c.metricsV1beta1
 }
 

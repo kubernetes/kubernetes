@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -49,7 +50,15 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	master := StartRealMasterOrDie(t)
+	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
+		// force enable all resources so we can check storage.
+		// TODO: drop these once we stop allowing them to be served.
+		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/deployments"] = "true"
+		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/daemonsets"] = "true"
+		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/replicasets"] = "true"
+		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/podsecuritypolicies"] = "true"
+		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/networkpolicies"] = "true"
+	})
 	defer master.Cleanup()
 	defer dumpEtcdKVOnFailure(t, master.KV)
 

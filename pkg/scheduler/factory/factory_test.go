@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,10 +39,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -254,73 +254,124 @@ func TestDefaultErrorFunc(t *testing.T) {
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
-	queue := &internalqueue.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
-	podBackoff := util.CreatePodBackoff(1*time.Millisecond, 1*time.Second)
-	errFunc := factory.MakeDefaultErrorFunc(podBackoff, queue)
 
+	timestamp := time.Now()
+	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
+
+	// Trigger error handling again to put the pod in unschedulable queue
 	errFunc(testPod, nil)
 
-	for {
-		// This is a terrible way to do this but I plan on replacing this
-		// whole error handling system in the future. The test will time
-		// out if something doesn't work.
-		time.Sleep(10 * time.Millisecond)
-		got, exists, _ := queue.Get(testPod)
-		if !exists {
+	// Try up to a minute to retrieve the error pod from priority queue
+	foundPodFlag := false
+	maxIterations := 10 * 60
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
 			continue
 		}
-		requestReceived := false
-		actions := client.Actions()
-		for _, a := range actions {
-			if a.GetVerb() == "get" {
-				getAction, ok := a.(clienttesting.GetAction)
-				if !ok {
-					t.Errorf("Can't cast action object to GetAction interface")
-					break
-				}
-				name := getAction.GetName()
-				ns := a.GetNamespace()
-				if name != "foo" || ns != "bar" {
-					t.Errorf("Expected name %s namespace %s, got %s %s",
-						"foo", "bar", name, ns)
-				}
-				requestReceived = true
-			}
-		}
-		if !requestReceived {
-			t.Errorf("Get pod request not received")
-		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
+
+		foundPodFlag = true
 		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the unschedulable queue after waiting for a minute: %v", testPod)
+	}
+
+	// Remove the pod from priority queue to test putting error
+	// pod in backoff queue.
+	queue.Delete(testPod)
+
+	// Trigger a move request
+	queue.MoveAllToActiveQueue()
+
+	// Trigger error handling again to put the pod in backoff queue
+	errFunc(testPod, nil)
+
+	foundPodFlag = false
+	for i := 0; i < maxIterations; i++ {
+		time.Sleep(100 * time.Millisecond)
+		// The pod should be found from backoff queue at this time
+		got := getPodfromPriorityQueue(queue, testPod)
+		if got == nil {
+			continue
+		}
+
+		testClientGetPodRequest(client, t, testPod.Namespace, testPod.Name)
+
+		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+
+		foundPodFlag = true
+		break
+	}
+
+	if !foundPodFlag {
+		t.Errorf("Failed to get pod from the backoff queue after waiting for a minute: %v", testPod)
 	}
 }
 
-func TestNodeEnumerator(t *testing.T) {
-	testList := &v1.NodeList{
-		Items: []v1.Node{
-			{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "baz"}},
-		},
+// getPodfromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
+// the specific pod from the given priority queue. It returns the found pod in the priority queue.
+func getPodfromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
+	podList := queue.PendingPods()
+	if len(podList) == 0 {
+		return nil
 	}
-	me := nodeEnumerator{testList}
 
-	if e, a := 3, me.Len(); e != a {
-		t.Fatalf("expected %v, got %v", e, a)
+	queryPodKey, err := cache.MetaNamespaceKeyFunc(pod)
+	if err != nil {
+		return nil
 	}
-	for i := range testList.Items {
-		t.Run(fmt.Sprintf("node enumerator/%v", i), func(t *testing.T) {
-			gotObj := me.Get(i)
-			if e, a := testList.Items[i].Name, gotObj.(*v1.Node).Name; e != a {
-				t.Errorf("Expected %v, got %v", e, a)
+
+	for _, foundPod := range podList {
+		foundPodKey, err := cache.MetaNamespaceKeyFunc(foundPod)
+		if err != nil {
+			return nil
+		}
+
+		if foundPodKey == queryPodKey {
+			return foundPod
+		}
+	}
+
+	return nil
+}
+
+// testClientGetPodRequest function provides a routine used by TestDefaultErrorFunc test.
+// It tests whether the fake client can receive request and correctly "get" the namespace
+// and name of the error pod.
+func testClientGetPodRequest(client *fake.Clientset, t *testing.T, podNs string, podName string) {
+	requestReceived := false
+	actions := client.Actions()
+	for _, a := range actions {
+		if a.GetVerb() == "get" {
+			getAction, ok := a.(clienttesting.GetAction)
+			if !ok {
+				t.Errorf("Can't cast action object to GetAction interface")
+				break
 			}
-			if e, a := &testList.Items[i], gotObj; !reflect.DeepEqual(e, a) {
-				t.Errorf("Expected %#v, got %v#", e, a)
+			name := getAction.GetName()
+			ns := a.GetNamespace()
+			if name != podName || ns != podNs {
+				t.Errorf("Expected name %s namespace %s, got %s %s",
+					podName, podNs, name, ns)
 			}
-		})
+			requestReceived = true
+		}
+	}
+	if !requestReceived {
+		t.Errorf("Get pod request not received")
 	}
 }
 
@@ -424,98 +475,6 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 }
 
-func TestSkipPodUpdate(t *testing.T) {
-	table := []struct {
-		pod              *v1.Pod
-		isAssumedPodFunc func(*v1.Pod) bool
-		getPodFunc       func(*v1.Pod) *v1.Pod
-		expected         bool
-		name             string
-	}{
-		{
-			name: "Non-assumed pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool { return false },
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod-0",
-					},
-				}
-			},
-			expected: false,
-		},
-		{
-			name: "with changes on ResourceVersion, Spec.NodeName and/or Annotations",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "pod-0",
-					Annotations:     map[string]string{"a": "b"},
-					ResourceVersion: "0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "node-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "pod-0",
-						Annotations:     map[string]string{"c": "d"},
-						ResourceVersion: "1",
-					},
-					Spec: v1.PodSpec{
-						NodeName: "node-1",
-					},
-				}
-			},
-			expected: true,
-		},
-		{
-			name: "with changes on Labels",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "pod-0",
-					Labels: map[string]string{"a": "b"},
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "pod-0",
-						Labels: map[string]string{"c": "d"},
-					},
-				}
-			},
-			expected: false,
-		},
-	}
-	for _, test := range table {
-		t.Run(test.name, func(t *testing.T) {
-			c := &configFactory{
-				schedulerCache: &fakecache.Cache{
-					IsAssumedPodFunc: test.isAssumedPodFunc,
-					GetPodFunc:       test.getPodFunc,
-				},
-			}
-			got := c.skipPodUpdate(test.pod)
-			if got != test.expected {
-				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-			}
-		})
-	}
-}
-
 func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
@@ -536,6 +495,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
 		stopCh,
+		framework.NewRegistry(),
 	})
 }
 
@@ -651,148 +611,5 @@ func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm
 	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
 	if binderType != expectedBinderType {
 		t.Errorf("Expected binder %q but got %q", expectedBinderType, binderType)
-	}
-}
-
-func TestNodeAllocatableChanged(t *testing.T) {
-	newQuantity := func(value int64) resource.Quantity {
-		return *resource.NewQuantity(value, resource.BinarySI)
-	}
-	for _, c := range []struct {
-		Name           string
-		Changed        bool
-		OldAllocatable v1.ResourceList
-		NewAllocatable v1.ResourceList
-	}{
-		{
-			Name:           "no allocatable resources changed",
-			Changed:        false,
-			OldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
-			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
-		},
-		{
-			Name:           "new node has more allocatable resources",
-			Changed:        true,
-			OldAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024)},
-			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
-		},
-	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.OldAllocatable}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.NewAllocatable}}
-		changed := nodeAllocatableChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("nodeAllocatableChanged should be %t, got %t", c.Changed, changed)
-		}
-	}
-}
-
-func TestNodeLabelsChanged(t *testing.T) {
-	for _, c := range []struct {
-		Name      string
-		Changed   bool
-		OldLabels map[string]string
-		NewLabels map[string]string
-	}{
-		{
-			Name:      "no labels changed",
-			Changed:   false,
-			OldLabels: map[string]string{"foo": "bar"},
-			NewLabels: map[string]string{"foo": "bar"},
-		},
-		// Labels changed.
-		{
-			Name:      "new node has more labels",
-			Changed:   true,
-			OldLabels: map[string]string{"foo": "bar"},
-			NewLabels: map[string]string{"foo": "bar", "test": "value"},
-		},
-	} {
-		oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.OldLabels}}
-		newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.NewLabels}}
-		changed := nodeLabelsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
-	}
-}
-
-func TestNodeTaintsChanged(t *testing.T) {
-	for _, c := range []struct {
-		Name      string
-		Changed   bool
-		OldTaints []v1.Taint
-		NewTaints []v1.Taint
-	}{
-		{
-			Name:      "no taint changed",
-			Changed:   false,
-			OldTaints: []v1.Taint{{Key: "key", Value: "value"}},
-			NewTaints: []v1.Taint{{Key: "key", Value: "value"}},
-		},
-		{
-			Name:      "taint value changed",
-			Changed:   true,
-			OldTaints: []v1.Taint{{Key: "key", Value: "value1"}},
-			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
-		},
-	} {
-		oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.OldTaints}}
-		newNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.NewTaints}}
-		changed := nodeTaintsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, not %t", c.Name, c.Changed, changed)
-		}
-	}
-}
-
-func TestNodeConditionsChanged(t *testing.T) {
-	nodeConditionType := reflect.TypeOf(v1.NodeCondition{})
-	if nodeConditionType.NumField() != 6 {
-		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
-	}
-
-	for _, c := range []struct {
-		Name          string
-		Changed       bool
-		OldConditions []v1.NodeCondition
-		NewConditions []v1.NodeCondition
-	}{
-		{
-			Name:          "no condition changed",
-			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
-		},
-		{
-			Name:          "only LastHeartbeatTime changed",
-			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
-		},
-		{
-			Name:          "new node has more healthy conditions",
-			Changed:       true,
-			OldConditions: []v1.NodeCondition{},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
-		},
-		{
-			Name:          "new node has less unhealthy conditions",
-			Changed:       true,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
-			NewConditions: []v1.NodeCondition{},
-		},
-		{
-			Name:          "condition status changed",
-			Changed:       true,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
-		},
-	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.OldConditions}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.NewConditions}}
-		changed := nodeConditionsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
 	}
 }

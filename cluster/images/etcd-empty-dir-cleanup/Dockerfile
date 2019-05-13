@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM busybox
+FROM k8s.gcr.io/debian-base:v1.0.0
 
 COPY etcdctl etcd-empty-dir-cleanup.sh /
 RUN chmod a+rx /etcdctl /etcd-empty-dir-cleanup.sh

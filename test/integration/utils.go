@@ -31,6 +31,7 @@ import (
 	"github.com/coreos/etcd/pkg/transport"
 )
 
+// DeletePodOrErrorf deletes a pod or fails with a call to t.Errorf.
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
 	if err := c.CoreV1().Pods(ns).Delete(name, nil); err != nil {
 		t.Errorf("unable to delete pod %v: %v", name, err)
@@ -39,17 +40,19 @@ func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
 
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
-var Code200 = map[int]bool{200: true}
-var Code201 = map[int]bool{201: true}
-var Code400 = map[int]bool{400: true}
-var Code401 = map[int]bool{401: true}
-var Code403 = map[int]bool{403: true}
-var Code404 = map[int]bool{404: true}
-var Code405 = map[int]bool{405: true}
-var Code409 = map[int]bool{409: true}
-var Code422 = map[int]bool{422: true}
-var Code500 = map[int]bool{500: true}
-var Code503 = map[int]bool{503: true}
+var (
+	Code200 = map[int]bool{200: true}
+	Code201 = map[int]bool{201: true}
+	Code400 = map[int]bool{400: true}
+	Code401 = map[int]bool{401: true}
+	Code403 = map[int]bool{403: true}
+	Code404 = map[int]bool{404: true}
+	Code405 = map[int]bool{405: true}
+	Code409 = map[int]bool{409: true}
+	Code422 = map[int]bool{422: true}
+	Code500 = map[int]bool{500: true}
+	Code503 = map[int]bool{503: true}
+)
 
 // WaitForPodToDisappear polls the API server if the pod has been deleted.
 func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, interval, timeout time.Duration) error {
@@ -57,16 +60,15 @@ func WaitForPodToDisappear(podClient coreclient.PodInterface, podName string, in
 		_, err := podClient.Get(podName, metav1.GetOptions{})
 		if err == nil {
 			return false, nil
-		} else {
-			if errors.IsNotFound(err) {
-				return true, nil
-			} else {
-				return false, err
-			}
 		}
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
 	})
 }
 
+// GetEtcdClients returns an initialized  clientv3.Client and clientv3.KV.
 func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: config.CertFile,

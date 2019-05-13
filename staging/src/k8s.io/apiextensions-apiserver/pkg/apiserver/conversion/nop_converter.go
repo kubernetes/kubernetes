@@ -17,9 +17,6 @@ limitations under the License.
 package conversion
 
 import (
-	"errors"
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -27,53 +24,18 @@ import (
 
 // nopConverter is a converter that only sets the apiVersion fields, but does not real conversion.
 type nopConverter struct {
-	validVersions map[schema.GroupVersion]bool
 }
 
-var _ runtime.ObjectConvertor = &nopConverter{}
+var _ crConverterInterface = &nopConverter{}
 
-func (nopConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
-	return "", "", errors.New("unstructured cannot convert field labels")
-}
-
-func (c *nopConverter) Convert(in, out, context interface{}) error {
-	unstructIn, ok := in.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
+// ConvertToVersion converts in object to the given gv in place and returns the same `in` object.
+func (c *nopConverter) Convert(in runtime.Object, targetGV schema.GroupVersion) (runtime.Object, error) {
+	// Run the converter on the list items instead of list itself
+	if list, ok := in.(*unstructured.UnstructuredList); ok {
+		for i := range list.Items {
+			list.Items[i].SetGroupVersionKind(targetGV.WithKind(list.Items[i].GroupVersionKind().Kind))
+		}
 	}
-
-	unstructOut, ok := out.(*unstructured.Unstructured)
-	if !ok {
-		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
-	}
-
-	outGVK := unstructOut.GroupVersionKind()
-	if !c.validVersions[outGVK.GroupVersion()] {
-		return fmt.Errorf("request to convert CR from an invalid group/version: %s", outGVK.String())
-	}
-	inGVK := unstructIn.GroupVersionKind()
-	if !c.validVersions[inGVK.GroupVersion()] {
-		return fmt.Errorf("request to convert CR to an invalid group/version: %s", inGVK.String())
-	}
-
-	unstructOut.SetUnstructuredContent(unstructIn.UnstructuredContent())
-	_, err := c.ConvertToVersion(unstructOut, outGVK.GroupVersion())
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *nopConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
-	kind := in.GetObjectKind().GroupVersionKind()
-	gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{kind})
-	if !ok {
-		// TODO: should this be a typed error?
-		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", kind, target)
-	}
-	if !c.validVersions[gvk.GroupVersion()] {
-		return nil, fmt.Errorf("request to convert CR to an invalid group/version: %s", gvk.String())
-	}
-	in.GetObjectKind().SetGroupVersionKind(gvk)
+	in.GetObjectKind().SetGroupVersionKind(targetGV.WithKind(in.GetObjectKind().GroupVersionKind().Kind))
 	return in, nil
 }

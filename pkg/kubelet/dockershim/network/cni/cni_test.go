@@ -121,16 +121,14 @@ func tearDownPlugin(tmpDir string) {
 type fakeNetworkHost struct {
 	networktest.FakePortMappingGetter
 	kubeClient clientset.Interface
-	runtime    kubecontainer.Runtime
+	pods       []*containertest.FakePod
 }
 
 func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod, ports map[string][]*hostport.PortMapping) *fakeNetworkHost {
 	host := &fakeNetworkHost{
 		networktest.FakePortMappingGetter{PortMaps: ports},
 		kubeClient,
-		&containertest.FakeRuntime{
-			AllPodList: pods,
-		},
+		pods,
 	}
 	return host
 }
@@ -143,12 +141,15 @@ func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
 	return fnh.kubeClient
 }
 
-func (fnh *fakeNetworkHost) GetRuntime() kubecontainer.Runtime {
-	return fnh.runtime
-}
-
 func (fnh *fakeNetworkHost) GetNetNS(containerID string) (string, error) {
-	return fnh.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "test", ID: containerID})
+	for _, fp := range fnh.pods {
+		for _, c := range fp.Pod.Containers {
+			if c.ID.ID == containerID {
+				return fp.NetnsPath, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("container %q not found", containerID)
 }
 
 func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {
@@ -290,7 +291,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("mismatch in expected port mappings. expected %v got %v", expectedMappings, inputConfig.RuntimeConfig.PortMappings)
 	}
 	expectedBandwidth := map[string]interface{}{
-		"ingressRate": 1000.0, "egressRate": 1000.0,
+		"ingressRate": 1000000.0, "egressRate": 1000000.0,
 		"ingressBurst": 2147483647.0, "egressBurst": 2147483647.0,
 	}
 	if !reflect.DeepEqual(inputConfig.RuntimeConfig.Bandwidth, expectedBandwidth) {

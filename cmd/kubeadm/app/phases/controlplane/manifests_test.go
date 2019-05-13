@@ -37,18 +37,15 @@ import (
 
 const (
 	testCertsDir = "/var/lib/certs"
-	etcdDataDir  = "/var/lib/etcd"
 )
 
 var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()
 
 func TestGetStaticPodSpecs(t *testing.T) {
 
-	// Creates a Master Configuration
-	cfg := &kubeadmapi.InitConfiguration{
-		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-			KubernetesVersion: "v1.9.0",
-		},
+	// Creates a Cluster Configuration
+	cfg := &kubeadmapi.ClusterConfiguration{
+		KubernetesVersion: "v1.9.0",
 	}
 
 	// Executes GetStaticPodSpecs
@@ -56,102 +53,110 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
 	k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
 
-	specs := GetStaticPodSpecs(cfg, k8sVersion)
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, k8sVersion)
 
-	var assertions = []struct {
+	var tests = []struct {
+		name          string
 		staticPodName string
 	}{
 		{
+			name:          "KubeAPIServer",
 			staticPodName: kubeadmconstants.KubeAPIServer,
 		},
 		{
+			name:          "KubeControllerManager",
 			staticPodName: kubeadmconstants.KubeControllerManager,
 		},
 		{
+			name:          "KubeScheduler",
 			staticPodName: kubeadmconstants.KubeScheduler,
 		},
 	}
 
-	for _, assertion := range assertions {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// assert the spec for the staticPodName exists
+			if spec, ok := specs[tc.staticPodName]; ok {
 
-		// assert the spec for the staticPodName exists
-		if spec, ok := specs[assertion.staticPodName]; ok {
+				// Assert each specs refers to the right pod
+				if spec.Spec.Containers[0].Name != tc.staticPodName {
+					t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", tc.staticPodName, spec.Spec.Containers[0].Name, tc.staticPodName)
+				}
 
-			// Assert each specs refers to the right pod
-			if spec.Spec.Containers[0].Name != assertion.staticPodName {
-				t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", assertion.staticPodName, spec.Spec.Containers[0].Name, assertion.staticPodName)
+			} else {
+				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
-
-		} else {
-			t.Errorf("getStaticPodSpecs didn't create spec for %s ", assertion.staticPodName)
-		}
+		})
 	}
 }
 
 func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 	var tests = []struct {
+		name       string
 		components []string
 	}{
 		{
+			name:       "KubeAPIServer KubeAPIServer KubeScheduler",
 			components: []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
 		},
 		{
+			name:       "KubeAPIServer",
 			components: []string{kubeadmconstants.KubeAPIServer},
 		},
 		{
+			name:       "KubeControllerManager",
 			components: []string{kubeadmconstants.KubeControllerManager},
 		},
 		{
+			name:       "KubeScheduler",
 			components: []string{kubeadmconstants.KubeScheduler},
 		},
 	}
 
 	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create temp folder for the test case
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
 
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-
-		// Creates a Master Configuration
-		cfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			// Creates a Cluster Configuration
+			cfg := &kubeadmapi.ClusterConfiguration{
 				KubernetesVersion: "v1.9.0",
-			},
-		}
+			}
 
-		// Execute createStaticPodFunction
-		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-		err := CreateStaticPodFiles(manifestPath, cfg, test.components...)
-		if err != nil {
-			t.Errorf("Error executing createStaticPodFunction: %v", err)
-			continue
-		}
+			// Execute createStaticPodFunction
+			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
+			err := CreateStaticPodFiles(manifestPath, cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			if err != nil {
+				t.Errorf("Error executing createStaticPodFunction: %v", err)
+				return
+			}
 
-		// Assert expected files are there
-		testutil.AssertFilesCount(t, manifestPath, len(test.components))
+			// Assert expected files are there
+			testutil.AssertFilesCount(t, manifestPath, len(test.components))
 
-		for _, fileName := range test.components {
-			testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
-		}
+			for _, fileName := range test.components {
+				testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
+			}
+		})
 	}
 }
 
 func TestGetAPIServerCommand(t *testing.T) {
 	var tests = []struct {
 		name     string
-		cfg      *kubeadmapi.InitConfiguration
+		cfg      *kubeadmapi.ClusterConfiguration
+		endpoint *kubeadmapi.APIEndpoint
 		expected []string
 	}{
 		{
 			name: "testing defaults",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					CertificatesDir: testCertsDir,
-				},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				CertificatesDir: testCertsDir,
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -184,13 +189,11 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "ipv6 advertise address",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					CertificatesDir: testCertsDir,
-				},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				CertificatesDir: testCertsDir,
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -223,21 +226,19 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "an external etcd with custom ca, certs and keys",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
-					Etcd: kubeadmapi.Etcd{
-						External: &kubeadmapi.ExternalEtcd{
-							Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"},
-							CAFile:    "fuz",
-							CertFile:  "fiz",
-							KeyFile:   "faz",
-						},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"https://8.6.4.1:2379", "https://8.6.4.2:2379"},
+						CAFile:    "fuz",
+						CertFile:  "fiz",
+						KeyFile:   "faz",
 					},
-					CertificatesDir: testCertsDir,
 				},
+				CertificatesDir: testCertsDir,
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -270,18 +271,16 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "an insecure etcd",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
-					Etcd: kubeadmapi.Etcd{
-						External: &kubeadmapi.ExternalEtcd{
-							Endpoints: []string{"http://127.0.0.1:2379", "http://127.0.0.1:2380"},
-						},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking: kubeadmapi.Networking{ServiceSubnet: "bar"},
+				Etcd: kubeadmapi.Etcd{
+					External: &kubeadmapi.ExternalEtcd{
+						Endpoints: []string{"http://127.0.0.1:2379", "http://127.0.0.1:2380"},
 					},
-					CertificatesDir: testCertsDir,
 				},
+				CertificatesDir: testCertsDir,
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "2001:db8::1"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -311,23 +310,21 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "test APIServer.ExtraArgs works as expected",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					CertificatesDir: testCertsDir,
-					APIServer: kubeadmapi.APIServer{
-						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-							ExtraArgs: map[string]string{
-								"service-cluster-ip-range": "baz",
-								"advertise-address":        "9.9.9.9",
-								"audit-policy-file":        "/etc/config/audit.yaml",
-								"audit-log-path":           "/var/log/kubernetes",
-							},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				CertificatesDir: testCertsDir,
+				APIServer: kubeadmapi.APIServer{
+					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{
+							"service-cluster-ip-range": "baz",
+							"advertise-address":        "9.9.9.9",
+							"audit-policy-file":        "/etc/config/audit.yaml",
+							"audit-log-path":           "/var/log/kubernetes",
 						},
 					},
 				},
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -362,20 +359,18 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "authorization-mode extra-args ABAC",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					CertificatesDir: testCertsDir,
-					APIServer: kubeadmapi.APIServer{
-						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-							ExtraArgs: map[string]string{
-								"authorization-mode": authzmodes.ModeABAC,
-							},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				CertificatesDir: testCertsDir,
+				APIServer: kubeadmapi.APIServer{
+					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{
+							"authorization-mode": authzmodes.ModeABAC,
 						},
 					},
 				},
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -408,20 +403,18 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "insecure-port extra-args",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					CertificatesDir: testCertsDir,
-					APIServer: kubeadmapi.APIServer{
-						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-							ExtraArgs: map[string]string{
-								"insecure-port": "1234",
-							},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				CertificatesDir: testCertsDir,
+				APIServer: kubeadmapi.APIServer{
+					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{
+							"insecure-port": "1234",
 						},
 					},
 				},
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=1234",
@@ -454,20 +447,18 @@ func TestGetAPIServerCommand(t *testing.T) {
 		},
 		{
 			name: "authorization-mode extra-args Webhook",
-			cfg: &kubeadmapi.InitConfiguration{
-				LocalAPIEndpoint: kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
-				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-					Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
-					CertificatesDir: testCertsDir,
-					APIServer: kubeadmapi.APIServer{
-						ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
-							ExtraArgs: map[string]string{
-								"authorization-mode": authzmodes.ModeWebhook,
-							},
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking:      kubeadmapi.Networking{ServiceSubnet: "bar"},
+				CertificatesDir: testCertsDir,
+				APIServer: kubeadmapi.APIServer{
+					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+						ExtraArgs: map[string]string{
+							"authorization-mode": authzmodes.ModeWebhook,
 						},
 					},
 				},
 			},
+			endpoint: &kubeadmapi.APIEndpoint{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 			expected: []string{
 				"kube-apiserver",
 				"--insecure-port=0",
@@ -502,7 +493,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual := getAPIServerCommand(rt.cfg)
+			actual := getAPIServerCommand(rt.cfg, rt.endpoint)
 			sort.Strings(actual)
 			sort.Strings(rt.expected)
 			if !reflect.DeepEqual(actual, rt.expected) {
@@ -646,16 +637,14 @@ func TestGetControllerManagerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		// TODO: Make getControllerManagerCommand accept a ClusterConfiguration object instead of InitConfiguration
-		initcfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: *rt.cfg,
-		}
-		actual := getControllerManagerCommand(initcfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			errorDiffArguments(t, rt.name, actual, rt.expected)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := getControllerManagerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+			sort.Strings(actual)
+			sort.Strings(rt.expected)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				errorDiffArguments(t, rt.name, actual, rt.expected)
+			}
+		})
 	}
 }
 
@@ -727,16 +716,17 @@ func TestCalcNodeCidrSize(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		actualPrefix := calcNodeCidrSize(test.podSubnet)
-		if actualPrefix != test.expectedPrefix {
-			t.Errorf("Case [%s]\nCalc of node CIDR size for pod subnet %q failed: Expected %q, saw %q",
-				test.name, test.podSubnet, test.expectedPrefix, actualPrefix)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			actualPrefix := calcNodeCidrSize(test.podSubnet)
+			if actualPrefix != test.expectedPrefix {
+				t.Errorf("Case [%s]\nCalc of node CIDR size for pod subnet %q failed: Expected %q, saw %q",
+					test.name, test.podSubnet, test.expectedPrefix, actualPrefix)
+			}
+		})
 	}
 
 }
 func TestGetControllerManagerCommandExternalCA(t *testing.T) {
-
 	tests := []struct {
 		name            string
 		cfg             *kubeadmapi.InitConfiguration
@@ -804,32 +794,34 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-		test.cfg.CertificatesDir = tmpdir
+		t.Run(test.name, func(t *testing.T) {
+			// Create temp folder for the test case
+			tmpdir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(tmpdir)
+			test.cfg.CertificatesDir = tmpdir
 
-		if err := certs.CreatePKIAssets(test.cfg); err != nil {
-			t.Errorf("failed creating pki assets: %v", err)
-		}
-
-		// delete ca.key and front-proxy-ca.key if test.caKeyPresent is false
-		if !test.caKeyPresent {
-			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
-				t.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+			if err := certs.CreatePKIAssets(test.cfg); err != nil {
+				t.Errorf("failed creating pki assets: %v", err)
 			}
-			if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
-				t.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
-			}
-		}
 
-		actual := getControllerManagerCommand(test.cfg, version.MustParseSemantic(test.cfg.KubernetesVersion))
-		expected := test.expectedArgFunc(tmpdir)
-		sort.Strings(actual)
-		sort.Strings(expected)
-		if !reflect.DeepEqual(actual, expected) {
-			errorDiffArguments(t, test.name, actual, expected)
-		}
+			// delete ca.key and front-proxy-ca.key if test.caKeyPresent is false
+			if !test.caKeyPresent {
+				if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
+					t.Errorf("failed removing %s: %v", kubeadmconstants.CAKeyName, err)
+				}
+				if err := os.Remove(filepath.Join(test.cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
+					t.Errorf("failed removing %s: %v", kubeadmconstants.FrontProxyCAKeyName, err)
+				}
+			}
+
+			actual := getControllerManagerCommand(&test.cfg.ClusterConfiguration, version.MustParseSemantic(test.cfg.KubernetesVersion))
+			expected := test.expectedArgFunc(tmpdir)
+			sort.Strings(actual)
+			sort.Strings(expected)
+			if !reflect.DeepEqual(actual, expected) {
+				errorDiffArguments(t, test.name, actual, expected)
+			}
+		})
 	}
 }
 
@@ -852,16 +844,14 @@ func TestGetSchedulerCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		// TODO: Make getSchedulerCommand accept a ClusterConfiguration object instead of InitConfiguration
-		initcfg := &kubeadmapi.InitConfiguration{
-			ClusterConfiguration: *rt.cfg,
-		}
-		actual := getSchedulerCommand(initcfg)
-		sort.Strings(actual)
-		sort.Strings(rt.expected)
-		if !reflect.DeepEqual(actual, rt.expected) {
-			errorDiffArguments(t, rt.name, actual, rt.expected)
-		}
+		t.Run(rt.name, func(t *testing.T) {
+			actual := getSchedulerCommand(rt.cfg)
+			sort.Strings(actual)
+			sort.Strings(rt.expected)
+			if !reflect.DeepEqual(actual, rt.expected) {
+				errorDiffArguments(t, rt.name, actual, rt.expected)
+			}
+		})
 	}
 }
 
@@ -929,7 +919,6 @@ func TestGetAuthzModes(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-
 		t.Run(rt.name, func(t *testing.T) {
 			actual := getAuthzModes(strings.Join(rt.authMode, ","))
 			if actual != rt.expected {

@@ -330,38 +330,43 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 	})
 
 	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		tc.Lock()
-		defer tc.Unlock()
+		handled, obj, err := func() (handled bool, ret *autoscalingv1.HorizontalPodAutoscaler, err error) {
+			tc.Lock()
+			defer tc.Unlock()
 
-		obj := action.(core.UpdateAction).GetObject().(*autoscalingv1.HorizontalPodAutoscaler)
-		assert.Equal(t, namespace, obj.Namespace, "the HPA namespace should be as expected")
-		assert.Equal(t, hpaName, obj.Name, "the HPA name should be as expected")
-		assert.Equal(t, tc.expectedDesiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
-		if tc.verifyCPUCurrent {
-			if assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage, "the reported CPU utilization percentage should be non-nil") {
-				assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage, "the report CPU utilization percentage should be as expected")
+			obj := action.(core.UpdateAction).GetObject().(*autoscalingv1.HorizontalPodAutoscaler)
+			assert.Equal(t, namespace, obj.Namespace, "the HPA namespace should be as expected")
+			assert.Equal(t, hpaName, obj.Name, "the HPA name should be as expected")
+			assert.Equal(t, tc.expectedDesiredReplicas, obj.Status.DesiredReplicas, "the desired replica count reported in the object status should be as expected")
+			if tc.verifyCPUCurrent {
+				if assert.NotNil(t, obj.Status.CurrentCPUUtilizationPercentage, "the reported CPU utilization percentage should be non-nil") {
+					assert.Equal(t, tc.CPUCurrent, *obj.Status.CurrentCPUUtilizationPercentage, "the report CPU utilization percentage should be as expected")
+				}
 			}
+			var actualConditions []autoscalingv1.HorizontalPodAutoscalerCondition
+			if err := json.Unmarshal([]byte(obj.ObjectMeta.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]), &actualConditions); err != nil {
+				return true, nil, err
+			}
+			// TODO: it's ok not to sort these becaues statusOk
+			// contains all the conditions, so we'll never be appending.
+			// Default to statusOk when missing any specific conditions
+			if tc.expectedConditions == nil {
+				tc.expectedConditions = statusOkWithOverrides()
+			}
+			// clear the message so that we can easily compare
+			for i := range actualConditions {
+				actualConditions[i].Message = ""
+				actualConditions[i].LastTransitionTime = metav1.Time{}
+			}
+			assert.Equal(t, tc.expectedConditions, actualConditions, "the status conditions should have been as expected")
+			tc.statusUpdated = true
+			// Every time we reconcile HPA object we are updating status.
+			return true, obj, nil
+		}()
+		if obj != nil {
+			tc.processed <- obj.Name
 		}
-		var actualConditions []autoscalingv1.HorizontalPodAutoscalerCondition
-		if err := json.Unmarshal([]byte(obj.ObjectMeta.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]), &actualConditions); err != nil {
-			return true, nil, err
-		}
-		// TODO: it's ok not to sort these becaues statusOk
-		// contains all the conditions, so we'll never be appending.
-		// Default to statusOk when missing any specific conditions
-		if tc.expectedConditions == nil {
-			tc.expectedConditions = statusOkWithOverrides()
-		}
-		// clear the message so that we can easily compare
-		for i := range actualConditions {
-			actualConditions[i].Message = ""
-			actualConditions[i].LastTransitionTime = metav1.Time{}
-		}
-		assert.Equal(t, tc.expectedConditions, actualConditions, "the status conditions should have been as expected")
-		tc.statusUpdated = true
-		// Every time we reconcile HPA object we are updating status.
-		tc.processed <- obj.Name
-		return true, obj, nil
+		return handled, obj, err
 	})
 
 	fakeScaleClient := &scalefake.FakeScaleClient{}
@@ -665,9 +670,9 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	defaultDownscalestabilizationWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
-		eventClient.Core(),
+		eventClient.CoreV1(),
 		testScaleClient,
-		testClient.Autoscaling(),
+		testClient.AutoscalingV1(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
 		metricsClient,
 		informerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
@@ -701,15 +706,25 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 	go hpaController.Run(stop)
 
 	tc.Lock()
-	if tc.verifyEvents {
-		tc.Unlock()
+	shouldWait := tc.verifyEvents
+	tc.Unlock()
+
+	if shouldWait {
 		// We need to wait for events to be broadcasted (sleep for longer than record.sleepDuration).
-		time.Sleep(2 * time.Second)
+		timeoutTime := time.Now().Add(2 * time.Second)
+		for now := time.Now(); timeoutTime.After(now); now = time.Now() {
+			sleepUntil := timeoutTime.Sub(now)
+			select {
+			case <-tc.processed:
+				// drain the chan of any sent events to keep it from filling before the timeout
+			case <-time.After(sleepUntil):
+				// timeout reached, ready to verifyResults
+			}
+		}
 	} else {
-		tc.Unlock()
+		// Wait for HPA to be processed.
+		<-tc.processed
 	}
-	// Wait for HPA to be processed.
-	<-tc.processed
 	tc.verifyResults(t)
 }
 
@@ -1051,6 +1066,37 @@ func TestScaleUpCMObject(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpPerPodCMObject(t *testing.T) {
+	targetAverageValue := resource.MustParse("10.0")
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         3,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &targetAverageValue,
+					},
+				},
+			},
+		},
+		reportedLevels: []uint64{40000},
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUpCMExternal(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -1197,6 +1243,39 @@ func TestScaleDownCMObject(t *testing.T) {
 			},
 		},
 		reportedLevels:      []uint64{12000},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
+	}
+	tc.runTest(t)
+}
+
+func TestScaleDownPerPodCMObject(t *testing.T) {
+	targetAverageValue := resource.MustParse("20.0")
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         5,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: &targetAverageValue,
+					},
+				},
+			},
+		},
+		reportedLevels:      []uint64{60000},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		recommendations:     []timestampedRecommendation{},
 	}
@@ -1432,6 +1511,41 @@ func TestToleranceCMExternal(t *testing.T) {
 					},
 					Target: autoscalingv2.MetricTarget{
 						Value: resource.NewMilliQuantity(8666, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		reportedLevels: []uint64{8600},
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+	}
+	tc.runTest(t)
+}
+
+func TestTolerancePerPodCMObject(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         4,
+		expectedDesiredReplicas: 4,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						AverageValue: resource.NewMilliQuantity(2200, resource.DecimalSI),
 					},
 				},
 			},
@@ -2319,7 +2433,9 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 			// wait a tick and then mark that we're finished (otherwise, we have no
 			// way to indicate that we're finished, because the function decides not to do anything)
 			time.Sleep(1 * time.Second)
+			tc.Lock()
 			tc.statusUpdated = true
+			tc.Unlock()
 			tc.processed <- "test-hpa"
 		}()
 
@@ -2394,8 +2510,6 @@ func TestAvoidUncessaryUpdates(t *testing.T) {
 		return true, objv1, nil
 	})
 	testClient.PrependReactor("update", "horizontalpodautoscalers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		tc.Lock()
-		defer tc.Unlock()
 		assert.Fail(t, "should not have attempted to update the HPA when nothing changed")
 		// mark that we've processed this HPA
 		tc.processed <- ""

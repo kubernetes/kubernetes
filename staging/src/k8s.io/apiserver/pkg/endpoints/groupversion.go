@@ -87,6 +87,10 @@ type APIGroupVersion struct {
 
 	// OpenAPIModels exposes the OpenAPI models to each individual handler.
 	OpenAPIModels openapiproto.Models
+
+	// The limit on the request body size that would be accepted and decoded in a write request.
+	// 0 means no limit.
+	MaxRequestBodyBytes int64
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.

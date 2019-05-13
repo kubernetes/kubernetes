@@ -17,6 +17,7 @@ go_library(
 go_binary(
     name = "openapi-gen",
     embed = [":go_default_library"],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

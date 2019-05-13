@@ -7,7 +7,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      run: hostname  
+      run: hostname
   template:
     metadata:
       labels:

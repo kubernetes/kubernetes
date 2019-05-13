@@ -48,6 +48,8 @@ var (
 		- anywhere on the user's PATH
 		- begin with "kubectl-"
 `)
+
+	ValidPluginFilenamePrefixes = []string{"kubectl"}
 )
 
 func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
@@ -68,6 +70,8 @@ func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 type PluginListOptions struct {
 	Verifier PathVerifier
 	NameOnly bool
+
+	PluginPaths []string
 
 	genericclioptions.IOStreams
 }
@@ -97,22 +101,25 @@ func (o *PluginListOptions) Complete(cmd *cobra.Command) error {
 		root:        cmd.Root(),
 		seenPlugins: make(map[string]string, 0),
 	}
+
+	o.PluginPaths = filepath.SplitList(os.Getenv("PATH"))
 	return nil
 }
 
 func (o *PluginListOptions) Run() error {
-	path := "PATH"
-	if runtime.GOOS == "windows" {
-		path = "path"
-	}
-
 	pluginsFound := false
 	isFirstFile := true
 	pluginErrors := []error{}
 	pluginWarnings := 0
-	for _, dir := range filepath.SplitList(os.Getenv(path)) {
+
+	for _, dir := range uniquePathsList(o.PluginPaths) {
 		files, err := ioutil.ReadDir(dir)
 		if err != nil {
+			if _, ok := err.(*os.PathError); ok {
+				fmt.Fprintf(o.ErrOut, "Unable read directory %q from your PATH: %v. Skipping...", dir, err)
+				continue
+			}
+
 			pluginErrors = append(pluginErrors, fmt.Errorf("error: unable to read directory %q in your PATH: %v", dir, err))
 			continue
 		}
@@ -121,12 +128,12 @@ func (o *PluginListOptions) Run() error {
 			if f.IsDir() {
 				continue
 			}
-			if !strings.HasPrefix(f.Name(), "kubectl-") {
+			if !hasValidPrefix(f.Name(), ValidPluginFilenamePrefixes) {
 				continue
 			}
 
 			if isFirstFile {
-				fmt.Fprintf(o.ErrOut, "The following kubectl-compatible plugins are available:\n\n")
+				fmt.Fprintf(o.ErrOut, "The following compatible plugins are available:\n\n")
 				pluginsFound = true
 				isFirstFile = false
 			}
@@ -226,7 +233,10 @@ func isExecutable(fullPath string) (bool, error) {
 	}
 
 	if runtime.GOOS == "windows" {
-		if strings.HasSuffix(info.Name(), ".exe") {
+		fileExt := strings.ToLower(filepath.Ext(fullPath))
+
+		switch fileExt {
+		case ".bat", ".cmd", ".com", ".exe", ".ps1":
 			return true, nil
 		}
 		return false, nil
@@ -237,4 +247,29 @@ func isExecutable(fullPath string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+// uniquePathsList deduplicates a given slice of strings without
+// sorting or otherwise altering its order in any way.
+func uniquePathsList(paths []string) []string {
+	seen := map[string]bool{}
+	newPaths := []string{}
+	for _, p := range paths {
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		newPaths = append(newPaths, p)
+	}
+	return newPaths
+}
+
+func hasValidPrefix(filepath string, validPrefixes []string) bool {
+	for _, prefix := range validPrefixes {
+		if !strings.HasPrefix(filepath, prefix+"-") {
+			continue
+		}
+		return true
+	}
+	return false
 }

@@ -25,9 +25,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
@@ -36,10 +36,10 @@ import (
 type createClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
-	server                flag.StringFlag
-	insecureSkipTLSVerify flag.Tristate
-	certificateAuthority  flag.StringFlag
-	embedCAData           flag.Tristate
+	server                cliflag.StringFlag
+	insecureSkipTLSVerify cliflag.Tristate
+	certificateAuthority  cliflag.StringFlag
+	embedCAData           cliflag.Tristate
 }
 
 var (

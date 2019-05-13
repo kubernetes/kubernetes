@@ -76,4 +76,43 @@ func TestTranslationStability(t *testing.T) {
 	}
 }
 
+func TestPluginNameMappings(t *testing.T) {
+	testCases := []struct {
+		name             string
+		inTreePluginName string
+		csiPluginName    string
+	}{
+		{
+			name:             "GCE PD plugin name",
+			inTreePluginName: "kubernetes.io/gce-pd",
+			csiPluginName:    "pd.csi.storage.gke.io",
+		},
+		{
+			name:             "AWS EBS plugin name",
+			inTreePluginName: "kubernetes.io/aws-ebs",
+			csiPluginName:    "ebs.csi.aws.com",
+		},
+	}
+	for _, test := range testCases {
+		t.Logf("Testing %v", test.name)
+		csiPluginName, err := GetCSINameFromInTreeName(test.inTreePluginName)
+		if err != nil {
+			t.Errorf("Error when mapping In-tree plugin name to CSI plugin name %s", err)
+		}
+		if !IsMigratedCSIDriverByName(csiPluginName) {
+			t.Errorf("%s expected to supersede an In-tree plugin", csiPluginName)
+		}
+		inTreePluginName, err := GetInTreeNameFromCSIName(csiPluginName)
+		if err != nil {
+			t.Errorf("Error when mapping CSI plugin name to In-tree plugin name %s", err)
+		}
+		if !IsMigratableIntreePluginByName(inTreePluginName) {
+			t.Errorf("%s expected to be migratable to a CSI name", inTreePluginName)
+		}
+		if inTreePluginName != test.inTreePluginName || csiPluginName != test.csiPluginName {
+			t.Errorf("CSI plugin name and In-tree plugin name do not map to each other: [%s => %s], [%s => %s]", test.csiPluginName, inTreePluginName, test.inTreePluginName, csiPluginName)
+		}
+	}
+}
+
 // TODO: test for not modifying the original PV.

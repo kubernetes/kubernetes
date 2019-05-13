@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
     ],
 )
 

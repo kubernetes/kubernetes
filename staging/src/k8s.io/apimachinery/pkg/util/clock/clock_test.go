@@ -44,8 +44,8 @@ func TestFakeClock(t *testing.T) {
 
 	tt := tc.Now()
 	tc.SetTime(tt.Add(time.Hour))
-	if tc.Now().Sub(tt) != time.Hour {
-		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Now().Sub(tt), time.Hour)
+	if tc.Since(tt) != time.Hour {
+		t.Errorf("input: %s now=%s gap=%s expected=%s", tt, tc.Now(), tc.Since(tt), time.Hour)
 	}
 }
 

@@ -17,20 +17,20 @@ limitations under the License.
 package testpatterns
 
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 )
 
 const (
 	// MinFileSize represents minimum file size (1 MiB) for testing
-	MinFileSize = 1 * framework.MiB
+	MinFileSize = 1 * volume.MiB
 
 	// FileSizeSmall represents small file size (1 MiB) for testing
-	FileSizeSmall = 1 * framework.MiB
+	FileSizeSmall = 1 * volume.MiB
 	// FileSizeMedium represents medium file size (100 MiB) for testing
-	FileSizeMedium = 100 * framework.MiB
+	FileSizeMedium = 100 * volume.MiB
 	// FileSizeLarge represents large file size (1 GiB) for testing
-	FileSizeLarge = 1 * framework.GiB
+	FileSizeLarge = 1 * volume.GiB
 )
 
 // TestVolType represents a volume type to be tested in a TestSuite
@@ -45,13 +45,22 @@ var (
 	DynamicPV TestVolType = "DynamicPV"
 )
 
+// TestSnapshotType represents a snapshot type to be tested in a TestSuite
+type TestSnapshotType string
+
+var (
+	// DynamicCreatedSnapshot represents a snapshot type for dynamic created snapshot
+	DynamicCreatedSnapshot TestSnapshotType = "DynamicSnapshot"
+)
+
 // TestPattern represents a combination of parameters to be tested in a TestSuite
 type TestPattern struct {
-	Name       string                  // Name of TestPattern
-	FeatureTag string                  // featureTag for the TestSuite
-	VolType    TestVolType             // Volume type of the volume
-	FsType     string                  // Fstype of the volume
-	VolMode    v1.PersistentVolumeMode // PersistentVolumeMode of the volume
+	Name         string                  // Name of TestPattern
+	FeatureTag   string                  // featureTag for the TestSuite
+	VolType      TestVolType             // Volume type of the volume
+	FsType       string                  // Fstype of the volume
+	VolMode      v1.PersistentVolumeMode // PersistentVolumeMode of the volume
+	SnapshotType TestSnapshotType        // Snapshot type of the snapshot
 }
 
 var (
@@ -136,6 +145,30 @@ var (
 		FsType:  "xfs",
 	}
 
+	// Definitions for ntfs
+
+	// NtfsInlineVolume is TestPattern for "Inline-volume (ntfs)"
+	NtfsInlineVolume = TestPattern{
+		Name:       "Inline-volume (ntfs)",
+		VolType:    InlineVolume,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+	// NtfsPreprovisionedPV is TestPattern for "Pre-provisioned PV (ntfs)"
+	NtfsPreprovisionedPV = TestPattern{
+		Name:       "Pre-provisioned PV (ntfs)",
+		VolType:    PreprovisionedPV,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+	// NtfsDynamicPV is TestPattern for "Dynamic PV (xfs)"
+	NtfsDynamicPV = TestPattern{
+		Name:       "Dynamic PV (ntfs)",
+		VolType:    DynamicPV,
+		FsType:     "ntfs",
+		FeatureTag: "[sig-windows]",
+	}
+
 	// Definitions for Filesystem volume mode
 
 	// FsVolModePreprovisionedPV is TestPattern for "Pre-provisioned PV (filesystem)"
@@ -164,5 +197,13 @@ var (
 		Name:    "Dynamic PV (block volmode)",
 		VolType: DynamicPV,
 		VolMode: v1.PersistentVolumeBlock,
+	}
+
+	// Definitions for snapshot case
+
+	// DynamicSnapshot is TestPattern for "Dynamic snapshot"
+	DynamicSnapshot = TestPattern{
+		Name:         "Dynamic Snapshot",
+		SnapshotType: DynamicCreatedSnapshot,
 	}
 )

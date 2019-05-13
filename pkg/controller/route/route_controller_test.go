@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 )
 
 func alwaysReady() bool { return true }

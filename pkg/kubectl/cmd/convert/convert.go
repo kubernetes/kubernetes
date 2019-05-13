@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	scheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -107,12 +107,15 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 
 	cmdutil.AddValidateFlags(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "to need to get converted.")
-	cmd.MarkFlagRequired("filename")
 	return cmd
 }
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) (err error) {
+	err = o.FilenameOptions.RequireFilenameOrKustomize()
+	if err != nil {
+		return err
+	}
 	o.builder = f.NewBuilder
 
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
@@ -260,9 +263,7 @@ func asVersionedObjects(infos []*resource.Info, specifiedOutputVersion schema.Gr
 			gvks, _, err := scheme.Scheme.ObjectKinds(info.Object)
 			if err == nil {
 				for _, gvk := range gvks {
-					for _, version := range scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group) {
-						targetVersions = append(targetVersions, version)
-					}
+					targetVersions = append(targetVersions, scheme.Scheme.PrioritizedVersionsForGroup(gvk.Group)...)
 				}
 			}
 		}

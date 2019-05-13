@@ -31,10 +31,8 @@ const logFlushFreqFlagName = "log-flush-frequency"
 
 var logFlushFreq = pflag.Duration(logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
 
-// TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.
 func init() {
 	klog.InitFlags(flag.CommandLine)
-	flag.Set("logtostderr", "true")
 }
 
 // AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the

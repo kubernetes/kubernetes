@@ -40,6 +40,7 @@ message APIService {
   optional APIServiceStatus status = 3;
 }
 
+// APIServiceCondition describes the state of an APIService at a particular point
 message APIServiceCondition {
   // Type is the type of the condition.
   optional string type = 1;
@@ -129,5 +130,11 @@ message ServiceReference {
 
   // Name is the name of the service
   optional string name = 2;
+
+  // If specified, the port on the service that hosting webhook.
+  // Default to 443 for backward compatibility.
+  // `port` should be a valid port number (1-65535, inclusive).
+  // +optional
+  optional int32 port = 3;
 }
 

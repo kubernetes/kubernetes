@@ -18,11 +18,9 @@ package wait
 
 import (
 	"io/ioutil"
-	"testing"
-
-	"time"
-
 	"strings"
+	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -32,11 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	dynamicfakeclient "k8s.io/client-go/dynamic/fake"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -203,7 +200,7 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			timeout: 1 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
@@ -254,7 +251,7 @@ func TestWaitForDeletion(t *testing.T) {
 			},
 			timeout: 3 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))
@@ -306,6 +303,58 @@ func TestWaitForDeletion(t *testing.T) {
 					t.Error(spew.Sdump(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "handles watch delete multiple",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource-1"},
+					},
+					Name:      "name-foo-1",
+					Namespace: "ns-foo",
+				},
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource-2"},
+					},
+					Name:      "name-foo-2",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient.PrependReactor("get", "theresource-1", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-1"), nil
+				})
+				fakeClient.PrependReactor("get", "theresource-2", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-2"), nil
+				})
+				fakeClient.PrependWatchReactor("theresource-1", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Deleted, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-1"))
+					return true, fakeWatch, nil
+				})
+				fakeClient.PrependWatchReactor("theresource-2", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
+					fakeWatch := watch.NewRaceFreeFake()
+					fakeWatch.Action(watch.Deleted, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo-2"))
+					return true, fakeWatch, nil
+				})
+				return fakeClient
+			},
+			timeout: 10 * time.Second,
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource-1") {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("list", "theresource-2") {
 					t.Error(spew.Sdump(actions))
 				}
 			},
@@ -502,7 +551,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			timeout: 1 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
 					t.Fatal(spew.Sdump(actions))
@@ -553,7 +602,7 @@ func TestWaitForCondition(t *testing.T) {
 			},
 			timeout: 3 * time.Second,
 
-			expectedErr: wait.ErrWaitTimeout.Error(),
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
 					t.Fatal(spew.Sdump(actions))

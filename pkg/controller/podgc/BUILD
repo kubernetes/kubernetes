@@ -57,6 +57,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/podgc/config:all-srcs",
+    ],
     tags = ["automanaged"],
 )

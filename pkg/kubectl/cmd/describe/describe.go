@@ -27,7 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/cli-runtime/pkg/genericclioptions/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	describeversioned "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
@@ -79,9 +79,8 @@ type DescribeOptions struct {
 
 	BuilderArgs []string
 
-	EnforceNamespace     bool
-	AllNamespaces        bool
-	IncludeUninitialized bool
+	EnforceNamespace bool
+	AllNamespaces    bool
 
 	DescriberSettings *describe.DescriberSettings
 	FilenameOptions   *resource.FilenameOptions
@@ -132,7 +131,7 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 		o.EnforceNamespace = false
 	}
 
-	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
+	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
 		return fmt.Errorf("You must specify the type of resource to describe. %s\n", cmdutil.SuggestAPIResources(o.CmdParent))
 	}
 
@@ -144,9 +143,6 @@ func (o *DescribeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 
 	o.NewBuilder = f.NewBuilder
 
-	// include the uninitialized objects by default
-	// unless user explicitly set --include-uninitialized=false
-	o.IncludeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, true)
 	return nil
 }
 
@@ -161,7 +157,6 @@ func (o *DescribeOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
-		IncludeUninitialized(o.IncludeUninitialized).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
 		Flatten().
 		Do()

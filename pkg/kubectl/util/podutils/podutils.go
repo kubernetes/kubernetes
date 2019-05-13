@@ -21,7 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/integer"
+	"k8s.io/utils/integer"
 )
 
 // IsPodAvailable returns true if a pod is available; false otherwise.

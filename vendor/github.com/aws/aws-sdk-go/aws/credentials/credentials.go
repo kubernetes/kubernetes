@@ -49,6 +49,8 @@
 package credentials
 
 import (
+	"fmt"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"sync"
 	"time"
 )
@@ -64,8 +66,6 @@ import (
 //       Credentials: credentials.AnonymousCredentials,
 //     })))
 //     // Access public S3 buckets.
-//
-// @readonly
 var AnonymousCredentials = NewStaticCredentials("", "", "")
 
 // A Value is the AWS credentials value for individual credential fields.
@@ -97,6 +97,14 @@ type Provider interface {
 	// IsExpired returns if the credentials are no longer valid, and need
 	// to be retrieved.
 	IsExpired() bool
+}
+
+// An Expirer is an interface that Providers can implement to expose the expiration
+// time, if known.  If the Provider cannot accurately provide this info,
+// it should not implement this interface.
+type Expirer interface {
+	// The time at which the credentials are no longer valid
+	ExpiresAt() time.Time
 }
 
 // An ErrorProvider is a stub credentials provider that always returns an error
@@ -158,13 +166,19 @@ func (e *Expiry) SetExpiration(expiration time.Time, window time.Duration) {
 
 // IsExpired returns if the credentials are expired.
 func (e *Expiry) IsExpired() bool {
-	if e.CurrentTime == nil {
-		e.CurrentTime = time.Now
+	curTime := e.CurrentTime
+	if curTime == nil {
+		curTime = time.Now
 	}
-	return e.expiration.Before(e.CurrentTime())
+	return e.expiration.Before(curTime())
 }
 
-// A Credentials provides synchronous safe retrieval of AWS credentials Value.
+// ExpiresAt returns the expiration time of the credential
+func (e *Expiry) ExpiresAt() time.Time {
+	return e.expiration
+}
+
+// A Credentials provides concurrency safe retrieval of AWS credentials Value.
 // Credentials will cache the credentials value until they expire. Once the value
 // expires the next Get will attempt to retrieve valid credentials.
 //
@@ -255,4 +269,24 @@ func (c *Credentials) IsExpired() bool {
 // isExpired helper method wrapping the definition of expired credentials.
 func (c *Credentials) isExpired() bool {
 	return c.forceRefresh || c.provider.IsExpired()
+}
+
+// ExpiresAt provides access to the functionality of the Expirer interface of
+// the underlying Provider, if it supports that interface.  Otherwise, it returns
+// an error.
+func (c *Credentials) ExpiresAt() (time.Time, error) {
+	c.m.RLock()
+	defer c.m.RUnlock()
+
+	expirer, ok := c.provider.(Expirer)
+	if !ok {
+		return time.Time{}, awserr.New("ProviderNotExpirer",
+			fmt.Sprintf("provider %s does not support ExpiresAt()", c.creds.ProviderName),
+			nil)
+	}
+	if c.forceRefresh {
+		// set expiration time to the distant past
+		return time.Time{}, nil
+	}
+	return expirer.ExpiresAt(), nil
 }

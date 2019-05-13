@@ -26,7 +26,7 @@ set -x
 
 : "${1:?Usage test/e2e_node/jenkins/e2e-node-jenkins.sh <path to properties>}"
 
-. $1
+. "${1}"
 
 # indirectly generates test/e2e/generated/bindata.go too
 make generated_files
@@ -39,7 +39,7 @@ WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
 TIMEOUT=${TIMEOUT:-"45m"}
 
-mkdir -p ${ARTIFACTS}
+mkdir -p "${ARTIFACTS}"
 
 go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 \
   --ssh-env="gce" --ssh-user="$GCE_USER" --zone="$GCE_ZONE" --project="$GCE_PROJECT" \
@@ -47,4 +47,5 @@ go run test/e2e_node/runner/remote/run_remote.go  --logtostderr --vmodule=*=4 \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \
   --results-dir="$ARTIFACTS" --ginkgo-flags="--nodes=$PARALLELISM $GINKGO_FLAGS" \
   --test-timeout="$TIMEOUT" --test_args="$TEST_ARGS --kubelet-flags=\"$KUBELET_ARGS\"" \
-  --instance-metadata="$GCE_INSTANCE_METADATA" --system-spec-name="$SYSTEM_SPEC_NAME"
+  --instance-metadata="$GCE_INSTANCE_METADATA" --system-spec-name="$SYSTEM_SPEC_NAME" \
+  --extra-envs="$EXTRA_ENVS"

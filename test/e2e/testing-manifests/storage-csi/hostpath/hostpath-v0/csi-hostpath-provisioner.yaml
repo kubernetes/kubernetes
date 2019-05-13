@@ -1,12 +1,12 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: csi-hostpath-provisioner 
+  name: csi-hostpath-provisioner
   labels:
-    app: csi-hostpath-provisioner 
+    app: csi-hostpath-provisioner
 spec:
   selector:
-    app: csi-hostpath-provisioner 
+    app: csi-hostpath-provisioner
   ports:
     - name: dummy
       port: 12345

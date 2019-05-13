@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"time"
 
 	"github.com/pborman/uuid"
 	"k8s.io/klog"
 
-	"reflect"
-
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -117,8 +117,9 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 	if ae.ObjectRef == nil {
 		ae.ObjectRef = &auditinternal.ObjectReference{}
 	}
-	if acc, ok := obj.(metav1.ObjectMetaAccessor); ok {
-		meta := acc.GetObjectMeta()
+
+	// meta.Accessor is more general than ObjectMetaAccessor, but if it fails, we can just skip setting these bits
+	if meta, err := meta.Accessor(obj); err == nil {
 		if len(ae.ObjectRef.Namespace) == 0 {
 			ae.ObjectRef.Namespace = meta.GetNamespace()
 		}
@@ -196,22 +197,22 @@ func LogResponseObject(ae *auditinternal.Event, obj runtime.Object, gv schema.Gr
 }
 
 func encodeObject(obj runtime.Object, gv schema.GroupVersion, serializer runtime.NegotiatedSerializer) (*runtime.Unknown, error) {
-	supported := serializer.SupportedMediaTypes()
-	for i := range supported {
-		if supported[i].MediaType == "application/json" {
-			enc := serializer.EncoderForVersion(supported[i].Serializer, gv)
-			var buf bytes.Buffer
-			if err := enc.Encode(obj, &buf); err != nil {
-				return nil, fmt.Errorf("encoding failed: %v", err)
-			}
-
-			return &runtime.Unknown{
-				Raw:         buf.Bytes(),
-				ContentType: runtime.ContentTypeJSON,
-			}, nil
-		}
+	const mediaType = runtime.ContentTypeJSON
+	info, ok := runtime.SerializerInfoForMediaType(serializer.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return nil, fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
 	}
-	return nil, fmt.Errorf("no json encoder found")
+
+	enc := serializer.EncoderForVersion(info.Serializer, gv)
+	var buf bytes.Buffer
+	if err := enc.Encode(obj, &buf); err != nil {
+		return nil, fmt.Errorf("encoding failed: %v", err)
+	}
+
+	return &runtime.Unknown{
+		Raw:         buf.Bytes(),
+		ContentType: runtime.ContentTypeJSON,
+	}, nil
 }
 
 // LogAnnotation fills in the Annotations according to the key value pair.

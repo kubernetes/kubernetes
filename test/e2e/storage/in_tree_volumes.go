@@ -17,16 +17,14 @@ limitations under the License.
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
+var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -40,6 +38,14 @@ var testDrivers = []func(config testsuites.TestConfig) testsuites.TestDriver{
 	drivers.InitVSphereDriver,
 	drivers.InitAzureDriver,
 	drivers.InitAwsDriver,
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryBindMounted),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLinkBindMounted),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeTmpfs),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlock),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeBlockFS),
+	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeGCELocalSSD),
 }
 
 // List of testSuites to be executed in below loop
@@ -49,43 +55,16 @@ var testSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumeModeTestSuite,
 	testsuites.InitSubPathTestSuite,
 	testsuites.InitProvisioningTestSuite,
-}
-
-func intreeTunePattern(patterns []testpatterns.TestPattern) []testpatterns.TestPattern {
-	return patterns
+	testsuites.InitMultiVolumeTestSuite,
 }
 
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
-	f := framework.NewDefaultFramework("volumes")
-
-	var (
-		// Common configuration options for all drivers.
-		config = testsuites.TestConfig{
-			Framework: f,
-			Prefix:    "in-tree",
-		}
-	)
-
 	for _, initDriver := range testDrivers {
-		curDriver := initDriver(config)
-		curConfig := curDriver.GetDriverInfo().Config
-		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			BeforeEach(func() {
-				// Reset config. The driver might have modified its copy
-				// in a previous test.
-				curDriver.GetDriverInfo().Config = curConfig
+		curDriver := initDriver()
 
-				// setupDriver
-				curDriver.CreateDriver()
-			})
-
-			AfterEach(func() {
-				// Cleanup driver
-				curDriver.CleanupDriver()
-			})
-
-			testsuites.RunTestSuite(f, curDriver, testSuites, intreeTunePattern)
+		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
+			testsuites.DefineTestSuite(curDriver, testSuites)
 		})
 	}
 })

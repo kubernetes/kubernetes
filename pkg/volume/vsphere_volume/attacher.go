@@ -19,17 +19,17 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
-	"k8s.io/kubernetes/pkg/util/keymutex"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/vsphere"
+	"k8s.io/utils/keymutex"
 )
 
 type vsphereVMDKAttacher struct {
@@ -90,7 +90,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 		return "", err
 	}
 
-	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
+	return filepath.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
 func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -292,7 +292,15 @@ func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.No
 }
 
 func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
-	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
+}
+
+func (plugin *vsphereVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *vsphereVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func setNodeVolume(

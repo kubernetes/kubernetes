@@ -23,7 +23,6 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -32,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 )
 
-func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
+func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]rest.ResponseWrapper, error) {
 	clientConfig, err := restClientGetter.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -47,7 +46,7 @@ func logsForObject(restClientGetter genericclioptions.RESTClientGetter, object, 
 
 // TODO: remove internal clientset once all callers use external versions
 // this is split for easy test-ability
-func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]*rest.Request, error) {
+func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, options runtime.Object, timeout time.Duration, allContainers bool) ([]rest.ResponseWrapper, error) {
 	opts, ok := options.(*corev1.PodLogOptions)
 	if !ok {
 		return nil, errors.New("provided options object is not a PodLogOptions")
@@ -55,7 +54,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 
 	switch t := object.(type) {
 	case *corev1.PodList:
-		ret := []*rest.Request{}
+		ret := []rest.ResponseWrapper{}
 		for i := range t.Items {
 			currRet, err := logsForObjectWithClient(clientset, &t.Items[i], options, timeout, allContainers)
 			if err != nil {
@@ -68,10 +67,10 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	case *corev1.Pod:
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
-			return []*rest.Request{clientset.Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
+			return []rest.ResponseWrapper{clientset.Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
 		}
 
-		ret := []*rest.Request{}
+		ret := []rest.ResponseWrapper{}
 		for _, c := range t.Spec.InitContainers {
 			currOpts := opts.DeepCopy()
 			currOpts.Container = c.Name
@@ -99,7 +98,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return nil, fmt.Errorf("cannot get the logs from %T: %v", object, err)
 	}
 
-	sortBy := func(pods []*v1.Pod) sort.Interface { return podutils.ByLogging(pods) }
+	sortBy := func(pods []*corev1.Pod) sort.Interface { return podutils.ByLogging(pods) }
 	pod, numPods, err := GetFirstPod(clientset, namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err

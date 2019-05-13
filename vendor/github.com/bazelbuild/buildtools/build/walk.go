@@ -72,11 +72,14 @@ func walk1(v *Expr, stack *[]Expr, f func(x Expr, stk []Expr) Expr) Expr {
 		walk1(&v.Value, stack, f)
 	case *SliceExpr:
 		walk1(&v.X, stack, f)
-		if v.Y != nil {
-			walk1(&v.Y, stack, f)
+		if v.From != nil {
+			walk1(&v.From, stack, f)
 		}
-		if v.Z != nil {
-			walk1(&v.Z, stack, f)
+		if v.To != nil {
+			walk1(&v.To, stack, f)
+		}
+		if v.Step != nil {
+			walk1(&v.Step, stack, f)
 		}
 	case *ParenExpr:
 		walk1(&v.X, stack, f)

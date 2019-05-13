@@ -109,6 +109,11 @@ func (in *Rule) DeepCopyInto(out *Rule) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Scope != nil {
+		in, out := &in.Scope, &out.Scope
+		*out = new(ScopeType)
+		**out = **in
+	}
 	return
 }
 
@@ -150,6 +155,11 @@ func (in *ServiceReference) DeepCopyInto(out *ServiceReference) {
 	if in.Path != nil {
 		in, out := &in.Path, &out.Path
 		*out = new(string)
+		**out = **in
+	}
+	if in.Port != nil {
+		in, out := &in.Port, &out.Port
+		*out = new(int32)
 		**out = **in
 	}
 	return
@@ -256,6 +266,16 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		in, out := &in.SideEffects, &out.SideEffects
 		*out = new(SideEffectClass)
 		**out = **in
+	}
+	if in.TimeoutSeconds != nil {
+		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
+		*out = new(int32)
+		**out = **in
+	}
+	if in.AdmissionReviewVersions != nil {
+		in, out := &in.AdmissionReviewVersions, &out.AdmissionReviewVersions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }

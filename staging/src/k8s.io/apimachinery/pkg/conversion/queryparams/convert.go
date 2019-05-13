@@ -54,10 +54,6 @@ func jsonTag(field reflect.StructField) (string, bool) {
 	return tag, omitempty
 }
 
-func formatValue(value interface{}) string {
-	return fmt.Sprintf("%v", value)
-}
-
 func isPointerKind(kind reflect.Kind) bool {
 	return kind == reflect.Ptr
 }

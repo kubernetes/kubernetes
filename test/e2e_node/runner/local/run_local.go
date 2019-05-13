@@ -35,6 +35,7 @@ var buildDependencies = flag.Bool("build-dependencies", true, "If true, build al
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to node e2e test.")
 var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
+var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 
 func main() {
 	klog.InitFlags(nil)
@@ -63,7 +64,7 @@ func main() {
 			klog.Fatalf("Failed to get k8s root directory: %v", err)
 		}
 		systemSpecFile := filepath.Join(rootDir, system.SystemSpecPath, *systemSpecName+".yaml")
-		args = append(args, fmt.Sprintf("--system-spec-name=%s --system-spec-file=%s", *systemSpecName, systemSpecFile))
+		args = append(args, fmt.Sprintf("--system-spec-name=%s --system-spec-file=%s --extra-envs=%s", *systemSpecName, systemSpecFile, *extraEnvs))
 	}
 	if err := runCommand(ginkgo, args...); err != nil {
 		klog.Exitf("Test failed: %v", err)

@@ -22,10 +22,10 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature/testing:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
     ],
 )
 
@@ -40,7 +40,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/helper/qos:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
-        "//pkg/kubeapiserver/admission/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/util/tolerations:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",

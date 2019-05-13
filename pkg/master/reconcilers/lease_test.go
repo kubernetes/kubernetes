@@ -547,7 +547,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 	}
 }
 
-func TestLeaseStopReconciling(t *testing.T) {
+func TestLeaseRemoveEndpoints(t *testing.T) {
 	ns := corev1.NamespaceDefault
 	om := func(name string) metav1.ObjectMeta {
 		return metav1.ObjectMeta{Namespace: ns, Name: name}
@@ -627,7 +627,7 @@ func TestLeaseStopReconciling(t *testing.T) {
 				}
 			}
 			r := NewLeaseEndpointReconciler(clientset.CoreV1(), fakeLeases)
-			err := r.StopReconciling(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
+			err := r.RemoveEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

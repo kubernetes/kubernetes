@@ -32,14 +32,19 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
-// ProberResults stores the results of a probe as prometheus metrics.
-var ProberResults = prometheus.NewGaugeVec(
-	prometheus.GaugeOpts{
+// ProberResults stores the cumulative number of a probe by result as prometheus metrics.
+var ProberResults = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
 		Subsystem: "prober",
-		Name:      "probe_result",
-		Help:      "The result of a liveness or readiness probe for a container.",
+		Name:      "probe_total",
+		Help:      "Cumulative number of a liveness or readiness probe for a container by result.",
 	},
-	[]string{"probe_type", "container_name", "pod_name", "namespace", "pod_uid"},
+	[]string{"probe_type",
+		"result",
+		"container",
+		"pod",
+		"namespace",
+		"pod_uid"},
 )
 
 // Manager manages pod probing. It creates a probe "worker" for every container that specifies a
@@ -124,6 +129,10 @@ type probeType int
 const (
 	liveness probeType = iota
 	readiness
+
+	probeResultSuccessful string = "successful"
+	probeResultFailed     string = "failed"
+	probeResultUnknown    string = "unknown"
 )
 
 // For debugging.

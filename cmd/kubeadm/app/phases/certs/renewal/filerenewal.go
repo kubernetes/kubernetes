@@ -17,7 +17,7 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -27,11 +27,11 @@ import (
 // FileRenewal renews a certificate using local certs
 type FileRenewal struct {
 	caCert *x509.Certificate
-	caKey  *rsa.PrivateKey
+	caKey  crypto.Signer
 }
 
 // NewFileRenewal takes a certificate pair to construct the Interface.
-func NewFileRenewal(caCert *x509.Certificate, caKey *rsa.PrivateKey) Interface {
+func NewFileRenewal(caCert *x509.Certificate, caKey crypto.Signer) Interface {
 	return &FileRenewal{
 		caCert: caCert,
 		caKey:  caKey,
@@ -39,6 +39,6 @@ func NewFileRenewal(caCert *x509.Certificate, caKey *rsa.PrivateKey) Interface {
 }
 
 // Renew takes a certificate using the cert and key
-func (r *FileRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
+func (r *FileRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
 	return pkiutil.NewCertAndKey(r.caCert, r.caKey, cfg)
 }

@@ -9,11 +9,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "cached_discovery.go",
         "discovery_client.go",
         "doc.go",
         "helper.go",
-        "round_tripper.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/discovery",
     importpath = "k8s.io/client-go/discovery",
@@ -30,10 +28,6 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
-        "//vendor/github.com/gregjones/httpcache:go_default_library",
-        "//vendor/github.com/gregjones/httpcache/diskcache:go_default_library",
-        "//vendor/github.com/peterbourgon/diskv:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -57,15 +51,12 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
-        "cached_discovery_test.go",
         "discovery_client_test.go",
         "helper_blackbox_test.go",
-        "round_tripper_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

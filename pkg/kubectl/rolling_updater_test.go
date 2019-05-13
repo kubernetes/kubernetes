@@ -903,8 +903,8 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 	newRc := newRc(1, 1)
 	fake := fake.NewSimpleClientset(oldRc)
 	updater := &RollingUpdater{
-		rcClient:  fake.Core(),
-		podClient: fake.Core(),
+		rcClient:  fake.CoreV1(),
+		podClient: fake.CoreV1(),
 		ns:        "default",
 		scaleAndWait: func(rc *corev1.ReplicationController, retry *RetryParams, wait *RetryParams) (*corev1.ReplicationController, error) {
 			return rc, nil
@@ -1101,7 +1101,7 @@ func TestRollingUpdater_multipleContainersInPod(t *testing.T) {
 				Container:     tt.container,
 				DeploymentKey: tt.deploymentKey,
 			}
-			updatedRc, err := CreateNewControllerFromCurrentController(fake.Core(), codec, config)
+			updatedRc, err := CreateNewControllerFromCurrentController(fake.CoreV1(), codec, config)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1177,8 +1177,8 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			fake := fake.NewSimpleClientset(objs...)
 			updater := &RollingUpdater{
 				ns:        "default",
-				rcClient:  fake.Core(),
-				podClient: fake.Core(),
+				rcClient:  fake.CoreV1(),
+				podClient: fake.CoreV1(),
 			}
 			config := &RollingUpdaterConfig{
 				Out:           ioutil.Discard,
@@ -1227,7 +1227,7 @@ func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
 		return false, nil, nil
 	})
 
-	err := Rename(fake.Core(), rcExisting, rc.Name)
+	err := Rename(fake.CoreV1(), rcExisting, rc.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1315,7 +1315,7 @@ func TestFindSourceController(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(tt.list)
-			ctrl, err := FindSourceController(fakeClient.Core(), "default", tt.name)
+			ctrl, err := FindSourceController(fakeClient.CoreV1(), "default", tt.name)
 			if tt.expectError && err == nil {
 				t.Errorf("unexpected non-error")
 			}
@@ -1425,7 +1425,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			buffer := &bytes.Buffer{}
 			fakeClient := fake.NewSimpleClientset(tt.expectedRc)
-			rc, err := UpdateExistingReplicationController(fakeClient.Core(), fakeClient.Core(), tt.rc, "default", tt.name, tt.deploymentKey, tt.deploymentValue, buffer)
+			rc, err := UpdateExistingReplicationController(fakeClient.CoreV1(), fakeClient.CoreV1(), tt.rc, "default", tt.name, tt.deploymentKey, tt.deploymentValue, buffer)
 			if !reflect.DeepEqual(rc, tt.expectedRc) {
 				t.Errorf("expected:\n%#v\ngot:\n%#v\n", tt.expectedRc, rc)
 			}
@@ -1832,8 +1832,8 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 
 			updater := &RollingUpdater{
 				ns:        "default",
-				rcClient:  client.Core(),
-				podClient: client.Core(),
+				rcClient:  client.CoreV1(),
+				podClient: client.CoreV1(),
 				nowFn:     tt.nowFn,
 			}
 			oldReady, newReady, err := updater.readyPods(tt.oldRc, tt.newRc, tt.minReadySeconds)

@@ -25,5 +25,3 @@ file-name	types_swagger_doc_generated.go
 path-prefix	Godeps/
 path-prefix	vendor/
 path-prefix	pkg/generated/
-
-paths-from-repo	docs/.generated_docs

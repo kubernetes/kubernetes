@@ -1,6 +1,6 @@
 // +build freebsd darwin
 
-package operatingsystem
+package operatingsystem // import "github.com/docker/docker/pkg/parsers/operatingsystem"
 
 import (
 	"errors"

@@ -103,6 +103,16 @@ func Int64sEqual(a, b Int64s) bool {
 // Nodes is a set of nodes keyed in their integer identifiers.
 type Nodes map[int64]graph.Node
 
+// NewNodes returns a new Nodes.
+func NewNodes() Nodes {
+	return make(Nodes)
+}
+
+// NewNodes returns a new Nodes with the given size hint, n.
+func NewNodesSize(n int) Nodes {
+	return make(Nodes, n)
+}
+
 // The simple accessor methods for Nodes are provided to allow ease of
 // implementation change should the need arise.
 
@@ -116,34 +126,23 @@ func (s Nodes) Remove(e graph.Node) {
 	delete(s, e.ID())
 }
 
-// Has reports the existence of the element in the set.
+// Count returns the number of element in the set.
+func (s Nodes) Count() int {
+	return len(s)
+}
+
+// Has reports the existence of the elements in the set.
 func (s Nodes) Has(n graph.Node) bool {
 	_, ok := s[n.ID()]
 	return ok
 }
 
-// clear clears the set, possibly using the same backing store.
-func (s *Nodes) clear() {
-	if len(*s) != 0 {
-		*s = make(Nodes)
-	}
-}
-
-// Copy performs a perfect copy from src to dst (meaning the sets will
-// be equal).
-func (dst Nodes) Copy(src Nodes) Nodes {
-	if same(src, dst) {
-		return dst
-	}
-
-	if len(dst) > 0 {
-		dst = make(Nodes, len(src))
-	}
-
+// CloneNodes returns a clone of src.
+func CloneNodes(src Nodes) Nodes {
+	dst := make(Nodes, len(src))
 	for e, n := range src {
 		dst[e] = n
 	}
-
 	return dst
 }
 
@@ -167,7 +166,7 @@ func Equal(a, b Nodes) bool {
 	return true
 }
 
-// Union takes the union of a and b, and stores it in dst.
+// UnionOfNodes returns the union of a and b.
 //
 // The union of two sets, a and b, is the set containing all the
 // elements of each, for instance:
@@ -179,31 +178,23 @@ func Equal(a, b Nodes) bool {
 //
 //     {a,b,c} UNION {b,c,d} = {a,b,c,d}
 //
-func (dst Nodes) Union(a, b Nodes) Nodes {
+func UnionOfNodes(a, b Nodes) Nodes {
 	if same(a, b) {
-		return dst.Copy(a)
+		return CloneNodes(a)
 	}
 
-	if !same(a, dst) && !same(b, dst) {
-		dst.clear()
+	dst := make(Nodes)
+	for e, n := range a {
+		dst[e] = n
 	}
-
-	if !same(dst, a) {
-		for e, n := range a {
-			dst[e] = n
-		}
-	}
-
-	if !same(dst, b) {
-		for e, n := range b {
-			dst[e] = n
-		}
+	for e, n := range b {
+		dst[e] = n
 	}
 
 	return dst
 }
 
-// Intersect takes the intersection of a and b, and stores it in dst.
+// IntersectionOfNodes returns the intersection of a and b.
 //
 // The intersection of two sets, a and b, is the set containing all
 // the elements shared between the two sets, for instance:
@@ -220,37 +211,18 @@ func (dst Nodes) Union(a, b Nodes) Nodes {
 //
 //     {a,b,c} INTERSECT {d,e,f} = {}
 //
-func (dst Nodes) Intersect(a, b Nodes) Nodes {
-	var swap Nodes
-
+func IntersectionOfNodes(a, b Nodes) Nodes {
 	if same(a, b) {
-		return dst.Copy(a)
+		return CloneNodes(a)
 	}
-	if same(a, dst) {
-		swap = b
-	} else if same(b, dst) {
-		swap = a
-	} else {
-		dst.clear()
-
-		if len(a) > len(b) {
-			a, b = b, a
-		}
-
-		for e, n := range a {
-			if _, ok := b[e]; ok {
-				dst[e] = n
-			}
-		}
-
-		return dst
+	dst := make(Nodes)
+	if len(a) > len(b) {
+		a, b = b, a
 	}
-
-	for e := range dst {
-		if _, ok := swap[e]; !ok {
-			delete(dst, e)
+	for e, n := range a {
+		if _, ok := b[e]; ok {
+			dst[e] = n
 		}
 	}
-
 	return dst
 }

@@ -27,9 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -152,9 +152,122 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods(t *testing.T) {
 
 }
 
+func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
+	// create dswp
+	mode := v1.PersistentVolumeFilesystem
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "dswp-test-volume-name",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			ClaimRef:   &v1.ObjectReference{Namespace: "ns", Name: "file-bound"},
+			VolumeMode: &mode,
+		},
+	}
+	pvc := &v1.PersistentVolumeClaim{
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeName: "dswp-test-volume-name",
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Phase: v1.ClaimBound,
+		},
+	}
+	dswp, fakePodManager, fakesDSW := createDswpWithVolume(t, pv, pvc)
+
+	// create pod
+	containers := []v1.Container{
+		{
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "dswp-test-volume-name",
+					MountPath: "/mnt",
+				},
+			},
+		},
+	}
+	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
+
+	fakePodManager.AddPod(pod)
+
+	podName := util.GetUniquePodName(pod)
+
+	generatedVolumeName := "fake-plugin/" + pod.Spec.Volumes[0].Name
+
+	dswp.findAndAddNewPods()
+
+	if !dswp.pods.processedPods[podName] {
+		t.Fatalf("Failed to record that the volumes for the specified pod: %s have been processed by the populator", podName)
+	}
+
+	expectedVolumeName := v1.UniqueVolumeName(generatedVolumeName)
+
+	volumeExists := fakesDSW.VolumeExists(expectedVolumeName)
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := fakesDSW.PodExistsInVolume(
+		podName, expectedVolumeName); !podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	verifyVolumeExistsInVolumesToMount(
+		t, v1.UniqueVolumeName(generatedVolumeName), false /* expectReportedInUse */, fakesDSW)
+
+	//let the pod be terminated
+	podGet, exist := fakePodManager.GetPodByName(pod.Namespace, pod.Name)
+	if !exist {
+		t.Fatalf("Failed to get pod by pod name: %s and namespace: %s", pod.Name, pod.Namespace)
+	}
+	podGet.Status.Phase = v1.PodFailed
+
+	dswp.findAndRemoveDeletedPods()
+	// Although Pod status is terminated, pod still exists in pod manager and actual state does not has this pod and volume information
+	// desired state populator will fail to delete this pod and volume first
+	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
+	if !volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <true> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := fakesDSW.PodExistsInVolume(
+		podName, expectedVolumeName); !podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <true> Actual: <%v>",
+			podExistsInVolume)
+	}
+
+	// reconcile with actual state so that volume is added into the actual state
+	// desired state populator now can successfully delete the pod and volume
+	fakeASW := dswp.actualStateOfWorld
+	reconcileASW(fakeASW, fakesDSW, t)
+	dswp.findAndRemoveDeletedPods()
+	volumeExists = fakesDSW.VolumeExists(expectedVolumeName)
+	if volumeExists {
+		t.Fatalf(
+			"VolumeExists(%q) failed. Expected: <false> Actual: <%v>",
+			expectedVolumeName,
+			volumeExists)
+	}
+
+	if podExistsInVolume := fakesDSW.PodExistsInVolume(
+		podName, expectedVolumeName); podExistsInVolume {
+		t.Fatalf(
+			"DSW PodExistsInVolume returned incorrect value. Expected: <false> Actual: <%v>",
+			podExistsInVolume)
+	}
+}
+
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -309,7 +422,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 
 func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -358,7 +471,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 
 func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
@@ -407,7 +520,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 
 func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -503,7 +616,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 	reconcileASW(fakeASW, fakeDSW, t)
 
 	// No resize request for volume, volumes in ASW shouldn't be marked as fsResizeRequired.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 	resizeRequiredVolumes := reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
 		t.Fatalf("No resize request for any volumes, but found resize required volumes in ASW: %v", resizeRequiredVolumes)
@@ -514,14 +627,14 @@ func TestCheckVolumeFSResize(t *testing.T) {
 	pvc.Spec.Resources.Requests = volumeCapacity(2)
 
 	// Disable the feature gate, so volume shouldn't be marked as fsResizeRequired.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, false)()
 	resizeRequiredVolumes = reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
 		t.Fatalf("Feature gate disabled, but found resize required volumes in ASW: %v", resizeRequiredVolumes)
 	}
 
 	// Make volume used as ReadOnly, so volume shouldn't be marked as fsResizeRequired.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 	pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = true
 	resizeRequiredVolumes = reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {

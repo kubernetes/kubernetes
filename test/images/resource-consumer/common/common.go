@@ -22,7 +22,7 @@ const (
 	ConsumeMemAddress       = "/ConsumeMem"
 	BumpMetricAddress       = "/BumpMetric"
 	GetCurrentStatusAddress = "/GetCurrentStatus"
-	MetricsAddress          = "/Metrics"
+	MetricsAddress          = "/metrics"
 
 	MillicoresQuery              = "millicores"
 	MegabytesQuery               = "megabytes"

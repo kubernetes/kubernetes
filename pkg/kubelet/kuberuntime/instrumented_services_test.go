@@ -24,13 +24,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestRecordOperation(t *testing.T) {
 	prometheus.MustRegister(metrics.RuntimeOperations)
-	prometheus.MustRegister(metrics.RuntimeOperationsLatency)
+	prometheus.MustRegister(metrics.RuntimeOperationsDuration)
 	prometheus.MustRegister(metrics.RuntimeOperationsErrors)
 
 	temporalServer := "127.0.0.1:1234"
@@ -50,8 +50,8 @@ func TestRecordOperation(t *testing.T) {
 	}()
 
 	recordOperation("create_container", time.Now())
-	runtimeOperationsCounterExpected := "kubelet_runtime_operations{operation_type=\"create_container\"} 1"
-	runtimeOperationsLatencyExpected := "kubelet_runtime_operations_latency_microseconds_count{operation_type=\"create_container\"} 1"
+	runtimeOperationsCounterExpected := "kubelet_runtime_operations_total{operation_type=\"create_container\"} 1"
+	runtimeOperationsDurationExpected := "kubelet_runtime_operations_duration_seconds_count{operation_type=\"create_container\"} 1"
 
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
@@ -59,7 +59,7 @@ func TestRecordOperation(t *testing.T) {
 
 	assert.HTTPBodyContains(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mux.ServeHTTP(w, r)
-	}), "GET", prometheusURL, nil, runtimeOperationsLatencyExpected)
+	}), "GET", prometheusURL, nil, runtimeOperationsDurationExpected)
 }
 
 func TestInstrumentedVersion(t *testing.T) {

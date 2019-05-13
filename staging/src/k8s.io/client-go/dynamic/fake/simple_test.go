@@ -96,7 +96,7 @@ func (tc *patchTestCase) runner(t *testing.T) {
 	client := NewSimpleDynamicClient(runtime.NewScheme(), tc.object)
 	resourceInterface := client.Resource(schema.GroupVersionResource{Group: testGroup, Version: testVersion, Resource: testResource}).Namespace(testNamespace)
 
-	got, recErr := resourceInterface.Patch(testName, tc.patchType, tc.patchBytes, metav1.UpdateOptions{})
+	got, recErr := resourceInterface.Patch(testName, tc.patchType, tc.patchBytes, metav1.PatchOptions{})
 
 	if err := tc.verifyErr(recErr); err != nil {
 		t.Error(err)
@@ -181,11 +181,11 @@ func TestPatch(t *testing.T) {
 			patchBytes: []byte(`[{"op": "add", "path": "/spec/newvalue", "value": "dummy"}]`),
 			wantErrMsg: "invalid JSON document",
 		}, {
-			name:       "merge patch fails as unsupported",
-			object:     newUnstructured(testAPIVersion, testKind, testNamespace, testName),
-			patchType:  types.MergePatchType,
-			patchBytes: []byte(`{}`),
-			wantErrMsg: "PatchType is not supported",
+			name:                  "merge patch works with simple replacement",
+			object:                newUnstructuredWithSpec(map[string]interface{}{"foo": "bar"}),
+			patchType:             types.MergePatchType,
+			patchBytes:            []byte(`{ "spec": { "foo": "baz" } }`),
+			expectedPatchedObject: newUnstructuredWithSpec(map[string]interface{}{"foo": "baz"}),
 		},
 		// TODO: Add tests for strategic merge using v1.Pod for example to ensure the test cases
 		// demonstrate expected use cases.

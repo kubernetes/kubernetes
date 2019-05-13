@@ -76,13 +76,18 @@ type convertor struct {
 }
 
 func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
-	table := &metav1beta1.Table{
-		ColumnDefinitions: c.headers,
+	table := &metav1beta1.Table{}
+	opt, ok := tableOptions.(*metav1beta1.TableOptions)
+	noHeaders := ok && opt != nil && opt.NoHeaders
+	if !noHeaders {
+		table.ColumnDefinitions = c.headers
 	}
+
 	if m, err := meta.ListAccessor(obj); err == nil {
 		table.ResourceVersion = m.GetResourceVersion()
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
+		table.RemainingItemCount = m.GetRemainingItemCount()
 	} else {
 		if m, err := meta.CommonAccessor(obj); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()

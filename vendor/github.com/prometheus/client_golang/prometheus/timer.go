@@ -39,13 +39,16 @@ func NewTimer(o Observer) *Timer {
 
 // ObserveDuration records the duration passed since the Timer was created with
 // NewTimer. It calls the Observe method of the Observer provided during
-// construction with the duration in seconds as an argument. ObserveDuration is
-// usually called with a defer statement.
+// construction with the duration in seconds as an argument. The observed
+// duration is also returned. ObserveDuration is usually called with a defer
+// statement.
 //
 // Note that this method is only guaranteed to never observe negative durations
 // if used with Go1.9+.
-func (t *Timer) ObserveDuration() {
+func (t *Timer) ObserveDuration() time.Duration {
+	d := time.Since(t.begin)
 	if t.observer != nil {
-		t.observer.Observe(time.Since(t.begin).Seconds())
+		t.observer.Observe(d.Seconds())
 	}
+	return d
 }

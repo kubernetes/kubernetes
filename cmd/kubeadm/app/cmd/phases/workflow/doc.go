@@ -22,7 +22,7 @@ Composable kubeadm workflows are built by an ordered sequence of phases;
 each phase can have it's own, nested, ordered sequence of sub phases.
 For instance
 
-	preflight     	Run master pre-flight checks
+	preflight     	Run control-plane pre-flight checks
 	certs         	Generates all PKI assets necessary to establish the control plane
 		/ca             Generates a self-signed Kubernetes CA to provision identities for Kubernetes components
 		/apiserver      Generates an API server serving certificate and key

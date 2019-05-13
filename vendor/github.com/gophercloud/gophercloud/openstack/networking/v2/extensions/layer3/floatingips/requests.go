@@ -12,6 +12,7 @@ import (
 // either `asc' or `desc'. Marker and Limit are used for pagination.
 type ListOpts struct {
 	ID                string `q:"id"`
+	Description       string `q:"description"`
 	FloatingNetworkID string `q:"floating_network_id"`
 	PortID            string `q:"port_id"`
 	FixedIP           string `q:"fixed_ip_address"`
@@ -24,6 +25,10 @@ type ListOpts struct {
 	SortDir           string `q:"sort_dir"`
 	RouterID          string `q:"router_id"`
 	Status            string `q:"status"`
+	Tags              string `q:"tags"`
+	TagsAny           string `q:"tags-any"`
+	NotTags           string `q:"not-tags"`
+	NotTagsAny        string `q:"not-tags-any"`
 }
 
 // List returns a Pager which allows you to iterate over a collection of
@@ -50,6 +55,7 @@ type CreateOptsBuilder interface {
 // resource. The only required fields are FloatingNetworkID and PortID which
 // refer to the external network and internal port respectively.
 type CreateOpts struct {
+	Description       string `json:"description,omitempty"`
 	FloatingNetworkID string `json:"floating_network_id" required:"true"`
 	FloatingIP        string `json:"floating_ip_address,omitempty"`
 	PortID            string `json:"port_id,omitempty"`
@@ -116,13 +122,23 @@ type UpdateOptsBuilder interface {
 // linked to. To associate the floating IP with a new internal port, provide its
 // ID. To disassociate the floating IP from all ports, provide an empty string.
 type UpdateOpts struct {
-	PortID *string `json:"port_id"`
+	Description *string `json:"description,omitempty"`
+	PortID      *string `json:"port_id,omitempty"`
 }
 
 // ToFloatingIPUpdateMap allows UpdateOpts to satisfy the UpdateOptsBuilder
 // interface
 func (opts UpdateOpts) ToFloatingIPUpdateMap() (map[string]interface{}, error) {
-	return gophercloud.BuildRequestBody(opts, "floatingip")
+	b, err := gophercloud.BuildRequestBody(opts, "floatingip")
+	if err != nil {
+		return nil, err
+	}
+
+	if m := b["floatingip"].(map[string]interface{}); m["port_id"] == "" {
+		m["port_id"] = nil
+	}
+
+	return b, nil
 }
 
 // Update allows floating IP resources to be updated. Currently, the only way to

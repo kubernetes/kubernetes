@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "codec_test.go",
         "conversion_test.go",
         "converter_test.go",
         "embedded_test.go",

@@ -18,7 +18,6 @@ package vsphere_volume
 
 import (
 	"fmt"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -26,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 var _ volume.BlockVolumePlugin = &vsphereVolumePlugin{}
@@ -153,9 +152,9 @@ func (v *vsphereVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return path.Join(v.plugin.host.GetVolumeDevicePluginDir(vsphereVolumePluginName), string(volumeSource.VolumePath)), nil
+	return filepath.Join(v.plugin.host.GetVolumeDevicePluginDir(vsphereVolumePluginName), string(volumeSource.VolumePath)), nil
 }
 
 func (v *vsphereVolume) GetPodDeviceMapPath() (string, string) {
-	return v.plugin.host.GetPodVolumeDeviceDir(v.podUID, kstrings.EscapeQualifiedNameForDisk(vsphereVolumePluginName)), v.volName
+	return v.plugin.host.GetPodVolumeDeviceDir(v.podUID, utilstrings.EscapeQualifiedName(vsphereVolumePluginName)), v.volName
 }

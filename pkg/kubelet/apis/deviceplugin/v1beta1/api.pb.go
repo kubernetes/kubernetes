@@ -135,7 +135,7 @@ func (*Empty) ProtoMessage()               {}
 func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptorApi, []int{2} }
 
 // ListAndWatch returns a stream of List of Devices
-// Whenever a Device state change or a Device disapears, ListAndWatch
+// Whenever a Device state change or a Device disappears, ListAndWatch
 // returns the new list
 type ListAndWatchResponse struct {
 	Devices []*Device `protobuf:"bytes,1,rep,name=devices" json:"devices,omitempty"`
@@ -482,7 +482,7 @@ type DevicePluginClient interface {
 	// Manager
 	GetDevicePluginOptions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DevicePluginOptions, error)
 	// ListAndWatch returns a stream of List of Devices
-	// Whenever a Device state change or a Device disapears, ListAndWatch
+	// Whenever a Device state change or a Device disappears, ListAndWatch
 	// returns the new list
 	ListAndWatch(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DevicePlugin_ListAndWatchClient, error)
 	// Allocate is called during container creation so that the Device
@@ -569,7 +569,7 @@ type DevicePluginServer interface {
 	// Manager
 	GetDevicePluginOptions(context.Context, *Empty) (*DevicePluginOptions, error)
 	// ListAndWatch returns a stream of List of Devices
-	// Whenever a Device state change or a Device disapears, ListAndWatch
+	// Whenever a Device state change or a Device disappears, ListAndWatch
 	// returns the new list
 	ListAndWatch(*Empty, DevicePlugin_ListAndWatchServer) error
 	// Allocate is called during container creation so that the Device

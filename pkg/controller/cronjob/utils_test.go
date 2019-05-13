@@ -17,6 +17,8 @@ limitations under the License.
 package cronjob
 
 import (
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -26,16 +28,15 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilpointer "k8s.io/utils/pointer"
 )
-
-func boolptr(b bool) *bool { return &b }
 
 func TestGetJobFromTemplate(t *testing.T) {
 	// getJobFromTemplate() needs to take the job template and copy the labels and annotations
 	// and other fields, and add a created-by reference.
 
 	var one int64 = 1
-	var no bool = false
+	var no bool
 
 	sj := batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
@@ -132,7 +133,7 @@ func TestGetParentUIDFromJob(t *testing.T) {
 			{
 				Kind:       "CronJob",
 				UID:        types.UID("5ef034e0-1890-11e6-8935-42010af0003e"),
-				Controller: boolptr(true),
+				Controller: utilpointer.BoolPtr(true),
 			},
 		})
 
@@ -156,19 +157,19 @@ func TestGroupJobsByParent(t *testing.T) {
 	ownerReference1 := metav1.OwnerReference{
 		Kind:       "CronJob",
 		UID:        uid1,
-		Controller: boolptr(true),
+		Controller: utilpointer.BoolPtr(true),
 	}
 
 	ownerReference2 := metav1.OwnerReference{
 		Kind:       "CronJob",
 		UID:        uid2,
-		Controller: boolptr(true),
+		Controller: utilpointer.BoolPtr(true),
 	}
 
 	ownerReference3 := metav1.OwnerReference{
 		Kind:       "CronJob",
 		UID:        uid3,
-		Controller: boolptr(true),
+		Controller: utilpointer.BoolPtr(true),
 	}
 
 	{
@@ -373,6 +374,69 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		_, err := getRecentUnmetScheduleTimes(sj, now)
 		if err != nil {
 			t.Errorf("unexpected error")
+		}
+	}
+}
+
+func TestByJobStartTime(t *testing.T) {
+	now := metav1.NewTime(time.Date(2018, time.January, 1, 2, 3, 4, 5, time.UTC))
+	later := metav1.NewTime(time.Date(2019, time.January, 1, 2, 3, 4, 5, time.UTC))
+	aNil := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "a"},
+		Status:     batchv1.JobStatus{},
+	}
+	bNil := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "b"},
+		Status:     batchv1.JobStatus{},
+	}
+	aSet := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "a"},
+		Status:     batchv1.JobStatus{StartTime: &now},
+	}
+	bSet := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "b"},
+		Status:     batchv1.JobStatus{StartTime: &now},
+	}
+	aSetLater := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{Name: "a"},
+		Status:     batchv1.JobStatus{StartTime: &later},
+	}
+
+	testCases := []struct {
+		name            string
+		input, expected []batchv1.Job
+	}{
+		{
+			name:     "both have nil start times",
+			input:    []batchv1.Job{bNil, aNil},
+			expected: []batchv1.Job{aNil, bNil},
+		},
+		{
+			name:     "only the first has a nil start time",
+			input:    []batchv1.Job{aNil, bSet},
+			expected: []batchv1.Job{bSet, aNil},
+		},
+		{
+			name:     "only the second has a nil start time",
+			input:    []batchv1.Job{aSet, bNil},
+			expected: []batchv1.Job{aSet, bNil},
+		},
+		{
+			name:     "both have non-nil, equal start time",
+			input:    []batchv1.Job{bSet, aSet},
+			expected: []batchv1.Job{aSet, bSet},
+		},
+		{
+			name:     "both have non-nil, different start time",
+			input:    []batchv1.Job{aSetLater, bSet},
+			expected: []batchv1.Job{bSet, aSetLater},
+		},
+	}
+
+	for _, testCase := range testCases {
+		sort.Sort(byJobStartTime(testCase.input))
+		if !reflect.DeepEqual(testCase.input, testCase.expected) {
+			t.Errorf("case: '%s', jobs not sorted as expected", testCase.name)
 		}
 	}
 }

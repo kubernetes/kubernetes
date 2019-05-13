@@ -19,7 +19,7 @@ package photon_pd
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -72,6 +72,10 @@ func (plugin *photonPersistentDiskPlugin) GetVolumeName(spec *volume.Spec) (stri
 func (plugin *photonPersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.PhotonPersistentDisk != nil) ||
 		(spec.Volume != nil && spec.Volume.PhotonPersistentDisk != nil)
+}
+
+func (plugin *photonPersistentDiskPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *photonPersistentDiskPlugin) RequiresRemount() bool {
@@ -132,8 +136,8 @@ func (plugin *photonPersistentDiskPlugin) newUnmounterInternal(volName string, p
 
 func (plugin *photonPersistentDiskPlugin) ConstructVolumeSpec(volumeSpecName, mountPath string) (*volume.Spec, error) {
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
-	pdID, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	pluginMntDir := util.GetPluginMountDir(plugin.host, plugin.GetPluginName())
+	pdID, err := mounter.GetDeviceNameFromMount(mountPath, pluginMntDir)
 	if err != nil {
 		return nil, err
 	}
@@ -277,16 +281,16 @@ func (c *photonPersistentDiskUnmounter) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (c *photonPersistentDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 func makeGlobalPDPath(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(photonPersistentDiskPluginName), mount.MountsInGlobalPDPath, devName)
+	return filepath.Join(host.GetPluginDir(photonPersistentDiskPluginName), util.MountsInGlobalPDPath, devName)
 }
 
 func (ppd *photonPersistentDisk) GetPath() string {
 	name := photonPersistentDiskPluginName
-	return ppd.plugin.host.GetPodVolumeDir(ppd.podUID, utilstrings.EscapeQualifiedNameForDisk(name), ppd.volName)
+	return ppd.plugin.host.GetPodVolumeDir(ppd.podUID, utilstrings.EscapeQualifiedName(name), ppd.volName)
 }
 
 // TODO: supporting more access mode for PhotonController persistent disk

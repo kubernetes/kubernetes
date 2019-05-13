@@ -21,16 +21,16 @@ import (
 
 	"k8s.io/klog"
 
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -40,11 +40,11 @@ func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.Prio
 	ctrl.SetExternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
 	for _, c := range priorityClasses {
-		s := &schedulingv1beta1.PriorityClass{}
-		if err := v1beta1.Convert_scheduling_PriorityClass_To_v1beta1_PriorityClass(c, s, nil); err != nil {
+		s := &schedulingv1.PriorityClass{}
+		if err := v1.Convert_scheduling_PriorityClass_To_v1_PriorityClass(c, s, nil); err != nil {
 			return err
 		}
-		informerFactory.Scheduling().V1beta1().PriorityClasses().Informer().GetStore().Add(s)
+		informerFactory.Scheduling().V1().PriorityClasses().Informer().GetStore().Add(s)
 	}
 	return nil
 }
@@ -158,7 +158,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 			false,
 			test.userInfo,
 		)
-		err := ctrl.Validate(attrs)
+		err := ctrl.Validate(attrs, nil)
 		klog.Infof("Got %v", err)
 		if err != nil && !test.expectError {
 			t.Errorf("Test %q: unexpected error received: %v", test.name, err)
@@ -254,7 +254,7 @@ func TestDefaultPriority(t *testing.T) {
 				test.name, test.expectedDefaultNameBefore, test.expectedDefaultBefore, pcName, defaultPriority)
 		}
 		if test.attributes != nil {
-			err := ctrl.Validate(test.attributes)
+			err := ctrl.Validate(test.attributes, nil)
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			}
@@ -468,9 +468,9 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 	// Enable PodPriority feature gate.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Enable ExperimentalCriticalPodAnnotation feature gate.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
@@ -603,7 +603,7 @@ func TestPodAdmission(t *testing.T) {
 			false,
 			nil,
 		)
-		err := ctrl.Admit(attrs)
+		err := ctrl.Admit(attrs, nil)
 		klog.Infof("Got %v", err)
 		if !test.expectError {
 			if err != nil {

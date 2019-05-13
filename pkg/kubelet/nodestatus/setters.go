@@ -440,6 +440,7 @@ func ReadyCondition(
 	nowFunc func() time.Time, // typically Kubelet.clock.Now
 	runtimeErrorsFunc func() error, // typically Kubelet.runtimeState.runtimeErrors
 	networkErrorsFunc func() error, // typically Kubelet.runtimeState.networkErrors
+	storageErrorsFunc func() error, // typically Kubelet.runtimeState.storageErrors
 	appArmorValidateHostFunc func() error, // typically Kubelet.appArmorValidator.ValidateHost, might be nil depending on whether there was an appArmorValidator
 	cmStatusFunc func() cm.Status, // typically Kubelet.containerManager.Status
 	recordEventFunc func(eventType, event string), // typically Kubelet.recordNodeStatusEvent
@@ -456,7 +457,7 @@ func ReadyCondition(
 			Message:           "kubelet is posting ready status",
 			LastHeartbeatTime: currentTime,
 		}
-		errs := []error{runtimeErrorsFunc(), networkErrorsFunc()}
+		errs := []error{runtimeErrorsFunc(), networkErrorsFunc(), storageErrorsFunc()}
 		requiredCapacities := []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePods}
 		if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
 			requiredCapacities = append(requiredCapacities, v1.ResourceEphemeralStorage)
@@ -743,6 +744,21 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 				node.Status.Allocatable[v1.ResourceName(limitKey)] = *resource.NewQuantity(value, resource.DecimalSI)
 			}
 		}
+		return nil
+	}
+}
+
+// RemoveOutOfDiskCondition removes stale OutOfDisk condition
+// OutOfDisk condition has been removed from kubelet in 1.12
+func RemoveOutOfDiskCondition() Setter {
+	return func(node *v1.Node) error {
+		var conditions []v1.NodeCondition
+		for i := range node.Status.Conditions {
+			if node.Status.Conditions[i].Type != v1.NodeOutOfDisk {
+				conditions = append(conditions, node.Status.Conditions[i])
+			}
+		}
+		node.Status.Conditions = conditions
 		return nil
 	}
 }

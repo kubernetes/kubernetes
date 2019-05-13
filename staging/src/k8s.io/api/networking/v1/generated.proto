@@ -48,7 +48,7 @@ message IPBlock {
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -101,7 +101,7 @@ message NetworkPolicyIngressRule {
 // NetworkPolicyList is a list of NetworkPolicy objects.
 message NetworkPolicyList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
@@ -180,7 +180,7 @@ message NetworkPolicySpec {
   repeated NetworkPolicyEgressRule egress = 3;
 
   // List of rule types that the NetworkPolicy relates to.
-  // Valid options are Ingress, Egress, or Ingress,Egress.
+  // Valid options are "Ingress", "Egress", or "Ingress,Egress".
   // If this field is not specified, it will default based on the existence of Ingress or Egress rules;
   // policies that contain an Egress section are assumed to affect Egress, and all policies
   // (whether or not they contain an Ingress section) are assumed to affect Ingress.

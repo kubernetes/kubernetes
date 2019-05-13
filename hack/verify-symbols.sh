@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -33,7 +33,7 @@ BADSYMBOLS=(
 )
 
 # b/c hyperkube binds everything simply check that for bad symbols
-SYMBOLS="$(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube)"
+SYMBOLS="$(nm "${KUBE_OUTPUT_HOSTBIN}/hyperkube")"
 
 RESULT=0
 for BADSYMBOL in "${BADSYMBOLS[@]}"; do

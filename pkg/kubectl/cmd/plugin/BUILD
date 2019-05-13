@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -32,4 +32,12 @@ filegroup(
     name = "testdata",
     data = glob(["testdata/**"]),
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["plugin_test.go"],
+    data = glob(["testdata/**"]),
+    embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library"],
 )

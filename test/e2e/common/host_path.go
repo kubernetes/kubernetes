@@ -44,8 +44,9 @@ var _ = Describe("[sig-storage] HostPath", func() {
 	   Release : v1.9
 	   Testname: Host path, volume mode default
 	   Description: Create a Pod with host volume mounted. The volume mounted MUST be a directory with permissions mode -rwxrwxrwx and that is has the sticky bit (mode flag t) set.
+	   This test is marked LinuxOnly since Windows does not support setting the sticky bit (mode flag t).
 	*/
-	framework.ConformanceIt("should give a volume the correct mode [NodeConformance]", func() {
+	framework.ConformanceIt("should give a volume the correct mode [LinuxOnly] [NodeConformance]", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}

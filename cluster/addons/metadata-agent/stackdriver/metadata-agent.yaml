@@ -43,8 +43,8 @@ spec:
           failureThreshold: 1
           successThreshold: 1
         args:
-        - -o KubernetesUseWatch=true 
-        - -o KubernetesClusterLevelMetadata=false 
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=false
         - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000
@@ -105,8 +105,8 @@ spec:
           failureThreshold: 1
           successThreshold: 1
         args:
-        - -o KubernetesUseWatch=true 
-        - -o KubernetesClusterLevelMetadata=true 
+        - -o KubernetesUseWatch=true
+        - -o KubernetesClusterLevelMetadata=true
         - -o MetadataReporterPurgeDeleted=true
         ports:
         - containerPort: 8000

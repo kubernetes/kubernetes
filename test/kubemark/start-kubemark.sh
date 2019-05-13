@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
+TMP_ROOT="$(dirname "${BASH_SOURCE[@]}")/../.."
 KUBE_ROOT=$(readlink -e "${TMP_ROOT}" 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' "${TMP_ROOT}")
 
 source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
@@ -100,6 +100,7 @@ function generate-pki-config {
   gen-kube-bearertoken
   gen-kube-basicauth
   create-certs "${MASTER_IP}"
+  create-etcd-apiserver-certs "etcd-${MASTER_NAME}" "${MASTER_NAME}"
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
@@ -122,6 +123,12 @@ function write-pki-config-to-master {
     sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/ca.crt\" && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.cert\" && \
     sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CA_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/etcd-apiserver-ca.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CA_CERT_BASE64} | base64 --decode | gunzip > /home/kubernetes/k8s_auth_data/etcd-apiserver-ca.crt\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_SERVER_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/etcd-apiserver-server.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_SERVER_CERT_BASE64} | base64 --decode | gunzip > /home/kubernetes/k8s_auth_data/etcd-apiserver-server.crt\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CLIENT_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/etcd-apiserver-client.key\" && \
+    sudo bash -c \"echo ${ETCD_APISERVER_CLIENT_CERT_BASE64} | base64 --decode | gunzip > /home/kubernetes/k8s_auth_data/etcd-apiserver-client.crt\" && \
     sudo bash -c \"echo ${REQUESTHEADER_CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/aggr_ca.crt\" && \
     sudo bash -c \"echo ${PROXY_CLIENT_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.crt\" && \
     sudo bash -c \"echo ${PROXY_CLIENT_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.key\" && \
@@ -373,14 +380,14 @@ current-context: kubemark-context"
   mkdir -p "${RESOURCE_DIRECTORY}/addons"
   sed "s/{{MASTER_IP}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/heapster_template.json" > "${RESOURCE_DIRECTORY}/addons/heapster.json"
   metrics_mem_per_node=4
-  metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES}))
+  metrics_mem=$((200 + metrics_mem_per_node*NUM_NODES))
   sed -i'' -e "s/{{METRICS_MEM}}/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   metrics_cpu_per_node_numerator=${NUM_NODES}
   metrics_cpu_per_node_denominator=2
   metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
   sed -i'' -e "s/{{METRICS_CPU}}/${metrics_cpu}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   eventer_mem_per_node=500
-  eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES}))
+  eventer_mem=$((200 * 1024 + eventer_mem_per_node*NUM_NODES))
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
 
   # Cluster Autoscaler.
@@ -415,7 +422,7 @@ current-context: kubemark-context"
     proxy_cpu=50
   fi
   proxy_mem_per_node=50
-  proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES}))
+  proxy_mem=$((100 * 1024 + proxy_mem_per_node*NUM_NODES))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s'{{kubemark_image_registry}}'${KUBEMARK_IMAGE_REGISTRY}'g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
@@ -434,8 +441,8 @@ function wait-for-hollow-nodes-to-run-or-timeout {
   echo -n "Waiting for all hollow-nodes to become Running"
   start=$(date +%s)
   nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
-  ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
-  
+  ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
+
   until [[ "${ready}" -ge "${NUM_REPLICAS}" ]]; do
     echo -n "."
     sleep 1
@@ -443,6 +450,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     # Fail it if it already took more than 30 minutes.
     if [ $((now - start)) -gt 1800 ]; then
       echo ""
+      # shellcheck disable=SC2154 # Color defined in sourced script
       echo -e "${color_red} Timeout waiting for all hollow-nodes to become Running. ${color_norm}"
       # Try listing nodes again - if it fails it means that API server is not responding
       if "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node &> /dev/null; then
@@ -451,16 +459,17 @@ function wait-for-hollow-nodes-to-run-or-timeout {
         echo "Got error while trying to list hollow-nodes. Probably API server is down."
       fi
       pods=$("${KUBECTL}" get pods -l name=hollow-node --namespace=kubemark) || true
-      running=$(($(echo "${pods}" | grep "Running" | wc -l)))
+      running=$(($(echo "${pods}" | grep -c "Running")))
       echo "${running} hollow-nodes are reported as 'Running'"
-      not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
+      not_running=$(($(echo "${pods}" | grep -vc "Running") - 1))
       echo "${not_running} hollow-nodes are reported as NOT 'Running'"
       echo "${pods}" | grep -v Running
       exit 1
     fi
     nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
-    ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
+    ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
   done
+  # shellcheck disable=SC2154 # Color defined in sourced script
   echo -e "${color_green} Done!${color_norm}"
 }
 
@@ -475,6 +484,7 @@ write-local-kubeconfig
 
 # Setup for master.
 function start-master {
+  # shellcheck disable=SC2154 # Color defined in sourced script
   echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
   create-master-environment-file
   create-master-instance-with-resources
@@ -484,6 +494,7 @@ function start-master {
   start-master-components
 }
 start-master &
+start_master_pid=$!
 
 # Setup for hollow-nodes.
 function start-hollow-nodes {
@@ -493,8 +504,11 @@ function start-hollow-nodes {
   wait-for-hollow-nodes-to-run-or-timeout
 }
 start-hollow-nodes &
+start_hollow_nodes_pid=$!
 
-wait
+wait $start_master_pid || { echo "Failed to start kubemark master" ; exit 1 ; }
+wait $start_hollow_nodes_pid ||{ echo "Failed to start hollow nodes" ; exit 1 ; }
+
 echo ""
 echo "Master IP: ${MASTER_IP}"
 echo "Password to kubemark master: ${KUBE_PASSWORD}"

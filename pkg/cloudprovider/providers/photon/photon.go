@@ -39,8 +39,8 @@ import (
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -326,14 +326,14 @@ func (pc *PCCloud) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 							// Filter external IP by MAC address OUIs from vCenter and from ESX
 							if strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_VC) ||
 								strings.HasPrefix(i.HardwareAddr.String(), MAC_OUI_ESX) {
-								v1helper.AddToNodeAddresses(&nodeAddrs,
+								nodehelpers.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeExternalIP,
 										Address: ipnet.IP.String(),
 									},
 								)
 							} else {
-								v1helper.AddToNodeAddresses(&nodeAddrs,
+								nodehelpers.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipnet.IP.String(),
@@ -396,14 +396,14 @@ func (pc *PCCloud) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 						if ipAddr != "-" {
 							if strings.HasPrefix(macAddr, MAC_OUI_VC) ||
 								strings.HasPrefix(macAddr, MAC_OUI_ESX) {
-								v1helper.AddToNodeAddresses(&nodeAddrs,
+								nodehelpers.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeExternalIP,
 										Address: ipAddr,
 									},
 								)
 							} else {
-								v1helper.AddToNodeAddresses(&nodeAddrs,
+								nodehelpers.AddToNodeAddresses(&nodeAddrs,
 									v1.NodeAddress{
 										Type:    v1.NodeInternalIP,
 										Address: ipAddr,

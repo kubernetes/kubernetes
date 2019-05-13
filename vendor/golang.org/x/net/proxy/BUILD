@@ -11,6 +11,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/proxy",
     importpath = "golang.org/x/net/proxy",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/golang.org/x/net/internal/socks:go_default_library"],
 )
 
 filegroup(

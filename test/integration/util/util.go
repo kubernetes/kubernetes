@@ -26,7 +26,10 @@ import (
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
+	// import DefaultProvider
+	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -70,8 +73,19 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
+	config.Recorder = evtBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
 
 	sched := scheduler.NewFromConfig(config)
+	scheduler.AddAllEventHandlers(sched,
+		v1.DefaultSchedulerName,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Storage().V1().StorageClasses(),
+	)
+
 	informerFactory.Start(stopCh)
 	sched.Run()
 

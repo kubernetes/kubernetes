@@ -22,23 +22,24 @@ import (
 	"fmt"
 	"net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	apiserverflag "k8s.io/apiserver/pkg/util/flag"
 	clientset "k8s.io/client-go/kubernetes"
 	clientgokubescheme "k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cliflag "k8s.io/component-base/cli/flag"
 	kubectrlmgrconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
@@ -177,9 +178,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 	s.SecureServing.ServerCert.PairName = "kube-controller-manager"
 	s.SecureServing.BindPort = ports.KubeControllerManagerPort
 
-	gcIgnoredResources := make([]kubectrlmgrconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
+	gcIgnoredResources := make([]garbagecollectorconfig.GroupResource, 0, len(garbagecollector.DefaultIgnoredResources()))
 	for r := range garbagecollector.DefaultIgnoredResources() {
-		gcIgnoredResources = append(gcIgnoredResources, kubectrlmgrconfig.GroupResource{Group: r.Group, Resource: r.Resource})
+		gcIgnoredResources = append(gcIgnoredResources, garbagecollectorconfig.GroupResource{Group: r.Group, Resource: r.Resource})
 	}
 
 	s.GarbageCollectorController.GCIgnoredResources = gcIgnoredResources
@@ -201,8 +202,8 @@ func NewDefaultComponentConfig(insecurePort int32) (kubectrlmgrconfig.KubeContro
 }
 
 // Flags returns flags for a specific APIServer by section name
-func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) apiserverflag.NamedFlagSets {
-	fss := apiserverflag.NamedFlagSets{}
+func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledByDefaultControllers []string) cliflag.NamedFlagSets {
+	fss := cliflag.NamedFlagSets{}
 	s.Generic.AddFlags(&fss, allControllers, disabledByDefaultControllers)
 	s.KubeCloudShared.AddFlags(fss.FlagSet("generic"))
 	s.ServiceController.AddFlags(fss.FlagSet("service controller"))

@@ -11,7 +11,7 @@ go_library(
         "curl.go",
         "discover.go",
         "doc.go",
-        "keys.generated.go",
+        "json.go",
         "keys.go",
         "members.go",
         "util.go",
@@ -24,7 +24,8 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/srv:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
         "//vendor/github.com/coreos/etcd/version:go_default_library",
-        "//vendor/github.com/ugorji/go/codec:go_default_library",
+        "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/github.com/modern-go/reflect2:go_default_library",
     ],
 )
 

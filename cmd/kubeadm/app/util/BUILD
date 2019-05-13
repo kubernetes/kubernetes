@@ -46,7 +46,6 @@ go_test(
     srcs = [
         "arguments_test.go",
         "cgroupdriver_test.go",
-        "chroot_test.go",
         "endpoint_test.go",
         "error_test.go",
         "marshal_test.go",
@@ -56,7 +55,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta1:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -82,6 +81,7 @@ filegroup(
         "//cmd/kubeadm/app/util/audit:all-srcs",
         "//cmd/kubeadm/app/util/certs:all-srcs",
         "//cmd/kubeadm/app/util/config:all-srcs",
+        "//cmd/kubeadm/app/util/crypto:all-srcs",
         "//cmd/kubeadm/app/util/dryrun:all-srcs",
         "//cmd/kubeadm/app/util/etcd:all-srcs",
         "//cmd/kubeadm/app/util/kubeconfig:all-srcs",

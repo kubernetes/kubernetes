@@ -81,7 +81,7 @@ func NewDefaultTolerationSeconds() *Plugin {
 }
 
 // Admit makes an admission decision based on the request attributes
-func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
+func (p *Plugin) Admit(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

@@ -19,18 +19,20 @@ package apis
 import (
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
-	LabelHostname           = "kubernetes.io/hostname"
-	LabelZoneFailureDomain  = "failure-domain.beta.kubernetes.io/zone"
-	LabelMultiZoneDelimiter = "__"
-	LabelZoneRegion         = "failure-domain.beta.kubernetes.io/region"
-
-	LabelInstanceType = "beta.kubernetes.io/instance-type"
-
-	LabelOS   = "beta.kubernetes.io/os"
+	// LabelOS is a label to indicate the operating system of the node.
+	// The OS labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta OS labels in Kubernetes 1.18.
+	LabelOS = "beta.kubernetes.io/os"
+	// LabelArch is a label to indicate the architecture of the node.
+	// The Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta Arch labels in Kubernetes 1.18.
 	LabelArch = "beta.kubernetes.io/arch"
 
 	// GA versions of the legacy beta labels.
@@ -38,40 +40,27 @@ const (
 	labelZoneFailureDomainGA = "failure-domain.kubernetes.io/zone"
 	labelZoneRegionGA        = "failure-domain.kubernetes.io/region"
 	labelInstanceTypeGA      = "kubernetes.io/instance-type"
-	labelOSGA                = "kubernetes.io/os"
-	labelArchGA              = "kubernetes.io/arch"
-
-	// LabelNamespaceSuffixKubelet is an allowed label namespace suffix kubelets can self-set ([*.]kubelet.kubernetes.io/*)
-	LabelNamespaceSuffixKubelet = "kubelet.kubernetes.io"
-	// LabelNamespaceSuffixNode is an allowed label namespace suffix kubelets can self-set ([*.]node.kubernetes.io/*)
-	LabelNamespaceSuffixNode = "node.kubernetes.io"
-
-	// LabelNamespaceNodeRestriction is a forbidden label namespace that kubelets may not self-set when the NodeRestriction admission plugin is enabled
-	LabelNamespaceNodeRestriction = "node-restriction.kubernetes.io"
 )
 
-// When the --failure-domains scheduler flag is not specified,
-// DefaultFailureDomains defines the set of label keys used when TopologyKey is empty in PreferredDuringScheduling anti-affinity.
-var DefaultFailureDomains string = LabelHostname + "," + LabelZoneFailureDomain + "," + LabelZoneRegion
-
 var kubeletLabels = sets.NewString(
-	LabelHostname,
-	LabelZoneFailureDomain,
-	LabelZoneRegion,
-	LabelInstanceType,
+	v1.LabelHostname,
+	v1.LabelZoneFailureDomain,
+	v1.LabelZoneRegion,
+	v1.LabelInstanceType,
+	v1.LabelOSStable,
+	v1.LabelArchStable,
+
 	LabelOS,
 	LabelArch,
 
 	labelZoneFailureDomainGA,
 	labelZoneRegionGA,
 	labelInstanceTypeGA,
-	labelOSGA,
-	labelArchGA,
 )
 
 var kubeletLabelNamespaces = sets.NewString(
-	LabelNamespaceSuffixKubelet,
-	LabelNamespaceSuffixNode,
+	v1.LabelNamespaceSuffixKubelet,
+	v1.LabelNamespaceSuffixNode,
 )
 
 // KubeletLabels returns the list of label keys kubelets are allowed to set on their own Node objects

@@ -38,6 +38,11 @@ func NewOpenStackCinderCSITranslator() InTreePlugin {
 	return &osCinderCSITranslator{}
 }
 
+// TranslateInTreeStorageClassParametersToCSI translates InTree Cinder storage class parameters to CSI storage class
+func (t *osCinderCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
+	return scParameters, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with Cinder set from in-tree
 // and converts the Cinder source to a CSIPersistentVolumeSource
 func (t *osCinderCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
@@ -90,4 +95,9 @@ func (t *osCinderCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 // GetInTreePluginName returns the name of the intree plugin driver
 func (t *osCinderCSITranslator) GetInTreePluginName() string {
 	return CinderInTreePluginName
+}
+
+// GetCSIPluginName returns the name of the CSI plugin
+func (t *osCinderCSITranslator) GetCSIPluginName() string {
+	return CinderDriverName
 }

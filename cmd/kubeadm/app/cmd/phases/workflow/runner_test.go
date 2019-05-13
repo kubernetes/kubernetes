@@ -172,7 +172,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 		t.Run(u.name, func(t *testing.T) {
 			callstack = []string{}
 			w.Options = u.options
-			err := w.Run()
+			err := w.Run([]string{})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -241,7 +241,7 @@ func TestRunHandleErrors(t *testing.T) {
 	for _, u := range usecases {
 		t.Run(u.name, func(t *testing.T) {
 			w.Options = u.options
-			err := w.Run()
+			err := w.Run([]string{})
 			if (err != nil) != u.expectedError {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -262,7 +262,7 @@ func TestHelp(t *testing.T) {
 	var w = Runner{
 		Phases: []Phase{
 			phaseBuilder3("foo", false,
-				phaseBuilder3("bar", false),
+				phaseBuilder3("bar [arg]", false),
 				phaseBuilder3("baz", true),
 			),
 			phaseBuilder3("qux", false),
@@ -272,7 +272,7 @@ func TestHelp(t *testing.T) {
 	expected := "The \"myCommand\" command executes the following phases:\n" +
 		"```\n" +
 		"foo   long description for foo ...\n" +
-		"  /bar  long description for bar ...\n" +
+		"  /bar  long description for bar [arg] ...\n" +
 		"qux   long description for qux ...\n" +
 		"```"
 
@@ -294,6 +294,134 @@ func phaseBuilder5(name string, flags *pflag.FlagSet) Phase {
 	return Phase{
 		Name:       name,
 		LocalFlags: flags,
+	}
+}
+
+type argTest struct {
+	args cobra.PositionalArgs
+	pass []string
+	fail []string
+}
+
+func phaseBuilder6(name string, args cobra.PositionalArgs, phases ...Phase) Phase {
+	return Phase{
+		Name:          name,
+		Short:         fmt.Sprintf("long description for %s ...", name),
+		Phases:        phases,
+		ArgsValidator: args,
+	}
+}
+
+// customArgs is a custom cobra.PositionArgs function
+func customArgs(cmd *cobra.Command, args []string) error {
+	for _, a := range args {
+		if a != "qux" {
+			return fmt.Errorf("arg %s does not equal qux", a)
+		}
+	}
+	return nil
+}
+
+func TestBindToCommandArgRequirements(t *testing.T) {
+
+	// because cobra.ExactArgs(1) == cobra.ExactArgs(3), it is needed
+	// to run test argument sets that both pass and fail to ensure the correct function was set.
+	var usecases = []struct {
+		name      string
+		runner    Runner
+		testCases map[string]argTest
+		cmd       *cobra.Command
+	}{
+		{
+			name: "leaf command, no defined args, follow parent",
+			runner: Runner{
+				Phases: []Phase{phaseBuilder("foo")},
+			},
+			testCases: map[string]argTest{
+				"phase foo": {
+					pass: []string{"one", "two", "three"},
+					fail: []string{"one", "two"},
+					args: cobra.ExactArgs(3),
+				},
+			},
+			cmd: &cobra.Command{
+				Use:  "init",
+				Args: cobra.ExactArgs(3),
+			},
+		},
+		{
+			name: "container cmd expect none, custom arg check for leaf",
+			runner: Runner{
+				Phases: []Phase{phaseBuilder6("foo", cobra.NoArgs,
+					phaseBuilder6("bar", cobra.ExactArgs(1)),
+					phaseBuilder6("baz", customArgs),
+				)},
+			},
+			testCases: map[string]argTest{
+				"phase foo": {
+					pass: []string{},
+					fail: []string{"one"},
+					args: cobra.NoArgs,
+				},
+				"phase foo bar": {
+					pass: []string{"one"},
+					fail: []string{"one", "two"},
+					args: cobra.ExactArgs(1),
+				},
+				"phase foo baz": {
+					pass: []string{"qux"},
+					fail: []string{"one"},
+					args: customArgs,
+				},
+			},
+			cmd: &cobra.Command{
+				Use:  "init",
+				Args: cobra.NoArgs,
+			},
+		},
+	}
+
+	for _, rt := range usecases {
+		t.Run(rt.name, func(t *testing.T) {
+
+			rt.runner.BindToCommand(rt.cmd)
+
+			// Checks that cmd gets a new phase subcommand
+			phaseCmd := getCmd(rt.cmd, "phase")
+			if phaseCmd == nil {
+				t.Error("cmd didn't have phase subcommand\n")
+				return
+			}
+
+			for c, args := range rt.testCases {
+
+				cCmd := getCmd(rt.cmd, c)
+				if cCmd == nil {
+					t.Errorf("cmd didn't have %s subcommand\n", c)
+					continue
+				}
+
+				// Ensure it is the expected function
+				if reflect.ValueOf(cCmd.Args).Pointer() != reflect.ValueOf(args.args).Pointer() {
+					t.Error("The function poiners where not equal.")
+				}
+
+				// Test passing argument set
+				err := cCmd.Args(cCmd, args.pass)
+
+				if err != nil {
+					t.Errorf("command %s should validate the args: %v\n %v", cCmd.Name(), args.pass, err)
+				}
+
+				// Test failing argument set
+				err = cCmd.Args(cCmd, args.fail)
+
+				if err == nil {
+					t.Errorf("command %s should fail to validate the args: %v\n %v", cCmd.Name(), args.pass, err)
+				}
+			}
+
+		})
 	}
 }
 

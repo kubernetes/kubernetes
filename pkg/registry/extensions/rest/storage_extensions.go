@@ -28,7 +28,7 @@ import (
 	deploymentstore "k8s.io/kubernetes/pkg/registry/apps/deployment/storage"
 	replicasetstore "k8s.io/kubernetes/pkg/registry/apps/replicaset/storage"
 	expcontrollerstore "k8s.io/kubernetes/pkg/registry/extensions/controller/storage"
-	ingressstore "k8s.io/kubernetes/pkg/registry/extensions/ingress/storage"
+	ingressstore "k8s.io/kubernetes/pkg/registry/networking/ingress/storage"
 	networkpolicystore "k8s.io/kubernetes/pkg/registry/networking/networkpolicy/storage"
 	pspstore "k8s.io/kubernetes/pkg/registry/policy/podsecuritypolicy/storage"
 )

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/klog"
 
+	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -30,11 +31,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	schedulingclient "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
 	schedulingapiv1beta1 "k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
-	schedulingclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/scheduling/internalversion"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 )
 
@@ -48,15 +50,36 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(scheduling.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = p.storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
 	if apiResourceConfigSource.VersionEnabled(schedulingapiv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = p.storage(apiResourceConfigSource, restOptionsGetter)
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+	}
+	if apiResourceConfigSource.VersionEnabled(schedulingapiv1.SchemeGroupVersion) {
+		apiGroupInfo.VersionedResourcesStorageMap[schedulingapiv1.SchemeGroupVersion.Version] = p.v1Storage(apiResourceConfigSource, restOptionsGetter)
 	}
 	return apiGroupInfo, true
 }
 
-func (p RESTStorageProvider) storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+	// priorityclasses
+	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
+	storage["priorityclasses"] = priorityClassStorage
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+	storage := map[string]rest.Storage{}
+	// priorityclasses
+	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
+	storage["priorityclasses"] = priorityClassStorage
+
+	return storage
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
 	storage := map[string]rest.Storage{}
 	// priorityclasses
 	priorityClassStorage := priorityclassstore.NewREST(restOptionsGetter)
@@ -84,7 +107,12 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 				_, err := schedClientSet.PriorityClasses().Get(pc.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
-						_, err := schedClientSet.PriorityClasses().Create(pc)
+						// TODO: Remove this explicit conversion after scheduling api move to v1
+						v1beta1PriorityClass := &schedulingv1beta1.PriorityClass{}
+						if err := schedulingapiv1beta1.Convert_scheduling_PriorityClass_To_v1beta1_PriorityClass(pc, v1beta1PriorityClass, nil); err != nil {
+							return false, err
+						}
+						_, err := schedClientSet.PriorityClasses().Create(v1beta1PriorityClass)
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
 						} else {

@@ -65,7 +65,7 @@ Last, build and push the docker images for all supported architectures.
 # Build images for all the architecture and push the manifest image as well
 $ make all-push
 
-# Build images for all the architecture 
+# Build images for all the architecture
 $ make all-build
 
 # Build image for target architecture(default=amd64)

@@ -18,8 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+source "${KUBE_ROOT}/hack/lib/util.sh"
 
 kube::golang::verify_go_version
 
@@ -35,41 +36,18 @@ go install k8s.io/kubernetes/vendor/golang.org/x/lint/golint
 
 cd "${KUBE_ROOT}"
 
-array_contains () {
-    local seeking=$1; shift # shift will iterate through the array
-    local in=1 # in holds the exit status for the function
-    for element; do
-        if [[ "$element" == "$seeking" ]]; then
-            in=0 # set in to 0 since we found it
-            break
-        fi
-    done
-    return $in
-}
-
 # Check that the file is in alphabetical order
 failure_file="${KUBE_ROOT}/hack/.golint_failures"
-if ! diff -u "${failure_file}" <(LC_ALL=C sort "${failure_file}"); then
-  {
-    echo
-    echo "hack/.golint_failures is not in alphabetical order. Please sort it:"
-    echo
-    echo "  LC_ALL=C sort -o hack/.golint_failures hack/.golint_failures"
-    echo
-  } >&2
-  false
-fi
+kube::util::check-file-in-alphabetical-order "${failure_file}"
 
 export IFS=$'\n'
 # NOTE: when "go list -e ./..." is run within GOPATH, it turns the k8s.io/kubernetes
 # as the prefix, however if we run it outside it returns the full path of the file
 # with a leading underscore. We'll need to support both scenarios for all_packages.
-all_packages=(
-  $(go list -e ./... | egrep -v "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
-)
-failing_packages=(
-  $(cat $failure_file)
-)
+all_packages=()
+while IFS='' read -r line; do all_packages+=("$line"); done < <(go list -e ./... | grep -vE "/(third_party|vendor|staging/src/k8s.io/client-go/pkg|generated|clientset_generated)" | sed -e 's|^k8s.io/kubernetes/||' -e "s|^_\(${KUBE_ROOT}/\)\{0,1\}||")
+failing_packages=()
+while IFS='' read -r line; do failing_packages+=("$line"); done < <(cat "$failure_file")
 unset IFS
 errors=()
 not_failing=()
@@ -83,20 +61,20 @@ for p in "${all_packages[@]}"; do
   # completely.
   # Ref: https://github.com/kubernetes/kubernetes/pull/67675
   # Ref: https://github.com/golang/lint/issues/68
-  failedLint=$(ls "$p"/*.go | egrep -v "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
-  array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
+  failedLint=$(find "$p"/*.go | grep -vE "(zz_generated.*.go|generated.pb.go|generated.proto|types_swagger_doc_generated.go)" | xargs -L1 golint 2>/dev/null)
+  kube::util::array_contains "$p" "${failing_packages[@]}" && in_failing=$? || in_failing=$?
   if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
     errors+=( "${failedLint}" )
   fi
   if [[ -z "${failedLint}" ]] && [[ "${in_failing}" -eq "0" ]]; then
-    not_failing+=( $p )
+    not_failing+=( "$p" )
   fi
 done
 
 # Check that all failing_packages actually still exist
 gone=()
 for p in "${failing_packages[@]}"; do
-  array_contains "$p" "${all_packages[@]}" || gone+=( "$p" )
+  kube::util::array_contains "$p" "${all_packages[@]}" || gone+=( "$p" )
 done
 
 # Check to be sure all the packages that should pass lint are.
@@ -114,7 +92,7 @@ else
     echo 'checking by adding it to hack/.golint_failures (if your reviewer is okay with it).'
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
@@ -126,7 +104,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi
 
 if [[ ${#gone[@]} -gt 0 ]]; then
@@ -138,5 +116,5 @@ if [[ ${#gone[@]} -gt 0 ]]; then
     done
     echo
   } >&2
-  false
+  exit 1
 fi

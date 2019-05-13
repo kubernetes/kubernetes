@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/docker/api/types/swarm"
 
 import (
 	"time"
@@ -33,6 +33,7 @@ type SELinuxContext struct {
 
 // CredentialSpec for managed service account (Windows only)
 type CredentialSpec struct {
+	Config   string
 	File     string
 	Registry string
 }
@@ -71,4 +72,5 @@ type ContainerSpec struct {
 	Secrets   []*SecretReference  `json:",omitempty"`
 	Configs   []*ConfigReference  `json:",omitempty"`
 	Isolation container.Isolation `json:",omitempty"`
+	Sysctls   map[string]string   `json:",omitempty"`
 }

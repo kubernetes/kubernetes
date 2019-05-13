@@ -23,6 +23,4 @@ const (
 	DefaultCACertPath = "C:/etc/kubernetes/pki/ca.crt"
 	// DefaultUrlScheme defines default socket url prefix
 	DefaultUrlScheme = "tcp"
-	// DefaultCRISocket defines the default cri socket
-	DefaultCRISocket = "tcp://localhost:2375"
 )

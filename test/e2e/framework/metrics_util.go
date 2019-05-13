@@ -37,6 +37,7 @@ import (
 	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -65,88 +66,105 @@ const (
 	caFunctionMetricLabel = "function"
 )
 
-type MetricsForE2E metrics.MetricsCollection
+// MetricsForE2E is metrics collection of components.
+type MetricsForE2E metrics.Collection
 
 func (m *MetricsForE2E) filterMetrics() {
-	interestingApiServerMetrics := make(metrics.ApiServerMetrics)
-	for _, metric := range InterestingApiServerMetrics {
-		interestingApiServerMetrics[metric] = (*m).ApiServerMetrics[metric]
+	apiServerMetrics := make(metrics.APIServerMetrics)
+	for _, metric := range interestingAPIServerMetrics {
+		apiServerMetrics[metric] = (*m).APIServerMetrics[metric]
 	}
-	interestingControllerManagerMetrics := make(metrics.ControllerManagerMetrics)
-	for _, metric := range InterestingControllerManagerMetrics {
-		interestingControllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
+	controllerManagerMetrics := make(metrics.ControllerManagerMetrics)
+	for _, metric := range interestingControllerManagerMetrics {
+		controllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
 	}
-	interestingClusterAutoscalerMetrics := make(metrics.ClusterAutoscalerMetrics)
-	for _, metric := range InterestingClusterAutoscalerMetrics {
-		interestingClusterAutoscalerMetrics[metric] = (*m).ClusterAutoscalerMetrics[metric]
-	}
-	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
+	kubeletMetrics := make(map[string]metrics.KubeletMetrics)
 	for kubelet, grabbed := range (*m).KubeletMetrics {
-		interestingKubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
-		for _, metric := range InterestingKubeletMetrics {
-			interestingKubeletMetrics[kubelet][metric] = grabbed[metric]
+		kubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
+		for _, metric := range interestingKubeletMetrics {
+			kubeletMetrics[kubelet][metric] = grabbed[metric]
 		}
 	}
-	(*m).ApiServerMetrics = interestingApiServerMetrics
-	(*m).ControllerManagerMetrics = interestingControllerManagerMetrics
-	(*m).KubeletMetrics = interestingKubeletMetrics
+	(*m).APIServerMetrics = apiServerMetrics
+	(*m).ControllerManagerMetrics = controllerManagerMetrics
+	(*m).KubeletMetrics = kubeletMetrics
 }
 
+func printSample(sample *model.Sample) string {
+	buf := make([]string, 0)
+	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
+	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
+	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
+	// but it works...
+	_, normalContainer := sample.Metric["kubernetes_container_name"]
+	for k, v := range sample.Metric {
+		if strings.HasPrefix(string(k), "__") {
+			continue
+		}
+
+		if string(k) == "id" && normalContainer {
+			continue
+		}
+		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
+	}
+	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
+}
+
+// PrintHumanReadable returns e2e metrics with JSON format.
 func (m *MetricsForE2E) PrintHumanReadable() string {
 	buf := bytes.Buffer{}
-	for _, interestingMetric := range InterestingApiServerMetrics {
+	for _, interestingMetric := range interestingAPIServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
-		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		for _, sample := range (*m).APIServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
-	for _, interestingMetric := range InterestingControllerManagerMetrics {
+	for _, interestingMetric := range interestingControllerManagerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
-	for _, interestingMetric := range InterestingClusterAutoscalerMetrics {
+	for _, interestingMetric := range interestingClusterAutoscalerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
 		}
 	}
 	for kubelet, grabbed := range (*m).KubeletMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", kubelet))
-		for _, interestingMetric := range InterestingKubeletMetrics {
+		for _, interestingMetric := range interestingKubeletMetrics {
 			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
 			for _, sample := range grabbed[interestingMetric] {
-				buf.WriteString(fmt.Sprintf("\t\t%v\n", metrics.PrintSample(sample)))
+				buf.WriteString(fmt.Sprintf("\t\t%v\n", printSample(sample)))
 			}
 		}
 	}
 	return buf.String()
 }
 
+// PrintJSON returns e2e metrics with JSON format.
 func (m *MetricsForE2E) PrintJSON() string {
 	m.filterMetrics()
 	return PrettyPrintJSON(m)
 }
 
+// SummaryKind returns the summary of e2e metrics.
 func (m *MetricsForE2E) SummaryKind() string {
 	return "MetricsForE2E"
 }
 
-var SchedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
+var schedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
 
-var InterestingApiServerMetrics = []string{
-	"apiserver_request_count",
+var interestingAPIServerMetrics = []string{
+	"apiserver_request_total",
+	// TODO(krzysied): apiserver_request_latencies_summary is a deprecated metric.
+	// It should be replaced with new metric.
 	"apiserver_request_latencies_summary",
-	"etcd_helper_cache_entry_count",
-	"etcd_helper_cache_hit_count",
-	"etcd_helper_cache_miss_count",
-	"etcd_request_cache_add_latencies_summary",
-	"etcd_request_cache_get_latencies_summary",
-	"etcd_request_latencies_summary",
+	"apiserver_init_events_total",
 }
 
-var InterestingControllerManagerMetrics = []string{
+var interestingControllerManagerMetrics = []string{
 	"garbage_collector_attempt_to_delete_queue_latency",
 	"garbage_collector_attempt_to_delete_work_duration",
 	"garbage_collector_attempt_to_orphan_queue_latency",
@@ -166,24 +184,21 @@ var InterestingControllerManagerMetrics = []string{
 	"namespace_work_duration_count",
 }
 
-var InterestingKubeletMetrics = []string{
-	"kubelet_container_manager_latency_microseconds",
-	"kubelet_docker_errors",
-	"kubelet_docker_operations_latency_microseconds",
-	"kubelet_generate_pod_status_latency_microseconds",
-	"kubelet_pod_start_latency_microseconds",
-	"kubelet_pod_worker_latency_microseconds",
-	"kubelet_pod_worker_start_latency_microseconds",
-	"kubelet_sync_pods_latency_microseconds",
+var interestingKubeletMetrics = []string{
+	"kubelet_docker_operations_errors_total",
+	"kubelet_docker_operations_duration_seconds",
+	"kubelet_pod_start_duration_seconds",
+	"kubelet_pod_worker_duration_seconds",
+	"kubelet_pod_worker_start_duration_seconds",
 }
 
-var InterestingClusterAutoscalerMetrics = []string{
+var interestingClusterAutoscalerMetrics = []string{
 	"function_duration_seconds",
 	"errors_total",
 	"evicted_pods_total",
 }
 
-// Dashboard metrics
+// LatencyMetric is a struct for dashboard metrics.
 type LatencyMetric struct {
 	Perc50  time.Duration `json:"Perc50"`
 	Perc90  time.Duration `json:"Perc90"`
@@ -191,6 +206,7 @@ type LatencyMetric struct {
 	Perc100 time.Duration `json:"Perc100"`
 }
 
+// PodStartupLatency is a struct for managing latency of pod startup.
 type PodStartupLatency struct {
 	CreateToScheduleLatency LatencyMetric `json:"createToScheduleLatency"`
 	ScheduleToRunLatency    LatencyMetric `json:"scheduleToRunLatency"`
@@ -199,18 +215,22 @@ type PodStartupLatency struct {
 	E2ELatency              LatencyMetric `json:"e2eLatency"`
 }
 
+// SummaryKind returns the summary of pod startup latency.
 func (l *PodStartupLatency) SummaryKind() string {
 	return "PodStartupLatency"
 }
 
+// PrintHumanReadable returns pod startup letency with JSON format.
 func (l *PodStartupLatency) PrintHumanReadable() string {
 	return PrettyPrintJSON(l)
 }
 
+// PrintJSON returns pod startup letency with JSON format.
 func (l *PodStartupLatency) PrintJSON() string {
 	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
 }
 
+// SchedulingMetrics is a struct for managing scheduling metrics.
 type SchedulingMetrics struct {
 	PredicateEvaluationLatency  LatencyMetric `json:"predicateEvaluationLatency"`
 	PriorityEvaluationLatency   LatencyMetric `json:"priorityEvaluationLatency"`
@@ -222,23 +242,28 @@ type SchedulingMetrics struct {
 	ThroughputPerc99            float64       `json:"throughputPerc99"`
 }
 
+// SummaryKind returns the summary of scheduling metrics.
 func (l *SchedulingMetrics) SummaryKind() string {
 	return "SchedulingMetrics"
 }
 
+// PrintHumanReadable returns scheduling metrics with JSON format.
 func (l *SchedulingMetrics) PrintHumanReadable() string {
 	return PrettyPrintJSON(l)
 }
 
+// PrintJSON returns scheduling metrics with JSON format.
 func (l *SchedulingMetrics) PrintJSON() string {
 	return PrettyPrintJSON(l)
 }
 
+// Histogram is a struct for managing histogram.
 type Histogram struct {
 	Labels  map[string]string `json:"labels"`
 	Buckets map[string]int    `json:"buckets"`
 }
 
+// HistogramVec is an array of Histogram.
 type HistogramVec []Histogram
 
 func newHistogram(labels map[string]string) *Histogram {
@@ -248,6 +273,7 @@ func newHistogram(labels map[string]string) *Histogram {
 	}
 }
 
+// EtcdMetrics is a struct for managing etcd metrics.
 type EtcdMetrics struct {
 	BackendCommitDuration     HistogramVec `json:"backendCommitDuration"`
 	SnapshotSaveTotalDuration HistogramVec `json:"snapshotSaveTotalDuration"`
@@ -265,24 +291,29 @@ func newEtcdMetrics() *EtcdMetrics {
 	}
 }
 
+// SummaryKind returns the summary of etcd metrics.
 func (l *EtcdMetrics) SummaryKind() string {
 	return "EtcdMetrics"
 }
 
+// PrintHumanReadable returns etcd metrics with JSON format.
 func (l *EtcdMetrics) PrintHumanReadable() string {
 	return PrettyPrintJSON(l)
 }
 
+// PrintJSON returns etcd metrics with JSON format.
 func (l *EtcdMetrics) PrintJSON() string {
 	return PrettyPrintJSON(l)
 }
 
+// EtcdMetricsCollector is a struct for managing etcd metrics collector.
 type EtcdMetricsCollector struct {
 	stopCh  chan struct{}
 	wg      *sync.WaitGroup
 	metrics *EtcdMetrics
 }
 
+// NewEtcdMetricsCollector creates a new etcd metrics collector.
 func NewEtcdMetricsCollector() *EtcdMetricsCollector {
 	return &EtcdMetricsCollector{
 		stopCh:  make(chan struct{}),
@@ -293,13 +324,13 @@ func NewEtcdMetricsCollector() *EtcdMetricsCollector {
 
 func getEtcdMetrics() ([]*model.Sample, error) {
 	// Etcd is only exposed on localhost level. We are using ssh method
-	if TestContext.Provider == "gke" {
-		Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+	if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
+		Logf("Not grabbing etcd metrics through master SSH: unsupported for %s", TestContext.Provider)
 		return nil, nil
 	}
 
 	cmd := "curl http://localhost:2379/metrics"
-	sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil || sshResult.Code != 0 {
 		return nil, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 	}
@@ -343,6 +374,7 @@ func (mc *EtcdMetricsCollector) StartCollecting(interval time.Duration) {
 	}()
 }
 
+// StopAndSummarize stops etcd metrics collector and summarizes the metrics.
 func (mc *EtcdMetricsCollector) StopAndSummarize() error {
 	close(mc.stopCh)
 	mc.wg.Wait()
@@ -367,17 +399,12 @@ func (mc *EtcdMetricsCollector) StopAndSummarize() error {
 	return nil
 }
 
+// GetMetrics returns metrics of etcd metrics collector.
 func (mc *EtcdMetricsCollector) GetMetrics() *EtcdMetrics {
 	return mc.metrics
 }
 
-type SaturationTime struct {
-	TimeToSaturate time.Duration `json:"timeToSaturate"`
-	NumberOfNodes  int           `json:"numberOfNodes"`
-	NumberOfPods   int           `json:"numberOfPods"`
-	Throughput     float32       `json:"throughput"`
-}
-
+// APICall is a struct for managing API call.
 type APICall struct {
 	Resource    string        `json:"resource"`
 	Subresource string        `json:"subresource"`
@@ -387,20 +414,24 @@ type APICall struct {
 	Count       int           `json:"count"`
 }
 
+// APIResponsiveness is a struct for managing multiple API calls.
 type APIResponsiveness struct {
 	APICalls []APICall `json:"apicalls"`
 }
 
+// SummaryKind returns the summary of API responsiveness.
 func (a *APIResponsiveness) SummaryKind() string {
 	return "APIResponsiveness"
 }
 
+// PrintHumanReadable returns metrics with JSON format.
 func (a *APIResponsiveness) PrintHumanReadable() string {
 	return PrettyPrintJSON(a)
 }
 
+// PrintJSON returns metrics of PerfData(50, 90 and 99th percentiles) with JSON format.
 func (a *APIResponsiveness) PrintJSON() string {
-	return PrettyPrintJSON(ApiCallToPerfData(a))
+	return PrettyPrintJSON(APICallToPerfData(a))
 }
 
 func (a *APIResponsiveness) Len() int { return len(a.APICalls) }
@@ -476,9 +507,9 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 	for _, sample := range samples {
 		// Example line:
 		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
-		// apiserver_request_count{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
+		// apiserver_request_total{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
 		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
-			sample.Metric[model.MetricNameLabel] != "apiserver_request_count" {
+			sample.Metric[model.MetricNameLabel] != "apiserver_request_total" {
 			continue
 		}
 
@@ -498,7 +529,7 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 				return nil, err
 			}
 			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Microsecond)
-		case "apiserver_request_count":
+		case "apiserver_request_total":
 			count := sample.Value
 			a.addMetricRequestCount(resource, subresource, verb, scope, int(count))
 
@@ -508,7 +539,7 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 	return &a, err
 }
 
-// Prints top five summary metrics for request types with latency and returns
+// HighLatencyRequests prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold. We use a higher threshold for
 // list calls if nodeCount is above a given threshold (i.e. cluster is big).
 func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIResponsiveness, error) {
@@ -548,7 +579,7 @@ func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIRespons
 	return badMetrics, metrics, nil
 }
 
-// Verifies whether 50, 90 and 99th percentiles of a latency metric are
+// VerifyLatencyWithinThreshold verifies whether 50, 90 and 99th percentiles of a latency metric are
 // within the expected threshold.
 func VerifyLatencyWithinThreshold(threshold, actual LatencyMetric, metricName string) error {
 	if actual.Perc50 > threshold.Perc50 {
@@ -563,7 +594,7 @@ func VerifyLatencyWithinThreshold(threshold, actual LatencyMetric, metricName st
 	return nil
 }
 
-// Resets latency metrics in apiserver.
+// ResetMetrics resets latency metrics in apiserver.
 func ResetMetrics(c clientset.Interface) error {
 	Logf("Resetting latency metrics in apiserver...")
 	body, err := c.CoreV1().RESTClient().Delete().AbsPath("/metrics").DoRaw()
@@ -620,13 +651,13 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 		responseText = string(body)
 	} else {
 		// If master is not registered fall back to old method of using SSH.
-		if TestContext.Provider == "gke" {
-			Logf("Not grabbing scheduler metrics through master SSH: unsupported for gke")
+		if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
+			Logf("Not grabbing scheduler metrics through master SSH: unsupported for %s", TestContext.Provider)
 			return "", nil
 		}
 
 		cmd := "curl -X " + opUpper + " http://localhost:10251/metrics"
-		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		sshResult, err := e2essh.SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
 			return "", fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 		}
@@ -649,11 +680,11 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	}
 
 	for _, sample := range samples {
-		if sample.Metric[model.MetricNameLabel] != SchedulingLatencyMetricName {
+		if sample.Metric[model.MetricNameLabel] != schedulingLatencyMetricName {
 			continue
 		}
 
-		var metric *LatencyMetric = nil
+		var metric *LatencyMetric
 		switch sample.Metric[schedulermetric.OperationLabel] {
 		case schedulermetric.PredicateEvaluation:
 			metric = &result.PredicateEvaluationLatency
@@ -677,7 +708,7 @@ func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	return &result, nil
 }
 
-// Verifies (currently just by logging them) the scheduling latencies.
+// VerifySchedulerLatency verifies (currently just by logging them) the scheduling latencies.
 func VerifySchedulerLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	latency, err := getSchedulingLatency(c)
 	if err != nil {
@@ -686,6 +717,7 @@ func VerifySchedulerLatency(c clientset.Interface) (*SchedulingMetrics, error) {
 	return latency, nil
 }
 
+// ResetSchedulerMetrics sends a DELETE request to kube-scheduler for resetting metrics.
 func ResetSchedulerMetrics(c clientset.Interface) error {
 	responseText, err := sendRestRequestToScheduler(c, "DELETE")
 	if err != nil {
@@ -715,6 +747,7 @@ func convertSampleToBucket(sample *model.Sample, h *HistogramVec) {
 	hist.Buckets[string(sample.Metric["le"])] = int(sample.Value)
 }
 
+// PrettyPrintJSON converts metrics to JSON format.
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
@@ -761,12 +794,14 @@ type PodLatencyData struct {
 	Latency time.Duration
 }
 
+// LatencySlice is an array of PodLatencyData which encapsulates pod startup latency information.
 type LatencySlice []PodLatencyData
 
 func (a LatencySlice) Len() int           { return len(a) }
 func (a LatencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a LatencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
 
+// ExtractLatencyMetrics returns latency metrics for each percentile(50th, 90th and 99th).
 func ExtractLatencyMetrics(latencies []PodLatencyData) LatencyMetric {
 	length := len(latencies)
 	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
@@ -791,13 +826,14 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
 }
 
+// PrintLatencies outputs latencies to log with readable format.
 func PrintLatencies(latencies []PodLatencyData, header string) {
 	metrics := ExtractLatencyMetrics(latencies)
 	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
 	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
 
-func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.MetricsCollection) {
+func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.Collection) {
 	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
 			beforeSamplesMap := make(map[string]*model.Sample)

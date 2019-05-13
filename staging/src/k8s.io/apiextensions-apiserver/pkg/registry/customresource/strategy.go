@@ -153,12 +153,12 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func (a customResourceStrategy) GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, err
 	}
-	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), accessor.GetInitializers() != nil, nil
+	return labels.Set(accessor.GetLabels()), objectMetaFieldsSet(accessor, a.namespaceScoped), nil
 }
 
 // objectMetaFieldsSet returns a fields that represent the ObjectMeta.

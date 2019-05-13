@@ -45,16 +45,6 @@ const (
 	DefaultMethodRejectRE = "^$"
 )
 
-var (
-	// ReverseProxyFlushInterval is the frequency to flush the reverse proxy.
-	// Only matters for long poll connections like the one used to watch. With an
-	// interval of 0 the reverse proxy will buffer content sent on any connection
-	// with transfer-encoding=chunked.
-	// TODO: Flush after each chunk so the client doesn't suffer a 100ms latency per
-	// watch event.
-	ReverseProxyFlushInterval = 100 * time.Millisecond
-)
-
 // FilterServer rejects requests which don't match one of the specified regular expressions
 type FilterServer struct {
 	// Only paths that match this regexp will be accepted

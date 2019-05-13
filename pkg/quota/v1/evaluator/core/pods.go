@@ -28,14 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/util/clock"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
-	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
@@ -150,14 +148,7 @@ func (p *podEvaluator) Handles(a admission.Attributes) bool {
 	if op == admission.Create {
 		return true
 	}
-	initializationCompletion, err := util.IsInitializationCompletion(a)
-	if err != nil {
-		// fail closed, will try to give an evaluation.
-		utilruntime.HandleError(err)
-		return true
-	}
-	// only uninitialized pods might be updated.
-	return initializationCompletion
+	return false
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item

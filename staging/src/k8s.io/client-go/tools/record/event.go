@@ -21,7 +21,7 @@ import (
 	"math/rand"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,10 +29,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record/util"
 	ref "k8s.io/client-go/tools/reference"
-
-	"net/http"
-
 	"k8s.io/klog"
 )
 
@@ -50,6 +48,40 @@ type EventSink interface {
 	Create(event *v1.Event) (*v1.Event, error)
 	Update(event *v1.Event) (*v1.Event, error)
 	Patch(oldEvent *v1.Event, data []byte) (*v1.Event, error)
+}
+
+// CorrelatorOptions allows you to change the default of the EventSourceObjectSpamFilter
+// and EventAggregator in EventCorrelator
+type CorrelatorOptions struct {
+	// The lru cache size used for both EventSourceObjectSpamFilter and the EventAggregator
+	// If not specified (zero value), the default specified in events_cache.go will be picked
+	// This means that the LRUCacheSize has to be greater than 0.
+	LRUCacheSize int
+	// The burst size used by the token bucket rate filtering in EventSourceObjectSpamFilter
+	// If not specified (zero value), the default specified in events_cache.go will be picked
+	// This means that the BurstSize has to be greater than 0.
+	BurstSize int
+	// The fill rate of the token bucket in queries per second in EventSourceObjectSpamFilter
+	// If not specified (zero value), the default specified in events_cache.go will be picked
+	// This means that the QPS has to be greater than 0.
+	QPS float32
+	// The func used by the EventAggregator to group event keys for aggregation
+	// If not specified (zero value), EventAggregatorByReasonFunc will be used
+	KeyFunc EventAggregatorKeyFunc
+	// The func used by the EventAggregator to produced aggregated message
+	// If not specified (zero value), EventAggregatorByReasonMessageFunc will be used
+	MessageFunc EventAggregatorMessageFunc
+	// The number of events in an interval before aggregation happens by the EventAggregator
+	// If not specified (zero value), the default specified in events_cache.go will be picked
+	// This means that the MaxEvents has to be greater than 0
+	MaxEvents int
+	// The amount of time in seconds that must transpire since the last occurrence of a similar event before it is considered new by the EventAggregator
+	// If not specified (zero value), the default specified in events_cache.go will be picked
+	// This means that the MaxIntervalInSeconds has to be greater than 0
+	MaxIntervalInSeconds int
+	// The clock used by the EventAggregator to allow for testing
+	// If not specified (zero value), clock.RealClock{} will be used
+	Clock clock.Clock
 }
 
 // EventRecorder knows how to record events on behalf of an EventSource.
@@ -99,16 +131,31 @@ type EventBroadcaster interface {
 
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), defaultSleepDuration}
+	return &eventBroadcasterImpl{
+		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		sleepDuration: defaultSleepDuration,
+	}
 }
 
 func NewBroadcasterForTests(sleepDuration time.Duration) EventBroadcaster {
-	return &eventBroadcasterImpl{watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull), sleepDuration}
+	return &eventBroadcasterImpl{
+		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		sleepDuration: sleepDuration,
+	}
+}
+
+func NewBroadcasterWithCorrelatorOptions(options CorrelatorOptions) EventBroadcaster {
+	return &eventBroadcasterImpl{
+		Broadcaster:   watch.NewBroadcaster(maxQueuedEvents, watch.DropIfChannelFull),
+		sleepDuration: defaultSleepDuration,
+		options:       options,
+	}
 }
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
 	sleepDuration time.Duration
+	options       CorrelatorOptions
 }
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
@@ -118,7 +165,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	eventCorrelator := NewEventCorrelator(clock.RealClock{})
+	eventCorrelator := NewEventCorrelatorWithOptions(eventBroadcaster.options)
 	return eventBroadcaster.StartEventWatcher(
 		func(event *v1.Event) {
 			recordToSink(sink, event, eventCorrelator, randGen, eventBroadcaster.sleepDuration)
@@ -157,16 +204,6 @@ func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrela
 	}
 }
 
-func isKeyNotFoundError(err error) bool {
-	statusErr, _ := err.(*errors.StatusError)
-
-	if statusErr != nil && statusErr.Status().Code == http.StatusNotFound {
-		return true
-	}
-
-	return false
-}
-
 // recordEvent attempts to write event to a sink. It returns true if the event
 // was successfully recorded or discarded, false if it should be retried.
 // If updateExistingEvent is false, it creates a new event, otherwise it updates
@@ -178,7 +215,7 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 		newEvent, err = sink.Patch(event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
-	if !updateExistingEvent || (updateExistingEvent && isKeyNotFoundError(err)) {
+	if !updateExistingEvent || (updateExistingEvent && util.IsKeyNotFoundError(err)) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
 		newEvent, err = sink.Create(event)
@@ -260,7 +297,7 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 		return
 	}
 
-	if !validateEventType(eventtype) {
+	if !util.ValidateEventType(eventtype) {
 		klog.Errorf("Unsupported event type: '%v'", eventtype)
 		return
 	}
@@ -273,14 +310,6 @@ func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations m
 		defer utilruntime.HandleCrash()
 		recorder.Action(watch.Added, event)
 	}()
-}
-
-func validateEventType(eventtype string) bool {
-	switch eventtype {
-	case v1.EventTypeNormal, v1.EventTypeWarning:
-		return true
-	}
-	return false
 }
 
 func (recorder *recorderImpl) Event(object runtime.Object, eventtype, reason, message string) {

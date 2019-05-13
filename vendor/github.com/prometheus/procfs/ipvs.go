@@ -1,3 +1,16 @@
+// Copyright 2018 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package procfs
 
 import (
@@ -31,16 +44,16 @@ type IPVSStats struct {
 type IPVSBackendStatus struct {
 	// The local (virtual) IP address.
 	LocalAddress net.IP
+	// The remote (real) IP address.
+	RemoteAddress net.IP
 	// The local (virtual) port.
 	LocalPort uint16
+	// The remote (real) port.
+	RemotePort uint16
 	// The local firewall mark
 	LocalMark string
 	// The transport protocol (TCP, UDP).
 	Proto string
-	// The remote (real) IP address.
-	RemoteAddress net.IP
-	// The remote (real) port.
-	RemotePort uint16
 	// The current number of active connections for this virtual/real address pair.
 	ActiveConn uint64
 	// The current number of inactive connections for this virtual/real address pair.
@@ -151,7 +164,7 @@ func parseIPVSBackendStatus(file io.Reader) ([]IPVSBackendStatus, error) {
 	)
 
 	for scanner.Scan() {
-		fields := strings.Fields(string(scanner.Text()))
+		fields := strings.Fields(scanner.Text())
 		if len(fields) == 0 {
 			continue
 		}

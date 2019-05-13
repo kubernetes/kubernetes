@@ -108,3 +108,28 @@ run_create_job_tests() {
     set +o nounset
     set +o errexit
 }
+
+run_kubectl_create_kustomization_directory_tests() {
+  set -o nounset
+  set -o errexit
+
+  ## kubectl create -k <dir> for kustomization directory
+  # Pre-condition: no ConfigMap, Deployment, Service exist
+  kube::test::get_object_assert configmaps "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -k hack/testdata/kustomize
+  # Post-condition: test-the-map, test-the-deployment, test-the-service exist
+
+  # Check that all items in the list are printed
+  kube::test::get_object_assert 'configmap test-the-map' "{{${id_field}}}" 'test-the-map'
+  kube::test::get_object_assert 'deployment test-the-deployment' "{{${id_field}}}" 'test-the-deployment'
+  kube::test::get_object_assert 'service test-the-service' "{{${id_field}}}" 'test-the-service'
+
+  # cleanup
+  kubectl delete -k hack/testdata/kustomize
+
+  set +o nounset
+  set +o errexit
+}

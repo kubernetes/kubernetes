@@ -142,6 +142,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                  {},
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                     {},
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                 {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIDriver"}:                                        {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIDriverList"}:                                    {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                          {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                      {},
 		{Group: "authentication.k8s.io", Version: "v1", Kind: "TokenRequest"}:                                   {},

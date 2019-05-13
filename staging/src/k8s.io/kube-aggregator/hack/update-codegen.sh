@@ -18,22 +18,22 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
-CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
+SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset_generated \
-${CODEGEN_PKG}/generate-groups.sh deepcopy,client,lister,informer \
+"${CODEGEN_PKG}/generate-groups.sh" deepcopy,client,lister,informer \
   k8s.io/kube-aggregator/pkg/client k8s.io/kube-aggregator/pkg/apis \
   "apiregistration:v1beta1,v1" \
-  --output-base "$(dirname ${BASH_SOURCE})/../../.." \
-  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
+  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset_generated \
 CLIENTSET_NAME_INTERNAL=internalclientset \
-${CODEGEN_PKG}/generate-internal-groups.sh deepcopy,client,lister,informer,conversion \
+"${CODEGEN_PKG}/generate-internal-groups.sh" deepcopy,client,lister,informer,conversion \
   k8s.io/kube-aggregator/pkg/client k8s.io/kube-aggregator/pkg/apis k8s.io/kube-aggregator/pkg/apis \
   "apiregistration:v1beta1,v1" \
-  --output-base "$(dirname ${BASH_SOURCE})/../../.." \
-  --go-header-file ${SCRIPT_ROOT}/hack/boilerplate.go.txt
+  --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
+  --go-header-file "${SCRIPT_ROOT}/hack/boilerplate.go.txt"

@@ -29,7 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilpath "k8s.io/utils/path"
 )
 
 // Whether AppArmor should be disabled by default.
@@ -195,7 +195,7 @@ func getAppArmorFS() (string, error) {
 		}
 		if fields[2] == "securityfs" {
 			appArmorFS := path.Join(fields[1], "apparmor")
-			if ok, err := utilfile.FileExists(appArmorFS); !ok {
+			if ok, err := utilpath.Exists(utilpath.CheckFollowSymlink, appArmorFS); !ok {
 				msg := fmt.Sprintf("path %s does not exist", appArmorFS)
 				if err != nil {
 					return "", fmt.Errorf("%s: %v", msg, err)

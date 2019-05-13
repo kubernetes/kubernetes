@@ -107,7 +107,7 @@ function find-attached-pd() {
 	if [[ ! -e /dev/disk/by-id/${pd_name} ]]; then
 		echo ""
 	fi
-	device_info=$(ls -l /dev/disk/by-id/${pd_name})
+	device_info=$(ls -l "/dev/disk/by-id/${pd_name}")
 	relative_path=${device_info##* }
 	echo "/dev/disk/by-id/${relative_path}"
 }
@@ -184,6 +184,30 @@ contexts:
     user: kube-scheduler
   name: kube-scheduler
 current-context: kube-scheduler
+EOF
+}
+
+function create-addonmanager-kubeconfig {
+  echo "Creating addonmanager kubeconfig file"
+  mkdir -p "${KUBE_ROOT}/k8s_auth_data/addon-manager"
+  cat <<EOF >"${KUBE_ROOT}/k8s_auth_data/addon-manager/kubeconfig"
+apiVersion: v1
+kind: Config
+users:
+- name: addon-manager
+  user:
+    token: ${ADDON_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: addon-manager
+  name: addon-manager
+current-context: addon-manager
 EOF
 }
 
@@ -288,9 +312,9 @@ function start-kubelet {
 #
 # $1 is the file to create.
 function prepare-log-file {
-	touch $1
-	chmod 644 $1
-	chown root:root $1
+	touch "$1"
+	chmod 644 "$1"
+	chown root:root "$1"
 }
 
 # A helper function for copying addon manifests and set dir/files
@@ -301,10 +325,13 @@ function prepare-log-file {
 function setup-addon-manifests {
   local -r src_dir="${KUBE_ROOT}/$2"
   local -r dst_dir="/etc/kubernetes/$1/$2"
+
   if [[ ! -d "${dst_dir}" ]]; then
     mkdir -p "${dst_dir}"
   fi
-  local files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
+
+  local files
+  files=$(find "${src_dir}" -maxdepth 1 -name "*.yaml")
   if [[ -n "${files}" ]]; then
     cp "${src_dir}/"*.yaml "${dst_dir}"
   fi
@@ -466,9 +493,17 @@ EOF
 # Computes command line arguments to be passed to etcd.
 function compute-etcd-params {
 	local params="${ETCD_TEST_ARGS:-}"
+	params+=" --name=etcd-$(hostname -s)"
 	params+=" --listen-peer-urls=http://127.0.0.1:2380"
 	params+=" --advertise-client-urls=http://127.0.0.1:2379"
 	params+=" --listen-client-urls=http://0.0.0.0:2379"
+
+	# Enable apiserver->etcd auth.
+	params+=" --client-cert-auth"
+	params+=" --trusted-ca-file /etc/srv/kubernetes/etcd-apiserver-ca.crt"
+	params+=" --cert-file /etc/srv/kubernetes/etcd-apiserver-server.crt"
+	params+=" --key-file /etc/srv/kubernetes/etcd-apiserver-server.key"
+
 	params+=" --data-dir=/var/etcd/data"
 	params+=" ${ETCD_QUOTA_BYTES}"
 	echo "${params}"
@@ -477,6 +512,7 @@ function compute-etcd-params {
 # Computes command line arguments to be passed to etcd-events.
 function compute-etcd-events-params {
 	local params="${ETCD_TEST_ARGS:-}"
+	params+=" --name=etcd-$(hostname -s)"
 	params+=" --listen-peer-urls=http://127.0.0.1:2381"
 	params+=" --advertise-client-urls=http://127.0.0.1:4002"
 	params+=" --listen-client-urls=http://0.0.0.0:4002"
@@ -494,6 +530,11 @@ function compute-kube-apiserver-params {
 	elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
 		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
 	fi
+	# Enable apiserver->etcd auth.
+	params+=" --etcd-cafile=/etc/srv/kubernetes/etcd-apiserver-ca.crt"
+	params+=" --etcd-certfile=/etc/srv/kubernetes/etcd-apiserver-client.crt"
+	params+=" --etcd-keyfile=/etc/srv/kubernetes/etcd-apiserver-client.key"
+
 	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
 	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --requestheader-client-ca-file=/etc/srv/kubernetes/aggr_ca.crt"
@@ -508,7 +549,7 @@ function compute-kube-apiserver-params {
 	params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
 	params+=" --secure-port=443"
 	params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
-	params+=" --target-ram-mb=$((${NUM_NODES} * 60))"
+	params+=" --target-ram-mb=$((NUM_NODES * 60))"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
 	params+=" --authorization-mode=Node,RBAC"
@@ -598,7 +639,7 @@ function start-kubemaster-component() {
 	local -r component=$1
 	prepare-log-file /var/log/"${component}".log
 	local -r src_file="${KUBE_ROOT}/${component}.yaml"
-	local -r params=$(compute-${component}-params)
+	local -r params=$("compute-${component}-params")
 
 	# Evaluate variables.
 	sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -609,18 +650,18 @@ function start-kubemaster-component() {
 	elif [ "${component}" == "kube-addon-manager" ]; then
 		setup-addon-manifests "addons" "kubemark-rbac-bindings"
 	else
-		local -r component_docker_tag=$(cat ${KUBE_BINDIR}/${component}.docker_tag)
+		local -r component_docker_tag=$(cat "${KUBE_BINDIR}/${component}.docker_tag")
 		sed -i -e "s@{{${component}_docker_tag}}@${component_docker_tag}@g" "${src_file}"
 		if [ "${component}" == "kube-apiserver" ]; then
 			local audit_policy_config_mount=""
 			local audit_policy_config_volume=""
 			if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
-				read -d '' audit_policy_config_mount << EOF
+				read -r -d '' audit_policy_config_mount << EOF
 - name: auditpolicyconfigmount
   mountPath: ${audit_policy_file}
   readOnly: true
 EOF
-				read -d '' audit_policy_config_volume << EOF
+				read -r -d '' audit_policy_config_volume << EOF
 - name: auditpolicyconfigmount
   hostPath:
     path: ${audit_policy_file}
@@ -664,12 +705,17 @@ if [[ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-scheduler/kubeconfig" ]]; then
 	create-kubescheduler-kubeconfig
 fi
 
+ADDON_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+echo "${ADDON_MANAGER_TOKEN},system:addon-manager,admin,system:masters" >> "${KUBE_ROOT}/k8s_auth_data/known_tokens.csv"
+create-addonmanager-kubeconfig
+
 # Mount master PD for etcd and create symbolic links to it.
 {
 	main_etcd_mount_point="/mnt/disks/master-pd"
 	mount-pd "google-master-pd" "${main_etcd_mount_point}"
 	# Contains all the data stored in etcd.
-	mkdir -m 700 -p "${main_etcd_mount_point}/var/etcd"
+	mkdir -p "${main_etcd_mount_point}/var/etcd"
+	chmod 700 "${main_etcd_mount_point}/var/etcd"
 	ln -s -f "${main_etcd_mount_point}/var/etcd" /var/etcd
 	mkdir -p /etc/srv
 	# Setup the dynamically generated apiserver auth certs and keys to pd.
@@ -692,7 +738,8 @@ fi
 		event_etcd_mount_point="/mnt/disks/master-event-pd"
 		mount-pd "google-master-event-pd" "${event_etcd_mount_point}"
 		# Contains all the data stored in event etcd.
-		mkdir -m 700 -p "${event_etcd_mount_point}/var/etcd/events"
+		mkdir -p "${event_etcd_mount_point}/var/etcd/events"
+		chmod 700 "${event_etcd_mount_point}/var/etcd/events"
 		ln -s -f "${event_etcd_mount_point}/var/etcd/events" /var/etcd/events
 	fi
 }

@@ -62,11 +62,6 @@ func (a *atomicBool) get() bool {
 	return atomic.LoadInt32(&a.v) == 1
 }
 
-type output struct {
-	responses []string
-	errors    []string
-}
-
 func init() {
 	flag.IntVar(&httpPort, "http-port", 8080, "HTTP Listen Port")
 	flag.IntVar(&udpPort, "udp-port", 8081, "UDP Listen Port")

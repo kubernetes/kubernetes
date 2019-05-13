@@ -17,6 +17,7 @@ limitations under the License.
 package certs
 
 import (
+	"crypto"
 	"crypto/rsa"
 	"crypto/x509"
 	"net"
@@ -24,25 +25,19 @@ import (
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	"k8s.io/client-go/util/keyutil"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 // SetupCertificateAuthorithy is a utility function for kubeadm testing that creates a
 // CertificateAuthorithy cert/key pair
-func SetupCertificateAuthorithy(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
+func SetupCertificateAuthorithy(t *testing.T) (*x509.Certificate, crypto.Signer) {
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 	if err != nil {
 		t.Fatalf("failure while generating CA certificate and key: %v", err)
 	}
 
 	return caCert, caKey
-}
-
-// AssertCertificateIsCa is a utility function for kubeadm testing that asserts if a given certificate is a CA
-func AssertCertificateIsCa(t *testing.T, cert *x509.Certificate) {
-	if !cert.IsCA {
-		t.Error("cert is not a valida CA")
-	}
 }
 
 // AssertCertificateIsSignedByCa is a utility function for kubeadm testing that asserts if a given certificate is signed
@@ -136,7 +131,7 @@ func AssertCertificateHasIPAddresses(t *testing.T, cert *x509.Certificate, IPAdd
 }
 
 // CreateCACert creates a generic CA cert.
-func CreateCACert(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
+func CreateCACert(t *testing.T) (*x509.Certificate, crypto.Signer) {
 	certCfg := &certutil.Config{CommonName: "kubernetes"}
 	cert, key, err := pkiutil.NewCertificateAuthority(certCfg)
 	if err != nil {
@@ -145,17 +140,18 @@ func CreateCACert(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	return cert, key
 }
 
-// CreateTestCert makes a generic certficate with the given CA.
-func CreateTestCert(t *testing.T, caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey) {
-	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey,
-		&certutil.Config{
-			CommonName: "testCert",
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
-		})
+// CreateTestCert makes a generic certificate with the given CA and alternative names.
+func CreateTestCert(t *testing.T, caCert *x509.Certificate, caKey crypto.Signer, altNames certutil.AltNames) (*x509.Certificate, crypto.Signer, *certutil.Config) {
+	config := &certutil.Config{
+		CommonName: "testCert",
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageAny},
+		AltNames:   altNames,
+	}
+	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, config)
 	if err != nil {
 		t.Fatalf("couldn't create test cert: %v", err)
 	}
-	return cert, key
+	return cert, key, config
 }
 
 // CertTestCase is a configuration of certificates and whether it's expected to work.
@@ -172,7 +168,7 @@ func GetSparseCertTestCases(t *testing.T) []CertTestCase {
 	fpCACert, fpCAKey := CreateCACert(t)
 	etcdCACert, etcdCAKey := CreateCACert(t)
 
-	fpCert, fpKey := CreateTestCert(t, fpCACert, fpCAKey)
+	fpCert, fpKey, _ := CreateTestCert(t, fpCACert, fpCAKey, certutil.AltNames{})
 
 	return []CertTestCase{
 		{
@@ -229,19 +225,23 @@ func WritePKIFiles(t *testing.T, dir string, files PKIFiles) {
 	for filename, body := range files {
 		switch body := body.(type) {
 		case *x509.Certificate:
-			if err := certutil.WriteCert(path.Join(dir, filename), certutil.EncodeCertPEM(body)); err != nil {
+			if err := certutil.WriteCert(path.Join(dir, filename), pkiutil.EncodeCertPEM(body)); err != nil {
 				t.Errorf("unable to write certificate to file %q: [%v]", dir, err)
 			}
 		case *rsa.PublicKey:
-			publicKeyBytes, err := certutil.EncodePublicKeyPEM(body)
+			publicKeyBytes, err := pkiutil.EncodePublicKeyPEM(body)
 			if err != nil {
 				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
 			}
-			if err := certutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
+			if err := keyutil.WriteKey(path.Join(dir, filename), publicKeyBytes); err != nil {
 				t.Errorf("unable to write public key to file %q: [%v]", filename, err)
 			}
 		case *rsa.PrivateKey:
-			if err := certutil.WriteKey(path.Join(dir, filename), certutil.EncodePrivateKeyPEM(body)); err != nil {
+			privateKey, err := keyutil.MarshalPrivateKeyToPEM(body)
+			if err != nil {
+				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
+			}
+			if err := keyutil.WriteKey(path.Join(dir, filename), privateKey); err != nil {
 				t.Errorf("unable to write private key to file %q: [%v]", filename, err)
 			}
 		}

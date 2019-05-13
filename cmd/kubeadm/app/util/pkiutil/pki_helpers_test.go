@@ -17,6 +17,9 @@ limitations under the License.
 package pkiutil
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -29,68 +32,58 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-// certificateRequest is an x509 certificate request in PEM encoded format
-// openssl req -new -key rsa2048.pem -sha256 -nodes -out x509certrequest.pem -subj "/C=US/CN=not-valid"
-const certificateRequest = `-----BEGIN CERTIFICATE REQUEST-----
-MIICZjCCAU4CAQAwITELMAkGA1UEBhMCVVMxEjAQBgNVBAMMCW5vdC12YWxpZDCC
-ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMdoBxV0SbSS+7XrgVDF/P4x
-tqyun+DLxeRF5265ZOFRJDXCJgYH7wKlxlkEaHZQhnNmnqFiy96MHSKaiQmlkEm4
-EhlqTf38yEWx+t98A0CDbHsIPZ0/+MPCjb2kf+OfBXJJl908io0grs02jxN9lceL
-RFrKT6vaB+6i7LxbPQcOmjF7OUqWS6S2qSpShw2GY+mJz4HM7OFb9RcN4izh+GF6
-7hajYgt7pAFyWF1ua/H98Ysn4FVgIYk30rHCNBkQpJnna7EyGYuj08VuFa088W9g
-c/DCpL+VgBDwTel9tfeMxRAoLIPF9iJ8Ftr7dsRZ/Y/SnxfUJo2ed8y7dgIiLuEC
-AwEAAaAAMA0GCSqGSIb3DQEBCwUAA4IBAQCOjPB/4LKa2G7LarMMLAeNqvWF9SIG
-y2VGQoTn9D5blXMvnfzWSYgU6nBzf/E/32q26OwiCriuOPXfxM/cxEMOJ62u7b50
-OR52JFvQdONsCZaLgylGWppl0YeqylbTosHjsWJNlp+zjXcQHjCQ9OoLgfmrwYyD
-2MsYJR4p7JZ2ZN8FF1hgMUrDzypZ0NSBKAiQMU9TFhxgyk75RNDtmX+2K35zqLyr
-0otimyYwPCGPD2GHwNfvu1oP0A+/cT+rCPz6AlXhWEbz2JkLo6/muRfRl0QSRgHE
-Q3+eWlA1YdqEBwvp3NEQI9BtMnzxJVWA5dvYluMNllsV/q8s2IEEAFG9
------END CERTIFICATE REQUEST-----`
-
 func TestNewCertificateAuthority(t *testing.T) {
 	cert, key, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
 
 	if cert == nil {
-		t.Errorf(
-			"failed NewCertificateAuthority, cert == nil",
-		)
+		t.Error("failed NewCertificateAuthority, cert == nil")
+	} else if !cert.IsCA {
+		t.Error("cert is not a valida CA")
 	}
+
 	if key == nil {
-		t.Errorf(
-			"failed NewCertificateAuthority, key == nil",
-		)
+		t.Error("failed NewCertificateAuthority, key == nil")
 	}
+
 	if err != nil {
-		t.Errorf(
-			"failed NewCertificateAuthority with an error: %v",
-			err,
-		)
+		t.Errorf("failed NewCertificateAuthority with an error: %+v", err)
 	}
 }
 
 func TestNewCertAndKey(t *testing.T) {
 	var tests = []struct {
-		name      string
-		caKeySize int
-		expected  bool
+		name       string
+		keyGenFunc func() (crypto.Signer, error)
+		expected   bool
 	}{
 		{
-			name:      "RSA key too small",
-			caKeySize: 128,
-			expected:  false,
+			name: "RSA key too small",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 128)
+			},
+			expected: false,
 		},
 		{
-			name:      "Should succeed",
-			caKeySize: 2048,
-			expected:  true,
+			name: "RSA should succeed",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 2048)
+			},
+			expected: true,
+		},
+		{
+			name: "ECDSA should succeed",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			},
+			expected: true,
 		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			caKey, err := rsa.GenerateKey(rand.Reader, rt.caKeySize)
+			caKey, err := rt.keyGenFunc()
 			if err != nil {
-				t.Fatalf("Couldn't create rsa Private Key")
+				t.Fatalf("Couldn't create Private Key")
 			}
 			caCert := &x509.Certificate{}
 			config := &certutil.Config{
@@ -396,49 +389,66 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 }
 
 func TestTryLoadKeyFromDisk(t *testing.T) {
-	tmpdir, err := ioutil.TempDir("", "")
-	if err != nil {
-		t.Fatalf("Couldn't create tmpdir")
-	}
-	defer os.RemoveAll(tmpdir)
-
-	_, caKey, err := NewCertificateAuthority(&certutil.Config{CommonName: "kubernetes"})
-	if err != nil {
-		t.Errorf(
-			"failed to create cert and key with an error: %v",
-			err,
-		)
-	}
-	err = WriteKey(tmpdir, "foo", caKey)
-	if err != nil {
-		t.Errorf(
-			"failed to write cert and key with an error: %v",
-			err,
-		)
-	}
 
 	var tests = []struct {
-		desc     string
-		path     string
-		name     string
-		expected bool
+		desc       string
+		pathSuffix string
+		name       string
+		keyGenFunc func() (crypto.Signer, error)
+		expected   bool
 	}{
 		{
-			desc:     "empty path and name",
-			path:     "",
-			name:     "",
+			desc:       "empty path and name",
+			pathSuffix: "somegarbage",
+			name:       "",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 2048)
+			},
 			expected: false,
 		},
 		{
-			desc:     "valid path and name",
-			path:     tmpdir,
-			name:     "foo",
+			desc:       "RSA valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return rsa.GenerateKey(rand.Reader, 2048)
+			},
+			expected: true,
+		},
+		{
+			desc:       "ECDSA valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			keyGenFunc: func() (crypto.Signer, error) {
+				return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+			},
 			expected: true,
 		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.desc, func(t *testing.T) {
-			_, actual := TryLoadKeyFromDisk(rt.path, rt.name)
+			tmpdir, err := ioutil.TempDir("", "")
+			if err != nil {
+				t.Fatalf("Couldn't create tmpdir")
+			}
+			defer os.RemoveAll(tmpdir)
+
+			caKey, err := rt.keyGenFunc()
+			if err != nil {
+				t.Errorf(
+					"failed to create key with an error: %v",
+					err,
+				)
+			}
+
+			err = WriteKey(tmpdir, "foo", caKey)
+			if err != nil {
+				t.Errorf(
+					"failed to write key with an error: %v",
+					err,
+				)
+			}
+			_, actual := TryLoadKeyFromDisk(tmpdir+rt.pathSuffix, rt.name)
 			if (actual == nil) != rt.expected {
 				t.Errorf(
 					"failed TryLoadCertAndKeyFromDisk:\n\texpected: %t\n\t  actual: %t",
@@ -693,4 +703,32 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAppendSANsToAltNames(t *testing.T) {
+	var tests = []struct {
+		sans     []string
+		expected int
+	}{
+		{[]string{}, 0},
+		{[]string{"abc"}, 1},
+		{[]string{"*.abc"}, 1},
+		{[]string{"**.abc"}, 0},
+		{[]string{"a.*.bc"}, 0},
+		{[]string{"a.*.bc", "abc.def"}, 1},
+		{[]string{"a*.bc", "abc.def"}, 1},
+	}
+	for _, rt := range tests {
+		altNames := certutil.AltNames{}
+		appendSANsToAltNames(&altNames, rt.sans, "foo")
+		actual := len(altNames.DNSNames)
+		if actual != rt.expected {
+			t.Errorf(
+				"failed AppendSANsToAltNames Numbers:\n\texpected: %d\n\t  actual: %d",
+				rt.expected,
+				actual,
+			)
+		}
+	}
+
 }

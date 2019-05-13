@@ -43,6 +43,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -162,6 +163,70 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			),
 			expectedPrioritizers: sets.NewString(),
 		},
+		{
+			policy: `apiVersion: v1
+kind: Policy
+predicates:
+- name: PredicateOne
+- name: PredicateTwo
+priorities:
+- name: PriorityOne
+  weight: 1
+- name: PriorityTwo
+  weight: 5
+`,
+			expectedPredicates: sets.NewString(
+				"CheckNodeCondition", // mandatory predicate
+				"PredicateOne",
+				"PredicateTwo",
+			),
+			expectedPrioritizers: sets.NewString(
+				"PriorityOne",
+				"PriorityTwo",
+			),
+		},
+		{
+			policy: `apiVersion: v1
+kind: Policy
+`,
+			expectedPredicates: sets.NewString(
+				"CheckNodeCondition", // mandatory predicate
+				"CheckNodeDiskPressure",
+				"CheckNodeMemoryPressure",
+				"CheckNodePIDPressure",
+				"CheckVolumeBinding",
+				"GeneralPredicates",
+				"MatchInterPodAffinity",
+				"MaxAzureDiskVolumeCount",
+				"MaxCSIVolumeCountPred",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"NoDiskConflict",
+				"NoVolumeZoneConflict",
+				"PodToleratesNodeTaints",
+			),
+			expectedPrioritizers: sets.NewString(
+				"BalancedResourceAllocation",
+				"InterPodAffinityPriority",
+				"LeastRequestedPriority",
+				"NodeAffinityPriority",
+				"NodePreferAvoidPodsPriority",
+				"SelectorSpreadPriority",
+				"TaintTolerationPriority",
+				"ImageLocalityPriority",
+			),
+		},
+		{
+			policy: `apiVersion: v1
+kind: Policy
+predicates: []
+priorities: []
+`,
+			expectedPredicates: sets.NewString(
+				"CheckNodeCondition", // mandatory predicate
+			),
+			expectedPrioritizers: sets.NewString(),
+		},
 	} {
 		// Add a ConfigMap object.
 		configPolicyName := fmt.Sprintf("scheduler-custom-policy-config-%d", i)
@@ -199,6 +264,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				},
 			},
 			nil,
+			schedulerframework.NewRegistry(),
 			scheduler.WithName(v1.DefaultSchedulerName),
 			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
@@ -267,6 +333,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 			},
 		},
 		nil,
+		schedulerframework.NewRegistry(),
 		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
@@ -531,7 +598,7 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, stopCh)
+	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(), stopCh)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
@@ -539,10 +606,20 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet2.CoreV1().Events("")})
-	go podInformer2.Informer().Run(stopCh)
-	informerFactory2.Start(stopCh)
 
 	sched2 := scheduler.NewFromConfig(schedulerConfig2)
+	scheduler.AddAllEventHandlers(sched2,
+		fooScheduler,
+		context.informerFactory.Core().V1().Nodes(),
+		podInformer2,
+		context.informerFactory.Core().V1().PersistentVolumes(),
+		context.informerFactory.Core().V1().PersistentVolumeClaims(),
+		context.informerFactory.Core().V1().Services(),
+		context.informerFactory.Storage().V1().StorageClasses(),
+	)
+
+	go podInformer2.Informer().Run(stopCh)
+	informerFactory2.Start(stopCh)
 	sched2.Run()
 
 	//	6. **check point-2**:

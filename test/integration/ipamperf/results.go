@@ -105,7 +105,7 @@ func (o *Observer) StartObserving() error {
 func (o *Observer) Results(name string, config *Config) *Results {
 	var (
 		firstAdd       time.Time // earliest time any node was added (first node add)
-		lastAssignment time.Time // latest time any node was assignged CIDR (last node assignment)
+		lastAssignment time.Time // latest time any node was assigned CIDR (last node assignment)
 	)
 	o.wg.Wait()
 	close(o.stopChan) // shutdown the shared informer

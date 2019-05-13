@@ -30,7 +30,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
@@ -153,7 +153,7 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 		return zones, err
 	}
 	for _, node := range nodes.Items {
-		if zone, ok := node.Labels[kubeletapis.LabelZoneFailureDomain]; ok {
+		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
 			zones.Insert(zone)
 		}
 	}
@@ -170,7 +170,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 
 	capacity := c.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Cinder works with gigabytes, convert to GiB with rounding up
-	volSizeGiB, err := volutil.RoundUpToGiBInt(capacity)
+	volSizeGiB, err := volumehelpers.RoundUpToGiBInt(capacity)
 	if err != nil {
 		return "", 0, nil, "", err
 	}
@@ -207,7 +207,7 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 		// if we did not get any zones, lets leave it blank and gophercloud will
 		// use zone "nova" as default
 		if len(zones) > 0 {
-			availability, err = volutil.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
+			availability, err = volumehelpers.SelectZoneForVolume(false, false, "", nil, zones, node, allowedTopologies, c.options.PVC.Name)
 			if err != nil {
 				klog.V(2).Infof("error selecting zone for volume: %v", err)
 				return "", 0, nil, "", err
@@ -226,10 +226,10 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 	volumeLabels = make(map[string]string)
 	if IgnoreVolumeAZ == false {
 		if volumeAZ != "" {
-			volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+			volumeLabels[v1.LabelZoneFailureDomain] = volumeAZ
 		}
 		if volumeRegion != "" {
-			volumeLabels[kubeletapis.LabelZoneRegion] = volumeRegion
+			volumeLabels[v1.LabelZoneRegion] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

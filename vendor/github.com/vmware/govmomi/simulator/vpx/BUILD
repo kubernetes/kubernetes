@@ -4,9 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "performance_manager.go",
+        "performance_manager_data.go",
         "root_folder.go",
         "service_content.go",
         "setting.go",
+        "task_manager.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator/vpx",
     importpath = "github.com/vmware/govmomi/simulator/vpx",

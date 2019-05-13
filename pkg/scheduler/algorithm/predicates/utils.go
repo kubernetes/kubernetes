@@ -77,3 +77,13 @@ func portsConflict(existingPorts schedulernodeinfo.HostPortInfo, wantPorts []*v1
 
 	return false
 }
+
+// SetPredicatesOrderingDuringTest sets the predicatesOrdering to the specified
+// value, and returns a function that restores the original value.
+func SetPredicatesOrderingDuringTest(value []string) func() {
+	origVal := predicatesOrdering
+	predicatesOrdering = value
+	return func() {
+		predicatesOrdering = origVal
+	}
+}

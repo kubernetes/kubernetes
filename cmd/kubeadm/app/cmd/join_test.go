@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta1
+	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta2
 kind: JoinConfiguration
 discovery:
   bootstrapToken:
@@ -238,7 +238,7 @@ func TestNewJoinData(t *testing.T) {
 
 			// exec additional validation on the returned value
 			if tc.validate != nil {
-				tc.validate(t, &data)
+				tc.validate(t, data)
 			}
 		})
 	}

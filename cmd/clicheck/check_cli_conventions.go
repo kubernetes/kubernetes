@@ -25,10 +25,6 @@ import (
 	cmdsanity "k8s.io/kubernetes/pkg/kubectl/cmd/util/sanity"
 )
 
-var (
-	skip = []string{}
-)
-
 func main() {
 	var errorCount int
 

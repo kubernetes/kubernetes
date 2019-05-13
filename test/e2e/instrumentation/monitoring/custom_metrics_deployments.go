@@ -18,9 +18,8 @@ package monitoring
 
 import (
 	"fmt"
-	"strings"
-
 	"os/exec"
+	"strings"
 
 	gcm "google.golang.org/api/monitoring/v3"
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,13 +27,19 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 var (
-	CustomMetricName    = "foo"
-	UnusedMetricName    = "unused"
-	CustomMetricValue   = int64(448)
-	UnusedMetricValue   = int64(446)
+	// CustomMetricName is the metrics name used in test cases.
+	CustomMetricName = "foo"
+	// UnusedMetricName is the unused metrics name used in test cases.
+	UnusedMetricName = "unused"
+	// CustomMetricValue is the value for CustomMetricName.
+	CustomMetricValue = int64(448)
+	// UnusedMetricValue is the value for UnusedMetricName.
+	UnusedMetricValue = int64(446)
+	// StackdriverExporter is exporter name.
 	StackdriverExporter = "stackdriver-exporter"
 	// HPAPermissions is a ClusterRoleBinding that grants unauthenticated user permissions granted for
 	// HPA for testing purposes, i.e. it should grant permission to read custom metrics.
@@ -55,11 +60,16 @@ var (
 			},
 		},
 	}
+	// StagingDeploymentsLocation is the location where the adapter deployment files are stored.
 	StagingDeploymentsLocation = "https://raw.githubusercontent.com/GoogleCloudPlatform/k8s-stackdriver/master/custom-metrics-stackdriver-adapter/deploy/staging/"
+	// AdapterForOldResourceModel is file name for the old resource model.
 	AdapterForOldResourceModel = "adapter_old_resource_model.yaml"
+	// AdapterForNewResourceModel is file name for the new resource model.
 	AdapterForNewResourceModel = "adapter_new_resource_model.yaml"
-	AdapterDefault             = AdapterForOldResourceModel
-	ClusterAdminBinding        = "e2e-test-cluster-admin-binding"
+	// AdapterDefault is the default model.
+	AdapterDefault = AdapterForOldResourceModel
+	// ClusterAdminBinding is the cluster rolebinding name for test cases.
+	ClusterAdminBinding = "e2e-test-cluster-admin-binding"
 )
 
 // CustomMetricContainerSpec allows to specify a config for StackdriverExporterDeployment
@@ -212,7 +222,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 			},
 			{
 				Name:            "prometheus-to-sd",
-				Image:           "k8s.gcr.io/prometheus-to-sd:v0.3.1",
+				Image:           "k8s.gcr.io/prometheus-to-sd:v0.5.0",
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
 					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},
@@ -255,26 +265,26 @@ func CreateAdapter(adapterDeploymentFile string) error {
 		return err
 	}
 	stat, err := framework.RunKubectl("create", "-f", adapterURL)
-	framework.Logf(stat)
+	e2elog.Logf(stat)
 	return err
 }
 
 func createClusterAdminBinding() error {
 	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
 	if err != nil {
-		framework.Logf(stderr)
+		e2elog.Logf(stderr)
 		return err
 	}
 	serviceAccount := strings.TrimSpace(stdout)
-	framework.Logf("current service account: %q", serviceAccount)
+	e2elog.Logf("current service account: %q", serviceAccount)
 	stat, err := framework.RunKubectl("create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
-	framework.Logf(stat)
+	e2elog.Logf(stat)
 	return err
 }
 
 // CreateDescriptors creates descriptors for metrics: CustomMetricName and UnusedMetricName.
-func CreateDescriptors(service *gcm.Service, projectId string) error {
-	_, err := service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectId), &gcm.MetricDescriptor{
+func CreateDescriptors(service *gcm.Service, projectID string) error {
+	_, err := service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectID), &gcm.MetricDescriptor{
 		Name:       CustomMetricName,
 		ValueType:  "INT64",
 		Type:       "custom.googleapis.com/" + CustomMetricName,
@@ -283,7 +293,7 @@ func CreateDescriptors(service *gcm.Service, projectId string) error {
 	if err != nil {
 		return err
 	}
-	_, err = service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectId), &gcm.MetricDescriptor{
+	_, err = service.Projects.MetricDescriptors.Create(fmt.Sprintf("projects/%s", projectID), &gcm.MetricDescriptor{
 		Name:       UnusedMetricName,
 		ValueType:  "INT64",
 		Type:       "custom.googleapis.com/" + UnusedMetricName,
@@ -294,35 +304,35 @@ func CreateDescriptors(service *gcm.Service, projectId string) error {
 
 // CleanupDescriptors deletes descriptors for metrics: CustomMetricName and UnusedMetricName.
 // TODO: Cleanup time series as well
-func CleanupDescriptors(service *gcm.Service, projectId string) {
-	_, err := service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectId, CustomMetricName)).Do()
+func CleanupDescriptors(service *gcm.Service, projectID string) {
+	_, err := service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectID, CustomMetricName)).Do()
 	if err != nil {
-		framework.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
+		e2elog.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
 	}
-	_, err = service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectId, UnusedMetricName)).Do()
+	_, err = service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectID, UnusedMetricName)).Do()
 	if err != nil {
-		framework.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
+		e2elog.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
 	}
 }
 
 // CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
 func CleanupAdapter(adapterDeploymentFile string) {
 	stat, err := framework.RunKubectl("delete", "-f", adapterDeploymentFile)
-	framework.Logf(stat)
+	e2elog.Logf(stat)
 	if err != nil {
-		framework.Logf("Failed to delete adapter deployments: %s", err)
+		e2elog.Logf("Failed to delete adapter deployments: %s", err)
 	}
 	err = exec.Command("rm", adapterDeploymentFile).Run()
 	if err != nil {
-		framework.Logf("Failed to delete adapter deployment file: %s", err)
+		e2elog.Logf("Failed to delete adapter deployment file: %s", err)
 	}
 	cleanupClusterAdminBinding()
 }
 
 func cleanupClusterAdminBinding() {
 	stat, err := framework.RunKubectl("delete", "clusterrolebinding", ClusterAdminBinding)
-	framework.Logf(stat)
+	e2elog.Logf(stat)
 	if err != nil {
-		framework.Logf("Failed to delete cluster admin binding: %s", err)
+		e2elog.Logf("Failed to delete cluster admin binding: %s", err)
 	}
 }

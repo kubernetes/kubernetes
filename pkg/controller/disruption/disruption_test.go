@@ -18,7 +18,6 @@ package disruption
 
 import (
 	"fmt"
-	"reflect"
 	"runtime/debug"
 	"testing"
 	"time"
@@ -26,6 +25,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -67,7 +67,7 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 		ObservedGeneration:    actualPDB.Generation,
 	}
 	actualStatus := actualPDB.Status
-	if !reflect.DeepEqual(actualStatus, expectedStatus) {
+	if !apiequality.Semantic.DeepEqual(actualStatus, expectedStatus) {
 		debug.PrintStack()
 		t.Fatalf("PDB %q status mismatch.  Expected %+v but got %+v.", key, expectedStatus, actualStatus)
 	}
@@ -430,6 +430,31 @@ func TestIntegerMaxUnavailableWithScaling(t *testing.T) {
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 3, 5, map[string]metav1.Time{})
 }
 
+// Verify that an percentage MaxUnavailable will recompute allowed disruptions when the scale of
+// the selected pod's controller is modified.
+func TestPercentageMaxUnavailableWithScaling(t *testing.T) {
+	dc, ps := newFakeDisruptionController()
+
+	pdb, pdbName := newMaxUnavailablePodDisruptionBudget(t, intstr.FromString("30%"))
+	add(t, dc.pdbStore, pdb)
+
+	rs, _ := newReplicaSet(t, 7)
+	add(t, dc.rsStore, rs)
+
+	pod, _ := newPod(t, "pod")
+	updatePodOwnerToRs(t, pod, rs)
+	add(t, dc.podStore, pod)
+	dc.sync(pdbName)
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 4, 7, map[string]metav1.Time{})
+
+	// Update scale of ReplicaSet and check PDB
+	rs.Spec.Replicas = to.Int32Ptr(3)
+	update(t, dc.rsStore, rs)
+
+	dc.sync(pdbName)
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 2, 3, map[string]metav1.Time{})
+}
+
 // Create a pod  with no controller, and verify that a PDB with a percentage
 // specified won't allow a disruption.
 func TestNakedPod(t *testing.T) {
@@ -710,7 +735,7 @@ func TestPDBNotExist(t *testing.T) {
 
 func TestUpdateDisruptedPods(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
-	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb-queue")
+	dc.recheckQueue = workqueue.NewNamedDelayingQueue("pdb_queue")
 	pdb, pdbName := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
 	currentTime := time.Now()
 	pdb.Status.DisruptedPods = map[string]metav1.Time{

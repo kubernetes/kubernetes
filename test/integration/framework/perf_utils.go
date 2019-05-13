@@ -31,12 +31,14 @@ const (
 	retries = 5
 )
 
+// IntegrationTestNodePreparer holds configuration information for the test node preparer.
 type IntegrationTestNodePreparer struct {
 	client          clientset.Interface
 	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
 }
 
+// NewIntegrationTestNodePreparer creates an IntegrationTestNodePreparer configured with defaults.
 func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
 	return &IntegrationTestNodePreparer{
 		client:          client,
@@ -45,6 +47,7 @@ func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy 
 	}
 }
 
+// PrepareNodes prepares countToStrategy test nodes.
 func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	numNodes := 0
 	for _, v := range p.countToStrategy {
@@ -96,6 +99,7 @@ func (p *IntegrationTestNodePreparer) PrepareNodes() error {
 	return nil
 }
 
+// CleanupNodes deletes existing test nodes.
 func (p *IntegrationTestNodePreparer) CleanupNodes() error {
 	nodes := e2eframework.GetReadySchedulableNodesOrDie(p.client)
 	for i := range nodes.Items {

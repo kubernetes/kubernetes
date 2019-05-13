@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/onsi/ginkgo/config"
@@ -58,7 +59,7 @@ func (w *SpecWatcher) runnersForSuites(suites []testsuite.TestSuite, additionalA
 	runners := []*testrunner.TestRunner{}
 
 	for _, suite := range suites {
-		runners = append(runners, testrunner.New(suite, w.commandFlags.NumCPU, w.commandFlags.ParallelStream, w.commandFlags.GoOpts, additionalArgs))
+		runners = append(runners, testrunner.New(suite, w.commandFlags.NumCPU, w.commandFlags.ParallelStream, w.commandFlags.Timeout, w.commandFlags.GoOpts, additionalArgs))
 	}
 
 	return runners
@@ -72,7 +73,7 @@ func (w *SpecWatcher) WatchSuites(args []string, additionalArgs []string) {
 	}
 
 	fmt.Printf("Identified %d test %s.  Locating dependencies to a depth of %d (this may take a while)...\n", len(suites), pluralizedWord("suite", "suites", len(suites)), w.commandFlags.Depth)
-	deltaTracker := watch.NewDeltaTracker(w.commandFlags.Depth)
+	deltaTracker := watch.NewDeltaTracker(w.commandFlags.Depth, regexp.MustCompile(w.commandFlags.WatchRegExp))
 	delta, errors := deltaTracker.Delta(suites)
 
 	fmt.Printf("Watching %d %s:\n", len(delta.NewSuites), pluralizedWord("suite", "suites", len(delta.NewSuites)))

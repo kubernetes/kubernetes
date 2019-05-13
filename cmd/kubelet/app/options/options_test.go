@@ -24,7 +24,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 func newKubeletServerOrDie() *KubeletServer {
@@ -36,7 +36,7 @@ func newKubeletServerOrDie() *KubeletServer {
 }
 
 func cleanFlags(s *KubeletServer) {
-	s.DynamicConfigDir = utilflag.NewStringFlag(s.DynamicConfigDir.Value())
+	s.DynamicConfigDir = cliflag.NewStringFlag(s.DynamicConfigDir.Value())
 }
 
 // TestRoundTrip ensures that flag values from the Kubelet can be serialized
@@ -118,8 +118,8 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 	defaultFn(defaults)
 	var args []string
 	fs.VisitAll(func(flag *pflag.Flag) {
-		// if the flag implements utilflag.OmitEmpty and the value is Empty, then just omit it from the command line
-		if omit, ok := flag.Value.(utilflag.OmitEmpty); ok && omit.Empty() {
+		// if the flag implements cliflag.OmitEmpty and the value is Empty, then just omit it from the command line
+		if omit, ok := flag.Value.(cliflag.OmitEmpty); ok && omit.Empty() {
 			return
 		}
 		s := flag.Value.String()

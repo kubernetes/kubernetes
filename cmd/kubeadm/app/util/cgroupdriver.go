@@ -24,53 +24,31 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
+const (
+	// CgroupDriverSystemd holds the systemd driver type
+	CgroupDriverSystemd = "systemd"
+	// CgroupDriverCgroupfs holds the cgroupfs driver type
+	CgroupDriverCgroupfs = "cgroupfs"
+)
+
 // TODO: add support for detecting the cgroup driver for CRI other than
 // Docker. Currently only Docker driver detection is supported:
 // Discussion:
 //     https://github.com/kubernetes/kubeadm/issues/844
 
-// GetCgroupDriverDocker runs 'docker info' to obtain the docker cgroup driver
+// GetCgroupDriverDocker runs 'docker info -f "{{.CgroupDriver}}"' to obtain the docker cgroup driver
 func GetCgroupDriverDocker(execer utilsexec.Interface) (string, error) {
-	info, err := callDockerInfo(execer)
+	driver, err := callDockerInfo(execer)
 	if err != nil {
 		return "", err
 	}
-	return getCgroupDriverFromDockerInfo(info)
+	return strings.TrimSuffix(driver, "\n"), nil
 }
 
-func validateCgroupDriver(driver string) error {
-	if driver != "cgroupfs" && driver != "systemd" {
-		return errors.Errorf("unknown cgroup driver %q", driver)
-	}
-	return nil
-}
-
-// TODO: Docker 1.13 has a new way to obatain the cgroup driver:
-//     docker info -f "{{.CgroupDriver}}
-// If the minimum supported Docker version in K8s becomes 1.13, move to
-// this syntax.
 func callDockerInfo(execer utilsexec.Interface) (string, error) {
-	out, err := execer.Command("docker", "info").Output()
+	out, err := execer.Command("docker", "info", "-f", "{{.CgroupDriver}}").Output()
 	if err != nil {
 		return "", errors.Wrap(err, "cannot execute 'docker info'")
 	}
 	return string(out), nil
-}
-
-func getCgroupDriverFromDockerInfo(info string) (string, error) {
-	lineSeparator := ": "
-	prefix := "Cgroup Driver"
-	for _, line := range strings.Split(info, "\n") {
-		if !strings.Contains(line, prefix+lineSeparator) {
-			continue
-		}
-		lineSplit := strings.Split(line, lineSeparator)
-		// At this point len(lineSplit) is always >= 2
-		driver := lineSplit[1]
-		if err := validateCgroupDriver(driver); err != nil {
-			return "", err
-		}
-		return driver, nil
-	}
-	return "", errors.New("cgroup driver is not defined in 'docker info'")
 }

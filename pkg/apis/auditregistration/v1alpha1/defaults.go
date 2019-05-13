@@ -54,3 +54,10 @@ func SetDefaults_AuditSink(obj *auditregistrationv1alpha1.AuditSink) {
 		obj.Spec.Webhook.Throttle = DefaultThrottle()
 	}
 }
+
+// SetDefaults_ServiceReference sets defaults for AuditSync Webhook's ServiceReference
+func SetDefaults_ServiceReference(obj *auditregistrationv1alpha1.ServiceReference) {
+	if obj.Port == nil {
+		obj.Port = utilpointer.Int32Ptr(443)
+	}
+}

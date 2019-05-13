@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const devicePath = "/mnt/volume1"
@@ -43,10 +43,12 @@ type VolumeModeDowngradeTest struct {
 	pod      *v1.Pod
 }
 
+// Name returns the tracking name of the test.
 func (VolumeModeDowngradeTest) Name() string {
 	return "[sig-storage] volume-mode-downgrade"
 }
 
+// Skip returns true when this test can be skipped.
 func (t *VolumeModeDowngradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
 	if !framework.ProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure") {
 		return true
@@ -72,7 +74,7 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	cs := f.ClientSet
 	ns := f.Namespace.Name
 
-	By("Creating a PVC")
+	ginkgo.By("Creating a PVC")
 	block := v1.PersistentVolumeBlock
 	pvcConfig := framework.PersistentVolumeClaimConfig{
 		StorageClassName: nil,
@@ -80,46 +82,46 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	}
 	t.pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
 	t.pvc, err = framework.CreatePVC(cs, ns, t.pvc)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, ns, t.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	t.pvc, err = cs.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Get(t.pvc.Name, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 	t.pv, err = cs.CoreV1().PersistentVolumes().Get(t.pvc.Spec.VolumeName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	By("Consuming the PVC before downgrade")
+	ginkgo.By("Consuming the PVC before downgrade")
 	t.pod, err = framework.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, false, "", false, false, framework.SELinuxLabel, nil, framework.PodStartTimeout)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-	By("Checking if PV exists as expected volume mode")
+	ginkgo.By("Checking if PV exists as expected volume mode")
 	utils.CheckVolumeModeOfPath(t.pod, block, devicePath)
 
-	By("Checking if read/write to PV works properly")
+	ginkgo.By("Checking if read/write to PV works properly")
 	utils.CheckReadWriteToPath(t.pod, block, devicePath)
 }
 
 // Test waits for the downgrade to complete, and then verifies that a pod can no
 // longer consume the pv as it is not mapped nor mounted into the pod
 func (t *VolumeModeDowngradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade upgrades.UpgradeType) {
-	By("Waiting for downgrade to finish")
+	ginkgo.By("Waiting for downgrade to finish")
 	<-done
 
-	By("Verifying that nothing exists at the device path in the pod")
+	ginkgo.By("Verifying that nothing exists at the device path in the pod")
 	utils.VerifyExecInPodFail(t.pod, fmt.Sprintf("test -e %s", devicePath), 1)
 }
 
 // Teardown cleans up any remaining resources.
 func (t *VolumeModeDowngradeTest) Teardown(f *framework.Framework) {
-	By("Deleting the pod")
+	ginkgo.By("Deleting the pod")
 	framework.ExpectNoError(framework.DeletePodWithWait(f, f.ClientSet, t.pod))
 
-	By("Deleting the PVC")
+	ginkgo.By("Deleting the PVC")
 	framework.ExpectNoError(f.ClientSet.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Delete(t.pvc.Name, nil))
 
-	By("Waiting for the PV to be deleted")
+	ginkgo.By("Waiting for the PV to be deleted")
 	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(f.ClientSet, t.pv.Name, 5*time.Second, 20*time.Minute))
 }

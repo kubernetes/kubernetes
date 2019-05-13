@@ -28,25 +28,41 @@ import (
 // tau contains the scalar factors of the elementary reflectors H_i.
 //
 // Dlarft is an internal routine. It is exported for testing purposes.
-func (Implementation) Dlarft(direct lapack.Direct, store lapack.StoreV, n, k int,
-	v []float64, ldv int, tau []float64, t []float64, ldt int) {
+func (Implementation) Dlarft(direct lapack.Direct, store lapack.StoreV, n, k int, v []float64, ldv int, tau []float64, t []float64, ldt int) {
+	mv, nv := n, k
+	if store == lapack.RowWise {
+		mv, nv = k, n
+	}
+	switch {
+	case direct != lapack.Forward && direct != lapack.Backward:
+		panic(badDirect)
+	case store != lapack.RowWise && store != lapack.ColumnWise:
+		panic(badStoreV)
+	case n < 0:
+		panic(nLT0)
+	case k < 1:
+		panic(kLT1)
+	case ldv < max(1, nv):
+		panic(badLdV)
+	case len(tau) < k:
+		panic(shortTau)
+	case ldt < max(1, k):
+		panic(shortT)
+	}
+
 	if n == 0 {
 		return
 	}
-	if n < 0 || k < 0 {
-		panic(negDimension)
+
+	switch {
+	case len(v) < (mv-1)*ldv+nv:
+		panic(shortV)
+	case len(t) < (k-1)*ldt+k:
+		panic(shortT)
 	}
-	if direct != lapack.Forward && direct != lapack.Backward {
-		panic(badDirect)
-	}
-	if store != lapack.RowWise && store != lapack.ColumnWise {
-		panic(badStore)
-	}
-	if len(tau) < k {
-		panic(badTau)
-	}
-	checkMatrix(k, k, t, ldt)
+
 	bi := blas64.Implementation()
+
 	// TODO(btracey): There are a number of minor obvious loop optimizations here.
 	// TODO(btracey): It may be possible to rearrange some of the code so that
 	// index of 1 is more common in the Dgemv.

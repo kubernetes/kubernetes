@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 
 	"k8s.io/klog"
@@ -102,7 +101,7 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	// Remove old symbolic link(or file) then create new one.
 	// This should be done because current symbolic link is
 	// stale across node reboot.
-	linkPath := path.Join(mapPath, string(linkName))
+	linkPath := filepath.Join(mapPath, string(linkName))
 	if err = os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -119,7 +118,7 @@ func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
 	klog.V(5).Infof("UnmapDevice: linkName %s", linkName)
 
 	// Check symbolic link exists
-	linkPath := path.Join(mapPath, string(linkName))
+	linkPath := filepath.Join(mapPath, string(linkName))
 	if islinkExist, checkErr := v.IsSymlinkExist(linkPath); checkErr != nil {
 		return checkErr
 	} else if !islinkExist {
@@ -144,16 +143,16 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 }
 
 // IsSymlinkExist returns true if specified file exists and the type is symbolik link.
-// If file doesn't exist, or file exists but not symbolick link, return false with no error.
+// If file doesn't exist, or file exists but not symbolic link, return false with no error.
 // On other cases, return false with error from Lstat().
 func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	fi, err := os.Lstat(mapPath)
 	if err == nil {
-		// If file exits and it's symbolick link, return true and no error
+		// If file exits and it's symbolic link, return true and no error
 		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
 			return true, nil
 		}
-		// If file exits but it's not symbolick link, return fale and no error
+		// If file exits but it's not symbolic link, return fale and no error
 		return false, nil
 	}
 	// If file doesn't exist, return false and no error
@@ -176,13 +175,13 @@ func (v VolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) 
 			continue
 		}
 		filename := file.Name()
-		filepath, err := os.Readlink(path.Join(mapPath, filename))
+		fp, err := os.Readlink(filepath.Join(mapPath, filename))
 		if err != nil {
 			return nil, fmt.Errorf("Symbolic link cannot be retrieved %v", err)
 		}
-		klog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", filepath, devPath)
-		if filepath == devPath {
-			refs = append(refs, path.Join(mapPath, filename))
+		klog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", fp, devPath)
+		if fp == devPath {
+			refs = append(refs, filepath.Join(mapPath, filename))
 		}
 	}
 	klog.V(5).Infof("GetDeviceSymlinkRefs: refs %v", refs)

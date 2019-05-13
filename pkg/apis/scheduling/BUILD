@@ -36,6 +36,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/scheduling/fuzzer:all-srcs",
         "//pkg/apis/scheduling/install:all-srcs",
+        "//pkg/apis/scheduling/v1:all-srcs",
         "//pkg/apis/scheduling/v1alpha1:all-srcs",
         "//pkg/apis/scheduling/v1beta1:all-srcs",
         "//pkg/apis/scheduling/validation:all-srcs",

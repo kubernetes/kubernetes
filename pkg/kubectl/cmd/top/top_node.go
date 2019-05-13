@@ -219,7 +219,7 @@ func (o TopNodeOptions) RunTopNode() error {
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
 	var err error
 	versionedMetrics := &metricsV1beta1api.NodeMetricsList{}
-	mc := metricsClient.Metrics()
+	mc := metricsClient.MetricsV1beta1()
 	nm := mc.NodeMetricses()
 	if resourceName != "" {
 		m, err := nm.Get(resourceName, metav1.GetOptions{})

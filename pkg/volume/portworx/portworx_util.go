@@ -27,10 +27,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/volume"
-	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -59,7 +59,7 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	// Portworx Volumes are specified in GiB
-	requestGiB := volutil.RoundUpToGiB(capacity)
+	requestGiB := volumehelpers.RoundUpToGiB(capacity)
 
 	// Perform a best-effort parsing of parameters. Portworx 1.2.9 and later parses volume parameters from
 	// spec.VolumeLabels. So even if below SpecFromOpts() fails to parse certain parameters or
@@ -72,14 +72,16 @@ func (util *portworxVolumeUtil) CreateVolume(p *portworxVolumeProvisioner) (stri
 	}
 
 	// Pass all parameters as volume labels for Portworx server-side processing
-	if len(p.options.Parameters) > 0 {
-		spec.VolumeLabels = p.options.Parameters
-	} else {
+	if spec.VolumeLabels == nil {
 		spec.VolumeLabels = make(map[string]string, 0)
 	}
 
+	for k, v := range p.options.Parameters {
+		spec.VolumeLabels[k] = v
+	}
+
 	// Update the requested size in the spec
-	spec.Size = uint64(requestGiB * volutil.GIB)
+	spec.Size = uint64(requestGiB * volumehelpers.GiB)
 
 	// Change the Portworx Volume name to PV name
 	if locator == nil {
@@ -208,7 +210,7 @@ func (util *portworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	newSizeInBytes := uint64(volutil.RoundUpToGiB(newSize) * volutil.GIB)
+	newSizeInBytes := uint64(volumehelpers.RoundUpToGiB(newSize) * volumehelpers.GiB)
 	if vol.Spec.Size >= newSizeInBytes {
 		klog.Infof("Portworx volume: %s already at size: %d greater than or equal to new "+
 			"requested size: %d. Skipping resize.", spec.Name(), vol.Spec.Size, newSizeInBytes)
@@ -261,11 +263,11 @@ func createDriverClient(hostname string, port int32) (*osdclient.Client, error) 
 		return nil, err
 	}
 
-	if isValid, err := isClientValid(client); isValid {
+	isValid, err := isClientValid(client)
+	if isValid {
 		return client, nil
-	} else {
-		return nil, err
 	}
+	return nil, err
 }
 
 // getPortworxDriver returns a Portworx volume driver which can be used for cluster wide operations.
@@ -363,7 +365,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	}
 
 	if svc == nil {
-		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it.", pxServiceName)
+		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
 		klog.Errorf(err.Error())
 		return nil, err
 	}

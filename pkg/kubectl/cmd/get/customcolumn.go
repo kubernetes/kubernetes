@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/cli-runtime/pkg/genericclioptions/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
 	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
 )
@@ -75,7 +75,7 @@ func NewCustomColumnsPrinterFromSpec(spec string, decoder runtime.Decoder, noHea
 	parts := strings.Split(spec, ",")
 	columns := make([]Column, len(parts))
 	for ix := range parts {
-		colSpec := strings.Split(parts[ix], ":")
+		colSpec := strings.SplitN(parts[ix], ":", 2)
 		if len(colSpec) != 2 {
 			return nil, fmt.Errorf("unexpected custom-columns spec: %s, expected <header>:<json-path-expr>", parts[ix])
 		}

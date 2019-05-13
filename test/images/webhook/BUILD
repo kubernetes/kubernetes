@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "addlabel.go",
+        "alwaysallow.go",
         "alwaysdeny.go",
         "config.go",
         "configmap.go",

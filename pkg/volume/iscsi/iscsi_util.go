@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	utilexec "k8s.io/utils/exec"
 )
 
 const (
@@ -51,6 +51,10 @@ const (
 
 	// How many seconds to wait for a multipath device if at least two paths are available.
 	multipathDeviceTimeout = 10
+
+	// 'iscsiadm' error code stating that a session is logged in
+	// See https://github.com/open-iscsi/open-iscsi/blob/7d121d12ad6ba7783308c25ffd338a9fa0cc402b/include/iscsi_err.h#L37-L38
+	iscsiadmErrorSessExists = 15
 )
 
 var (
@@ -181,12 +185,12 @@ func getDevicePrefixRefCount(mounter mount.Interface, deviceNamePrefix string) (
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/iface_name/portal-some_iqn-lun-lun_id
 func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
-	return path.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+	return filepath.Join(host.GetPluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/iscsi/volumeDevices/iface_name/portal-some_iqn-lun-lun_id
 func makeVDPDNameInternal(host volume.VolumeHost, portal string, iqn string, lun string, iface string) string {
-	return path.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
+	return filepath.Join(host.GetVolumeDevicePluginDir(iscsiPluginName), "iface-"+iface, portal+"-"+iqn+"-lun-"+lun)
 }
 
 type ISCSIUtil struct{}
@@ -202,7 +206,7 @@ func (util *ISCSIUtil) MakeGlobalVDPDName(iscsi iscsiDisk) string {
 }
 
 func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
-	file := path.Join(mnt, "iscsi.json")
+	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Create(file)
 	if err != nil {
 		return fmt.Errorf("iscsi: create %s err %s", file, err)
@@ -216,7 +220,7 @@ func (util *ISCSIUtil) persistISCSI(conf iscsiDisk, mnt string) error {
 }
 
 func (util *ISCSIUtil) loadISCSI(conf *iscsiDisk, mnt string) error {
-	file := path.Join(mnt, "iscsi.json")
+	file := filepath.Join(mnt, "iscsi.json")
 	fp, err := os.Open(file)
 	if err != nil {
 		return fmt.Errorf("iscsi: open %s err %s", file, err)
@@ -414,9 +418,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			}
 
 			if exist := waitForPathToExist(&devicePath, multipathDeviceTimeout, iscsiTransport); !exist {
-				klog.Errorf("Could not attach disk: Timeout after 10s")
+				klog.Errorf("Could not attach disk: Timeout after %ds", multipathDeviceTimeout)
 				// update last error
-				lastErr = fmt.Errorf("Could not attach disk: Timeout after 10s")
+				lastErr = fmt.Errorf("Could not attach disk: Timeout after %ds", multipathDeviceTimeout)
 				continue
 			} else {
 				devicePaths[tp] = devicePath
@@ -590,7 +594,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 
 // DetachDisk unmounts and detaches a volume from node
 func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
-	if pathExists, pathErr := volumeutil.PathExists(mntPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(mntPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
@@ -667,7 +671,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 
 // DetachBlockISCSIDisk removes loopback device for a volume and detaches a volume from node
 func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string) error {
-	if pathExists, pathErr := volumeutil.PathExists(mapPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
@@ -872,8 +876,13 @@ func cloneIface(b iscsiDiskMounter, newIface string) error {
 	// create new iface
 	out, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", newIface, "-o", "new")
 	if err != nil {
-		lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", string(out), err)
-		return lastErr
+		exit, ok := err.(utilexec.ExitError)
+		if ok && exit.ExitStatus() == iscsiadmErrorSessExists {
+			klog.Infof("iscsi: there is a session already logged in with iface %s", newIface)
+		} else {
+			lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", string(out), err)
+			return lastErr
+		}
 	}
 	// update new iface records
 	for key, val := range params {

@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ExampleV1() examplev1.ExampleV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Example() examplev1.ExampleV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // ExampleV1 retrieves the ExampleV1Client
 func (c *Clientset) ExampleV1() examplev1.ExampleV1Interface {
-	return c.exampleV1
-}
-
-// Deprecated: Example retrieves the default version of ExampleClient.
-// Please explicitly pick a version.
-func (c *Clientset) Example() examplev1.ExampleV1Interface {
 	return c.exampleV1
 }
 

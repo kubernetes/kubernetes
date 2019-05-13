@@ -24,8 +24,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
+	"github.com/coreos/etcd/clientv3"
+	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/util/env"
@@ -35,7 +38,7 @@ var etcdURL = ""
 
 const installEtcd = `
 Cannot find etcd, cannot run integration tests
-Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions.
+Please see https://git.k8s.io/community/contributors/devel/sig-testing/integration-tests.md#install-etcd-dependency for instructions.
 
 You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
@@ -43,7 +46,8 @@ You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 
 // getEtcdPath returns a path to an etcd executable.
 func getEtcdPath() (string, error) {
-	bazelPath := filepath.Join(os.Getenv("RUNFILES_DIR"), "com_coreos_etcd/etcd")
+	bazelPath := filepath.Join(os.Getenv("RUNFILES_DIR"), fmt.Sprintf("com_coreos_etcd_%s", runtime.GOARCH), "etcd")
+
 	p, err := exec.LookPath(bazelPath)
 	if err == nil {
 		return p, nil
@@ -107,7 +111,7 @@ func startEtcd() (func(), error) {
 		"--listen-peer-urls",
 		"http://127.0.0.1:0",
 		"--log-package-levels",
-		"*=DEBUG",
+		"*=NOTICE", // set to INFO or DEBUG for more logs
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -120,6 +124,10 @@ func startEtcd() (func(), error) {
 			klog.Warningf("error during etcd cleanup: %v", err)
 		}
 	}
+
+	// Quiet etcd logs for integration tests
+	// Comment out to get verbose logs if desired
+	clientv3.SetLogger(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to run etcd: %v", err)

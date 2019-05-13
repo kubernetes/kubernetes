@@ -18,12 +18,12 @@ package cloudprovider
 
 import (
 	// Cloud providers
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	_ "k8s.io/legacy-cloud-providers/aws"
+	_ "k8s.io/legacy-cloud-providers/azure"
+	_ "k8s.io/legacy-cloud-providers/gce"
+	_ "k8s.io/legacy-cloud-providers/vsphere"
 )

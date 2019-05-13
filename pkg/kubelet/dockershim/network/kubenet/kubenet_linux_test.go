@@ -221,7 +221,6 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 	for _, tc := range testCases {
 		fhost := nettest.NewFakeHost(nil)
 		fhost.Legacy = false
-		fhost.Runtime = nil
 		mockcni := &mock_cni.MockCNI{}
 
 		fexec := &fakeexec.FakeExec{

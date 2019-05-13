@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 var allNodes = []*v1.Node{
@@ -37,7 +36,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-1",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion: "region-1",
+				v1.LabelZoneRegion: "region-1",
 			},
 		},
 	},
@@ -46,7 +45,7 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-2",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -55,8 +54,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-3",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -65,8 +64,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-4",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -75,8 +74,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-5",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-1",
-				kubeletapis.LabelZoneFailureDomain: "zone-3",
+				v1.LabelZoneRegion:        "region-1",
+				v1.LabelZoneFailureDomain: "zone-3",
 			},
 		},
 	},
@@ -85,8 +84,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-6",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -95,8 +94,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-7",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	},
@@ -105,8 +104,8 @@ var allNodes = []*v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-8",
 			Labels: map[string]string{
-				kubeletapis.LabelZoneRegion:        "region-2",
-				kubeletapis.LabelZoneFailureDomain: "zone-2",
+				v1.LabelZoneRegion:        "region-2",
+				v1.LabelZoneFailureDomain: "zone-2",
 			},
 		},
 	}}
@@ -141,28 +140,28 @@ func TestNodeTree_AddNode(t *testing.T) {
 		{
 			name:         "single node no labels",
 			nodesToAdd:   allNodes[:1],
-			expectedTree: map[string]*nodeArray{"": {[]string{"node-0"}, 0}},
+			expectedTree: map[string]*nodeArray{"": {[]string{"node-0"}, 1}},
 		},
 		{
 			name:       "mix of nodes with and without proper labels",
 			nodesToAdd: allNodes[:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3"}, 0},
+				"":                     {[]string{"node-0"}, 1},
+				"region-1:\x00:":       {[]string{"node-1"}, 1},
+				":\x00:zone-2":         {[]string{"node-2"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-3"}, 1},
 			},
 		},
 		{
 			name:       "mix of nodes with and without proper labels and some zones with multiple nodes",
 			nodesToAdd: allNodes[:7],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"":                     {[]string{"node-0"}, 1},
+				"region-1:\x00:":       {[]string{"node-1"}, 1},
+				":\x00:zone-2":         {[]string{"node-2"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 2},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
 			},
 		},
 	}
@@ -191,11 +190,11 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[:1],
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"region-1:\x00:":       {[]string{"node-1"}, 1},
+				":\x00:zone-2":         {[]string{"node-2"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-3", "node-4"}, 2},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
 			},
 		},
 		{
@@ -203,10 +202,10 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[1:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-4"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"":                     {[]string{"node-0"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-4"}, 1},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
 			},
 		},
 		{
@@ -252,17 +251,17 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:":       {[]string{"node-1"}, 0},
-				":\x00:zone-2":         {[]string{"node-2"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-3", "node-4", "node-0"}, 0},
-				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
-				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
+				"region-1:\x00:":       {[]string{"node-1"}, 1},
+				":\x00:zone-2":         {[]string{"node-2"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-3", "node-4", "node-0"}, 3},
+				"region-1:\x00:zone-3": {[]string{"node-5"}, 1},
+				"region-2:\x00:zone-2": {[]string{"node-6"}, 1},
 			},
 		},
 		{
@@ -272,13 +271,13 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-0",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"region-1:\x00:zone-2": {[]string{"node-0"}, 0},
+				"region-1:\x00:zone-2": {[]string{"node-0"}, 1},
 			},
 		},
 		{
@@ -288,14 +287,14 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node-new",
 					Labels: map[string]string{
-						kubeletapis.LabelZoneRegion:        "region-1",
-						kubeletapis.LabelZoneFailureDomain: "zone-2",
+						v1.LabelZoneRegion:        "region-1",
+						v1.LabelZoneFailureDomain: "zone-2",
 					},
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
-				"region-1:\x00:zone-2": {[]string{"node-new"}, 0},
+				"":                     {[]string{"node-0"}, 1},
+				"region-1:\x00:zone-2": {[]string{"node-new"}, 1},
 			},
 		},
 	}
@@ -323,7 +322,7 @@ func TestNodeTree_Next(t *testing.T) {
 	tests := []struct {
 		name           string
 		nodesToAdd     []*v1.Node
-		numRuns        int // number of times to run Next()
+		numRuns        int // number of times to run next()
 		expectedOutput []string
 	}{
 		{
@@ -358,7 +357,7 @@ func TestNodeTree_Next(t *testing.T) {
 
 			var output []string
 			for i := 0; i < test.numRuns; i++ {
-				output = append(output, nt.Next())
+				output = append(output, nt.next())
 			}
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("unexpected output. Expected: %v, Got: %v", test.expectedOutput, output)
@@ -400,15 +399,15 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 			name:           "add more nodes to an exhausted zone",
 			nodesToAdd:     append(allNodes[4:9], allNodes[3]),
 			nodesToRemove:  nil,
-			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "add", "next", "next", "next"},
-			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-3", "node-8", "node-4"},
+			operations:     []string{"add", "add", "add", "add", "add", "next", "next", "next", "next", "next", "next", "next"},
+			expectedOutput: []string{"node-4", "node-5", "node-6", "node-7", "node-8", "node-4", "node-5"},
 		},
 		{
 			name:           "remove zone and add new to ensure exhausted is reset correctly",
 			nodesToAdd:     append(allNodes[3:5], allNodes[6:8]...),
 			nodesToRemove:  allNodes[3:5],
 			operations:     []string{"add", "add", "next", "next", "remove", "add", "add", "next", "next", "remove", "next", "next"},
-			expectedOutput: []string{"node-3", "node-4", "node-6", "node-7", "node-6", "node-7"},
+			expectedOutput: []string{"node-3", "node-4", "node-4", "node-6", "node-6", "node-7"},
 		},
 	}
 
@@ -435,7 +434,7 @@ func TestNodeTreeMultiOperations(t *testing.T) {
 						removeIndex++
 					}
 				case "next":
-					output = append(output, nt.Next())
+					output = append(output, nt.next())
 				default:
 					t.Errorf("unknow operation: %v", op)
 				}

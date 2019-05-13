@@ -66,7 +66,7 @@ func (m HostCertificateManager) CertificateInfo(ctx context.Context) (*HostCerti
 // Use InstallServerCertificate to import this certificate.
 func (m HostCertificateManager) GenerateCertificateSigningRequest(ctx context.Context, useIPAddressAsCommonName bool) (string, error) {
 	req := types.GenerateCertificateSigningRequest{
-		This: m.Reference(),
+		This:                     m.Reference(),
 		UseIpAddressAsCommonName: useIPAddressAsCommonName,
 	}
 

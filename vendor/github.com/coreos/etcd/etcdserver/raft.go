@@ -344,7 +344,7 @@ func (r *raftNode) processMessages(ms []raftpb.Message) []raftpb.Message {
 			ok, exceed := r.td.Observe(ms[i].To)
 			if !ok {
 				// TODO: limit request rate.
-				plog.Warningf("failed to send out heartbeat on time (exceeded the %v timeout for %v)", r.heartbeat, exceed)
+				plog.Warningf("failed to send out heartbeat on time (exceeded the %v timeout for %v, to %x)", r.heartbeat, exceed, ms[i].To)
 				plog.Warningf("server is likely overloaded")
 				heartbeatSendFailures.Inc()
 			}
@@ -403,7 +403,7 @@ func startNode(cfg ServerConfig, cl *membership.RaftCluster, ids []types.ID) (id
 		},
 	)
 	if w, err = wal.Create(cfg.WALDir(), metadata); err != nil {
-		plog.Fatalf("create wal error: %v", err)
+		plog.Panicf("create wal error: %v", err)
 	}
 	peers := make([]raft.Peer, len(ids))
 	for i, id := range ids {

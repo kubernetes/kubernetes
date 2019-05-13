@@ -42,12 +42,15 @@ import (
 	"gopkg.in/gcfg.v1"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	netutil "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	cloudprovider "k8s.io/cloud-provider"
+	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -110,9 +113,10 @@ type LoadBalancerOpts struct {
 
 // BlockStorageOpts is used to talk to Cinder service
 type BlockStorageOpts struct {
-	BSVersion       string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
-	TrustDevicePath bool   `gcfg:"trust-device-path"` // See Issue #33128
-	IgnoreVolumeAZ  bool   `gcfg:"ignore-volume-az"`
+	BSVersion             string `gcfg:"bs-version"`        // overrides autodetection. v1 or v2. Defaults to auto
+	TrustDevicePath       bool   `gcfg:"trust-device-path"` // See Issue #33128
+	IgnoreVolumeAZ        bool   `gcfg:"ignore-volume-az"`
+	NodeVolumeAttachLimit int    `gcfg:"node-volume-attach-limit"` // override volume attach limit for Cinder. Default is : 256
 }
 
 // RouterOpts is used for Neutron routes
@@ -144,17 +148,20 @@ type OpenStack struct {
 // Config is used to read and store information from the cloud configuration file
 type Config struct {
 	Global struct {
-		AuthURL    string `gcfg:"auth-url"`
-		Username   string
-		UserID     string `gcfg:"user-id"`
-		Password   string
-		TenantID   string `gcfg:"tenant-id"`
-		TenantName string `gcfg:"tenant-name"`
-		TrustID    string `gcfg:"trust-id"`
-		DomainID   string `gcfg:"domain-id"`
-		DomainName string `gcfg:"domain-name"`
-		Region     string
-		CAFile     string `gcfg:"ca-file"`
+		AuthURL         string `gcfg:"auth-url"`
+		Username        string
+		UserID          string `gcfg:"user-id"`
+		Password        string
+		TenantID        string `gcfg:"tenant-id"`
+		TenantName      string `gcfg:"tenant-name"`
+		TrustID         string `gcfg:"trust-id"`
+		DomainID        string `gcfg:"domain-id"`
+		DomainName      string `gcfg:"domain-name"`
+		Region          string
+		CAFile          string `gcfg:"ca-file"`
+		SecretName      string `gcfg:"secret-name"`
+		SecretNamespace string `gcfg:"secret-namespace"`
+		KubeconfigPath  string `gcfg:"kubeconfig-path"`
 	}
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
@@ -230,6 +237,10 @@ func configFromEnv() (cfg Config, ok bool) {
 		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
 	}
 
+	cfg.Global.SecretName = os.Getenv("SECRET_NAME")
+	cfg.Global.SecretNamespace = os.Getenv("SECRET_NAMESPACE")
+	cfg.Global.KubeconfigPath = os.Getenv("KUBECONFIG_PATH")
+
 	ok = cfg.Global.AuthURL != "" &&
 		cfg.Global.Username != "" &&
 		cfg.Global.Password != "" &&
@@ -242,6 +253,58 @@ func configFromEnv() (cfg Config, ok bool) {
 	cfg.BlockStorage.BSVersion = "auto"
 
 	return
+}
+
+func createKubernetesClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
+	klog.Info("Creating kubernetes API client.")
+
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	v, err := client.Discovery().ServerVersion()
+	if err != nil {
+		return nil, err
+	}
+
+	klog.Infof("Kubernetes API client created, server version %s", fmt.Sprintf("v%v.%v", v.Major, v.Minor))
+	return client, nil
+}
+
+// setConfigFromSecret allows setting up the config from k8s secret
+func setConfigFromSecret(cfg *Config) error {
+	secretName := cfg.Global.SecretName
+	secretNamespace := cfg.Global.SecretNamespace
+	kubeconfigPath := cfg.Global.KubeconfigPath
+
+	k8sClient, err := createKubernetesClient(kubeconfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to get kubernetes client: %v", err)
+	}
+
+	secret, err := k8sClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+	if err != nil {
+		klog.Warningf("Cannot get secret %s in namespace %s. error: %q", secretName, secretNamespace, err)
+		return err
+	}
+
+	if content, ok := secret.Data["clouds.conf"]; ok {
+		err = gcfg.ReadStringInto(cfg, string(content))
+		if err != nil {
+			klog.Errorf("Cannot parse data from the secret.")
+			return fmt.Errorf("cannot parse data from the secret")
+		}
+		return nil
+	}
+
+	klog.Errorf("Cannot find \"clouds.conf\" key in the secret.")
+	return fmt.Errorf("cannot find \"clouds.conf\" key in the secret")
 }
 
 func readConfig(config io.Reader) (Config, error) {
@@ -258,7 +321,19 @@ func readConfig(config io.Reader) (Config, error) {
 	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
 
 	err := gcfg.ReadInto(&cfg, config)
-	return cfg, err
+	if err != nil {
+		return cfg, err
+	}
+
+	if cfg.Global.SecretName != "" && cfg.Global.SecretNamespace != "" {
+		klog.Infof("Set credentials from secret %s in namespace %s", cfg.Global.SecretName, cfg.Global.SecretNamespace)
+		err = setConfigFromSecret(&cfg)
+		if err != nil {
+			return cfg, err
+		}
+	}
+
+	return cfg, nil
 }
 
 // caller is a tiny helper for conditional unwind logic
@@ -364,6 +439,32 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	err = checkOpenStackOpts(&os)
 	if err != nil {
 		return nil, err
+	}
+
+	return &os, nil
+}
+
+// NewFakeOpenStackCloud creates and returns an instance of Openstack cloudprovider.
+// Mainly for use in tests that require instantiating Openstack without having
+// to go through cloudprovider interface.
+func NewFakeOpenStackCloud(cfg Config) (*OpenStack, error) {
+	provider, err := openstack.NewClient(cfg.Global.AuthURL)
+	if err != nil {
+		return nil, err
+	}
+	emptyDuration := MyDuration{}
+	if cfg.Metadata.RequestTimeout == emptyDuration {
+		cfg.Metadata.RequestTimeout.Duration = time.Duration(defaultTimeOut)
+	}
+	provider.HTTPClient.Timeout = cfg.Metadata.RequestTimeout.Duration
+
+	os := OpenStack{
+		provider:     provider,
+		region:       cfg.Global.Region,
+		lbOpts:       cfg.LoadBalancer,
+		bsOpts:       cfg.BlockStorage,
+		routeOpts:    cfg.Route,
+		metadataOpts: cfg.Metadata,
 	}
 
 	return &os, nil
@@ -476,7 +577,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 				addressType = v1.NodeInternalIP
 			}
 
-			v1helper.AddToNodeAddresses(&addrs,
+			nodehelpers.AddToNodeAddresses(&addrs,
 				v1.NodeAddress{
 					Type:    addressType,
 					Address: props.Addr,
@@ -487,7 +588,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 
 	// AccessIPs are usually duplicates of "public" addresses.
 	if srv.AccessIPv4 != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv4,
@@ -496,7 +597,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.AccessIPv6 != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeExternalIP,
 				Address: srv.AccessIPv6,
@@ -505,7 +606,7 @@ func nodeAddresses(srv *servers.Server) ([]v1.NodeAddress, error) {
 	}
 
 	if srv.Metadata[TypeHostName] != "" {
-		v1helper.AddToNodeAddresses(&addrs,
+		nodehelpers.AddToNodeAddresses(&addrs,
 			v1.NodeAddress{
 				Type:    v1.NodeHostName,
 				Address: srv.Metadata[TypeHostName],

@@ -18,20 +18,19 @@ package flexvolume
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
-
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/exec"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -57,7 +56,7 @@ type flexVolumeAttachablePlugin struct {
 
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
-var _ volume.FSResizableVolumePlugin = &flexVolumePlugin{}
+var _ volume.NodeExpandableVolumePlugin = &flexVolumePlugin{}
 var _ volume.ExpandableVolumePlugin = &flexVolumePlugin{}
 
 var _ volume.DeviceMountableVolumePlugin = &flexVolumeAttachablePlugin{}
@@ -70,9 +69,9 @@ type PluginFactory interface {
 type pluginFactory struct{}
 
 func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Interface) (volume.VolumePlugin, error) {
-	execPath := path.Join(pluginDir, name)
+	execPath := filepath.Join(pluginDir, name)
 
-	driverName := utilstrings.UnescapePluginName(name)
+	driverName := utilstrings.UnescapeQualifiedName(name)
 
 	flexPlugin := &flexVolumePlugin{
 		driverName:          driverName,
@@ -106,7 +105,7 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")
 	execName := parts[len(parts)-1]
-	execPath := path.Join(plugin.execPath, execName)
+	execPath := filepath.Join(plugin.execPath, execName)
 	if runtime.GOOS == "windows" {
 		execPath = util.GetWindowsPath(execPath)
 	}
@@ -149,6 +148,10 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return sourceDriver == plugin.driverName
 }
 
+func (plugin *flexVolumePlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 // RequiresRemount is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) RequiresRemount() bool {
 	return false
@@ -182,7 +185,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 	var metricsProvider volume.MetricsProvider
 	if plugin.capabilities.SupportsMetrics {
 		metricsProvider = volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(
-			pod.UID, utilstrings.EscapeQualifiedNameForDisk(sourceDriver), spec.Name()))
+			pod.UID, utilstrings.EscapeQualifiedName(sourceDriver), spec.Name()))
 	} else {
 		metricsProvider = &volume.MetricsNil{}
 	}
@@ -216,7 +219,7 @@ func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID type
 	var metricsProvider volume.MetricsProvider
 	if plugin.capabilities.SupportsMetrics {
 		metricsProvider = volume.NewMetricsStatFS(plugin.host.GetPodVolumeDir(
-			podUID, utilstrings.EscapeQualifiedNameForDisk(plugin.driverName), volName))
+			podUID, utilstrings.EscapeQualifiedName(plugin.driverName), volName))
 	} else {
 		metricsProvider = &volume.MetricsNil{}
 	}
@@ -251,6 +254,14 @@ func (plugin *flexVolumeAttachablePlugin) NewDetacher() (volume.Detacher, error)
 
 func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return plugin.NewDetacher()
+}
+
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *flexVolumeAttachablePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
@@ -304,8 +315,8 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 		return "", fmt.Errorf("GetVolumeName failed from getDeviceMountPath: %s", err)
 	}
 
-	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
-	return path.Join(mountsDir, volumeName), nil
+	mountsDir := filepath.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
+	return filepath.Join(mountsDir, volumeName), nil
 }
 
 func (plugin *flexVolumePlugin) RequiresFSResize() bool {

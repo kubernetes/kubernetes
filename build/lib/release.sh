@@ -32,6 +32,11 @@ KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
+# The mondo test tarball is deprecated as of Kubernetes 1.14, and the default
+# will be set to 'n' in a future release.
+# See KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball
+KUBE_BUILD_MONDO_TEST_TARBALL=${KUBE_BUILD_MONDO_TEST_TARBALL:-y}
+
 # Validate a ci version
 #
 # Globals:
@@ -89,7 +94,7 @@ function kube::release::package_tarballs() {
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 
   kube::release::package_final_tarball & # _final depends on some of the previous phases
-  kube::release::package_test_tarball & # _test doesn't depend on anything
+  kube::release::package_test_tarballs & # _test doesn't depend on anything
   kube::util::wait-for-jobs || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
@@ -136,7 +141,7 @@ function kube::release::package_client_tarballs() {
 
       # This fancy expression will expand to prepend a path
       # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # KUBE_CLIENT_BINARIES array.
+      # client_bins array.
       cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/client/bin/"
 
@@ -169,7 +174,7 @@ function kube::release::package_node_tarballs() {
     fi
     # This fancy expression will expand to prepend a path
     # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_NODE_BINARIES array.
+    # node_bins array.
     cp "${node_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
@@ -181,6 +186,9 @@ function kube::release::package_node_tarballs() {
     if [[ "${platform%/*}" == "windows" ]]; then
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # client_bins array.
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
@@ -248,6 +256,9 @@ function kube::release::package_server_tarballs() {
     if [[ "${platform%/*}" == "windows" ]]; then
       client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
     fi
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # client_bins array.
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
@@ -466,39 +477,111 @@ function kube::release::package_kube_manifests_tarball() {
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
+# Builds tarballs for each test platform containing the appropriate binaries.
+function kube::release::package_test_platform_tarballs() {
+  local platform
+  rm -rf "${RELEASE_STAGE}/test"
+  # KUBE_TEST_SERVER_PLATFORMS is a subset of KUBE_TEST_PLATFORMS,
+  # so process it first.
+  for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
+    local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+    local release_stage="${RELEASE_STAGE}/test/${platform_tag}/kubernetes"
+    mkdir -p "${release_stage}/test/bin"
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_TEST_SERVER_BINARIES array.
+    cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/test/bin/"
+  done
+  for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
+    (
+      local platform_tag=${platform/\//-} # Replace a "/" for a "-"
+      kube::log::status "Starting tarball: test $platform_tag"
+      local release_stage="${RELEASE_STAGE}/test/${platform_tag}/kubernetes"
+      mkdir -p "${release_stage}/test/bin"
+
+      local test_bins=("${KUBE_TEST_BINARIES[@]}")
+      if [[ "${platform%/*}" == "windows" ]]; then
+        test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
+      fi
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # test_bins array.
+      cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/test/bin/"
+
+      local package_name="${RELEASE_TARS}/kubernetes-test-${platform_tag}.tar.gz"
+      kube::release::create_tarball "${package_name}" "${release_stage}/.."
+    ) &
+  done
+
+  kube::log::status "Waiting on test tarballs"
+  kube::util::wait-for-jobs || { kube::log::error "test tarball creation failed"; exit 1; }
+}
+
+
 # This is the stuff you need to run tests from the binary distribution.
-function kube::release::package_test_tarball() {
-  kube::log::status "Building tarball: test"
+function kube::release::package_test_tarballs() {
+  kube::release::package_test_platform_tarballs
+
+  kube::log::status "Building tarball: test portable"
 
   local release_stage="${RELEASE_STAGE}/test/kubernetes"
   rm -rf "${release_stage}"
   mkdir -p "${release_stage}"
 
-  local platform
-  for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
-    local test_bins=("${KUBE_TEST_BINARIES[@]}")
-    if [[ "${platform%/*}" == "windows" ]]; then
-      test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
-    fi
-    mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/platforms/${platform}"
-  done
-  for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
-    mkdir -p "${release_stage}/platforms/${platform}"
-    cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/platforms/${platform}"
-  done
-
-  # Add the test image files
+  # First add test image files and other portable sources so we can create
+  # the portable test tarball.
   mkdir -p "${release_stage}/test/images"
   cp -fR "${KUBE_ROOT}/test/images" "${release_stage}/test/"
   tar c "${KUBE_TEST_PORTABLE[@]}" | tar x -C "${release_stage}"
 
   kube::release::clean_cruft
 
-  local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
-  kube::release::create_tarball "${package_name}" "${release_stage}/.."
+  local portable_tarball_name="${RELEASE_TARS}/kubernetes-test-portable.tar.gz"
+  kube::release::create_tarball "${portable_tarball_name}" "${release_stage}/.."
+
+  if [[ "${KUBE_BUILD_MONDO_TEST_TARBALL}" =~ [yY] ]]; then
+    kube::log::status "Building tarball: test mondo (deprecated by KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball)"
+    local platform
+    for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
+      local test_bins=("${KUBE_TEST_BINARIES[@]}")
+      if [[ "${platform%/*}" == "windows" ]]; then
+        test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
+      fi
+      mkdir -p "${release_stage}/platforms/${platform}"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # test_bins array.
+      cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/platforms/${platform}"
+    done
+    for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
+      mkdir -p "${release_stage}/platforms/${platform}"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # KUBE_TEST_SERVER_BINARIES array.
+      cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/platforms/${platform}"
+    done
+
+    cat <<EOF > "${release_stage}/DEPRECATION_NOTICE"
+The mondo test tarball containing binaries for all platforms is
+DEPRECATED as of Kubernetes 1.14.
+
+Users of this tarball should migrate to using the platform-specific
+tarballs in combination with the "portable" tarball which contains
+scripts, test images, and other manifests.
+
+For more details, please see KEP
+sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball.
+EOF
+
+    kube::release::clean_cruft
+
+    local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
+  fi
 }
 
 # This is all the platform-independent stuff you need to run/install kubernetes.

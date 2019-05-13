@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -135,7 +136,7 @@ func (c *Controller) processPV(pvName string) error {
 		return err
 	}
 
-	if isDeletionCandidate(pv) {
+	if protectionutil.IsDeletionCandidate(pv, volumeutil.PVProtectionFinalizer) {
 		// PV should be deleted. Check if it's used and remove finalizer if
 		// it's not.
 		isUsed := c.isBeingUsed(pv)
@@ -144,7 +145,7 @@ func (c *Controller) processPV(pvName string) error {
 		}
 	}
 
-	if needToAddFinalizer(pv) {
+	if protectionutil.NeedToAddFinalizer(pv, volumeutil.PVProtectionFinalizer) {
 		// PV is not being deleted -> it should have the finalizer. The
 		// finalizer should be added by admission plugin, this is just to add
 		// the finalizer to old PVs that were created before the admission
@@ -202,15 +203,7 @@ func (c *Controller) pvAddedUpdated(obj interface{}) {
 	}
 	klog.V(4).Infof("Got event on PV %s", pv.Name)
 
-	if needToAddFinalizer(pv) || isDeletionCandidate(pv) {
+	if protectionutil.NeedToAddFinalizer(pv, volumeutil.PVProtectionFinalizer) || protectionutil.IsDeletionCandidate(pv, volumeutil.PVProtectionFinalizer) {
 		c.queue.Add(pv.Name)
 	}
-}
-
-func isDeletionCandidate(pv *v1.PersistentVolume) bool {
-	return pv.ObjectMeta.DeletionTimestamp != nil && slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
-}
-
-func needToAddFinalizer(pv *v1.PersistentVolume) bool {
-	return pv.ObjectMeta.DeletionTimestamp == nil && !slice.ContainsString(pv.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
 }

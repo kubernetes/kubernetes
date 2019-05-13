@@ -18,7 +18,6 @@ package scheme
 
 import (
 	admissionv1alpha1 "k8s.io/api/admission/v1beta1"
-	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -46,6 +45,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -57,11 +57,13 @@ import (
 func init() {
 	// Register external types for Scheme
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+	utilruntime.Must(metav1beta1.AddMetaToScheme(Scheme))
+	utilruntime.Must(metav1.AddMetaToScheme(Scheme))
 	utilruntime.Must(scheme.AddToScheme(Scheme))
 
 	utilruntime.Must(Scheme.SetVersionPriority(corev1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(admissionv1alpha1.SchemeGroupVersion))
-	utilruntime.Must(Scheme.SetVersionPriority(admissionregistrationv1beta1.SchemeGroupVersion, admissionregistrationv1alpha1.SchemeGroupVersion))
+	utilruntime.Must(Scheme.SetVersionPriority(admissionregistrationv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(appsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion, appsv1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(authenticationv1.SchemeGroupVersion, authenticationv1beta1.SchemeGroupVersion))
 	utilruntime.Must(Scheme.SetVersionPriority(authorizationv1.SchemeGroupVersion, authorizationv1beta1.SchemeGroupVersion))

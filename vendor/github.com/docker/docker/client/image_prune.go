@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -23,10 +23,10 @@ func (cli *Client) ImagesPrune(ctx context.Context, pruneFilters filters.Args) (
 	}
 
 	serverResp, err := cli.post(ctx, "/images/prune", query, nil, nil)
+	defer ensureReaderClosed(serverResp)
 	if err != nil {
 		return report, err
 	}
-	defer ensureReaderClosed(serverResp)
 
 	if err := json.NewDecoder(serverResp.body).Decode(&report); err != nil {
 		return report, fmt.Errorf("Error retrieving disk usage: %v", err)

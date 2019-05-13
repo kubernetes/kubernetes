@@ -55,6 +55,7 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&DeleteOptions{},
 		&CreateOptions{},
 		&UpdateOptions{},
+		&PatchOptions{},
 	)
 	utilruntime.Must(scheme.AddConversionFuncs(
 		Convert_v1_WatchEvent_To_watch_Event,
@@ -90,8 +91,26 @@ func init() {
 		&DeleteOptions{},
 		&CreateOptions{},
 		&UpdateOptions{},
+		&PatchOptions{},
 	)
+
+	if err := AddMetaToScheme(scheme); err != nil {
+		panic(err)
+	}
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	utilruntime.Must(RegisterDefaults(scheme))
+}
+
+func AddMetaToScheme(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Table{},
+		&TableOptions{},
+		&PartialObjectMetadata{},
+		&PartialObjectMetadataList{},
+	)
+
+	return scheme.AddConversionFuncs(
+		Convert_Slice_string_To_v1_IncludeObjectPolicy,
+	)
 }

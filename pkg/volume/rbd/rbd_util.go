@@ -27,7 +27,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -36,12 +36,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
+	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	fileutil "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	utilpath "k8s.io/utils/path"
 )
 
 const (
@@ -79,7 +80,7 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 			// https://github.com/torvalds/linux/blob/master/drivers/block/rbd.c
 			name := f.Name()
 			// First match pool, then match name.
-			poolFile := path.Join(sys_path, name, "pool")
+			poolFile := filepath.Join(sys_path, name, "pool")
 			poolBytes, err := ioutil.ReadFile(poolFile)
 			if err != nil {
 				klog.V(4).Infof("error reading %s: %v", poolFile, err)
@@ -89,7 +90,7 @@ func getRbdDevFromImageAndPool(pool string, image string) (string, bool) {
 				klog.V(4).Infof("device %s is not %q: %q", name, pool, string(poolBytes))
 				continue
 			}
-			imgFile := path.Join(sys_path, name, "name")
+			imgFile := filepath.Join(sys_path, name, "name")
 			imgBytes, err := ioutil.ReadFile(imgFile)
 			if err != nil {
 				klog.V(4).Infof("error reading %s: %v", imgFile, err)
@@ -159,12 +160,12 @@ func getNbdDevFromImageAndPool(pool string, image string) (string, bool) {
 			klog.V(4).Infof("error reading nbd info directory %s: %v", nbdPath, err)
 			continue
 		}
-		pidBytes, err := ioutil.ReadFile(path.Join(nbdPath, "pid"))
+		pidBytes, err := ioutil.ReadFile(filepath.Join(nbdPath, "pid"))
 		if err != nil {
 			klog.V(5).Infof("did not find valid pid file in dir %s: %v", nbdPath, err)
 			continue
 		}
-		cmdlineFileName := path.Join("/proc", strings.TrimSpace(string(pidBytes)), "cmdline")
+		cmdlineFileName := filepath.Join("/proc", strings.TrimSpace(string(pidBytes)), "cmdline")
 		rawCmdline, err := ioutil.ReadFile(cmdlineFileName)
 		if err != nil {
 			klog.V(4).Infof("failed to read cmdline file %s: %v", cmdlineFileName, err)
@@ -185,7 +186,7 @@ func getNbdDevFromImageAndPool(pool string, image string) (string, bool) {
 				nbdPath, imgPath, cmdlineArgs[2])
 			continue
 		}
-		devicePath := path.Join("/dev", "nbd"+strconv.Itoa(i))
+		devicePath := filepath.Join("/dev", "nbd"+strconv.Itoa(i))
 		if _, err := os.Lstat(devicePath); err != nil {
 			klog.Warningf("Stat device %s for imgpath %s failed %v", devicePath, imgPath, err)
 			continue
@@ -247,7 +248,7 @@ func checkRbdNbdTools(e mount.Exec) bool {
 // Make a directory like /var/lib/kubelet/plugins/kubernetes.io/rbd/mounts/pool-image-image.
 func makePDNameInternal(host volume.VolumeHost, pool string, image string) string {
 	// Backward compatibility for the deprecated format: /var/lib/kubelet/plugins/kubernetes.io/rbd/rbd/pool-image-image.
-	deprecatedDir := path.Join(host.GetPluginDir(rbdPluginName), "rbd", pool+"-image-"+image)
+	deprecatedDir := filepath.Join(host.GetPluginDir(rbdPluginName), "rbd", pool+"-image-"+image)
 	info, err := os.Stat(deprecatedDir)
 	if err == nil && info.IsDir() {
 		// The device mount path has already been created with the deprecated format, return it.
@@ -255,12 +256,12 @@ func makePDNameInternal(host volume.VolumeHost, pool string, image string) strin
 		return deprecatedDir
 	}
 	// Return the canonical format path.
-	return path.Join(host.GetPluginDir(rbdPluginName), mount.MountsInGlobalPDPath, pool+"-image-"+image)
+	return filepath.Join(host.GetPluginDir(rbdPluginName), volutil.MountsInGlobalPDPath, pool+"-image-"+image)
 }
 
 // Make a directory like /var/lib/kubelet/plugins/kubernetes.io/rbd/volumeDevices/pool-image-image.
 func makeVDPDNameInternal(host volume.VolumeHost, pool string, image string) string {
-	return path.Join(host.GetVolumeDevicePluginDir(rbdPluginName), pool+"-image-"+image)
+	return filepath.Join(host.GetVolumeDevicePluginDir(rbdPluginName), pool+"-image-"+image)
 }
 
 // RBDUtil implements diskManager interface.
@@ -363,7 +364,7 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 	var output []byte
 
 	globalPDPath := util.MakeGlobalPDName(*b.rbd)
-	if pathExists, pathErr := volutil.PathExists(globalPDPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(globalPDPath); pathErr != nil {
 		return "", fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		if err := os.MkdirAll(globalPDPath, 0750); err != nil {
@@ -485,8 +486,8 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 
 	// Currently, we don't persist rbd info on the disk, but for backward
 	// compatbility, we need to clean it if found.
-	rbdFile := path.Join(deviceMountPath, "rbd.json")
-	exists, err := fileutil.FileExists(rbdFile)
+	rbdFile := filepath.Join(deviceMountPath, "rbd.json")
+	exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, rbdFile)
 	if err != nil {
 		return err
 	}
@@ -505,7 +506,7 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 // DetachBlockDisk detaches the disk from the node.
 func (util *RBDUtil) DetachBlockDisk(disk rbdDiskUnmapper, mapPath string) error {
 
-	if pathExists, pathErr := volutil.PathExists(mapPath); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("Error checking if path exists: %v", pathErr)
 	} else if !pathExists {
 		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
@@ -580,9 +581,8 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, size int, err error) {
 	var output []byte
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	volSizeBytes := capacity.Value()
 	// Convert to MB that rbd defaults on.
-	sz, err := volutil.RoundUpSizeInt(volSizeBytes, 1024*1024)
+	sz, err := volumehelpers.RoundUpToMiBInt(capacity)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -641,9 +641,9 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 func (util *RBDUtil) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize resource.Quantity, newSize resource.Quantity) (resource.Quantity, error) {
 	var output []byte
 	var err error
-	volSizeBytes := newSize.Value()
+
 	// Convert to MB that rbd defaults on.
-	sz := int(volutil.RoundUpSize(volSizeBytes, 1024*1024))
+	sz := int(volumehelpers.RoundUpToMiB(newSize))
 	newVolSz := fmt.Sprintf("%d", sz)
 	newSizeQuant := resource.MustParse(fmt.Sprintf("%dMi", sz))
 

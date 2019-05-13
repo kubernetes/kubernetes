@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -27,8 +26,10 @@ import (
 	"k8s.io/klog"
 )
 
+// Metrics is generic metrics for other specific metrics
 type Metrics map[string]model.Samples
 
+// Equal returns true if all metrics are the same as the arguments.
 func (m *Metrics) Equal(o Metrics) bool {
 	leftKeySet := []string{}
 	rightKeySet := []string{}
@@ -49,26 +50,7 @@ func (m *Metrics) Equal(o Metrics) bool {
 	return true
 }
 
-func PrintSample(sample *model.Sample) string {
-	buf := make([]string, 0)
-	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
-	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
-	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
-	// but it works...
-	_, normalContainer := sample.Metric["kubernetes_container_name"]
-	for k, v := range sample.Metric {
-		if strings.HasPrefix(string(k), "__") {
-			continue
-		}
-
-		if string(k) == "id" && normalContainer {
-			continue
-		}
-		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
-	}
-	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
-}
-
+// NewMetrics returns new metrics which are initialized.
 func NewMetrics() Metrics {
 	result := make(Metrics)
 	return result

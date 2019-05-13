@@ -104,7 +104,7 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 			fakeTestPod.Labels = test.podLabels
 
 			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeSelector)
-			assert.EqualValuesf(t, test.expectedResult, realValue, "Faild to test: %s", test.name)
+			assert.EqualValuesf(t, test.expectedResult, realValue, "Failed to test: %s", test.name)
 		})
 	}
 
@@ -220,7 +220,7 @@ func TestNodesHaveSameTopologyKey(t *testing.T) {
 			topologyKey: "",
 		},
 		{
-			name: "nodeA lable nil vs. nodeB{'a':''} by key('a')",
+			name: "nodeA label nil vs. nodeB{'a':''} by key('a')",
 			nodeA: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{},
 			},

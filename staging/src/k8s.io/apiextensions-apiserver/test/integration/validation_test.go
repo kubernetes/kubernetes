@@ -22,12 +22,14 @@ import (
 	"testing"
 	"time"
 
+	clientschema "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
@@ -222,7 +224,7 @@ func newNoxuValidationInstance(namespace, name string) *unstructured.Unstructure
 }
 
 func TestCustomResourceValidation(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -254,7 +256,7 @@ func TestCustomResourceValidation(t *testing.T) {
 }
 
 func TestCustomResourceUpdateValidation(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -308,7 +310,7 @@ func TestCustomResourceUpdateValidation(t *testing.T) {
 }
 
 func TestCustomResourceValidationErrors(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -409,7 +411,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 }
 
 func TestCRValidationOnCRDUpdate(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -481,7 +483,7 @@ func TestCRValidationOnCRDUpdate(t *testing.T) {
 }
 
 func TestForbiddenFieldsInSchema(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -537,6 +539,802 @@ func TestForbiddenFieldsInSchema(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestNonStructuralSchemaConditionUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+
+	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	manifest := `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: foos.tests.apiextensions.k8s.io
+spec:
+  group: tests.apiextensions.k8s.io
+  version: v1beta1
+  names:
+    plural: foos
+    singular: foo
+    kind: Foo
+    listKind: Foolist
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      type: object
+      properties:
+        a: {}
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+`
+
+	// decode CRD manifest
+	obj, _, err := clientschema.Codecs.UniversalDeserializer().Decode([]byte(manifest), nil, nil)
+	if err != nil {
+		t.Fatalf("failed decoding of: %v\n\n%s", err, manifest)
+	}
+	crd := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
+	name := crd.Name
+
+	// save schema for later
+	origSchema := crd.Spec.Validation.OpenAPIV3Schema
+
+	// create CRDs
+	t.Logf("Creating CRD %s", crd.Name)
+	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	if err != nil {
+		t.Fatalf("unexpected create error: %v", err)
+	}
+
+	// wait for condition with violations
+	t.Log("Waiting for NonStructuralSchema condition")
+	var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
+	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+		return cond != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error waiting for NonStructuralSchema condition: %v", cond)
+	}
+	if v := "spec.validation.openAPIV3Schema.properties[a].type: Required value: must not be empty for specified object fields"; !strings.Contains(cond.Message, v) {
+		t.Fatalf("expected violation %q, but got: %v", v, cond.Message)
+	}
+
+	// remove schema
+	t.Log("Remove schema")
+	for retry := 0; retry < 5; retry++ {
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("unexpected get error: %v", err)
+		}
+		crd.Spec.Validation = nil
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+		if apierrors.IsConflict(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("unexpected update error: %v", err)
+		}
+	}
+	if err != nil {
+		t.Fatalf("unexpected update error: %v", err)
+	}
+
+	// wait for condition to go away
+	t.Log("Wait for condition to disappear")
+	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+		return cond == nil, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error waiting for NonStructuralSchema condition: %v", cond)
+	}
+
+	// readd schema
+	t.Log("Readd schema")
+	for retry := 0; retry < 5; retry++ {
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("unexpected get error: %v", err)
+		}
+		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{OpenAPIV3Schema: origSchema}
+		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
+		if apierrors.IsConflict(err) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("unexpected update error: %v", err)
+		}
+	}
+	if err != nil {
+		t.Fatalf("unexpected update error: %v", err)
+	}
+
+	// wait for condition with violations
+	t.Log("Wait for condition to reappear")
+	err = wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+		obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+		return cond != nil, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error waiting for NonStructuralSchema condition: %v", cond)
+	}
+	if v := "spec.validation.openAPIV3Schema.properties[a].type: Required value: must not be empty for specified object fields"; !strings.Contains(cond.Message, v) {
+		t.Fatalf("expected violation %q, but got: %v", v, cond.Message)
+	}
+}
+
+func TestNonStructuralSchemaCondition(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+
+	tearDown, apiExtensionClient, _, err := fixtures.StartDefaultServerWithClients(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tearDown()
+
+	tmpl := `
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+spec:
+  version: v1beta1
+  names:
+    plural: foos
+    singular: foo
+    kind: Foo
+    listKind: Foolist
+  scope: Namespaced
+  validation: GLOBAL_SCHEMA
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema: V1BETA1_SCHEMA
+  - name: v1
+    served: true
+    schema: V1_SCHEMA
+`
+
+	type Test struct {
+		desc                                  string
+		globalSchema, v1Schema, v1beta1Schema string
+		expectedCreateError                   bool
+		expectedViolations                    []string
+		unexpectedViolations                  []string
+	}
+	tests := []Test{
+		{"empty", "", "", "", false, nil, nil},
+		{
+			desc: "int-or-string and preserve-unknown-fields true",
+			globalSchema: `
+x-kubernetes-preserve-unknown-fields: true
+x-kubernetes-int-or-string: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.x-kubernetes-preserve-unknown-fields: Invalid value: true: must be false if x-kubernetes-int-or-string is true",
+			},
+		},
+		{
+			desc: "int-or-string and embedded-resource true",
+			globalSchema: `
+type: object
+x-kubernetes-embedded-resource: true
+x-kubernetes-int-or-string: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.x-kubernetes-embedded-resource: Invalid value: true: must be false if x-kubernetes-int-or-string is true",
+			},
+		},
+		{
+			desc: "embedded-resource without preserve-unknown-fields",
+			globalSchema: `
+type: object
+x-kubernetes-embedded-resource: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties: Required value: must not be empty if x-kubernetes-embedded-resource is true without x-kubernetes-preserve-unknown-fields",
+			},
+		},
+		{
+			desc: "embedded-resource without preserve-unknown-fields, but properties",
+			globalSchema: `
+type: object
+x-kubernetes-embedded-resource: true
+properties:
+  apiVersion:
+    type: string 
+  kind:
+    type: string
+  metadata:
+    type: object
+`,
+			expectedViolations: []string{},
+		},
+		{
+			desc: "embedded-resource with preserve-unknown-fields",
+			globalSchema: `
+type: object
+x-kubernetes-embedded-resource: true
+x-kubernetes-preserve-unknown-fields: true
+`,
+			expectedViolations: []string{},
+		},
+		{
+			desc: "embedded-resource with wrong type",
+			globalSchema: `
+type: array
+x-kubernetes-embedded-resource: true
+x-kubernetes-preserve-unknown-fields: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.type: Invalid value: \"array\": must be object if x-kubernetes-embedded-resource is true",
+			},
+		},
+		{
+			desc: "embedded-resource with empty type",
+			globalSchema: `
+type: ""
+x-kubernetes-embedded-resource: true
+x-kubernetes-preserve-unknown-fields: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.type: Required value: must be object if x-kubernetes-embedded-resource is true",
+			},
+		},
+		{
+			desc: "no top-level type",
+			globalSchema: `
+type: ""
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.type: Required value: must not be empty at the root",
+			},
+		},
+		{
+			desc: "non-object top-level type",
+			globalSchema: `
+type: "integer"
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.type: Invalid value: \"integer\": must be object at the root",
+			},
+		},
+		{
+			desc: "forbidden in nested value validation",
+			globalSchema: `
+type: object
+properties:
+  foo:
+    type: string
+not:
+  type: string
+  additionalProperties: true
+  title: hello
+  description: world
+  nullable: true
+allOf:
+- properties:
+    foo: 
+      type: string
+      additionalProperties: true
+      title: hello
+      description: world
+      nullable: true
+anyOf:
+- items:
+    type: string
+    additionalProperties: true
+    title: hello
+    description: world
+    nullable: true
+oneOf:
+- properties:
+    foo: 
+      type: string
+      additionalProperties: true
+      title: hello
+      description: world
+      nullable: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.anyOf[0].items.type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].items.additionalProperties: Forbidden: must be undefined to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].items.title: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].items.description: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].items.nullable: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[foo].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[foo].additionalProperties: Forbidden: must be undefined to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[foo].title: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[foo].description: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[foo].nullable: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[foo].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[foo].additionalProperties: Forbidden: must be undefined to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[foo].title: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[foo].description: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[foo].nullable: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.not.type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.not.additionalProperties: Forbidden: must be undefined to be structural",
+				"spec.validation.openAPIV3Schema.not.title: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.not.description: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.not.nullable: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.items: Required value: because it is defined in spec.validation.openAPIV3Schema.anyOf[0].items",
+			},
+			unexpectedViolations: []string{
+				"spec.validation.openAPIV3Schema.not.default",
+			},
+		},
+		{
+			desc: "forbidden vendor extensions in nested value validation",
+			globalSchema: `
+type: object
+properties:
+  int-or-string:
+    x-kubernetes-int-or-string: true
+  embedded-resource:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+not:
+  properties:
+    int-or-string:
+      x-kubernetes-int-or-string: true
+    embedded-resource:
+      x-kubernetes-embedded-resource: true
+      x-kubernetes-preserve-unknown-fields: true
+allOf:
+- properties:
+    int-or-string:
+      x-kubernetes-int-or-string: true
+    embedded-resource:
+      x-kubernetes-embedded-resource: true
+      x-kubernetes-preserve-unknown-fields: true
+anyOf:
+- properties:
+    int-or-string:
+      x-kubernetes-int-or-string: true
+    embedded-resource:
+      x-kubernetes-embedded-resource: true
+      x-kubernetes-preserve-unknown-fields: true
+oneOf:
+- properties:
+    int-or-string:
+      x-kubernetes-int-or-string: true
+    embedded-resource:
+      x-kubernetes-embedded-resource: true
+      x-kubernetes-preserve-unknown-fields: true
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.allOf[0].properties[embedded-resource].x-kubernetes-preserve-unknown-fields: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[embedded-resource].x-kubernetes-embedded-resource: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.allOf[0].properties[int-or-string].x-kubernetes-int-or-string: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].properties[embedded-resource].x-kubernetes-preserve-unknown-fields: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].properties[embedded-resource].x-kubernetes-embedded-resource: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.anyOf[0].properties[int-or-string].x-kubernetes-int-or-string: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[embedded-resource].x-kubernetes-preserve-unknown-fields: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[embedded-resource].x-kubernetes-embedded-resource: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.oneOf[0].properties[int-or-string].x-kubernetes-int-or-string: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.not.properties[embedded-resource].x-kubernetes-preserve-unknown-fields: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.not.properties[embedded-resource].x-kubernetes-embedded-resource: Forbidden: must be false to be structural",
+				"spec.validation.openAPIV3Schema.not.properties[int-or-string].x-kubernetes-int-or-string: Forbidden: must be false to be structural",
+			},
+		},
+		{
+			desc: "missing types",
+			globalSchema: `
+properties:
+  foo:
+    properties:
+      a: {}
+  bar:
+    items:
+      additionalProperties:
+        properties:
+          a: {}
+        items: {}
+  abc:
+    additionalProperties:
+      properties:
+        a:
+          items:
+            additionalProperties:
+              items:
+  json:
+    x-kubernetes-preserve-unknown-fields: true
+    properties:
+      a: {}
+  int-or-string:
+    x-kubernetes-int-or-string: true
+    properties:
+      a: {}
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[foo].properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[foo].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[int-or-string].properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[json].properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[abc].additionalProperties.properties[a].items.additionalProperties.type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[abc].additionalProperties.properties[a].items.type: Required value: must not be empty for specified array items",
+				"spec.validation.openAPIV3Schema.properties[abc].additionalProperties.properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[abc].additionalProperties.type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[abc].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[bar].items.additionalProperties.items.type: Required value: must not be empty for specified array items",
+				"spec.validation.openAPIV3Schema.properties[bar].items.additionalProperties.properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[bar].items.additionalProperties.type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.properties[bar].items.type: Required value: must not be empty for specified array items",
+				"spec.validation.openAPIV3Schema.properties[bar].type: Required value: must not be empty for specified object fields",
+				"spec.validation.openAPIV3Schema.type: Required value: must not be empty at the root",
+			},
+		},
+		{
+			desc: "int-or-string variants",
+			globalSchema: `
+type: object
+properties:
+  a:
+    x-kubernetes-int-or-string: true
+  b:
+    x-kubernetes-int-or-string: true
+    anyOf:
+    - type: integer
+    - type: string
+    allOf:
+    - pattern: abc
+  c:
+    x-kubernetes-int-or-string: true
+    allOf:
+    - anyOf:
+      - type: integer
+      - type: string
+    - pattern: abc
+    - pattern: abc
+  d:
+    x-kubernetes-int-or-string: true
+    anyOf:
+    - type: integer
+    - type: string
+      pattern: abc
+  e:
+    x-kubernetes-int-or-string: true
+    allOf:
+    - anyOf:
+      - type: integer
+      - type: string
+        pattern: abc
+    - pattern: abc
+  f:
+    x-kubernetes-int-or-string: true
+    anyOf:
+    - type: integer
+    - type: string
+    - pattern: abc
+  g:
+    x-kubernetes-int-or-string: true
+    anyOf:
+    - type: string
+    - type: integer
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[d].anyOf[0].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[d].anyOf[1].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[e].allOf[0].anyOf[0].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[e].allOf[0].anyOf[1].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[f].anyOf[0].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[f].anyOf[1].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[g].anyOf[0].type: Forbidden: must be empty to be structural",
+				"spec.validation.openAPIV3Schema.properties[g].anyOf[1].type: Forbidden: must be empty to be structural",
+			},
+			unexpectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[a]",
+				"spec.validation.openAPIV3Schema.properties[b]",
+				"spec.validation.openAPIV3Schema.properties[c]",
+			},
+		},
+		{
+			desc: "forbidden additionalProperties at the root",
+			globalSchema: `
+type: object
+additionalProperties: false
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.additionalProperties: Forbidden: must not be used at the root",
+			},
+		},
+		{
+			desc: "structural incomplete",
+			globalSchema: `
+type: object
+properties:
+  b:
+    type: object
+    properties:
+      b:
+        type: array
+  c:
+    type: array
+    items:
+      type: object
+  d:
+    type: array
+not:
+  properties:
+    a: {}
+    b:
+      not:
+        properties:
+          a: {}
+          b:
+            items: {}
+    c:
+      items:
+        not:
+          items:
+            properties:
+              a: {}
+    d:
+      items: {}
+allOf:
+- properties:
+    e: {}
+anyOf:
+- properties:
+    f: {}
+oneOf:
+- properties:
+    g: {}
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[d].items: Required value: because it is defined in spec.validation.openAPIV3Schema.not.properties[d].items",
+				"spec.validation.openAPIV3Schema.properties[a]: Required value: because it is defined in spec.validation.openAPIV3Schema.not.properties[a]",
+				"spec.validation.openAPIV3Schema.properties[b].properties[a]: Required value: because it is defined in spec.validation.openAPIV3Schema.not.properties[b].not.properties[a]",
+				"spec.validation.openAPIV3Schema.properties[b].properties[b].items: Required value: because it is defined in spec.validation.openAPIV3Schema.not.properties[b].not.properties[b].items",
+				"spec.validation.openAPIV3Schema.properties[c].items.items: Required value: because it is defined in spec.validation.openAPIV3Schema.not.properties[c].items.not.items",
+				"spec.validation.openAPIV3Schema.properties[e]: Required value: because it is defined in spec.validation.openAPIV3Schema.allOf[0].properties[e]",
+				"spec.validation.openAPIV3Schema.properties[f]: Required value: because it is defined in spec.validation.openAPIV3Schema.anyOf[0].properties[f]",
+				"spec.validation.openAPIV3Schema.properties[g]: Required value: because it is defined in spec.validation.openAPIV3Schema.oneOf[0].properties[g]",
+			},
+		},
+		{
+			desc: "structural complete",
+			globalSchema: `
+type: object
+properties:
+  a:
+    type: string
+  b:
+    type: object
+    properties:
+      a:
+        type: string
+      b:
+        type: array
+        items:
+          type: string
+  c:
+    type: array
+    items:
+      type: array
+      items:
+        type: object
+        properties:
+          a:
+            type: string
+  d:
+    type: array
+    items:
+      type: string
+  e:
+    type: string
+  f:
+    type: string
+  g:
+    type: string
+not:
+  properties:
+    a: {}
+    b:
+      not:
+        properties:
+          a: {}
+          b:
+            items: {}
+    c:
+      items:
+        not:
+          items:
+            properties:
+              a: {}
+    d:
+      items: {}
+allOf:
+- properties:
+    e: {}
+anyOf:
+- properties:
+    f: {}
+oneOf:
+- properties:
+    g: {}
+`,
+			expectedViolations: nil,
+		},
+		{
+			desc: "invalid v1beta1 schema",
+			v1beta1Schema: `
+type: object
+properties:
+  a: {}
+not:
+  properties:
+    b: {}
+`,
+			v1Schema: `
+type: object
+properties:
+  a:
+    type: string
+`,
+			expectedViolations: []string{
+				"spec.version[v1beta1].schema.openAPIV3Schema.properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.version[v1beta1].schema.openAPIV3Schema.properties[b]: Required value: because it is defined in spec.version[v1beta1].schema.openAPIV3Schema.not.properties[b]",
+			},
+		},
+		{
+			desc: "invalid v1beta1 and v1 schemas",
+			v1beta1Schema: `
+type: object
+properties:
+  a: {}
+not:
+  properties:
+    b: {}
+`,
+			v1Schema: `
+type: object
+properties:
+  c: {}
+not:
+  properties:
+    d: {}
+`,
+			expectedViolations: []string{
+				"spec.version[v1beta1].schema.openAPIV3Schema.properties[a].type: Required value: must not be empty for specified object fields",
+				"spec.version[v1beta1].schema.openAPIV3Schema.properties[b]: Required value: because it is defined in spec.version[v1beta1].schema.openAPIV3Schema.not.properties[b]",
+				"spec.version[v1].schema.openAPIV3Schema.properties[c].type: Required value: must not be empty for specified object fields",
+				"spec.version[v1].schema.openAPIV3Schema.properties[d]: Required value: because it is defined in spec.version[v1].schema.openAPIV3Schema.not.properties[d]",
+			},
+		},
+	}
+
+	for i := range tests {
+		tst := tests[i]
+		t.Run(tst.desc, func(t *testing.T) {
+			// plug in schemas
+			manifest := strings.NewReplacer(
+				"GLOBAL_SCHEMA", toValidationJSON(tst.globalSchema),
+				"V1BETA1_SCHEMA", toValidationJSON(tst.v1beta1Schema),
+				"V1_SCHEMA", toValidationJSON(tst.v1Schema),
+			).Replace(tmpl)
+
+			// decode CRD manifest
+			obj, _, err := clientschema.Codecs.UniversalDeserializer().Decode([]byte(manifest), nil, nil)
+			if err != nil {
+				t.Fatalf("failed decoding of: %v\n\n%s", err, manifest)
+			}
+			crd := obj.(*apiextensionsv1beta1.CustomResourceDefinition)
+			crd.Spec.Group = fmt.Sprintf("tests-%d.apiextension.k8s.io", i)
+			crd.Name = fmt.Sprintf("foos.%s", crd.Spec.Group)
+
+			// create CRDs
+			crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+			if tst.expectedCreateError && err == nil {
+				t.Fatalf("expected error, got none")
+			} else if !tst.expectedCreateError && err != nil {
+				t.Fatalf("unexpected create error: %v", err)
+			}
+			if err != nil {
+				return
+			}
+
+			if len(tst.expectedViolations) == 0 {
+				// wait for condition to not appear
+				var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
+				err := wait.PollImmediate(100*time.Millisecond, 5*time.Second, func() (bool, error) {
+					obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+					if err != nil {
+						return false, err
+					}
+					cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+					if cond == nil {
+						return false, nil
+					}
+					return true, nil
+				})
+				if err != wait.ErrWaitTimeout {
+					t.Fatalf("expected no NonStructuralSchema condition, but got one: %v", cond)
+				}
+				return
+			}
+
+			// wait for condition to appear with the given violations
+			var cond *apiextensionsv1beta1.CustomResourceDefinitionCondition
+			err = wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				obj, err := apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
+				if err != nil {
+					return false, err
+				}
+				cond = findCRDCondition(obj, apiextensionsv1beta1.NonStructuralSchema)
+				if cond != nil {
+					return true, nil
+				}
+				return false, nil
+			})
+			if err != nil {
+				t.Fatalf("unexpected error waiting for violations in NonStructuralSchema condition: %v", err)
+			}
+
+			// check that the condition looks good
+			if cond.Reason != "Violations" {
+				t.Errorf("expected reason Violations, got: %v", cond.Reason)
+			}
+			if cond.Status != apiextensionsv1beta1.ConditionTrue {
+				t.Errorf("expected reason True, got: %v", cond.Status)
+			}
+
+			// check that we got all violations
+			t.Logf("Got violations: %q", cond.Message)
+			for _, v := range tst.expectedViolations {
+				if strings.Index(cond.Message, v) == -1 {
+					t.Errorf("expected violation %q, but didn't get it", v)
+				}
+			}
+			for _, v := range tst.unexpectedViolations {
+				if strings.Index(cond.Message, v) != -1 {
+					t.Errorf("unexpected violation %q", v)
+				}
+			}
+		})
+	}
+}
+
+// findCRDCondition returns the condition you're looking for or nil.
+func findCRDCondition(crd *apiextensionsv1beta1.CustomResourceDefinition, conditionType apiextensionsv1beta1.CustomResourceDefinitionConditionType) *apiextensionsv1beta1.CustomResourceDefinitionCondition {
+	for i := range crd.Status.Conditions {
+		if crd.Status.Conditions[i].Type == conditionType {
+			return &crd.Status.Conditions[i]
+		}
+	}
+
+	return nil
+}
+
+func toValidationJSON(yml string) string {
+	if len(yml) == 0 {
+		return "null"
+	}
+	bs, err := yaml.ToJSON([]byte(yml))
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("{\"openAPIV3Schema\": %s}", string(bs))
 }
 
 func float64Ptr(f float64) *float64 {

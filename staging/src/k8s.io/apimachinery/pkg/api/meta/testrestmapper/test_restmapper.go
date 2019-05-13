@@ -111,7 +111,6 @@ func newRESTMapper(group string, scheme *runtime.Scheme) meta.RESTMapper {
 var rootScopedKinds = map[schema.GroupKind]bool{
 	{Group: "admission.k8s.io", Kind: "AdmissionReview"}: true,
 
-	{Group: "admissionregistration.k8s.io", Kind: "InitializerConfiguration"}:       true,
 	{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"}: true,
 	{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"}:   true,
 

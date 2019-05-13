@@ -88,6 +88,15 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 	JitterUntil(f, period, 0.0, true, stopCh)
 }
 
+// UntilWithContext loops until context is done, running f every period.
+//
+// UntilWithContext is syntactic sugar on top of JitterUntilWithContext
+// with zero jitter factor and with sliding = true (which means the timer
+// for period starts after the f completes).
+func UntilWithContext(ctx context.Context, f func(context.Context), period time.Duration) {
+	JitterUntilWithContext(ctx, f, period, 0.0, true)
+}
+
 // NonSlidingUntil loops until stop channel is closed, running f every
 // period.
 //
@@ -96,6 +105,16 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 // time as the function starts).
 func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
 	JitterUntil(f, period, 0.0, false, stopCh)
+}
+
+// NonSlidingUntilWithContext loops until context is done, running f every
+// period.
+//
+// NonSlidingUntilWithContext is syntactic sugar on top of JitterUntilWithContext
+// with zero jitter factor, with sliding = false (meaning the timer for period
+// starts at the same time as the function starts).
+func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration) {
+	JitterUntilWithContext(ctx, f, period, 0.0, false)
 }
 
 // JitterUntil loops until stop channel is closed, running f every period.
@@ -149,6 +168,19 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 			sawTimeout = true
 		}
 	}
+}
+
+// JitterUntilWithContext loops until context is done, running f every period.
+//
+// If jitterFactor is positive, the period is jittered before every run of f.
+// If jitterFactor is not positive, the period is unchanged and not jittered.
+//
+// If sliding is true, the period is computed after f runs. If it is false then
+// period includes the runtime for f.
+//
+// Cancel context to stop. f may not be invoked if context is already expired.
+func JitterUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool) {
+	JitterUntil(func() { f(ctx) }, period, jitterFactor, sliding, ctx.Done())
 }
 
 // Jitter returns a time.Duration between duration and duration + maxFactor *
@@ -216,6 +248,25 @@ func (b *Backoff) Step() time.Duration {
 		duration = Jitter(duration, b.Jitter)
 	}
 	return duration
+}
+
+// contextForChannel derives a child context from a parent channel.
+//
+// The derived context's Done channel is closed when the returned cancel function
+// is called or when the parent channel is closed, whichever happens first.
+//
+// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
+func contextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		select {
+		case <-parentCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
 }
 
 // ExponentialBackoff repeats a condition check with exponential backoff.
@@ -321,7 +372,9 @@ func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) erro
 // PollUntil always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
-	return WaitFor(poller(interval, 0), condition, stopCh)
+	ctx, cancel := contextForChannel(stopCh)
+	defer cancel()
+	return WaitFor(poller(interval, 0), condition, ctx.Done())
 }
 
 // PollImmediateUntil tries a condition func until it returns true, an error or stopCh is closed.
@@ -390,7 +443,9 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 // timeout has elapsed and then closes the channel.
 //
 // Over very short intervals you may receive no ticks before the channel is
-// closed. A timeout of 0 is interpreted as an infinity.
+// closed. A timeout of 0 is interpreted as an infinity, and in such a case
+// it would be the caller's responsibility to close the done channel.
+// Failure to do so would result in a leaked goroutine.
 //
 // Output ticks are not buffered. If the channel is not ready to receive an
 // item, the tick is skipped.

@@ -38,7 +38,6 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
-	csiclientset "k8s.io/csi-api/pkg/client/clientset/versioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/expand/cache"
@@ -46,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -211,16 +211,16 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 		volumePlugin, err := expc.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 		if err != nil || volumePlugin == nil {
-			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+			retErr := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
 				"waiting for an external controller to process this PVC")
 			eventType := v1.EventTypeNormal
 			if err != nil {
 				eventType = v1.EventTypeWarning
 			}
 			expc.recorder.Event(newPVC, eventType, events.ExternalExpanding,
-				fmt.Sprintf("Ignoring the PVC: %v.", err))
+				fmt.Sprintf("Ignoring the PVC: %v.", retErr))
 			klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
-				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, err)
+				util.GetPersistentVolumeClaimQualifiedName(newPVC), newPVC.UID, retErr)
 			return
 		}
 		expc.resizeMap.AddPVCUpdate(newPVC, pv)
@@ -335,7 +335,7 @@ func (expc *expandController) GetEventRecorder() record.EventRecorder {
 	return expc.recorder
 }
 
-func (expc *expandController) GetCSIClient() csiclientset.Interface {
-	// No volume plugin in expand controller needs csi.storage.k8s.io
+func (expc *expandController) GetSubpather() subpath.Interface {
+	// not needed for expand controller
 	return nil
 }

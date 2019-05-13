@@ -21,10 +21,10 @@ import (
 	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1informers "k8s.io/client-go/informers/core/v1"
-	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -195,10 +195,10 @@ func (g *graphPopulator) addVolumeAttachment(obj interface{}) {
 }
 
 func (g *graphPopulator) updateVolumeAttachment(oldObj, obj interface{}) {
-	attachment := obj.(*storagev1beta1.VolumeAttachment)
+	attachment := obj.(*storagev1.VolumeAttachment)
 	if oldObj != nil {
 		// skip add if node name is identical
-		oldAttachment := oldObj.(*storagev1beta1.VolumeAttachment)
+		oldAttachment := oldObj.(*storagev1.VolumeAttachment)
 		if oldAttachment.Spec.NodeName == attachment.Spec.NodeName {
 			return
 		}
@@ -210,7 +210,7 @@ func (g *graphPopulator) deleteVolumeAttachment(obj interface{}) {
 	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 		obj = tombstone.Obj
 	}
-	attachment, ok := obj.(*storagev1beta1.VolumeAttachment)
+	attachment, ok := obj.(*storagev1.VolumeAttachment)
 	if !ok {
 		klog.Infof("unexpected type %T", obj)
 		return

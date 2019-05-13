@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_KMS_GRPC_ROOT="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
@@ -40,22 +40,24 @@ if [[ -z "$(which protoc)" || "$(protoc --version)" != "libprotoc 3."* ]]; then
 fi
 
 function cleanup {
-	rm -f ${KUBE_KMS_GRPC_ROOT}/service.pb.go.bak
+	rm -f "${KUBE_KMS_GRPC_ROOT}/service.pb.go.bak"
+	rm -f "${KUBE_KMS_GRPC_ROOT}/service.pb.go.tmp"
 }
 
 trap cleanup EXIT
 
-gogopath=$(dirname $(kube::util::find-binary "protoc-gen-gogo"))
+gogopath=$(dirname "$(kube::util::find-binary "protoc-gen-gogo")")
 
 PATH="${gogopath}:${PATH}" \
   protoc \
   --proto_path="${KUBE_KMS_GRPC_ROOT}" \
   --proto_path="${KUBE_ROOT}/vendor" \
-  --gogo_out=plugins=grpc:${KUBE_KMS_GRPC_ROOT} ${KUBE_KMS_GRPC_ROOT}/service.proto
+  --gogo_out=plugins=grpc:"${KUBE_KMS_GRPC_ROOT}" "${KUBE_KMS_GRPC_ROOT}/service.proto"
 
 # Update boilerplate for the generated file.
-echo "$(cat hack/boilerplate/boilerplate.generatego.txt ${KUBE_KMS_GRPC_ROOT}/service.pb.go)" > ${KUBE_KMS_GRPC_ROOT}/service.pb.go
+cat hack/boilerplate/boilerplate.generatego.txt "${KUBE_KMS_GRPC_ROOT}/service.pb.go" > "${KUBE_KMS_GRPC_ROOT}/service.pb.go.tmp" && \
+mv "${KUBE_KMS_GRPC_ROOT}/service.pb.go.tmp" "${KUBE_KMS_GRPC_ROOT}/service.pb.go"
 
 # Run gofmt to clean up the generated code.
 kube::golang::verify_go_version
-gofmt -l -s -w ${KUBE_KMS_GRPC_ROOT}/service.pb.go
+gofmt -l -s -w "${KUBE_KMS_GRPC_ROOT}/service.pb.go"

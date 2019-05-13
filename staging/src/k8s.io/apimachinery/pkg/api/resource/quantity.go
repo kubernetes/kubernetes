@@ -680,7 +680,7 @@ func NewScaledQuantity(value int64, scale Scale) *Quantity {
 	}
 }
 
-// Value returns the value of q; any fractional part will be lost.
+// Value returns the unscaled value of q rounded up to the nearest integer away from 0.
 func (q *Quantity) Value() int64 {
 	return q.ScaledValue(0)
 }

@@ -43,7 +43,7 @@ func ValidateStatefulSetName(name string, prefix bool) []string {
 	return apimachineryvalidation.NameIsDNSSubdomain(name, prefix)
 }
 
-// Validates the given template and ensures that it is in accordance with the desired selector.
+// ValidatePodTemplateSpecForStatefulSet validates the given template and ensures that it is in accordance with the desired selector.
 func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, selector labels.Selector, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {
@@ -291,7 +291,7 @@ func validateDaemonSetStatus(status *apps.DaemonSetStatus, fldPath *field.Path) 
 	return allErrs
 }
 
-// ValidateDaemonSetStatus validates tests if required fields in the DaemonSet Status section
+// ValidateDaemonSetStatusUpdate validates tests if required fields in the DaemonSet Status section
 func ValidateDaemonSetStatusUpdate(ds, oldDS *apps.DaemonSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDaemonSetStatus(&ds.Status, field.NewPath("status"))...)
@@ -375,7 +375,7 @@ func ValidateDaemonSetUpdateStrategy(strategy *apps.DaemonSetUpdateStrategy, fld
 // trailing dashes are allowed.
 var ValidateDaemonSetName = apimachineryvalidation.NameIsDNSSubdomain
 
-// Validates that the given name can be used as a deployment name.
+// ValidateDeploymentName validates that the given name can be used as a deployment name.
 var ValidateDeploymentName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidatePositiveIntOrPercent(intOrPercent intstr.IntOrString, fldPath *field.Path) field.ErrorList {
@@ -463,7 +463,7 @@ func ValidateRollback(rollback *apps.RollbackConfig, fldPath *field.Path) field.
 	return allErrs
 }
 
-// Validates given deployment spec.
+// ValidateDeploymentSpec validates given deployment spec.
 func ValidateDeploymentSpec(spec *apps.DeploymentSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(spec.Replicas), fldPath.Child("replicas"))...)
@@ -502,7 +502,7 @@ func ValidateDeploymentSpec(spec *apps.DeploymentSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-// Validates given deployment status.
+// ValidateDeploymentStatus validates given deployment status.
 func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(status.ObservedGeneration, fldPath.Child("observedGeneration"))...)
@@ -642,7 +642,7 @@ func ValidateReplicaSetSpec(spec *apps.ReplicaSetSpec, fldPath *field.Path) fiel
 	return allErrs
 }
 
-// Validates the given template and ensures that it is in accordance with the desired selector and replicas.
+// ValidatePodTemplateSpecForReplicaSet validates the given template and ensures that it is in accordance with the desired selector and replicas.
 func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selector labels.Selector, replicas int32, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if template == nil {

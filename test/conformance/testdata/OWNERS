@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 # To be owned by sig-architecture.
 options:
   no_parent_owners: true
@@ -7,6 +9,7 @@ reviewers:
   - spiffxp
   - timothysc
   - dims
+  - johnbelamaric
 approvers:
   - bgrant0607
   - smarterclayton

@@ -114,14 +114,14 @@ func TestBackoffGC(t *testing.T) {
 	b.GC()
 	_, found := b.perItemBackoff[id]
 	if !found {
-		t.Errorf("expected GC to skip entry, elapsed time=%s maxDuration=%s", tc.Now().Sub(lastUpdate), maxDuration)
+		t.Errorf("expected GC to skip entry, elapsed time=%s maxDuration=%s", tc.Since(lastUpdate), maxDuration)
 	}
 
 	tc.Step(maxDuration + step)
 	b.GC()
 	r, found := b.perItemBackoff[id]
 	if found {
-		t.Errorf("expected GC of entry after %s got entry %v", tc.Now().Sub(lastUpdate), r)
+		t.Errorf("expected GC of entry after %s got entry %v", tc.Since(lastUpdate), r)
 	}
 }
 

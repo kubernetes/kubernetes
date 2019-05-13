@@ -17,9 +17,6 @@ limitations under the License.
 package securitycontext
 
 import (
-	"fmt"
-	"strings"
-
 	"k8s.io/api/core/v1"
 )
 
@@ -45,26 +42,6 @@ func HasCapabilitiesRequest(container *v1.Container) bool {
 		return false
 	}
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
-}
-
-const expectedSELinuxFields = 4
-
-// ParseSELinuxOptions parses a string containing a full SELinux context
-// (user, role, type, and level) into an SELinuxOptions object.  If the
-// context is malformed, an error is returned.
-func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
-	fields := strings.SplitN(context, ":", expectedSELinuxFields)
-
-	if len(fields) != expectedSELinuxFields {
-		return nil, fmt.Errorf("expected %v fields in selinux; got %v (context: %v)", expectedSELinuxFields, len(fields), context)
-	}
-
-	return &v1.SELinuxOptions{
-		User:  fields[0],
-		Role:  fields[1],
-		Type:  fields[2],
-		Level: fields[3],
-	}, nil
 }
 
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {

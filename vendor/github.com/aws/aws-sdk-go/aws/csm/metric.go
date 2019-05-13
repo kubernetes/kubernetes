@@ -3,6 +3,8 @@ package csm
 import (
 	"strconv"
 	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 type metricTime time.Time
@@ -39,6 +41,12 @@ type metric struct {
 	SDKException        *string `json:"SdkException,omitempty"`
 	SDKExceptionMessage *string `json:"SdkExceptionMessage,omitempty"`
 
+	FinalHTTPStatusCode      *int    `json:"FinalHttpStatusCode,omitempty"`
+	FinalAWSException        *string `json:"FinalAwsException,omitempty"`
+	FinalAWSExceptionMessage *string `json:"FinalAwsExceptionMessage,omitempty"`
+	FinalSDKException        *string `json:"FinalSdkException,omitempty"`
+	FinalSDKExceptionMessage *string `json:"FinalSdkExceptionMessage,omitempty"`
+
 	DestinationIP    *string `json:"DestinationIp,omitempty"`
 	ConnectionReused *int    `json:"ConnectionReused,omitempty"`
 
@@ -48,4 +56,54 @@ type metric struct {
 	DNSLatency               *int `json:"DnsLatency,omitempty"`
 	TCPLatency               *int `json:"TcpLatency,omitempty"`
 	SSLLatency               *int `json:"SslLatency,omitempty"`
+
+	MaxRetriesExceeded *int `json:"MaxRetriesExceeded,omitempty"`
+}
+
+func (m *metric) TruncateFields() {
+	m.ClientID = truncateString(m.ClientID, 255)
+	m.UserAgent = truncateString(m.UserAgent, 256)
+
+	m.AWSException = truncateString(m.AWSException, 128)
+	m.AWSExceptionMessage = truncateString(m.AWSExceptionMessage, 512)
+
+	m.SDKException = truncateString(m.SDKException, 128)
+	m.SDKExceptionMessage = truncateString(m.SDKExceptionMessage, 512)
+
+	m.FinalAWSException = truncateString(m.FinalAWSException, 128)
+	m.FinalAWSExceptionMessage = truncateString(m.FinalAWSExceptionMessage, 512)
+
+	m.FinalSDKException = truncateString(m.FinalSDKException, 128)
+	m.FinalSDKExceptionMessage = truncateString(m.FinalSDKExceptionMessage, 512)
+}
+
+func truncateString(v *string, l int) *string {
+	if v != nil && len(*v) > l {
+		nv := (*v)[:l]
+		return &nv
+	}
+
+	return v
+}
+
+func (m *metric) SetException(e metricException) {
+	switch te := e.(type) {
+	case awsException:
+		m.AWSException = aws.String(te.exception)
+		m.AWSExceptionMessage = aws.String(te.message)
+	case sdkException:
+		m.SDKException = aws.String(te.exception)
+		m.SDKExceptionMessage = aws.String(te.message)
+	}
+}
+
+func (m *metric) SetFinalException(e metricException) {
+	switch te := e.(type) {
+	case awsException:
+		m.FinalAWSException = aws.String(te.exception)
+		m.FinalAWSExceptionMessage = aws.String(te.message)
+	case sdkException:
+		m.FinalSDKException = aws.String(te.exception)
+		m.FinalSDKExceptionMessage = aws.String(te.message)
+	}
 }

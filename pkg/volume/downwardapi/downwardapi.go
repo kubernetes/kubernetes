@@ -23,13 +23,12 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/fieldpath"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
-	"k8s.io/klog"
+	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -49,7 +48,7 @@ type downwardAPIPlugin struct {
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(downwardAPIPluginName), volName)
 }
 
 func wrappedVolumeSpec() volume.Spec {
@@ -79,6 +78,10 @@ func (plugin *downwardAPIPlugin) GetVolumeName(spec *volume.Spec) (string, error
 
 func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
+}
+
+func (plugin *downwardAPIPlugin) IsMigratedToCSI() bool {
+	return false
 }
 
 func (plugin *downwardAPIPlugin) RequiresRemount() bool {
@@ -285,7 +288,7 @@ func CollectData(items []v1.DownwardAPIVolumeFile, pod *v1.Pod, host volume.Volu
 }
 
 func (d *downwardAPIVolume) GetPath() string {
-	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName), d.volName)
+	return d.plugin.host.GetPodVolumeDir(d.podUID, utilstrings.EscapeQualifiedName(downwardAPIPluginName), d.volName)
 }
 
 // downwardAPIVolumeCleaner handles cleaning up downwardAPI volumes

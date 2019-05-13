@@ -36,4 +36,11 @@ go_test(
     name = "go_default_test",
     srcs = ["tableconvertor_test.go"],
     embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/client-go/util/jsonpath:go_default_library",
+    ],
 )

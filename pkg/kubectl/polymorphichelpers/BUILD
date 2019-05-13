@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "attachablepodforobject.go",
-        "canbeautoscaled.go",
         "canbeexposed.go",
         "helpers.go",
         "historyviewer.go",
@@ -12,6 +11,7 @@ go_library(
         "logsforobject.go",
         "mapbasedselectorforobject.go",
         "objectpauser.go",
+        "objectrestarter.go",
         "objectresumer.go",
         "portsforobject.go",
         "protocolsforobject.go",
@@ -51,7 +51,6 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
-        "canbeautoscaled_test.go",
         "canbeexposed_test.go",
         "helpers_test.go",
         "logsforobject_test.go",

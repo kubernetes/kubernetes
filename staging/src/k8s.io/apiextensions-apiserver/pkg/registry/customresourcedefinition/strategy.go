@@ -164,12 +164,12 @@ func (statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Objec
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*apiextensions.CustomResourceDefinition)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a CustomResourceDefinition")
+		return nil, nil, fmt.Errorf("given object is not a CustomResourceDefinition")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), CustomResourceDefinitionToSelectableFields(apiserver), nil
 }
 
 // MatchCustomResourceDefinition is the filter used by the generic etcd backend to watch events

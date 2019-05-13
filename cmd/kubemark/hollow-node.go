@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	goflag "flag"
 	"fmt"
 	"math/rand"
@@ -29,11 +30,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilflag "k8s.io/apiserver/pkg/util/flag"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
@@ -42,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubemark"
+	"k8s.io/kubernetes/pkg/master/ports"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
@@ -49,7 +51,7 @@ import (
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
-type HollowNodeConfig struct {
+type hollowNodeConfig struct {
 	KubeconfigPath       string
 	KubeletPort          int
 	KubeletReadOnlyPort  int
@@ -71,10 +73,10 @@ const (
 // and make the config driven.
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
-func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
+func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.KubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
-	fs.IntVar(&c.KubeletPort, "kubelet-port", 10250, "Port on which HollowKubelet should be listening.")
-	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", 10255, "Read-only port on which Kubelet is listening.")
+	fs.IntVar(&c.KubeletPort, "kubelet-port", ports.KubeletPort, "Port on which HollowKubelet should be listening.")
+	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", ports.KubeletReadOnlyPort, "Read-only port on which Kubelet is listening.")
 	fs.StringVar(&c.NodeName, "name", "fake-node", "Name of this Hollow Node.")
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
@@ -84,7 +86,7 @@ func (c *HollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
 }
 
-func (c *HollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
+func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
 	clientConfig, err := clientcmd.LoadFromFile(c.KubeconfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("error while loading kubeconfig from file %v: %v", c.KubeconfigPath, err)
@@ -105,11 +107,11 @@ func main() {
 	command := newHollowNodeCommand()
 
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
-	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	// utilflag.InitFlags()
+	// cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
@@ -121,7 +123,7 @@ func main() {
 
 // newControllerManagerCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
-	s := &HollowNodeConfig{}
+	s := &hollowNodeConfig{}
 
 	cmd := &cobra.Command{
 		Use:  "kubemark",
@@ -136,7 +138,7 @@ func newHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(config *HollowNodeConfig) {
+func run(config *hollowNodeConfig) {
 	if !knownMorphs.Has(config.Morph) {
 		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}
@@ -185,7 +187,9 @@ func run(config *HollowNodeConfig) {
 		}
 		iptInterface := fakeiptables.NewFake()
 		sysctl := fakesysctl.NewFake()
-		execer := &fakeexec.FakeExec{}
+		execer := &fakeexec.FakeExec{
+			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
+		}
 		eventBroadcaster := record.NewBroadcaster()
 		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
 

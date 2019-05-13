@@ -338,6 +338,7 @@ func TestDeltaFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 		// Since "bar" didn't have a delete event and wasn't in the Replace list
 		// it should get a tombstone key with the right Obj.
 		{{Deleted, DeletedFinalStateUnknown{Key: "bar", Obj: mkFifoObj("bar", 6)}}},
+		{{Deleted, DeletedFinalStateUnknown{Key: "baz", Obj: mkFifoObj("baz", 7)}}},
 	}
 
 	for _, expected := range expectedList {
@@ -349,7 +350,7 @@ func TestDeltaFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 	}
-	if f.HasSynced() {
+	if !f.HasSynced() {
 		t.Errorf("Expected HasSynced to be true")
 	}
 }

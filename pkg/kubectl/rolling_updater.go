@@ -33,17 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
+	"k8s.io/utils/integer"
+	utilpointer "k8s.io/utils/pointer"
 )
-
-func newInt32Ptr(val int) *int32 {
-	ret := int32(val)
-	return &ret
-}
 
 func valOrZero(val *int32) int32 {
 	if val == nil {
@@ -101,7 +97,7 @@ type RollingUpdaterConfig struct {
 	// when the rolling update starts, such that the total number of old and new pods do not exceed
 	// 130% of desired pods. Once old pods have been killed, new RC can be scaled up
 	// further, ensuring that total number of pods running at any time during
-	// the update is atmost 130% of desired pods.
+	// the update is at most 130% of desired pods.
 	MaxSurge intstr.IntOrString
 	// OnProgress is invoked if set during each scale cycle, to allow the caller to perform additional logic or
 	// abort the scale. If an error is returned the cleanup method will not be invoked. The percentage value
@@ -393,12 +389,12 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *corev1.ReplicationController, d
 	nextOldVal := valOrZero(oldRc.Spec.Replicas) - decrement
 	oldRc.Spec.Replicas = &nextOldVal
 	if valOrZero(oldRc.Spec.Replicas) < 0 {
-		oldRc.Spec.Replicas = newInt32Ptr(0)
+		oldRc.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 	// If the new is already fully scaled and available up to the desired size, go
 	// ahead and scale old all the way down.
 	if valOrZero(newRc.Spec.Replicas) == desired && newAvailable == desired {
-		oldRc.Spec.Replicas = newInt32Ptr(0)
+		oldRc.Spec.Replicas = utilpointer.Int32Ptr(0)
 	}
 	// Perform the scale-down.
 	fmt.Fprintf(config.Out, "Scaling %s down to %d\n", oldRc.Name, valOrZero(oldRc.Spec.Replicas))
@@ -482,7 +478,7 @@ func (r *RollingUpdater) getOrCreateTargetControllerWithClient(controller *corev
 		}
 		controller.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", valOrZero(controller.Spec.Replicas))
 		controller.Annotations[sourceIDAnnotation] = sourceID
-		controller.Spec.Replicas = newInt32Ptr(0)
+		controller.Spec.Replicas = utilpointer.Int32Ptr(0)
 		newRc, err := r.rcClient.ReplicationControllers(r.ns).Create(controller)
 		return newRc, false, err
 	}

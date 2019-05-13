@@ -18,14 +18,18 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -71,7 +75,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		startedTime, err := getContainerStartedTime(p, probTestContainerName)
 		framework.ExpectNoError(err)
 
-		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
+		e2elog.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
 		initialDelay := probTestInitialDelaySeconds * time.Second
 		if readyTime.Sub(startedTime) < initialDelay {
 			framework.Failf("Pod became ready before it's %v initial delay", initialDelay)
@@ -252,7 +256,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "liveness",
-						Image: imageutils.GetE2EImage(imageutils.Nginx),
+						Image: imageutils.GetE2EImage(imageutils.TestWebserver),
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &v1.Probe{
 							Handler: v1.Handler{
@@ -304,6 +308,82 @@ var _ = framework.KubeDescribe("Probing container", func() {
 				},
 			},
 		}, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release : v1.14
+		Testname: Pod http liveness probe, redirected to a local address
+		Description: A Pod is created with liveness probe on http endpoint /redirect?loc=healthz. The http handler on the /redirect will redirect to the /healthz endpoint, which will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
+	*/
+	It("should be restarted with a local redirect http liveness probe", func() {
+		runLivenessTest(f, &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "liveness-http-redirect",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "liveness",
+						Image:   imageutils.GetE2EImage(imageutils.Liveness),
+						Command: []string{"/server"},
+						LivenessProbe: &v1.Probe{
+							Handler: v1.Handler{
+								HTTPGet: &v1.HTTPGetAction{
+									Path: "/redirect?loc=" + url.QueryEscape("/healthz"),
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 1, defaultObservationTimeout)
+	})
+
+	/*
+		Release : v1.14
+		Testname: Pod http liveness probe, redirected to a non-local address
+		Description: A Pod is created with liveness probe on http endpoint /redirect with a redirect to http://0.0.0.0/. The http handler on the /redirect should not follow the redirect, but instead treat it as a success and generate an event.
+	*/
+	It("should *not* be restarted with a non-local redirect http liveness probe", func() {
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "liveness-http-redirect",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "liveness",
+						Image:   imageutils.GetE2EImage(imageutils.Liveness),
+						Command: []string{"/server"},
+						LivenessProbe: &v1.Probe{
+							Handler: v1.Handler{
+								HTTPGet: &v1.HTTPGetAction{
+									Path: "/redirect?loc=" + url.QueryEscape("http://0.0.0.0/"),
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}
+		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		// Expect an event of type "ProbeWarning".
+		expectedEvent := fields.Set{
+			"involvedObject.kind":      "Pod",
+			"involvedObject.name":      pod.Name,
+			"involvedObject.namespace": f.Namespace.Name,
+			"reason":                   events.ContainerProbeWarning,
+		}.AsSelector().String()
+		framework.ExpectNoError(framework.WaitTimeoutForPodEvent(
+			f.ClientSet, pod.Name, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
 })
 
@@ -405,14 +485,14 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// 'Terminated' which can cause indefinite blocking.)
 	framework.ExpectNoError(framework.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
-	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
+	e2elog.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
-	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
+	e2elog.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
 	deadline := time.Now().Add(timeout)
@@ -423,7 +503,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
-			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
+			e2elog.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))
 			if restartCount < lastRestartCount {
 				framework.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",

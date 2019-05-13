@@ -46,8 +46,9 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, volume mode 0400
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with permission mode set to 0400. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -r——-——-—-.
+	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance]", func() {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -61,8 +62,9 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, non-root user
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap as non-root user with uid 1000. Pod MUST be able to read the content of the ConfigMap successfully and the mode on the volume MUST be -rw—r——r—-.
+	   This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root [LinuxOnly] [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
@@ -83,8 +85,9 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, mapped, volume mode 0400
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap with permission mode set to 0400. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r-—r——r—-.
+	   This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance]", func() {
 		mode := int32(0400)
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
@@ -93,8 +96,9 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 	   Release : v1.9
 	   Testname: Projected Volume, ConfigMap, mapped, non-root user
 	   Description: A Pod is created with projected volume source ‘ConfigMap’ to store a configMap as non-root user with uid 1000. The ConfigMap is also mapped to a custom path. Pod MUST be able to read the content of the ConfigMap from the custom location successfully and the mode on the volume MUST be -r-—r——r—-.
+	   This test is marked LinuxOnly since Windows does not support running as UID / GID.
 	*/
-	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [NodeConformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root [LinuxOnly] [NodeConformance]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 

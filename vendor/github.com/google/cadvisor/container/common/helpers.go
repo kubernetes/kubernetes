@@ -134,7 +134,7 @@ func readString(dirpath string, file string) string {
 	if err != nil {
 		// Ignore non-existent files
 		if !os.IsNotExist(err) {
-			klog.Errorf("readString: Failed to read %q: %s", cgroupFile, err)
+			klog.Warningf("readString: Failed to read %q: %s", cgroupFile, err)
 		}
 		return ""
 	}

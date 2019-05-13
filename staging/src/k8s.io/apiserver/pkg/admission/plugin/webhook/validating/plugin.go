@@ -59,6 +59,6 @@ func NewValidatingAdmissionWebhook(configFile io.Reader) (*Plugin, error) {
 }
 
 // Validate makes an admission decision based on the request attributes.
-func (a *Plugin) Validate(attr admission.Attributes) error {
-	return a.Webhook.Dispatch(attr)
+func (a *Plugin) Validate(attr admission.Attributes, o admission.ObjectInterfaces) error {
+	return a.Webhook.Dispatch(attr, o)
 }

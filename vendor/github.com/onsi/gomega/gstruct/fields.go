@@ -14,10 +14,21 @@ import (
 
 //MatchAllFields succeeds if every field of a struct matches the field matcher associated with
 //it, and every element matcher is matched.
-//  Expect([]string{"a", "b"}).To(MatchAllFields(idFn, gstruct.Fields{
-//      "a": BeEqual("a"),
-//      "b": BeEqual("b"),
-//  })
+//    actual := struct{
+//      A int
+//      B []bool
+//      C string
+//    }{
+//      A: 5,
+//      B: []bool{true, false},
+//      C: "foo",
+//    }
+//
+//    Expect(actual).To(MatchAllFields(Fields{
+//      "A": Equal(5),
+//      "B": ConsistOf(true, false),
+//      "C": Equal("foo"),
+//    }))
 func MatchAllFields(fields Fields) types.GomegaMatcher {
 	return &FieldsMatcher{
 		Fields: fields,
@@ -26,10 +37,26 @@ func MatchAllFields(fields Fields) types.GomegaMatcher {
 
 //MatchFields succeeds if each element of a struct matches the field matcher associated with
 //it. It can ignore extra fields and/or missing fields.
-//  Expect([]string{"a", "c"}).To(MatchFields(idFn, IgnoreMissing|IgnoreExtra, gstruct.Fields{
-//      "a": BeEqual("a")
-//      "b": BeEqual("b"),
-//  })
+//    actual := struct{
+//      A int
+//      B []bool
+//      C string
+//    }{
+//      A: 5,
+//      B: []bool{true, false},
+//      C: "foo",
+//    }
+//
+//    Expect(actual).To(MatchFields(IgnoreExtras, Fields{
+//      "A": Equal(5),
+//      "B": ConsistOf(true, false),
+//    }))
+//    Expect(actual).To(MatchFields(IgnoreMissing, Fields{
+//      "A": Equal(5),
+//      "B": ConsistOf(true, false),
+//      "C": Equal("foo"),
+//      "D": Equal("extra"),
+//    }))
 func MatchFields(options Options, fields Fields) types.GomegaMatcher {
 	return &FieldsMatcher{
 		Fields:        fields,

@@ -73,7 +73,7 @@ var _ = initializer.WantsExternalKubeInformerFactory(&Lifecycle{})
 var _ = initializer.WantsExternalKubeClientSet(&Lifecycle{})
 
 // Admit makes an admission decision based on the request attributes
-func (l *Lifecycle) Admit(a admission.Attributes) error {
+func (l *Lifecycle) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// prevent deletion of immortal namespaces
 	if a.GetOperation() == admission.Delete && a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Namespace").GroupKind() && l.immortalNamespaces.Has(a.GetName()) {
 		return errors.NewForbidden(a.GetResource().GroupResource(), a.GetName(), fmt.Errorf("this namespace may not be deleted"))

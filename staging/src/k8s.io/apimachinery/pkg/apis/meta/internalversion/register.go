@@ -89,12 +89,12 @@ func addToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&metav1beta1.PartialObjectMetadata{},
 		&metav1beta1.PartialObjectMetadataList{},
 	)
-	scheme.AddKnownTypes(metav1beta1.SchemeGroupVersion,
-		&metav1beta1.Table{},
-		&metav1beta1.TableOptions{},
-		&metav1beta1.PartialObjectMetadata{},
-		&metav1beta1.PartialObjectMetadataList{},
-	)
+	if err := metav1beta1.AddMetaToScheme(scheme); err != nil {
+		return err
+	}
+	if err := metav1.AddMetaToScheme(scheme); err != nil {
+		return err
+	}
 	// Allow delete options to be decoded across all version in this scheme (we may want to be more clever than this)
 	scheme.AddUnversionedTypes(SchemeGroupVersion,
 		&metav1.DeleteOptions{},

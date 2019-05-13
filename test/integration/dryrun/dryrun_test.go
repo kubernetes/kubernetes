@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 )
 
@@ -58,7 +58,7 @@ func DryRunCreateTest(t *testing.T, rsc dynamic.ResourceInterface, obj *unstruct
 
 func DryRunPatchTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	patch := []byte(`{"metadata":{"annotations":{"patch": "true"}}}`)
-	obj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
+	obj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}
@@ -97,7 +97,7 @@ func DryRunScalePatchTest(t *testing.T, rsc dynamic.ResourceInterface, name stri
 
 	replicas := getReplicasOrFail(t, obj)
 	patch := []byte(`{"spec":{"replicas":10}}`)
-	patchedObj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
+	patchedObj, err := rsc.Patch(name, types.MergePatchType, patch, metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "scale")
 	if err != nil {
 		t.Fatalf("failed to dry-run patch object: %v", err)
 	}
@@ -204,7 +204,7 @@ func DryRunDeleteTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 
 // TestDryRun tests dry-run on all types.
 func TestDryRun(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, true)()
 
 	master := etcd.StartRealMasterOrDie(t)
 	defer master.Cleanup()

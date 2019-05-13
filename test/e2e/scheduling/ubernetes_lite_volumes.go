@@ -28,8 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 )
 
@@ -66,7 +66,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 	// Get all the zones that the nodes are in
 	expectedZones, err := gceCloud.GetAllZonesFromCloudProvider()
 	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("Expected zones: %v", expectedZones)
+	e2elog.Logf("Expected zones: %v", expectedZones)
 
 	// Get all the zones in this current region
 	region := gceCloud.Region()
@@ -121,7 +121,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	defer func() {
 		// Teardown of the compute instance
-		framework.Logf("Deleting compute resource: %v", name)
+		e2elog.Logf("Deleting compute resource: %v", name)
 		err := gceCloud.DeleteInstance(project, zone, name)
 		Expect(err).NotTo(HaveOccurred())
 	}()
@@ -141,7 +141,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 		// Defer the cleanup
 		defer func() {
-			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil {
 				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
@@ -166,7 +166,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 		pv, err := c.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
-		pvZone, ok := pv.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain]
+		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		Expect(ok).To(BeTrue(), "PV has no LabelZone to be found")
 		pvZones.Insert(pvZone)
 	}

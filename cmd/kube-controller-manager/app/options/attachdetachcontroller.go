@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 )
 
 // AttachDetachControllerOptions holds the AttachDetachController options.
 type AttachDetachControllerOptions struct {
-	*kubectrlmgrconfig.AttachDetachControllerConfiguration
+	*attachdetachconfig.AttachDetachControllerConfiguration
 }
 
 // AddFlags adds flags related to AttachDetachController for controller manager to the specified FlagSet.
@@ -38,7 +38,7 @@ func (o *AttachDetachControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up AttachDetachController config with options.
-func (o *AttachDetachControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.AttachDetachControllerConfiguration) error {
+func (o *AttachDetachControllerOptions) ApplyTo(cfg *attachdetachconfig.AttachDetachControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

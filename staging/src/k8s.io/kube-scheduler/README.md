@@ -1,6 +1,6 @@
 # kube-scheduler
 
-Implements [KEP 14 - Moving ComponentConfig API types to staging repos](https://github.com/kubernetes/community/blob/master/keps/sig-cluster-lifecycle/0014-20180707-componentconfig-api-types-to-staging.md#kube-scheduler-changes)
+Implements [KEP 14 - Moving ComponentConfig API types to staging repos](https://git.k8s.io/enhancements/keps/sig-cluster-lifecycle/0014-20180707-componentconfig-api-types-to-staging.md#kube-scheduler-changes)
 
 This repo provides external, versioned ComponentConfig API types for configuring the kube-scheduler.
 These external types can easily be vendored and used by any third-party tool writing Kubernetes

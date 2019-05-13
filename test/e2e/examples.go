@@ -28,7 +28,10 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	. "github.com/onsi/ginkgo"
@@ -50,10 +53,11 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		framework.BindClusterRoleInNamespace(c.RbacV1beta1(), "edit", f.Namespace.Name,
+		err := auth.BindClusterRoleInNamespace(c.RbacV1beta1(), "edit", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+		framework.ExpectNoError(err)
 
-		err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+		err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)
@@ -62,8 +66,8 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Liveness", func() {
 		It("liveness pods should be automatically restarted", func() {
 			test := "test/fixtures/doc-yaml/user-guide/liveness"
-			execYaml := readFile(test, "exec-liveness.yaml")
-			httpYaml := readFile(test, "http-liveness.yaml")
+			execYaml := readFile(test, "exec-liveness.yaml.in")
+			httpYaml := readFile(test, "http-liveness.yaml.in")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			framework.RunKubectlOrDieInput(execYaml, "create", "-f", "-", nsFlag)
@@ -79,14 +83,14 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
-					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
+					e2elog.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
 					if stat.RestartCount > 0 {
-						framework.Logf("Saw %v restart, succeeded...", podName)
+						e2elog.Logf("Saw %v restart, succeeded...", podName)
 						wg.Done()
 						return
 					}
 				}
-				framework.Logf("Failed waiting for %v restart! ", podName)
+				e2elog.Logf("Failed waiting for %v restart! ", podName)
 				passed = false
 				wg.Done()
 			}
@@ -111,7 +115,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		It("should create a pod that reads a secret", func() {
 			test := "test/fixtures/doc-yaml/user-guide/secrets"
 			secretYaml := readFile(test, "secret.yaml")
-			podYaml := readFile(test, "secret-pod.yaml")
+			podYaml := readFile(test, "secret-pod.yaml.in")
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "secret-test-pod"
@@ -131,7 +135,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			test := "test/fixtures/doc-yaml/user-guide/downward-api"
-			podYaml := readFile(test, "dapi-pod.yaml")
+			podYaml := readFile(test, "dapi-pod.yaml.in")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "dapi-test-pod"
 
@@ -151,5 +155,5 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
-	return string(testfiles.ReadOrDie(from, Fail))
+	return commonutils.SubstituteImageName(string(testfiles.ReadOrDie(from, Fail)))
 }

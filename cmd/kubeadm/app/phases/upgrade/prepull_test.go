@@ -116,32 +116,32 @@ func TestPrepullImagesInParallel(t *testing.T) {
 		{
 			name:        "should error out; create failed",
 			p:           NewFailedCreatePrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: true,
 		},
 		{
 			name:        "should error out; timeout exceeded",
 			p:           NewForeverWaitPrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: true,
 		},
 		{
 			name:        "should error out; delete failed",
 			p:           NewFailedDeletePrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: true,
 		},
 		{
 			name:        "should work just fine",
 			p:           NewGoodPrepuller(),
-			timeout:     10 * time.Second,
+			timeout:     constants.PrepullImagesInParallelTimeout,
 			expectedErr: false,
 		},
 	}
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actualErr := PrepullImagesInParallel(rt.p, rt.timeout, append(constants.MasterComponents, constants.Etcd))
+			actualErr := PrepullImagesInParallel(rt.p, rt.timeout, append(constants.ControlPlaneComponents, constants.Etcd))
 			if (actualErr != nil) != rt.expectedErr {
 				t.Errorf(
 					"failed TestPrepullImagesInParallel\n\texpected error: %t\n\tgot: %t",

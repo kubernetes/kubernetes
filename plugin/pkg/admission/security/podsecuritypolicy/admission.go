@@ -109,7 +109,7 @@ func (a *PodSecurityPolicyPlugin) SetExternalKubeInformerFactory(f informers.Sha
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -149,7 +149,7 @@ func (c *PodSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
-func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes) error {
+func (c *PodSecurityPolicyPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -306,35 +306,14 @@ func (c *PodSecurityPolicyPlugin) computeSecurityContext(a admission.Attributes,
 func assignSecurityContext(provider psp.Provider, pod *api.Pod) field.ErrorList {
 	errs := field.ErrorList{}
 
-	err := provider.DefaultPodSecurityContext(pod)
-	if err != nil {
-		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
+	if err := provider.MutatePod(pod); err != nil {
+		// TODO(tallclair): MutatePod should return a field.ErrorList
+		errs = append(errs, field.Invalid(field.NewPath(""), pod, err.Error()))
 	}
 
 	errs = append(errs, provider.ValidatePod(pod)...)
 
-	for i := range pod.Spec.InitContainers {
-		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
-			continue
-		}
-		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i))...)
-	}
-
-	for i := range pod.Spec.Containers {
-		err := provider.DefaultContainerSecurityContext(pod, &pod.Spec.Containers[i])
-		if err != nil {
-			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
-			continue
-		}
-		errs = append(errs, provider.ValidateContainer(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i))...)
-	}
-
-	if len(errs) > 0 {
-		return errs
-	}
-	return nil
+	return errs
 }
 
 // createProvidersFromPolicies creates providers from the constraints supplied.

@@ -24,12 +24,14 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -38,6 +40,10 @@ import (
 
 const (
 	CNIPluginName = "cni"
+
+	// defaultSyncConfigPeriod is the default period to sync CNI config
+	// TODO: consider making this value configurable or to be a more appropriate value.
+	defaultSyncConfigPeriod = time.Second * 5
 )
 
 type cniNetworkPlugin struct {
@@ -194,6 +200,10 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfi
 	plugin.host = host
 
 	plugin.syncNetworkConfig()
+
+	// start a goroutine to sync network config from confDir periodically to detect network config updates in every 5 seconds
+	go wait.Forever(plugin.syncNetworkConfig, defaultSyncConfigPeriod)
+
 	return nil
 }
 
@@ -264,9 +274,6 @@ func (plugin *cniNetworkPlugin) Name() string {
 }
 
 func (plugin *cniNetworkPlugin) Status() error {
-	// sync network config from confDir periodically to detect network config updates
-	plugin.syncNetworkConfig()
-
 	// Can't set up pods if we don't have any CNI network configs yet
 	return plugin.checkInitialized()
 }
@@ -391,11 +398,14 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	if ingress != nil || egress != nil {
 		bandwidthParam := cniBandwidthEntry{}
 		if ingress != nil {
-			bandwidthParam.IngressRate = int(ingress.Value() / 1000)
+			// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md and
+			// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
+			// Rates are in bits per second, burst values are in bits.
+			bandwidthParam.IngressRate = int(ingress.Value())
 			bandwidthParam.IngressBurst = math.MaxInt32 // no limit
 		}
 		if egress != nil {
-			bandwidthParam.EgressRate = int(egress.Value() / 1000)
+			bandwidthParam.EgressRate = int(egress.Value())
 			bandwidthParam.EgressBurst = math.MaxInt32 // no limit
 		}
 		rt.CapabilityArgs["bandwidth"] = bandwidthParam

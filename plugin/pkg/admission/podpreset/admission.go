@@ -90,7 +90,7 @@ func (a *podPresetPlugin) SetExternalKubeInformerFactory(f informers.SharedInfor
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
-func (c *podPresetPlugin) Admit(a admission.Attributes) error {
+func (c *podPresetPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than CREATE.
 	if len(a.GetSubresource()) != 0 || a.GetResource().GroupResource() != api.Resource("pods") || a.GetOperation() != admission.Create {
@@ -184,6 +184,12 @@ func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.Pod
 			errs = append(errs, err)
 		}
 	}
+	for _, iCtr := range pod.Spec.InitContainers {
+		if err := safeToApplyPodPresetsOnContainer(&iCtr, podPresets); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
 	return utilerrors.NewAggregate(errs)
 }
 
@@ -380,6 +386,10 @@ func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.PodPreset
 	for i, ctr := range pod.Spec.Containers {
 		applyPodPresetsOnContainer(&ctr, podPresets)
 		pod.Spec.Containers[i] = ctr
+	}
+	for i, iCtr := range pod.Spec.InitContainers {
+		applyPodPresetsOnContainer(&iCtr, podPresets)
+		pod.Spec.InitContainers[i] = iCtr
 	}
 
 	// add annotation

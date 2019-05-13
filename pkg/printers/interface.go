@@ -37,6 +37,7 @@ func (fn ResourcePrinterFunc) PrintObj(obj runtime.Object, w io.Writer) error {
 	return fn(obj, w)
 }
 
+// PrintOptions struct defines a struct for various print options
 type PrintOptions struct {
 	// supported Format types can be found in pkg/printers/printers.go
 	OutputFormatType     string
@@ -46,7 +47,6 @@ type PrintOptions struct {
 	WithNamespace      bool
 	WithKind           bool
 	Wide               bool
-	ShowAll            bool
 	ShowLabels         bool
 	AbsoluteTimestamps bool
 	Kind               schema.GroupKind

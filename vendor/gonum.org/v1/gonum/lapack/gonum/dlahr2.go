@@ -65,15 +65,41 @@ import (
 //
 // Dlahr2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlahr2(n, k, nb int, a []float64, lda int, tau, t []float64, ldt int, y []float64, ldy int) {
-	checkMatrix(n, n-k+1, a, lda)
-	if len(tau) < nb {
-		panic(badTau)
+	switch {
+	case n < 0:
+		panic(nLT0)
+	case k < 0:
+		panic(kLT0)
+	case nb < 0:
+		panic(nbLT0)
+	case nb > n:
+		panic(nbGTN)
+	case lda < max(1, n-k+1):
+		panic(badLdA)
+	case ldt < max(1, nb):
+		panic(badLdT)
+	case ldy < max(1, nb):
+		panic(badLdY)
 	}
-	checkMatrix(nb, nb, t, ldt)
-	checkMatrix(n, nb, y, ldy)
 
 	// Quick return if possible.
-	if n <= 1 {
+	if n < 0 {
+		return
+	}
+
+	switch {
+	case len(a) < (n-1)*lda+n-k+1:
+		panic(shortA)
+	case len(tau) < nb:
+		panic(shortTau)
+	case len(t) < (nb-1)*ldt+nb:
+		panic(shortT)
+	case len(y) < (n-1)*ldy+nb:
+		panic(shortY)
+	}
+
+	// Quick return if possible.
+	if n == 1 {
 		return
 	}
 

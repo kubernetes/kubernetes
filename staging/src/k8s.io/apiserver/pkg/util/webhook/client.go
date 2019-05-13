@@ -49,6 +49,7 @@ type ClientConfigService struct {
 	Name      string
 	Namespace string
 	Path      string
+	Port      int32
 }
 
 // ClientManager builds REST clients to talk to webhooks. It caches the clients
@@ -164,7 +165,11 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 		}
 		cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == host {
-				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name)
+				port := cc.Service.Port
+				if port == 0 {
+					port = 443
+				}
+				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name, port)
 				if err != nil {
 					return nil, err
 				}

@@ -92,6 +92,7 @@ var (
 	}
 )
 
+// NewCmdCompletion creates the `completion` command
 func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	shells := []string{}
 	for s := range completionShells {
@@ -114,6 +115,7 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	return cmd
 }
 
+// RunCompletion checks given arguments and executes command
 func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return cmdutil.UsageErrorf(cmd, "Shell not specified.")

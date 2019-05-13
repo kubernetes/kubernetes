@@ -19,23 +19,18 @@ package config
 import (
 	"bytes"
 	"io/ioutil"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-)
-
-const (
-	master_v1alpha3YAML   = "testdata/conversion/master/v1alpha3.yaml"
-	master_v1beta1YAML    = "testdata/conversion/master/v1beta1.yaml"
-	master_internalYAML   = "testdata/conversion/master/internal.yaml"
-	master_incompleteYAML = "testdata/defaulting/master/incomplete.yaml"
-	master_defaultedYAML  = "testdata/defaulting/master/defaulted.yaml"
-	master_invalidYAML    = "testdata/validation/invalid_mastercfg.yaml"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"sigs.k8s.io/yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -51,49 +46,125 @@ func diff(expected, actual []byte) string {
 	return diffBytes.String()
 }
 
-func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
+func TestLoadInitConfigurationFromFile(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Couldn't create tmpdir")
+	}
+	defer os.RemoveAll(tmpdir)
+
+	// cfgFiles is in cluster_test.go
+	var tests = []struct {
+		name         string
+		fileContents []byte
+		expectErr    bool
+	}{
+		{
+			name:         "v1beta1.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta1"],
+		},
+		{
+			name:         "v1beta1.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta1"],
+		},
+		{
+			name: "v1beta1.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta1"],
+				cfgFiles["ClusterConfiguration_v1beta1"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+		{
+			name:         "v1beta2.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta2"],
+		},
+		{
+			name:         "v1beta2.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta2"],
+		},
+		{
+			name: "v1beta2.full",
+			fileContents: bytes.Join([][]byte{
+				cfgFiles["InitConfiguration_v1beta2"],
+				cfgFiles["ClusterConfiguration_v1beta2"],
+				cfgFiles["Kube-proxy_componentconfig"],
+				cfgFiles["Kubelet_componentconfig"],
+			}, []byte(constants.YAMLDocumentSeparator)),
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.name, func(t2 *testing.T) {
+			cfgPath := filepath.Join(tmpdir, rt.name)
+			err := ioutil.WriteFile(cfgPath, rt.fileContents, 0644)
+			if err != nil {
+				t.Errorf("Couldn't create file")
+				return
+			}
+
+			obj, err := LoadInitConfigurationFromFile(cfgPath)
+			if rt.expectErr {
+				if err == nil {
+					t.Error("Unexpected success")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Error reading file: %v", err)
+					return
+				}
+
+				if obj == nil {
+					t.Errorf("Unexpected nil return value")
+				}
+			}
+		})
+	}
+}
+
+/*
+func TestInitConfigurationMarshallingFromFile(t *testing.T) {
+	controlPlaneV1beta1YAMLAbstracted := controlPlaneV1beta1YAML
+	controlPlaneInternalYAMLAbstracted := controlPlaneInternalYAML
+	controlPlaneDefaultedYAMLAbstracted := controlPlaneDefaultedYAML
+	if runtime.GOOS != "linux" {
+		controlPlaneV1beta1YAMLAbstracted = controlPlaneV1beta1YAMLNonLinux
+		controlPlaneInternalYAMLAbstracted = controlPlaneInternalYAMLNonLinux
+		controlPlaneDefaultedYAMLAbstracted = controlPlaneDefaultedYAMLNonLinux
+	}
+
 	var tests = []struct {
 		name, in, out string
 		groupVersion  schema.GroupVersion
 		expectedErr   bool
 	}{
-		// These tests are reading one file, loading it using ConfigFileAndDefaultsToInternalConfig that all of kubeadm is using for unmarshal of our API types,
+		// These tests are reading one file, loading it using LoadInitConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha3 -> internal
-			name:         "v1alpha3ToInternal",
-			in:           master_v1alpha3YAML,
-			out:          master_internalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
-		},
-		{ // v1beta1 -> internal
-			name:         "v1beta1ToInternal",
-			in:           master_v1beta1YAML,
-			out:          master_internalYAML,
-			groupVersion: kubeadm.SchemeGroupVersion,
-		},
-		{ // v1alpha3 -> internal -> v1beta1
-			name:         "v1alpha3Tov1beta1",
-			in:           master_v1alpha3YAML,
-			out:          master_v1beta1YAML,
-			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
-		},
+		//{ // v1beta1 -> internal NB. test commented after changes required for upgrading to go v1.12
+		//	name:         "v1beta1ToInternal",
+		//	in:           controlPlaneV1beta1YAMLAbstracted,
+		//	out:          controlPlaneInternalYAMLAbstracted,
+		//	groupVersion: kubeadm.SchemeGroupVersion,
+		//},
 		{ // v1beta1 -> internal -> v1beta1
 			name:         "v1beta1Tov1beta1",
-			in:           master_v1beta1YAML,
-			out:          master_v1beta1YAML,
+			in:           controlPlaneV1beta1YAMLAbstracted,
+			out:          controlPlaneV1beta1YAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		// These tests are reading one file that has only a subset of the fields populated, loading it using ConfigFileAndDefaultsToInternalConfig,
+		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadInitConfigurationFromFile,
 		// and then marshals the internal object to the expected groupVersion
 		{ // v1beta1 -> default -> validate -> internal -> v1beta1
 			name:         "incompleteYAMLToDefaultedv1beta1",
-			in:           master_incompleteYAML,
-			out:          master_defaultedYAML,
+			in:           controlPlaneIncompleteYAML,
+			out:          controlPlaneDefaultedYAMLAbstracted,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
-		{ // v1alpha3 -> validation should fail
+		{ // v1beta1 -> validation should fail
 			name:        "invalidYAMLShouldFail",
-			in:          master_invalidYAML,
+			in:          controlPlaneInvalidYAML,
 			expectedErr: true,
 		},
 	}
@@ -101,7 +172,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			internalcfg, err := ConfigFileAndDefaultsToInternalConfig(rt.in, &kubeadmapiv1beta1.InitConfiguration{})
+			internalcfg, err := LoadInitConfigurationFromFile(rt.in)
 			if err != nil {
 				if rt.expectedErr {
 					return
@@ -126,6 +197,7 @@ func TestConfigFileAndDefaultsToInternalConfig(t *testing.T) {
 		})
 	}
 }
+*/
 
 func TestConsistentOrderByteSlice(t *testing.T) {
 	var (
@@ -211,6 +283,83 @@ apiVersion: foo.k8s.io/v1
 			actual := consistentOrderByteSlice(rt.in)
 			if !reflect.DeepEqual(rt.expected, actual) {
 				t2.Errorf("the expected and actual output differs.\n\texpected: %s\n\tout: %s\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestDefaultTaintsMarshaling(t *testing.T) {
+	tests := []struct {
+		desc             string
+		cfg              kubeadmapiv1beta2.InitConfiguration
+		expectedTaintCnt int
+	}{
+		{
+			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedTaintCnt: 1,
+		},
+		{
+			desc: "Uninitialized taints field produces a single taint (the master one)",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{},
+			},
+			expectedTaintCnt: 1,
+		},
+		{
+			desc: "Forsing taints to an empty slice produces no taints",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+					Taints: []v1.Taint{},
+				},
+			},
+			expectedTaintCnt: 0,
+		},
+		{
+			desc: "Custom taints are used",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+					Taints: []v1.Taint{
+						{Key: "taint1"},
+						{Key: "taint2"},
+					},
+				},
+			},
+			expectedTaintCnt: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			b, err := yaml.Marshal(tc.cfg)
+			if err != nil {
+				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
+			}
+
+			cfg, err := BytesToInitConfiguration(b)
+			if err != nil {
+				t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
+			}
+
+			if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
+				t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
 			}
 		})
 	}

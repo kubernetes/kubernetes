@@ -18,20 +18,21 @@ package node
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -46,13 +47,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 		BeforeEach(func() {
 			podClient = f.PodClient()
 		})
-		// TODO: Fix Flaky issue #68066 and then re-add this back into Conformance Suite
+
 		/*
-			Release : v1.9
+			Release : v1.15
 			Testname: Pods, delete grace period
-			Description: Create a pod, make sure it is running, create a watch to observe Pod creation. Create a 'kubectl local proxy', capture the port the proxy is listening. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
+			Description: Create a pod, make sure it is running. Create a 'kubectl local proxy', capture the port the proxy is listening. Using the http client send a ‘delete’ with gracePeriodSeconds=30. Pod SHOULD get deleted within 30 seconds.
 		*/
-		It("should be submitted and removed  [Flaky]", func() {
+		framework.ConformanceIt("should be submitted and removed", func() {
 			By("creating the pod")
 			name := "pod-submit-remove-" + string(uuid.NewUUID())
 			value := strconv.Itoa(time.Now().Nanosecond())
@@ -74,7 +75,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 				},
 			}
 
-			By("setting up watch")
+			By("setting up selector")
 			selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 			options := metav1.ListOptions{LabelSelector: selector.String()}
 			pods, err := podClient.List(options)
@@ -84,8 +85,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 				LabelSelector:   selector.String(),
 				ResourceVersion: pods.ListMeta.ResourceVersion,
 			}
-			w, err := podClient.Watch(options)
-			Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
 
 			By("submitting the pod to kubernetes")
 			podClient.Create(pod)
@@ -96,16 +95,6 @@ var _ = SIGDescribe("Pods Extended", func() {
 			pods, err = podClient.List(options)
 			Expect(err).NotTo(HaveOccurred(), "failed to query for pod")
 			Expect(len(pods.Items)).To(Equal(1))
-
-			By("verifying pod creation was observed")
-			select {
-			case event, _ := <-w.ResultChan():
-				if event.Type != watch.Added {
-					framework.Failf("Failed to observe pod creation: %v", event)
-				}
-			case <-time.After(framework.PodStartTimeout):
-				framework.Failf("Timeout while waiting for pod creation")
-			}
 
 			// We need to wait for the pod to be running, otherwise the deletion
 			// may be carried out immediately rather than gracefully.
@@ -143,14 +132,19 @@ var _ = SIGDescribe("Pods Extended", func() {
 			By("deleting the pod gracefully")
 			rsp, err := client.Do(req)
 			Expect(err).NotTo(HaveOccurred(), "failed to use http client to send delete")
+			Expect(rsp.StatusCode).Should(Equal(http.StatusOK), "failed to delete gracefully by client request")
+			var lastPod v1.Pod
+			err = json.NewDecoder(rsp.Body).Decode(&lastPod)
+			Expect(err).NotTo(HaveOccurred(), "failed to decode graceful termination proxy response")
 
 			defer rsp.Body.Close()
 
 			By("verifying the kubelet observed the termination notice")
+
 			Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
 				podList, err := framework.GetKubeletPods(f.ClientSet, pod.Spec.NodeName)
 				if err != nil {
-					framework.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
+					e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", pod.Spec.NodeName, err)
 					return false, nil
 				}
 				for _, kubeletPod := range podList.Items {
@@ -158,34 +152,14 @@ var _ = SIGDescribe("Pods Extended", func() {
 						continue
 					}
 					if kubeletPod.ObjectMeta.DeletionTimestamp == nil {
-						framework.Logf("deletion has not yet been observed")
+						e2elog.Logf("deletion has not yet been observed")
 						return false, nil
 					}
-					return true, nil
+					return false, nil
 				}
-				framework.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
+				e2elog.Logf("no pod exists with the name we were looking for, assuming the termination request was observed and completed")
 				return true, nil
 			})).NotTo(HaveOccurred(), "kubelet never observed the termination notice")
-
-			By("verifying pod deletion was observed")
-			deleted := false
-			timeout := false
-			var lastPod *v1.Pod
-			timer := time.After(2 * time.Minute)
-			for !deleted && !timeout {
-				select {
-				case event, _ := <-w.ResultChan():
-					if event.Type == watch.Deleted {
-						lastPod = event.Object.(*v1.Pod)
-						deleted = true
-					}
-				case <-timer:
-					timeout = true
-				}
-			}
-			if !deleted {
-				framework.Failf("Failed to observe pod deletion")
-			}
 
 			Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
 			Expect(lastPod.Spec.TerminationGracePeriodSeconds).ToNot(BeZero())

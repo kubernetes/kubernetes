@@ -30,7 +30,7 @@ func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
 
 type fakeServiceResolver struct{}
 
-func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return nil, nil
 }
 

@@ -33,7 +33,7 @@ data:
     clusters:
     - cluster:
         certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        server: {{ .MasterEndpoint }}
+        server: {{ .ControlPlaneEndpoint }}
       name: default
     contexts:
     - context:
@@ -69,8 +69,6 @@ spec:
     metadata:
       labels:
         k8s-app: kube-proxy
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ""
     spec:
       priorityClassName: system-node-critical
       containers:
@@ -114,5 +112,7 @@ spec:
       - key: CriticalAddonsOnly
         operator: Exists
       - operator: Exists
+      nodeSelector:
+        beta.kubernetes.io/os: linux
 `
 )

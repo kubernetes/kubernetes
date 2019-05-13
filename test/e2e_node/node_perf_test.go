@@ -56,53 +56,74 @@ func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfigur
 // Slow by design.
 var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 	f := framework.NewDefaultFramework("node-performance-testing")
+	var (
+		wl     workloads.NodePerfWorkload
+		oldCfg *kubeletconfig.KubeletConfiguration
+		newCfg *kubeletconfig.KubeletConfiguration
+		pod    *corev1.Pod
+	)
+	JustBeforeEach(func() {
+		err := wl.PreTestExec()
+		framework.ExpectNoError(err)
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+		newCfg, err = wl.KubeletConfig(oldCfg)
+		framework.ExpectNoError(err)
+		setKubeletConfig(f, newCfg)
+	})
+
+	cleanup := func() {
+		gp := int64(0)
+		delOpts := metav1.DeleteOptions{
+			GracePeriodSeconds: &gp,
+		}
+		f.PodClient().DeleteSync(pod.Name, &delOpts, framework.DefaultPodDeletionTimeout)
+		By("running the post test exec from the workload")
+		err := wl.PostTestExec()
+		framework.ExpectNoError(err)
+		setKubeletConfig(f, oldCfg)
+	}
+
+	runWorkload := func() {
+		By("running the workload and waiting for success")
+		// Make the pod for the workload.
+		pod = makeNodePerfPod(wl)
+		// Create the pod.
+		pod = f.PodClient().CreateSync(pod)
+		// Wait for pod success.
+		f.PodClient().WaitForSuccess(pod.Name, wl.Timeout())
+		podLogs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		framework.ExpectNoError(err)
+		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
+		framework.ExpectNoError(err)
+		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
+	}
 
 	Context("Run node performance testing with pre-defined workloads", func() {
-		It("run each pre-defined workload", func() {
-			By("running the workloads")
-			for _, workload := range workloads.NodePerfWorkloads {
-				By("running the pre test exec from the workload")
-				err := workload.PreTestExec()
-				framework.ExpectNoError(err)
-
-				By("restarting kubelet with required configuration")
-				// Get the Kubelet config required for this workload.
-				oldCfg, err := getCurrentKubeletConfig()
-				framework.ExpectNoError(err)
-
-				newCfg, err := workload.KubeletConfig(oldCfg)
-				framework.ExpectNoError(err)
-				// Set the Kubelet config required for this workload.
-				setKubeletConfig(f, newCfg)
-
-				By("running the workload and waiting for success")
-				// Make the pod for the workload.
-				pod := makeNodePerfPod(workload)
-
-				// Create the pod.
-				pod = f.PodClient().CreateSync(pod)
-				// Wait for pod success.
-				f.PodClient().WaitForSuccess(pod.Name, workload.Timeout())
-				podLogs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-				framework.ExpectNoError(err)
-				perf, err := workload.ExtractPerformanceFromLogs(podLogs)
-				framework.ExpectNoError(err)
-				framework.Logf("Time to complete workload %s: %v", workload.Name(), perf)
-
-				// Delete the pod.
-				gp := int64(0)
-				delOpts := metav1.DeleteOptions{
-					GracePeriodSeconds: &gp,
-				}
-				f.PodClient().DeleteSync(pod.Name, &delOpts, framework.DefaultPodDeletionTimeout)
-
-				By("running the post test exec from the workload")
-				err = workload.PostTestExec()
-				framework.ExpectNoError(err)
-
-				// Set the Kubelet config back to the old one.
-				setKubeletConfig(f, oldCfg)
-			}
+		BeforeEach(func() {
+			wl = workloads.NodePerfWorkloads[0]
+		})
+		It("NAS parallel benchmark (NPB) suite - Integer Sort (IS) workload", func() {
+			defer cleanup()
+			runWorkload()
+		})
+	})
+	Context("Run node performance testing with pre-defined workloads", func() {
+		BeforeEach(func() {
+			wl = workloads.NodePerfWorkloads[1]
+		})
+		It("NAS parallel benchmark (NPB) suite - Embarrassingly Parallel (EP) workload", func() {
+			defer cleanup()
+			runWorkload()
+		})
+	})
+	Context("Run node performance testing with pre-defined workloads", func() {
+		BeforeEach(func() {
+			wl = workloads.NodePerfWorkloads[2]
+		})
+		It("TensorFlow workload", func() {
+			defer cleanup()
+			runWorkload()
 		})
 	})
 })

@@ -8,7 +8,11 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["constants.go"],
+    srcs = [
+        "constants.go",
+        "constants_unix.go",
+        "constants_windows.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/constants",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

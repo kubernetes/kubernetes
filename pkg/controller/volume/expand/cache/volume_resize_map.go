@@ -92,7 +92,7 @@ func NewVolumeResizeMap(kubeClient clientset.Interface) VolumeResizeMap {
 // AddPVCUpdate adds pvc for resizing
 // This function intentionally allows addition of PVCs for which pv.Spec.Size >= pvc.Spec.Size,
 // the reason being - lack of transaction in k8s means after successful resize, we can't guarantee that when we update PV,
-// pvc update will be successful too and after resize we alyways update PV first.
+// pvc update will be successful too and after resize we always update PV first.
 // If for some reason we weren't able to update PVC after successful resize, then we are going to reprocess
 // the PVC and hopefully after a no-op resize in volume plugin, PVC will be updated with right values as well.
 func (resizeMap *volumeResizeMap) AddPVCUpdate(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
@@ -185,7 +185,7 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	oldData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Unexpected error marshaling old PV %q with error : %v", pvClone.Name, err)
 	}
 
 	pvClone.Spec.Capacity[v1.ResourceStorage] = newSize
@@ -193,13 +193,13 @@ func (resizeMap *volumeResizeMap) UpdatePVSize(pvcr *PVCWithResizeRequest, newSi
 	newData, err := json.Marshal(pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Unexpected error marshaling new PV %q with error : %v", pvClone.Name, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvClone)
 
 	if err != nil {
-		return fmt.Errorf("Error Creating two way merge patch for  PV : %q with error %v", pvClone.Name, err)
+		return fmt.Errorf("Error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
 	_, updateErr := resizeMap.kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, commontypes.StrategicMergePatchType, patchBytes)

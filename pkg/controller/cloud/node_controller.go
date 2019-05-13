@@ -22,9 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -57,14 +56,6 @@ type CloudNodeController struct {
 
 	nodeStatusUpdateFrequency time.Duration
 }
-
-const (
-	// nodeStatusUpdateRetry controls the number of retries of writing NodeStatus update.
-	nodeStatusUpdateRetry = 5
-
-	// The amount of time the nodecontroller should sleep between retrying NodeStatus updates
-	retrySleepTime = 20 * time.Millisecond
-)
 
 // NewCloudNodeController creates a CloudNodeController object
 func NewCloudNodeController(
@@ -187,11 +178,11 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 			return
 		}
 	}
-	newNode := node.DeepCopy()
-	newNode.Status.Addresses = nodeAddresses
-	if !nodeAddressesChangeDetected(node.Status.Addresses, newNode.Status.Addresses) {
+	if !nodeAddressesChangeDetected(node.Status.Addresses, nodeAddresses) {
 		return
 	}
+	newNode := node.DeepCopy()
+	newNode.Status.Addresses = nodeAddresses
 	_, _, err = nodeutil.PatchNodeStatus(cnc.kubeClient.CoreV1(), types.NodeName(node.Name), node, newNode)
 	if err != nil {
 		klog.Errorf("Error patching node with cloud ip addresses = [%v]", err)
@@ -199,14 +190,22 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 }
 
 func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
-	if _, ok := newObj.(*v1.Node); !ok {
+	node, ok := newObj.(*v1.Node)
+	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
 		return
 	}
-	cnc.AddCloudNode(newObj)
+
+	cloudTaint := getCloudTaint(node.Spec.Taints)
+	if cloudTaint == nil {
+		// The node has already been initialized so nothing to do.
+		return
+	}
+
+	cnc.initializeNode(node)
 }
 
-// This processes nodes that were added into the cluster, and cloud initialize them if appropriate
+// AddCloudNode handles initializing new nodes registered with the cloud taint.
 func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 	node := obj.(*v1.Node)
 
@@ -215,6 +214,12 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		klog.V(2).Infof("This node %s is registered without the cloud taint. Will not process.", node.Name)
 		return
 	}
+
+	cnc.initializeNode(node)
+}
+
+// This processes nodes that were added into the cluster, and cloud initialize them if appropriate
+func (cnc *CloudNodeController) initializeNode(node *v1.Node) {
 
 	instances, ok := cnc.cloud.Instances()
 	if !ok {
@@ -271,8 +276,8 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 		if instanceType, err := getInstanceTypeByProviderIDOrName(instances, curNode); err != nil {
 			return err
 		} else if instanceType != "" {
-			klog.V(2).Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelInstanceType, instanceType)
-			curNode.ObjectMeta.Labels[kubeletapis.LabelInstanceType] = instanceType
+			klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
+			curNode.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
 		}
 
 		if zones, ok := cnc.cloud.Zones(); ok {
@@ -281,16 +286,16 @@ func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
 				return fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneFailureDomain, zone.FailureDomain)
-				curNode.ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain] = zone.FailureDomain
+				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
+				curNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", kubeletapis.LabelZoneRegion, zone.Region)
-				curNode.ObjectMeta.Labels[kubeletapis.LabelZoneRegion] = zone.Region
+				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
+				curNode.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
 			}
 		}
 
-		curNode.Spec.Taints = excludeTaintFromList(curNode.Spec.Taints, *cloudTaint)
+		curNode.Spec.Taints = excludeCloudTaint(curNode.Spec.Taints)
 
 		_, err = cnc.kubeClient.CoreV1().Nodes().Update(curNode)
 		if err != nil {
@@ -318,10 +323,10 @@ func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	return nil
 }
 
-func excludeTaintFromList(taints []v1.Taint, toExclude v1.Taint) []v1.Taint {
+func excludeCloudTaint(taints []v1.Taint) []v1.Taint {
 	newTaints := []v1.Taint{}
 	for _, taint := range taints {
-		if toExclude.MatchTaint(&taint) {
+		if taint.Key == schedulerapi.TaintExternalCloudProvider {
 			continue
 		}
 		newTaints = append(newTaints, taint)
@@ -369,15 +374,13 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 		return true
 	}
 	addressMap1 := map[v1.NodeAddressType]string{}
-	addressMap2 := map[v1.NodeAddressType]string{}
 
 	for i := range addressSet1 {
 		addressMap1[addressSet1[i].Type] = addressSet1[i].Address
-		addressMap2[addressSet2[i].Type] = addressSet2[i].Address
 	}
 
-	for k, v := range addressMap1 {
-		if addressMap2[k] != v {
+	for _, v := range addressSet2 {
+		if addressMap1[v.Type] != v.Address {
 			return true
 		}
 	}

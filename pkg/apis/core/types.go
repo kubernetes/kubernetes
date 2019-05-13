@@ -154,6 +154,9 @@ type VolumeSource struct {
 	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
 	// +optional
 	StorageOS *StorageOSVolumeSource
+	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver (Alpha feature).
+	// +optional
+	CSI *CSIVolumeSource
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -229,7 +232,7 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
-	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver.
+	// CSI (Container Storage Interface) represents storage that is handled by an external CSI driver.
 	// +optional
 	CSI *CSIPersistentVolumeSource
 }
@@ -252,8 +255,6 @@ const (
 	MountOptionAnnotation = "volume.beta.kubernetes.io/mount-options"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PersistentVolume struct {
@@ -360,7 +361,6 @@ type PersistentVolumeList struct {
 	Items []PersistentVolume
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
@@ -918,6 +918,11 @@ type QuobyteVolumeSource struct {
 	// Default is no group
 	// +optional
 	Group string
+
+	// Tenant owning the given Quobyte volume in the Backend
+	// Used with dynamically provisioned Quobyte volumes, value is set by the plugin
+	// +optional
+	Tenant string
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.
@@ -1438,7 +1443,7 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1461,7 +1466,7 @@ type ConfigMapProjection struct {
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1596,6 +1601,47 @@ type CSIPersistentVolumeSource struct {
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodePublishSecretRef *SecretReference
+
+	// ControllerExpandSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// ControllerExpandVolume call.
+	// This is an alpha field and requires enabling ExpandCSIVolumes feature gate.
+	// This field is optional, and may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	ControllerExpandSecretRef *SecretReference
+}
+
+// Represents a source location of a volume to mount, managed by an external CSI driver
+type CSIVolumeSource struct {
+	// Driver is the name of the CSI driver that handles this volume.
+	// Consult with your admin for the correct name as registered in the cluster.
+	// Required.
+	Driver string
+
+	// Specifies a read-only configuration for the volume.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly *bool
+
+	// Filesystem type to mount. Ex. "ext4", "xfs", "ntfs".
+	// If not provided, the empty value is passed to the associated CSI driver
+	// which will determine the default filesystem to apply.
+	// +optional
+	FSType *string
+
+	// VolumeAttributes stores driver-specific properties that are passed to the CSI
+	// driver. Consult your driver's documentation for supported values.
+	// +optional
+	VolumeAttributes map[string]string
+
+	// NodePublishSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// NodePublishVolume and NodeUnpublishVolume calls.
+	// This field is optional, and  may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secret references are passed.
+	// +optional
+	NodePublishSecretRef *LocalObjectReference
 }
 
 // ContainerPort represents a network port in a single container
@@ -1639,6 +1685,13 @@ type VolumeMount struct {
 	// This field is beta in 1.10.
 	// +optional
 	MountPropagation *MountPropagationMode
+	// Expanded path within the volume from which the container's volume should be mounted.
+	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+	// Defaults to "" (volume's root).
+	// SubPathExpr and SubPath are mutually exclusive.
+	// This field is beta in 1.15.
+	// +optional
+	SubPathExpr string
 }
 
 // MountPropagationMode describes mount propagation.
@@ -1740,7 +1793,7 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference
 	// The key to select.
 	Key string
-	// Specify whether the ConfigMap or it's key must be defined
+	// Specify whether the ConfigMap or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -1751,7 +1804,7 @@ type SecretKeySelector struct {
 	LocalObjectReference
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string
-	// Specify whether the Secret or it's key must be defined
+	// Specify whether the Secret or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -2023,8 +2076,15 @@ type Lifecycle struct {
 	// is terminated and restarted.
 	// +optional
 	PostStart *Handler
-	// PreStop is called immediately before a container is terminated.  The reason for termination is
-	// passed to the handler.  Regardless of the outcome of the handler, the container is eventually terminated.
+	// PreStop is called immediately before a container is terminated due to an
+	// API request or management event such as liveness probe failure,
+	// preemption, resource contention, etc. The handler is not called if the
+	// container crashes or exits. The reason for termination is passed to the
+	// handler. The Pod's termination grace period countdown begins before the
+	// PreStop hooked is executed. Regardless of the outcome of the handler, the
+	// container will eventually terminate within the Pod's termination grace
+	// period. Other management of the container blocks until the hook completes
+	// or until the termination grace period is reached.
 	// +optional
 	PreStop *Handler
 }
@@ -2610,15 +2670,15 @@ type PodSpec struct {
 	// If specified, all readiness gates will be evaluated for pod readiness.
 	// A pod is ready when all its containers are ready AND
 	// all conditions specified in the readiness gates have status equal to "True"
-	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md
+	// More info: https://git.k8s.io/enhancements/keps/sig-network/0007-pod-ready%2B%2B.md
 	// +optional
 	ReadinessGates []PodReadinessGate
 	// RuntimeClassName refers to a RuntimeClass object in the node.k8s.io group, which should be used
 	// to run this pod.  If no RuntimeClass resource matches the named class, the pod will not be run.
 	// If unset or empty, the "legacy" RuntimeClass will be used, which is an implicit class with an
 	// empty definition that uses the default runtime handler.
-	// More info: https://github.com/kubernetes/community/blob/master/keps/sig-node/0014-runtime-class.md
-	// This is an alpha feature and may change in the future.
+	// More info: https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+	// This is a beta feature as of Kubernetes v1.14.
 	// +optional
 	RuntimeClassName *string
 	// EnableServiceLinks indicates whether information about services should be injected into pod's
@@ -2679,6 +2739,9 @@ type PodSecurityContext struct {
 	// takes precedence for that container.
 	// +optional
 	SELinuxOptions *SELinuxOptions
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in SecurityContext.  If set in both SecurityContext and
@@ -2825,7 +2888,6 @@ type PodStatusResult struct {
 	Status PodStatus
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
@@ -2855,7 +2917,6 @@ type PodTemplateSpec struct {
 	Spec PodSpec
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodTemplate describes a template for creating copies of a predefined pod.
@@ -2963,9 +3024,6 @@ type ReplicationControllerCondition struct {
 	Message string
 }
 
-// +genclient
-// +genclient:method=GetScale,verb=get,subresource=scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
-// +genclient:method=UpdateScale,verb=update,subresource=scale,input=k8s.io/kubernetes/pkg/apis/autoscaling.Scale,result=k8s.io/kubernetes/pkg/apis/autoscaling.Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicationController represents the configuration of a replication controller.
@@ -3239,7 +3297,6 @@ type ServicePort struct {
 	NodePort int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
@@ -3259,7 +3316,6 @@ type Service struct {
 	Status ServiceStatus
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceAccount binds together:
@@ -3297,7 +3353,6 @@ type ServiceAccountList struct {
 	Items []ServiceAccount
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:
@@ -3722,8 +3777,6 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Node is a worker node in Kubernetes
@@ -3785,8 +3838,6 @@ const (
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // A namespace provides a scope for Names.
@@ -4041,7 +4092,6 @@ const (
 	EventTypeWarning string = "Warning"
 )
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
@@ -4118,6 +4168,7 @@ type EventSeries struct {
 	// Time of the last occurrence observed
 	LastObservedTime metav1.MicroTime
 	// State of this Series: Ongoing or Finished
+	// Deprecated. Planned removal for 1.18
 	State EventSeriesState
 }
 
@@ -4185,7 +4236,6 @@ type LimitRangeSpec struct {
 	Limits []LimitRangeItem
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
@@ -4332,7 +4382,6 @@ type ResourceQuotaStatus struct {
 	Used ResourceList
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
@@ -4362,7 +4411,6 @@ type ResourceQuotaList struct {
 	Items []ResourceQuota
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Secret holds secret data of a certain type.  The total bytes of the values in
@@ -4482,7 +4530,6 @@ type SecretList struct {
 	Items []Secret
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ConfigMap holds configuration data for components or applications to consume.
@@ -4580,8 +4627,6 @@ type ComponentCondition struct {
 	Error string
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
@@ -4623,6 +4668,9 @@ type SecurityContext struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	SELinuxOptions *SELinuxOptions
+	// Windows security options.
+	// +optional
+	WindowsOptions *WindowsSecurityContextOptions
 	// The UID to run the entrypoint of the container process.
 	// Defaults to user specified in image metadata if unspecified.
 	// May also be set in PodSecurityContext.  If set in both SecurityContext and
@@ -4687,6 +4735,11 @@ type SELinuxOptions struct {
 	// SELinux level label.
 	// +optional
 	Level string
+}
+
+// WindowsSecurityContextOptions contain Windows-specific options and credentials.
+type WindowsSecurityContextOptions struct {
+	// intentionally left empty for now
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

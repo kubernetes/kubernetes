@@ -57,7 +57,7 @@ func TestAdmission(t *testing.T) {
 		},
 	}
 
-	updatedPod, err := client.Core().Pods(pod.Namespace).Create(&pod)
+	updatedPod, err := client.CoreV1().Pods(pod.Namespace).Create(&pod)
 	if err != nil {
 		t.Fatalf("error creating pod: %v", err)
 	}

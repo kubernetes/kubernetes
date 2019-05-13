@@ -14,7 +14,7 @@ func New() UUID {
 	return Must(NewRandom())
 }
 
-// NewRandom returns a Random (Version 4) UUID or panics.
+// NewRandom returns a Random (Version 4) UUID.
 //
 // The strength of the UUIDs is based on the strength of the crypto/rand
 // package.

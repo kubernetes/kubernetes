@@ -460,35 +460,12 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		if err := evaluator.Constraints(restrictedResources, inputObject); err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
 		}
-		if !hasUsageStats(&resourceQuota) {
-			return nil, admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s", resourceQuota.Name))
+		if !hasUsageStats(&resourceQuota, restrictedResources) {
+			return nil, admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s, resources: %s", resourceQuota.Name, prettyPrintResourceNames(restrictedResources)))
 		}
 		interestingQuotaIndexes = append(interestingQuotaIndexes, i)
 		localRestrictedResourcesSet := quota.ToSet(restrictedResources)
 		restrictedResourcesSet.Insert(localRestrictedResourcesSet.List()...)
-	}
-
-	// verify that for every resource that had limited by default consumption
-	// enabled that there was a corresponding quota that covered its use.
-	// if not, we reject the request.
-	hasNoCoveringQuota := limitedResourceNamesSet.Difference(restrictedResourcesSet)
-	if len(hasNoCoveringQuota) > 0 {
-		return quotas, admission.NewForbidden(a, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ",")))
-	}
-
-	// verify that for every scope that had limited access enabled
-	// that there was a corresponding quota that covered it.
-	// if not, we reject the request.
-	scopesHasNoCoveringQuota, err := evaluator.UncoveredQuotaScopes(limitedScopes, restrictedScopes)
-	if err != nil {
-		return quotas, err
-	}
-	if len(scopesHasNoCoveringQuota) > 0 {
-		return quotas, fmt.Errorf("insufficient quota to match these scopes: %v", scopesHasNoCoveringQuota)
-	}
-
-	if len(interestingQuotaIndexes) == 0 {
-		return quotas, nil
 	}
 
 	// Usage of some resources cannot be counted in isolation. For example, when
@@ -534,6 +511,29 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 	}
 
 	if quota.IsZero(deltaUsage) {
+		return quotas, nil
+	}
+
+	// verify that for every resource that had limited by default consumption
+	// enabled that there was a corresponding quota that covered its use.
+	// if not, we reject the request.
+	hasNoCoveringQuota := limitedResourceNamesSet.Difference(restrictedResourcesSet)
+	if len(hasNoCoveringQuota) > 0 {
+		return quotas, admission.NewForbidden(a, fmt.Errorf("insufficient quota to consume: %v", strings.Join(hasNoCoveringQuota.List(), ",")))
+	}
+
+	// verify that for every scope that had limited access enabled
+	// that there was a corresponding quota that covered it.
+	// if not, we reject the request.
+	scopesHasNoCoveringQuota, err := evaluator.UncoveredQuotaScopes(limitedScopes, restrictedScopes)
+	if err != nil {
+		return quotas, err
+	}
+	if len(scopesHasNoCoveringQuota) > 0 {
+		return quotas, fmt.Errorf("insufficient quota to match these scopes: %v", scopesHasNoCoveringQuota)
+	}
+
+	if len(interestingQuotaIndexes) == 0 {
 		return quotas, nil
 	}
 
@@ -702,9 +702,13 @@ func prettyPrintResourceNames(a []corev1.ResourceName) string {
 	return strings.Join(values, ",")
 }
 
-// hasUsageStats returns true if for each hard constraint there is a value for its current usage
-func hasUsageStats(resourceQuota *corev1.ResourceQuota) bool {
+// hasUsageStats returns true if for each hard constraint in interestingResources there is a value for its current usage
+func hasUsageStats(resourceQuota *corev1.ResourceQuota, interestingResources []corev1.ResourceName) bool {
+	interestingSet := quota.ToSet(interestingResources)
 	for resourceName := range resourceQuota.Status.Hard {
+		if !interestingSet.Has(string(resourceName)) {
+			continue
+		}
 		if _, found := resourceQuota.Status.Used[resourceName]; !found {
 			return false
 		}

@@ -462,9 +462,9 @@ func TestZoneInitialized(t *testing.T) {
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
 	assert.Equal(t, 2, len(fnh.UpdatedNodes[0].ObjectMeta.Labels),
 		"Node label for Region and Zone were not set")
-	assert.Equal(t, "us-west", fnh.UpdatedNodes[0].ObjectMeta.Labels[kubeletapis.LabelZoneRegion],
+	assert.Equal(t, "us-west", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneRegion],
 		"Node Region not correctly updated")
-	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[kubeletapis.LabelZoneFailureDomain],
+	assert.Equal(t, "us-west-1a", fnh.UpdatedNodes[0].ObjectMeta.Labels[v1.LabelZoneFailureDomain],
 		"Node FailureDomain not correctly updated")
 }
 

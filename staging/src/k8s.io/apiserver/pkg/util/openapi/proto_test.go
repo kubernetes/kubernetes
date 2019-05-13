@@ -44,8 +44,8 @@ func TestOpenAPIDefinitionsToProtoModels(t *testing.T) {
 					},
 					VendorExtensible: spec.VendorExtensible{
 						Extensions: spec.Extensions{
-							"x-kubernetes-group-version-kind": []map[string]string{
-								{
+							"x-kubernetes-group-version-kind": []interface{}{
+								map[string]interface{}{
 									"group":   "testgroup.k8s.io",
 									"version": "v1",
 									"kind":    "Foo",

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	schedulingv1beta1 "k8s.io/api/scheduling/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,7 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	schedulingv1beta1listers "k8s.io/client-go/listers/scheduling/v1beta1"
+	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,7 +52,7 @@ func Register(plugins *admission.Plugins) {
 type priorityPlugin struct {
 	*admission.Handler
 	client kubernetes.Interface
-	lister schedulingv1beta1listers.PriorityClassLister
+	lister schedulingv1listers.PriorityClassLister
 }
 
 var _ admission.MutationInterface = &priorityPlugin{}
@@ -85,7 +85,7 @@ func (p *priorityPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
 
 // SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
 func (p *priorityPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	priorityInformer := f.Scheduling().V1beta1().PriorityClasses()
+	priorityInformer := f.Scheduling().V1().PriorityClasses()
 	p.lister = priorityInformer.Lister()
 	p.SetReadyFunc(priorityInformer.Informer().HasSynced)
 }
@@ -97,7 +97,7 @@ var (
 
 // Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
 // Note that pod validation mechanism prevents update of a pod priority.
-func (p *priorityPlugin) Admit(a admission.Attributes) error {
+func (p *priorityPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		return nil
 	}
@@ -121,7 +121,7 @@ func (p *priorityPlugin) Admit(a admission.Attributes) error {
 }
 
 // Validate checks PriorityClasses and admits or rejects them.
-func (p *priorityPlugin) Validate(a admission.Attributes) error {
+func (p *priorityPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {
@@ -244,14 +244,14 @@ func (p *priorityPlugin) validatePriorityClass(a admission.Attributes) error {
 	return nil
 }
 
-func (p *priorityPlugin) getDefaultPriorityClass() (*schedulingv1beta1.PriorityClass, error) {
+func (p *priorityPlugin) getDefaultPriorityClass() (*schedulingv1.PriorityClass, error) {
 	list, err := p.lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 	// In case more than one global default priority class is added as a result of a race condition,
 	// we pick the one with the lowest priority value.
-	var defaultPC *schedulingv1beta1.PriorityClass
+	var defaultPC *schedulingv1.PriorityClass
 	for _, pci := range list {
 		if pci.GlobalDefault {
 			if defaultPC == nil || defaultPC.Value > pci.Value {

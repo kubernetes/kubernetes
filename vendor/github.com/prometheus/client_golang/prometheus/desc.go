@@ -93,7 +93,7 @@ func NewDesc(fqName, help string, variableLabels []string, constLabels Labels) *
 	// First add only the const label names and sort them...
 	for labelName := range constLabels {
 		if !checkLabelName(labelName) {
-			d.err = fmt.Errorf("%q is not a valid label name", labelName)
+			d.err = fmt.Errorf("%q is not a valid label name for metric %q", labelName, fqName)
 			return d
 		}
 		labelNames = append(labelNames, labelName)
@@ -115,7 +115,7 @@ func NewDesc(fqName, help string, variableLabels []string, constLabels Labels) *
 	// dimension with a different mix between preset and variable labels.
 	for _, labelName := range variableLabels {
 		if !checkLabelName(labelName) {
-			d.err = fmt.Errorf("%q is not a valid label name", labelName)
+			d.err = fmt.Errorf("%q is not a valid label name for metric %q", labelName, fqName)
 			return d
 		}
 		labelNames = append(labelNames, "$"+labelName)

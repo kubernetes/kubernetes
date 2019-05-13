@@ -18,9 +18,6 @@ package dockershim
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"testing"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -28,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -126,20 +123,6 @@ func TestParsingCreationConflictError(t *testing.T) {
 	matches := conflictRE.FindStringSubmatch(msg)
 	require.Len(t, matches, 2)
 	require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
-}
-
-// writeDockerConfig will write a config file into a temporary dir, and return that dir.
-// Caller is responsible for deleting the dir and its contents.
-func writeDockerConfig(cfg string) (string, error) {
-	tmpdir, err := ioutil.TempDir("", "dockershim=helpers_test.go=")
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Join(tmpdir, ".docker")
-	if err := os.Mkdir(dir, 0755); err != nil {
-		return "", err
-	}
-	return tmpdir, ioutil.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0644)
 }
 
 func TestEnsureSandboxImageExists(t *testing.T) {

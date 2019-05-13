@@ -63,6 +63,8 @@ type Object interface {
 	SetOwnerReferences([]OwnerReference)
 	GetClusterName() string
 	SetClusterName(clusterName string)
+	GetManagedFields() []ManagedFieldsEntry
+	SetManagedFields(managedFields []ManagedFieldsEntry)
 }
 
 // ListMetaAccessor retrieves the list interface from an object
@@ -92,6 +94,8 @@ type ListInterface interface {
 	SetSelfLink(selfLink string)
 	GetContinue() string
 	SetContinue(c string)
+	GetRemainingItemCount() int64
+	SetRemainingItemCount(c int64)
 }
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
@@ -103,12 +107,16 @@ type Type interface {
 	SetKind(kind string)
 }
 
+var _ ListInterface = &ListMeta{}
+
 func (meta *ListMeta) GetResourceVersion() string        { return meta.ResourceVersion }
 func (meta *ListMeta) SetResourceVersion(version string) { meta.ResourceVersion = version }
 func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink }
 func (meta *ListMeta) SetSelfLink(selfLink string)       { meta.SelfLink = selfLink }
 func (meta *ListMeta) GetContinue() string               { return meta.Continue }
 func (meta *ListMeta) SetContinue(c string)              { meta.Continue = c }
+func (meta *ListMeta) GetRemainingItemCount() int64      { return meta.RemainingItemCount }
+func (meta *ListMeta) SetRemainingItemCount(c int64)     { meta.RemainingItemCount = c }
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 
@@ -166,5 +174,9 @@ func (meta *ObjectMeta) GetOwnerReferences() []OwnerReference         { return m
 func (meta *ObjectMeta) SetOwnerReferences(references []OwnerReference) {
 	meta.OwnerReferences = references
 }
-func (meta *ObjectMeta) GetClusterName() string            { return meta.ClusterName }
-func (meta *ObjectMeta) SetClusterName(clusterName string) { meta.ClusterName = clusterName }
+func (meta *ObjectMeta) GetClusterName() string                 { return meta.ClusterName }
+func (meta *ObjectMeta) SetClusterName(clusterName string)      { meta.ClusterName = clusterName }
+func (meta *ObjectMeta) GetManagedFields() []ManagedFieldsEntry { return meta.ManagedFields }
+func (meta *ObjectMeta) SetManagedFields(managedFields []ManagedFieldsEntry) {
+	meta.ManagedFields = managedFields
+}

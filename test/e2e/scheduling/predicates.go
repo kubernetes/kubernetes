@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -88,7 +89,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
 			framework.PrintAllKubeletPods(cs, node.Name)
 		}
 
@@ -103,7 +104,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		totalPodCapacity = 0
 
 		for _, node := range nodeList.Items {
-			framework.Logf("Node: %v", node)
+			e2elog.Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
@@ -123,7 +124,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 				*initPausePod(f, pausePodConfig{
 					Name:   "",
 					Labels: map[string]string{"name": ""},
-				}), true, framework.Logf))
+				}), true, e2elog.Logf))
 		}
 		podName := "additional-pod"
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, pausePodConfig{
@@ -158,7 +159,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				e2elog.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
 			}
 		}
@@ -167,9 +168,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		milliEphemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
 
-		framework.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
+		e2elog.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
-			framework.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
+			e2elog.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
 			podsNeededForSaturation += (int)(leftAllocatable / milliEphemeralStoragePerPod)
 		}
 
@@ -192,7 +193,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
 						},
 					},
-				}), true, framework.Logf))
+				}), true, e2elog.Logf))
 		}
 		podName := "additional-pod"
 		conf := pausePodConfig{
@@ -262,7 +263,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				e2elog.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
 		}
@@ -570,13 +571,13 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		port := int32(54321)
 		By(fmt.Sprintf("Trying to create a pod(pod1) with hostport %v and hostIP 127.0.0.1 and expect scheduled", port))
-		creatHostPortPodOnNode(f, "pod1", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod1", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, true)
 
 		By(fmt.Sprintf("Trying to create another pod(pod2) with hostport %v but hostIP 127.0.0.2 on the node which pod1 resides and expect scheduled", port))
-		creatHostPortPodOnNode(f, "pod2", ns, "127.0.0.2", port, v1.ProtocolTCP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod2", ns, "127.0.0.2", port, v1.ProtocolTCP, nodeSelector, true)
 
 		By(fmt.Sprintf("Trying to create a third pod(pod3) with hostport %v, hostIP 127.0.0.2 but use UDP protocol on the node which pod2 resides", port))
-		creatHostPortPodOnNode(f, "pod3", ns, "127.0.0.2", port, v1.ProtocolUDP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod3", ns, "127.0.0.2", port, v1.ProtocolUDP, nodeSelector, true)
 	})
 
 	It("validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP", func() {
@@ -596,10 +597,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		port := int32(54322)
 		By(fmt.Sprintf("Trying to create a pod(pod4) with hostport %v and hostIP 0.0.0.0(empty string here) and expect scheduled", port))
-		creatHostPortPodOnNode(f, "pod4", ns, "", port, v1.ProtocolTCP, nodeSelector, true)
+		createHostPortPodOnNode(f, "pod4", ns, "", port, v1.ProtocolTCP, nodeSelector, true)
 
 		By(fmt.Sprintf("Trying to create another pod(pod5) with hostport %v but hostIP 127.0.0.1 on the node which pod4 resides and expect not scheduled", port))
-		creatHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
+		createHostPortPodOnNode(f, "pod5", ns, "127.0.0.1", port, v1.ProtocolTCP, nodeSelector, false)
 	})
 })
 
@@ -787,14 +788,13 @@ func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	By(fmt.Sprintf("Running RC which reserves host port"))
 	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
-		Image:          imageutils.GetPauseImageName(),
-		Replicas:       replicas,
-		HostPorts:      map[string]int{"port1": 4321},
+		Client:    f.ClientSet,
+		Name:      id,
+		Namespace: f.Namespace.Name,
+		Timeout:   defaultTimeout,
+		Image:     imageutils.GetPauseImageName(),
+		Replicas:  replicas,
+		HostPorts: map[string]int{"port1": 4321},
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {
@@ -803,7 +803,7 @@ func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectR
 }
 
 // create pod which using hostport on the specified node according to the nodeSelector
-func creatHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
+func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
 	createPausePod(f, pausePodConfig{
 		Name: podName,
 		Ports: []v1.ContainerPort{

@@ -433,7 +433,7 @@ filename | sha256 hash
   Changelog (vs 55-8872-18-0)
     * Cherry-pick runc PR#608: Eliminate redundant parsing of mountinfo
     * Updated kubernetes to v1.4.5
-    * Fixed a bug in e2fsprogs that caused mke2fs to take a very long time. Upstream fix: http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/commit/?h=next&id=d33e690fe7a6cbeb51349d9f2c7fb16a6ebec9c2 
+    * Fixed a bug in e2fsprogs that caused mke2fs to take a very long time. Upstream fix: http://git.kernel.org/cgit/fs/ext2/e2fsprogs.git/commit/?h=next&id=d33e690fe7a6cbeb51349d9f2c7fb16a6ebec9c2
 ```
 
 * Fix fetching pids running in a cgroup, which caused problems with OOM score adjustments & setting the /system cgroup ("misc" in the summary API). ([#36614](https://github.com/kubernetes/kubernetes/pull/36614), [@timstclair](https://github.com/timstclair))

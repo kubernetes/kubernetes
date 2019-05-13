@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -72,7 +73,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
-			framework.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
+			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
 			framework.PrintAllKubeletPods(cs, node.Name)
 		}
 
@@ -228,7 +229,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			return err
 		}, ns, labelRCName, false)
 
-		// these two replicas should all be rejected since podAntiAffinity says it they anit-affinity with pod {"service": "S1"}
+		// these two replicas should all be rejected since podAntiAffinity says it they anti-affinity with pod {"service": "S1"}
 		verifyReplicasResult(cs, 0, replica, ns, labelRCName)
 	})
 })
@@ -272,15 +273,14 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 
 	config := &testutils.RCConfig{
-		Client:         f.ClientSet,
-		InternalClient: f.InternalClientset,
-		Name:           id,
-		Namespace:      f.Namespace.Name,
-		Timeout:        defaultTimeout,
-		Image:          imageutils.GetPauseImageName(),
-		Replicas:       replicas,
-		HostPorts:      map[string]int{"port1": 4321},
-		NodeSelector:   nodeSelector,
+		Client:       f.ClientSet,
+		Name:         id,
+		Namespace:    f.Namespace.Name,
+		Timeout:      defaultTimeout,
+		Image:        imageutils.GetPauseImageName(),
+		Replicas:     replicas,
+		HostPorts:    map[string]int{"port1": 4321},
+		NodeSelector: nodeSelector,
 	}
 	err := framework.RunRC(*config)
 	if expectRunning {

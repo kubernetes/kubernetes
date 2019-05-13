@@ -27,6 +27,7 @@ go_library(
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )

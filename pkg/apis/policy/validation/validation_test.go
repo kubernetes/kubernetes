@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/utils/pointer"
 )
 
 func TestValidatePodDisruptionBudgetSpec(t *testing.T) {
@@ -802,7 +804,7 @@ func TestIsValidSysctlPattern(t *testing.T) {
 	}
 }
 
-func Test_validatePSPRunAsUser(t *testing.T) {
+func TestValidatePSPRunAsUser(t *testing.T) {
 	var testCases = []struct {
 		name              string
 		runAsUserStrategy policy.RunAsUserStrategyOptions
@@ -825,6 +827,197 @@ func Test_validatePSPRunAsUser(t *testing.T) {
 			}
 			if actualErrors != expectedErrors {
 				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPFSGroup(t *testing.T) {
+	var testCases = []struct {
+		name            string
+		fsGroupStrategy policy.FSGroupStrategyOptions
+		fail            bool
+	}{
+		{"Invalid FSGroupStrategy", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyType("someInvalidStrategy")}, true},
+		{"FSGroupStrategyMustRunAs", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyMustRunAs}, false},
+		{"FSGroupStrategyMayRunAs", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyMayRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"FSGroupStrategyRunAsAny", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyRunAsAny}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPFSGroup(field.NewPath("Status"), &testCase.fsGroupStrategy)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPSupplementalGroup(t *testing.T) {
+	var testCases = []struct {
+		name                      string
+		supplementalGroupStrategy policy.SupplementalGroupsStrategyOptions
+		fail                      bool
+	}{
+		{"Invalid SupplementalGroupStrategy", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyType("someInvalidStrategy")}, true},
+		{"SupplementalGroupsStrategyMustRunAs", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyMustRunAs}, false},
+		{"SupplementalGroupsStrategyMayRunAs", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyMayRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"SupplementalGroupsStrategyRunAsAny", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyRunAsAny}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPSupplementalGroup(field.NewPath("Status"), &testCase.supplementalGroupStrategy)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPRunAsGroup(t *testing.T) {
+	var testCases = []struct {
+		name       string
+		runAsGroup policy.RunAsGroupStrategyOptions
+		fail       bool
+	}{
+		{"RunAsGroupStrategyMayRunAs", policy.RunAsGroupStrategyOptions{Rule: policy.RunAsGroupStrategyMayRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"RunAsGroupStrategyMustRunAs", policy.RunAsGroupStrategyOptions{Rule: policy.RunAsGroupStrategyMustRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"RunAsGroupStrategyRunAsAny", policy.RunAsGroupStrategyOptions{Rule: policy.RunAsGroupStrategyRunAsAny}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPRunAsGroup(field.NewPath("Status"), &testCase.runAsGroup)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPSELinux(t *testing.T) {
+	var testCases = []struct {
+		name    string
+		selinux policy.SELinuxStrategyOptions
+		fail    bool
+	}{
+		{"SELinuxStrategyMustRunAs",
+			policy.SELinuxStrategyOptions{
+				Rule:           policy.SELinuxStrategyMustRunAs,
+				SELinuxOptions: &api.SELinuxOptions{Level: "s9:z0,z1"}}, false},
+		{"SELinuxStrategyMustRunAs",
+			policy.SELinuxStrategyOptions{
+				Rule:           policy.SELinuxStrategyMustRunAs,
+				SELinuxOptions: &api.SELinuxOptions{Level: "s0"}}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPSELinux(field.NewPath("Status"), &testCase.selinux)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeClassStrategy(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		strategy     *policy.RuntimeClassStrategyOptions
+		expectErrors bool
+	}{{
+		name:     "nil strategy",
+		strategy: nil,
+	}, {
+		name:     "empty strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{},
+	}, {
+		name: "allow all strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*"},
+		},
+	}, {
+		name: "valid defaulting & allow all",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			AllowedRuntimeClassNames: []string{"*"},
+		},
+	}, {
+		name: "valid defaulting & allow explicit",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
+		},
+	}, {
+		name: "valid whitelisting",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
+		},
+	}, {
+		name: "invalid default name",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName: pointer.StringPtr("foo bar"),
+		},
+		expectErrors: true,
+	}, {
+		name: "disallowed default",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+			AllowedRuntimeClassNames: []string{"native", "sandboxed"},
+		},
+		expectErrors: true,
+	}, {
+		name: "nothing allowed default",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName: pointer.StringPtr("foo"),
+		},
+		expectErrors: true,
+	}, {
+		name: "invalid whitelist name",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"native", "sandboxed", "foo*"},
+		},
+		expectErrors: true,
+	}, {
+		name: "duplicate whitelist names",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"native", "sandboxed", "native"},
+		},
+		expectErrors: true,
+	}, {
+		name: "allow all redundant whitelist",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*", "sandboxed", "native"},
+		},
+		expectErrors: true,
+	}}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateRuntimeClassStrategy(field.NewPath(""), test.strategy)
+			if test.expectErrors {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Empty(t, errs)
 			}
 		})
 	}

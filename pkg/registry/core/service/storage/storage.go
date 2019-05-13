@@ -48,7 +48,7 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter) (*GenericREST, *Status
 		DeleteStrategy: service.Strategy,
 		ExportStrategy: service.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

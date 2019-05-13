@@ -28,15 +28,15 @@ CMD_FLAG=false
 PLUGIN_CMD_FLAG=false
 
 echo "--------------------------------------------------------------------------------"
-for tar in $ALL_TARGETS; do
-	for cmdtar in $CMD_TARGETS; do
-		if [ $tar = $cmdtar ]; then
-			if [ $CMD_FLAG = true ]; then
+for tar in ${ALL_TARGETS}; do
+	for cmdtar in ${CMD_TARGETS}; do
+		if [ ${tar} = ${cmdtar} ]; then
+			if [ ${CMD_FLAG} = true ]; then
 				continue 2;
 			fi
 
 			echo -e "${red}${CMD_TARGETS}${reset}"
-			make -C "${KUBE_ROOT}" $tar PRINT_HELP=y
+			make -C "${KUBE_ROOT}" ${tar} PRINT_HELP=y
 			echo "---------------------------------------------------------------------------------"
 
 			CMD_FLAG=true
@@ -45,6 +45,6 @@ for tar in $ALL_TARGETS; do
 	done
 
 	echo -e "${red}${tar}${reset}"
-	make -C "${KUBE_ROOT}" $tar PRINT_HELP=y
+	make -C "${KUBE_ROOT}" ${tar} PRINT_HELP=y
 	echo "---------------------------------------------------------------------------------"
 done

@@ -91,6 +91,16 @@ type CustomResourceConversion struct {
 	// alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
 	// +optional
 	WebhookClientConfig *WebhookClientConfig `json:"webhookClientConfig,omitempty" protobuf:"bytes,2,name=webhookClientConfig"`
+
+	// ConversionReviewVersions is an ordered list of preferred `ConversionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, conversion will fail for this object.
+	// If a persisted Webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail.
+	// Default to `['v1beta1']`.
+	// +optional
+	ConversionReviewVersions []string `json:"conversionReviewVersions,omitempty" protobuf:"bytes,3,rep,name=conversionReviewVersions"`
 }
 
 // WebhookClientConfig contains the information to make a TLS
@@ -130,8 +140,6 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// Port 443 will be used if it is open, otherwise it is an error.
-	//
 	// +optional
 	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
@@ -154,6 +162,12 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
+
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }
 
 // CustomResourceDefinitionVersion describes a version for CRD.
@@ -265,13 +279,29 @@ const (
 	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
 	// the group and are therefore accepted.
 	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
+	// NonStructuralSchema means that one or more OpenAPI schema is not structural.
+	//
+	// A schema is structural if it specifies types for all values, with the only exceptions of those with
+	// - x-kubernetes-int-or-string: true — for fields which can be integer or string
+	// - x-kubernetes-preserve-unknown-fields: true — for raw, unspecified JSON values
+	// and there is no type, additionalProperties, default, nullable or x-kubernetes-* vendor extenions
+	// specified under allOf, anyOf, oneOf or not.
+	//
+	// Non-structural schemas will not be allowed anymore in v1 API groups. Moreover, new features will not be
+	// available for non-structural CRDs:
+	// - pruning
+	// - defaulting
+	// - read-only
+	// - OpenAPI publishing
+	// - webhook conversion
+	NonStructuralSchema CustomResourceDefinitionConditionType = "NonStructuralSchema"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
 type CustomResourceDefinitionCondition struct {
-	// Type is the type of the condition.
+	// Type is the type of the condition. Types include Established, NamesAccepted and Terminating.
 	Type CustomResourceDefinitionConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=CustomResourceDefinitionConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.

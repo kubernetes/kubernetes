@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
-
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -162,9 +161,10 @@ var nonRoundTrippableTypes = sets.NewString(
 	"DeleteOptions",
 	"CreateOptions",
 	"UpdateOptions",
+	"PatchOptions",
 )
 
-var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions"}
+var commonKinds = []string{"Status", "ListOptions", "DeleteOptions", "ExportOptions", "GetOptions", "CreateOptions", "UpdateOptions", "PatchOptions"}
 
 // TestCommonKindsRegistered verifies that all group/versions registered with
 // the testapi package have the common kinds.
@@ -387,7 +387,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
 		outEvent := &metav1.WatchEvent{}
-		res, _, err = sr.Decode(nil, outEvent)
+		_, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {
 			t.Fatalf("%v: %#v", err, outEvent)
 		}

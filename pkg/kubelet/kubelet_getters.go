@@ -25,14 +25,14 @@ import (
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	"k8s.io/klog"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	utilfile "k8s.io/kubernetes/pkg/util/file"
+	"k8s.io/kubernetes/pkg/util/mount"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	utilpath "k8s.io/utils/path"
 )
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -278,7 +278,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	volumes := []string{}
 	podVolDir := kl.getPodVolumesDir(podUID)
 
-	if pathExists, pathErr := volumeutil.PathExists(podVolDir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return volumes, fmt.Errorf("Error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
 		klog.Warningf("Path %q does not exist", podVolDir)
@@ -293,7 +293,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(podUID types.UID) ([]string, err
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
 		volumePluginPath := filepath.Join(podVolDir, volumePluginName)
-		volumeDirs, err := utilfile.ReadDirNoStat(volumePluginPath)
+		volumeDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 		if err != nil {
 			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
 		}
@@ -327,7 +327,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(podUID types.UID) ([]string,
 func (kl *Kubelet) podVolumeSubpathsDirExists(podUID types.UID) (bool, error) {
 	podVolDir := kl.getPodVolumeSubpathsDir(podUID)
 
-	if pathExists, pathErr := volumeutil.PathExists(podVolDir); pathErr != nil {
+	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
 		return true, fmt.Errorf("Error checking if path %q exists: %v", podVolDir, pathErr)
 	} else if !pathExists {
 		return false, nil

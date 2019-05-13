@@ -17,7 +17,7 @@ limitations under the License.
 package renewal
 
 import (
-	"crypto/rsa"
+	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
@@ -31,6 +31,7 @@ import (
 	certstype "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 	csrutil "k8s.io/client-go/util/certificate/csr"
+	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
 const certAPIPrefixName = "kubeadm-cert"
@@ -50,7 +51,7 @@ func NewCertsAPIRenawal(client kubernetes.Interface) Interface {
 }
 
 // Renew takes a certificate using the cert and key.
-func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
+func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
 	reqTmp := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -60,7 +61,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		IPAddresses: cfg.AltNames.IPs,
 	}
 
-	key, err := certutil.NewPrivateKey()
+	key, err := pkiutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "couldn't create new private key")
 	}
@@ -94,7 +95,7 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, *rsa.P
 		return nil, nil, errors.Wrap(err, "couldn't create certificate signing request")
 	}
 
-	fmt.Printf("[certs] certificate request %q created\n", req.Name)
+	fmt.Printf("[certs] Certificate request %q created\n", req.Name)
 
 	certData, err := csrutil.WaitForCertificate(r.client.CertificateSigningRequests(), req, watchTimeout)
 	if err != nil {

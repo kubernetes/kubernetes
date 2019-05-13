@@ -46,7 +46,7 @@ type base64Plugin struct {
 	encryptRequest chan *kmsapi.EncryptRequest
 }
 
-func NewBase64Plugin() (*base64Plugin, error) {
+func newBase64Plugin() (*base64Plugin, error) {
 	listener, err := net.Listen(unixProtocol, sockFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on the unix socket, error: %v", err)

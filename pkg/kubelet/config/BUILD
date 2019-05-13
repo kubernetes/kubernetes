@@ -48,7 +48,7 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-            "//vendor/github.com/sigma/go-inotify:go_default_library",
+            "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         ],
         "//conditions:default": [],
     }),

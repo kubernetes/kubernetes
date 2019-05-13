@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
         "//staging/src/k8s.io/client-go/informers/networking/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/networking/v1beta1:go_default_library",
     ],
 )
 
@@ -28,6 +29,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/client-go/informers/networking/v1:all-srcs",
+        "//staging/src/k8s.io/client-go/informers/networking/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -34,7 +34,8 @@ func Resource(resource string) schema.GroupResource {
 
 var (
 	localSchemeBuilder = &coordinationv1beta1.SchemeBuilder
-	AddToScheme        = localSchemeBuilder.AddToScheme
+	// AddToScheme is a common registration function for mapping packaged scoped group & version keys to a scheme
+	AddToScheme = localSchemeBuilder.AddToScheme
 )
 
 func init() {

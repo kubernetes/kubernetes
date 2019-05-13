@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
 	. "github.com/onsi/ginkgo"
@@ -237,7 +238,7 @@ func (tc *CustomMetricTestCase) Run() {
 	// and uncomment following lines:
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		framework.Logf("Couldn't get application default credentials, %v", err)
+		e2elog.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
 			framework.Failf("Error accessing application default credentials, %v", err)
 		}
@@ -442,7 +443,7 @@ func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, t
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
-		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		e2elog.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	if err != nil {

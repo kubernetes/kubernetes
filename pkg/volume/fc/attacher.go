@@ -162,7 +162,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	// Unmount for deviceMountPath(=globalPDPath)
-	err = volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+	err = mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 	if err != nil {
 		return fmt.Errorf("fc: failed to unmount: %s\nError: %v", deviceMountPath, err)
 	}
@@ -173,6 +173,14 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 	klog.V(4).Infof("fc: successfully detached disk: %s", devName)
 	return nil
+}
+
+func (plugin *fcPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *fcPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMounter, error) {

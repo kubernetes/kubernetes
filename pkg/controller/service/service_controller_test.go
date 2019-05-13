@@ -151,7 +151,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 
 	for _, item := range table {
 		controller, cloud, client := newController()
-		err := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
+		err := controller.syncLoadBalancerIfNeeded("foo/bar", item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {

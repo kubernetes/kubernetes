@@ -25,16 +25,16 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    label,
 			Namespace: metav1.NamespaceDefault,
@@ -53,8 +53,8 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 }
 
 func TestIsPodUpdated(t *testing.T) {
-	templateGeneration := int64Ptr(12345)
-	badGeneration := int64Ptr(12345)
+	templateGeneration := utilpointer.Int64Ptr(12345)
+	badGeneration := utilpointer.Int64Ptr(12345)
 	hash := "55555"
 	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
 	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
@@ -150,8 +150,8 @@ func TestCreatePodTemplate(t *testing.T) {
 		hash               string
 		expectUniqueLabel  bool
 	}{
-		{int64Ptr(1), "", false},
-		{int64Ptr(2), "3242341807", true},
+		{utilpointer.Int64Ptr(1), "", false},
+		{utilpointer.Int64Ptr(2), "3242341807", true},
 	}
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}
@@ -168,11 +168,6 @@ func TestCreatePodTemplate(t *testing.T) {
 			t.Errorf("Expected podTemplateSpec to have no hash label, got: %s", val)
 		}
 	}
-}
-
-func int64Ptr(i int) *int64 {
-	li := int64(i)
-	return &li
 }
 
 func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
@@ -210,7 +205,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -247,7 +242,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -265,7 +260,7 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -481,11 +476,11 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 	}
 }
 
-func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...utilfeature.Feature) {
+func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...featuregate.Feature) {
 	for _, fg := range gates {
 		for _, f := range []bool{true, false} {
 			func() {
-				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
 			}()
 		}

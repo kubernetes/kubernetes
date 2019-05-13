@@ -87,7 +87,6 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 		}
 		return configProvider{
 			config: decodedConfig,
-			scheme: configScheme,
 		}, nil
 	}
 	// we got an error where the decode wasn't related to a missing type
@@ -127,13 +126,11 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	}
 	return configProvider{
 		config: internalConfig,
-		scheme: configScheme,
 	}, nil
 }
 
 type configProvider struct {
 	config *apiserver.AdmissionConfiguration
-	scheme *runtime.Scheme
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.

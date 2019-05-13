@@ -256,7 +256,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 		operation := admission.Update
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, false, nil)
 
-		err := ctrl.Validate(attributes)
+		err := ctrl.Validate(attributes, nil)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

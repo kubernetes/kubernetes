@@ -30,7 +30,7 @@ var (
 	)
 	unavailableGauge = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "aggregator_unavailable_apiserver_gauge",
+			Name: "aggregator_unavailable_apiservice",
 			Help: "Gauge of APIServices which are marked as unavailable broken down by APIService name.",
 		},
 		[]string{"name"},

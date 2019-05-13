@@ -992,6 +992,32 @@ __EOF__
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
+  ### Create deployent and service
+  # Pre-condition: no deployment exists
+  kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run testmetadata --image=nginx --replicas=2 --port=80 --expose --service-overrides='{ "metadata": { "annotations": { "zone-context": "home" } } } '
+  # Check result
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'testmetadata:'
+  kube::test::get_object_assert 'service testmetadata' "{{.metadata.annotations}}" "map\[zone-context:home\]"
+
+  ### Expose deployment as a new service
+  # Command
+  kubectl expose deployment testmetadata  --port=1000 --target-port=80 --type=NodePort --name=exposemetadata --overrides='{ "metadata": { "annotations": { "zone-context": "work" } } } '
+  # Check result
+  kube::test::get_object_assert 'service exposemetadata' "{{.metadata.annotations}}" "map\[zone-context:work\]"
+
+  # Clean-Up
+  # Command
+  kubectl delete service exposemetadata testmetadata "${kube_flags[@]}"
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
+  fi
+  kubectl delete deployment testmetadata "${kube_flags[@]}"
+  if [[ "${WAIT_FOR_DELETION:-}" == "true" ]]; then
+    kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  fi
+
   set +o nounset
   set +o errexit
 }
@@ -1299,6 +1325,12 @@ run_namespace_tests() {
   kubectl wait --for=delete ns/my-namespace
   output_message=$(! kubectl get ns/my-namespace 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" ' not found'
+
+  kubectl create namespace my-namespace
+  kube::test::get_object_assert 'namespaces/my-namespace' "{{$id_field}}" 'my-namespace'
+  output_message=$(! kubectl delete namespace -n my-namespace --all 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'namespace "my-namespace" deleted'
 
   ######################
   # Pods in Namespaces #

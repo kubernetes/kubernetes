@@ -29,7 +29,7 @@ import (
 
 const (
 	testInitConfig = `---
-apiVersion: kubeadm.k8s.io/v1beta1
+apiVersion: kubeadm.k8s.io/v1beta2
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: "1.2.3.4"
@@ -39,7 +39,7 @@ nodeRegistration:
   criSocket: /run/containerd/containerd.sock
   name: someName
 ---
-apiVersion: kubeadm.k8s.io/v1beta1
+apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
 `
@@ -142,7 +142,7 @@ func TestNewInitData(t *testing.T) {
 			}
 
 			// test newInitData method
-			data, err := newInitData(cmd, initOptions, nil)
+			data, err := newInitData(cmd, tc.args, initOptions, nil)
 			if err != nil && !tc.expectError {
 				t.Fatalf("newInitData returned unexpected error: %v", err)
 			}
@@ -152,7 +152,7 @@ func TestNewInitData(t *testing.T) {
 
 			// exec additional validation on the returned value
 			if tc.validate != nil {
-				tc.validate(t, &data)
+				tc.validate(t, data)
 			}
 		})
 	}

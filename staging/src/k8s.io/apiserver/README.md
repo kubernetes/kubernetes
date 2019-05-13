@@ -5,7 +5,7 @@ Generic library for building a Kubernetes aggregated API server.
 
 ## Purpose
 
-This library contains code to create Kubernetes aggregation server complete with delegated authentication and authorization, 
+This library contains code to create Kubernetes aggregation server complete with delegated authentication and authorization,
 `kubectl` compatible discovery information, optional admission chain, and versioned types.  It's first consumers are
 `k8s.io/kubernetes`, `k8s.io/kube-aggregator`, and `github.com/kubernetes-incubator/service-catalog`.
 

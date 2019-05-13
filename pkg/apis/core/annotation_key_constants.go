@@ -101,4 +101,10 @@ const (
 	// This annotation will be used to compute the in-cluster network programming latency SLI, see
 	// https://github.com/kubernetes/community/blob/master/sig-scalability/slos/network_programming_latency.md
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
+
+	// MigratedPluginsAnnotationKey is the annotation key, set for CSINode objects, that is a comma-separated
+	// list of in-tree plugins that will be serviced by the CSI backend on the Node represented by CSINode.
+	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
+	// CSI Backend for a volume plugin on a specific node.
+	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
 )

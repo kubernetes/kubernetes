@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -57,20 +57,6 @@ users:
   user:
     client-certificate-data:
     client-key-data:
-`
-	testConfigTokenCertAuthorityData = "certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUN5RENDQWJDZ0F3SUJBZ0lCQURBTkJna3Foa2lHOXcwQkFRc0ZBREFWTVJNd0VRWURWUVFERXdwcmRXSmwKY201bGRHVnpNQjRYRFRFM01USXhOREUxTlRFek1Gb1hEVEkzTVRJeE1qRTFOVEV6TUZvd0ZURVRNQkVHQTFVRQpBeE1LYTNWaVpYSnVaWFJsY3pDQ0FTSXdEUVlKS29aSWh2Y05BUUVCQlFBRGdnRVBBRENDQVFvQ2dnRUJBTlZrCnNkT0NjRDBIOG9ycXZ5djBEZ09jZEpjRGc4aTJPNGt3QVpPOWZUanJGRHJqbDZlVXRtdlMyZ1lZd0c4TGhPV2gKb0lkZ3AvbVkrbVlDakliUUJtTmE2Ums1V2JremhJRzM1c1lseE9NVUJJR0xXMzN0RTh4SlR1RVd3V0NmZnpLcQpyaU1UT1A3REF3MUxuM2xUNlpJNGRNM09NOE1IUk9Wd3lRMDVpbWo5eUx5R1lYdTlvSncwdTVXWVpFYmpUL3VpCjJBZ2QwVDMrZGFFb044aVBJOTlVQkQxMzRkc2VGSEJEY3hHcmsvVGlQdHBpSC9IOGoxRWZaYzRzTGlONzJmL2YKYUpacTROSHFiT2F5UkpITCtJejFNTW1DRkN3cjdHOHVENWVvWWp2dEdZN2xLc1pBTlUwK3VlUnJsTitxTzhQWQpxaTZNMDFBcmV1UzFVVHFuTkM4Q0F3RUFBYU1qTUNFd0RnWURWUjBQQVFIL0JBUURBZ0trTUE4R0ExVWRFd0VCCi93UUZNQU1CQWY4d0RRWUpLb1pJaHZjTkFRRUxCUUFEZ2dFQkFNbXo4Nm9LMmFLa0owMnlLSC9ZcTlzaDZZcDEKYmhLS25mMFJCaTA1clRacWdhTi9oTnROdmQxSzJxZGRLNzhIT2pVdkpNRGp3NERieXF0Wll2V01XVFRCQnQrSgpPMGNyWkg5NXlqUW42YzRlcU1FTjFhOUFKNXRlclNnTDVhREJsK0FMTWxaNVpxTzBUOUJDdTJtNXV3dGNWaFZuCnh6cGpTT3V5WVdOQ3A5bW9mV2VPUTljNXhEcElWeUlMUkFvNmZ5Z2c3N25TSDN4ckVmd0VKUHFMd1RPYVk1bTcKeEZWWWJoR3dxUGU5V0I5aTR5cnNrZUFBWlpUSzdVbklKMXFkRmlHQk9aZlRtaDhYQ3BOTHZZcFBLQW9hWWlsRwpjOW1acVhpWVlESTV6R1IxMElpc2FWNXJUY2hDenNQVWRhQzRVbnpTZG01cTdKYTAyb0poQlU1TE1FMD0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo="
-	testConfigTokenNoCluster         = `apiVersion: v1
-clusters:
-- cluster:
-    server:
-  name: prod
-contexts:
-- context:
-    namespace: default
-    user: default-service-account
-  name: default
-kind: Config
-preferences: {}
 `
 )
 
@@ -168,18 +154,18 @@ func TestRunCreateToken(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bts, err := kubeadmapiv1beta1.NewBootstrapTokenString(tc.token)
+			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tc.token)
 			if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
 				t.Fatalf("token couldn't be parsed for testing: %v", err)
 			}
 
-			cfg := &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
+			cfg := &kubeadmapiv1beta2.InitConfiguration{
+				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 					// KubernetesVersion is not used, but we set this explicitly to avoid
-					// the lookup of the version from the internet when executing ConfigFileAndDefaultsToInternalConfig
+					// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
 					KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
 				},
-				BootstrapTokens: []kubeadmapiv1beta1.BootstrapToken{
+				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
 						Token:  bts,
 						TTL:    &metav1.Duration{Duration: 0},
@@ -314,7 +300,7 @@ func TestGetClientset(t *testing.T) {
 	}
 }
 
-func TestRunDeleteToken(t *testing.T) {
+func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
 
 	tmpDir, err := ioutil.TempDir("", "kubeadm-token-test")
@@ -341,12 +327,12 @@ func TestRunDeleteToken(t *testing.T) {
 
 	// test valid; should not fail
 	// for some reason Secrets().Delete() does not fail even for this dummy config
-	if err = RunDeleteToken(&buf, client, "abcdef.1234567890123456"); err != nil {
+	if err = RunDeleteTokens(&buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
 		t.Errorf("RunDeleteToken() failed for a valid token: %v", err)
 	}
 
 	// test invalid token; should fail
-	if err = RunDeleteToken(&buf, client, "invalid-token"); err == nil {
+	if err = RunDeleteTokens(&buf, client, []string{"invalid-token"}); err == nil {
 		t.Errorf("RunDeleteToken() succeeded for an invalid token: %v", err)
 	}
 }

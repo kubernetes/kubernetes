@@ -299,6 +299,8 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 					Kubelet: &kubeletconfig.KubeletConfiguration{
 						CgroupsPerQOS:               true,
 						EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
+						SystemReservedCgroup:        "/system.slice",
+						KubeReservedCgroup:          "/kubelet.service",
 						SystemCgroups:               "",
 						CgroupRoot:                  "",
 						EventBurst:                  10,

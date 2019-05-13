@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"k8s.io/klog"
@@ -287,12 +286,6 @@ func (s *fileStore) updateSymlink(filename string) error {
 
 func (s *fileStore) filename(qualifier string) string {
 	return s.pairNamePrefix + "-" + qualifier + pemExtension
-}
-
-// withoutExt returns the given filename after removing the extension. The
-// extension to remove will be the result of filepath.Ext().
-func withoutExt(filename string) string {
-	return strings.TrimSuffix(filename, filepath.Ext(filename))
 }
 
 func loadX509KeyPair(certFile, keyFile string) (*tls.Certificate, error) {

@@ -205,13 +205,13 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 	}
 	versionedMetrics := &metricsv1beta1api.PodMetricsList{}
 	if resourceName != "" {
-		m, err := metricsClient.Metrics().PodMetricses(ns).Get(resourceName, metav1.GetOptions{})
+		m, err := metricsClient.MetricsV1beta1().PodMetricses(ns).Get(resourceName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
 	} else {
-		versionedMetrics, err = metricsClient.Metrics().PodMetricses(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			return nil, err
 		}

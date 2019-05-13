@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE}")/..}
+KUBE_ROOT=${KUBE_ROOT:-$(dirname "${BASH_SOURCE[0]}")/..}
 source "${KUBE_ROOT}/cluster/clientbin.sh"
 
 # If KUBEADM_PATH isn't set, gather up the list of likely places and use ls

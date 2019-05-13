@@ -38,11 +38,12 @@ import (
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/client-go/util/keyutil"
 )
 
-// certificateWaitBackoff controls the amount and timing of retries when the
-// watch for certificate approval is interrupted.
-var certificateWaitBackoff = wait.Backoff{Duration: 30 * time.Second, Steps: 4, Factor: 1.5, Jitter: 0.1}
+// certificateWaitTimeout controls the amount of time we wait for certificate
+// approval in one iteration.
+var certificateWaitTimeout = 15 * time.Minute
 
 // Manager maintains and updates the certificates in use by this certificate
 // manager. In the background it communicates with the API server to get new
@@ -388,29 +389,10 @@ func (m *manager) rotateCerts() (bool, error) {
 	// Once we've successfully submitted a CSR for this template, record that we did so
 	m.setLastRequest(template)
 
-	// Wait for the certificate to be signed. Instead of one long watch, we retry with slightly longer
-	// intervals each time in order to tolerate failures from the server AND to preserve the liveliness
-	// of the cert manager loop. This creates slightly more traffic against the API server in return
-	// for bounding the amount of time we wait when a certificate expires.
-	var crtPEM []byte
-	watchDuration := time.Minute
-	if err := wait.ExponentialBackoff(certificateWaitBackoff, func() (bool, error) {
-		data, err := csr.WaitForCertificate(client, req, watchDuration)
-		switch {
-		case err == nil:
-			crtPEM = data
-			return true, nil
-		case err == wait.ErrWaitTimeout:
-			watchDuration += time.Minute
-			if watchDuration > 5*time.Minute {
-				watchDuration = 5 * time.Minute
-			}
-			return false, nil
-		default:
-			utilruntime.HandleError(fmt.Errorf("Unable to check certificate signing status: %v", err))
-			return false, m.updateServerError(err)
-		}
-	}); err != nil {
+	// Wait for the certificate to be signed. This interface and internal timout
+	// is a remainder after the old design using raw watch wrapped with backoff.
+	crtPEM, err := csr.WaitForCertificate(client, req, certificateWaitTimeout)
+	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Certificate request was not signed: %v", err))
 		return false, nil
 	}
@@ -566,7 +548,7 @@ func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byt
 		return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
 	}
 
-	keyPEM = pem.EncodeToMemory(&pem.Block{Type: cert.ECPrivateKeyBlockType, Bytes: der})
+	keyPEM = pem.EncodeToMemory(&pem.Block{Type: keyutil.ECPrivateKeyBlockType, Bytes: der})
 
 	template = m.getTemplate()
 	if template == nil {

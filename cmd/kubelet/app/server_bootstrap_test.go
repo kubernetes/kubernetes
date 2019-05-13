@@ -254,7 +254,13 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer s.lock.Unlock()
 	t := s.t
 
-	t.Logf("Request %s %s %s", req.Method, req.URL, req.UserAgent())
+	// filter out timeouts as csrSimulator don't support them
+	q := req.URL.Query()
+	q.Del("timeout")
+	q.Del("timeoutSeconds")
+	req.URL.RawQuery = q.Encode()
+
+	t.Logf("Request %q %q %q", req.Method, req.URL, req.UserAgent())
 
 	if len(s.expectUserAgent) > 0 && req.UserAgent() != s.expectUserAgent {
 		t.Errorf("Unexpected user agent: %s", req.UserAgent())
@@ -305,7 +311,7 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		s.csr = csr
 
-	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&limit=500":
+	case req.Method == "GET" && req.URL.Path == "/apis/certificates.k8s.io/v1beta1/certificatesigningrequests" && req.URL.RawQuery == "fieldSelector=metadata.name%3Dtest-csr&limit=500&resourceVersion=0":
 		if s.csr == nil {
 			t.Fatalf("no csr")
 		}

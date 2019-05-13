@@ -27,11 +27,11 @@ import (
 	"time"
 
 	"github.com/evanphx/json-patch"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -39,11 +39,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utiltrace "k8s.io/apiserver/pkg/util/trace"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	utiltrace "k8s.io/utils/trace"
 )
 
 var (
@@ -149,10 +151,10 @@ func TestJSONPatch(t *testing.T) {
 		},
 	} {
 		p := &patcher{
-			patchType: types.JSONPatchType,
-			patchJS:   []byte(test.patch),
+			patchType:  types.JSONPatchType,
+			patchBytes: []byte(test.patch),
 		}
-		jp := jsonPatcher{p}
+		jp := jsonPatcher{patcher: p}
 		codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
 		pod := &examplev1.Pod{}
 		pod.Name = "podA"
@@ -365,6 +367,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	creater := runtime.ObjectCreater(scheme)
 	defaulter := runtime.ObjectDefaulter(scheme)
 	convertor := runtime.UnsafeObjectConvertor(scheme)
+	objectInterfaces := &admission.SchemeBasedObjectInterfaces{scheme}
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
 	schemaReferenceObj := &examplev1.Pod{}
@@ -441,6 +444,8 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			kind:            kind,
 			resource:        resource,
 
+			objectInterfaces: objectInterfaces,
+
 			hubGroupVersion: hubVersion,
 
 			createValidation: rest.ValidateAllObjectFunc,
@@ -454,12 +459,12 @@ func (tc *patchTestCase) Run(t *testing.T) {
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
-			patchJS:     patch,
+			patchBytes:  patch,
 
 			trace: utiltrace.New("Patch" + name),
 		}
 
-		resultObj, err := p.patchResource(ctx)
+		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -938,4 +943,60 @@ func setTcPod(tcPod *example.Pod, name string, namespace string, uid types.UID, 
 	if len(nodeName) != 0 {
 		tcPod.Spec.NodeName = nodeName
 	}
+}
+
+func (f mutateObjectUpdateFunc) Handles(operation admission.Operation) bool {
+	return true
+}
+
+func (f mutateObjectUpdateFunc) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	return f(a.GetObject(), a.GetOldObject())
+}
+
+func TestTransformDecodeErrorEnsuresBadRequestError(t *testing.T) {
+	testCases := []struct {
+		name             string
+		typer            runtime.ObjectTyper
+		decodedGVK       *schema.GroupVersionKind
+		decodeIntoObject runtime.Object
+		baseErr          error
+		expectedErr      error
+	}{
+		{
+			name:  "decoding normal objects fails and returns a bad-request error",
+			typer: clientgoscheme.Scheme,
+			decodedGVK: &schema.GroupVersionKind{
+				Group:   testapigroupv1.GroupName,
+				Version: "v1",
+				Kind:    "Carp",
+			},
+			decodeIntoObject: &testapigroupv1.Carp{}, // which client-go's scheme doesn't recognize
+			baseErr:          fmt.Errorf("plain error"),
+		},
+		{
+			name:             "decoding objects with unknown GVK fails and returns a bad-request error",
+			typer:            alwaysErrorTyper{},
+			decodedGVK:       nil,
+			decodeIntoObject: &testapigroupv1.Carp{}, // which client-go's scheme doesn't recognize
+			baseErr:          nil,
+		},
+	}
+	for _, testCase := range testCases {
+		err := transformDecodeError(testCase.typer, testCase.baseErr, testCase.decodeIntoObject, testCase.decodedGVK, []byte(``))
+		if apiStatus, ok := err.(apierrors.APIStatus); !ok || apiStatus.Status().Code != http.StatusBadRequest {
+			t.Errorf("expected bad request error but got: %v", err)
+		}
+	}
+}
+
+var _ runtime.ObjectTyper = alwaysErrorTyper{}
+
+type alwaysErrorTyper struct{}
+
+func (alwaysErrorTyper) ObjectKinds(runtime.Object) ([]schema.GroupVersionKind, bool, error) {
+	return nil, false, fmt.Errorf("always error")
+}
+
+func (alwaysErrorTyper) Recognizes(gvk schema.GroupVersionKind) bool {
+	return false
 }

@@ -69,7 +69,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		DeleteStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: namespace.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -147,6 +147,14 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		)
 		return nil, false, err
 	}
+	if options.Preconditions.ResourceVersion != nil && *options.Preconditions.ResourceVersion != namespace.ResourceVersion {
+		err = apierrors.NewConflict(
+			api.Resource("namespaces"),
+			name,
+			fmt.Errorf("Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v", *options.Preconditions.ResourceVersion, namespace.ResourceVersion),
+		)
+		return nil, false, err
+	}
 
 	// upon first request to delete, we switch the phase to start namespace termination
 	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
@@ -156,7 +164,7 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 			return nil, false, err
 		}
 
-		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+		preconditions := storage.Preconditions{UID: options.Preconditions.UID, ResourceVersion: options.Preconditions.ResourceVersion}
 
 		out := r.store.NewFunc()
 		err = r.store.Storage.GuaranteedUpdate(
@@ -177,17 +185,33 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 					existingNamespace.Status.Phase = api.NamespaceTerminating
 				}
 
-				// Remove orphan finalizer if options.OrphanDependents = false.
-				if options.OrphanDependents != nil && *options.OrphanDependents == false {
-					// remove Orphan finalizer.
-					newFinalizers := []string{}
-					for i := range existingNamespace.ObjectMeta.Finalizers {
-						finalizer := existingNamespace.ObjectMeta.Finalizers[i]
-						if string(finalizer) != metav1.FinalizerOrphanDependents {
-							newFinalizers = append(newFinalizers, finalizer)
-						}
+				// the current finalizers which are on namespace
+				currentFinalizers := map[string]bool{}
+				for _, f := range existingNamespace.Finalizers {
+					currentFinalizers[f] = true
+				}
+				// the finalizers we should ensure on namespace
+				shouldHaveFinalizers := map[string]bool{
+					metav1.FinalizerOrphanDependents: shouldHaveOrphanFinalizer(options, currentFinalizers[metav1.FinalizerOrphanDependents]),
+					metav1.FinalizerDeleteDependents: shouldHaveDeleteDependentsFinalizer(options, currentFinalizers[metav1.FinalizerDeleteDependents]),
+				}
+				// determine whether there are changes
+				changeNeeded := false
+				for finalizer, shouldHave := range shouldHaveFinalizers {
+					changeNeeded = currentFinalizers[finalizer] != shouldHave || changeNeeded
+					if shouldHave {
+						currentFinalizers[finalizer] = true
+					} else {
+						delete(currentFinalizers, finalizer)
 					}
-					existingNamespace.ObjectMeta.Finalizers = newFinalizers
+				}
+				// make the changes if needed
+				if changeNeeded {
+					newFinalizers := []string{}
+					for f := range currentFinalizers {
+						newFinalizers = append(newFinalizers, f)
+					}
+					existingNamespace.Finalizers = newFinalizers
 				}
 				return existingNamespace, nil
 			}),
@@ -214,6 +238,26 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 	return r.store.Delete(ctx, name, options)
 }
 
+func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalizer bool) bool {
+	if options.OrphanDependents != nil {
+		return *options.OrphanDependents
+	}
+	if options.PropagationPolicy != nil {
+		return *options.PropagationPolicy == metav1.DeletePropagationOrphan
+	}
+	return haveOrphanFinalizer
+}
+
+func shouldHaveDeleteDependentsFinalizer(options *metav1.DeleteOptions, haveDeleteDependentsFinalizer bool) bool {
+	if options.OrphanDependents != nil {
+		return *options.OrphanDependents == false
+	}
+	if options.PropagationPolicy != nil {
+		return *options.PropagationPolicy == metav1.DeletePropagationForeground
+	}
+	return haveDeleteDependentsFinalizer
+}
+
 func (e *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
 	return e.store.ConvertToTable(ctx, object, tableOptions)
 }
@@ -224,6 +268,12 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"ns"}
+}
+
+var _ rest.StorageVersionProvider = &REST{}
+
+func (r *REST) StorageVersion() runtime.GroupVersioner {
+	return r.store.StorageVersion()
 }
 
 func (r *StatusREST) New() runtime.Object {

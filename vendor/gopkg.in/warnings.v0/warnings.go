@@ -75,7 +75,7 @@
 //  - go vet-style invocations verifier
 //  - semi-automatic code converter
 //
-package warnings
+package warnings // import "gopkg.in/warnings.v0"
 
 import (
 	"bytes"

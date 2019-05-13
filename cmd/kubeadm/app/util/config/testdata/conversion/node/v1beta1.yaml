@@ -14,7 +14,7 @@ discovery:
 kind: JoinConfiguration
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
-  name: master-1
+  name: control-plane-1
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master

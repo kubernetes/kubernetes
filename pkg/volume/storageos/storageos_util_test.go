@@ -108,8 +108,8 @@ func (f fakeAPI) VolumeUnmount(opts storageostypes.VolumeUnmountOptions) error {
 func (f fakeAPI) VolumeDelete(opts storageostypes.DeleteOptions) error {
 	return nil
 }
-func (f fakeAPI) Controller(ref string) (*storageostypes.Controller, error) {
-	return &storageostypes.Controller{}, nil
+func (f fakeAPI) Node(ref string) (*storageostypes.Node, error) {
+	return &storageostypes.Node{}, nil
 }
 
 func TestCreateVolume(t *testing.T) {

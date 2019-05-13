@@ -47,13 +47,13 @@ const (
 )
 
 // EnsureProxyAddon creates the kube-proxy addons
-func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
 		return errors.Wrap(err, "error when creating kube-proxy service account")
 	}
 
-	// Generate Master Enpoint kubeconfig file
-	masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+	// Generate ControlPlane Enpoint kubeconfig file
+	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
 	if err != nil {
 		return err
 	}
@@ -67,21 +67,21 @@ func EnsureProxyAddon(cfg *kubeadmapi.InitConfiguration, client clientset.Interf
 	var proxyConfigMapBytes, proxyDaemonSetBytes []byte
 	proxyConfigMapBytes, err = kubeadmutil.ParseTemplate(KubeProxyConfigMap19,
 		struct {
-			MasterEndpoint    string
-			ProxyConfig       string
-			ProxyConfigMap    string
-			ProxyConfigMapKey string
+			ControlPlaneEndpoint string
+			ProxyConfig          string
+			ProxyConfigMap       string
+			ProxyConfigMapKey    string
 		}{
-			MasterEndpoint:    masterEndpoint,
-			ProxyConfig:       prefixBytes.String(),
-			ProxyConfigMap:    constants.KubeProxyConfigMap,
-			ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
+			ControlPlaneEndpoint: controlPlaneEndpoint,
+			ProxyConfig:          prefixBytes.String(),
+			ProxyConfigMap:       constants.KubeProxyConfigMap,
+			ProxyConfigMapKey:    constants.KubeProxyConfigMapKey,
 		})
 	if err != nil {
 		return errors.Wrap(err, "error when parsing kube-proxy configmap template")
 	}
 	proxyDaemonSetBytes, err = kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
-		Image:             images.GetKubernetesImage(constants.KubeProxy, &cfg.ClusterConfiguration),
+		Image:             images.GetKubernetesImage(constants.KubeProxy, cfg),
 		ProxyConfigMap:    constants.KubeProxyConfigMap,
 		ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
 	})

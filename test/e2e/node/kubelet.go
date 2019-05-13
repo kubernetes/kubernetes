@@ -22,13 +22,16 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -49,10 +52,10 @@ const (
 // podNamePrefix and namespace.
 func getPodMatches(c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
-	framework.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
+	e2elog.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
 	runningPods, err := framework.GetKubeletPods(c, nodeName)
 	if err != nil {
-		framework.Logf("Error checking running pods on %v: %v", nodeName, err)
+		e2elog.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches
 	}
 	for _, pod := range runningPods.Items {
@@ -89,7 +92,7 @@ func waitTillNPodsRunningOnNodes(c clientset.Interface, nodeNames sets.String, p
 		if seen.Len() == targetNumPods {
 			return true, nil
 		}
-		framework.Logf("Waiting for %d pods to be running on the node; %d are currently running;", targetNumPods, seen.Len())
+		e2elog.Logf("Waiting for %d pods to be running on the node; %d are currently running;", targetNumPods, seen.Len())
 		return false, nil
 	})
 }
@@ -210,11 +213,11 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	}
 
 	for _, test := range tests {
-		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
+		e2elog.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.Poll(poll, timeout, func() (bool, error) {
-			result, err := framework.NodeExec(nodeIP, test.cmd)
+			result, err := e2essh.NodeExec(nodeIP, test.cmd, framework.TestContext.Provider)
 			Expect(err).NotTo(HaveOccurred())
-			framework.LogSSHResult(result)
+			e2essh.LogResult(result)
 			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
 			if expectClean && ok { // keep trying
 				return false, nil
@@ -228,9 +231,9 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	}
 
 	if expectClean {
-		framework.Logf("Pod's host has been cleaned up")
+		e2elog.Logf("Pod's host has been cleaned up")
 	} else {
-		framework.Logf("Pod's host has not been cleaned up (per expectation)")
+		e2elog.Logf("Pod's host has not been cleaned up (per expectation)")
 	}
 }
 
@@ -315,13 +318,12 @@ var _ = SIGDescribe("kubelet", func() {
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
 				Expect(framework.RunRC(testutils.RCConfig{
-					Client:         f.ClientSet,
-					InternalClient: f.InternalClientset,
-					Name:           rcName,
-					Namespace:      f.Namespace.Name,
-					Image:          imageutils.GetPauseImageName(),
-					Replicas:       totalPods,
-					NodeSelector:   nodeLabels,
+					Client:       f.ClientSet,
+					Name:         rcName,
+					Namespace:    f.Namespace.Name,
+					Image:        imageutils.GetPauseImageName(),
+					Replicas:     totalPods,
+					NodeSelector: nodeLabels,
 				})).NotTo(HaveOccurred())
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
@@ -345,7 +347,7 @@ var _ = SIGDescribe("kubelet", func() {
 				start := time.Now()
 				Expect(waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, 0,
 					itArg.timeout)).NotTo(HaveOccurred())
-				framework.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
+				e2elog.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
 					time.Since(start))
 				if resourceMonitor != nil {
 					resourceMonitor.LogCPUSummary()
@@ -389,7 +391,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			BeforeEach(func() {
 				framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-				_, nfsServerPod, nfsIP = framework.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
+				_, nfsServerPod, nfsIP = volume.NewNFSServer(c, ns, []string{"-G", "777", "/exports"})
 			})
 
 			AfterEach(func() {

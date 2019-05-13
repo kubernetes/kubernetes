@@ -94,6 +94,10 @@ type ContainerGC interface {
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
 type KillPodFunc func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error
 
+// MirrorPodFunc returns the mirror pod for the given static pod and
+// whether it was known to the pod manager.
+type MirrorPodFunc func(*v1.Pod) (*v1.Pod, bool)
+
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
 type ActivePodsFunc func() []*v1.Pod
 

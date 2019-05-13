@@ -35,8 +35,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/controller"
+	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -133,7 +133,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 	for _, node := range nodes {
 		// Default NodeReady status to v1.ConditionUnknown
 		status := v1.ConditionUnknown
-		if _, c := nodeutilv1.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
+		if _, c := nodeutil.GetNodeCondition(&node.Status, v1.NodeReady); c != nil {
 			status = c.Status
 		}
 
