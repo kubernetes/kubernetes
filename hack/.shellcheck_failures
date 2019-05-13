@@ -28,6 +28,7 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/update-vendor.sh
+./hack/verify-no-vendor-cycles.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/batch.sh
 ./test/cmd/certificate.sh
