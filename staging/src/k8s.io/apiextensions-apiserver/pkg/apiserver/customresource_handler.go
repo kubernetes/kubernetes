@@ -592,6 +592,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
 				encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
 				structuralSchema:      structuralSchema,
+				structuralSchemaGK:    kind.GroupKind(),
 				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
 			},
 			crd.Status.AcceptedNames.Categories,
@@ -614,7 +615,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, structuralSchema: structuralSchema, preserveUnknownFields: *crd.Spec.PreserveUnknownFields},
+			Serializer: unstructuredNegotiatedSerializer{
+				typer:                 typer,
+				creator:               creator,
+				converter:             safeConverter,
+				structuralSchema:      structuralSchema,
+				structuralSchemaGK:    kind.GroupKind(),
+				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
+			},
 			ParameterCodec: parameterCodec,
 
 			Creater:         creator,
@@ -665,7 +673,13 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		// shallow copy
 		statusScope := *requestScopes[v.Name]
 		statusScope.Subresource = "status"
-		statusScope.Serializer = unstructuredNegotiatedSerializer{typer: typer, creator: creator, converter: safeConverter, structuralSchema: structuralSchema, preserveUnknownFields: *crd.Spec.PreserveUnknownFields}
+		statusScope.Serializer = unstructuredNegotiatedSerializer{
+			typer: typer, creator: creator,
+			converter:             safeConverter,
+			structuralSchema:      structuralSchema,
+			structuralSchemaGK:    kind.GroupKind(),
+			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
+		}
 		statusScope.Namer = handlers.ContextBasedNaming{
 			SelfLinker:         meta.NewAccessor(),
 			ClusterScoped:      clusterScoped,
@@ -702,6 +716,7 @@ type unstructuredNegotiatedSerializer struct {
 	converter runtime.ObjectConvertor
 
 	structuralSchema      *structuralschema.Structural
+	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
 
@@ -735,7 +750,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchema: s.structuralSchema, preserveUnknownFields: s.preserveUnknownFields}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchema: s.structuralSchema, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
@@ -828,6 +843,7 @@ type crdConversionRESTOptionsGetter struct {
 	encoderVersion        schema.GroupVersion
 	decoderVersion        schema.GroupVersion
 	structuralSchema      *structuralschema.Structural
+	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
 
@@ -838,9 +854,14 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
 			dropInvalidMetadata:   true,
 			structuralSchema:      t.structuralSchema,
+			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
 		}}
-		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{structuralSchema: t.structuralSchema, preserveUnknownFields: t.preserveUnknownFields}}
+		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{
+			structuralSchema:      t.structuralSchema,
+			structuralSchemaGK:    t.structuralSchemaGK,
+			preserveUnknownFields: t.preserveUnknownFields,
+		}}
 		ret.StorageConfig.Codec = versioning.NewCodec(
 			ret.StorageConfig.Codec,
 			d,
@@ -927,8 +948,10 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 // - validating and pruning ObjectMeta
 // - generic pruning of unknown fields following a structural schema.
 type unstructuredSchemaCoercer struct {
-	dropInvalidMetadata   bool
+	dropInvalidMetadata bool
+
 	structuralSchema      *structuralschema.Structural
+	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
 
@@ -947,7 +970,12 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 		return err
 	}
 
-	if !v.preserveUnknownFields {
+	// compare group and kind because also other object like DeleteCollection options pass through here
+	gv, err := schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return err
+	}
+	if !v.preserveUnknownFields && gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
 		structuralpruning.Prune(u.Object, v.structuralSchema)
 	}
 
