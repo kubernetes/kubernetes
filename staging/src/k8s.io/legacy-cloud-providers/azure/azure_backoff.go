@@ -550,25 +550,13 @@ func (az *Cloud) deleteRouteWithRetry(routeName string) error {
 	})
 }
 
-// CreateOrUpdateVMWithRetry invokes az.VirtualMachinesClient.CreateOrUpdate with exponential backoff retry
-func (az *Cloud) CreateOrUpdateVMWithRetry(resourceGroup, vmName string, newVM compute.VirtualMachine) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		ctx, cancel := getContextWithCancel()
-		defer cancel()
-
-		resp, err := az.VirtualMachinesClient.CreateOrUpdate(ctx, resourceGroup, vmName, newVM)
-		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s): end", vmName)
-		return az.processHTTPRetryResponse(nil, "", resp, err)
-	})
-}
-
 // UpdateVmssVMWithRetry invokes az.VirtualMachineScaleSetVMsClient.Update with exponential backoff retry
-func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM) error {
+func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
+		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source)
 		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
