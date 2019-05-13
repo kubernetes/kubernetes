@@ -223,6 +223,10 @@ func TestDryRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	dynamicClient, err := dynamic.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatal(err)
@@ -241,10 +245,6 @@ func TestDryRun(t *testing.T) {
 	}
 
 	// gather resources to test
-	dynamicClient, err := dynamic.NewForConfig(s.ClientConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
 	_, resources, err := client.Discovery().ServerGroupsAndResources()
 	if err != nil {
 		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
