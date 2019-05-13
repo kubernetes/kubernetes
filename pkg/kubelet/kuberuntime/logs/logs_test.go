@@ -18,6 +18,10 @@ package logs
 
 import (
 	"bytes"
+	"context"
+	"io"
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -180,7 +184,7 @@ func TestWriteLogs(t *testing.T) {
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
-		err := w.write(msg)
+		err := w.write(msg, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
@@ -244,17 +248,66 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
 			msg.stream = runtimeapi.Stdout
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		for i := 0; i < test.stderrLines; i++ {
 			msg.stream = runtimeapi.Stderr
-			if err := w.write(msg); err != nil {
+			if err := w.write(msg, true); err != nil {
 				assert.EqualError(t, err, errMaximumWrite.Error())
 			}
 		}
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
 		assert.Equal(t, test.expectStderr, stderrBuf.String())
+	}
+}
+
+func TestReadLogs(t *testing.T) {
+	timestamp, err := time.Parse(timeFormatIn, "2016-10-20T18:39:20.57606443Z")
+	assert.NoError(t, err)
+
+	timestampStr := timestamp.Format(timeFormatOut)
+	// Docker log format - The content is saved in 2 records when it is more than 16K
+	log := `{"log":"docker stdout test log","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}` + "\n" +
+		`{"log":" and the second part of content\n","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}` + "\n"
+
+	for c, test := range []struct {
+		timestamp    bool
+		expectStdout string
+		expectStderr string
+	}{
+		{
+			timestamp:    true,
+			expectStdout: timestampStr + " " + "docker stdout test log and the second part of content\n",
+		},
+		{
+			timestamp:    false,
+			expectStdout: "docker stdout test log and the second part of content\n",
+		},
+	} {
+		t.Logf("TestCase #%d: %+v", c, test)
+
+		tmpfile, err := ioutil.TempFile("", "log.*.txt")
+		assert.NoError(t, err)
+
+		defer os.Remove(tmpfile.Name()) // clean up
+
+		_, err = tmpfile.Write([]byte(log))
+		assert.NoError(t, err)
+		tmpfile.Close()
+
+		var buf bytes.Buffer
+		w := io.MultiWriter(&buf)
+
+		err = ReadLogs(context.Background(), tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: test.timestamp}, nil, w, w)
+		assert.NoError(t, err)
+
+		if test.expectStdout != "" {
+			assert.Equal(t, test.expectStdout, buf.String())
+		}
+		if test.expectStderr != "" {
+			assert.Equal(t, test.expectStderr, buf.String())
+		}
 	}
 }
