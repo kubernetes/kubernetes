@@ -859,17 +859,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		serverType = "readwrite"
 	}
 
-	method, path, host := req.Method, trimURLPath(req.URL.Path), req.URL.Host
+	method, path := req.Method, trimURLPath(req.URL.Path)
 
 	longRunning := strconv.FormatBool(isLongRunningRequest(path))
 
-	servermetrics.HTTPRequests.WithLabelValues(method, path, host, serverType, longRunning).Inc()
+	servermetrics.HTTPRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
 
-	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, host, serverType, longRunning).Inc()
-	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, host, serverType, longRunning).Dec()
+	servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Inc()
+	defer servermetrics.HTTPInflightRequests.WithLabelValues(method, path, serverType, longRunning).Dec()
 
 	startTime := time.Now()
-	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, host, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
+	defer servermetrics.HTTPRequestsDuration.WithLabelValues(method, path, serverType, longRunning).Observe(servermetrics.SinceInSeconds(startTime))
 
 	s.restfulCont.ServeHTTP(w, req)
 }
