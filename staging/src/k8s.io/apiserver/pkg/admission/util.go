@@ -23,10 +23,11 @@ type RuntimeObjectInterfaces struct {
 	runtime.ObjectTyper
 	runtime.ObjectDefaulter
 	runtime.ObjectConvertor
+	runtime.EquivalentResourceMapper
 }
 
 func NewObjectInterfacesFromScheme(scheme *runtime.Scheme) ObjectInterfaces {
-	return &RuntimeObjectInterfaces{scheme, scheme, scheme, scheme}
+	return &RuntimeObjectInterfaces{scheme, scheme, scheme, scheme, runtime.NewEquivalentResourceRegistry()}
 }
 
 func (r *RuntimeObjectInterfaces) GetObjectCreater() runtime.ObjectCreater {
@@ -40,4 +41,7 @@ func (r *RuntimeObjectInterfaces) GetObjectDefaulter() runtime.ObjectDefaulter {
 }
 func (r *RuntimeObjectInterfaces) GetObjectConvertor() runtime.ObjectConvertor {
 	return r.ObjectConvertor
+}
+func (r *RuntimeObjectInterfaces) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
+	return r.EquivalentResourceMapper
 }

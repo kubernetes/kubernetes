@@ -229,6 +229,8 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Linker:          selfLinker,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
+
 		ParameterCodec: parameterCodec,
 
 		Admit: admissionControl,
@@ -3554,6 +3556,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Linker:          selfLinker,
 		RootScopedKinds: sets.NewString("SimpleRoot"),
 
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
+
 		Admit: admissionControl,
 
 		GroupVersion:           newGroupVersion,
@@ -3583,6 +3587,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Linker:          selfLinker,
+
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
 		Admit: admissionControl,
 
@@ -4300,6 +4306,8 @@ func TestXGSubresource(t *testing.T) {
 		Defaulter:       scheme,
 		Typer:           scheme,
 		Linker:          selfLinker,
+
+		EquivalentResourceRegistry: runtime.NewEquivalentResourceRegistry(),
 
 		ParameterCodec: parameterCodec,
 

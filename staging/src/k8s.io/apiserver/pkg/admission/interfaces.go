@@ -76,6 +76,8 @@ type ObjectInterfaces interface {
 	GetObjectDefaulter() runtime.ObjectDefaulter
 	// GetObjectConvertor is the ObjectConvertor appropriate for the requested object.
 	GetObjectConvertor() runtime.ObjectConvertor
+	// GetEquivalentResourceMapper is the EquivalentResourceMapper appropriate for finding equivalent resources and expected kind for the requested object.
+	GetEquivalentResourceMapper() runtime.EquivalentResourceMapper
 }
 
 // privateAnnotationsGetter is a private interface which allows users to get annotations from Attributes.
