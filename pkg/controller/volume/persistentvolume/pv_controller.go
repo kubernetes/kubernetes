@@ -237,8 +237,7 @@ type PersistentVolumeController struct {
 	// Not used when set to nil
 	csiNameFromIntreeNameHook func(pluginName string) (string, error)
 
-	// For CSI provisioning/deletion related metrics recording
-	// this ThreadSafeStore is keyed of format: <claimKey>-<operation-name>
+	// This ThreadSafeStore is keyed of format: <claimKey/volumeName>-<operation-name>
 	// where claimKey is created by claimToClaimKey(claim) or claimRefToClaimKey(volume.Spec.ClaimRef),
 	// and operation-name is the corresponding operation the metric should be related
 	// value to be start timestamps of when the operation starts along with the plugin name
@@ -1684,8 +1683,6 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	storageClass *storage.StorageClass) (string, error) {
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperationExternal [%s] started, class: %q", claimToClaimKey(claim), claimClass)
-	// pluginName is not set here to align with existing behavior
-	// of not setting pluginName for external provisioners (including CSI)
 	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
 	provisionerName := storageClass.Provisioner

@@ -74,6 +74,8 @@ func registerMetrics() {
 	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
+// RecordOperationLatencyMetric records the end to end latency for certain operation
+// into metric volume_operation_total_seconds
 func RecordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
 	storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
 }

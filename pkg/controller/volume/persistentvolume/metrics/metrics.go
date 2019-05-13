@@ -190,6 +190,8 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 	}
 }
 
+// RecordVolumeOperationErrorMetric records error count into metric
+// volume_operation_total_errors for provisioning/deletion operations
 func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 	if pluginName == "" {
 		pluginName = "N/A"
