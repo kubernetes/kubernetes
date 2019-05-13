@@ -19,10 +19,6 @@ package etcd
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -35,61 +31,35 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
-	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration"
-	"k8s.io/kubernetes/test/integration/framework"
 
 	// install all APIs
 	_ "k8s.io/kubernetes/pkg/master"
 )
 
-// StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource
-func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOptions)) *Master {
-	certDir, err := ioutil.TempDir("", t.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
+// Master represents a running API server that is ready for use
+// The Cleanup func must be deferred to prevent resource leaks
+type Master struct {
+	Client    clientset.Interface
+	Dynamic   dynamic.Interface
+	Config    *restclient.Config
+	KV        clientv3.KV
+	Mapper    meta.RESTMapper
+	Resources []Resource
+	Cleanup   func()
+}
 
-	_, defaultServiceClusterIPRange, err := net.ParseCIDR("10.0.0.0/24")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	kubeAPIServerOptions := options.NewServerRunOptions()
-	kubeAPIServerOptions.InsecureServing.BindPort = 0
-	kubeAPIServerOptions.SecureServing.Listener = listener
-	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
-	kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
-	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
-	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
-	kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
-	kubeAPIServerOptions.APIEnablement.RuntimeConfig["api/all"] = "true"
-	for _, f := range configFuncs {
-		f(kubeAPIServerOptions)
-	}
-	completedOptions, err := app.Complete(kubeAPIServerOptions)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+// EtcdClientAndWipeRegistryPrefix returns an etcd KV client for the given etcd storage config of an API server.
+func EtcdClientAndWipeRegistryPrefix(t *testing.T, options *genericapiserveroptions.EtcdOptions) clientv3.KV {
 	// get etcd client before starting API server
-	rawClient, kvClient, err := integration.GetEtcdClients(completedOptions.Etcd.StorageConfig.Transport)
+	rawClient, kvClient, err := integration.GetEtcdClients(options.StorageConfig.Transport)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,103 +80,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 		t.Fatal(err)
 	}
 
-	stopCh := make(chan struct{})
-
-	kubeAPIServer, err := app.CreateServerChain(completedOptions, stopCh)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	kubeClientConfig := restclient.CopyConfig(kubeAPIServer.LoopbackClientConfig)
-
-	// we make lots of requests, don't be slow
-	kubeClientConfig.QPS = 99999
-	kubeClientConfig.Burst = 9999
-
-	kubeClient := clientset.NewForConfigOrDie(kubeClientConfig)
-
-	go func() {
-		// Catch panics that occur in this go routine so we get a comprehensible failure
-		defer func() {
-			if err := recover(); err != nil {
-				t.Errorf("Unexpected panic trying to start API master: %#v", err)
-			}
-		}()
-
-		if err := kubeAPIServer.PrepareRun().Run(stopCh); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
-	lastHealth := ""
-	attempt := 0
-	if err := wait.PollImmediate(time.Second, time.Minute, func() (done bool, err error) {
-		// wait for the server to be healthy
-		result := kubeClient.RESTClient().Get().AbsPath("/healthz").Do()
-		content, _ := result.Raw()
-		lastHealth = string(content)
-		if errResult := result.Error(); errResult != nil {
-			attempt++
-			if attempt < 10 {
-				t.Log("waiting for server to be healthy")
-			} else {
-				t.Log(errResult)
-			}
-			return false, nil
-		}
-		var status int
-		result.StatusCode(&status)
-		return status == http.StatusOK, nil
-	}); err != nil {
-		t.Log(lastHealth)
-		t.Fatal(err)
-	}
-
-	// create CRDs so we can make sure that custom resources do not get lost
-	CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(kubeClientConfig), false, GetCustomResourceDefinitionData()...)
-
-	// force cached discovery reset
-	discoveryClient := cacheddiscovery.NewMemCacheClient(kubeClient.Discovery())
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	restMapper.Reset()
-
-	serverResources, err := kubeClient.Discovery().ServerResources()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cleanup := func() {
-		if err := os.RemoveAll(certDir); err != nil {
-			t.Log(err)
-		}
-		close(stopCh)
-		lock.Unlock()
-		if err := session.Close(); err != nil {
-			t.Log(err)
-		}
-	}
-
-	return &Master{
-		Client:    kubeClient,
-		Dynamic:   dynamic.NewForConfigOrDie(kubeClientConfig),
-		Config:    kubeClientConfig,
-		KV:        kvClient,
-		Mapper:    restMapper,
-		Resources: GetResources(t, serverResources),
-		Cleanup:   cleanup,
-	}
-}
-
-// Master represents a running API server that is ready for use
-// The Cleanup func must be deferred to prevent resource leaks
-type Master struct {
-	Client    clientset.Interface
-	Dynamic   dynamic.Interface
-	Config    *restclient.Config
-	KV        clientv3.KV
-	Mapper    meta.RESTMapper
-	Resources []Resource
-	Cleanup   func()
+	return kvClient
 }
 
 // Resource contains REST mapping information for a specific resource and extra metadata such as delete collection support
@@ -215,10 +89,18 @@ type Resource struct {
 	HasDeleteCollection bool
 }
 
-// GetResources fetches the Resources associated with serverResources that support get and create
-func GetResources(t *testing.T, serverResources []*metav1.APIResourceList) []Resource {
-	var resources []Resource
+// GetResources fetches the resources that support get and create from server discovery information.
+func GetResources(t *testing.T, config *restclient.Config) []Resource {
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, serverResources, err := client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
+	}
 
+	var resources []Resource
 	for _, discoveryGroup := range serverResources {
 		for _, discoveryResource := range discoveryGroup.APIResources {
 			// this is a subresource, skip it

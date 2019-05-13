@@ -26,7 +26,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -50,23 +54,42 @@ const testNamespace = "etcdstoragepathtestnamespace"
 // It will also fail when a type gets moved to a different location. Be very careful in this situation because
 // it essentially means that you will be break old clusters unless you create some migration path for the old data.
 func TestEtcdStoragePath(t *testing.T) {
-	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
-		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/deployments"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/daemonsets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/replicasets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/podsecuritypolicies"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/networkpolicies"] = "true"
-	})
-	defer master.Cleanup()
-	defer dumpEtcdKVOnFailure(t, master.KV)
+	storageConfig := framework.SharedEtcd()
+	storageConfig.Prefix = "/registry"
 
-	client := &allClient{dynamicClient: master.Dynamic}
-
-	if _, err := master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	// start API server
+	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true,api/all=true",
+		"--storage-media-type=application/json", // force json we can easily interpret the result in etcd
+	}, storageConfig)
+	if err != nil {
 		t.Fatal(err)
 	}
+	defer s.TearDownFn()
+
+	kubeClient, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resources := GetResources(t, s.ClientConfig)
+	kv := EtcdClientAndWipeRegistryPrefix(t, s.ServerOpts.Etcd)
+	defer dumpEtcdKVOnFailure(t, kv)
+
+	client := &allClient{dynamicClient: dynamicClient}
+
+	if _, err := kubeClient.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+		t.Fatal(err)
+	}
+
+	// force cached discovery reset
+	discoveryClient := memory.NewMemCacheClient(kubeClient.Discovery())
+	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+	restMapper.Reset()
 
 	etcdStorageData := GetEtcdStorageData()
 
@@ -75,7 +98,7 @@ func TestEtcdStoragePath(t *testing.T) {
 	etcdSeen := map[schema.GroupVersionResource]empty{}
 	cohabitatingResources := map[string]map[schema.GroupVersionKind]empty{}
 
-	for _, resourceToPersist := range master.Resources {
+	for _, resourceToPersist := range resources {
 		t.Run(resourceToPersist.Mapping.Resource.String(), func(t *testing.T) {
 			mapping := resourceToPersist.Mapping
 			gvk := resourceToPersist.Mapping.GroupVersionKind
@@ -123,7 +146,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				}
 			}()
 
-			if err := client.createPrerequisites(master.Mapper, testNamespace, testData.Prerequisites, all); err != nil {
+			if err := client.createPrerequisites(restMapper, testNamespace, testData.Prerequisites, all); err != nil {
 				t.Fatalf("failed to create prerequisites for %s: %#v", gvResource, err)
 			}
 
@@ -133,7 +156,7 @@ func TestEtcdStoragePath(t *testing.T) {
 				}
 			}
 
-			output, err := getFromEtcd(master.KV, testData.ExpectedEtcdPath)
+			output, err := getFromEtcd(kv, testData.ExpectedEtcdPath)
 			if err != nil {
 				t.Fatalf("failed to get from etcd for %s: %#v", gvResource, err)
 			}

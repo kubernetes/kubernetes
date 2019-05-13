@@ -22,7 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,30 +31,45 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	"k8s.io/client-go/kubernetes"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // TestCrossGroupStorage tests to make sure that all objects stored in an expected location in etcd can be converted/read.
 func TestCrossGroupStorage(t *testing.T) {
-	master := StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
-		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/deployments"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/daemonsets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/replicasets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/podsecuritypolicies"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/networkpolicies"] = "true"
-	})
-	defer master.Cleanup()
+	storageConfig := framework.SharedEtcd()
+	storageConfig.Prefix = "/registry"
 
+	// start API server
+	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+	}, storageConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resources := GetResources(t, s.ClientConfig)
+	kv := EtcdClientAndWipeRegistryPrefix(t, s.ServerOpts.Etcd)
 	etcdStorageData := GetEtcdStorageData()
 
-	crossGroupResources := map[schema.GroupVersionKind][]Resource{}
-
-	master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
+	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil && !errors.IsAlreadyExists(err) {
+		t.Fatal(err)
+	}
 
 	// Group by persisted GVK
-	for _, resourceToPersist := range master.Resources {
+	crossGroupResources := map[schema.GroupVersionKind][]Resource{}
+	for _, resourceToPersist := range resources {
 		gvk := resourceToPersist.Mapping.GroupVersionKind
 		data, exists := etcdStorageData[resourceToPersist.Mapping.Resource]
 		if !exists {
@@ -96,7 +112,7 @@ func TestCrossGroupStorage(t *testing.T) {
 
 			data := etcdStorageData[resource.Mapping.Resource]
 			// create object
-			resourceClient, obj, err := JSONToUnstructured(data.Stub, ns, resource.Mapping, master.Dynamic)
+			resourceClient, obj, err := JSONToUnstructured(data.Stub, ns, resource.Mapping, dynamicClient)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -113,7 +129,7 @@ func TestCrossGroupStorage(t *testing.T) {
 				watches       = map[schema.GroupVersionResource]watch.Interface{}
 			)
 			for _, resource := range resources {
-				clients[resource.Mapping.Resource] = master.Dynamic.Resource(resource.Mapping.Resource).Namespace(ns)
+				clients[resource.Mapping.Resource] = dynamicClient.Resource(resource.Mapping.Resource).Namespace(ns)
 				versionedData[resource.Mapping.Resource], err = clients[resource.Mapping.Resource].Get(name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("error finding resource via %s: %v", resource.Mapping.Resource.GroupVersion().String(), err)
@@ -136,7 +152,7 @@ func TestCrossGroupStorage(t *testing.T) {
 				}
 
 				// Update in etcd
-				if _, err := master.KV.Put(context.Background(), data.ExpectedEtcdPath, string(versionedJSON)); err != nil {
+				if _, err := kv.Put(context.Background(), data.ExpectedEtcdPath, string(versionedJSON)); err != nil {
 					t.Error(err)
 					continue
 				}

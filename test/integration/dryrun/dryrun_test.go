@@ -19,7 +19,7 @@ package dryrun
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -244,13 +244,7 @@ func TestDryRun(t *testing.T) {
 		dryrunData[resource] = data
 	}
 
-	// gather resources to test
-	_, resources, err := client.Discovery().ServerGroupsAndResources()
-	if err != nil {
-		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
-	}
-
-	for _, resourceToTest := range etcd.GetResources(t, resources) {
+	for _, resourceToTest := range etcd.GetResources(t, s.ClientConfig) {
 		t.Run(resourceToTest.Mapping.Resource.String(), func(t *testing.T) {
 			mapping := resourceToTest.Mapping
 			gvk := resourceToTest.Mapping.GroupVersionKind
