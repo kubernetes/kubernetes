@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -38,9 +39,11 @@ import (
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
@@ -50,6 +53,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/klog"
 )
 
 var (
@@ -244,6 +248,55 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		go finalizingController.Run(5, context.StopCh)
 		return nil
 	})
+	s.GenericAPIServer.AddPostStartHookOrDie("crd-discovery-available", func(context genericapiserver.PostStartHookContext) error {
+		return wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+			// only check if we have a valid list for a given resourceversion
+			if !s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced() {
+				return false, nil
+			}
+
+			// The returned group and resource lists might be non-nil with partial results even in the
+			// case of non-nil error.  If API aggregation fails, we still want our other discovery information because the CRDs
+			// may all be present.
+			_, serverGroupsAndResources, discoveryErr := crdClient.Discovery().ServerGroupsAndResources()
+			if discoveryErr != nil {
+				klog.V(2).Info(discoveryErr)
+			}
+
+			serverCRDs, err := s.Informers.Apiextensions().V1().CustomResourceDefinitions().Lister().List(labels.Everything())
+			if err != nil {
+				return false, err
+			}
+			activeCRDNameVersionGroups := sets.NewString()
+			for _, crd := range serverCRDs {
+				// Skip not active CRD
+				if !apiextensionshelpers.IsCRDConditionTrue(crd, v1.Established) {
+					continue
+				}
+				for _, version := range crd.Spec.Versions {
+					// Skip versions that are not served
+					if !version.Served {
+						continue
+					}
+					groupVersion := schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}
+					activeCRDNameVersionGroups.Insert(fmt.Sprintf("%s.%s", crd.Spec.Names.Plural, groupVersion.String()))
+				}
+			}
+
+			discoveryGroupsAndResources := sets.NewString()
+			for _, resourceList := range serverGroupsAndResources {
+				for _, apiResource := range resourceList.APIResources {
+					discoveryGroupsAndResources.Insert(fmt.Sprintf("%s.%s", apiResource.Name, resourceList.GroupVersion))
+				}
+			}
+			if !discoveryGroupsAndResources.HasAll(activeCRDNameVersionGroups.List()...) {
+				klog.Infof("waiting for CRD resources in discovery: %#v", activeCRDNameVersionGroups.Difference(discoveryGroupsAndResources))
+				return false, nil
+			}
+			return true, nil
+		}, context.StopCh)
+	})
+
 	// we don't want to report healthy until we can handle all CRDs that have already been registered.  Waiting for the informer
 	// to sync makes sure that the lister will be valid before we begin.  There may still be races for CRDs added after startup,
 	// but we won't go healthy until we can handle the ones already present.
