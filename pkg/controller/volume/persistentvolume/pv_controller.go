@@ -366,12 +366,15 @@ func (ctrl *PersistentVolumeController) recordMetric(opName, claimKey string, er
 		klog.V(2).Infof("Cannot convert object from operationTimestamps cache to operationTimeStamp for volume claim key[%s], operation[%s]: %#v", claimKey, opName, obj)
 		return
 	}
-	timeTaken := time.Since(operationTs.startTs).Seconds()
-	metrics.RecordVolumeOperationMetric(operationTs.provisionerName, opName, timeTaken, err)
 	if err == nil {
+		timeTaken := time.Since(operationTs.startTs).Seconds()
+		util.RecordOperationLatencyMetric(operationTs.provisionerName, opName, timeTaken)
 		// this is safe as the idempotency nature of storage operations
 		// clean the cache as now the claim is bound to a PV
 		ctrl.operationTimestamps.Delete(operationTsKey)
+	} else {
+		// record error metric
+		metrics.RecordVolumeOperationErrorMetric(operationTs.provisionerName, opName)
 	}
 }
 
@@ -1106,21 +1109,11 @@ func (ctrl *PersistentVolumeController) unbindVolume(volume *v1.PersistentVolume
 // reclaimVolume implements volume.Spec.PersistentVolumeReclaimPolicy and
 // starts appropriate reclaim action.
 func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolume) error {
-	opKey := ctrl.createOperationTimestampCacheKey("delete", volume.Name)
-	_, exists := ctrl.operationTimestamps.Get(opKey)
 	switch volume.Spec.PersistentVolumeReclaimPolicy {
 	case v1.PersistentVolumeReclaimRetain:
-		if exists {
-			// do not record latency metric for deletion if policy is reclaim
-			ctrl.operationTimestamps.Delete(opKey)
-		}
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Retain, nothing to do", volume.Name)
 
 	case v1.PersistentVolumeReclaimRecycle:
-		if exists {
-			// do not record latency metric for deletion if policy is recycle
-			ctrl.operationTimestamps.Delete(opKey)
-		}
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Recycle", volume.Name)
 		opName := fmt.Sprintf("recycle-%s[%s]", volume.Name, string(volume.UID))
 		ctrl.scheduleOperation(opName, func() error {
@@ -1131,11 +1124,17 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 	case v1.PersistentVolumeReclaimDelete:
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Delete", volume.Name)
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
+		// create a start timestamp for deletion operation
+		deleterName := ctrl.getDeleterName(volume)
+		deletionTs := newOperationTimestamp(deleterName)
+		ctrl.addOperationTimestamp("delete", volume.Name, deletionTs)
 		ctrl.scheduleOperation(opName, func() error {
-			pluginName, err := ctrl.deleteVolumeOperation(volume)
+			_, err := ctrl.deleteVolumeOperation(volume)
 			if err != nil {
 				// only report error count to "volume_operation_total_errors"
-				metrics.RecordVolumeOperationMetric(pluginName, "delete", 0.0, err)
+				// latency reporting will happen when the volume get finally
+				// deleted and a volume deleted event is captured
+				ctrl.recordMetric(deleterName, "delete", err)
 			}
 			return err
 		})
@@ -1451,7 +1450,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		var provisionerName string
 		var err error
 		if plugin == nil || plugin.IsMigratedToCSI() {
-			provisionerName, err = ctrl.provisionClaimOperationCSI(claim, plugin, storageClass)
+			provisionerName, err = ctrl.provisionClaimOperationExternal(claim, plugin, storageClass)
 		} else {
 			provisionerName, err = ctrl.provisionClaimOperation(claim, plugin, storageClass)
 		}
@@ -1460,10 +1459,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		// add an entry to mark the provisioning request start time
 		opTimestamps.provisionerName = provisionerName
 		claimKey := claimToClaimKey(claim)
-		provisionStartTsKey := ctrl.createOperationTimestampCacheKey("provision", claimKey)
-		if _, exists := ctrl.operationTimestamps.Get(provisionStartTsKey); !exists {
-			ctrl.operationTimestamps.Add(provisionStartTsKey, opTimestamps)
-		}
+		ctrl.addOperationTimestamp("provision", claimKey, opTimestamps)
 		// if error happened, record an error count metric
 		if err != nil {
 			ctrl.recordMetric("provision", claimKey, err)
@@ -1483,7 +1479,7 @@ func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName stri
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
 // TODO: the following function could be removed along with deprecation of
-//       non-CSI workflow
+//       in-tree workflow
 func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	claim *v1.PersistentVolumeClaim,
 	plugin vol.ProvisionableVolumePlugin,
@@ -1497,7 +1493,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	pluginName := plugin.GetPluginName()
 	provisionerName := storageClass.Provisioner
 
-	// Add provisioner annotation to be consistent with CSI workflow
+	// Add provisioner annotation to be consistent with external provisioner workflow
 	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
 	if err != nil {
 		// Save failed, the controller will retry in the next sync
@@ -1680,17 +1676,17 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	return pluginName, nil
 }
 
-// provisionClaimOperationCSI provisions a volume using external provisioner async-ly
+// provisionClaimOperationExternal provisions a volume using external provisioner async-ly
 // This method will be running in a standalone go-routine scheduled in "provisionClaim"
-func (ctrl *PersistentVolumeController) provisionClaimOperationCSI(
+func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	claim *v1.PersistentVolumeClaim,
 	plugin vol.ProvisionableVolumePlugin,
 	storageClass *storage.StorageClass) (string, error) {
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
-	klog.V(4).Infof("provisionClaimOperationCSI [%s] started, class: %q", claimToClaimKey(claim), claimClass)
+	klog.V(4).Infof("provisionClaimOperationExternal [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 	// pluginName is not set here to align with existing behavior
 	// of not setting pluginName for external provisioners (including CSI)
-	// Set provisionerName to CSI plugin name by setClaimProvisioner
+	// Set provisionerName to external provisioner name by setClaimProvisioner
 	var err error
 	provisionerName := storageClass.Provisioner
 	if plugin != nil {
@@ -1715,7 +1711,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationCSI(
 	// External provisioner has been requested for provisioning the volume
 	// Report an event and wait for external provisioner to finish
 	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
-	klog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
+	klog.V(3).Infof("provisionClaimOperationExternal provisioning claim %q: %s", claimToClaimKey(claim), msg)
 	// return provisioner name here for metric reporting
 	return provisionerName, nil
 }
@@ -1833,4 +1829,22 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 		return nil, fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
 	}
 	return plugin, nil
+}
+
+// obtain deleter name for a volume
+func (ctrl *PersistentVolumeController) getDeleterName(volume *v1.PersistentVolume) string {
+	storageClass := v1helper.GetPersistentVolumeClass(volume)
+	class, err := ctrl.classLister.Get(storageClass)
+	if err != nil {
+		return "N/A"
+	}
+	return class.Provisioner
+}
+
+// add an operation start timestamp if there exists no record in the cache
+func (ctrl *PersistentVolumeController) addOperationTimestamp(operationName, claimKey string, ts operationTimestamp) {
+	cacheKey := ctrl.createOperationTimestampCacheKey(operationName, claimKey)
+	if _, exists := ctrl.operationTimestamps.Get(cacheKey); !exists {
+		ctrl.operationTimestamps.Add(cacheKey, ts)
+	}
 }

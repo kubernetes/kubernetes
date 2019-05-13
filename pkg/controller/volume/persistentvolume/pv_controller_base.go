@@ -209,15 +209,15 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
 	_ = ctrl.volumes.store.Delete(volume)
 
+	// record deletion metric if a deletion start timestamp is in the cache
+	// the following call will be a no-op if there is nothing for this volume in the cache
+	ctrl.recordMetric("delete", volume.Name, nil)
 	if volume.Spec.ClaimRef == nil {
 		return
 	}
 
 	claimKey := claimrefToClaimKey(volume.Spec.ClaimRef)
 	klog.V(4).Infof("volume %q deleted", volume.Name)
-	// record deletion metric if a deletion start timestamp is in the cache
-	// the following call will be a no-op if there is nothing for this volume in the cache
-	ctrl.recordMetric("delete", claimKey, nil)
 	// sync the claim when its volume is deleted. Explicitly syncing the
 	// claim here in response to volume deletion prevents the claim from
 	// waiting until the next sync period for its Lost status.
@@ -255,16 +255,6 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 	_ = ctrl.claims.Delete(claim)
 	claimKey := claimToClaimKey(claim)
 	klog.V(4).Infof("claim %q deleted", claimKey)
-	// There are couple of scenarios here for metric recording:
-	// 1. Claim is NOT bound to any PV for some reason. In this case, clean provision operation
-	//    start timestamp from controller cache (operationTimestamps) if exists.
-	// 2. Claim is bound to a PV. In this case, there should NOT be provision operation start timestamp
-	//    cached in controller.
-	//    The bound PV will be recycled/retained/deleted based on corresponding retain policy
-	//    insert a deletion operation start timestamp into controller cache for the claim
-	//    if there is not one yet ONLY if the retain policy of PV is deletion
-	//    when a volume deleted event is captured, an end to end deletion latency will be reported
-	//    if error happened during "deleteVolumeOperation" call, error metric will be reported
 	// clean any possible unfinished provisioning start timestamp from cache
 	provisionTsKey := ctrl.createOperationTimestampCacheKey("provision", claimKey)
 
@@ -276,30 +266,6 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 	if volumeName == "" {
 		klog.V(5).Infof("deleteClaim[%q]: volume not bound", claimKey)
 		return
-	}
-	// the claim is bound to a PV, insert start timestamp for deletion into controller
-	// cache for metric recording with key composed from claim key and "delete"
-	// operation ONLY if the retain policy is PersistentVolumeReclaimDelete
-	volume, err := ctrl.volumeLister.Get(volumeName)
-	if err == nil && volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
-		deletionTsKey := ctrl.createOperationTimestampCacheKey("delete", claimKey)
-		if _, exists := ctrl.operationTimestamps.Get(deletionTsKey); !exists {
-			// find provisioner name
-			plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
-			var provisionerName string
-			if err == nil {
-				provisionerName = storageClass.Provisioner
-				if plugin != nil {
-					if plugin.IsMigratedToCSI() {
-						provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
-					} else {
-						provisionerName = plugin.GetPluginName()
-					}
-				}
-				deleteionTs := newOperationTimestamp(provisionerName)
-				ctrl.operationTimestamps.Add(deletionTsKey, deleteionTs)
-			}
-		}
 	}
 
 	// sync the volume when its claim is deleted.  Explicitly sync'ing the

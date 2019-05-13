@@ -74,15 +74,8 @@ func registerMetrics() {
 	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
-func RecordOperationMetric(plugin, operationName string, secondsTaken float64, err error) {
-	status := statusSuccess
-	if err != nil {
-		storageOperationErrorMetric.WithLabelValues(plugin, operationName).Inc()
-		status = statusFailUnknown
-	} else {
-		storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
-	}
-	storageOperationStatusMetric.WithLabelValues(plugin, operationName, status).Inc()
+func RecordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
+	storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed

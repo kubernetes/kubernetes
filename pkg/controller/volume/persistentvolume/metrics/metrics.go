@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -191,16 +190,9 @@ func (collector *pvAndPVCCountCollector) pvcCollect(ch chan<- prometheus.Metric)
 	}
 }
 
-// RecordVolumeOperationMetric records the latency and errors of volume operations.
-func RecordVolumeOperationMetric(pluginName, opName string, timeTaken float64, err error) {
+func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 	if pluginName == "" {
 		pluginName = "N/A"
 	}
-	if err != nil {
-		// record provisioning/deletion error count
-		volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
-		return
-	}
-	// record operation end to end latency
-	util.RecordOperationMetric(pluginName, opName, timeTaken, err)
+	volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
 }
