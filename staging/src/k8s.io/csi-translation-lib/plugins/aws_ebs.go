@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -44,8 +45,8 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree EBS storage class parameters to CSI storage class
-func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
-	return scParameters, nil
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeVolumeOptionsToCSI(sc storage.StorageClass) (storage.StorageClass, error) {
+	return sc, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with AWSElasticBlockStore set from in-tree
