@@ -220,7 +220,7 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 			}
 			partial := meta.AsPartialObjectMetadata(m)
 			partial.GetObjectKind().SetGroupVersionKind(gvk)
-			list.Items = append(list.Items, partial)
+			list.Items = append(list.Items, *partial)
 			return nil
 		})
 		if err != nil {
@@ -240,7 +240,7 @@ func asPartialObjectMetadataList(result runtime.Object, groupVersion schema.Grou
 			}
 			partial := meta.AsPartialObjectMetadata(m)
 			partial.GetObjectKind().SetGroupVersionKind(gvk)
-			list.Items = append(list.Items, partial)
+			list.Items = append(list.Items, *partial)
 			return nil
 		})
 		if err != nil {

@@ -805,13 +805,9 @@ func (in *PartialObjectMetadataList) DeepCopyInto(out *PartialObjectMetadataList
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]*PartialObjectMetadata, len(*in))
+		*out = make([]PartialObjectMetadata, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(PartialObjectMetadata)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	return

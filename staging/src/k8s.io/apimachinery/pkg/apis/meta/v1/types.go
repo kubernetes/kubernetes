@@ -1309,5 +1309,5 @@ type PartialObjectMetadataList struct {
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items contains each of the included items.
-	Items []*PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
