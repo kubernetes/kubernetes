@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 )
 
 // SetFeatureGateDuringTest sets the specified gate to the specified value, and returns a function that restores the original value.
@@ -28,16 +28,16 @@ import (
 //
 // Example use:
 //
-// defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
-func SetFeatureGateDuringTest(tb testing.TB, gate feature.FeatureGate, f feature.Feature, value bool) func() {
+// defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)()
+func SetFeatureGateDuringTest(tb testing.TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) func() {
 	originalValue := gate.Enabled(f)
 
-	if err := gate.(feature.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
+	if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, value)); err != nil {
 		tb.Errorf("error setting %s=%v: %v", f, value, err)
 	}
 
 	return func() {
-		if err := gate.(feature.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
+		if err := gate.(featuregate.MutableFeatureGate).Set(fmt.Sprintf("%s=%v", f, originalValue)); err != nil {
 			tb.Errorf("error restoring %s=%v: %v", f, originalValue, err)
 		}
 	}

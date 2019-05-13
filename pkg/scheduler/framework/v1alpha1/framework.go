@@ -33,6 +33,7 @@ type framework struct {
 	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
+	unreservePlugins []UnreservePlugin
 }
 
 var _ = Framework(&framework{})
@@ -63,6 +64,9 @@ func NewFramework(r Registry, _ *runtime.Unknown) (Framework, error) {
 		}
 		if pp, ok := p.(PrebindPlugin); ok {
 			f.prebindPlugins = append(f.prebindPlugins, pp)
+		}
+		if up, ok := p.(UnreservePlugin); ok {
+			f.unreservePlugins = append(f.unreservePlugins, up)
 		}
 	}
 	return f, nil
@@ -103,6 +107,14 @@ func (f *framework) RunReservePlugins(
 		}
 	}
 	return nil
+}
+
+// RunUnreservePlugins runs the set of configured unreserve plugins.
+func (f *framework) RunUnreservePlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) {
+	for _, pl := range f.unreservePlugins {
+		pl.Unreserve(pc, pod, nodeName)
+	}
 }
 
 // NodeInfoSnapshot returns the latest NodeInfo snapshot. The snapshot

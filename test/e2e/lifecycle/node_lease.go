@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -108,7 +109,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				pass := true
 				for _, node := range originalNodes.Items {
 					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
-						framework.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
+						e2elog.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
 						pass = false
 					}
 				}

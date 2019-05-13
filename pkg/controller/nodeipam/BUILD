@@ -11,7 +11,6 @@ go_test(
     srcs = ["node_ipam_controller_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
         "//pkg/controller/testutil:go_default_library",
@@ -19,6 +18,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
     ],
 )
 

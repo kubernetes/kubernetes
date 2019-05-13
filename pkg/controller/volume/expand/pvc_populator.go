@@ -102,16 +102,16 @@ func (populator *pvcPopulator) Sync() {
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 		volumePlugin, err := populator.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 		if (err != nil || volumePlugin == nil) && pvcStatusSize.Cmp(pvcSize) < 0 {
-			err = fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
+			retErr := fmt.Errorf("didn't find a plugin capable of expanding the volume; " +
 				"waiting for an external controller to process this PVC")
 			eventType := v1.EventTypeNormal
 			if err != nil {
 				eventType = v1.EventTypeWarning
 			}
 			populator.recorder.Event(pvc, eventType, events.ExternalExpanding,
-				fmt.Sprintf("Ignoring the PVC: %v.", err))
+				fmt.Sprintf("Ignoring the PVC: %v.", retErr))
 			klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.",
-				util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
+				util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, retErr)
 			continue
 		}
 

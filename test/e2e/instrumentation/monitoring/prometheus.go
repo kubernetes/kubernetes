@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 )
 
@@ -171,7 +172,7 @@ func validateQueryReturnsCorrectValues(c clientset.Interface, query string, expe
 	if len(samples) < minSamplesCount {
 		return fmt.Errorf("Not enough samples for query '%v', got %v", query, samples)
 	}
-	framework.Logf("Executed query '%v' returned %v", query, samples)
+	e2elog.Logf("Executed query '%v' returned %v", query, samples)
 	for _, value := range samples {
 		error := math.Abs(value-expectedValue) / expectedValue
 		if error >= errorTolerance {
@@ -238,7 +239,7 @@ func fetchPrometheusTargetDiscovery(c clientset.Interface) (TargetDiscovery, err
 		Raw()
 	var qres promTargetsResponse
 	if err != nil {
-		framework.Logf(string(response))
+		e2elog.Logf(string(response))
 		return qres.Data, err
 	}
 	err = json.Unmarshal(response, &qres)
@@ -303,7 +304,7 @@ func queryPrometheus(c clientset.Interface, query string, start, end time.Time, 
 		Do().
 		Raw()
 	if err != nil {
-		framework.Logf(string(response))
+		e2elog.Logf(string(response))
 		return nil, err
 	}
 	var qres promQueryResponse
@@ -369,7 +370,7 @@ func retryUntilSucceeds(validator func() error, timeout time.Duration) {
 		if time.Since(startTime) >= timeout {
 			break
 		}
-		framework.Logf(err.Error())
+		e2elog.Logf(err.Error())
 		time.Sleep(prometheusSleepBetweenAttempts)
 	}
 	framework.Failf(err.Error())

@@ -30,7 +30,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	f := framework.NewDefaultFramework("performancedns")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout))
 		framework.WaitForAllNodesHealthy(f.ClientSet, time.Minute)
 
@@ -52,7 +52,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 	})
 
 	// answers dns for service - creates the maximum number of services, and then check dns record for one
-	It("Should answer DNS query for maximum number of services per cluster", func() {
+	ginkgo.It("Should answer DNS query for maximum number of services per cluster", func() {
 		// get integer ceiling of maxServicesPerCluster / maxServicesPerNamespace
 		numNs := (maxServicesPerCluster + maxServicesPerNamespace - 1) / maxServicesPerNamespace
 
@@ -64,7 +64,7 @@ var _ = SIGDescribe("[Feature:PerformanceDNS][Serial]", func() {
 
 		services := generateServicesInNamespaces(namespaces, maxServicesPerCluster)
 		createService := func(i int) {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			framework.ExpectNoError(testutils.CreateServiceWithRetries(f.ClientSet, services[i].Namespace, services[i]))
 		}
 		e2elog.Logf("Creating %v test services", maxServicesPerCluster)

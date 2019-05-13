@@ -198,8 +198,7 @@ func Convert_autoscaling_PodsMetricSource_To_v2beta1_PodsMetricSource(in *autosc
 
 func Convert_v2beta1_PodsMetricSource_To_autoscaling_PodsMetricSource(in *autoscalingv2beta1.PodsMetricSource, out *autoscaling.PodsMetricSource, s conversion.Scope) error {
 	targetAverageValue := &in.TargetAverageValue
-	var metricType autoscaling.MetricTargetType
-	metricType = autoscaling.AverageValueMetricType
+	metricType := autoscaling.AverageValueMetricType
 
 	out.Target = autoscaling.MetricTarget{
 		Type:         metricType,

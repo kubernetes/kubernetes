@@ -24,6 +24,7 @@ import (
 const VolumeSchedulerSubsystem = "scheduler_volume"
 
 var (
+	// VolumeBindingRequestSchedulerBinderCache tracks the number of volume binder cache operations.
 	VolumeBindingRequestSchedulerBinderCache = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: VolumeSchedulerSubsystem,
@@ -32,6 +33,7 @@ var (
 		},
 		[]string{"operation"},
 	)
+	// VolumeSchedulingStageLatency tracks the latency of volume scheduling operations.
 	VolumeSchedulingStageLatency = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Subsystem: VolumeSchedulerSubsystem,
@@ -41,6 +43,7 @@ var (
 		},
 		[]string{"operation"},
 	)
+	// VolumeSchedulingStageFailed tracks the number of failed volume scheduling operations.
 	VolumeSchedulingStageFailed = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: VolumeSchedulerSubsystem,

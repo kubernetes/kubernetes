@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -46,7 +47,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 		nodeToDelete := nodeDeleteCandidates.Items[0]
 
 		origNodes := framework.GetReadyNodesIncludingTaintedOrDie(c)
-		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
+		e2elog.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
 		err := framework.DeleteNodeOnCloudProvider(&nodeToDelete)
 		if err != nil {

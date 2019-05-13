@@ -657,9 +657,9 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	}
 
 	pm.refreshProbedPlugins()
-	for _, plugin := range pm.probedPlugins {
+	for pluginName, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
+			matchedPluginNames = append(matchedPluginNames, pluginName)
 			matches = append(matches, plugin)
 		}
 	}
@@ -713,19 +713,15 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	// Once we can get rid of legacy names we can reduce this to a map lookup.
 	matchedPluginNames := []string{}
 	matches := []VolumePlugin{}
-	for k, v := range pm.plugins {
-		if v.GetPluginName() == name {
-			matchedPluginNames = append(matchedPluginNames, k)
-			matches = append(matches, v)
-		}
+	if v, found := pm.plugins[name]; found {
+		matchedPluginNames = append(matchedPluginNames, name)
+		matches = append(matches, v)
 	}
 
 	pm.refreshProbedPlugins()
-	for _, plugin := range pm.probedPlugins {
-		if plugin.GetPluginName() == name {
-			matchedPluginNames = append(matchedPluginNames, plugin.GetPluginName())
-			matches = append(matches, plugin)
-		}
+	if plugin, found := pm.probedPlugins[name]; found {
+		matchedPluginNames = append(matchedPluginNames, name)
+		matches = append(matches, plugin)
 	}
 
 	if len(matches) == 0 {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -281,7 +282,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			return false, fmt.Errorf("pods is nil")
 		}
 		if len(pods.Items) < n {
-			framework.Logf("pods: %v < %v", len(pods.Items), n)
+			e2elog.Logf("pods: %v < %v", len(pods.Items), n)
 			return false, nil
 		}
 		ready := 0
@@ -291,7 +292,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			}
 		}
 		if ready < n {
-			framework.Logf("running pods: %v < %v", ready, n)
+			e2elog.Logf("running pods: %v < %v", ready, n)
 			return false, nil
 		}
 		return true, nil

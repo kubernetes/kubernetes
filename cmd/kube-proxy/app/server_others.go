@@ -237,7 +237,7 @@ func newProxyServer(
 	}, nil
 }
 
-func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
+func getProxyMode(proxyMode string, iptver iptables.Versioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
 	switch proxyMode {
 	case proxyModeUserspace:
 		return proxyModeUserspace
@@ -250,7 +250,7 @@ func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, khandle i
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
-func tryIPVSProxy(iptver iptables.IPTablesVersioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
+func tryIPVSProxy(iptver iptables.Versioner, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
 	// IPVS Proxier relies on ip_vs_* kernel modules and ipset
 	useIPVSProxy, err := ipvs.CanUseIPVSProxier(khandle, ipsetver)
@@ -267,7 +267,7 @@ func tryIPVSProxy(iptver iptables.IPTablesVersioner, khandle ipvs.KernelHandler,
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
-func tryIPTablesProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
+func tryIPTablesProxy(iptver iptables.Versioner, kcompat iptables.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
 	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(iptver, kcompat)
 	if err != nil {

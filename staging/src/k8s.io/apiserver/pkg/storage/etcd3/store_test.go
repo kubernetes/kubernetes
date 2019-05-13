@@ -825,14 +825,15 @@ func TestList(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		disablePaging  bool
-		rv             string
-		prefix         string
-		pred           storage.SelectionPredicate
-		expectedOut    []*example.Pod
-		expectContinue bool
-		expectError    bool
+		name                       string
+		disablePaging              bool
+		rv                         string
+		prefix                     string
+		pred                       storage.SelectionPredicate
+		expectedOut                []*example.Pod
+		expectContinue             bool
+		expectedRemainingItemCount int64
+		expectError                bool
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -882,8 +883,9 @@ func TestList(t *testing.T) {
 				Field: fields.Everything(),
 				Limit: 1,
 			},
-			expectedOut:    []*example.Pod{preset[1].storedObj},
-			expectContinue: true,
+			expectedOut:                []*example.Pod{preset[1].storedObj},
+			expectContinue:             true,
+			expectedRemainingItemCount: 1,
 		},
 		{
 			name:          "test List with limit when paging disabled",
@@ -1060,6 +1062,9 @@ func TestList(t *testing.T) {
 		if len(tt.expectedOut) != len(out.Items) {
 			t.Errorf("(%s): length of list want=%d, got=%d", tt.name, len(tt.expectedOut), len(out.Items))
 			continue
+		}
+		if e, a := tt.expectedRemainingItemCount, out.ListMeta.RemainingItemCount; e != a {
+			t.Errorf("(%s): remainingItemCount want=%d, got=%d", tt.name, e, a)
 		}
 		for j, wantPod := range tt.expectedOut {
 			getPod := &out.Items[j]

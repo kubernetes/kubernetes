@@ -33,19 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilpointer "k8s.io/utils/pointer"
 )
-
-type fakeNodeInterface struct {
-	node api.Node
-}
-
-func (fake *fakeNodeInterface) Get(hostname string, options metav1.GetOptions) (*api.Node, error) {
-	return &fake.node, nil
-}
 
 type fakeIPTablesVersioner struct {
 	version string // what to return

@@ -1084,7 +1084,7 @@ $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 # `Restart-Service StackdriverLogging` may fail because StackdriverLogging
 # sometimes is unstoppable, so we work around it by killing the processes.
 function Restart-StackdriverLoggingAgent {
-  Stop-Service -NoWait StackdriverLogging
+  Stop-Service -NoWait -ErrorAction Ignore StackdriverLogging
   # TODO: check periodically to lower the wait time
   Start-Sleep 10
   if ((Get-service StackdriverLogging).Status -ne 'Stopped') {

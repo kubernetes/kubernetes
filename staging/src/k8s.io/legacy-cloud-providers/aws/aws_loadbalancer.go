@@ -935,10 +935,10 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, in
 	{
 		// Server side filter
 		describeRequest := &ec2.DescribeSecurityGroupsInput{}
-		filters := []*ec2.Filter{
+		describeRequest.Filters = []*ec2.Filter{
 			newEc2Filter("ip-permission.protocol", "tcp"),
+			newEc2Filter("vpc-id", c.vpcID),
 		}
-		describeRequest.Filters = c.tagging.addFilters(filters)
 		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 		if err != nil {
 			return fmt.Errorf("Error querying security groups for NLB: %q", err)

@@ -27,7 +27,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -122,7 +121,7 @@ func (f fakeEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func getEtcdVersion(v *version.Version) string {
+func getEtcdVersion(v *versionutil.Version) string {
 	return constants.SupportedEtcdVersion[uint8(v.Minor())]
 }
 

@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const (
@@ -93,7 +95,7 @@ func gatherProfile(componentName, profileBaseName, profileKind string) error {
 
 	// Get the profile data over SSH.
 	getCommand := fmt.Sprintf("curl -s localhost:%v/debug/pprof/%s", profilePort, profileKind)
-	sshResult, err := SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil {
 		return fmt.Errorf("Failed to execute curl command on master through SSH: %v", err)
 	}

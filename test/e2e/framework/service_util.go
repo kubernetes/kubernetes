@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -1379,9 +1380,9 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		func() string {
 			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
 			Logf("Executing cmd %q on host %v", cmd, host)
-			result, err := SSH(cmd, host, TestContext.Provider)
+			result, err := e2essh.SSH(cmd, host, TestContext.Provider)
 			if err != nil || result.Code != 0 {
-				LogSSHResult(result)
+				e2essh.LogResult(result)
 				Logf("error while SSH-ing to node: %v", err)
 			}
 			return result.Stdout
@@ -1447,9 +1448,9 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 		"curl -g -s --connect-timeout 2 http://%s && exit 99", ipPort)
 
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := SSH(command, host, TestContext.Provider)
+		result, err := e2essh.SSH(command, host, TestContext.Provider)
 		if err != nil {
-			LogSSHResult(result)
+			e2essh.LogResult(result)
 			Logf("error while SSH-ing to node: %v", err)
 		}
 		if result.Code != 99 {

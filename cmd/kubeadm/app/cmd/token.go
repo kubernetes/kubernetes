@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -215,6 +216,12 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
+
+	// In fact, we don't do any CRI ops at all.
+	// This is just to force skipping the CRI detection.
+	// Ref: https://github.com/kubernetes/kubeadm/issues/1559
+	cfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultDockerCRISocket
+
 	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
 	if err != nil {
 		return err

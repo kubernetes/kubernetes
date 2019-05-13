@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
@@ -71,7 +72,7 @@ type nodePlugin struct {
 	nodeIdentifier nodeidentifier.NodeIdentifier
 	podsGetter     corev1lister.PodLister
 	// allows overriding for testing
-	features utilfeature.FeatureGate
+	features featuregate.FeatureGate
 }
 
 var (

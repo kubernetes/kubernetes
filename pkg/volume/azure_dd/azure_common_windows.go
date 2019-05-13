@@ -84,7 +84,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 					if d, ok := v["number"]; ok {
 						if diskNum, ok := d.(float64); ok {
 							klog.V(2).Infof("azureDisk Mount: got disk number(%d) by LUN(%d)", int(diskNum), lun)
-							return strconv.Itoa(int(diskNum)), nil
+							return fmt.Sprintf(winDiskNumFormat, int(diskNum)), nil
 						}
 						klog.Warningf("LUN(%d) found, but could not get disk number(%q), location: %q", lun, d, location)
 					}

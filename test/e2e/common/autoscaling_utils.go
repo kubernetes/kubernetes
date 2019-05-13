@@ -24,7 +24,7 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -33,6 +33,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -170,19 +171,19 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 
 // ConsumeCPU consumes given number of CPU
 func (rc *ResourceConsumer) ConsumeCPU(millicores int) {
-	framework.Logf("RC %s: consume %v millicores in total", rc.name, millicores)
+	e2elog.Logf("RC %s: consume %v millicores in total", rc.name, millicores)
 	rc.cpu <- millicores
 }
 
 // ConsumeMem consumes given number of Mem
 func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
-	framework.Logf("RC %s: consume %v MB in total", rc.name, megabytes)
+	e2elog.Logf("RC %s: consume %v MB in total", rc.name, megabytes)
 	rc.mem <- megabytes
 }
 
 // ConsumeMem consumes given number of custom metric
 func (rc *ResourceConsumer) ConsumeCustomMetric(amount int) {
-	framework.Logf("RC %s: consume custom metric %v in total", rc.name, amount)
+	e2elog.Logf("RC %s: consume custom metric %v in total", rc.name, amount)
 	rc.customMetric <- amount
 }
 
@@ -195,13 +196,13 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 	for {
 		select {
 		case millicores = <-rc.cpu:
-			framework.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
+			e2elog.Logf("RC %s: setting consumption to %v millicores in total", rc.name, millicores)
 		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
+			e2elog.Logf("RC %s: sending request to consume %d millicores", rc.name, millicores)
 			rc.sendConsumeCPURequest(millicores)
 			sleepTime = rc.sleepTime
 		case <-rc.stopCPU:
-			framework.Logf("RC %s: stopping CPU consumer", rc.name)
+			e2elog.Logf("RC %s: stopping CPU consumer", rc.name)
 			return
 		}
 	}
@@ -216,13 +217,13 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 	for {
 		select {
 		case megabytes = <-rc.mem:
-			framework.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
+			e2elog.Logf("RC %s: setting consumption to %v MB in total", rc.name, megabytes)
 		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
+			e2elog.Logf("RC %s: sending request to consume %d MB", rc.name, megabytes)
 			rc.sendConsumeMemRequest(megabytes)
 			sleepTime = rc.sleepTime
 		case <-rc.stopMem:
-			framework.Logf("RC %s: stopping mem consumer", rc.name)
+			e2elog.Logf("RC %s: stopping mem consumer", rc.name)
 			return
 		}
 	}
@@ -237,13 +238,13 @@ func (rc *ResourceConsumer) makeConsumeCustomMetric() {
 	for {
 		select {
 		case delta = <-rc.customMetric:
-			framework.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
+			e2elog.Logf("RC %s: setting bump of metric %s to %d in total", rc.name, customMetricName, delta)
 		case <-time.After(sleepTime):
-			framework.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
+			e2elog.Logf("RC %s: sending request to consume %d of custom metric %s", rc.name, delta, customMetricName)
 			rc.sendConsumeCustomMetric(delta)
 			sleepTime = rc.sleepTime
 		case <-rc.stopCustomMetric:
-			framework.Logf("RC %s: stopping metric consumer", rc.name)
+			e2elog.Logf("RC %s: stopping metric consumer", rc.name)
 			return
 		}
 	}
@@ -263,10 +264,10 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 			Param("millicores", strconv.Itoa(millicores)).
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMillicores", strconv.Itoa(rc.requestSizeInMillicores))
-		framework.Logf("ConsumeCPU URL: %v", *req.URL())
+		e2elog.Logf("ConsumeCPU URL: %v", *req.URL())
 		_, err = req.DoRaw()
 		if err != nil {
-			framework.Logf("ConsumeCPU failure: %v", err)
+			e2elog.Logf("ConsumeCPU failure: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -290,10 +291,10 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 			Param("megabytes", strconv.Itoa(megabytes)).
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMegabytes", strconv.Itoa(rc.requestSizeInMegabytes))
-		framework.Logf("ConsumeMem URL: %v", *req.URL())
+		e2elog.Logf("ConsumeMem URL: %v", *req.URL())
 		_, err = req.DoRaw()
 		if err != nil {
-			framework.Logf("ConsumeMem failure: %v", err)
+			e2elog.Logf("ConsumeMem failure: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -318,10 +319,10 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 			Param("delta", strconv.Itoa(delta)).
 			Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
 			Param("requestSizeMetrics", strconv.Itoa(rc.requestSizeCustomMetric))
-		framework.Logf("ConsumeCustomMetric URL: %v", *req.URL())
+		e2elog.Logf("ConsumeCustomMetric URL: %v", *req.URL())
 		_, err = req.DoRaw()
 		if err != nil {
-			framework.Logf("ConsumeCustomMetric failure: %v", err)
+			e2elog.Logf("ConsumeCustomMetric failure: %v", err)
 			return false, nil
 		}
 		return true, nil
@@ -366,7 +367,7 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.D
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
 		replicas := rc.GetReplicas()
-		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		e2elog.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
@@ -380,12 +381,12 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, max
 	interval := 10 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
 		replicas := rc.GetReplicas()
-		framework.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
+		e2elog.Logf("expecting there to be in [%d, %d] replicas (are: %d)", minDesiredReplicas, maxDesiredReplicas, replicas)
 		as, err := rc.GetHpa(hpaName)
 		if err != nil {
-			framework.Logf("Error getting HPA: %s", err)
+			e2elog.Logf("Error getting HPA: %s", err)
 		} else {
-			framework.Logf("HPA status: %+v", as.Status)
+			e2elog.Logf("HPA status: %+v", as.Status)
 		}
 		if replicas < minDesiredReplicas {
 			return false, fmt.Errorf("number of replicas below target")
@@ -397,7 +398,7 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, max
 	})
 	// The call above always returns an error, but if it is timeout, it's OK (condition satisfied all the time).
 	if err == wait.ErrWaitTimeout {
-		framework.Logf("Number of replicas was stable over %v", duration)
+		e2elog.Logf("Number of replicas was stable over %v", duration)
 		return
 	}
 	framework.ExpectNoErrorWithOffset(1, err)

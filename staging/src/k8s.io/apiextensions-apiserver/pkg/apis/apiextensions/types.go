@@ -264,6 +264,22 @@ const (
 	// NamesAccepted means the names chosen for this CustomResourceDefinition do not conflict with others in
 	// the group and are therefore accepted.
 	NamesAccepted CustomResourceDefinitionConditionType = "NamesAccepted"
+	// NonStructuralSchema means that one or more OpenAPI schema is not structural.
+	//
+	// A schema is structural if it specifies types for all values, with the only exceptions of those with
+	// - x-kubernetes-int-or-string: true — for fields which can be integer or string
+	// - x-kubernetes-preserve-unknown-fields: true — for raw, unspecified JSON values
+	// and there is no type, additionalProperties, default, nullable or x-kubernetes-* vendor extenions
+	// specified under allOf, anyOf, oneOf or not.
+	//
+	// Non-structural schemas will not be allowed anymore in v1 API groups. Moreover, new features will not be
+	// available for non-structural CRDs:
+	// - pruning
+	// - defaulting
+	// - read-only
+	// - OpenAPI publishing
+	// - webhook conversion
+	NonStructuralSchema CustomResourceDefinitionConditionType = "NonStructuralSchema"
 	// Terminating means that the CustomResourceDefinition has been deleted and is cleaning up.
 	Terminating CustomResourceDefinitionConditionType = "Terminating"
 )

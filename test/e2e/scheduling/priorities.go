@@ -35,6 +35,7 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -154,7 +155,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
 			if err := framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
-				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
+				e2elog.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
 			}
 		}()
 
@@ -301,7 +302,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 					Requests: needCreateResource,
 				},
 				NodeName: node.Name,
-			}), true, framework.Logf)
+			}), true, e2elog.Logf)
 
 		if err != nil {
 			return err
@@ -317,7 +318,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 }
 
 func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
-	framework.Logf("ComputeCpuMemFraction for node: %v", node.Name)
+	e2elog.Logf("ComputeCpuMemFraction for node: %v", node.Name)
 	totalRequestedCpuResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
 	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
@@ -326,7 +327,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	}
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {
-			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
+			e2elog.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
 			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
 			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
 				continue
@@ -352,8 +353,8 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 		memFraction = floatOne
 	}
 
-	framework.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
-	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
+	e2elog.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
+	e2elog.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
 
 	return cpuFraction, memFraction
 }

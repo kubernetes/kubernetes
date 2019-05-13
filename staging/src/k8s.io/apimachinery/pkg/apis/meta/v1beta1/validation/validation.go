@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -25,7 +26,7 @@ import (
 func ValidateTableOptions(opts *metav1beta1.TableOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	switch opts.IncludeObject {
-	case metav1beta1.IncludeMetadata, metav1beta1.IncludeNone, metav1beta1.IncludeObject, "":
+	case metav1.IncludeMetadata, metav1.IncludeNone, metav1.IncludeObject, "":
 	default:
 		allErrs = append(allErrs, field.Invalid(field.NewPath("includeObject"), opts.IncludeObject, "must be 'Metadata', 'Object', 'None', or empty"))
 	}

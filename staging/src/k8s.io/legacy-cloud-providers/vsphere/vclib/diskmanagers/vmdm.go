@@ -212,7 +212,7 @@ func (vmdisk vmDiskManager) createDummyVM(ctx context.Context, datacenter *vclib
 }
 
 // CleanUpDummyVMs deletes stale dummyVM's
-func CleanUpDummyVMs(ctx context.Context, folder *vclib.Folder, dc *vclib.Datacenter) error {
+func CleanUpDummyVMs(ctx context.Context, folder *vclib.Folder) error {
 	vmList, err := folder.GetVirtualMachines(ctx)
 	if err != nil {
 		klog.V(4).Infof("Failed to get virtual machines in the kubernetes cluster: %s, err: %+v", folder.InventoryPath, err)
@@ -231,7 +231,7 @@ func CleanUpDummyVMs(ctx context.Context, folder *vclib.Folder, dc *vclib.Datace
 			continue
 		}
 		if strings.HasPrefix(vmName, vclib.DummyVMPrefixName) {
-			vmObj := vclib.VirtualMachine{VirtualMachine: object.NewVirtualMachine(dc.Client(), vm.Reference()), Datacenter: dc}
+			vmObj := vclib.VirtualMachine{VirtualMachine: object.NewVirtualMachine(folder.Client(), vm.Reference())}
 			dummyVMList = append(dummyVMList, &vmObj)
 		}
 	}

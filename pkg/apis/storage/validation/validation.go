@@ -247,7 +247,7 @@ func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.P
 func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if topologies == nil || len(topologies) == 0 {
+	if len(topologies) == 0 {
 		return allErrs
 	}
 

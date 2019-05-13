@@ -22,7 +22,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,8 +87,8 @@ func SvcFromManifest(fileName string) (*v1.Service, error) {
 }
 
 // IngressFromManifest reads a .json/yaml file and returns the ingress in it.
-func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
-	var ing extensions.Ingress
+func IngressFromManifest(fileName string) (*networkingv1beta1.Ingress, error) {
+	var ing networkingv1beta1.Ingress
 	data, err := testfiles.Read(fileName)
 	if err != nil {
 		return nil, err
@@ -106,8 +106,8 @@ func IngressFromManifest(fileName string) (*extensions.Ingress, error) {
 
 // IngressToManifest generates a yaml file in the given path with the given ingress.
 // Assumes that a directory exists at the given path.
-func IngressToManifest(ing *extensions.Ingress, path string) error {
-	serialized, err := marshalToYaml(ing, extensions.SchemeGroupVersion)
+func IngressToManifest(ing *networkingv1beta1.Ingress, path string) error {
+	serialized, err := marshalToYaml(ing, networkingv1beta1.SchemeGroupVersion)
 	if err != nil {
 		return fmt.Errorf("failed to marshal ingress %v to YAML: %v", ing, err)
 	}

@@ -96,8 +96,14 @@ func (ds *Datastore) GetDatastoreHostMounts(ctx context.Context) ([]types.Manage
 		return nil, err
 	}
 	hosts := make([]types.ManagedObjectReference, len(dsMo.Host))
-	for _, dsHostMount := range dsMo.Host {
-		hosts = append(hosts, dsHostMount.Key)
+	for i, dsHostMount := range dsMo.Host {
+		hosts[i] = dsHostMount.Key
 	}
 	return hosts, nil
+}
+
+// Exists returns whether the given file exists in this datastore
+func (ds *Datastore) Exists(ctx context.Context, file string) bool {
+	_, err := ds.Datastore.Stat(ctx, file)
+	return err == nil
 }

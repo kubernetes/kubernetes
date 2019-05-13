@@ -25,7 +25,6 @@ import (
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
-	validationutil "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -123,7 +122,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 
 	if len(spec.Group) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("group"), ""))
-	} else if errs := validationutil.IsDNS1123Subdomain(spec.Group); len(errs) > 0 {
+	} else if errs := utilvalidation.IsDNS1123Subdomain(spec.Group); len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, strings.Join(errs, ",")))
 	} else if len(strings.Split(spec.Group, ".")) < 2 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("group"), spec.Group, "should be a domain with at least one dot"))
@@ -143,7 +142,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		} else {
 			versionsMap[version.Name] = true
 		}
-		if errs := validationutil.IsDNS1035Label(version.Name); len(errs) > 0 {
+		if errs := utilvalidation.IsDNS1035Label(version.Name); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions").Index(i).Child("name"), spec.Versions[i].Name, strings.Join(errs, ",")))
 		}
 		subresources := getSubresourcesForVersion(spec, version.Name)
@@ -179,7 +178,7 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), spec.Versions, "must have exactly one version marked as storage version"))
 	}
 	if len(spec.Version) != 0 {
-		if errs := validationutil.IsDNS1035Label(spec.Version); len(errs) > 0 {
+		if errs := utilvalidation.IsDNS1035Label(spec.Version); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("version"), spec.Version, strings.Join(errs, ",")))
 		}
 		if len(spec.Versions) >= 1 && spec.Versions[0].Name != spec.Version {
@@ -466,21 +465,21 @@ func ValidateCustomResourceDefinitionStatus(status *apiextensions.CustomResource
 // ValidateCustomResourceDefinitionNames statically validates
 func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDefinitionNames, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if errs := validationutil.IsDNS1035Label(names.Plural); len(names.Plural) > 0 && len(errs) > 0 {
+	if errs := utilvalidation.IsDNS1035Label(names.Plural); len(names.Plural) > 0 && len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("plural"), names.Plural, strings.Join(errs, ",")))
 	}
-	if errs := validationutil.IsDNS1035Label(names.Singular); len(names.Singular) > 0 && len(errs) > 0 {
+	if errs := utilvalidation.IsDNS1035Label(names.Singular); len(names.Singular) > 0 && len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("singular"), names.Singular, strings.Join(errs, ",")))
 	}
-	if errs := validationutil.IsDNS1035Label(strings.ToLower(names.Kind)); len(names.Kind) > 0 && len(errs) > 0 {
+	if errs := utilvalidation.IsDNS1035Label(strings.ToLower(names.Kind)); len(names.Kind) > 0 && len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), names.Kind, "may have mixed case, but should otherwise match: "+strings.Join(errs, ",")))
 	}
-	if errs := validationutil.IsDNS1035Label(strings.ToLower(names.ListKind)); len(names.ListKind) > 0 && len(errs) > 0 {
+	if errs := utilvalidation.IsDNS1035Label(strings.ToLower(names.ListKind)); len(names.ListKind) > 0 && len(errs) > 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("listKind"), names.ListKind, "may have mixed case, but should otherwise match: "+strings.Join(errs, ",")))
 	}
 
 	for i, shortName := range names.ShortNames {
-		if errs := validationutil.IsDNS1035Label(shortName); len(errs) > 0 {
+		if errs := utilvalidation.IsDNS1035Label(shortName); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("shortNames").Index(i), shortName, strings.Join(errs, ",")))
 		}
 	}
@@ -491,7 +490,7 @@ func ValidateCustomResourceDefinitionNames(names *apiextensions.CustomResourceDe
 	}
 
 	for i, category := range names.Categories {
-		if errs := validationutil.IsDNS1035Label(category); len(errs) > 0 {
+		if errs := utilvalidation.IsDNS1035Label(category); len(errs) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("categories").Index(i), category, strings.Join(errs, ",")))
 		}
 	}
@@ -687,6 +686,10 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		return allErrs
 	}
 
+	//
+	// WARNING: if anything new is allowed below, NewStructural must be adapted to support it.
+	//
+
 	if schema.Default != nil {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "default is not supported"))
 	}
@@ -787,7 +790,7 @@ func validateSimpleJSONPath(s string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example"}
+var allowedFieldsAtRootSchema = []string{"Description", "Type", "Format", "Title", "Maximum", "ExclusiveMaximum", "Minimum", "ExclusiveMinimum", "MaxLength", "MinLength", "Pattern", "MaxItems", "MinItems", "UniqueItems", "MultipleOf", "Required", "Items", "Properties", "ExternalDocs", "Example", "XPreserveUnknownFields"}
 
 func allowedAtRootSchema(field string) bool {
 	for _, v := range allowedFieldsAtRootSchema {

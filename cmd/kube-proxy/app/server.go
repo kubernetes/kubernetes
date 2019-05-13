@@ -236,10 +236,7 @@ func (o *Options) Complete() error {
 		return err
 	}
 
-	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates); err != nil {
-		return err
-	}
-	return nil
+	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
 }
 
 // Creates a new filesystem watcher and adds watches for the config file.
@@ -332,11 +329,9 @@ func (o *Options) runLoop() error {
 	}()
 
 	for {
-		select {
-		case err := <-o.errCh:
-			if err != nil {
-				return err
-			}
+		err := <-o.errCh
+		if err != nil {
+			return err
 		}
 	}
 }

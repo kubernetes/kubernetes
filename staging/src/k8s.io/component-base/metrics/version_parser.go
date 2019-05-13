@@ -14,20 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package features
+package metrics
 
 import (
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"fmt"
+	"github.com/blang/semver"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"regexp"
 )
 
-// TODO: this file should ideally live in k8s.io/cloud-provider-gcp, but it is
-// temporarily placed here to remove dependencies to k8s.io/kubernetes in the
-// in-tree GCE cloud provider. Move this to k8s.io/cloud-provider-gcp as soon
-// as it's ready to be used
 const (
-	// owner: @verult
-	// GA: v1.13
-	//
-	// Enables the regional PD feature on GCE.
-	GCERegionalPersistentDisk utilfeature.Feature = "GCERegionalPersistentDisk"
+	versionRegexpString = `^v(\d+\.\d+\.\d+)`
 )
+
+var (
+	versionRe = regexp.MustCompile(versionRegexpString)
+)
+
+func parseVersion(ver apimachineryversion.Info) semver.Version {
+	matches := versionRe.FindAllStringSubmatch(ver.String(), -1)
+
+	if len(matches) != 1 {
+		panic(fmt.Sprintf("version string \"%v\" doesn't match expected regular expression: \"%v\"", ver.String(), versionRe.String()))
+	}
+	return semver.MustParse(matches[0][1])
+}
