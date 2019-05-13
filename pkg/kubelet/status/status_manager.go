@@ -356,7 +356,7 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 	if pod.Spec.RestartPolicy != v1.RestartPolicyAlways && oldStatus.Phase == v1.PodFailed && status.Phase != v1.PodFailed {
 		klog.Errorf("terminated pod %v attempted illegal transition to non-terminated state", pod.Name)
-		return false;
+		return false
 	}
 
 	// Set ContainersReadyCondition.LastTransitionTime.

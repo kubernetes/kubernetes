@@ -574,7 +574,7 @@ func TestTerminatePod(t *testing.T) {
 	testPod.Status = getRandomPodStatus()
 	testPod.Status.Phase = v1.PodRunning
 
-	syncer.TerminatePod(testPod)
+	syncer.TerminatePod(testPod, nil)
 
 	t.Logf("we expect the container statuses to have changed to terminated")
 	newStatus := expectPodStatus(t, syncer, testPod)
