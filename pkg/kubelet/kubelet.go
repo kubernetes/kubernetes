@@ -1987,6 +1987,7 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
 				kl.statusManager.TerminatePod(pod, podStatus)
 			} else {
+				klog.V(3).Infof("Didn't find pod %q in cache", format.Pod(pod))
 				kl.statusManager.TerminatePod(pod, nil)
 			}
 		}
