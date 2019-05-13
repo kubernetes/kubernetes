@@ -23,27 +23,25 @@ import (
 func TestCanAdmitPodResult1(t *testing.T) {
 	tcases := []struct {
 		name     string
-		affinity bool
+		admit    bool
 		expected bool
 	}{
 		{
 			name:     "Affinity is set to false in topology hints",
-			affinity: false,
+			admit:    false,
 			expected: true,
 		},
 		{
 			name:     "Affinity is set to true in topology hints",
-			affinity: true,
+			admit:    true,
 			expected: true,
 		},
 	}
 
 	for _, tc := range tcases {
 		policy := NewPreferredPolicy()
-		hints := TopologyHints{
-			Affinity: tc.affinity,
-		}
-		result := policy.CanAdmitPodResult(hints)
+		admit := tc.admit
+		result := policy.CanAdmitPodResult(admit)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
