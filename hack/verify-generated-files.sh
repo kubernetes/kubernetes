@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 export KUBE_ROOT
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::ensure_clean_working_dir

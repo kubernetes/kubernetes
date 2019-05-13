@@ -23,6 +23,7 @@ ERROR="Device plugin api is out of date. Please run hack/update-generated-device
 DEVICE_PLUGIN_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha/"
 DEVICE_PLUGIN_V1BETA1="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1beta1/"
 
+# shellcheck source=../hack/lib/protoc.sh
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::golang::setup_env
 

@@ -23,6 +23,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 OPENAPI_ROOT_DIR="${KUBE_ROOT}/api/openapi-spec"
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::util::require-jq

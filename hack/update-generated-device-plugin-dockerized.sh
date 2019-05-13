@@ -22,6 +22,7 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
 DEVICE_PLUGIN_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha/"
 DEVICE_PLUGIN_V1BETA1="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1beta1/"
 
+# shellcheck source=../hack/lib/protoc.sh
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::protoc::generate_proto "${DEVICE_PLUGIN_ALPHA}"
 kube::protoc::generate_proto "${DEVICE_PLUGIN_V1BETA1}"

@@ -21,5 +21,6 @@ set -o pipefail
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
 POD_RESOURCES_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/podresources/v1alpha1/"
 
+# shellcheck source=../hack/lib/protoc.sh
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::protoc::generate_proto "${POD_RESOURCES_ALPHA}"

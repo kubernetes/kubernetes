@@ -19,6 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory

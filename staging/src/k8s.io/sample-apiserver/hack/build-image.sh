@@ -19,6 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../../..
+# shellcheck source=../../../../../hack/lib/util.sh
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # Register function to be called on EXIT to remove generated binary.

@@ -15,6 +15,7 @@
 # limitations under the License.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/util.sh
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"

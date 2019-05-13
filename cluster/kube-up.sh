@@ -27,9 +27,11 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 if [ -f "${KUBE_ROOT}/cluster/env.sh" ]; then
+    # shellcheck disable=SC1090 
     source "${KUBE_ROOT}/cluster/env.sh"
 fi
 
+# shellcheck source=../cluster/kube-util.sh
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 if [ -z "${ZONE-}" ]; then

@@ -147,6 +147,7 @@ fi
 # Stop right away if the build fails
 set -e
 
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::util::ensure-gnu-sed
 

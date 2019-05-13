@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
+# shellcheck source=../cluster/common.sh
 source "${KUBE_ROOT}/cluster/common.sh"
 
 declare -r KUBE_RELEASE_BUCKET_URL="https://storage.googleapis.com/kubernetes-release"

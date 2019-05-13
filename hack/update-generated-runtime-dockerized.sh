@@ -20,6 +20,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_REMOTE_RUNTIME_ROOT="${KUBE_ROOT}/staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env

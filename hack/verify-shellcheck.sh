@@ -19,7 +19,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
+# shellcheck source=../hack/lib/util.sh
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 # required version for this script, if not installed on the host we will
@@ -33,9 +35,6 @@ SHELLCHECK_CONTAINER="k8s-shellcheck"
 
 # disabled lints
 disabled=(
-  # this lint disallows non-constant source, which we use extensively without
-  # any known bugs
-  1090
   # this lint prefers command -v to which, they are not the same
   2230
 )

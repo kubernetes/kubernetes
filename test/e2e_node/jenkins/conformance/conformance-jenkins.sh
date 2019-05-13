@@ -21,10 +21,12 @@ set -e
 set -x
 
 : "${1:?Usage test/e2e_node/jenkins/conformance-node-jenkins.sh <path to properties>}"
-
+# TODO Verify that this is reasonable with Tim, I cannot find conformance-node-jenkins.sh but there is conformance-jenkins.sh
+# shellcheck source=./conformance-jenkins.sh
 . "${1}"
 
 make generated_files
+
 
 WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts

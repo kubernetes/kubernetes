@@ -19,7 +19,9 @@ set -o pipefail
 
 # Complete the release with the standard env
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../build/common.sh
 source "${KUBE_ROOT}/build/common.sh"
+# shellcheck source=../build/lib/release.sh
 source "${KUBE_ROOT}/build/lib/release.sh"
 
 kube::build::ensure_tar

@@ -19,7 +19,9 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../cluster/common.sh
 source "${KUBE_ROOT}/cluster/common.sh"
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Find the ginkgo binary build as part of the release.
@@ -43,6 +45,7 @@ GINKGO_TOLERATE_FLAKES=${GINKGO_TOLERATE_FLAKES:-n}
 
 export KUBECTL KUBE_CONFIG_FILE
 
+# shellcheck source=../cluster/kube-util.sh
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function detect-master-from-kubeconfig() {

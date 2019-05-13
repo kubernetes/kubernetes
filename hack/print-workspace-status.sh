@@ -22,6 +22,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
+# shellcheck source=../hack/lib/version.sh
 source "${KUBE_ROOT}/hack/lib/version.sh"
 kube::version::get_version_vars
 

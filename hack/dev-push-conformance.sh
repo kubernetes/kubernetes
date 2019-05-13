@@ -27,6 +27,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(dirname "${BASH_SOURCE[0]}")/.."
+# shellcheck source=../build/common.sh
 source "${KUBE_ROOT}/build/common.sh"
 
 if [[ -z "${REGISTRY:-}" ]]; then

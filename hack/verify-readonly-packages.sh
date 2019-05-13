@@ -23,6 +23,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}

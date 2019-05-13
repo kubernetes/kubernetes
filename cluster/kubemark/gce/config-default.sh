@@ -19,8 +19,10 @@
 # gce/util.sh script which assumes config filename), but if some things that
 # are enabled by default should not run in hollow clusters, they should be disabled here.
 
-# shellcheck disable=SC2034 # Variables sourced in other scripts.
+# shellcheck disable=SC2034
+# Variables sourced in other scripts.
 
+# shellcheck source=../config-common.sh
 source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 GCLOUD=gcloud

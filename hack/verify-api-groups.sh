@@ -22,6 +22,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 prefix="${KUBE_ROOT%"k8s.io/kubernetes"}"
 

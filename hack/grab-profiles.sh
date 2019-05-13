@@ -48,6 +48,7 @@ function grab_profiles_from_component {
 }
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 server_addr=""

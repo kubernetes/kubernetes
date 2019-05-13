@@ -17,4 +17,5 @@ set -x
 
 NODE_INSTANCE_PREFIX=${NODE_INSTANCE_PREFIX:-"${INSTANCE_PREFIX}-node"}
 
+# shellcheck source=../../cluster/gce/util.sh
 source "${KUBE_ROOT}/cluster/gce/util.sh"

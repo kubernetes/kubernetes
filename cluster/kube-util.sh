@@ -20,6 +20,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
+# shellcheck source=../cluster/skeleton/util.sh
 source "${KUBE_ROOT}/cluster/skeleton/util.sh"
 
 if [[ "${KUBERNETES_PROVIDER:-}" != "kubernetes-anywhere" ]]; then
@@ -37,5 +38,6 @@ fi
 
 PROVIDER_UTILS="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 if [ -f "${PROVIDER_UTILS}" ]; then
+    # shellcheck source=../cluster/kubernetes-anywhere/util.sh
     source "${PROVIDER_UTILS}"
 fi

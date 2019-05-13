@@ -128,6 +128,7 @@ process_content () {
 # MAIN
 #############################################################################
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 export GO111MODULE=on

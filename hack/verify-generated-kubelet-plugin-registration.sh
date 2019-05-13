@@ -23,6 +23,7 @@ ERROR="Kubelet Plugin Registration api is out of date. Please run hack/update-ge
 KUBELET_PLUGIN_REGISTRATION_V1ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration/v1alpha1/"
 KUBELET_PLUGIN_REGISTRATION_V1BETA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration/v1beta1/"
 
+# shellcheck source=../hack/lib/protoc.sh
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::golang::setup_env
 

@@ -22,6 +22,7 @@ set -o pipefail
 
 AGG_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 KUBE_ROOT=${AGG_ROOT}/../../../..
+# shellcheck source=../../../../../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 AGGREGATOR_SECURE_PORT=${AGGREGATOR_SECURE_PORT:-31090}

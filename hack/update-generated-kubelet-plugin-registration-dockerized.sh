@@ -24,6 +24,7 @@ KUBELET_PLUGIN_REGISTRATION_V1BETA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistra
 KUBELET_EXAMPLE_PLUGIN_V1BETA1="${KUBE_ROOT}/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1/"
 KUBELET_EXAMPLE_PLUGIN_V1BETA2="${KUBE_ROOT}/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2/"
 
+# shellcheck source=../hack/lib/protoc.sh
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::protoc::generate_proto "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}"
 kube::protoc::generate_proto "${KUBELET_PLUGIN_REGISTRATION_V1BETA}"
