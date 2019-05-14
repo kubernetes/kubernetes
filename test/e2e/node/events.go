@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Events", func() {
@@ -45,7 +45,7 @@ var _ = SIGDescribe("Events", func() {
 
 		podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "send-events-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &v1.Pod{
@@ -67,9 +67,9 @@ var _ = SIGDescribe("Events", func() {
 			},
 		}
 
-		By("submitting the pod to kubernetes")
+		ginkgo.By("submitting the pod to kubernetes")
 		defer func() {
-			By("deleting the pod")
+			ginkgo.By("deleting the pod")
 			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
@@ -78,25 +78,25 @@ var _ = SIGDescribe("Events", func() {
 
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
-		By("verifying the pod is in kubernetes")
+		ginkgo.By("verifying the pod is in kubernetes")
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		Expect(len(pods.Items)).To(Equal(1))
+		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
-		By("retrieving the pod")
-		podWithUid, err := podClient.Get(pod.Name, metav1.GetOptions{})
+		ginkgo.By("retrieving the pod")
+		podWithUID, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("Failed to get pod: %v", err)
 		}
-		e2elog.Logf("%+v\n", podWithUid)
+		e2elog.Logf("%+v\n", podWithUID)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
-		By("checking for scheduler event about the pod")
+		ginkgo.By("checking for scheduler event about the pod")
 		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
 				"involvedObject.kind":      "Pod",
-				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   v1.DefaultSchedulerName,
 			}.AsSelector().String()
@@ -112,10 +112,10 @@ var _ = SIGDescribe("Events", func() {
 			return false, nil
 		}))
 		// Check for kubelet event about the pod.
-		By("checking for kubelet event about the pod")
+		ginkgo.By("checking for kubelet event about the pod")
 		framework.ExpectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			selector := fields.Set{
-				"involvedObject.uid":       string(podWithUid.UID),
+				"involvedObject.uid":       string(podWithUID.UID),
 				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": f.Namespace.Name,
 				"source":                   "kubelet",
