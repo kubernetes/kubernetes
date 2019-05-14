@@ -145,7 +145,7 @@ func (nm *NamespaceController) worker() {
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
 			nm.queue.AddRateLimited(key)
-			utilruntime.HandleError(err)
+			utilruntime.HandleError(fmt.Errorf("deletion of namespace %v failed: %v", key, err))
 		}
 		return false
 	}
