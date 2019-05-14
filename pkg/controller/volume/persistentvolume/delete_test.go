@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
@@ -169,21 +169,22 @@ func TestDeleteSync(t *testing.T) {
 			// external provisioner.
 			"8-12 - two PVs externally provisioned for a single claim",
 			[]*v1.PersistentVolume{
-				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
-				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+				volumeWithAnnotation(pvutil.AnnDynamicallyProvisioned, "external.io/test",
+					newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)),
+				volumeWithAnnotation(pvutil.AnnDynamicallyProvisioned, "external.io/test",
+					newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			},
 			[]*v1.PersistentVolume{
-				newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
-				newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty, pvutil.AnnDynamicallyProvisioned),
+				volumeWithAnnotation(pvutil.AnnDynamicallyProvisioned, "external.io/test",
+					newVolume("volume8-12-1", "1Gi", "uid8-12", "claim8-12", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classEmpty)),
+				volumeWithAnnotation(pvutil.AnnDynamicallyProvisioned, "external.io/test",
+					newVolume("volume8-12-2", "1Gi", "uid8-12", "claim8-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty)),
 			},
 			// the claim is bound to volume8-12-2 -> volume8-12-1 has lost the race and will be "Released"
 			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", v1.ClaimBound, nil),
 			newClaimArray("claim8-12", "uid8-12", "10Gi", "volume8-12-2", v1.ClaimBound, nil),
 			noevents, noerrors,
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
-				// Inject external deleter annotation
-				test.initialVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "external.io/test"
-				test.expectedVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "external.io/test"
 				return testSyncVolume(ctrl, reactor, test)
 			},
 		},

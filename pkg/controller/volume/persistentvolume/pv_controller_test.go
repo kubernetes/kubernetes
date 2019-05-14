@@ -106,7 +106,8 @@ func TestControllerSync(t *testing.T) {
 			// deleteClaim with a bound claim makes bound volume released with external deleter.
 			// delete the corresponding volume from apiserver, and report latency metric
 			"5-5 - delete claim and delete volume report metric",
-			newVolumeArray("volume5-5", "10Gi", "uid5-5", "claim5-5", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
+			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
 			novolumes,
 			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
@@ -133,8 +134,10 @@ func TestControllerSync(t *testing.T) {
 			// deleteClaim with a bound claim makes bound volume released with external deleter pending
 			// there should be an entry in operation timestamps cache in controller
 			"5-6 - delete claim and waiting for external volume deletion",
-			newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
-			newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
+			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
+			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
 			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
 				newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
 			noclaims,
@@ -143,8 +146,6 @@ func TestControllerSync(t *testing.T) {
 			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				// should have been provisioned by external provisioner
-				test.initialVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "gcr.io/vendor-csi"
-				test.expectedVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "gcr.io/vendor-csi"
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
 				reactor.DeleteClaimEvent(claim)
