@@ -59,7 +59,8 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	})
 })
 
-// Check that the pods comprising a service get spread evenly across available zones
+// SpreadServiceOrFail check that the pods comprising a service
+// get spread evenly across available zones
 func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string) {
 	// First create the service
 	serviceName := "test-service"
@@ -173,7 +174,8 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 	return true, nil
 }
 
-// Check that the pods comprising a replication controller get spread evenly across available zones
+// SpreadRCOrFail Check that the pods comprising a replication
+// controller get spread evenly across available zones
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
