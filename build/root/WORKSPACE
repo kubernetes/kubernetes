@@ -1,13 +1,15 @@
+workspace(name = "io_k8s_kubernetes")
+
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "f5acacb61693e00c993dbe3357cb4eb71eb49c6ed1e8b11215cef8738c7674cb",
-    strip_prefix = "bazel-toolchains-997c10a",
+    sha256 = "3a6ffe6dd91ee975f5d5bc5c50b34f58e3881dfac59a7b7aba3323bd8f8571a8",
+    strip_prefix = "bazel-toolchains-92dd8a7",
     urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/997c10a.tar.gz",
-        "https://github.com/bazelbuild/bazel-toolchains/archive/997c10a.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/92dd8a7.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/archive/92dd8a7.tar.gz",
     ],
 )
 
