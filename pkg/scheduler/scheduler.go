@@ -533,6 +533,25 @@ func (sched *Scheduler) scheduleOne() {
 			}
 		}
 
+		// Run "permit" plugins.
+		permitStatus := fwk.RunPermitPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
+		if !permitStatus.IsSuccess() {
+			var reason string
+			if permitStatus.Code() == framework.Unschedulable {
+				reason = v1.PodReasonUnschedulable
+			} else {
+				metrics.PodScheduleErrors.Inc()
+				reason = SchedulerError
+			}
+			if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
+				klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
+			}
+			sched.recordSchedulingFailure(assumedPod, permitStatus.AsError(), reason, permitStatus.Message())
+			// trigger un-reserve plugins to clean up state associated with the reserved Pod
+			fwk.RunUnreservePlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
+			return
+		}
+
 		// Run "prebind" plugins.
 		prebindStatus := fwk.RunPrebindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		if !prebindStatus.IsSuccess() {

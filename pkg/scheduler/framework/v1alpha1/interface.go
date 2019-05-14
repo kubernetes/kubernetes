@@ -20,8 +20,10 @@ package v1alpha1
 
 import (
 	"errors"
+	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -38,6 +40,8 @@ const (
 	// Unschedulable is used when a plugin finds a pod unschedulable.
 	// The accompanying status message should explain why the pod is unschedulable.
 	Unschedulable Code = 2
+	// Wait is used when a permit plugin finds a pod scheduling should wait.
+	Wait Code = 3
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
@@ -86,6 +90,18 @@ func NewStatus(code Code, msg string) *Status {
 	}
 }
 
+// WaitingPod represents a pod currently waiting in the permit phase.
+type WaitingPod interface {
+	// GetPod returns a reference to the waiting pod.
+	GetPod() *v1.Pod
+	// Allow the waiting pod to be scheduled. Returns true if the allow signal was
+	// successfully delivered, false otherwise.
+	Allow() bool
+	// Reject declares the waiting pod unschedulable. Returns true if the allow signal
+	// was successfully delivered, false otherwise.
+	Reject(msg string) bool
+}
+
 // Plugin is the parent type for all the scheduling framework plugins.
 type Plugin interface {
 	Name() string
@@ -105,7 +121,7 @@ type ReservePlugin interface {
 }
 
 // PrebindPlugin is an interface that must be implemented by "prebind" plugins.
-// These plugins are called before a pod being scheduled
+// These plugins are called before a pod being scheduled.
 type PrebindPlugin interface {
 	Plugin
 	// Prebind is called before binding a pod. All prebind plugins must return
@@ -122,6 +138,19 @@ type UnreservePlugin interface {
 	// Unreserve is called by the scheduling framework when a reserved pod was
 	// rejected in a later phase.
 	Unreserve(pc *PluginContext, p *v1.Pod, nodeName string)
+}
+
+// PermitPlugin is an interface that must be implemented by "permit" plugins.
+// These plugins are called before a pod is bound to a node.
+type PermitPlugin interface {
+	Plugin
+	// Permit is called before binding a pod (and before prebind plugins). Permit
+	// plugins are used to prevent or delay the binding of a Pod. A permit plugin
+	// must return success or wait with timeout duration, or the pod will be rejected.
+	// The pod will also be rejected if the wait timeout or the pod is rejected while
+	// waiting. Note that if the plugin returns "wait", the framework will wait only
+	// after running the remaining plugins given that no other plugin rejects the pod.
+	Permit(pc *PluginContext, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
@@ -142,6 +171,15 @@ type Framework interface {
 
 	// RunUnreservePlugins runs the set of configured unreserve plugins.
 	RunUnreservePlugins(pc *PluginContext, pod *v1.Pod, nodeName string)
+
+	// RunPermitPlugins runs the set of configured permit plugins. If any of these
+	// plugins returns a status other than "Success" or "Wait", it does not continue
+	// running the remaining plugins and returns an error. Otherwise, if any of the
+	// plugins returns "Wait", then this function will block for the timeout period
+	// returned by the plugin, if the time expires, then it will return an error.
+	// Note that if multiple plugins asked to wait, then we wait for the minimum
+	// timeout duration.
+	RunPermitPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is
@@ -153,4 +191,10 @@ type FrameworkHandle interface {
 	// a pod finishes "Reserve" point. There is no guarantee that the information
 	// remains unchanged in the binding phase of scheduling.
 	NodeInfoSnapshot() *internalcache.NodeInfoSnapshot
+
+	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
+	IterateOverWaitingPods(callback func(WaitingPod))
+
+	// GetWaitingPod returns a waiting pod given its UID.
+	GetWaitingPod(uid types.UID) WaitingPod
 }
