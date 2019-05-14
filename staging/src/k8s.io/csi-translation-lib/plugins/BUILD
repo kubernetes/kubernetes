@@ -40,5 +40,8 @@ go_test(
         "gce_pd_test.go",
     ],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/api/storage/v1:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/storage/v1:go_default_library",
+    ],
 )

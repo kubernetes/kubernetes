@@ -41,7 +41,7 @@ func NewOpenStackCinderCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree Cinder storage class parameters to CSI storage class
-func (t *osCinderCSITranslator) TranslateInTreeVolumeOptionsToCSI(sc storage.StorageClass) (storage.StorageClass, error) {
+func (t *osCinderCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
 	return sc, nil
 }
 

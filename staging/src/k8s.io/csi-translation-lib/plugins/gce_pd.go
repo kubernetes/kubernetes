@@ -33,6 +33,9 @@ const (
 	// GCEPDInTreePluginName is the name of the intree plugin for GCE PD
 	GCEPDInTreePluginName = "kubernetes.io/gce-pd"
 
+	// GCEPDTopologyKey is the zonal topology key for GCE PD CSI Driver
+	GCEPDTopologyKey = "topology.gke.io/zone"
+
 	// Volume ID Expected Format
 	// "projects/{projectName}/zones/{zoneName}/disks/{diskName}"
 	volIDZonalFmt = "projects/%s/zones/%s/disks/%s"
@@ -56,22 +59,102 @@ func NewGCEPersistentDiskCSITranslator() InTreePlugin {
 	return &gcePersistentDiskCSITranslator{}
 }
 
+func translateAllowedTopologies(terms []v1.TopologySelectorTerm) ([]v1.TopologySelectorTerm, error) {
+	if terms == nil {
+		return nil, nil
+	}
+
+	newTopologies := []v1.TopologySelectorTerm{}
+	for _, term := range terms {
+		newTerm := v1.TopologySelectorTerm{}
+		for _, exp := range term.MatchLabelExpressions {
+			var newExp v1.TopologySelectorLabelRequirement
+			if exp.Key == v1.LabelZoneFailureDomain {
+				newExp = v1.TopologySelectorLabelRequirement{
+					Key:    GCEPDTopologyKey,
+					Values: exp.Values,
+				}
+			} else if exp.Key == GCEPDTopologyKey {
+				newExp = exp
+			} else {
+				return nil, fmt.Errorf("unknown topology key: %v", exp.Key)
+			}
+			newTerm.MatchLabelExpressions = append(newTerm.MatchLabelExpressions, newExp)
+		}
+		newTopologies = append(newTopologies, newTerm)
+	}
+	return newTopologies, nil
+}
+
+func generateToplogySelectors(key string, values []string) []v1.TopologySelectorTerm {
+	return []v1.TopologySelectorTerm{
+		{
+			MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+				{
+					Key:    key,
+					Values: values,
+				},
+			},
+		},
+	}
+}
+
 // TranslateInTreeStorageClassParametersToCSI translates InTree GCE storage class parameters to CSI storage class
-func (g *gcePersistentDiskCSITranslator) TranslateInTreeVolumeOptionsToCSI(sc storage.StorageClass) (storage.StorageClass, error) {
+func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	var generatedTopologies []v1.TopologySelectorTerm
+
 	np := map[string]string{}
 	for k, v := range sc.Parameters {
 		switch strings.ToLower(k) {
 		case "fstype":
+			// prefixed fstype parameter is stripped out by external provisioner
 			np["csi.storage.k8s.io/fstype"] = v
+		// Strip out zone and zones parameters and translate them into topologies instead
+		case "zone":
+			generatedTopologies = generateToplogySelectors(GCEPDTopologyKey, []string{v})
+		case "zones":
+			generatedTopologies = generateToplogySelectors(GCEPDTopologyKey, strings.Split(v, ","))
 		default:
 			np[k] = v
 		}
 	}
+
+	if len(generatedTopologies) > 0 && len(sc.AllowedTopologies) > 0 {
+		return nil, fmt.Errorf("cannot simultaneously set allowed topologies and zone/zones parameters")
+	} else if len(generatedTopologies) > 0 {
+		sc.AllowedTopologies = generatedTopologies
+	} else if len(sc.AllowedTopologies) > 0 {
+		newTopologies, err := translateAllowedTopologies(sc.AllowedTopologies)
+		if err != nil {
+			return nil, fmt.Errorf("failed translating allowed topologies: %v", err)
+		}
+		sc.AllowedTopologies = newTopologies
+	}
+
 	sc.Parameters = np
 
-	// TODO(#77235): Translate AccessModes and zone/zones to AccessibleTopologies
-
 	return sc, nil
+}
+
+// backwardCompatibleAccessModes translates all instances of ReadWriteMany
+// access mode from the in-tree plugin to ReadWriteOnce. This is because in-tree
+// plugin never supported ReadWriteMany but also did not validate or enforce
+// this access mode for pre-provisioned volumes. The GCE PD CSI Driver validates
+// and enforces (fails) ReadWriteMany. Therefore we treat all in-tree
+// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes.
+func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
+	if ams == nil {
+		return nil
+	}
+	newAM := []v1.PersistentVolumeAccessMode{}
+	for _, am := range ams {
+		if am == v1.ReadWriteMany {
+			newAM = append(newAM, v1.ReadWriteOnce)
+		} else {
+			newAM = append(newAM, am)
+		}
+	}
+	return newAM
 }
 
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
@@ -119,6 +202,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.Persisten
 
 	pv.Spec.PersistentVolumeSource.GCEPersistentDisk = nil
 	pv.Spec.PersistentVolumeSource.CSI = csiSource
+	pv.Spec.AccessModes = backwardCompatibleAccessModes(pv.Spec.AccessModes)
 
 	return pv, nil
 }

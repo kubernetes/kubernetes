@@ -33,15 +33,16 @@ var (
 	}
 )
 
-// TranslateInTreeVolumeOptionsToCSI takes in-tree volume options
-// and translates them to a set of parameters consumable by CSI plugin
-func TranslateInTreeVolumeOptionsToCSI(inTreePluginName string, sc storage.StorageClass) (storage.StorageClass, error) {
+// TranslateInTreeStorageClassToCSI takes in-tree Storage Class
+// and translates it to a set of parameters consumable by CSI plugin
+func TranslateInTreeStorageClassToCSI(inTreePluginName string, sc *storage.StorageClass) (*storage.StorageClass, error) {
+	newSC := sc.DeepCopy()
 	for _, curPlugin := range inTreePlugins {
 		if inTreePluginName == curPlugin.GetInTreePluginName() {
-			return curPlugin.TranslateInTreeVolumeOptionsToCSI(sc)
+			return curPlugin.TranslateInTreeStorageClassToCSI(newSC)
 		}
 	}
-	return storage.StorageClass{}, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)
+	return nil, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)
 }
 
 // TranslateInTreePVToCSI takes a persistent volume and will translate
