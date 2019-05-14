@@ -90,6 +90,10 @@ func (t *dnsTestCommon) checkDNSRecordFrom(name string, predicate func([]string)
 		timeout,
 		func() (bool, error) {
 			actual = t.runDig(name, target)
+			// Windows output can contain additional \r
+			for i, item := range actual {
+				actual[i] = strings.TrimSpace(item)
+			}
 			if predicate(actual) {
 				return true, nil
 			}
@@ -274,8 +278,8 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 	}
 }
 
-func generateDNSServerPod(aRecords map[string]string) *v1.Pod {
-	pod := &v1.Pod{
+func generateCoreDNSServerPod(corednsConfig *v1.ConfigMap) *v1.Pod {
+	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "Pod",
 		},
@@ -283,29 +287,61 @@ func generateDNSServerPod(aRecords map[string]string) *v1.Pod {
 			GenerateName: "e2e-dns-configmap-dns-server-",
 		},
 		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "coredns-config",
+					VolumeSource: v1.VolumeSource{
+						ConfigMap: &v1.ConfigMapVolumeSource{
+							LocalObjectReference: v1.LocalObjectReference{
+								Name: corednsConfig.Name,
+							},
+						},
+					},
+				},
+			},
 			Containers: []v1.Container{
 				{
 					Name:  "dns",
-					Image: imageutils.GetE2EImage(imageutils.Dnsutils),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{
-						"/usr/sbin/dnsmasq",
-						"-u", "root",
-						"-k",
-						"--log-facility", "-",
-						"-q",
+						"/coredns",
+						"-conf", "/etc/coredns/Corefile",
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "coredns-config",
+							MountPath: "/etc/coredns",
+							ReadOnly:  true,
+						},
 					},
 				},
 			},
 			DNSPolicy: "Default",
 		},
 	}
+}
 
+func generateCoreDNSConfigmap(namespaceName string, aRecords map[string]string) *v1.ConfigMap {
+	entries := ""
 	for name, ip := range aRecords {
-		pod.Spec.Containers[0].Command = append(
-			pod.Spec.Containers[0].Command,
-			fmt.Sprintf("-A/%v/%v", name, ip))
+		entries += fmt.Sprintf("\n\t\t%v %v", ip, name)
 	}
-	return pod
+
+	corefileData := fmt.Sprintf(`. {
+	hosts {%s
+	}
+	log
+}`, entries)
+
+	return &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:    namespaceName,
+			GenerateName: "e2e-coredns-configmap-",
+		},
+		Data: map[string]string{
+			"Corefile": corefileData,
+		},
+	}
 }
 
 func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
@@ -322,47 +358,26 @@ func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
 	framework.ExpectNoError(err, "failed to get pod: %s", t.dnsServerPod.Name)
 }
 
-func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
-	t.createDNSPodFromObj(generateDNSServerPod(aRecords))
+func (t *dnsTestCommon) createDNSServer(namespace string, aRecords map[string]string) {
+	corednsConfig := generateCoreDNSConfigmap(namespace, aRecords)
+	corednsConfig, err := t.c.CoreV1().ConfigMaps(namespace).Create(context.TODO(), corednsConfig, metav1.CreateOptions{})
+	if err != nil {
+		framework.Failf("unable to create test configMap %s: %v", corednsConfig.Name, err)
+	}
+
+	t.createDNSPodFromObj(generateCoreDNSServerPod(corednsConfig))
 }
 
-func (t *dnsTestCommon) createDNSServerWithPtrRecord(isIPv6 bool) {
-	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Pod",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "e2e-dns-configmap-dns-server-",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "dns",
-					Image: imageutils.GetE2EImage(imageutils.Dnsutils),
-					Command: []string{
-						"/usr/sbin/dnsmasq",
-						"-u", "root",
-						"-k",
-						"--log-facility", "-",
-						"-q",
-					},
-				},
-			},
-			DNSPolicy: "Default",
-		},
-	}
-
+func (t *dnsTestCommon) createDNSServerWithPtrRecord(namespace string, isIPv6 bool) {
+	// NOTE: PTR records are generated automatically by CoreDNS.
+	// See: https://coredns.io/plugins/hosts/
+	var aRecords map[string]string
 	if isIPv6 {
-		pod.Spec.Containers[0].Command = append(
-			pod.Spec.Containers[0].Command,
-			fmt.Sprintf("--host-record=my.test,2001:db8::29"))
+		aRecords = map[string]string{"my.test": "2001:db8::29"}
 	} else {
-		pod.Spec.Containers[0].Command = append(
-			pod.Spec.Containers[0].Command,
-			fmt.Sprintf("--host-record=my.test,192.0.2.123"))
+		aRecords = map[string]string{"my.test": "192.0.2.123"}
 	}
-
-	t.createDNSPodFromObj(pod)
+	t.createDNSServer(namespace, aRecords)
 }
 
 func (t *dnsTestCommon) deleteDNSServerPod() {
