@@ -809,6 +809,11 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	customVolumeName := ""
 	epServiceName := ""
 
+	kubeClient := p.plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return nil, 0, "", fmt.Errorf("failed to get kube client to update endpoint")
+	}
+
 	if len(p.provisionerConfig.customEpNamePrefix) == 0 {
 		epServiceName = string(p.options.PVC.UID)
 	} else {
@@ -883,10 +888,6 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 	endpoint.Subsets[0].Addresses = addrlist
 	endpoint.Subsets[0].Ports = ports
 
-	kubeClient := p.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return nil, 0, "", fmt.Errorf("failed to get kube client to update endpoint")
-	}
 	_, err = kubeClient.CoreV1().Endpoints(epNamespace).Update(endpoint)
 	if err != nil {
 		deleteErr := cli.VolumeDelete(volume.Id)
@@ -897,6 +898,11 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsPersi
 		klog.V(3).Infof("failed to update endpoint, deleting %s", endpoint)
 
 		err = kubeClient.CoreV1().Services(epNamespace).Delete(epServiceName, nil)
+
+		if err != nil && errors.IsNotFound(err) {
+			klog.V(1).Infof("service %s does not exist in namespace %s", epServiceName, epNamespace)
+			err = nil
+		}
 		if err != nil {
 			klog.Errorf("failed to delete service %s/%s: %v", epNamespace, epServiceName, err)
 		}
