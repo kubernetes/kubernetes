@@ -28,11 +28,11 @@ import (
 
 func TestRestoreObjectMeta(t *testing.T) {
 	tests := []struct {
-		name      string
-		original  map[string]interface{}
-		converted map[string]interface{}
-		expected  map[string]interface{}
-		wantErr   bool
+		name          string
+		original      map[string]interface{}
+		converted     map[string]interface{}
+		expected      map[string]interface{}
+		expectedError bool
 	}{
 		{"no converted metadata",
 			map[string]interface{}{"metadata": map[string]interface{}{}, "spec": map[string]interface{}{}},
@@ -187,9 +187,9 @@ func TestRestoreObjectMeta(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := restoreObjectMeta(&unstructured.Unstructured{Object: tt.original}, &unstructured.Unstructured{Object: tt.converted}); err == nil && tt.wantErr {
+			if err := restoreObjectMeta(&unstructured.Unstructured{Object: tt.original}, &unstructured.Unstructured{Object: tt.converted}); err == nil && tt.expectedError {
 				t.Fatalf("expected error, but didn't get one")
-			} else if err != nil && !tt.wantErr {
+			} else if err != nil && !tt.expectedError {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
