@@ -26,7 +26,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
+	fuzz "github.com/google/gofuzz"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
@@ -999,4 +1001,90 @@ func (alwaysErrorTyper) ObjectKinds(runtime.Object) ([]schema.GroupVersionKind, 
 
 func (alwaysErrorTyper) Recognizes(gvk schema.GroupVersionKind) bool {
 	return false
+}
+
+func TestUpdateToCreateOptions(t *testing.T) {
+	f := fuzz.New()
+	for i := 0; i < 100; i++ {
+		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
+			update := &metav1.UpdateOptions{}
+			f.Fuzz(update)
+			create := updateToCreateOptions(update)
+
+			b, err := json.Marshal(create)
+			if err != nil {
+				t.Fatalf("failed to marshal CreateOptions (%v): %v", err, create)
+			}
+			got := &metav1.UpdateOptions{}
+			err = json.Unmarshal(b, &got)
+			if err != nil {
+				t.Fatalf("failed to unmarshal UpdateOptions: %v", err)
+			}
+			got.TypeMeta = metav1.TypeMeta{}
+			update.TypeMeta = metav1.TypeMeta{}
+			if !reflect.DeepEqual(*update, *got) {
+				t.Fatalf(`updateToCreateOptions round-trip failed:
+got:  %#+v
+want: %#+v`, got, update)
+			}
+
+		})
+	}
+}
+
+func TestPatchToUpdateOptions(t *testing.T) {
+	tests := []struct {
+		name        string
+		converterFn func(po *metav1.PatchOptions) interface{}
+	}{
+		{
+			name: "patchToUpdateOptions",
+			converterFn: func(patch *metav1.PatchOptions) interface{} {
+				return patchToUpdateOptions(patch)
+			},
+		},
+		{
+			name: "patchToCreateOptions",
+			converterFn: func(patch *metav1.PatchOptions) interface{} {
+				return patchToCreateOptions(patch)
+			},
+		},
+	}
+
+	f := fuzz.New()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for i := 0; i < 100; i++ {
+				t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
+					patch := &metav1.PatchOptions{}
+					f.Fuzz(patch)
+					converted := test.converterFn(patch)
+
+					b, err := json.Marshal(converted)
+					if err != nil {
+						t.Fatalf("failed to marshal converted object (%v): %v", err, converted)
+					}
+					got := &metav1.PatchOptions{}
+					err = json.Unmarshal(b, &got)
+					if err != nil {
+						t.Fatalf("failed to unmarshal converted object: %v", err)
+					}
+
+					// Clear TypeMeta because we expect it to be different between the original and converted type
+					got.TypeMeta = metav1.TypeMeta{}
+					patch.TypeMeta = metav1.TypeMeta{}
+
+					// clear fields that we know belong in PatchOptions only
+					patch.Force = nil
+
+					if !reflect.DeepEqual(*patch, *got) {
+						t.Fatalf(`round-trip failed:
+got:  %#+v
+want: %#+v`, got, converted)
+					}
+
+				})
+			}
+		})
+	}
 }

@@ -46,7 +46,7 @@ message ConversionRequest {
 // ConversionResponse describes a conversion response.
 message ConversionResponse {
   // `uid` is an identifier for the individual request/response.
-  // This should be copied over from the corresponding AdmissionRequest.
+  // This should be copied over from the corresponding ConversionRequest.
   optional string uid = 1;
 
   // `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
