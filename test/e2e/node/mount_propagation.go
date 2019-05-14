@@ -27,8 +27,8 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode, hostDir string) *v1.Pod {
@@ -80,7 +80,7 @@ func preparePod(name string, node *v1.Node, propagation *v1.MountPropagationMode
 var _ = SIGDescribe("Mount propagation", func() {
 	f := framework.NewDefaultFramework("mount-propagation")
 
-	It("should propagate mounts to the host", func() {
+	ginkgo.It("should propagate mounts to the host", func() {
 		// This test runs two pods: master and slave with respective mount
 		// propagation on common /var/lib/kubelet/XXXX directory. Both mount a
 		// tmpfs to a subdirectory there. We check that these mounts are
@@ -88,13 +88,13 @@ var _ = SIGDescribe("Mount propagation", func() {
 
 		// Pick a node where all pods will run.
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
+		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero(), "No available nodes for scheduling")
 		node := &nodes.Items[0]
 
 		// Fail the test if the namespace is not set. We expect that the
 		// namespace is unique and we might delete user data if it's not.
 		if len(f.Namespace.Name) == 0 {
-			Expect(f.Namespace.Name).ToNot(Equal(""))
+			gomega.Expect(f.Namespace.Name).ToNot(gomega.Equal(""))
 			return
 		}
 
@@ -172,10 +172,10 @@ var _ = SIGDescribe("Mount propagation", func() {
 				shouldBeVisible := mounts.Has(mountName)
 				if shouldBeVisible {
 					framework.ExpectNoError(err, "%s: failed to run %q", msg, cmd)
-					Expect(stdout).To(Equal(mountName), msg)
+					gomega.Expect(stdout).To(gomega.Equal(mountName), msg)
 				} else {
 					// We *expect* cat to return error here
-					Expect(err).To(HaveOccurred(), msg)
+					gomega.Expect(err).To(gomega.HaveOccurred(), msg)
 				}
 			}
 		}

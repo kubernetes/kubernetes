@@ -33,11 +33,9 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// KubernetesDir is the directory Kubernetes owns for storing various configuration files
-// This semi-constant MUST NOT be modified during runtime. It's a variable solely for use in unit testing.
-var KubernetesDir = "/etc/kubernetes"
-
 const (
+	// KubernetesDir is the directory Kubernetes owns for storing various configuration files
+	KubernetesDir = "/etc/kubernetes"
 	// ManifestsSubDirName defines directory name to store manifests
 	ManifestsSubDirName = "manifests"
 	// TempDirForKubeadm defines temporary directory for kubeadm
@@ -448,8 +446,12 @@ func AddSelfHostedPrefix(componentName string) string {
 }
 
 // CreateTempDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp (not using /tmp as that would potentially be dangerous)
-func CreateTempDirForKubeadm(dirName string) (string, error) {
+func CreateTempDirForKubeadm(kubernetesDir, dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
+	if len(kubernetesDir) != 0 {
+		tempDir = path.Join(kubernetesDir, TempDirForKubeadm)
+	}
+
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
 		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
@@ -463,8 +465,12 @@ func CreateTempDirForKubeadm(dirName string) (string, error) {
 }
 
 // CreateTimestampDirForKubeadm is a function that creates a temporary directory under /etc/kubernetes/tmp formatted with the current date
-func CreateTimestampDirForKubeadm(dirName string) (string, error) {
+func CreateTimestampDirForKubeadm(kubernetesDir, dirName string) (string, error) {
 	tempDir := path.Join(KubernetesDir, TempDirForKubeadm)
+	if len(kubernetesDir) != 0 {
+		tempDir = path.Join(kubernetesDir, TempDirForKubeadm)
+	}
+
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
 		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)

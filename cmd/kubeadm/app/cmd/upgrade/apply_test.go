@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestSessionIsInteractive(t *testing.T) {
@@ -114,14 +113,11 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error making temporary directory: %v", err)
 			}
-			oldK8sDir := constants.KubernetesDir
-			constants.KubernetesDir = tmpdir
 			defer func() {
-				constants.KubernetesDir = oldK8sDir
 				os.RemoveAll(tmpdir)
 			}()
 
-			pathmgr, err := GetPathManagerForUpgrade(test.cfg, test.etcdUpgrade)
+			pathmgr, err := GetPathManagerForUpgrade(tmpdir, test.cfg, test.etcdUpgrade)
 			if err != nil {
 				t.Fatalf("unexpected error creating path manager: %v", err)
 			}

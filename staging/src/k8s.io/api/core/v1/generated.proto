@@ -496,7 +496,7 @@ message ConfigMapKeySelector {
   // The key to select.
   optional string key = 2;
 
-  // Specify whether the ConfigMap or it's key must be defined
+  // Specify whether the ConfigMap or its key must be defined
   // +optional
   optional bool optional = 3;
 }
@@ -556,7 +556,7 @@ message ConfigMapProjection {
   // +optional
   repeated KeyToPath items = 2;
 
-  // Specify whether the ConfigMap or it's keys must be defined
+  // Specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -588,7 +588,7 @@ message ConfigMapVolumeSource {
   // +optional
   optional int32 defaultMode = 3;
 
-  // Specify whether the ConfigMap or it's keys must be defined
+  // Specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
 }
@@ -3986,7 +3986,7 @@ message SecretKeySelector {
   // The key of the secret to select from.  Must be a valid secret key.
   optional string key = 2;
 
-  // Specify whether the Secret or it's key must be defined
+  // Specify whether the Secret or its key must be defined
   // +optional
   optional bool optional = 3;
 }
@@ -4068,7 +4068,7 @@ message SecretVolumeSource {
   // +optional
   optional int32 defaultMode = 3;
 
-  // Specify whether the Secret or it's keys must be defined
+  // Specify whether the Secret or its keys must be defined
   // +optional
   optional bool optional = 4;
 }

@@ -59,27 +59,30 @@ type localTestConfig struct {
 type localVolumeType string
 
 const (
-	// default local volume type, aka a directory
+	// DirectoryLocalVolumeType is the default local volume type, aka a directory
 	DirectoryLocalVolumeType localVolumeType = "dir"
-	// like DirectoryLocalVolumeType but it's a symbolic link to directory
+	// DirectoryLinkLocalVolumeType is like DirectoryLocalVolumeType,
+	// but it's a symbolic link to directory
 	DirectoryLinkLocalVolumeType localVolumeType = "dir-link"
-	// like DirectoryLocalVolumeType but bind mounted
+	// DirectoryBindMountedLocalVolumeType is like DirectoryLocalVolumeType
+	// but bind mounted
 	DirectoryBindMountedLocalVolumeType localVolumeType = "dir-bindmounted"
-	// like DirectoryLocalVolumeType but it's a symbolic link to self bind mounted directory
+	// DirectoryLinkBindMountedLocalVolumeType is like DirectoryLocalVolumeType,
+	// but it's a symbolic link to self bind mounted directory
 	// Note that bind mounting at symbolic link actually mounts at directory it
 	// links to.
 	DirectoryLinkBindMountedLocalVolumeType localVolumeType = "dir-link-bindmounted"
-	// creates a tmpfs and mounts it
+	// TmpfsLocalVolumeType creates a tmpfs and mounts it
 	TmpfsLocalVolumeType localVolumeType = "tmpfs"
-	// tests based on local ssd at /mnt/disks/by-uuid/
+	// GCELocalSSDVolumeType tests based on local ssd at /mnt/disks/by-uuid/
 	GCELocalSSDVolumeType localVolumeType = "gce-localssd-scsi-fs"
-	// Creates a local file, formats it, and maps it as a block device.
+	// BlockLocalVolumeType creates a local file, formats it, and maps it as a block device.
 	BlockLocalVolumeType localVolumeType = "block"
-	// Creates a local file serving as the backing for block device., formats it,
-	// and mounts it to use as FS mode local volume.
+	// BlockFsWithFormatLocalVolumeType creates a local file serving as the backing for block device,
+	// formats it, and mounts it to use as FS mode local volume.
 	BlockFsWithFormatLocalVolumeType localVolumeType = "blockfswithformat"
-	// Creates a local file serving as the backing for block device. do not format it manually,
-	// and mounts it to use as FS mode local volume.
+	// BlockFsWithoutFormatLocalVolumeType creates a local file serving as the backing for block device,
+	// does not format it manually, and mounts it to use as FS mode local volume.
 	BlockFsWithoutFormatLocalVolumeType localVolumeType = "blockfswithoutformat"
 )
 
@@ -1003,21 +1006,19 @@ func createWriteCmd(testDir string, testFile string, writeTestFileContent string
 		// Cleanup the file containing testFileContent.
 		deleteTestFileCmd := fmt.Sprintf("rm %s", testFilePath)
 		return fmt.Sprintf("%s && %s && %s && %s", writeTestFileCmd, sudoCmd, writeBlockCmd, deleteTestFileCmd)
-	} else {
-		testFilePath := filepath.Join(testDir, testFile)
-		return fmt.Sprintf("mkdir -p %s; echo %s > %s", testDir, writeTestFileContent, testFilePath)
 	}
+	testFilePath := filepath.Join(testDir, testFile)
+	return fmt.Sprintf("mkdir -p %s; echo %s > %s", testDir, writeTestFileContent, testFilePath)
 }
 
 func createReadCmd(testFileDir string, testFile string, volumeType localVolumeType) string {
 	if volumeType == BlockLocalVolumeType {
 		// Create the command to read the beginning of the block device and print it in ascii.
 		return fmt.Sprintf("hexdump -n 100 -e '100 \"%%_p\"' %s | head -1", testFileDir)
-	} else {
-		// Create the command to read (aka cat) a file.
-		testFilePath := filepath.Join(testFileDir, testFile)
-		return fmt.Sprintf("cat %s", testFilePath)
 	}
+	// Create the command to read (aka cat) a file.
+	testFilePath := filepath.Join(testFileDir, testFile)
+	return fmt.Sprintf("cat %s", testFilePath)
 }
 
 // Read testFile and evaluate whether it contains the testFileContent

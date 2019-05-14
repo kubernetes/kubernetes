@@ -673,6 +673,10 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if schema.XPreserveUnknownFields != nil && *schema.XPreserveUnknownFields == false {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-preserve-unknown-fields"), *schema.XPreserveUnknownFields, "must be true or undefined"))
+	}
+
 	return allErrs
 }
 

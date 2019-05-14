@@ -377,7 +377,7 @@ type containerToKillInfo struct {
 type podActions struct {
 	// Stop all running (regular and init) containers and the sandbox for the pod.
 	KillPod bool
-	// Whether need to create a new sandbox. If needed to kill pod and create a
+	// Whether need to create a new sandbox. If needed to kill pod and create
 	// a new pod sandbox, all init containers need to be purged (i.e., removed).
 	CreateSandbox bool
 	// The id of existing sandbox. It is used for starting containers in ContainersToStart.

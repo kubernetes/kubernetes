@@ -1008,7 +1008,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
-	// Check if IVPS kube-proxy mode is supported
+	// Check if IPVS kube-proxy mode is supported
 	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}

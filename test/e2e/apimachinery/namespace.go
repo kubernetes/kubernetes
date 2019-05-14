@@ -47,7 +47,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 			defer ginkgo.GinkgoRecover()
 			ns := fmt.Sprintf("nslifetest-%v", n)
 			_, err = f.CreateNamespace(ns, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace: %s", ns)
+			framework.ExpectNoError(err, "failed to create namespace: %s", ns)
 		}(n)
 	}
 	wg.Wait()
@@ -57,7 +57,7 @@ func extinguish(f *framework.Framework, totalNS int, maxAllowedAfterDel int, max
 	time.Sleep(time.Duration(10 * time.Second))
 	deleteFilter := []string{"nslifetest"}
 	deleted, err := framework.DeleteNamespaces(f.ClientSet, deleteFilter, nil /* skipFilter */)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete namespace(s) containing: %s", deleteFilter)
+	framework.ExpectNoError(err, "failed to delete namespace(s) containing: %s", deleteFilter)
 	gomega.Expect(len(deleted)).To(gomega.Equal(totalNS))
 
 	ginkgo.By("Waiting for namespaces to vanish")
@@ -86,11 +86,11 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	ginkgo.By("Creating a test namespace")
 	namespaceName := "nsdeletetest"
 	namespace, err := f.CreateNamespace(namespaceName, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace: %s", namespaceName)
+	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 	err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
+	framework.ExpectNoError(err, "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
 
 	ginkgo.By("Creating a pod in the namespace")
 	podName := "test-pod"
@@ -108,14 +108,14 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		},
 	}
 	pod, err = f.ClientSet.CoreV1().Pods(namespace.Name).Create(pod)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod %s in namespace: %s", podName, namespace.Name)
+	framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", podName, namespace.Name)
 
 	ginkgo.By("Waiting for the pod to have running status")
 	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 	ginkgo.By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.Name, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete namespace: %s", namespace.Name)
+	framework.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60) + *pod.Spec.TerminationGracePeriodSeconds
@@ -130,7 +130,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(namespaceName, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace: %s", namespaceName)
+	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Verifying there are no pods in the namespace")
 	_, err = f.ClientSet.CoreV1().Pods(namespace.Name).Get(pod.Name, metav1.GetOptions{})
@@ -143,11 +143,11 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	ginkgo.By("Creating a test namespace")
 	namespaceName := "nsdeletetest"
 	namespace, err := f.CreateNamespace(namespaceName, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace: %s", namespaceName)
+	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Waiting for a default service account to be provisioned in namespace")
 	err = framework.WaitForDefaultServiceAccountInNamespace(f.ClientSet, namespace.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
+	framework.ExpectNoError(err, "failure while waiting for a default service account to be provisioned in namespace: %s", namespace.Name)
 
 	ginkgo.By("Creating a service in the namespace")
 	serviceName := "test-service"
@@ -168,11 +168,11 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 		},
 	}
 	service, err = f.ClientSet.CoreV1().Services(namespace.Name).Create(service)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service %s in namespace %s", serviceName, namespace.Name)
+	framework.ExpectNoError(err, "failed to create service %s in namespace %s", serviceName, namespace.Name)
 
 	ginkgo.By("Deleting the namespace")
 	err = f.ClientSet.CoreV1().Namespaces().Delete(namespace.Name, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete namespace: %s", namespace.Name)
+	framework.ExpectNoError(err, "failed to delete namespace: %s", namespace.Name)
 
 	ginkgo.By("Waiting for the namespace to be removed.")
 	maxWaitSeconds := int64(60)
@@ -187,7 +187,7 @@ func ensureServicesAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 
 	ginkgo.By("Recreating the namespace")
 	namespace, err = f.CreateNamespace(namespaceName, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace: %s", namespaceName)
+	framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 
 	ginkgo.By("Verifying there is no service in the namespace")
 	_, err = f.ClientSet.CoreV1().Services(namespace.Name).Get(service.Name, metav1.GetOptions{})

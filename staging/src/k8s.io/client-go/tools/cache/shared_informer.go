@@ -103,7 +103,8 @@ type SharedInformer interface {
 	GetStore() Store
 	// GetController gives back a synthetic interface that "votes" to start the informer
 	GetController() Controller
-	// Run starts the shared informer, which will be stopped when stopCh is closed.
+	// Run starts and runs the shared informer, returning after it stops.
+	// The informer will be stopped when stopCh is closed.
 	Run(stopCh <-chan struct{})
 	// HasSynced returns true if the shared informer's store has been
 	// informed by at least one full LIST of the authoritative state

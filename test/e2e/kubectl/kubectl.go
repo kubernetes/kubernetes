@@ -711,7 +711,7 @@ metadata:
 			ginkgo.By("trying to use kubectl with invalid token")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --token=invalid --v=7 2>&1")
 			e2elog.Logf("got err %v", err)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster namespace"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Using in-cluster configuration"))
 			gomega.Expect(err).To(gomega.ContainSubstring("Authorization: Bearer invalid"))
@@ -720,7 +720,7 @@ metadata:
 			ginkgo.By("trying to use kubectl with invalid server")
 			_, err = framework.RunHostCmd(ns, simplePodName, "/tmp/kubectl get pods --server=invalid --v=6 2>&1")
 			e2elog.Logf("got err %v", err)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			gomega.Expect(err).To(gomega.ContainSubstring("Unable to connect to the server"))
 			gomega.Expect(err).To(gomega.ContainSubstring("GET http://invalid/api"))
 
@@ -945,9 +945,6 @@ metadata:
 			Description: Deploy a redis controller and a redis service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
-			kv, err := framework.KubectlVersion()
-			framework.ExpectNoError(err)
-			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
 			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			serviceJSON := readTestFileOrDie(redisServiceFilename)
 
@@ -1717,7 +1714,7 @@ metadata:
 
 			ginkgo.By("verifying the job " + jobName + " was deleted")
 			_, err = c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			framework.ExpectError(err)
 			gomega.Expect(apierrs.IsNotFound(err)).To(gomega.BeTrue())
 		})
 	})

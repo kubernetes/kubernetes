@@ -847,7 +847,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipIfProviderIs("gke")
 			ginkgo.By("creating a Gluster DP server Pod")
 			pod := startGlusterDpServerPod(c, ns)
-			serverUrl := "http://" + pod.Status.PodIP + ":8081"
+			serverURL := "http://" + pod.Status.PodIP + ":8081"
 			ginkgo.By("creating a StorageClass")
 			test := testsuites.StorageClassTest{
 				Client:       c,
@@ -855,7 +855,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				Provisioner:  "kubernetes.io/glusterfs",
 				ClaimSize:    "2Gi",
 				ExpectedSize: "2Gi",
-				Parameters:   map[string]string{"resturl": serverUrl},
+				Parameters:   map[string]string{"resturl": serverURL},
 			}
 			suffix := fmt.Sprintf("glusterdptest")
 			test.Class = newStorageClass(test, ns, suffix)
@@ -1206,9 +1206,8 @@ func waitForProvisionedVolumesDeleted(c clientset.Interface, scName string) ([]*
 		}
 		if len(remainingPVs) > 0 {
 			return false, nil // Poll until no PVs remain
-		} else {
-			return true, nil // No PVs remain
 		}
+		return true, nil // No PVs remain
 	})
 	return remainingPVs, err
 }

@@ -10,7 +10,6 @@
 ./cluster/gce/gci/flexvolume_node_setup.sh
 ./cluster/gce/gci/health-monitor.sh
 ./cluster/gce/gci/master-helper.sh
-./cluster/gce/upgrade-aliases.sh
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
 ./cluster/log-dump/log-dump.sh
@@ -29,6 +28,7 @@
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/update-vendor.sh
+./hack/verify-no-vendor-cycles.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/batch.sh
 ./test/cmd/certificate.sh

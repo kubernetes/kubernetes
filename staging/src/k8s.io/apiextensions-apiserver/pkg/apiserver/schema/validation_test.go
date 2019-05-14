@@ -49,7 +49,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 		i := rand.Intn(x.NumField())
 		fuzzer.Fuzz(x.Field(i).Addr().Interface())
 
-		errs := validateNestedValueValidation(vv, false, false, nil)
+		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil)
 		if len(errs) == 0 && !reflect.DeepEqual(vv.ForbiddenGenerics, Generic{}) {
 			t.Errorf("expected ForbiddenGenerics validation errors for: %#v", vv)
 		}
@@ -63,7 +63,7 @@ func TestValidateNestedValueValidationComplete(t *testing.T) {
 		i := rand.Intn(x.NumField())
 		fuzzer.Fuzz(x.Field(i).Addr().Interface())
 
-		errs := validateNestedValueValidation(vv, false, false, nil)
+		errs := validateNestedValueValidation(vv, false, false, fieldLevel, nil)
 		if len(errs) == 0 && !reflect.DeepEqual(vv.ForbiddenExtensions, Extensions{}) {
 			t.Errorf("expected ForbiddenExtensions validation errors for: %#v", vv)
 		}

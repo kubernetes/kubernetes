@@ -39,10 +39,6 @@ type disruptiveTest struct {
 	runTest    testBody
 }
 
-const (
-	MinNodes = 2
-)
-
 var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	f := framework.NewDefaultFramework("disruptive-pv")
@@ -60,7 +56,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// To protect the NFS volume pod from the kubelet restart, we isolate it on its own node.
-		framework.SkipUnlessNodeCountIsAtLeast(MinNodes)
+		framework.SkipUnlessNodeCountIsAtLeast(minNodes)
 		framework.SkipIfProviderIs("local")
 
 		c = f.ClientSet

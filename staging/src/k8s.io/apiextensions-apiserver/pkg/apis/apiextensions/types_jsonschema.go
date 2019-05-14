@@ -61,7 +61,8 @@ type JSONSchemaProps struct {
 	// in the validation schema. This affects fields recursively,
 	// but switches back to normal pruning behaviour if nested
 	// properties or additionalProperties are specified in the schema.
-	XPreserveUnknownFields bool
+	// This can either be true or undefined. False is forbidden.
+	XPreserveUnknownFields *bool
 
 	// x-kubernetes-embedded-resource defines that the value is an
 	// embedded Kubernetes runtime.Object, with TypeMeta and

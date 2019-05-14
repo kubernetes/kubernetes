@@ -334,7 +334,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if options.dryRun {
-		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-init-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}

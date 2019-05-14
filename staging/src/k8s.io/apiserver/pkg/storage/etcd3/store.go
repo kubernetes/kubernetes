@@ -301,19 +301,20 @@ func (s *store) GuaranteedUpdate(
 
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
-			// It's possible we were working with stale data
-			if mustCheckData && apierrors.IsConflict(err) {
-				// Actually fetch
-				origState, err = getCurrentState()
-				if err != nil {
-					return err
-				}
-				mustCheckData = false
-				// Retry
-				continue
+			// If our data is already up to date, return the error
+			if !mustCheckData {
+				return err
 			}
 
-			return err
+			// It's possible we were working with stale data
+			// Actually fetch
+			origState, err = getCurrentState()
+			if err != nil {
+				return err
+			}
+			mustCheckData = false
+			// Retry
+			continue
 		}
 
 		data, err := runtime.Encode(s.codec, ret)
