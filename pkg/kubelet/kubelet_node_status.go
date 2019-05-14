@@ -63,7 +63,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
-		node, err := kl.initialNode()
+		node, err := kl.initialNode(true)
 		if err != nil {
 			klog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
 			continue
@@ -211,7 +211,11 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
-func (kl *Kubelet) initialNode() (*v1.Node, error) {
+func (kl *Kubelet) initialNode(shouldLog bool) (*v1.Node, error) {
+	logger := klog.V(2)
+	if !shouldLog {
+		logger = klog.V(7)
+	}
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
@@ -280,24 +284,24 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 
-		klog.Infof("Setting node annotation to enable volume controller attach/detach")
+		logger.Infof("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volutil.ControllerManagedAttachAnnotation] = "true"
 	} else {
-		klog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
+		logger.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
 	if kl.keepTerminatedPodVolumes {
 		if node.Annotations == nil {
 			node.Annotations = make(map[string]string)
 		}
-		klog.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
+		logger.Infof("Setting node annotation to keep pod volumes of terminated pods attached to the node")
 		node.Annotations[volutil.KeepTerminatedPodVolumesAnnotation] = "true"
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
 	for k, v := range kl.nodeLabels {
 		if cv, found := node.ObjectMeta.Labels[k]; found {
-			klog.Warningf("the node label %s=%s will overwrite default setting %s", k, v, cv)
+			logger.Infof("the node label %s=%s will overwrite default setting %s", k, v, cv)
 		}
 		node.ObjectMeta.Labels[k] = v
 	}
@@ -328,7 +332,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 			return nil, err
 		}
 		if instanceType != "" {
-			klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
+			logger.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
@@ -339,11 +343,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
 			if zone.FailureDomain != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
+				logger.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
 				node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
 			}
 			if zone.Region != "" {
-				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
+				logger.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
 				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
 			}
 		}
