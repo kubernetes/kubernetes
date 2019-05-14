@@ -274,7 +274,8 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
-		namesToResolve := []string{hostFQDN}
+		subdomain := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
+		namesToResolve := []string{hostFQDN, subdomain}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
