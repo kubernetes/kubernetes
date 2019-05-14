@@ -235,7 +235,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	}
 	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
 
-	runCore := func(ctx context.Context) {
+	run := func(ctx context.Context) {
 		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewCoreControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
@@ -247,22 +247,46 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		select {}
 	}
 
-	runMigration := func(ctx context.Context) {
-		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewMigratingControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
-			klog.Fatalf("error starting controllers: %v", err)
+	runWithMigration := func(ctx context.Context) {
+		runMigration := func(ctx context.Context) {
+			if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewMigratingControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
+				klog.Fatalf("error starting controllers: %v", err)
+			}
 		}
 
-		controllerContext.InformerFactory.Start(controllerContext.Stop)
-		controllerContext.GenericInformerFactory.Start(controllerContext.Stop)
-		close(controllerContext.InformersStarted)
+		rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+			"kube-system",
+			"component-migration",
+			c.LeaderElectionClient.CoreV1(),
+			c.LeaderElectionClient.CoordinationV1(),
+			resourcelock.ResourceLockConfig{
+				Identity:      id,
+				EventRecorder: c.EventRecorder,
+			})
+		if err != nil {
+			klog.Fatalf("error creating component migration lock: %v", err)
+		}
 
-		select {}
+		go leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+			Lock:          rl,
+			LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+			RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+			RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+			Callbacks: leaderelection.LeaderCallbacks{
+				OnStartedLeading: runMigration,
+				OnStoppedLeading: func() {
+					klog.Fatalf("leaderelection lost")
+				},
+			},
+			WatchDog: electionChecker,
+			Name:     "component-migration",
+		})
 
+		run(ctx)
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		go runMigration(context.TODO())
-		runCore(context.TODO())
+		run(context.TODO())
 		panic("unreachable")
 	}
 
@@ -273,7 +297,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
-	coreRL, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
 		c.LeaderElectionClient.CoreV1(),
@@ -286,42 +310,13 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Fatalf("error creating core leader election lock: %v", err)
 	}
 
-	componentMigrationRL, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"component-migration",
-		c.LeaderElectionClient.CoreV1(),
-		c.LeaderElectionClient.CoordinationV1(),
-		resourcelock.ResourceLockConfig{
-			Identity:      id,
-			EventRecorder: c.EventRecorder,
-		})
-	if err != nil {
-		klog.Fatalf("error creating component migration lock: %v", err)
-	}
-
-	// component migration leader election
-	go leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          componentMigrationRL,
-		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
-		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
-		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
-		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: runMigration,
-			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
-			},
-		},
-		WatchDog: electionChecker,
-		Name:     "component-migration",
-	})
-
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          coreRL,
+		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: runCore,
+			OnStartedLeading: runWithMigration,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
 			},
