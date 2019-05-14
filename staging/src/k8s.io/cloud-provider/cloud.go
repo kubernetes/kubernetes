@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/component-base/controllers"
 )
 
 // ControllerClientBuilder allows you to get clients and configs for controllers
@@ -59,6 +60,9 @@ type Interface interface {
 	ProviderName() string
 	// HasClusterID returns true if a ClusterID is required and set
 	HasClusterID() bool
+	// ControllerConfig returns an implementation of controllers.Config which determines which
+	// component a controller should run
+	ControllerConfig() controllers.Config
 }
 
 type InformerUser interface {

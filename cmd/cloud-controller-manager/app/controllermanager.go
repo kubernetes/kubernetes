@@ -37,6 +37,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/controllers"
 	"k8s.io/klog"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/cloud-controller-manager/app/options"
@@ -52,6 +53,8 @@ const (
 	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register cloud-controller manager /configz, same with GroupName.
 	ConfigzName = "cloudcontrollermanager.config.k8s.io"
+	// ComponentName defines the official name of the current component
+	ComponentName = "cloud-controller-manager"
 )
 
 // NewCloudControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -165,13 +168,23 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 		}
 	}
 
-	run := func(ctx context.Context) {
-		if err := startControllers(c, ctx.Done(), cloud, newControllerInitializers()); err != nil {
+	controllerConfig := cloud.ControllerConfig()
+	controllerConfig.SetComponentName(ComponentName)
+
+	runCloud := func(ctx context.Context) {
+		if err := startControllers(c, ctx.Done(), cloud, newControllerInitializers(controllerConfig)); err != nil {
+			klog.Fatalf("error running controllers: %v", err)
+		}
+	}
+
+	runMigration := func(ctx context.Context) {
+		if err := startControllers(c, ctx.Done(), cloud, newMigratingControllerInitializers(controllerConfig)); err != nil {
 			klog.Fatalf("error running controllers: %v", err)
 		}
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
+		go runMigration(context.TODO())
 		run(context.TODO())
 		panic("unreachable")
 	}
@@ -185,7 +198,7 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	id = id + "_" + string(uuid.NewUUID())
 
 	// Lock required for leader election
-	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+	cloudRL, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		"kube-system",
 		"cloud-controller-manager",
 		c.LeaderElectionClient.CoreV1(),
@@ -197,15 +210,41 @@ func Run(c *cloudcontrollerconfig.CompletedConfig, stopCh <-chan struct{}) error
 	if err != nil {
 		klog.Fatalf("error creating lock: %v", err)
 	}
+	migrationRL, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+		"kube-system",
+		"component-migration",
+		c.LeaderElectionClient.CoreV1(),
+		c.LeaderElectionClient.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: c.EventRecorder,
+		})
+	if err != nil {
+		klog.Fatalf("error creating lock: %v", err)
+	}
 
-	// Try and become the leader and start cloud controller manager loops
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          rl,
+	go leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		Lock:          migrationRL,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: run,
+			OnStartedLeading: runMigration,
+			OnStoppedLeading: func() {
+				klog.Fatalf("leaderelection lost")
+			},
+		},
+		WatchDog: electionChecker,
+		Name:     "component-migration",
+	})
+	// Try and become the leader and start cloud controller manager loops
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		Lock:          cloudRL,
+		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: runCloud,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
 			},
@@ -273,11 +312,45 @@ var ControllersDisabledByDefault = sets.NewString()
 
 // newControllerInitializers is a private map of named controller groups (you can start more than one in an init func)
 // paired to their initFunc.  This allows for structured downstream composition and subdivision.
-func newControllerInitializers() map[string]initFunc {
+func newControllerInitializers(controllerConfig controllers.Config) map[string]initFunc {
 	controllers := map[string]initFunc{}
-	controllers["cloud-node"] = startCloudNodeController
 	controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
-	controllers["service"] = startServiceController
-	controllers["route"] = startRouteController
+
+	_, withMigration := contrllerConfig.ControllerConfig("service-controller")
+	if !withMigration {
+		controllers["service"] = startServiceController
+	}
+
+	_, withMigration = contrllerConfig.ControllerConfig("route-controller")
+	if !withMigration {
+		controllers["route"] = startRouteController
+	}
+
+	_, withMigration = contrllerConfig.ControllerConfig("node-controller")
+	if !withMigration {
+		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
+	}
+	return controllers
+}
+
+// newMigratingControllerInitializers is a private map of named controller groups (you can start more than one in an init func)
+// paired to their initFunc.  This allows for structured downstream composition and subdivision.
+func newMigratingControllerInitializers(controllerConfig controllers.Config) map[string]initFunc {
+	controllers := map[string]initFunc{}
+	_, withMigration := contrllerConfig.ControllerConfig("service-controller")
+	if withMigration {
+		controllers["service"] = startServiceController
+	}
+
+	_, withMigration = contrllerConfig.ControllerConfig("route-controller")
+	if withMigration {
+		controllers["route"] = startRouteController
+	}
+
+	_, withMigration = contrllerConfig.ControllerConfig("node-controller")
+	if withMigration {
+		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
+	}
+
 	return controllers
 }

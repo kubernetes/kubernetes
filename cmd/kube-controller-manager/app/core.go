@@ -63,7 +63,16 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
+const (
+	componentName = "kube-controller-manager"
+)
+
 func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
+	shouldRun, _ := ctx.ControllerConfig.ControllerConfig("service-controller")
+	if !shouldRun {
+		return nil, false, nil
+	}
+
 	serviceController, err := servicecontroller.New(
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
@@ -147,6 +156,11 @@ func startNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, er
 }
 
 func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, bool, error) {
+	shouldRun, _ := ctx.ControllerConfig.ControllerConfig("node-controller")
+	if !shouldRun {
+		return nil, false, nil
+	}
+
 	cloudNodeLifecycleController, err := cloudcontroller.NewCloudNodeLifecycleController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		// cloud node lifecycle controller uses existing cluster role from node-controller
@@ -166,6 +180,11 @@ func startCloudNodeLifecycleController(ctx ControllerContext) (http.Handler, boo
 }
 
 func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
+	shouldRun, _ := ctx.ControllerConfig.ControllerConfig("route-controller")
+	if !shouldRun {
+		return nil, false, nil
+	}
+
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
 		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil

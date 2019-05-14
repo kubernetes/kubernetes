@@ -56,6 +56,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	"k8s.io/component-base/controllers"
 	"k8s.io/klog"
 	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
@@ -76,6 +77,8 @@ const (
 	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
+	// ComponentName represents the offical name of the component, kube-controller-manager
+	ComponentName = "kube-controller-manager"
 )
 
 type ControllerLoopMode int
@@ -194,44 +197,46 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 	}
 
-	run := func(ctx context.Context) {
-		rootClientBuilder := controller.SimpleControllerClientBuilder{
-			ClientConfig: c.Kubeconfig,
-		}
-		var clientBuilder controller.ControllerClientBuilder
-		if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-			if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-				// It's possible another controller process is creating the tokens for us.
-				// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
-				klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
-			}
+	rootClientBuilder := controller.SimpleControllerClientBuilder{
+		ClientConfig: c.Kubeconfig,
+	}
 
-			if shouldTurnOnDynamicClient(c.Client) {
-				klog.V(1).Infof("using dynamic client builder")
-				//Dynamic builder will use TokenRequest feature and refresh service account token periodically
-				clientBuilder = controller.NewDynamicClientBuilder(
-					restclient.AnonymousClientConfig(c.Kubeconfig),
-					c.Client.CoreV1(),
-					"kube-system")
-			} else {
-				klog.V(1).Infof("using legacy client builder")
-				clientBuilder = controller.SAControllerClientBuilder{
-					ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
-					CoreClient:           c.Client.CoreV1(),
-					AuthenticationClient: c.Client.AuthenticationV1(),
-					Namespace:            "kube-system",
-				}
-			}
+	var clientBuilder controller.ControllerClientBuilder
+	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
+		if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
+			// It's possible another controller process is creating the tokens for us.
+			// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
+			klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
+		}
+
+		if shouldTurnOnDynamicClient(c.Client) {
+			klog.V(1).Infof("using dynamic client builder")
+			//Dynamic builder will use TokenRequest feature and refresh service account token periodically
+			clientBuilder = controller.NewDynamicClientBuilder(
+				restclient.AnonymousClientConfig(c.Kubeconfig),
+				c.Client.CoreV1(),
+				"kube-system")
 		} else {
-			clientBuilder = rootClientBuilder
+			klog.V(1).Infof("using legacy client builder")
+			clientBuilder = controller.SAControllerClientBuilder{
+				ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
+				CoreClient:           c.Client.CoreV1(),
+				AuthenticationClient: c.Client.AuthenticationV1(),
+				Namespace:            "kube-system",
+			}
 		}
-		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
-		if err != nil {
-			klog.Fatalf("error building controller context: %v", err)
-		}
-		saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
+	} else {
+		clientBuilder = rootClientBuilder
+	}
 
-		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
+	controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
+	if err != nil {
+		klog.Fatalf("error building controller context: %v", err)
+	}
+	saTokenControllerInitFunc := serviceAccountTokenControllerStarter{rootClientBuilder: rootClientBuilder}.startServiceAccountTokenController
+
+	runCore := func(ctx context.Context) {
+		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewCoreControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
 
@@ -242,8 +247,22 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		select {}
 	}
 
+	runMigration := func(ctx context.Context) {
+		if err := StartControllers(controllerContext, saTokenControllerInitFunc, NewMigratingControllerInitializers(controllerContext.LoopMode), unsecuredMux); err != nil {
+			klog.Fatalf("error starting controllers: %v", err)
+		}
+
+		controllerContext.InformerFactory.Start(controllerContext.Stop)
+		controllerContext.GenericInformerFactory.Start(controllerContext.Stop)
+		close(controllerContext.InformersStarted)
+
+		select {}
+
+	}
+
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO())
+		go runMigration(context.TODO())
+		runCore(context.TODO())
 		panic("unreachable")
 	}
 
@@ -254,7 +273,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
-	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+	coreRL, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
 		"kube-system",
 		"kube-controller-manager",
 		c.LeaderElectionClient.CoreV1(),
@@ -264,16 +283,45 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			EventRecorder: c.EventRecorder,
 		})
 	if err != nil {
-		klog.Fatalf("error creating lock: %v", err)
+		klog.Fatalf("error creating core leader election lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
-		Lock:          rl,
+	componentMigrationRL, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
+		"kube-system",
+		"component-migration",
+		c.LeaderElectionClient.CoreV1(),
+		c.LeaderElectionClient.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
+			Identity:      id,
+			EventRecorder: c.EventRecorder,
+		})
+	if err != nil {
+		klog.Fatalf("error creating component migration lock: %v", err)
+	}
+
+	// component migration leader election
+	go leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		Lock:          componentMigrationRL,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
 		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
 		Callbacks: leaderelection.LeaderCallbacks{
-			OnStartedLeading: run,
+			OnStartedLeading: runMigration,
+			OnStoppedLeading: func() {
+				klog.Fatalf("leaderelection lost")
+			},
+		},
+		WatchDog: electionChecker,
+		Name:     "component-migration",
+	})
+
+	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+		Lock:          coreRL,
+		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
+		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
+		RetryPeriod:   c.ComponentConfig.Generic.LeaderElection.RetryPeriod.Duration,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: runCore,
 			OnStoppedLeading: func() {
 				klog.Fatalf("leaderelection lost")
 			},
@@ -309,6 +357,10 @@ type ControllerContext struct {
 	// Cloud is the cloud provider interface for the controllers to use.
 	// It must be initialized and ready to use.
 	Cloud cloudprovider.Interface
+
+	// ControllerConfig is the interface that defines which component a controller
+	// should run. This is specifically for controllers that are being migrated to new out-of-tree components
+	ControllerConfig controllers.Config
 
 	// Control for which control loops to be run
 	// IncludeCloudLoops is for a kube-controller-manager running all loops
@@ -362,7 +414,7 @@ const (
 
 // NewControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
 // paired to their InitFunc.  This allows for structured downstream composition and subdivision.
-func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
+func NewCoreControllerInitializers(controllerConfig controllers.Config) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
 	controllers["replicationcontroller"] = startReplicationController
@@ -387,12 +439,6 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["tokencleaner"] = startTokenCleanerController
 	controllers["nodeipam"] = startNodeIpamController
 	controllers["nodelifecycle"] = startNodeLifecycleController
-	if loopMode == IncludeCloudLoops {
-		controllers["service"] = startServiceController
-		controllers["route"] = startRouteController
-		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
-		// TODO: volume controller into the IncludeCloudLoops only set.
-	}
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
@@ -401,6 +447,45 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	controllers["pv-protection"] = startPVProtectionController
 	controllers["ttl-after-finished"] = startTTLAfterFinishedController
 	controllers["root-ca-cert-publisher"] = startRootCACertPublisher
+
+	// cloud controllers
+	_, withMigration := controllerConfig.ControllerConfig("service-controller")
+	if !withMigration {
+		controllers["service"] = startServiceController
+	}
+
+	_, withMigration = controllerConfig.ControllerConfig("route-controller")
+	if !withMigration {
+		controllers["route"] = startRouteController
+	}
+
+	_, withMigration = controllerConfig.ControllerConfig("node-controller")
+	if !withMigration {
+		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
+	}
+
+	return controllers
+}
+
+// NewMigratingControllerInitializers is a public map of named controller groups (you can start more than one in an init func)
+// paired to their InitFunc. The controllers here are to be migrated out of kube-controller-manager in a future release
+func NewMigratingControllerInitializers(controllerConfig controllers.Config) map[string]InitFunc {
+	controllers := map[string]InitFunc{}
+
+	_, withMigration := contrllerConfig.ControllerConfig("service-controller")
+	if withMigration {
+		controllers["service"] = startServiceController
+	}
+
+	_, withMigration = contrllerConfig.ControllerConfig("route-controller")
+	if withMigration {
+		controllers["route"] = startRouteController
+	}
+
+	_, withMigration = contrllerConfig.ControllerConfig("node-controller")
+	if withMigration {
+		controllers["cloud-node-lifecycle"] = startCloudNodeLifecycleController
+	}
 
 	return controllers
 }
@@ -468,6 +553,9 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		return ControllerContext{}, err
 	}
 
+	controllerConfig := cloud.ControllerConfig()
+	controllerConfig.SetComponentName(ComponentName)
+
 	ctx := ControllerContext{
 		ClientBuilder:          clientBuilder,
 		InformerFactory:        sharedInformers,
@@ -476,6 +564,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		RESTMapper:             restMapper,
 		AvailableResources:     availableResources,
 		Cloud:                  cloud,
+		ControllerConfig:       controllerConfig,
 		LoopMode:               loopMode,
 		Stop:                   stop,
 		InformersStarted:       make(chan struct{}),

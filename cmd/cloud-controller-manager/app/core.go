@@ -34,6 +34,11 @@ import (
 )
 
 func startCloudNodeController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+	shouldRun, _ := cloud.ControllerConfig().ControllerConfig("node-controller")
+	if !shouldRun {
+		return nil, false, nil
+	}
+
 	// Start the CloudNodeController
 	nodeController := cloudcontrollers.NewCloudNodeController(
 		ctx.SharedInformers.Core().V1().Nodes(),
@@ -67,6 +72,11 @@ func startCloudNodeLifecycleController(ctx *cloudcontrollerconfig.CompletedConfi
 }
 
 func startServiceController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+	shouldRun, _ := cloud.ControllerConfig().ControllerConfig("service-controller")
+	if !shouldRun {
+		return nil, false, nil
+	}
+
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
 		cloud,
@@ -87,6 +97,11 @@ func startServiceController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cl
 }
 
 func startRouteController(ctx *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+	shouldRun, _ := cloud.ControllerConfig().ControllerConfig("route-controller")
+	if !shouldRun {
+		return nil, false, nil
+	}
+
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs || !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
 		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
