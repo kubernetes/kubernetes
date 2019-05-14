@@ -314,21 +314,39 @@ func findContainerStatus(status *v1.PodStatus, containerID string) (containerSta
 func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
+
+	// ensure that all containers have a terminated state - because we do not know whether the container
+	// was successful, always report an error
 	oldStatus := &pod.Status
 	if cachedStatus, ok := m.podStatuses[pod.UID]; ok {
 		oldStatus = &cachedStatus.status
 	}
 	status := *oldStatus.DeepCopy()
 	for i := range status.ContainerStatuses {
+		if status.ContainerStatuses[i].State.Terminated != nil || status.ContainerStatuses[i].State.Waiting != nil {
+			continue
+		}
 		status.ContainerStatuses[i].State = v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+			Terminated: &v1.ContainerStateTerminated{
+				Reason:   "ContainerStatusUnknown",
+				Message:  "The container could not be located when the pod was terminated",
+				ExitCode: 137,
+			},
 		}
 	}
 	for i := range status.InitContainerStatuses {
+		if status.InitContainerStatuses[i].State.Terminated != nil || status.ContainerStatuses[i].State.Waiting != nil {
+			continue
+		}
 		status.InitContainerStatuses[i].State = v1.ContainerState{
-			Terminated: &v1.ContainerStateTerminated{},
+			Terminated: &v1.ContainerStateTerminated{
+				Reason:   "ContainerStatusUnknown",
+				Message:  "The container could not be located when the pod was terminated",
+				ExitCode: 137,
+			},
 		}
 	}
+
 	m.updateStatusInternal(pod, status, true)
 }
 
