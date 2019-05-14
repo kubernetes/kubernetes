@@ -272,9 +272,9 @@ func projectedDownwardAPIVolumePodForModeTest(name, filePath string, itemMode, d
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--file_mode=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -298,9 +298,9 @@ func projectedDownwardAPIVolumePodForUpdateTest(name string, labels, annotations
 
 	pod.Spec.Containers = []v1.Container{
 		{
-			Name:    "client-container",
-			Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=1200", "--file_content_in_loop=" + filePath},
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--break_on_expected_content=false", "--retry_time=1200", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",

@@ -37,7 +37,6 @@ import (
 var (
 	volumePath = "/test-volume"
 	volumeName = "test-volume"
-	mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
 )
 
 var _ = utils.SIGDescribe("Ephemeralstorage", func() {
@@ -85,7 +84,7 @@ func testEphemeralVolumePod(f *framework.Framework, volumeType string, source *v
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("test-container-subpath-%s", suffix),
-					Image: mountImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,

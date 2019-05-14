@@ -164,8 +164,9 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: imageutils.GetE2EImage(imageutils.Mounttest),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
 						Args: []string{
+							"mounttest",
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
@@ -290,9 +291,9 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    deleteContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
+						Name:  deleteContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -302,9 +303,9 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 						},
 					},
 					{
-						Name:    updateContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
+						Name:  updateContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -314,9 +315,9 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 						},
 					},
 					{
-						Name:    createContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+						Name:  createContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -484,8 +485,9 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
 					VolumeMounts: []v1.VolumeMount{
@@ -558,8 +560,9 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						"--file_content=/etc/secret-volume/new-path-data-1",
 						"--file_mode=/etc/secret-volume/new-path-data-1"},
 					VolumeMounts: []v1.VolumeMount{
@@ -615,9 +618,9 @@ func createNonOptionalSecretPod(f *framework.Framework, volumeMountPath, podName
 			},
 			Containers: []v1.Container{
 				{
-					Name:    createContainerName,
-					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+					Name:  createContainerName,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      createVolumeName,
@@ -676,9 +679,9 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 			},
 			Containers: []v1.Container{
 				{
-					Name:    createContainerName,
-					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+					Name:  createContainerName,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      createVolumeName,

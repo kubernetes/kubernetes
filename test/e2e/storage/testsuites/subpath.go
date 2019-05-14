@@ -50,7 +50,7 @@ var (
 	probeFilePath   = probeVolumePath + "/probe-file"
 	fileName        = "test-file"
 	retryDuration   = 20
-	mountImage      = imageutils.GetE2EImage(imageutils.Mounttest)
+	mountImage      = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 type subPathTestSuite struct {
@@ -532,6 +532,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 				{
 					Name:  fmt.Sprintf("test-init-subpath-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -548,6 +549,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 				{
 					Name:  fmt.Sprintf("test-init-volume-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -565,6 +567,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 				{
 					Name:  fmt.Sprintf("test-container-subpath-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -581,6 +584,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 				{
 					Name:  fmt.Sprintf("test-container-volume-%s", suffix),
 					Image: mountImage,
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -614,8 +618,8 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 }
 
 func containerIsUnused(container *v1.Container) bool {
-	// mountImage with nil Args does nothing. Leave everything else
-	return container.Image == mountImage && container.Args == nil
+	// mountImage with nil Args or with just "mounttest" as Args does nothing. Leave everything else
+	return container.Image == mountImage && (container.Args == nil || (len(container.Args) == 1 && container.Args[0] == "mounttest"))
 }
 
 // removeUnusedContainers removes containers from a SubpathTestPod that aren't
@@ -678,6 +682,7 @@ func setInitCommand(pod *v1.Pod, command string) {
 
 func setWriteCommand(file string, container *v1.Container) {
 	container.Args = []string{
+		"mounttest",
 		fmt.Sprintf("--new_file_0644=%v", file),
 		fmt.Sprintf("--file_mode=%v", file),
 	}
@@ -690,6 +695,7 @@ func addSubpathVolumeContainer(container *v1.Container, volumeMount v1.VolumeMou
 
 func addMultipleWrites(container *v1.Container, file1 string, file2 string) {
 	container.Args = []string{
+		"mounttest",
 		fmt.Sprintf("--new_file_0644=%v", file1),
 		fmt.Sprintf("--new_file_0666=%v", file2),
 	}
@@ -706,6 +712,7 @@ func testMultipleReads(f *framework.Framework, pod *v1.Pod, containerIndex int, 
 
 func setReadCommand(file string, container *v1.Container) {
 	container.Args = []string{
+		"mounttest",
 		fmt.Sprintf("--file_content_in_loop=%v", file),
 		fmt.Sprintf("--retry_time=%d", retryDuration),
 	}

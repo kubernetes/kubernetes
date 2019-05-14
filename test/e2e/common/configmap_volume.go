@@ -162,9 +162,9 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    containerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
+						Name:  containerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -249,9 +249,9 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    containerName1,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
+						Name:  containerName1,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -395,9 +395,9 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 				},
 				Containers: []v1.Container{
 					{
-						Name:    deleteContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/delete/data-1"},
+						Name:  deleteContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -407,9 +407,9 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 						},
 					},
 					{
-						Name:    updateContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/update/data-3"},
+						Name:  updateContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -419,9 +419,9 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 						},
 					},
 					{
-						Name:    createContainerName,
-						Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+						Name:  createContainerName,
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -526,8 +526,8 @@ var _ = ginkgo.Describe("[sig-storage] ConfigMap", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "configmap-volume-test",
-						Image: imageutils.GetE2EImage(imageutils.Mounttest),
-						Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"mounttest", "--file_content=/etc/configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -671,8 +671,9 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, asUser bool, fsGroup 
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
+						"mounttest",
 						"--file_content=/etc/configmap-volume/data-1",
 						"--file_mode=/etc/configmap-volume/data-1"},
 					VolumeMounts: []v1.VolumeMount{
@@ -753,8 +754,10 @@ func doConfigMapE2EWithMappings(f *framework.Framework, asUser bool, fsGroup int
 			Containers: []v1.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
-					Args: []string{"--file_content=/etc/configmap-volume/path/to/data-2",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args: []string{
+						"mounttest",
+						"--file_content=/etc/configmap-volume/path/to/data-2",
 						"--file_mode=/etc/configmap-volume/path/to/data-2"},
 					VolumeMounts: []v1.VolumeMount{
 						{
@@ -824,9 +827,9 @@ func createNonOptionalConfigMapPod(f *framework.Framework, volumeMountPath, podN
 			},
 			Containers: []v1.Container{
 				{
-					Name:    createContainerName,
-					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+					Name:  createContainerName,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      createVolumeName,
@@ -886,9 +889,9 @@ func createNonOptionalConfigMapPodWithConfig(f *framework.Framework, volumeMount
 			},
 			Containers: []v1.Container{
 				{
-					Name:    createContainerName,
-					Image:   imageutils.GetE2EImage(imageutils.Mounttest),
-					Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
+					Name:  createContainerName,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/configmap-volumes/create/data-1"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      createVolumeName,

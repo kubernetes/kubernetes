@@ -53,6 +53,7 @@ var _ = ginkgo.Describe("[sig-storage] HostPath", func() {
 		pod := testPodWithHostVol(volumePath, source, false)
 
 		pod.Spec.Containers[0].Args = []string{
+			"mounttest",
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
@@ -73,11 +74,13 @@ var _ = ginkgo.Describe("[sig-storage] HostPath", func() {
 		pod := testPodWithHostVol(volumePath, source, privileged)
 
 		pod.Spec.Containers[0].Args = []string{
+			"mounttest",
 			fmt.Sprintf("--new_file_0644=%v", filePath),
 			fmt.Sprintf("--file_mode=%v", filePath),
 		}
 
 		pod.Spec.Containers[1].Args = []string{
+			"mounttest",
 			fmt.Sprintf("--file_content_in_loop=%v", filePath),
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
@@ -108,12 +111,14 @@ var _ = ginkgo.Describe("[sig-storage] HostPath", func() {
 		container := &pod.Spec.Containers[0]
 		container.VolumeMounts[0].SubPath = subPath
 		container.Args = []string{
+			"mounttest",
 			fmt.Sprintf("--new_file_0644=%v", filePathInWriter),
 			fmt.Sprintf("--file_mode=%v", filePathInWriter),
 		}
 
 		// Read it from outside the subPath from container 1
 		pod.Spec.Containers[1].Args = []string{
+			"mounttest",
 			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
@@ -156,7 +161,8 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource, privileged
 			Containers: []v1.Container{
 				{
 					Name:  containerName1,
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -169,7 +175,8 @@ func testPodWithHostVol(path string, source *v1.HostPathVolumeSource, privileged
 				},
 				{
 					Name:  containerName2,
-					Image: imageutils.GetE2EImage(imageutils.Mounttest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"mounttest"},
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
