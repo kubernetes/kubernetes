@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -26,8 +25,6 @@ import (
 	"github.com/lithammer/dedent"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -83,21 +80,6 @@ func assertDirEmpty(t *testing.T, path string) {
 	if len(errors) != 0 {
 		t.Errorf("directory not empty: [%v]", errors)
 	}
-}
-
-func TestNewReset(t *testing.T) {
-	var in io.Reader
-	certsDir := kubeadmapiv1beta2.DefaultCertificatesDir
-	criSocketPath := kubeadmconstants.DefaultDockerCRISocket
-	forceReset := true
-
-	ignorePreflightErrors := []string{"all"}
-	ignorePreflightErrorsSet, _ := validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
-	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
-
-	ignorePreflightErrors = []string{}
-	ignorePreflightErrorsSet, _ = validation.ValidateIgnorePreflightErrors(ignorePreflightErrors)
-	NewReset(in, ignorePreflightErrorsSet, forceReset, certsDir, criSocketPath)
 }
 
 func TestConfigDirCleaner(t *testing.T) {
