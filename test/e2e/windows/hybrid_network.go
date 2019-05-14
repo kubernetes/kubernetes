@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.TestWebserver)
+	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.Agnhost)
 	linuxBusyBoxImage   = "docker.io/library/nginx:1.15-alpine"
 )
 
@@ -53,6 +53,7 @@ var _ = SIGDescribe("Hybrid cluster network", func() {
 			ginkgo.By("creating linux and windows pods")
 			linuxPod := createTestPod(f, linuxBusyBoxImage, linuxOS)
 			windowsPod := createTestPod(f, windowsBusyBoximage, windowsOS)
+			windowsPod.Spec.Containers[0].Args = []string{"test-webserver"}
 
 			ginkgo.By("checking connectivity to 8.8.8.8 53 (google.com) from Linux")
 			assertConsistentConnectivity(f, linuxPod.ObjectMeta.Name, linuxOS, linuxCheck("8.8.8.8", 53))

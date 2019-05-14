@@ -31,6 +31,7 @@ type RegistryList struct {
 	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
 	DockerGluster           string `yaml:"dockerGluster"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
+	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
@@ -69,6 +70,7 @@ func initReg() RegistryList {
 		DockerLibraryRegistry:   "docker.io/library",
 		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
+		PromoterE2eRegistry:     "us.gcr.io/k8s-artifacts-prod/e2e-test-images",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcRegistry:              "k8s.gcr.io",
 		GcrReleaseRegistry:      "gcr.io/gke-release",
@@ -100,6 +102,7 @@ var (
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
 	dockerGluster           = registry.DockerGluster
 	e2eRegistry             = registry.E2eRegistry
+	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
@@ -187,14 +190,10 @@ const (
 	RegressionIssue74839
 	// ResourceConsumer image
 	ResourceConsumer
-	// ResourceController image
-	ResourceController
 	// SdDummyExporter image
 	SdDummyExporter
 	// StartupScript image
 	StartupScript
-	// TestWebserver image
-	TestWebserver
 	// VolumeNFSServer image
 	VolumeNFSServer
 	// VolumeISCSIServer image
@@ -207,7 +206,7 @@ const (
 
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.8"}
+	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.10"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
@@ -243,10 +242,8 @@ func initImageConfigs() map[int]Config {
 	configs[Redis] = Config{dockerLibraryRegistry, "redis", "5.0.5-alpine"}
 	configs[RegressionIssue74839] = Config{e2eRegistry, "regression-issue-74839-amd64", "1.0"}
 	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
-	configs[ResourceController] = Config{e2eRegistry, "resource-consumer-controller", "1.0"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
 	configs[StartupScript] = Config{googleContainerRegistry, "startup-script", "v1"}
-	configs[TestWebserver] = Config{e2eRegistry, "test-webserver", "1.0"}
 	configs[VolumeNFSServer] = Config{e2eRegistry, "volume/nfs", "1.0"}
 	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}

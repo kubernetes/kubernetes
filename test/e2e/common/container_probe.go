@@ -303,7 +303,8 @@ func testWebServerPodSpec(readinessProbe, livenessProbe *v1.Probe, containerName
 			Containers: []v1.Container{
 				{
 					Name:           containerName,
-					Image:          imageutils.GetE2EImage(imageutils.TestWebserver),
+					Image:          imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:           []string{"test-webserver"},
 					Ports:          []v1.ContainerPort{{ContainerPort: int32(port)}},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,

@@ -396,7 +396,8 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 				// TODO: Consider scraping logs instead of running a webserver.
 				{
 					Name:  "webserver",
-					Image: imageutils.GetE2EImage(imageutils.TestWebserver),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"test-webserver"},
 					Ports: []v1.ContainerPort{
 						{
 							Name:          "http",

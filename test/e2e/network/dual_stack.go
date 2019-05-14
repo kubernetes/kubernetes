@@ -139,8 +139,9 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			replicas,
 			map[string]string{"test": "dual-stack-server"},
 			"dualstack-test-server",
-			imageutils.GetE2EImage(imageutils.TestWebserver),
+			imageutils.GetE2EImage(imageutils.Agnhost),
 			appsv1.RollingUpdateDeploymentStrategyType)
+		serverDeploymentSpec.Spec.Template.Spec.Containers[0].Args = []string{"test-webserver"}
 
 		// to ensure all the pods land on different nodes and we can thereby
 		// validate connectivity across all nodes.
