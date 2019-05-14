@@ -77,6 +77,7 @@ func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess
 	}
 
 	delete(config.Contexts, name)
+	config.CurrentContext = ""
 
 	if err := clientcmd.ModifyConfig(configAccess, *config, true); err != nil {
 		return err
