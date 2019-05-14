@@ -402,19 +402,34 @@ func TestBalancedResourceAllocation(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			if len(test.pod.Spec.Volumes) > 0 {
-				maxVolumes := 5
-				for _, info := range nodeNameToInfo {
-					info.TransientInfo.TransNodeInfo.AllocatableVolumesCount = getExistingVolumeCountForNode(info.Pods(), maxVolumes)
-					info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
+			metadata := &priorityMetadata{
+				nonZeroRequest: getNonZeroRequests(test.pod),
+			}
+
+			for _, hasMeta := range []bool{true, false} {
+				if len(test.pod.Spec.Volumes) > 0 {
+					maxVolumes := 5
+					for _, info := range nodeNameToInfo {
+						info.TransientInfo.TransNodeInfo.AllocatableVolumesCount = getExistingVolumeCountForNode(info.Pods(), maxVolumes)
+						info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
+					}
 				}
-			}
-			list, err := priorityFunction(BalancedResourceAllocationMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+
+				var function PriorityFunction
+				if hasMeta {
+					function = priorityFunction(BalancedResourceAllocationMap, nil, metadata)
+				} else {
+					function = priorityFunction(BalancedResourceAllocationMap, nil, nil)
+				}
+
+				list, err := function(test.pod, nodeNameToInfo, test.nodes)
+
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if !reflect.DeepEqual(test.expectedList, list) {
+					t.Errorf("hasMeta %#v expected %#v, got %#v", hasMeta, test.expectedList, list)
+				}
 			}
 		})
 	}

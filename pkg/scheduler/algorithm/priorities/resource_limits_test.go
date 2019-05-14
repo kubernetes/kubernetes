@@ -140,21 +140,25 @@ func TestResourceLimitsPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			metadata := &priorityMetadata{
+				podLimits: getResourceLimits(test.pod),
+			}
 
 			for _, hasMeta := range []bool{true, false} {
-				var metadata *priorityMetadata
+				var function PriorityFunction
 				if hasMeta {
-					metadata = &priorityMetadata{
-						podLimits: getResourceLimits(test.pod),
-					}
+					function = priorityFunction(ResourceLimitsPriorityMap, nil, metadata)
+				} else {
+					function = priorityFunction(ResourceLimitsPriorityMap, nil, nil)
 				}
 
-				list, err := priorityFunction(ResourceLimitsPriorityMap, nil, metadata)(test.pod, nodeNameToInfo, test.nodes)
+				list, err := function(test.pod, nodeNameToInfo, test.nodes)
+
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 				if !reflect.DeepEqual(test.expectedList, list) {
-					t.Errorf("expected %#v, got %#v", test.expectedList, list)
+					t.Errorf("hasMeta %#v expected %#v, got %#v", hasMeta, test.expectedList, list)
 				}
 			}
 		})

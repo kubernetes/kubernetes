@@ -43,7 +43,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 
 	// compute pod limits
 	var podLimits *schedulernodeinfo.Resource
-	if priorityMeta, ok := meta.(*priorityMetadata); ok && priorityMeta != nil {
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
 		// We were able to parse metadata, use podLimits from there.
 		podLimits = priorityMeta.podLimits
 	} else {
