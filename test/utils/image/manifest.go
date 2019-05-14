@@ -130,6 +130,8 @@ const (
 	GBRedisSlave
 	// Hostexec image
 	Hostexec
+	// InClusterClient image
+	InClusterClient
 	// IpcUtils image
 	IpcUtils
 	// Iperf image
@@ -211,6 +213,7 @@ func initImageConfigs() map[int]Config {
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
 	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}
 	configs[Hostexec] = Config{e2eRegistry, "hostexec", "1.1"}
+	configs[InClusterClient] = Config{e2eRegistry, "inclusterclient", "1.0"}
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
 	configs[Iperf] = Config{e2eRegistry, "iperf", "1.0"}
 	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
