@@ -810,6 +810,8 @@ github.com/vmware/govmomi/vim25/xml
 github.com/vmware/photon-controller-go-sdk/SSPI
 github.com/vmware/photon-controller-go-sdk/photon
 github.com/vmware/photon-controller-go-sdk/photon/lightwave
+# github.com/wk8/go-ordered-map v0.1.0 => github.com/wk8/go-ordered-map v0.1.0
+github.com/wk8/go-ordered-map
 # github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57 => github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
 github.com/xanzy/go-cloudstack/cloudstack
 # github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18 => github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18

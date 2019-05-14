@@ -7,6 +7,7 @@ go_library(
         "doc.go",
         "docker_checkpoint.go",
         "docker_container.go",
+        "docker_container_cleanup_manager.go",
         "docker_container_unsupported.go",
         "docker_container_windows.go",
         "docker_image.go",
@@ -59,6 +60,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         "//vendor/github.com/armon/circbuf:go_default_library",
@@ -69,6 +71,7 @@ go_library(
         "//vendor/github.com/docker/docker/api/types/strslice:go_default_library",
         "//vendor/github.com/docker/docker/pkg/jsonmessage:go_default_library",
         "//vendor/github.com/docker/go-connections/nat:go_default_library",
+        "//vendor/github.com/wk8/go-ordered-map:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
@@ -86,6 +89,7 @@ go_test(
     srcs = [
         "convert_test.go",
         "docker_checkpoint_test.go",
+        "docker_container_cleanup_manager_test.go",
         "docker_container_test.go",
         "docker_container_windows_test.go",
         "docker_image_test.go",

@@ -353,6 +353,7 @@ filegroup(
         "//vendor/github.com/vmware/govmomi:all-srcs",
         "//vendor/github.com/vmware/photon-controller-go-sdk/SSPI:all-srcs",
         "//vendor/github.com/vmware/photon-controller-go-sdk/photon:all-srcs",
+        "//vendor/github.com/wk8/go-ordered-map:all-srcs",
         "//vendor/github.com/xanzy/go-cloudstack/cloudstack:all-srcs",
         "//vendor/github.com/xiang90/probing:all-srcs",
         "//vendor/go.uber.org/atomic:all-srcs",
