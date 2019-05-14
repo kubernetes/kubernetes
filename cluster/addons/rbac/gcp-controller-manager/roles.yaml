@@ -1,0 +1,9 @@
+kind: ClusterRole
+metadata:
+  name: system:gcp-controller-manager
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "certificatesigningrequests"]
+  verbs: ["*"]

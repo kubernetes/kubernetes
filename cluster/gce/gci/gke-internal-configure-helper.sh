@@ -117,6 +117,12 @@ function configure_pdcsi_component {
   create-static-auth-kubeconfig-for-component "pdcsi-controller"
 }
 
+function configure_controller_manager_component {
+  # TODO: is there a reliable way to make this a no-op?
+  setup-addon-manifests "addons" "rbac/gcp-controller-manager"
+  create-static-auth-kubeconfig-for-component "gcp-controller-manager"
+}
+
 function generate_vertical_pod_autoscaler_admission_controller_certs {
   local certs_dir="/etc/tls-certs" #TODO: what is the best place for certs?
   echo "Generating certs for the VPA Admission Controller in ${certs_dir}."
@@ -169,6 +175,7 @@ function gke-internal-master-start {
   echo "Internal GKE configuration start"
   configure_healthcheck_component
   configure_pdcsi_component
+  configure_machine_controller_component
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
   start_vertical_pod_autoscaler
