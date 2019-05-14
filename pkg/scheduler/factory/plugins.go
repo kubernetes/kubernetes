@@ -408,8 +408,8 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 }
 
 func GetFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]predicates.FitPredicate, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	fitPredicates := map[string]predicates.FitPredicate{}
 	for _, name := range names.List() {
@@ -451,8 +451,8 @@ func GetPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateM
 }
 
 func GetPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
-	schedulerFactoryMutex.Lock()
-	defer schedulerFactoryMutex.Unlock()
+	schedulerFactoryMutex.RLock()
+	defer schedulerFactoryMutex.RUnlock()
 
 	var configs []priorities.PriorityConfig
 	for _, name := range names.List() {

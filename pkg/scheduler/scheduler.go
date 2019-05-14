@@ -82,7 +82,7 @@ type Scheduler struct {
 	PodConditionUpdater factory.PodConditionUpdater
 	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
 	// the preemptor pod.
-	PodPreemptor PodPreemptor
+	PodPreemptor factory.PodPreemptor
 	// Framework runs scheduler plugins at configured extension points.
 	Framework framework.Framework
 
@@ -265,7 +265,7 @@ func New(client clientset.Interface,
 		klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
 		provider, err := factory.GetAlgorithmProvider(providerName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
 		predicateKeys = provider.FitPredicateKeys
 		priorityKeys = provider.PriorityFunctionKeys
@@ -282,12 +282,13 @@ func New(client clientset.Interface,
 				return nil, err
 			}
 		}
-		klog.V(2).Infof("Creating scheduler from configuration: %v", policy)
+		klog.V(2).Infof("Creating scheduler from configuration: %v", *policy)
 
 		// validate the policy configuration
 		if err := validation.ValidatePolicy(*policy); err != nil {
 			return nil, err
 		}
+		fmt.Println(policy.Predicates)
 		if policy.Predicates == nil {
 			klog.V(2).Infof("Using predicates from algorithm provider '%v'", factory.DefaultProvider)
 			provider, err := factory.GetAlgorithmProvider(factory.DefaultProvider)
@@ -370,9 +371,6 @@ func New(client clientset.Interface,
 		return nil, err
 	}
 
-	// TODO(bsalamat): the default registrar should be able to process config files.
-	pluginSet := plugins.NewDefaultPluginSet(pluginsv1alpha1.NewPluginContext(), &schedulerCache)
-
 	algo := core.NewGenericScheduler(
 		schedulerCache,
 		podQueue,
@@ -380,7 +378,7 @@ func New(client clientset.Interface,
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
-		pluginSet,
+		framework,
 		extenders,
 		volumeBinder,
 		pvcInformer.Lister(),
@@ -399,7 +397,7 @@ func New(client clientset.Interface,
 		GetBinder:           factory.GetBinderFunc(client, extenders),
 		PodConditionUpdater: &podConditionUpdater{client},
 		PodPreemptor:        &podPreemptor{client},
-		PluginSet:           pluginSet,
+		Framework:           framework,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(stopEverything, scheduledPodsHasSynced)
 		},
@@ -568,7 +566,7 @@ func NewFromConfig(config *factory.Config) *Scheduler {
 		GetBinder:           config.GetBinder,
 		PodConditionUpdater: config.PodConditionUpdater,
 		PodPreemptor:        config.PodPreemptor,
-		PluginSet:           config.PluginSet,
+		Framework:           config.Framework,
 		NextPod:             config.NextPod,
 		WaitForCacheSync:    config.WaitForCacheSync,
 		Error:               config.Error,
