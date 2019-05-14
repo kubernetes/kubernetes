@@ -36,6 +36,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
 
@@ -727,9 +728,8 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 		if !printed {
 			printed = true
 			return msg
-		} else {
-			return ""
 		}
+		return ""
 	}
 
 	gomega.Expect(len(notScheduledPods)).To(gomega.Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
@@ -746,9 +746,8 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 		if !printed {
 			printed = true
 			return msg
-		} else {
-			return ""
 		}
+		return ""
 	}
 
 	gomega.Expect(len(notScheduledPods)).To(gomega.Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
@@ -775,6 +774,7 @@ func runAndKeepPodWithLabelAndGetNodeName(f *framework.Framework) (string, strin
 	return pod.Spec.NodeName, pod.Name
 }
 
+// GetNodeThatCanRunPod trying to launch a pod without a label to get a node which can launch it
 func GetNodeThatCanRunPod(f *framework.Framework) string {
 	ginkgo.By("Trying to launch a pod without a label to get a node which can launch it.")
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-label"})
@@ -785,6 +785,7 @@ func getNodeThatCanRunPodWithoutToleration(f *framework.Framework) string {
 	return runPodAndGetNodeName(f, pausePodConfig{Name: "without-toleration"})
 }
 
+// CreateHostPortPods creates RC with host port 4321
 func CreateHostPortPods(f *framework.Framework, id string, replicas int, expectRunning bool) {
 	ginkgo.By(fmt.Sprintf("Running RC which reserves host port"))
 	config := &testutils.RCConfig{

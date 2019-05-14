@@ -180,7 +180,8 @@ type staticPVTestConfig struct {
 	pod      *v1.Pod
 }
 
-// Check that the pods using statically created PVs get scheduled to the same zone that the PV is in.
+// PodsUseStaticPVsOrFail Check that the pods using statically
+// created PVs get scheduled to the same zone that the PV is in.
 func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) {
 	var err error
 	c := f.ClientSet

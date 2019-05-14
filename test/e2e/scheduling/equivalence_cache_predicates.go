@@ -33,6 +33,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
 
@@ -92,7 +93,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		nodeSelector := map[string]string{"kubernetes.io/hostname": nodeName}
 
 		ginkgo.By("One pod should be scheduled, the other should be rejected")
-		// CreateNodeSelectorPods creates RC with host port 4312
+		// CreateNodeSelectorPods creates RC with host port 4321
 		WaitForSchedulerAfterAction(f, func() error {
 			err := CreateNodeSelectorPods(f, rcName, 2, nodeSelector, false)
 			return err
@@ -269,6 +270,7 @@ func getRCWithInterPodAffinityNodeSelector(name string, labelsMap map[string]str
 	}
 }
 
+// CreateNodeSelectorPods creates RC with host port 4321 and defines node selector
 func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) error {
 	ginkgo.By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 

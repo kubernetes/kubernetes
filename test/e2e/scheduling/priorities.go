@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
@@ -40,14 +41,15 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// Resource is a collection of compute resource.
 type Resource struct {
 	MilliCPU int64
 	Memory   int64
 }
 
-var balancePodLabel map[string]string = map[string]string{"name": "priority-balanced-memory"}
+var balancePodLabel = map[string]string{"name": "priority-balanced-memory"}
 
-var podRequestedResource *v1.ResourceRequirements = &v1.ResourceRequirements{
+var podRequestedResource = &v1.ResourceRequirements{
 	Limits: v1.ResourceList{
 		v1.ResourceMemory: resource.MustParse("100Mi"),
 		v1.ResourceCPU:    resource.MustParse("100m"),
@@ -265,7 +267,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	var cpuFractionMap = make(map[string]float64)
 	var memFractionMap = make(map[string]float64)
 	for _, node := range nodes {
-		cpuFraction, memFraction := computeCpuMemFraction(cs, node, requestedResource)
+		cpuFraction, memFraction := computeCPUMemFraction(cs, node, requestedResource)
 		cpuFractionMap[node.Name] = cpuFraction
 		memFractionMap[node.Name] = memFraction
 		if cpuFraction > maxCPUFraction {
@@ -311,15 +313,15 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 
 	for _, node := range nodes {
 		ginkgo.By("Compute Cpu, Mem Fraction after create balanced pods.")
-		computeCpuMemFraction(cs, node, requestedResource)
+		computeCPUMemFraction(cs, node, requestedResource)
 	}
 
 	return nil
 }
 
-func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
-	e2elog.Logf("ComputeCpuMemFraction for node: %v", node.Name)
-	totalRequestedCpuResource := resource.Requests.Cpu().MilliValue()
+func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
+	e2elog.Logf("ComputeCPUMemFraction for node: %v", node.Name)
+	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
 	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
@@ -332,7 +334,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
 				continue
 			}
-			totalRequestedCpuResource += getNonZeroRequests(&pod).MilliCPU
+			totalRequestedCPUResource += getNonZeroRequests(&pod).MilliCPU
 			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
 		}
 	}
@@ -341,7 +343,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
 
 	floatOne := float64(1)
-	cpuFraction := float64(totalRequestedCpuResource) / float64(cpuAllocatableMil)
+	cpuFraction := float64(totalRequestedCPUResource) / float64(cpuAllocatableMil)
 	if cpuFraction > floatOne {
 		cpuFraction = floatOne
 	}
@@ -353,7 +355,7 @@ func computeCpuMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 		memFraction = floatOne
 	}
 
-	e2elog.Logf("Node: %v, totalRequestedCpuResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCpuResource, cpuAllocatableMil, cpuFraction)
+	e2elog.Logf("Node: %v, totalRequestedCPUResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCPUResource, cpuAllocatableMil, cpuFraction)
 	e2elog.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
 
 	return cpuFraction, memFraction
