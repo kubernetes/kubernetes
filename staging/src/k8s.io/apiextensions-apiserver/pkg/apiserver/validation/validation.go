@@ -195,8 +195,8 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		}
 	}
 
-	if in.XPreserveUnknownFields {
-		out.VendorExtensible.AddExtension("x-kubernetes-preserve-unknown-fields", true)
+	if in.XPreserveUnknownFields != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-preserve-unknown-fields", *in.XPreserveUnknownFields)
 	}
 	if in.XEmbeddedResource {
 		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
