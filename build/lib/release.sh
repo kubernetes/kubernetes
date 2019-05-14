@@ -159,7 +159,7 @@ function kube::release::package_client_tarballs() {
 # Package up all of the node binaries
 function kube::release::package_node_tarballs() {
   local platform
-  for platform in "${KUBE_NODE_PLATFORMS[@]}"; do
+  for platform in "${KUBE_NODE_PLATFORMS[@]:+"${KUBE_NODE_PLATFORMS[@]}"}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename "${platform}")
     kube::log::status "Building tarball: node $platform_tag"
@@ -208,7 +208,7 @@ function kube::release::build_server_images() {
   # Clean out any old images
   rm -rf "${RELEASE_IMAGES}"
   local platform
-  for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+  for platform in "${KUBE_SERVER_PLATFORMS[@]:+"${KUBE_SERVER_PLATFORMS[@]}"}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename "${platform}")
     kube::log::status "Building images: $platform_tag"
@@ -236,7 +236,7 @@ function kube::release::build_server_images() {
 function kube::release::package_server_tarballs() {
   kube::release::build_server_images
   local platform
-  for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
+  for platform in "${KUBE_SERVER_PLATFORMS[@]:+"${KUBE_SERVER_PLATFORMS[@]}"}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
@@ -483,7 +483,7 @@ function kube::release::package_test_platform_tarballs() {
   rm -rf "${RELEASE_STAGE}/test"
   # KUBE_TEST_SERVER_PLATFORMS is a subset of KUBE_TEST_PLATFORMS,
   # so process it first.
-  for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
+  for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]:+"${KUBE_TEST_SERVER_PLATFORMS[@]}"}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     local release_stage="${RELEASE_STAGE}/test/${platform_tag}/kubernetes"
     mkdir -p "${release_stage}/test/bin"
@@ -493,7 +493,7 @@ function kube::release::package_test_platform_tarballs() {
     cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/test/bin/"
   done
-  for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
+  for platform in "${KUBE_TEST_PLATFORMS[@]:+"${KUBE_TEST_PLATFORMS[@]}"}"; do
     (
       local platform_tag=${platform/\//-} # Replace a "/" for a "-"
       kube::log::status "Starting tarball: test $platform_tag"
@@ -544,7 +544,7 @@ function kube::release::package_test_tarballs() {
   if [[ "${KUBE_BUILD_MONDO_TEST_TARBALL}" =~ [yY] ]]; then
     kube::log::status "Building tarball: test mondo (deprecated by KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball)"
     local platform
-    for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
+    for platform in "${KUBE_TEST_PLATFORMS[@]:+"${KUBE_TEST_PLATFORMS[@]}"}"; do
       local test_bins=("${KUBE_TEST_BINARIES[@]}")
       if [[ "${platform%/*}" == "windows" ]]; then
         test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
@@ -556,7 +556,7 @@ function kube::release::package_test_tarballs() {
       cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
         "${release_stage}/platforms/${platform}"
     done
-    for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
+    for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]:+"${KUBE_TEST_SERVER_PLATFORMS[@]}"}"; do
       mkdir -p "${release_stage}/platforms/${platform}"
       # This fancy expression will expand to prepend a path
       # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the

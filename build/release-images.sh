@@ -30,12 +30,12 @@ if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
     CMD_TARGETS="${CMD_TARGETS} cmd/hyperkube"
 fi
 if [[ "${KUBE_BUILD_CONFORMANCE}" =~ [yY] ]]; then
-    CMD_TARGETS="${CMD_TARGETS} ${KUBE_CONFORMANCE_IMAGE_TARGETS[*]}"
+    CMD_TARGETS="${CMD_TARGETS} ${KUBE_CONFORMANCE_IMAGE_TARGETS[*]:+"${KUBE_CONFORMANCE_IMAGE_TARGETS[*]}"}"
 fi
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command make all WHAT="${CMD_TARGETS}" KUBE_BUILD_PLATFORMS="${KUBE_SERVER_PLATFORMS[*]}"
+kube::build::run_build_command make all WHAT="${CMD_TARGETS}" KUBE_BUILD_PLATFORMS=${KUBE_SERVER_PLATFORMS[*]:+"${KUBE_SERVER_PLATFORMS[*]}"}
 
 kube::build::copy_output
 
