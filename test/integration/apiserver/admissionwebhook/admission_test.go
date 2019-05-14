@@ -36,6 +36,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -46,9 +47,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	dynamic "k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 const (
@@ -323,25 +326,23 @@ func TestWebhookV1beta1(t *testing.T) {
 	defer webhookServer.Close()
 
 	// start API server
-	master := etcd.StartRealMasterOrDie(t, func(opts *options.ServerRunOptions) {
-		// turn off admission plugins that add finalizers
-		opts.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount", "StorageObjectInUseProtection"}
+	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.TearDownFn()
 
-		// force enable all resources so we can check storage.
-		// TODO: drop these once we stop allowing them to be served.
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/deployments"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/daemonsets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/replicasets"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/podsecuritypolicies"] = "true"
-		opts.APIEnablement.RuntimeConfig["extensions/v1beta1/networkpolicies"] = "true"
-	})
-	defer master.Cleanup()
+	// create CRDs so we can make sure that custom resources do not get lost
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(s.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
 	// Configure a client with a distinct user name so that it is easy to distinguish requests
 	// made by the client from requests made by controllers. We use this to filter out requests
 	// before recording them to ensure we don't accidentally mistake requests from controllers
 	// as requests made by the client.
-	clientConfig := master.Config
+	clientConfig := rest.CopyConfig(s.ClientConfig)
 	clientConfig.Impersonate.UserName = testClientUsername
 	clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
 	client, err := clientset.NewForConfig(clientConfig)
