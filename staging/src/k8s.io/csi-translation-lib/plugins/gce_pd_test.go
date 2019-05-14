@@ -24,45 +24,182 @@ import (
 	storage "k8s.io/api/storage/v1"
 )
 
-func NewStorageClass(params map[string]string) storage.StorageClass {
-	return storage.StorageClass{
-		Parameters: params,
+func NewStorageClass(params map[string]string, allowedTopologies []v1.TopologySelectorTerm) *storage.StorageClass {
+	return &storage.StorageClass{
+		Parameters:        params,
+		AllowedTopologies: allowedTopologies,
 	}
 }
 
-func TestTranslatePDInTreeVolumeOptionsToCSI(t *testing.T) {
+func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 	g := NewGCEPersistentDiskCSITranslator()
 
 	tcs := []struct {
 		name       string
-		options    storage.StorageClass
-		expOptions storage.StorageClass
+		options    *storage.StorageClass
+		expOptions *storage.StorageClass
+		expErr     bool
 	}{
 		{
 			name:       "nothing special",
-			options:    NewStorageClass(map[string]string{"foo": "bar"}),
-			expOptions: NewStorageClass(map[string]string{"foo": "bar"}),
+			options:    NewStorageClass(map[string]string{"foo": "bar"}, nil),
+			expOptions: NewStorageClass(map[string]string{"foo": "bar"}, nil),
 		},
 		{
 			name:       "fstype",
-			options:    NewStorageClass(map[string]string{"fstype": "myfs"}),
-			expOptions: NewStorageClass(map[string]string{"csi.storage.k8s.io/fstype": "myfs"}),
+			options:    NewStorageClass(map[string]string{"fstype": "myfs"}, nil),
+			expOptions: NewStorageClass(map[string]string{"csi.storage.k8s.io/fstype": "myfs"}, nil),
 		},
 		{
 			name:       "empty params",
-			options:    NewStorageClass(map[string]string{}),
-			expOptions: NewStorageClass(map[string]string{}),
+			options:    NewStorageClass(map[string]string{}, nil),
+			expOptions: NewStorageClass(map[string]string{}, nil),
+		},
+		{
+			name:       "zone",
+			options:    NewStorageClass(map[string]string{"zone": "foo"}, nil),
+			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
+		},
+		{
+			name:       "zones",
+			options:    NewStorageClass(map[string]string{"zones": "foo,bar,baz"}, nil),
+			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo", "bar", "baz"})),
+		},
+		{
+			name:       "some normal topology",
+			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
+			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
+		},
+		{
+			name:       "some translated topology",
+			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelZoneFailureDomain, []string{"foo"})),
+			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
+		},
+		{
+			name:    "zone and topology",
+			options: NewStorageClass(map[string]string{"zone": "foo"}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
+			expErr:  true,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Logf("Testing %v", tc.name)
-		gotOptions, err := g.TranslateInTreeVolumeOptionsToCSI(tc.options)
-		if err != nil {
+		gotOptions, err := g.TranslateInTreeStorageClassToCSI(tc.options)
+		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
+		}
+		if err == nil && tc.expErr {
+			t.Errorf("Expected error, but did not get one.")
 		}
 		if !reflect.DeepEqual(gotOptions, tc.expOptions) {
 			t.Errorf("Got parameters: %v, expected :%v", gotOptions, tc.expOptions)
+		}
+	}
+}
+
+func TestTranslateAllowedTopologies(t *testing.T) {
+	testCases := []struct {
+		name            string
+		topology        []v1.TopologySelectorTerm
+		expectedToplogy []v1.TopologySelectorTerm
+		expErr          bool
+	}{
+		{
+			name:     "no translation",
+			topology: generateToplogySelectors(GCEPDTopologyKey, []string{"foo", "bar"}),
+			expectedToplogy: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    GCEPDTopologyKey,
+							Values: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "translate",
+			topology: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    "failure-domain.beta.kubernetes.io/zone",
+							Values: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
+			expectedToplogy: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    GCEPDTopologyKey,
+							Values: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "combo",
+			topology: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    "failure-domain.beta.kubernetes.io/zone",
+							Values: []string{"foo", "bar"},
+						},
+						{
+							Key:    GCEPDTopologyKey,
+							Values: []string{"boo", "baz"},
+						},
+					},
+				},
+			},
+			expectedToplogy: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    GCEPDTopologyKey,
+							Values: []string{"foo", "bar"},
+						},
+						{
+							Key:    GCEPDTopologyKey,
+							Values: []string{"boo", "baz"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "some other key",
+			topology: []v1.TopologySelectorTerm{
+				{
+					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
+						{
+							Key:    "test",
+							Values: []string{"foo", "bar"},
+						},
+					},
+				},
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Logf("Running test: %v", tc.name)
+		gotTop, err := translateAllowedTopologies(tc.topology)
+		if err != nil && !tc.expErr {
+			t.Errorf("Did not expect an error, got: %v", err)
+		}
+		if err == nil && tc.expErr {
+			t.Errorf("Expected an error but did not get one")
+		}
+
+		if !reflect.DeepEqual(gotTop, tc.expectedToplogy) {
+			t.Errorf("Expected topology: %v, but got: %v", tc.expectedToplogy, gotTop)
 		}
 	}
 }

@@ -24,9 +24,9 @@ import (
 // InTreePlugin handles translations between CSI and in-tree sources in a PV
 type InTreePlugin interface {
 
-	// TranslateInTreeVolumeOptionsToCSI takes in-tree volume options
+	// TranslateInTreeStorageClassToCSI takes in-tree volume options
 	// and translates them to a volume options consumable by CSI plugin
-	TranslateInTreeVolumeOptionsToCSI(sc storage.StorageClass) (storage.StorageClass, error)
+	TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error)
 
 	// TranslateInTreePVToCSI takes a persistent volume and will translate
 	// the in-tree source to a CSI Source. The input persistent volume can be modified
