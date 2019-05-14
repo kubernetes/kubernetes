@@ -2378,7 +2378,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 					ResourceVersion: "10",
 					SelfLink:        "/test/link",
 				},
-				Items: []*metav1beta1.PartialObjectMetadata{
+				Items: []metav1beta1.PartialObjectMetadata{
 					{
 						TypeMeta:   metav1.TypeMeta{APIVersion: "meta.k8s.io/v1beta1", Kind: "PartialObjectMetadata"},
 						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "ns1", CreationTimestamp: now, UID: types.UID("newer")},
