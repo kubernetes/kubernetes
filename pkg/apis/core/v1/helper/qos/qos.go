@@ -23,6 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
+const (
+	KubeProxyOOMScoreAdj int = -999
+)
+
 var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 
 // QOSList is a set of (resource name, QoS class) pairs.

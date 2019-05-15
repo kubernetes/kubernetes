@@ -49,7 +49,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/util/oom"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
