@@ -68,7 +68,7 @@ func (t *dnsTestCommon) init() {
 
 	namespace := "kube-system"
 	pods, err := t.f.ClientSet.CoreV1().Pods(namespace).List(options)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to list pods in namespace: %s", namespace)
+	framework.ExpectNoError(err, "failed to list pods in namespace: %s", namespace)
 	gomega.Expect(len(pods.Items)).Should(gomega.BeNumerically(">=", 1))
 
 	t.dnsPod = &pods.Items[0]
@@ -157,23 +157,23 @@ func (t *dnsTestCommon) setConfigMap(cm *v1.ConfigMap) {
 		}.AsSelector().String(),
 	}
 	cmList, err := t.c.CoreV1().ConfigMaps(t.ns).List(options)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to list ConfigMaps in namespace: %s", t.ns)
+	framework.ExpectNoError(err, "failed to list ConfigMaps in namespace: %s", t.ns)
 
 	if len(cmList.Items) == 0 {
 		ginkgo.By(fmt.Sprintf("Creating the ConfigMap (%s:%s) %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Create(cm)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create ConfigMap (%s:%s) %+v", t.ns, t.name, *cm)
+		framework.ExpectNoError(err, "failed to create ConfigMap (%s:%s) %+v", t.ns, t.name, *cm)
 	} else {
 		ginkgo.By(fmt.Sprintf("Updating the ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm))
 		_, err := t.c.CoreV1().ConfigMaps(t.ns).Update(cm)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to update ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm)
+		framework.ExpectNoError(err, "failed to update ConfigMap (%s:%s) to %+v", t.ns, t.name, *cm)
 	}
 }
 
 func (t *dnsTestCommon) fetchDNSConfigMapData() map[string]string {
 	if t.name == "coredns" {
 		pcm, err := t.c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(t.name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get DNS ConfigMap: %s", t.name)
+		framework.ExpectNoError(err, "failed to get DNS ConfigMap: %s", t.name)
 		return pcm.Data
 	}
 	return nil
@@ -192,7 +192,7 @@ func (t *dnsTestCommon) deleteConfigMap() {
 	ginkgo.By(fmt.Sprintf("Deleting the ConfigMap (%s:%s)", t.ns, t.name))
 	t.cm = nil
 	err := t.c.CoreV1().ConfigMaps(t.ns).Delete(t.name, nil)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete config map: %s", t.name)
+	framework.ExpectNoError(err, "failed to delete config map: %s", t.name)
 }
 
 func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
@@ -224,9 +224,10 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 
 	var err error
 	t.utilPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(t.utilPod)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod: %v", t.utilPod)
+	framework.ExpectNoError(err, "failed to create pod: %v", t.utilPod)
 	e2elog.Logf("Created pod %v", t.utilPod)
-	gomega.Expect(t.f.WaitForPodRunning(t.utilPod.Name)).NotTo(gomega.HaveOccurred(), "pod failed to start running: %v", t.utilPod)
+	err = t.f.WaitForPodRunning(t.utilPod.Name)
+	framework.ExpectNoError(err, "pod failed to start running: %v", t.utilPod)
 
 	t.utilService = &v1.Service{
 		TypeMeta: metav1.TypeMeta{
@@ -249,7 +250,7 @@ func (t *dnsTestCommon) createUtilPodLabel(baseName string) {
 	}
 
 	t.utilService, err = t.c.CoreV1().Services(t.f.Namespace.Name).Create(t.utilService)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s/%s", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
+	framework.ExpectNoError(err, "failed to create service: %s/%s", t.f.Namespace.Name, t.utilService.ObjectMeta.Name)
 	e2elog.Logf("Created service %v", t.utilService)
 }
 
@@ -272,7 +273,7 @@ func (t *dnsTestCommon) deleteCoreDNSPods() {
 
 	for _, pod := range pods.Items {
 		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s", pod.Name)
+		framework.ExpectNoError(err, "failed to delete pod: %s", pod.Name)
 	}
 }
 
@@ -315,13 +316,14 @@ func (t *dnsTestCommon) createDNSPodFromObj(pod *v1.Pod) {
 
 	var err error
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Create(t.dnsServerPod)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod: %v", t.dnsServerPod)
+	framework.ExpectNoError(err, "failed to create pod: %v", t.dnsServerPod)
 	e2elog.Logf("Created pod %v", t.dnsServerPod)
-	gomega.Expect(t.f.WaitForPodRunning(t.dnsServerPod.Name)).NotTo(gomega.HaveOccurred(), "pod failed to start running: %v", t.dnsServerPod)
+	err = t.f.WaitForPodRunning(t.dnsServerPod.Name)
+	framework.ExpectNoError(err, "pod failed to start running: %v", t.dnsServerPod)
 
 	t.dnsServerPod, err = t.c.CoreV1().Pods(t.f.Namespace.Name).Get(
 		t.dnsServerPod.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get pod: %s", t.dnsServerPod.Name)
+	framework.ExpectNoError(err, "failed to get pod: %s", t.dnsServerPod.Name)
 }
 
 func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
