@@ -34,7 +34,6 @@ import (
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
 
 	"k8s.io/klog"
@@ -68,7 +67,7 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		if _, err = SetPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
 			if apierrors.IsConflict(err) {
 				updateErrList = append(updateErrList,
-					fmt.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err))
+					fmt.Errorf("update status failed for pod %q: %v", formatPod(&pod), err))
 				continue
 			}
 		}
@@ -95,6 +94,14 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		return false, utilerrors.NewAggregate(updateErrList)
 	}
 	return remaining, nil
+}
+
+// FormatPod returns a string representing a pod in a human readable format,
+// with pod UID as part of the string.
+func formatPod(pod *v1.Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s(%s)", pod.Name, pod.Namespace, pod.UID)
 }
 
 // SetPodTerminationReason attempts to set a reason and message in the
@@ -140,7 +147,7 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 				klog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
 				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(&pod)
 				if err != nil {
-					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(&pod), err)
+					klog.Warningf("Failed to update status for pod %q: %v", formatPod(&pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}
 				break
