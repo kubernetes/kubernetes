@@ -36,7 +36,7 @@ func TestAttachDisk(t *testing.T) {
 
 	diskURI := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/disks/disk-name", c.SubscriptionID, c.ResourceGroup)
 
-	err := common.AttachDisk(true, "", diskURI, "node1", compute.CachingTypesReadOnly)
+	_, err := common.AttachDisk(true, "", diskURI, "node1", compute.CachingTypesReadOnly)
 	if err != nil {
 		fmt.Printf("TestAttachDisk return expected error: %v", err)
 	} else {

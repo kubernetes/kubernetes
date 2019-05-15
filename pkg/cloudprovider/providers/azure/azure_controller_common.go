@@ -95,12 +95,12 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName, crt cacheReadTy
 }
 
 // AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI.
-func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) error {
+func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error) {
 	if isManagedDisk {
 		diskName := path.Base(diskURI)
 		resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
 		if err != nil {
-			return err
+			return -1, err
 		}
 
 		ctx, cancel := getContextWithCancel()
@@ -108,7 +108,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 
 		disk, err := c.cloud.DisksClient.Get(ctx, resourceGroup, diskName)
 		if err != nil {
-			return err
+			return -1, err
 		}
 
 		if disk.ManagedBy != nil {
@@ -118,19 +118,19 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			attachedNode := path.Base(*disk.ManagedBy)
 			klog.V(2).Infof("found dangling volume %s attached to node %s", diskURI, attachedNode)
 			danglingErr := volerr.NewDanglingError(attachErr, types.NodeName(attachedNode), "")
-			return danglingErr
+			return -1, danglingErr
 		}
 	}
 
 	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
-		return err
+		return -1, err
 	}
 
 	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
 		klog.Warningf("failed to get azure instance id (%v)", err)
-		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
+		return -1, fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
 	c.vmLockMap.LockEntry(strings.ToLower(string(nodeName)))
@@ -139,13 +139,13 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	lun, err := c.GetNextDiskLun(nodeName)
 	if err != nil {
 		klog.Warningf("no LUN available for instance %q (%v)", nodeName, err)
-		return fmt.Errorf("all LUNs are used, cannot attach volume (%s, %s) to instance %q (%v)", diskName, diskURI, instanceid, err)
+		return -1, fmt.Errorf("all LUNs are used, cannot attach volume (%s, %s) to instance %q (%v)", diskName, diskURI, instanceid, err)
 	}
 
 	klog.V(2).Infof("Trying to attach volume %q lun %d to node %q.", diskURI, lun, nodeName)
 	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "attaching")
 	defer c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
-	return vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
+	return lun, vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
 }
 
 // DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
