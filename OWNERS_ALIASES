@@ -380,9 +380,11 @@ aliases:
   #   - 
   #   -
   
-  # sig-node-api-reviewers:
-  #   - 
-  #   - 
+  sig-node-api-reviewers:
+    - dchen1107
+    - derekwaynecarr
+    - tallclair
+    - yujuhong
   
   sig-scheduling-api-reviewers:
       - bsalamat
