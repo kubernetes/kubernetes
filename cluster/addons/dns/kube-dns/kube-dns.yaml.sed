@@ -106,7 +106,7 @@ spec:
           # guaranteed class. Currently, this container falls into the
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
-            memory: 170Mi
+            memory: $DNS_MEMORY_LIMIT
           requests:
             cpu: 100m
             memory: 70Mi
