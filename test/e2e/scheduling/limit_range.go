@@ -146,7 +146,7 @@ var _ = SIGDescribe("LimitRange", func() {
 		ginkgo.By("Verifying LimitRange updating is effective")
 		err = wait.Poll(time.Second*2, time.Second*20, func() (bool, error) {
 			limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			return reflect.DeepEqual(limitRange.Spec.Limits[0].Min, newMin), nil
 		})
 		framework.ExpectNoError(err)

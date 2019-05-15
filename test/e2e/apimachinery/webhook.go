@@ -795,7 +795,7 @@ func testBlockingConfigmapDeletion(f *framework.Framework) {
 	client := f.ClientSet
 	configmap := nonDeletableConfigmap(f)
 	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("deleting the configmap should be denied by the webhook")
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
@@ -813,11 +813,11 @@ func testBlockingConfigmapDeletion(f *framework.Framework) {
 		cm.Data["webhook-e2e-test"] = "webhook-allow"
 	}
 	_, err = updateConfigMap(client, f.Namespace.Name, configmap.Name, toCompliantFn)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to update configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to update configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("deleting the updated configmap should be successful")
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to delete configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 }
 
 func testAttachingPodWebhook(f *framework.Framework) {
@@ -1440,7 +1440,7 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 		},
 	}
 	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the custom resource should be denied")
 	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
@@ -1459,11 +1459,11 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 		data["webhook-e2e-test"] = "webhook-allow"
 	}
 	_, err = updateCustomResource(customResourceClient, f.Namespace.Name, crInstanceName, toCompliantFn)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the updated custom resource should be successful")
 	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 }
 
