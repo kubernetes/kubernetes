@@ -6,6 +6,14 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
   # leader election
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    resourceNames: ["cluster-autoscaler"]
+    verbs: ["get", "update", "patch", "delete"]
+  # TODO: remove in 1.18; CA uses lease objects for leader election since 1.17
   - apiGroups: [""]
     resources: ["endpoints"]
     verbs: ["create"]
