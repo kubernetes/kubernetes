@@ -25,11 +25,10 @@
       }
     },
     "command": [
-      "/usr/local/bin/kube-scheduler"
-    ],
-    "args": [
-      {{params}}
-    ],
+                 "/bin/sh",
+                 "-c",
+                 "exec /usr/local/bin/kube-scheduler {{params}} 1>>/var/log/kube-scheduler.log 2>&1"
+               ],
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
