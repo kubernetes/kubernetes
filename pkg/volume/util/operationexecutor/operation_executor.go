@@ -139,8 +139,6 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
-	// Expand Volume will grow size available to PVC
-	ExpandVolume(*v1.PersistentVolumeClaim, *v1.PersistentVolume) error
 	// ExpandVolumeFSWithoutUnmounting will resize volume's file system to expected size without unmounting the volume.
 	ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
@@ -815,16 +813,6 @@ func (oe *operationExecutor) UnmountDevice(
 
 	return oe.pendingOperations.Run(
 		deviceToDetach.VolumeName, podName, generatedOperations)
-}
-
-func (oe *operationExecutor) ExpandVolume(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) error {
-	generatedOperations, err := oe.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
-	if err != nil {
-		return err
-	}
-	uniqueVolumeKey := v1.UniqueVolumeName(pvc.UID)
-
-	return oe.pendingOperations.Run(uniqueVolumeKey, "", generatedOperations)
 }
 
 func (oe *operationExecutor) ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
