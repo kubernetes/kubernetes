@@ -90,6 +90,8 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	FillObjectMetaSystemFields(objectMeta)
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))
+	} else {
+		objectMeta.SetGenerateName("")
 	}
 
 	// Initializers are a deprecated alpha field and should not be saved
