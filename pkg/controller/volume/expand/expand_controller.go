@@ -123,10 +123,16 @@ func NewExpandController(
 	pvcInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc: expc.enqueuePVC,
 		UpdateFunc: func(old, new interface{}) {
-			oldPVC := old.(*v1.PersistentVolumeClaim)
-			oldSize := oldPVC.Spec.Resources.Requests[v1.ResourceStorage]
+			oldPVC, ok := old.(*v1.PersistentVolumeClaim)
+			if !ok {
+				return
+			}
 
-			newPVC := new.(*v1.PersistentVolumeClaim)
+			oldSize := oldPVC.Spec.Resources.Requests[v1.ResourceStorage]
+			newPVC, ok := new.(*v1.PersistentVolumeClaim)
+			if !ok {
+				return
+			}
 			newSize := newPVC.Spec.Resources.Requests[v1.ResourceStorage]
 			if newSize.Cmp(oldSize) > 0 {
 				expc.enqueuePVC(new)
@@ -139,7 +145,11 @@ func NewExpandController(
 }
 
 func (expc *expandController) enqueuePVC(obj interface{}) {
-	pvc := obj.(*v1.PersistentVolumeClaim)
+	pvc, ok := obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		return
+	}
+
 	size := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 	statusSize := pvc.Status.Capacity[v1.ResourceStorage]
 
@@ -191,7 +201,7 @@ func (expc *expandController) syncHandler(key string) error {
 		klog.V(5).Infof("Error getting Persistent Volume for PVC %q (uid: %q) from informer : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
 		return err
 	}
-	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.Name != pv.Spec.ClaimRef.Name {
+	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.UID != pv.Spec.ClaimRef.UID {
 		err := fmt.Errorf("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
 		klog.V(4).Infof("%v", err)
 		return err
