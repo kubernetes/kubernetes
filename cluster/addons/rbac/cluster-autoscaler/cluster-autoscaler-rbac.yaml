@@ -13,6 +13,14 @@ rules:
     resources: ["leases"]
     resourceNames: ["cluster-autoscaler"]
     verbs: ["get", "update", "patch", "delete"]
+  # TODO: remove N releases after upgrading cluster autoscaler to a version that uses leases
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["create"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    resourceNames: ["cluster-autoscaler"]
+    verbs: ["get", "update", "patch", "delete"]
   # accessing & modifying cluster state (nodes & pods)
   - apiGroups: [""]
     resources: ["nodes"]
