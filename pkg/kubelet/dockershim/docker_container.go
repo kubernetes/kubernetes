@@ -184,13 +184,13 @@ func (ds *dockerService) CreateContainer(_ context.Context, r *runtimeapi.Create
 			// needed for the container to start (e.g. Windows credentials stored in
 			// registry keys); instead, we'll clean up after the container successfully
 			// starts or gets removed
-			ds.containerCleanupManager.insert(containerID, cleanupInfo)
+			ds.containerCleanupInfos[containerID] = cleanupInfo
 		}
 		return &runtimeapi.CreateContainerResponse{ContainerId: containerID}, nil
 	}
 
 	// the creation failed, let's clean up right away
-	ds.performContainerCleanup(containerName, cleanupInfo)
+	ds.performPlatformSpecificContainerCleanupAndLogErrors(containerName, cleanupInfo)
 
 	return nil, createErr
 }
@@ -278,7 +278,7 @@ func (ds *dockerService) StartContainer(_ context.Context, r *runtimeapi.StartCo
 		return nil, fmt.Errorf("failed to start container %q: %v", r.ContainerId, err)
 	}
 
-	ds.containerCleanupManager.performCleanup(r.ContainerId)
+	ds.performPlatformSpecificContainerForContainer(r.ContainerId)
 
 	return &runtimeapi.StartContainerResponse{}, nil
 }
@@ -294,7 +294,7 @@ func (ds *dockerService) StopContainer(_ context.Context, r *runtimeapi.StopCont
 
 // RemoveContainer removes the container.
 func (ds *dockerService) RemoveContainer(_ context.Context, r *runtimeapi.RemoveContainerRequest) (*runtimeapi.RemoveContainerResponse, error) {
-	ds.containerCleanupManager.performCleanup(r.ContainerId)
+	ds.performPlatformSpecificContainerForContainer(r.ContainerId)
 
 	// Ideally, log lifecycle should be independent of container lifecycle.
 	// However, docker will remove container log after container is removed,
@@ -454,7 +454,14 @@ func (ds *dockerService) UpdateContainerResources(_ context.Context, r *runtimea
 	return &runtimeapi.UpdateContainerResourcesResponse{}, nil
 }
 
-func (ds *dockerService) performContainerCleanup(containerNameOrID string, cleanupInfo *containerCleanupInfo) {
+func (ds *dockerService) performPlatformSpecificContainerForContainer(containerID string) {
+	if cleanupInfo, present := ds.containerCleanupInfos[containerID]; present {
+		ds.performPlatformSpecificContainerCleanupAndLogErrors(containerID, cleanupInfo)
+		delete(ds.containerCleanupInfos, containerID)
+	}
+}
+
+func (ds *dockerService) performPlatformSpecificContainerCleanupAndLogErrors(containerNameOrID string, cleanupInfo *containerCleanupInfo) {
 	if cleanupInfo == nil {
 		return
 	}
