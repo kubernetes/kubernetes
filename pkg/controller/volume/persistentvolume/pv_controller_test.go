@@ -194,6 +194,70 @@ func TestControllerSync(t *testing.T) {
 				return nil
 			},
 		},
+		{
+			// delete a claim waiting for being bound cleans up prebinding (volume ref != "") entry from timestamp cache
+			"5-8 - delete claim cleans up operation timestamp cache for prebinding",
+			novolumes,
+			novolumes,
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
+				newClaimArray("claim5-8", "uid5-8", "1Gi", "volume5-8", v1.ClaimPending, &classExternal)),
+			noclaims,
+			noevents,
+			noerrors,
+			// Custom test function that generates a delete claim event which should have been caught by
+			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				// wait until the prebinding timestamp has been inserted
+				if len(ctrl.operationTimestamps.ListKeys()) <= 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// delete the claim
+				obj := ctrl.claims.List()[0]
+				claim := obj.(*v1.PersistentVolumeClaim)
+				reactor.DeleteClaimEvent(claim)
+				// wait until claim is cleared from cache, i.e., deleteClaim is called
+				for len(ctrl.claims.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// make sure the operation timestamp cache is empty
+				if len(ctrl.operationTimestamps.ListKeys()) > 0 {
+					return errors.New("failed checking timestamp cache")
+				}
+				return nil
+			},
+		},
+		{
+			// delete a claim waiting for being bound cleans up provision(volume ref == "") entry from timestamp cache
+			"5-9 - delete claim cleans up operation timestamp cache for provision",
+			novolumes,
+			novolumes,
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
+				newClaimArray("claim5-9", "uid5-9", "1Gi", "", v1.ClaimPending, &classExternal)),
+			noclaims,
+			[]string{"Normal ExternalProvisioning"},
+			noerrors,
+			// Custom test function that generates a delete claim event which should have been caught by
+			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				// wait until the provision timestamp has been inserted
+				if len(ctrl.operationTimestamps.ListKeys()) <= 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// delete the claim
+				obj := ctrl.claims.List()[0]
+				claim := obj.(*v1.PersistentVolumeClaim)
+				reactor.DeleteClaimEvent(claim)
+				// wait until claim is cleared from cache, i.e., deleteClaim is called
+				for len(ctrl.claims.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// make sure the operation timestamp cache is empty
+				if len(ctrl.operationTimestamps.ListKeys()) > 0 {
+					return errors.New("failed checking timestamp cache")
+				}
+				return nil
+			},
+		},
 	}
 
 	for _, test := range tests {
