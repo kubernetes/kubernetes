@@ -10,6 +10,7 @@ go_test(
     size = "large",
     srcs = [
         "client_test.go",
+        "connection_test.go",
         "dynamic_client_test.go",
         "main_test.go",
     ],
@@ -18,6 +19,8 @@ go_test(
         "//cmd/kube-apiserver/app/testing:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/util/dbus:go_default_library",
+        "//pkg/util/iptables:go_default_library",
         "//pkg/version:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -34,6 +37,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/integration/framework:go_default_library",
         "//test/utils/image:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
