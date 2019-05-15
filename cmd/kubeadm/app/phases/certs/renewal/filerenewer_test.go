@@ -21,18 +21,13 @@ import (
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
-func TestFileRenew(t *testing.T) {
-	caCertCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, caKey, err := pkiutil.NewCertificateAuthority(caCertCfg)
-	if err != nil {
-		t.Fatalf("couldn't create CA: %v", err)
-	}
+func TestFileRenewer(t *testing.T) {
+	// creates a File renewer using a test Certificate authority
+	fr := NewFileRenewer(testCACert, testCAKey)
 
-	fr := NewFileRenewal(caCert, caKey)
-
+	// renews a certificate
 	certCfg := &certutil.Config{
 		CommonName: "test-certs",
 		AltNames: certutil.AltNames{
@@ -46,8 +41,9 @@ func TestFileRenew(t *testing.T) {
 		t.Fatalf("unexpected error renewing cert: %v", err)
 	}
 
+	// verify the renewed certificate
 	pool := x509.NewCertPool()
-	pool.AddCert(caCert)
+	pool.AddCert(testCACert)
 
 	_, err = cert.Verify(x509.VerifyOptions{
 		DNSName:   "test-domain.space",

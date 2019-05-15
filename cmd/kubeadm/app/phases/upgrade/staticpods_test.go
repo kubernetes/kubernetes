@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -823,7 +824,12 @@ func TestRenewCertsByComponent(t *testing.T) {
 			}
 
 			// Renew everything
-			err := renewCertsByComponent(cfg, tmpDir, test.component)
+			rm, err := renewal.NewManager(&cfg.ClusterConfiguration, tmpDir)
+			if err != nil {
+				t.Fatalf("Failed to create the certificate renewal manager: %v", err)
+			}
+
+			err = renewCertsByComponent(cfg, test.component, rm)
 			if test.shouldErrorOnRenew {
 				if err == nil {
 					t.Fatal("expected renewal error, got nothing")
