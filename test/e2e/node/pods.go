@@ -222,4 +222,118 @@ var _ = SIGDescribe("Pods Extended", func() {
 			gomega.Expect(pod.Status.QOSClass == v1.PodQOSGuaranteed)
 		})
 	})
+	ginkgo.It("should get killed, if pod exceed memory utilization limit", func() {
+		ginkgo.By("Creating a LimitRange")
+
+		min := getResourceList("100m", "100Mi", "100Mi")
+		max := getResourceList("500m", "500Mi", "500Mi")
+		defaultLimit := getResourceList("500m", "500Mi", "500Mi")
+		defaultRequest := getResourceList("100m", "200Mi", "200Mi")
+		maxLimitRequestRatio := v1.ResourceList{}
+		limitRange := newLimitRange("limit-range", v1.LimitTypeContainer,
+			min, max,
+			defaultLimit, defaultRequest,
+			maxLimitRequestRatio)
+
+		ginkgo.By("Submitting a LimitRange")
+		limitRange, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(limitRange)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("creating a Pod with requested and limited resources")
+		pod := getResourcePod("pod-resource-max", "max-container")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "failed created pod the cpu limit")
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+
+		gomega.Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+			if err != nil {
+				e2elog.Logf("Unable to retrieve pod %v: %v", pod.Name, err)
+				return false, nil
+			}
+			if pod.Status.ContainerStatuses[0].State.Terminated != nil &&
+				pod.Status.ContainerStatuses[0].State.Terminated.Reason == "OOMKilled" &&
+				pod.Status.Phase == v1.PodFailed {
+				return true, nil
+			}
+			return false, nil
+		})).NotTo(gomega.HaveOccurred(), "cotaier not get killed")
+
+		ginkgo.By("Deleting a LimitRange")
+		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(limitRange.Name, nil)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+		ginkgo.By("Verifying the deletion of LimitRange")
+		_, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
+		gomega.Expect(err).Should(gomega.HaveOccurred())
+
+		ginkgo.By("creating a Pod with requested resources")
+		pod = getResourcePod("pod-resource-nolimit", "nolimit-container")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "failed to created pod with above the cpu limit")
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name), "failed to created pod with above the memory limit")
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		gomega.Expect(err).ShouldNot(gomega.HaveOccurred(), "error getting pod")
+	})
 })
+
+// newLimitRange returns a limit range with specified data
+func newLimitRange(name string, limitType v1.LimitType,
+	min, max,
+	defaultLimit, defaultRequest,
+	maxLimitRequestRatio v1.ResourceList) *v1.LimitRange {
+	return &v1.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: v1.LimitRangeSpec{
+			Limits: []v1.LimitRangeItem{
+				{
+					Type:                 limitType,
+					Min:                  min,
+					Max:                  max,
+					Default:              defaultLimit,
+					DefaultRequest:       defaultRequest,
+					MaxLimitRequestRatio: maxLimitRequestRatio,
+				},
+			},
+		},
+	}
+}
+
+func getResourceList(cpu, memory string, ephemeralStorage string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if cpu != "" {
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[v1.ResourceMemory] = resource.MustParse(memory)
+	}
+	if ephemeralStorage != "" {
+		res[v1.ResourceEphemeralStorage] = resource.MustParse(ephemeralStorage)
+	}
+	return res
+}
+
+func getResourcePod(podName, containerName string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: containerName,
+					//imageutils.GetE2EImage(imageutils.BusyBox), busyBox image not suporting the stress.
+					Image:   "polinux/stress",
+					Command: []string{"stress"},
+					Args:    []string{"--vm", "1", "--vm-bytes", "5G", "--vm-hang", "1"},
+					Resources: v1.ResourceRequirements{
+						Requests: getResourceList("500m", "500Mi", "500Mi"),
+					},
+				},
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+		},
+	}
+}
