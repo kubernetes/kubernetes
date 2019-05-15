@@ -44,6 +44,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,6 +70,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -861,7 +863,7 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 			randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
 			if err := createApplyCustomResource(randomCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -870,19 +872,21 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR for CRD with validation schema", func() {
 			ginkgo.By("prepare CRD with validation schema")
-			crd, err := crd.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f, func(crd *v1beta1.CustomResourceDefinition) {
+				props := &v1beta1.JSONSchemaProps{}
+				if err := yaml.Unmarshal(schemaFoo, props); err != nil {
+					framework.Failf("failed to unmarshal schema: %v", err)
+				}
+			})
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
 			defer crd.CleanUp()
-			if err := crd.PatchSchema(schemaFoo); err != nil {
-				framework.Failf("%v", err)
-			}
 
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 			validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
 			if err := createApplyCustomResource(validCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -891,19 +895,21 @@ metadata:
 
 		ginkgo.It("should create/apply a valid CR with arbitrary-extra properties for CRD with partially-specified validation schema", func() {
 			ginkgo.By("prepare CRD with partially-specified validation schema")
-			crd, err := crd.CreateTestCRD(f)
+			crd, err := crd.CreateTestCRD(f, func(crd *v1beta1.CustomResourceDefinition) {
+				props := &v1beta1.JSONSchemaProps{}
+				if err := yaml.Unmarshal(schemaFoo, props); err != nil {
+					framework.Failf("failed to unmarshal schema: %v", err)
+				}
+			})
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
 			}
 			defer crd.CleanUp()
-			if err := crd.PatchSchema(schemaFoo); err != nil {
-				framework.Failf("%v", err)
-			}
 
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
-			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
 				framework.Failf("%v", err)
@@ -2258,14 +2264,14 @@ func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCr
 	if _, err := framework.RunKubectlInput(resource, ns, "create", "-f", "-"); err != nil {
 		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, ns, err)
 	}
-	if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), name); err != nil {
+	if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
 		return fmt.Errorf("failed to delete CR %s: %v", name, err)
 	}
 	ginkgo.By("successfully apply CR")
 	if _, err := framework.RunKubectlInput(resource, ns, "apply", "-f", "-"); err != nil {
 		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, ns, err)
 	}
-	if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), name); err != nil {
+	if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
 		return fmt.Errorf("failed to delete CR %s: %v", name, err)
 	}
 	return nil
