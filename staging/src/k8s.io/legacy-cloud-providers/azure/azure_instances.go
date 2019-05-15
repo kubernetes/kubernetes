@@ -83,7 +83,12 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 
 		// Not local instance, get addresses from Azure ARM API.
 		if !isLocalInstance {
-			return addressGetter(name)
+			if az.vmSet != nil {
+				return addressGetter(name)
+			}
+
+			// vmSet == nil indicates credentials are not provided.
+			return nil, fmt.Errorf("no credentials provided for Azure cloud provider")
 		}
 
 		if len(metadata.Network.Interface) == 0 {
@@ -242,7 +247,12 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 
 		// Not local instance, get instanceID from Azure ARM API.
 		if !isLocalInstance {
-			return az.vmSet.GetInstanceIDByNodeName(nodeName)
+			if az.vmSet != nil {
+				return az.vmSet.GetInstanceIDByNodeName(nodeName)
+			}
+
+			// vmSet == nil indicates credentials are not provided.
+			return "", fmt.Errorf("no credentials provided for Azure cloud provider")
 		}
 
 		// Get resource group name.
@@ -316,10 +326,17 @@ func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string,
 		if err != nil {
 			return "", err
 		}
-		if isLocalInstance {
-			if metadata.Compute.VMSize != "" {
-				return metadata.Compute.VMSize, nil
+		if !isLocalInstance {
+			if az.vmSet != nil {
+				return az.vmSet.GetInstanceTypeByNodeName(string(name))
 			}
+
+			// vmSet == nil indicates credentials are not provided.
+			return "", fmt.Errorf("no credentials provided for Azure cloud provider")
+		}
+
+		if metadata.Compute.VMSize != "" {
+			return metadata.Compute.VMSize, nil
 		}
 	}
 
