@@ -81,6 +81,7 @@ filegroup(
         "//pkg/kubelet/util/ioutils:all-srcs",
         "//pkg/kubelet/util/logreduction:all-srcs",
         "//pkg/kubelet/util/manager:all-srcs",
+        "//pkg/kubelet/util/oom:all-srcs",
         "//pkg/kubelet/util/pluginwatcher:all-srcs",
         "//pkg/kubelet/util/queue:all-srcs",
         "//pkg/kubelet/util/sliceutils:all-srcs",

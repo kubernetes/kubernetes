@@ -1,10 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -15,7 +9,8 @@ go_library(
         "oom_linux.go",
         "oom_unsupported.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/util/oom",
+    importpath = "k8s.io/kubernetes/pkg/kubelet/util/oom",
+    visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm/util:go_default_library",
@@ -48,4 +43,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -20,6 +20,7 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
+        "//pkg/kubelet/util/oom:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/apis:go_default_library",
@@ -39,7 +40,6 @@ go_library(
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/oom:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/version:go_default_library",
