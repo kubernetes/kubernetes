@@ -37,6 +37,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubelet/app:all-srcs",
+        "//cmd/kubelet/pkg:all-srcs",
     ],
     tags = ["automanaged"],
 )

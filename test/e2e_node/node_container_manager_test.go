@@ -29,9 +29,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/cm"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/stats/pidlimit"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"

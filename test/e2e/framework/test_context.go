@@ -32,7 +32,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
 )
 
 const (

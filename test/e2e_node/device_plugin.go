@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
-	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	pluginapi "k8s.io/kubernetes/cmd/kubelet/pkg/apis/deviceplugin/v1beta1"
+	dm "k8s.io/kubernetes/cmd/kubelet/pkg/cm/devicemanager"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

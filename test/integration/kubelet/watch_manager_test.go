@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/kubelet/util/manager"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 

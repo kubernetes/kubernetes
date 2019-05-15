@@ -32,11 +32,11 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/storage",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubelet/pkg/metrics:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
-        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

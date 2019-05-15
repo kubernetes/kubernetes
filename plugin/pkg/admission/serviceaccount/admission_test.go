@@ -33,10 +33,10 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
+	kubelet "k8s.io/kubernetes/cmd/kubelet/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 var (

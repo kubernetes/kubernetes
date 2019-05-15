@@ -30,9 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/events"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/sysctl"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

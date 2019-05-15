@@ -24,7 +24,7 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	stats "k8s.io/kubernetes/cmd/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 

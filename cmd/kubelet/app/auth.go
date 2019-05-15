@@ -30,8 +30,8 @@ import (
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/server"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/server"
 )
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs

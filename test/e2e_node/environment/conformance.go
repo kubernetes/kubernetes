@@ -30,7 +30,7 @@ import (
 	"errors"
 	"os"
 
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/cadvisor"
 )
 
 const success = "\033[0;32mSUCESS\033[0m"

@@ -20,7 +20,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
 )
 
 // NodePerfWorkload provides the necessary information to run a workload for

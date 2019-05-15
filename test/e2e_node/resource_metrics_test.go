@@ -21,7 +21,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
+	"k8s.io/kubernetes/cmd/kubelet/pkg/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/volume"

@@ -23,7 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubeletmetrics "k8s.io/kubernetes/cmd/kubelet/pkg/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"

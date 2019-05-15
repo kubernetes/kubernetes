@@ -26,8 +26,8 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubeletconfigv1beta1scheme "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
+	kubeletconfigv1beta1scheme "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config/v1beta1"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	kubeproxyconfigv1alpha1scheme "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 )

@@ -21,11 +21,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
+	kubecontainer "k8s.io/kubernetes/cmd/kubelet/pkg/container"
+	kubelogs "k8s.io/kubernetes/cmd/kubelet/pkg/logs"
+	kubetypes "k8s.io/kubernetes/cmd/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	kubelogs "k8s.io/kubernetes/pkg/kubelet/logs"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"

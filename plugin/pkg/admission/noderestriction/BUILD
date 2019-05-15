@@ -11,6 +11,7 @@ go_library(
     srcs = ["admission.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/noderestriction",
     deps = [
+        "//cmd/kubelet/pkg/apis:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/coordination:go_default_library",
@@ -19,7 +20,6 @@ go_library(
         "//pkg/apis/storage:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -41,6 +41,7 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//cmd/kubelet/pkg/apis:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -48,7 +49,6 @@ go_test(
         "//pkg/apis/storage:go_default_library",
         "//pkg/auth/nodeidentifier:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/apis:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",

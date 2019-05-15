@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	clientset "k8s.io/client-go/kubernetes"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
-	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
-	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
+	stats "k8s.io/kubernetes/cmd/kubelet/pkg/apis/stats/v1alpha1"
+	dockermetrics "k8s.io/kubernetes/cmd/kubelet/pkg/dockershim/metrics"
+	kubeletmetrics "k8s.io/kubernetes/cmd/kubelet/pkg/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 

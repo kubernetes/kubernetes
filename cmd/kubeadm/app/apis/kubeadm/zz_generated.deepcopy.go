@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	config "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	config "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
 	apisconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 

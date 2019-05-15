@@ -24,9 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	kubeletconfig "k8s.io/kubernetes/cmd/kubelet/pkg/apis/config"
+	evictionapi "k8s.io/kubernetes/cmd/kubelet/pkg/eviction/api"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"

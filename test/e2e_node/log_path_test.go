@@ -21,8 +21,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/kubelet"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/cmd/kubelet/pkg"
+	kubecontainer "k8s.io/kubernetes/cmd/kubelet/pkg/container"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

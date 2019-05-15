@@ -67,7 +67,6 @@ filegroup(
         "//pkg/generated:all-srcs",
         "//pkg/kubeapiserver:all-srcs",
         "//pkg/kubectl:all-srcs",
-        "//pkg/kubelet:all-srcs",
         "//pkg/master:all-srcs",
         "//pkg/printers:all-srcs",
         "//pkg/probe:all-srcs",
