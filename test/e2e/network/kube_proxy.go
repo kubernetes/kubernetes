@@ -29,11 +29,12 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/images/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Net)
@@ -48,7 +49,7 @@ var _ = SIGDescribe("Network", func() {
 
 	fr := framework.NewDefaultFramework("network")
 
-	It("should set TCP CLOSE_WAIT timeout", func() {
+	ginkgo.It("should set TCP CLOSE_WAIT timeout", func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
 		ips := framework.CollectAddresses(nodes, v1.NodeInternalIP)
 
@@ -79,7 +80,7 @@ var _ = SIGDescribe("Network", func() {
 		zero := int64(0)
 
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
-		_, err := framework.IssueSSHCommandWithResult(
+		_, err := e2essh.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
@@ -144,21 +145,21 @@ var _ = SIGDescribe("Network", func() {
 			},
 		}
 
-		By(fmt.Sprintf(
+		ginkgo.By(fmt.Sprintf(
 			"Launching a server daemon on node %v (node ip: %v, image: %v)",
 			serverNodeInfo.name,
 			serverNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(serverPodSpec)
 
-		By(fmt.Sprintf(
+		ginkgo.By(fmt.Sprintf(
 			"Launching a client daemon on node %v (node ip: %v, image: %v)",
 			clientNodeInfo.name,
 			clientNodeInfo.nodeIP,
 			kubeProxyE2eImage))
 		fr.PodClient().CreateSync(clientPodSpec)
 
-		By("Make client connect")
+		ginkgo.By("Make client connect")
 
 		options := nat.CloseWaitClientOptions{
 			RemoteAddr: fmt.Sprintf("%v:%v",
@@ -178,10 +179,10 @@ var _ = SIGDescribe("Network", func() {
 
 		<-time.After(time.Duration(1) * time.Second)
 
-		By("Checking /proc/net/nf_conntrack for the timeout")
+		ginkgo.By("Checking /proc/net/nf_conntrack for the timeout")
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
-		framework.IssueSSHCommandWithResult(
+		e2essh.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTCPPort),
 			framework.TestContext.Provider,
@@ -189,7 +190,7 @@ var _ = SIGDescribe("Network", func() {
 
 		// Timeout in seconds is available as the fifth column from
 		// /proc/net/nf_conntrack.
-		result, err := framework.IssueSSHCommandWithResult(
+		result, err := e2essh.IssueSSHCommandWithResult(
 			fmt.Sprintf(
 				"sudo cat /proc/net/nf_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+
@@ -213,8 +214,8 @@ var _ = SIGDescribe("Network", func() {
 		e2elog.Logf("conntrack entry timeout was: %v, expected: %v",
 			timeoutSeconds, expectedTimeoutSeconds)
 
-		Expect(math.Abs(float64(timeoutSeconds - expectedTimeoutSeconds))).Should(
-			BeNumerically("<", (epsilonSeconds)))
+		gomega.Expect(math.Abs(float64(timeoutSeconds - expectedTimeoutSeconds))).Should(
+			gomega.BeNumerically("<", (epsilonSeconds)))
 	})
 
 	// Regression test for #74839, where:
@@ -222,7 +223,7 @@ var _ = SIGDescribe("Network", func() {
 	// a problem where spurious retransmits in a long-running TCP connection to a service
 	// IP could result in the connection being closed with the error "Connection reset by
 	// peer"
-	It("should resolve connrection reset issue #74839 [Slow]", func() {
+	ginkgo.It("should resolve connrection reset issue #74839 [Slow]", func() {
 		serverLabel := map[string]string{
 			"app": "boom-server",
 		}
@@ -264,7 +265,7 @@ var _ = SIGDescribe("Network", func() {
 		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(serverPod)
 		framework.ExpectNoError(err)
 
-		By("Server pod created")
+		ginkgo.By("Server pod created")
 
 		svc := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -283,7 +284,7 @@ var _ = SIGDescribe("Network", func() {
 		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(svc)
 		framework.ExpectNoError(err)
 
-		By("Server service created")
+		ginkgo.By("Server service created")
 
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -318,13 +319,13 @@ var _ = SIGDescribe("Network", func() {
 		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
-		By("Client pod created")
+		ginkgo.By("Client pod created")
 
 		for i := 0; i < 20; i++ {
 			time.Sleep(3 * time.Second)
 			resultPod, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Get(serverPod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			Expect(resultPod.Status.ContainerStatuses[0].LastTerminationState.Terminated).Should(BeNil())
+			gomega.Expect(resultPod.Status.ContainerStatuses[0].LastTerminationState.Terminated).Should(gomega.BeNil())
 		}
 	})
 })

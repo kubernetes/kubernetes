@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -61,7 +61,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		iterations       int
 	)
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
@@ -76,18 +76,18 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 
 		nodes := framework.GetReadySchedulableNodesOrDie(client)
-		Expect(len(nodes.Items)).To(BeNumerically(">=", 1), "Requires at least %d nodes (not %d)", 2, len(nodes.Items))
+		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", 1), "Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 
 		msg := fmt.Sprintf("Cannot attach %d volumes to %d nodes. Maximum volumes that can be attached on %d nodes is %d", volumeCount, len(nodes.Items), len(nodes.Items), SCSIUnitsAvailablePerNode*len(nodes.Items))
-		Expect(volumeCount).To(BeNumerically("<=", SCSIUnitsAvailablePerNode*len(nodes.Items)), msg)
+		gomega.Expect(volumeCount).To(gomega.BeNumerically("<=", SCSIUnitsAvailablePerNode*len(nodes.Items)), msg)
 
 		msg = fmt.Sprintf("Cannot attach %d volumes per pod. Maximum volumes that can be attached per pod is %d", volumesPerPod, SCSIUnitsAvailablePerNode)
-		Expect(volumesPerPod).To(BeNumerically("<=", SCSIUnitsAvailablePerNode), msg)
+		gomega.Expect(volumesPerPod).To(gomega.BeNumerically("<=", SCSIUnitsAvailablePerNode), msg)
 
 		nodeSelectorList = createNodeLabels(client, namespace, nodes)
 	})
 
-	It("vcp performance tests", func() {
+	ginkgo.It("vcp performance tests", func() {
 		scList := getTestStorageClasses(client, policyName, datastoreName)
 		defer func(scList []*storageV1.StorageClass) {
 			for _, sc := range scList {
@@ -124,7 +124,7 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 	scArrays := make([]*storageV1.StorageClass, len(scNames))
 	for index, scname := range scNames {
 		// Create vSphere Storage Class
-		By(fmt.Sprintf("Creating Storage Class : %v", scname))
+		ginkgo.By(fmt.Sprintf("Creating Storage Class : %v", scname))
 		var sc *storageV1.StorageClass
 		var err error
 		switch scname {
@@ -147,7 +147,7 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 			scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters, nil)
 			sc, err = client.StorageV1().StorageClasses().Create(scWithDatastoreSpec)
 		}
-		Expect(sc).NotTo(BeNil())
+		gomega.Expect(sc).NotTo(gomega.BeNil())
 		framework.ExpectNoError(err)
 		scArrays[index] = sc
 	}
@@ -165,7 +165,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	latency = make(map[string]float64)
 	numPods := volumeCount / volumesPerPod
 
-	By(fmt.Sprintf("Creating %d PVCs", volumeCount))
+	ginkgo.By(fmt.Sprintf("Creating %d PVCs", volumeCount))
 	start := time.Now()
 	for i := 0; i < numPods; i++ {
 		var pvclaims []*v1.PersistentVolumeClaim
@@ -185,7 +185,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	elapsed := time.Since(start)
 	latency[CreateOp] = elapsed.Seconds()
 
-	By("Creating pod to attach PVs to the node")
+	ginkgo.By("Creating pod to attach PVs to the node")
 	start = time.Now()
 	for i, pvclaims := range totalpvclaims {
 		nodeSelector := nodeSelectorList[i%len(nodeSelectorList)]
@@ -202,7 +202,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		verifyVSphereVolumesAccessible(client, pod, totalpvs[i])
 	}
 
-	By("Deleting pods")
+	ginkgo.By("Deleting pods")
 	start = time.Now()
 	for _, pod := range totalpods {
 		err := framework.DeletePodWithWait(f, client, pod)
@@ -220,7 +220,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	err := waitForVSphereDisksToDetach(nodeVolumeMap)
 	framework.ExpectNoError(err)
 
-	By("Deleting the PVCs")
+	ginkgo.By("Deleting the PVCs")
 	start = time.Now()
 	for _, pvclaims := range totalpvclaims {
 		for _, pvc := range pvclaims {

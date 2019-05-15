@@ -57,7 +57,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -206,6 +206,16 @@ const volumeAttachmentStuck = "VolumeAttachmentStuck"
 const nodeWithImpairedVolumes = "NodeWithImpairedVolumes"
 
 const (
+	// These constants help to identify if a node is a master or a minion
+	labelKeyNodeRole    = "kubernetes.io/role"
+	nodeMasterRole      = "master"
+	nodeMinionRole      = "node"
+	labelKeyNodeMaster  = "node-role.kubernetes.io/master"
+	labelKeyNodeCompute = "node-role.kubernetes.io/compute"
+	labelKeyNodeMinion  = "node-role.kubernetes.io/node"
+)
+
+const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
 	// most attach/detach operations on AWS finish within 1-4 seconds
@@ -259,9 +269,6 @@ const MaxReadThenCreateRetries = 30
 // TODO: Remove when user/admin can configure volume types and thus we don't
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
-
-// Used to call recognizeWellKnownRegions just once
-var once sync.Once
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
@@ -904,12 +911,28 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 
 // Implements EC2.DescribeSecurityGroups
 func (s *awsSdkEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
-	// Security groups are not paged
-	response, err := s.ec2.DescribeSecurityGroups(request)
-	if err != nil {
-		return nil, fmt.Errorf("error listing AWS security groups: %q", err)
+	// Security groups are paged
+	results := []*ec2.SecurityGroup{}
+	var nextToken *string
+	requestTime := time.Now()
+	for {
+		response, err := s.ec2.DescribeSecurityGroups(request)
+		if err != nil {
+			recordAWSMetric("describe_security_groups", 0, err)
+			return nil, fmt.Errorf("error listing AWS security groups: %q", err)
+		}
+
+		results = append(results, response.SecurityGroups...)
+
+		nextToken = response.NextToken
+		if aws.StringValue(nextToken) == "" {
+			break
+		}
+		request.NextToken = nextToken
 	}
-	return response.SecurityGroups, nil
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAWSMetric("describe_security_groups", timeTaken, nil)
+	return results, nil
 }
 
 func (s *awsSdkEC2) AttachVolume(request *ec2.AttachVolumeInput) (*ec2.VolumeAttachment, error) {
@@ -1034,12 +1057,27 @@ func (s *awsSdkEC2) CreateTags(request *ec2.CreateTagsInput) (*ec2.CreateTagsOut
 }
 
 func (s *awsSdkEC2) DescribeRouteTables(request *ec2.DescribeRouteTablesInput) ([]*ec2.RouteTable, error) {
-	// Not paged
-	response, err := s.ec2.DescribeRouteTables(request)
-	if err != nil {
-		return nil, fmt.Errorf("error listing AWS route tables: %q", err)
+	results := []*ec2.RouteTable{}
+	var nextToken *string
+	requestTime := time.Now()
+	for {
+		response, err := s.ec2.DescribeRouteTables(request)
+		if err != nil {
+			recordAWSMetric("describe_route_tables", 0, err)
+			return nil, fmt.Errorf("error listing AWS route tables: %q", err)
+		}
+
+		results = append(results, response.RouteTables...)
+
+		nextToken = response.NextToken
+		if aws.StringValue(nextToken) == "" {
+			break
+		}
+		request.NextToken = nextToken
 	}
-	return response.RouteTables, nil
+	timeTaken := time.Since(requestTime).Seconds()
+	recordAWSMetric("describe_route_tables", timeTaken, nil)
+	return results, nil
 }
 
 func (s *awsSdkEC2) CreateRoute(request *ec2.CreateRouteInput) (*ec2.CreateRouteOutput, error) {
@@ -1173,14 +1211,8 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 		return nil, err
 	}
 
-	// Trust that if we get a region from configuration or AWS metadata that it is valid,
-	// and register ECR providers
-	recognizeRegion(regionName)
-
 	if !cfg.Global.DisableStrictZoneCheck {
-		valid := isRegionValid(regionName)
-		if !valid {
-			// This _should_ now be unreachable, given we call RecognizeRegion
+		if !isRegionValid(regionName, metadata) {
 			return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
 		}
 	} else {
@@ -1262,12 +1294,41 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 		}
 	}
 
-	// Register regions, in particular for ECR credentials
-	once.Do(func() {
-		recognizeWellKnownRegions()
-	})
-
 	return awsCloud, nil
+}
+
+// isRegionValid accepts an AWS region name and returns if the region is a
+// valid region known to the AWS SDK. Considers the region returned from the
+// EC2 metadata service to be a valid region as it's only available on a host
+// running in a valid AWS region.
+func isRegionValid(region string, metadata EC2Metadata) bool {
+	// Does the AWS SDK know about the region?
+	for _, p := range endpoints.DefaultPartitions() {
+		for r := range p.Regions() {
+			if r == region {
+				return true
+			}
+		}
+	}
+
+	// ap-northeast-3 is purposely excluded from the SDK because it
+	// requires an access request (for more details see):
+	// https://github.com/aws/aws-sdk-go/issues/1863
+	if region == "ap-northeast-3" {
+		return true
+	}
+
+	// Fallback to checking if the region matches the instance metadata region
+	// (ignoring any user overrides). This just accounts for running an old
+	// build of Kubernetes in a new region that wasn't compiled into the SDK
+	// when Kubernetes was built.
+	if az, err := getAvailabilityZone(metadata); err == nil {
+		if r, err := azToRegion(az); err == nil && region == r {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
@@ -1567,50 +1628,77 @@ func (c *Cloud) InstanceType(ctx context.Context, nodeName types.NodeName) (stri
 // GetCandidateZonesForDynamicVolume retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
 func (c *Cloud) GetCandidateZonesForDynamicVolume() (sets.String, error) {
-	// We don't currently cache this; it is currently used only in volume
-	// creation which is expected to be a comparatively rare occurrence.
+	zones := sets.NewString()
 
-	// TODO: Caching / expose v1.Nodes to the cloud provider?
-	// TODO: We could also query for subnets, I think
-
-	filters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
-
-	instances, err := c.describeInstances(filters)
+	// TODO: list from cache?
+	nodes, err := c.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
+		klog.Errorf("Failed to get nodes from api server: %#v", err)
 		return nil, err
 	}
 
-	if len(instances) == 0 {
-		return nil, fmt.Errorf("no instances returned")
-	}
-
-	zones := sets.NewString()
-
-	for _, instance := range instances {
-		// We skip over master nodes, if the installation tool labels them with one of the well-known master labels
-		// This avoids creating a volume in a zone where only the master is running - e.g. #34583
-		// This is a short-term workaround until the scheduler takes care of zone selection
-		master := false
-		for _, tag := range instance.Tags {
-			tagKey := aws.StringValue(tag.Key)
-			if awsTagNameMasterRoles.Has(tagKey) {
-				master = true
-			}
-		}
-
-		if master {
-			klog.V(4).Infof("Ignoring master instance %q in zone discovery", aws.StringValue(instance.InstanceId))
+	for _, n := range nodes.Items {
+		if !c.isNodeReady(&n) {
+			klog.V(4).Infof("Ignoring not ready node %q in zone discovery", n.Name)
 			continue
 		}
-
-		if instance.Placement != nil {
-			zone := aws.StringValue(instance.Placement.AvailabilityZone)
-			zones.Insert(zone)
+		// In some cluster provisioning software, a node can be both a minion and a master. Therefore we white-list
+		// here, and only filter out node that is not minion AND is labeled as master explicitly
+		if c.isMinionNode(&n) || !c.isMasterNode(&n) {
+			if zone, ok := n.Labels[v1.LabelZoneFailureDomain]; ok {
+				zones.Insert(zone)
+			} else {
+				klog.Warningf("Node %s does not have zone label, ignore for zone discovery.", n.Name)
+			}
+		} else {
+			klog.V(4).Infof("Ignoring master node %q in zone discovery", n.Name)
 		}
 	}
 
 	klog.V(2).Infof("Found instances in zones %s", zones)
 	return zones, nil
+}
+
+// isNodeReady checks node condition and return true if NodeReady is marked as true
+func (c *Cloud) isNodeReady(node *v1.Node) bool {
+	for _, c := range node.Status.Conditions {
+		if c.Type == v1.NodeReady {
+			return c.Status == v1.ConditionTrue
+		}
+	}
+	return false
+}
+
+// isMasterNode checks if the node is labeled as master
+func (c *Cloud) isMasterNode(node *v1.Node) bool {
+	// Master node has one or more of the following labels:
+	//
+	// 	kubernetes.io/role: master
+	//	node-role.kubernetes.io/master: ""
+	//	node-role.kubernetes.io/master: "true"
+	if val, ok := node.Labels[labelKeyNodeMaster]; ok && val != "false" {
+		return true
+	} else if role, ok := node.Labels[labelKeyNodeRole]; ok && role == nodeMasterRole {
+		return true
+	}
+	return false
+}
+
+// isMinionNode checks if the node is labeled as minion
+func (c *Cloud) isMinionNode(node *v1.Node) bool {
+	// Minion node has one or more oof the following labels:
+	//
+	// 	kubernetes.io/role: "node"
+	//	node-role.kubernetes.io/compute: "true"
+	//	node-role.kubernetes.io/node: ""
+	if val, ok := node.Labels[labelKeyNodeMinion]; ok && val != "false" {
+		return true
+	} else if val, ok := node.Labels[labelKeyNodeCompute]; ok && val != "false" {
+		return true
+	} else if role, ok := node.Labels[labelKeyNodeRole]; ok && role == nodeMinionRole {
+		return true
+	}
+	return false
 }
 
 // GetZone implements Zones.GetZone
@@ -3022,17 +3110,16 @@ func (c *Cloud) ensureSecurityGroup(name string, description string, additionalT
 	for {
 		attempt++
 
-		request := &ec2.DescribeSecurityGroupsInput{}
-		filters := []*ec2.Filter{
-			newEc2Filter("group-name", name),
-			newEc2Filter("vpc-id", c.vpcID),
-		}
 		// Note that we do _not_ add our tag filters; group-name + vpc-id is the EC2 primary key.
 		// However, we do check that it matches our tags.
 		// If it doesn't have any tags, we tag it; this is how we recover if we failed to tag before.
 		// If it has a different cluster's tags, that is an error.
 		// This shouldn't happen because name is expected to be globally unique (UUID derived)
-		request.Filters = filters
+		request := &ec2.DescribeSecurityGroupsInput{}
+		request.Filters = []*ec2.Filter{
+			newEc2Filter("group-name", name),
+			newEc2Filter("vpc-id", c.vpcID),
+		}
 
 		securityGroups, err := c.ec2.DescribeSecurityGroups(request)
 		if err != nil {
@@ -3108,8 +3195,7 @@ func findTag(tags []*ec2.Tag, key string) (string, bool) {
 // However, in future this will likely be treated as an error.
 func (c *Cloud) findSubnets() ([]*ec2.Subnet, error) {
 	request := &ec2.DescribeSubnetsInput{}
-	filters := []*ec2.Filter{newEc2Filter("vpc-id", c.vpcID)}
-	request.Filters = c.tagging.addFilters(filters)
+	request.Filters = []*ec2.Filter{newEc2Filter("vpc-id", c.vpcID)}
 
 	subnets, err := c.ec2.DescribeSubnets(request)
 	if err != nil {
@@ -3131,8 +3217,7 @@ func (c *Cloud) findSubnets() ([]*ec2.Subnet, error) {
 	klog.Warningf("No tagged subnets found; will fall-back to the current subnet only.  This is likely to be an error in a future version of k8s.")
 
 	request = &ec2.DescribeSubnetsInput{}
-	filters = []*ec2.Filter{newEc2Filter("subnet-id", c.selfAWSInstance.subnetID)}
-	request.Filters = filters
+	request.Filters = []*ec2.Filter{newEc2Filter("subnet-id", c.selfAWSInstance.subnetID)}
 
 	subnets, err = c.ec2.DescribeSubnets(request)
 	if err != nil {
@@ -3888,7 +3973,6 @@ func findSecurityGroupForInstance(instance *ec2.Instance, taggedSecurityGroups m
 // Return all the security groups that are tagged as being part of our cluster
 func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error) {
 	request := &ec2.DescribeSecurityGroupsInput{}
-	request.Filters = c.tagging.addFilters(nil)
 	groups, err := c.ec2.DescribeSecurityGroups(request)
 	if err != nil {
 		return nil, fmt.Errorf("error querying security groups: %q", err)
@@ -3937,10 +4021,9 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	var actualGroups []*ec2.SecurityGroup
 	{
 		describeRequest := &ec2.DescribeSecurityGroupsInput{}
-		filters := []*ec2.Filter{
+		describeRequest.Filters = []*ec2.Filter{
 			newEc2Filter("ip-permission.group-id", loadBalancerSecurityGroupID),
 		}
-		describeRequest.Filters = c.tagging.addFilters(filters)
 		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 		if err != nil {
 			return fmt.Errorf("error querying security groups for ELB: %q", err)
@@ -4098,10 +4181,9 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			{
 				// Server side filter
 				describeRequest := &ec2.DescribeSecurityGroupsInput{}
-				filters := []*ec2.Filter{
+				describeRequest.Filters = []*ec2.Filter{
 					newEc2Filter("ip-permission.protocol", "tcp"),
 				}
-				describeRequest.Filters = c.tagging.addFilters(filters)
 				response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 				if err != nil {
 					return fmt.Errorf("Error querying security groups for NLB: %q", err)
@@ -4229,10 +4311,9 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 		var loadBalancerSGs = aws.StringValueSlice(lb.SecurityGroups)
 
 		describeRequest := &ec2.DescribeSecurityGroupsInput{}
-		filters := []*ec2.Filter{
+		describeRequest.Filters = []*ec2.Filter{
 			newEc2Filter("group-id", loadBalancerSGs...),
 		}
-		describeRequest.Filters = c.tagging.addFilters(filters)
 		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
 		if err != nil {
 			return fmt.Errorf("error querying security groups for ELB: %q", err)
@@ -4444,7 +4525,6 @@ func (c *Cloud) getInstancesByNodeNames(nodeNames []string, states ...string) ([
 
 // TODO: Move to instanceCache
 func (c *Cloud) describeInstances(filters []*ec2.Filter) ([]*ec2.Instance, error) {
-	filters = c.tagging.addFilters(filters)
 	request := &ec2.DescribeInstancesInput{
 		Filters: filters,
 	}

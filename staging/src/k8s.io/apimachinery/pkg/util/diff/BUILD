@@ -18,8 +18,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/diff",
     importpath = "k8s.io/apimachinery/pkg/util/diff",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )
 

@@ -40,6 +40,7 @@ import (
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutil "k8s.io/kubernetes/test/utils"
 	utilpointer "k8s.io/utils/pointer"
@@ -128,49 +129,49 @@ var _ = SIGDescribe("Deployment", func() {
 func failureTrap(c clientset.Interface, ns string) {
 	deployments, err := c.AppsV1().Deployments(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
-		framework.Logf("Could not list Deployments in namespace %q: %v", ns, err)
+		e2elog.Logf("Could not list Deployments in namespace %q: %v", ns, err)
 		return
 	}
 	for i := range deployments.Items {
 		d := deployments.Items[i]
 
-		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
+		e2elog.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
 		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c.AppsV1())
 		if err != nil {
-			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
+			e2elog.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
 			return
 		}
-		testutil.LogReplicaSetsOfDeployment(&d, allOldRSs, newRS, framework.Logf)
+		testutil.LogReplicaSetsOfDeployment(&d, allOldRSs, newRS, e2elog.Logf)
 		rsList := allOldRSs
 		if newRS != nil {
 			rsList = append(rsList, newRS)
 		}
-		testutil.LogPodsOfDeployment(c, &d, rsList, framework.Logf)
+		testutil.LogPodsOfDeployment(c, &d, rsList, e2elog.Logf)
 	}
 	// We need print all the ReplicaSets if there are no Deployment object created
 	if len(deployments.Items) != 0 {
 		return
 	}
-	framework.Logf("Log out all the ReplicaSets if there is no deployment created")
+	e2elog.Logf("Log out all the ReplicaSets if there is no deployment created")
 	rss, err := c.AppsV1().ReplicaSets(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	if err != nil {
-		framework.Logf("Could not list ReplicaSets in namespace %q: %v", ns, err)
+		e2elog.Logf("Could not list ReplicaSets in namespace %q: %v", ns, err)
 		return
 	}
 	for _, rs := range rss.Items {
-		framework.Logf(spew.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
+		e2elog.Logf(spew.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
 		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
-			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
+			e2elog.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
 		}
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		podList, err := c.CoreV1().Pods(rs.Namespace).List(options)
 		if err != nil {
-			framework.Logf("Failed to list Pods in namespace %s: %v", rs.Namespace, err)
+			e2elog.Logf("Failed to list Pods in namespace %s: %v", rs.Namespace, err)
 			continue
 		}
 		for _, pod := range podList.Items {
-			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
+			e2elog.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
 		}
 	}
 }
@@ -190,23 +191,24 @@ func newDeploymentRollback(name string, annotations map[string]string, revision 
 
 func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Deleting deployment %s", deploymentName)
-	framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name))
+	e2elog.Logf("Deleting deployment %s", deploymentName)
+	err = framework.DeleteResourceAndWaitForGC(c, appsinternal.Kind("Deployment"), ns, deployment.Name)
+	framework.ExpectNoError(err)
 
-	framework.Logf("Ensuring deployment %s was deleted", deploymentName)
+	e2elog.Logf("Ensuring deployment %s was deleted", deploymentName)
 	_, err = c.AppsV1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
-	gomega.Expect(err).To(gomega.HaveOccurred())
+	framework.ExpectError(err)
 	gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
-	framework.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
+	e2elog.Logf("Ensuring deployment %s's RSes were deleted", deploymentName)
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rss, err := c.AppsV1().ReplicaSets(ns).List(options)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(rss.Items).Should(gomega.HaveLen(0))
-	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
+	e2elog.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
 		pods, err = c.CoreV1().Pods(ns).List(options)
@@ -230,23 +232,23 @@ func testDeleteDeployment(f *framework.Framework) {
 	deploymentName := "test-new-deployment"
 	podLabels := map[string]string{"name": NginxImageName}
 	replicas := int32(1)
-	framework.Logf("Creating simple deployment %s", deploymentName)
+	e2elog.Logf("Creating simple deployment %s", deploymentName)
 	d := e2edeploy.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, apps.RollingUpdateDeploymentStrategyType)
 	d.Annotations = map[string]string{"test": "should-copy-to-replica-set", v1.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
 	deploy, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 1
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", NginxImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = e2edeploy.WaitForDeploymentComplete(c, deploy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(newRS).NotTo(gomega.Equal(nilRs))
 	stopDeployment(c, ns, deploymentName)
 }
@@ -268,35 +270,35 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	annotations[deploymentutil.RevisionAnnotation] = rsRevision
 	rs := newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage)
 	rs.Annotations = annotations
-	framework.Logf("Creating replica set %q (going to be adopted)", rs.Name)
+	e2elog.Logf("Creating replica set %q (going to be adopted)", rs.Name)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(rs)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %s", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-rolling-update-deployment"
-	framework.Logf("Creating deployment %q", deploymentName)
+	e2elog.Logf("Creating deployment %q", deploymentName)
 	d := e2edeploy.NewDeployment(deploymentName, replicas, deploymentPodLabels, RedisImageName, RedisImage, apps.RollingUpdateDeploymentStrategyType)
 	deploy, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 3546343826724305833.
-	framework.Logf("Ensuring deployment %q gets the next revision from the one the adopted replica set %q has", deploy.Name, rs.Name)
+	e2elog.Logf("Ensuring deployment %q gets the next revision from the one the adopted replica set %q has", deploy.Name, rs.Name)
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", RedisImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Ensuring status for deployment %q is the expected", deploy.Name)
+	e2elog.Logf("Ensuring status for deployment %q is the expected", deploy.Name)
 	err = e2edeploy.WaitForDeploymentComplete(c, deploy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// There should be 1 old RS (nginx-controller, which is adopted)
-	framework.Logf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name)
+	e2elog.Logf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name)
 	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(allOldRSs)).Should(gomega.Equal(1))
 }
 
@@ -306,29 +308,31 @@ func testRecreateDeployment(f *framework.Framework) {
 
 	// Create a deployment that brings up redis pods.
 	deploymentName := "test-recreate-deployment"
-	framework.Logf("Creating deployment %q", deploymentName)
+	e2elog.Logf("Creating deployment %q", deploymentName)
 	d := e2edeploy.NewDeployment(deploymentName, int32(1), map[string]string{"name": "sample-pod-3"}, RedisImageName, RedisImage, apps.RecreateDeploymentStrategyType)
 	deployment, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 1
-	framework.Logf("Waiting deployment %q to be updated to revision 1", deploymentName)
+	e2elog.Logf("Waiting deployment %q to be updated to revision 1", deploymentName)
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", RedisImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Waiting deployment %q to complete", deploymentName)
-	gomega.Expect(e2edeploy.WaitForDeploymentComplete(c, deployment)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting deployment %q to complete", deploymentName)
+	err = e2edeploy.WaitForDeploymentComplete(c, deployment)
+	framework.ExpectNoError(err)
 
 	// Update deployment to delete redis pods and bring up nginx pods.
-	framework.Logf("Triggering a new rollout for deployment %q", deploymentName)
+	e2elog.Logf("Triggering a new rollout for deployment %q", deploymentName)
 	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = NginxImageName
 		update.Spec.Template.Spec.Containers[0].Image = NginxImage
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
-	gomega.Expect(e2edeploy.WatchRecreateDeployment(c, deployment)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Watching deployment %q to verify that new pods will not run with olds pods", deploymentName)
+	err = e2edeploy.WatchRecreateDeployment(c, deployment)
+	framework.ExpectNoError(err)
 }
 
 // testDeploymentCleanUpPolicy tests that deployment supports cleanup policy
@@ -345,18 +349,18 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	replicas := int32(1)
 	revisionHistoryLimit := utilpointer.Int32Ptr(0)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, "cleanup-pod", false, replicas)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %v", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis pods.
 	deploymentName := "test-cleanup-deployment"
-	framework.Logf("Creating deployment %s", deploymentName)
+	e2elog.Logf("Creating deployment %s", deploymentName)
 
 	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to query for pods: %v", err)
+	framework.ExpectNoError(err, "Failed to query for pods: %v", err)
 
 	options := metav1.ListOptions{
 		ResourceVersion: pods.ListMeta.ResourceVersion,
@@ -364,7 +368,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	w, err := c.CoreV1().Pods(ns).Watch(options)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	go func() {
 		// There should be only one pod being created, which is the pod with the redis image.
 		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.
@@ -394,11 +398,11 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	d := e2edeploy.NewDeployment(deploymentName, replicas, deploymentPodLabels, RedisImageName, RedisImage, apps.RollingUpdateDeploymentStrategyType)
 	d.Spec.RevisionHistoryLimit = revisionHistoryLimit
 	_, err = c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %s history to be cleaned up", deploymentName))
 	err = e2edeploy.WaitForDeploymentOldRSsNum(c, ns, deploymentName, int(*revisionHistoryLimit))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 // testRolloverDeployment tests that deployment supports rollover.
@@ -416,14 +420,15 @@ func testRolloverDeployment(f *framework.Framework) {
 	rsName := "test-rollover-controller"
 	rsReplicas := int32(1)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
 	err = framework.VerifyPodsRunning(c, ns, podName, false, rsReplicas)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %v", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
 	// Wait for replica set to become ready before adopting it.
-	framework.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
-	gomega.Expect(replicaset.WaitForReadyReplicaSet(c, ns, rsName)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for pods owned by replica set %q to become ready", rsName)
+	err = replicaset.WaitForReadyReplicaSet(c, ns, rsName)
+	framework.ExpectNoError(err)
 
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
 	// We use a nonexistent image here, so that we make sure it won't finish
@@ -431,7 +436,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	deploymentReplicas := int32(1)
 	deploymentImage := "gcr.io/google_samples/gb-redisslave:nonexistent"
 	deploymentStrategyType := apps.RollingUpdateDeploymentStrategyType
-	framework.Logf("Creating deployment %q", deploymentName)
+	e2elog.Logf("Creating deployment %q", deploymentName)
 	newDeployment := e2edeploy.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
 	newDeployment.Spec.Strategy.RollingUpdate = &apps.RollingUpdateDeployment{
 		MaxUnavailable: intOrStrP(0),
@@ -439,57 +444,57 @@ func testRolloverDeployment(f *framework.Framework) {
 	}
 	newDeployment.Spec.MinReadySeconds = int32(10)
 	_, err = c.AppsV1().Deployments(ns).Create(newDeployment)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Verify that the pods were scaled up and down as expected.
 	deployment, err := c.AppsV1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
+	framework.ExpectNoError(err)
+	e2elog.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
 	err = e2edeploy.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
 	// Check if it's updated to revision 1 correctly
-	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
+	e2elog.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	err = e2edeploy.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Ensure that both replica sets have 1 created replica")
+	e2elog.Logf("Ensure that both replica sets have 1 created replica")
 	oldRS, err := c.AppsV1().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ensureReplicas(oldRS, int32(1))
 	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ensureReplicas(newRS, int32(1))
 
 	// The deployment is stuck, update it to rollover the above 2 ReplicaSets and bring up redis pods.
-	framework.Logf("Rollover old replica sets for deployment %q with new image update", deploymentName)
+	e2elog.Logf("Rollover old replica sets for deployment %q with new image update", deploymentName)
 	updatedDeploymentImageName, updatedDeploymentImage := RedisImageName, RedisImage
 	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, newDeployment.Name, func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
 		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Use observedGeneration to determine if the controller noticed the pod template update.
-	framework.Logf("Wait deployment %q to be observed by the deployment controller", deploymentName)
+	e2elog.Logf("Wait deployment %q to be observed by the deployment controller", deploymentName)
 	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 2
-	framework.Logf("Wait for revision update of deployment %q to 2", deploymentName)
+	e2elog.Logf("Wait for revision update of deployment %q to 2", deploymentName)
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Make sure deployment %q is complete", deploymentName)
+	e2elog.Logf("Make sure deployment %q is complete", deploymentName)
 	err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Ensure that both old replica sets have no replicas")
+	e2elog.Logf("Ensure that both old replica sets have no replicas")
 	oldRS, err = c.AppsV1().ReplicaSets(ns).Get(rsName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ensureReplicas(oldRS, int32(0))
 	// Not really the new replica set anymore but we GET by name so that's fine.
 	newRS, err = c.AppsV1().ReplicaSets(ns).Get(newRS.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ensureReplicas(newRS, int32(0))
 }
 
@@ -514,23 +519,23 @@ func testRollbackDeployment(f *framework.Framework) {
 	deploymentReplicas := int32(1)
 	deploymentImage := NginxImage
 	deploymentStrategyType := apps.RollingUpdateDeploymentStrategyType
-	framework.Logf("Creating deployment %s", deploymentName)
+	e2elog.Logf("Creating deployment %s", deploymentName)
 	d := e2edeploy.NewDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType)
 	createAnnotation := map[string]string{"action": "create", "author": "node"}
 	d.Annotations = createAnnotation
 	deploy, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 1
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = e2edeploy.WaitForDeploymentComplete(c, deploy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Current newRS annotation should be "create"
 	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// 2. Update the deployment to create redis pods.
 	updatedDeploymentImage := RedisImage
@@ -541,112 +546,112 @@ func testRollbackDeployment(f *framework.Framework) {
 		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage
 		update.Annotations = updateAnnotation
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Use observedGeneration to determine if the controller noticed the pod template update.
 	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 2
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Current newRS annotation should be "update"
 	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// 3. Update the deploymentRollback to rollback to revision 1
 	revision := int64(1)
-	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
+	e2elog.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback := newDeploymentRollback(deploymentName, nil, revision)
 	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for the deployment to start rolling back
 	err = e2edeploy.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	// TODO: report RollbackDone in deployment status and check it here
 
 	// Wait for it to be updated to revision 3
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3", deploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Current newRS annotation should be "create", after the rollback
 	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, createAnnotation)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// 4. Update the deploymentRollback to rollback to last revision
 	revision = 0
-	framework.Logf("rolling back deployment %s to last revision", deploymentName)
+	e2elog.Logf("rolling back deployment %s to last revision", deploymentName)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
 	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = e2edeploy.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 4
 	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = e2edeploy.WaitForDeploymentCompleteAndCheckRolling(c, deployment)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Current newRS annotation should be "update", after the rollback
 	err = replicaset.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// 5. Update the deploymentRollback to rollback to revision 10
 	//    Since there's no revision 10 in history, it should stay as revision 4
 	revision = 10
-	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
+	e2elog.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
 	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for the deployment to start rolling back
 	err = e2edeploy.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	// TODO: report RollbackRevisionNotFound in deployment status and check it here
 
 	// The pod template shouldn't change since there's no revision 10
 	// Check if it's still revision 4 and still has the old pod template
 	err = e2edeploy.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// 6. Update the deploymentRollback to rollback to revision 4
 	//    Since it's already revision 4, it should be no-op
 	revision = 4
-	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
+	e2elog.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
 	rollback = newDeploymentRollback(deploymentName, nil, revision)
 	err = c.ExtensionsV1beta1().Deployments(ns).Rollback(rollback)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Wait for the deployment to start rolling back
 	err = e2edeploy.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	// TODO: report RollbackTemplateUnchanged in deployment status and check it here
 
 	// The pod template shouldn't change since it's already revision 4
 	// Check if it's still revision 4 and still has the old pod template
 	err = e2edeploy.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 func randomScale(d *apps.Deployment, i int) {
 	switch r := rand.Float32(); {
 	case r < 0.3:
-		framework.Logf("%02d: scaling up", i)
+		e2elog.Logf("%02d: scaling up", i)
 		*(d.Spec.Replicas)++
 	case r < 0.6:
 		if *(d.Spec.Replicas) > 1 {
-			framework.Logf("%02d: scaling down", i)
+			e2elog.Logf("%02d: scaling down", i)
 			*(d.Spec.Replicas)--
 		}
 	}
@@ -668,9 +673,9 @@ func testIterativeDeployments(f *framework.Framework) {
 	d.Spec.ProgressDeadlineSeconds = &thirty
 	d.Spec.RevisionHistoryLimit = &two
 	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &zero
-	framework.Logf("Creating deployment %q", deploymentName)
+	e2elog.Logf("Creating deployment %q", deploymentName)
 	deployment, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	iterations := 20
 	for i := 0; i < iterations; i++ {
@@ -681,61 +686,61 @@ func testIterativeDeployments(f *framework.Framework) {
 		switch n := rand.Float32(); {
 		case n < 0.2:
 			// trigger a new deployment
-			framework.Logf("%02d: triggering a new rollout for deployment %q", i, deployment.Name)
+			e2elog.Logf("%02d: triggering a new rollout for deployment %q", i, deployment.Name)
 			deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 				newEnv := v1.EnvVar{Name: "A", Value: fmt.Sprintf("%d", i)}
 				update.Spec.Template.Spec.Containers[0].Env = append(update.Spec.Template.Spec.Containers[0].Env, newEnv)
 				randomScale(update, i)
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 		case n < 0.4:
 			// rollback to the previous version
-			framework.Logf("%02d: rolling back a rollout for deployment %q", i, deployment.Name)
+			e2elog.Logf("%02d: rolling back a rollout for deployment %q", i, deployment.Name)
 			deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 				if update.Annotations == nil {
 					update.Annotations = make(map[string]string)
 				}
 				update.Annotations[apps.DeprecatedRollbackTo] = "0"
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 		case n < 0.6:
 			// just scaling
-			framework.Logf("%02d: scaling deployment %q", i, deployment.Name)
+			e2elog.Logf("%02d: scaling deployment %q", i, deployment.Name)
 			deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 				randomScale(update, i)
 			})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 		case n < 0.8:
 			// toggling the deployment
 			if deployment.Spec.Paused {
-				framework.Logf("%02d: pausing deployment %q", i, deployment.Name)
+				e2elog.Logf("%02d: pausing deployment %q", i, deployment.Name)
 				deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 					update.Spec.Paused = true
 					randomScale(update, i)
 				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 			} else {
-				framework.Logf("%02d: resuming deployment %q", i, deployment.Name)
+				e2elog.Logf("%02d: resuming deployment %q", i, deployment.Name)
 				deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 					update.Spec.Paused = false
 					randomScale(update, i)
 				})
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err)
 			}
 
 		default:
 			// arbitrarily delete deployment pods
-			framework.Logf("%02d: arbitrarily deleting one or more deployment pods for deployment %q", i, deployment.Name)
+			e2elog.Logf("%02d: arbitrarily deleting one or more deployment pods for deployment %q", i, deployment.Name)
 			selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			opts := metav1.ListOptions{LabelSelector: selector.String()}
 			podList, err := c.CoreV1().Pods(ns).List(opts)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			if len(podList.Items) == 0 {
-				framework.Logf("%02d: no deployment pods to delete", i)
+				e2elog.Logf("%02d: no deployment pods to delete", i)
 				continue
 			}
 			for p := range podList.Items {
@@ -743,10 +748,10 @@ func testIterativeDeployments(f *framework.Framework) {
 					continue
 				}
 				name := podList.Items[p].Name
-				framework.Logf("%02d: deleting deployment pod %q", i, name)
+				e2elog.Logf("%02d: deleting deployment pod %q", i, name)
 				err := c.CoreV1().Pods(ns).Delete(name, nil)
 				if err != nil && !errors.IsNotFound(err) {
-					gomega.Expect(err).NotTo(gomega.HaveOccurred())
+					framework.ExpectNoError(err)
 				}
 			}
 		}
@@ -754,21 +759,24 @@ func testIterativeDeployments(f *framework.Framework) {
 
 	// unpause the deployment if we end up pausing it
 	deployment, err = c.AppsV1().Deployments(ns).Get(deployment.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	if deployment.Spec.Paused {
 		deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 			update.Spec.Paused = false
 		})
 	}
 
-	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
-	gomega.Expect(e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
+	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	framework.ExpectNoError(err)
 
-	framework.Logf("Waiting for deployment %q status", deploymentName)
-	gomega.Expect(e2edeploy.WaitForDeploymentComplete(c, deployment)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for deployment %q status", deploymentName)
+	err = e2edeploy.WaitForDeploymentComplete(c, deployment)
+	framework.ExpectNoError(err)
 
-	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
-	gomega.Expect(e2edeploy.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, apps.DeploymentProgressing)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Checking deployment %q for a complete condition", deploymentName)
+	err = e2edeploy.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, apps.DeploymentProgressing)
+	framework.ExpectNoError(err)
 }
 
 func testDeploymentsControllerRef(f *framework.Framework) {
@@ -776,51 +784,51 @@ func testDeploymentsControllerRef(f *framework.Framework) {
 	c := f.ClientSet
 
 	deploymentName := "test-orphan-deployment"
-	framework.Logf("Creating Deployment %q", deploymentName)
+	e2elog.Logf("Creating Deployment %q", deploymentName)
 	podLabels := map[string]string{"name": NginxImageName}
 	replicas := int32(1)
 	d := e2edeploy.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, apps.RollingUpdateDeploymentStrategyType)
 	deploy, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	err = e2edeploy.WaitForDeploymentComplete(c, deploy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
+	e2elog.Logf("Verifying Deployment %q has only one ReplicaSet", deploymentName)
 	rsList := listDeploymentReplicaSets(c, ns, podLabels)
 	gomega.Expect(len(rsList.Items)).Should(gomega.Equal(1))
 
-	framework.Logf("Obtaining the ReplicaSet's UID")
+	e2elog.Logf("Obtaining the ReplicaSet's UID")
 	orphanedRSUID := rsList.Items[0].UID
 
-	framework.Logf("Checking the ReplicaSet has the right controllerRef")
+	e2elog.Logf("Checking the ReplicaSet has the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Deleting Deployment %q and orphaning its ReplicaSet", deploymentName)
+	e2elog.Logf("Deleting Deployment %q and orphaning its ReplicaSet", deploymentName)
 	err = orphanDeploymentReplicaSets(c, deploy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Wait for the ReplicaSet to be orphaned")
 	err = wait.Poll(dRetryPeriod, dRetryTimeout, waitDeploymentReplicaSetsOrphaned(c, ns, podLabels))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error waiting for Deployment ReplicaSet to be orphaned")
+	framework.ExpectNoError(err, "error waiting for Deployment ReplicaSet to be orphaned")
 
 	deploymentName = "test-adopt-deployment"
-	framework.Logf("Creating Deployment %q to adopt the ReplicaSet", deploymentName)
+	e2elog.Logf("Creating Deployment %q to adopt the ReplicaSet", deploymentName)
 	d = e2edeploy.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, apps.RollingUpdateDeploymentStrategyType)
 	deploy, err = c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	err = e2edeploy.WaitForDeploymentComplete(c, deploy)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Waiting for the ReplicaSet to have the right controllerRef")
+	e2elog.Logf("Waiting for the ReplicaSet to have the right controllerRef")
 	err = checkDeploymentReplicaSetsControllerRef(c, ns, deploy.UID, podLabels)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
+	e2elog.Logf("Verifying no extra ReplicaSet is created (Deployment %q still has only one ReplicaSet after adoption)", deploymentName)
 	rsList = listDeploymentReplicaSets(c, ns, podLabels)
 	gomega.Expect(len(rsList.Items)).Should(gomega.Equal(1))
 
-	framework.Logf("Verifying the ReplicaSet has the same UID as the orphaned ReplicaSet")
+	e2elog.Logf("Verifying the ReplicaSet has the same UID as the orphaned ReplicaSet")
 	gomega.Expect(rsList.Items[0].UID).Should(gomega.Equal(orphanedRSUID))
 }
 
@@ -841,107 +849,116 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	d.Spec.Strategy.RollingUpdate.MaxSurge = intOrStrP(3)
 	d.Spec.Strategy.RollingUpdate.MaxUnavailable = intOrStrP(2)
 
-	framework.Logf("Creating deployment %q", deploymentName)
+	e2elog.Logf("Creating deployment %q", deploymentName)
 	deployment, err := c.AppsV1().Deployments(ns).Create(d)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	gomega.Expect(e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for observed generation %d", deployment.Generation)
+	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
-	framework.Logf("Waiting for all required pods to come up")
+	e2elog.Logf("Waiting for all required pods to come up")
 	err = framework.VerifyPodsRunning(c, ns, NginxImageName, false, *(deployment.Spec.Replicas))
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "error in waiting for pods to come up: %v", err)
+	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
-	framework.Logf("Waiting for deployment %q to complete", deployment.Name)
-	gomega.Expect(e2edeploy.WaitForDeploymentComplete(c, deployment)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for deployment %q to complete", deployment.Name)
+	err = e2edeploy.WaitForDeploymentComplete(c, deployment)
+	framework.ExpectNoError(err)
 
 	firstRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Update the deployment with a non-existent image so that the new replica set
 	// will be blocked to simulate a partial rollout.
-	framework.Logf("Updating deployment %q with a non-existent image", deploymentName)
+	e2elog.Logf("Updating deployment %q with a non-existent image", deploymentName)
 	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *apps.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Image = "nginx:404"
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Waiting for observed generation %d", deployment.Generation)
-	gomega.Expect(e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for observed generation %d", deployment.Generation)
+	err = e2edeploy.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
+	framework.ExpectNoError(err)
 
 	// Checking state of first rollout's replicaset.
 	maxUnavailable, err := intstr.GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(deployment.Spec.Replicas)), false)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// First rollout's replicaset should have Deployment's (replicas - maxUnavailable) = 10 - 2 = 8 available replicas.
 	minAvailableReplicas := replicas - int32(maxUnavailable)
-	framework.Logf("Waiting for the first rollout's replicaset to have .status.availableReplicas = %d", minAvailableReplicas)
-	gomega.Expect(replicaset.WaitForReplicaSetTargetAvailableReplicas(c, firstRS, minAvailableReplicas)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for the first rollout's replicaset to have .status.availableReplicas = %d", minAvailableReplicas)
+	err = replicaset.WaitForReplicaSetTargetAvailableReplicas(c, firstRS, minAvailableReplicas)
+	framework.ExpectNoError(err)
 
 	// First rollout's replicaset should have .spec.replicas = 8 too.
-	framework.Logf("Waiting for the first rollout's replicaset to have .spec.replicas = %d", minAvailableReplicas)
-	gomega.Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for the first rollout's replicaset to have .spec.replicas = %d", minAvailableReplicas)
+	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, minAvailableReplicas)
+	framework.ExpectNoError(err)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
-	framework.Logf("Waiting for the first rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
+	e2elog.Logf("Waiting for the first rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(firstRS.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), firstRS)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Checking state of second rollout's replicaset.
 	secondRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	maxSurge, err := intstr.GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(*(deployment.Spec.Replicas)), false)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Second rollout's replicaset should have 0 available replicas.
-	framework.Logf("Verifying that the second rollout's replicaset has .status.availableReplicas = 0")
+	e2elog.Logf("Verifying that the second rollout's replicaset has .status.availableReplicas = 0")
 	gomega.Expect(secondRS.Status.AvailableReplicas).Should(gomega.Equal(int32(0)))
 
 	// Second rollout's replicaset should have Deployment's (replicas + maxSurge - first RS's replicas) = 10 + 3 - 8 = 5 for .spec.replicas.
 	newReplicas := replicas + int32(maxSurge) - minAvailableReplicas
-	framework.Logf("Waiting for the second rollout's replicaset to have .spec.replicas = %d", newReplicas)
-	gomega.Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Waiting for the second rollout's replicaset to have .spec.replicas = %d", newReplicas)
+	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, newReplicas)
+	framework.ExpectNoError(err)
 
 	// The desired replicas wait makes sure that the RS controller has created expected number of pods.
-	framework.Logf("Waiting for the second rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
+	e2elog.Logf("Waiting for the second rollout's replicaset of deployment %q to have desired number of replicas", deploymentName)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(secondRS.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	err = replicaset.WaitForReplicaSetDesiredReplicas(c.AppsV1(), secondRS)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Check the deployment's minimum availability.
-	framework.Logf("Verifying that deployment %q has minimum required number of available replicas", deploymentName)
+	e2elog.Logf("Verifying that deployment %q has minimum required number of available replicas", deploymentName)
 	if deployment.Status.AvailableReplicas < minAvailableReplicas {
-		gomega.Expect(fmt.Errorf("observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, minAvailableReplicas)).NotTo(gomega.HaveOccurred())
+		err = fmt.Errorf("observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, minAvailableReplicas)
+		framework.ExpectNoError(err)
 	}
 
 	// Scale the deployment to 30 replicas.
 	newReplicas = int32(30)
-	framework.Logf("Scaling up the deployment %q from %d to %d", deploymentName, replicas, newReplicas)
+	e2elog.Logf("Scaling up the deployment %q from %d to %d", deploymentName, replicas, newReplicas)
 	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *apps.Deployment) {
 		update.Spec.Replicas = &newReplicas
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
-	framework.Logf("Waiting for the replicasets of deployment %q to have desired number of replicas", deploymentName)
+	e2elog.Logf("Waiting for the replicasets of deployment %q to have desired number of replicas", deploymentName)
 	firstRS, err = c.AppsV1().ReplicaSets(ns).Get(firstRS.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	secondRS, err = c.AppsV1().ReplicaSets(ns).Get(secondRS.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// First rollout's replicaset should have .spec.replicas = 8 + (30-10)*(8/13) = 8 + 12 = 20 replicas.
 	// Note that 12 comes from rounding (30-10)*(8/13) to nearest integer.
-	framework.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
-	gomega.Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, 20)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Verifying that first rollout's replicaset has .spec.replicas = 20")
+	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, firstRS, 20)
+	framework.ExpectNoError(err)
 
 	// Second rollout's replicaset should have .spec.replicas = 5 + (30-10)*(5/13) = 5 + 8 = 13 replicas.
 	// Note that 8 comes from rounding (30-10)*(5/13) to nearest integer.
-	framework.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
-	gomega.Expect(replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, 13)).NotTo(gomega.HaveOccurred())
+	e2elog.Logf("Verifying that second rollout's replicaset has .spec.replicas = 13")
+	err = replicaset.WaitForReplicaSetTargetSpecReplicas(c, secondRS, 13)
+	framework.ExpectNoError(err)
 }
 
 func checkDeploymentReplicaSetsControllerRef(c clientset.Interface, ns string, uid types.UID, label map[string]string) error {
@@ -972,7 +989,7 @@ func listDeploymentReplicaSets(c clientset.Interface, ns string, label map[strin
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	rsList, err := c.AppsV1().ReplicaSets(ns).List(options)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(rsList.Items)).To(gomega.BeNumerically(">", 0))
 	return rsList
 }

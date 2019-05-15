@@ -18,7 +18,6 @@ package upgrades
 
 import (
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -69,12 +68,12 @@ func (t *StatefulSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
 	_, err := f.ClientSet.CoreV1().Services(ns).Create(t.service)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 	*(t.set.Spec.Replicas) = 3
 	_, err = f.ClientSet.AppsV1().StatefulSets(ns).Create(t.set)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Saturating stateful set " + t.set.Name)
 	t.tester.Saturate(t.set)

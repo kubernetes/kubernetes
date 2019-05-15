@@ -35,11 +35,12 @@ var map_AdmissionRequest = map[string]string{
 	"subResource": "SubResource is the name of the subresource being requested.  This is a different resource, scoped to the parent resource, but it may have a different kind. For instance, /pods has the resource \"pods\" and the kind \"Pod\", while /pods/foo/status has the resource \"pods\", the sub resource \"status\", and the kind \"Pod\" (because status operates on pods). The binding resource for a pod though may be /pods/foo/binding, which has resource \"pods\", subresource \"binding\", and kind \"Binding\".",
 	"name":        "Name is the name of the object as presented in the request.  On a CREATE operation, the client may omit name and rely on the server to generate the name.  If that is the case, this method will return the empty string.",
 	"namespace":   "Namespace is the namespace associated with the request (if any).",
-	"operation":   "Operation is the operation being performed",
+	"operation":   "Operation is the operation being performed. This may be different than the operation requested. e.g. a patch can result in either a CREATE or UPDATE Operation.",
 	"userInfo":    "UserInfo is information about the requesting user",
 	"object":      "Object is the object from the incoming request prior to default values being applied",
 	"oldObject":   "OldObject is the existing object. Only populated for UPDATE requests.",
 	"dryRun":      "DryRun indicates that modifications will definitely not be persisted for this request. Defaults to false.",
+	"options":     "Options is the operation option structure of the operation being performed. e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be different than the options the caller provided. e.g. for a patch request the performed Operation might be a CREATE, in which case the Options will a `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.",
 }
 
 func (AdmissionRequest) SwaggerDoc() map[string]string {

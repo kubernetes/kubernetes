@@ -25,24 +25,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-function convert-manifest-params {
-  # A helper function to convert the manifest args from a string to a list of
-  # flag arguments.
-  # Old format:
-  #   command=["/bin/sh", "-c", "exec KUBE_EXEC_BINARY --param1=val1 --param2-val2"].
-  # New format:
-  #   command=["KUBE_EXEC_BINARY"]  # No shell dependencies.
-  #   args=["--param1=val1", "--param2-val2"]
-  IFS=' ' read -ra FLAGS <<< "$1"
-  params=""
-  for flag in "${FLAGS[@]}"; do
-    params+="\n\"$flag\","
-  done
-  if [ ! -z $params ]; then
-    echo "${params::-1}"  #  drop trailing comma
-  fi
-}
-
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -116,9 +98,16 @@ function config-ip-firewall {
     iptables -w -t nat -N IP-MASQ
     iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 100.64.0.0/10 -m comment --comment "ip-masq: RFC 6598 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.0.0.0/24 -m comment --comment "ip-masq: RFC 6890 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.0.2.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.88.99.0/24 -m comment --comment "ip-masq: RFC 7526 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 198.18.0.0/15 -m comment --comment "ip-masq: RFC 2544 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 203.0.113.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 240.0.0.0/4 -m comment --comment "ip-masq: Former Class E range obsoleted by RFC 3232 is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 
@@ -596,6 +585,9 @@ function create-master-auth {
   fi
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+  fi
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "system:cluster-bootstrap,uid:system:cluster-bootstrap,system:masters"
   fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
@@ -1488,6 +1480,7 @@ function start-etcd-servers {
 #   DOCKER_REGISTRY
 #   FLEXVOLUME_HOSTPATH_MOUNT
 #   FLEXVOLUME_HOSTPATH_VOLUME
+#   INSECURE_PORT_MAPPING
 function compute-master-manifest-variables {
   CLOUD_CONFIG_OPT=""
   CLOUD_CONFIG_VOLUME=""
@@ -1508,6 +1501,11 @@ function compute-master-manifest-variables {
     FLEXVOLUME_HOSTPATH_MOUNT="{ \"name\": \"flexvolumedir\", \"mountPath\": \"${VOLUME_PLUGIN_DIR}\", \"readOnly\": true},"
     FLEXVOLUME_HOSTPATH_VOLUME="{ \"name\": \"flexvolumedir\", \"hostPath\": {\"path\": \"${VOLUME_PLUGIN_DIR}\"}},"
   fi
+
+  INSECURE_PORT_MAPPING=""
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
+    INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
+  fi 
 }
 
 # A helper function that bind mounts kubelet dirs for running mount in a chroot
@@ -1532,6 +1530,7 @@ function prepare-mounter-rootfs {
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
+#   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
   prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
@@ -1555,7 +1554,7 @@ function start-kube-apiserver {
     params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   fi
   params+=" --secure-port=443"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     # Default is :8080
     params+=" --insecure-port=0"
   fi
@@ -1832,10 +1831,6 @@ function start-kube-apiserver {
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
 
-  params+=" --log-file=${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
-  params+=" --logtostderr=false"
-  params+=" --log-file-max-size=0"
-  params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
   local -r kube_apiserver_docker_tag="${KUBE_API_SERVER_DOCKER_TAG:-$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)}"
   sed -i -e "s@{{params}}@${params}@g" "${src_file}"
@@ -1848,6 +1843,7 @@ function start-kube-apiserver {
   sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
   sed -i -e "s@{{liveness_probe_initial_delay}}@${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
+  sed -i -e "s@{{insecure_port_mapping}}@${INSECURE_PORT_MAPPING}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
   sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
@@ -2016,8 +2012,7 @@ function apply-encryption-config() {
 function start-kube-controller-manager {
   echo "Start kubernetes controller-manager"
   create-kubeconfig "kube-controller-manager" ${KUBE_CONTROLLER_MANAGER_TOKEN}
-  local LOG_PATH=/var/log/kube-controller-manager.log
-  prepare-log-file "${LOG_PATH}"
+  prepare-log-file /var/log/kube-controller-manager.log
   # Calculate variables and assemble the command line.
   local params="${CONTROLLER_MANAGER_TEST_LOG_LEVEL:-"--v=2"} ${CONTROLLER_MANAGER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
   params+=" --use-service-account-credentials"
@@ -2045,7 +2040,7 @@ function start-kube-controller-manager {
     params+=" --concurrent-service-syncs=${CONCURRENT_SERVICE_SYNCS}"
   fi
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]]; then
-    params+=" --allocate-node-cidrs"
+    params+=" --allocate-node-cidrs=true"
   elif [[ -n "${ALLOCATE_NODE_CIDRS:-}" ]]; then
     params+=" --allocate-node-cidrs=${ALLOCATE_NODE_CIDRS}"
   fi
@@ -2076,14 +2071,9 @@ function start-kube-controller-manager {
     params+=" --pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE"
   fi
   if [[ -n "${RUN_CONTROLLERS:-}" ]]; then
-    # Trim the `RUN_CONTROLLERS` value. This field is quoted which is
-    # incompatible with the `convert-manifest-params` format.
-    params+=" --controllers=${RUN_CONTROLLERS//\'}"
+    params+=" --controllers=${RUN_CONTROLLERS}"
   fi
-  params+=" --log-file=${LOG_PATH}"
-  params+=" --logtostderr=false"
-  params+=" --log-file-max-size=0"
-  params="$(convert-manifest-params "${params}")"
+
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
@@ -2118,8 +2108,7 @@ function start-kube-controller-manager {
 function start-kube-scheduler {
   echo "Start kubernetes scheduler"
   create-kubeconfig "kube-scheduler" ${KUBE_SCHEDULER_TOKEN}
-  local LOG_PATH=/var/log/kube-scheduler.log
-  prepare-log-file "${LOG_PATH}"
+  prepare-log-file /var/log/kube-scheduler.log
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
@@ -2135,11 +2124,6 @@ function start-kube-scheduler {
     params+=" --use-legacy-policy-config"
     params+=" --policy-config-file=/etc/srv/kubernetes/kube-scheduler/policy-config"
   fi
-
-  params+=" --log-file=${LOG_PATH}"
-  params+=" --logtostderr=false"
-  params+=" --log-file-max-size=0"
-  params="$(convert-manifest-params "${params}")"
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.
@@ -2859,6 +2843,14 @@ function wait-till-apiserver-ready() {
   done
 }
 
+function ensure-bootstrap-kubectl-auth {
+  # Creating an authenticated kubeconfig is only necessary if the insecure port is disabled.
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN}" ]]; then
+    create-kubeconfig "cluster-bootstrap" ${KUBE_BOOTSTRAP_TOKEN}
+    export KUBECONFIG=/etc/srv/kubernetes/cluster-bootstrap/kubeconfig
+  fi
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
@@ -2906,10 +2898,12 @@ function main() {
     fi
   fi
 
-  # generate the controller manager, scheduler and cluster autoscaler tokens here since they are only used on the master.
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
+  fi
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
@@ -2926,6 +2920,7 @@ function main() {
     create-node-pki
     create-master-pki
     create-master-auth
+    ensure-bootstrap-kubectl-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth

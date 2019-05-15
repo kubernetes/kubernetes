@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
@@ -51,7 +50,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
@@ -104,7 +103,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// the cluster is restored to health.
 			ginkgo.By("waiting for system pods to successfully restart")
 			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("should be able to delete nodes", func() {
@@ -112,20 +111,20 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
 			numNodes, err := framework.NumberOfRegisteredNodes(c)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
 			ginkgo.By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			err = framework.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
 				"the now non-existent node and the RC to recreate it")
@@ -133,7 +132,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 
 			ginkgo.By("verifying whether the pods from the removed node are recreated")
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 
 		// TODO: Bug here - testName is not correct
@@ -143,26 +142,26 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
 			numNodes, err := framework.NumberOfRegisteredNodes(c)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
 			ginkgo.By(fmt.Sprintf("increasing cluster size to %d", targetNumNodes))
 			err = framework.ResizeGroup(group, targetNumNodes)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			err = framework.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
 			err = resizeRC(c, ns, name, originalNodeCount+1)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			err = framework.VerifyPods(c, ns, name, true, originalNodeCount+1)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		})
 	})
 })

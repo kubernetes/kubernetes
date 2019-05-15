@@ -22,7 +22,6 @@ go_library(
         "//cmd/kube-apiserver/app:go_default_library",
         "//pkg/util/prometheusclientgo:go_default_library",
         "//pkg/version/prometheus:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
     ],
 )

@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -90,7 +91,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no jobs are scheduled")
 		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, false)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
@@ -127,7 +128,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no more jobs are scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 2)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -182,7 +183,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring no unexpected event has happened")
 		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
@@ -212,7 +213,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 
 		ginkgo.By("Ensuring the job is not in the cronjob active list")
@@ -423,7 +424,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
 		} else if len(aliveJobs) == 0 {
-			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
+			e2elog.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
 		return aliveJobs[0].Name != previousJobName, nil

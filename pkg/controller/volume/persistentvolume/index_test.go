@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
@@ -1145,7 +1145,7 @@ func TestVolumeModeCheck(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
 			expectedMismatch, err := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 			if err != nil {
 				t.Errorf("Unexpected failure for checkVolumeModeMismatches: %v", err)
@@ -1237,7 +1237,7 @@ func TestFilteringVolumeModes(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
 			pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc, false)
 			// expected to match but either got an error or no returned pvmatch
 			if pvmatch == nil && scenario.isExpectedMatch {
@@ -1325,7 +1325,7 @@ func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 
 	for name, testCase := range satisfyingTestCases {
 		t.Run(name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
 
 			err := checkVolumeSatisfyClaim(testCase.vol, testCase.pvc)
 			// expected to match but got an error
@@ -1372,7 +1372,7 @@ func TestStorageObjectInUseProtectionFiltering(t *testing.T) {
 	}
 	for name, testCase := range filteringTestCases {
 		t.Run(name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageObjectInUseProtection, testCase.enableStorageObjectInUseProtection)()
 
 			pvmatch, err := testCase.vol.findBestMatchForClaim(testCase.pvc, false)
 			// expected to match but either got an error or no returned pvmatch

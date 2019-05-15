@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,7 +36,7 @@ import (
 // Slow by design (7 min)
 var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
 	f := framework.NewDefaultFramework("pod-garbage-collector")
-	It("should handle the creation of 1000 pods", func() {
+	ginkgo.It("should handle the creation of 1000 pods", func() {
 		var count int
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		timeout := 2 * time.Minute
 		gcThreshold := 100
 
-		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
+		ginkgo.By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
 			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {

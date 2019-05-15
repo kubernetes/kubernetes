@@ -161,6 +161,7 @@ type Config struct {
 		CAFile          string `gcfg:"ca-file"`
 		SecretName      string `gcfg:"secret-name"`
 		SecretNamespace string `gcfg:"secret-namespace"`
+		KubeconfigPath  string `gcfg:"kubeconfig-path"`
 	}
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
@@ -238,6 +239,7 @@ func configFromEnv() (cfg Config, ok bool) {
 
 	cfg.Global.SecretName = os.Getenv("SECRET_NAME")
 	cfg.Global.SecretNamespace = os.Getenv("SECRET_NAMESPACE")
+	cfg.Global.KubeconfigPath = os.Getenv("KUBECONFIG_PATH")
 
 	ok = cfg.Global.AuthURL != "" &&
 		cfg.Global.Username != "" &&
@@ -253,11 +255,10 @@ func configFromEnv() (cfg Config, ok bool) {
 	return
 }
 
-func createKubernetesClient() (*kubernetes.Clientset, error) {
+func createKubernetesClient(kubeconfigPath string) (*kubernetes.Clientset, error) {
 	klog.Info("Creating kubernetes API client.")
 
-	// create in-cluster config
-	cfg, err := clientcmd.BuildConfigFromFlags("", "")
+	cfg, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -280,8 +281,9 @@ func createKubernetesClient() (*kubernetes.Clientset, error) {
 func setConfigFromSecret(cfg *Config) error {
 	secretName := cfg.Global.SecretName
 	secretNamespace := cfg.Global.SecretNamespace
+	kubeconfigPath := cfg.Global.KubeconfigPath
 
-	k8sClient, err := createKubernetesClient()
+	k8sClient, err := createKubernetesClient(kubeconfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to get kubernetes client: %v", err)
 	}

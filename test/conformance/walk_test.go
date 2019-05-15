@@ -80,6 +80,18 @@ var _ = framework.KubeDescribe("Feature", func() {
 		Description: `By default the stdout and stderr from the process
 being executed in a pod MUST be sent to the pod's logs.` + "\n\n"}},
 	},
+	{"e2e/foo.go", `
+var _ = framework.KubeDescribe("Feature", func() {
+	Context("with context and extra spaces before It block should still pick up Testname", func() {
+		//					Testname: Test with spaces		
+		//Description: Should pick up testname even if it is not within 3 spaces
+		//even when executed from memory.
+		framework.ConformanceIt("should work", func() {})
+	})
+})`, []conformanceData{{URL: "https://github.com/kubernetes/kubernetes/tree/master/e2e/foo.go#L8", TestName: "Test with spaces",
+		Description: `Should pick up testname even if it is not within 3 spaces
+even when executed from memory.` + "\n\n"}},
+	},
 }
 
 func TestConformance(t *testing.T) {

@@ -101,9 +101,10 @@ func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind sch
 		Name: "webhook-test",
 		UID:  "webhook-test",
 	}
+	options := &metav1.UpdateOptions{}
 
 	return &FakeAttributes{
-		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo),
+		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, options, dryRun, &userInfo),
 	}
 }
 

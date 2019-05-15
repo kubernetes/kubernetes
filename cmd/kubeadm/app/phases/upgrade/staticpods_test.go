@@ -468,7 +468,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				t.Fatalf("couldn't run NewFakeStaticPodPathManager: %v", err)
 			}
 			defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
-			constants.KubernetesDir = pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
+			tmpKubernetesDir := pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
 
 			tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
 			if err != nil {
@@ -505,7 +505,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				if rt.skipKubeConfig == kubeConfig {
 					continue
 				}
-				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, constants.KubernetesDir, oldcfg); err != nil {
+				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpKubernetesDir, oldcfg); err != nil {
 					t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
 				}
 			}
@@ -639,7 +639,7 @@ func TestCleanupDirs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			realManifestDir, cleanup := getTempDir(t, "realManifestDir")
+			realKubernetesDir, cleanup := getTempDir(t, "realKubernetesDir")
 			defer cleanup()
 
 			tempManifestDir, cleanup := getTempDir(t, "tempManifestDir")
@@ -651,7 +651,7 @@ func TestCleanupDirs(t *testing.T) {
 			backupEtcdDir, cleanup := getTempDir(t, "backupEtcdDir")
 			defer cleanup()
 
-			mgr := NewKubeStaticPodPathManager(realManifestDir, tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
+			mgr := NewKubeStaticPodPathManager(realKubernetesDir, tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
 			err := mgr.CleanupDirs()
 			if err != nil {
 				t.Errorf("unexpected error cleaning up: %v", err)

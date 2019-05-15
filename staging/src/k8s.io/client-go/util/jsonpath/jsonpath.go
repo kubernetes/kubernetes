@@ -93,17 +93,17 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 
 		// encounter an end node, break the current block
 		if j.endRange > 0 && j.endRange <= j.inRange {
-			j.endRange -= 1
+			j.endRange--
 			break
 		}
 		// encounter a range node, start a range loop
 		if j.beginRange > 0 {
-			j.beginRange -= 1
-			j.inRange += 1
+			j.beginRange--
+			j.inRange++
 			for k, value := range results {
 				j.parser.Root.Nodes = nodes[i+1:]
 				if k == len(results)-1 {
-					j.inRange -= 1
+					j.inRange--
 				}
 				nextResults, err := j.FindResults(value.Interface())
 				if err != nil {
@@ -213,11 +213,11 @@ func (j *JSONPath) evalIdentifier(input []reflect.Value, node *IdentifierNode) (
 	switch node.Name {
 	case "range":
 		j.stack = append(j.stack, j.cur)
-		j.beginRange += 1
+		j.beginRange++
 		results = input
 	case "end":
 		if j.endRange < j.inRange { // inside a loop, break the current block
-			j.endRange += 1
+			j.endRange++
 			break
 		}
 		// the loop is about to end, pop value and continue the following execution

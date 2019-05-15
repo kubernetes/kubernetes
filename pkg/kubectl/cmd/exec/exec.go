@@ -82,7 +82,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Executor: &DefaultRemoteExecutor{},
 	}
 	cmd := &cobra.Command{
-		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] -- COMMAND [args...]",
+		Use:                   "exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Execute a command in a container"),
 		Long:                  "Execute a command in a container.",

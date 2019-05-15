@@ -19,6 +19,7 @@ package upgrade
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -47,6 +48,8 @@ const (
 type StaticPodPathManager interface {
 	// MoveFile should move a file from oldPath to newPath
 	MoveFile(oldPath, newPath string) error
+	// KubernetesDir is the directory Kubernetes owns for storing various configuration files
+	KubernetesDir() string
 	// RealManifestPath gets the file path for the component in the "real" static pod manifest directory used by the kubelet
 	RealManifestPath(component string) string
 	// RealManifestDir should point to the static pod manifest directory used by the kubelet
@@ -67,6 +70,7 @@ type StaticPodPathManager interface {
 
 // KubeStaticPodPathManager is a real implementation of StaticPodPathManager that is used when upgrading a static pod cluster
 type KubeStaticPodPathManager struct {
+	kubernetesDir     string
 	realManifestDir   string
 	tempManifestDir   string
 	backupManifestDir string
@@ -77,9 +81,10 @@ type KubeStaticPodPathManager struct {
 }
 
 // NewKubeStaticPodPathManager creates a new instance of KubeStaticPodPathManager
-func NewKubeStaticPodPathManager(realDir, tempDir, backupDir, backupEtcdDir string, keepManifestDir, keepEtcdDir bool) StaticPodPathManager {
+func NewKubeStaticPodPathManager(kubernetesDir, tempDir, backupDir, backupEtcdDir string, keepManifestDir, keepEtcdDir bool) StaticPodPathManager {
 	return &KubeStaticPodPathManager{
-		realManifestDir:   realDir,
+		kubernetesDir:     kubernetesDir,
+		realManifestDir:   filepath.Join(kubernetesDir, constants.ManifestsSubDirName),
 		tempManifestDir:   tempDir,
 		backupManifestDir: backupDir,
 		backupEtcdDir:     backupEtcdDir,
@@ -89,26 +94,32 @@ func NewKubeStaticPodPathManager(realDir, tempDir, backupDir, backupEtcdDir stri
 }
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
-func NewKubeStaticPodPathManagerUsingTempDirs(realManifestDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
-	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgraded-manifests")
+func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
+
+	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm(kubernetesDir, "kubeadm-upgraded-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupManifestsDir, err := constants.CreateTimestampDirForKubeadm("kubeadm-backup-manifests")
+	backupManifestsDir, err := constants.CreateTimestampDirForKubeadm(kubernetesDir, "kubeadm-backup-manifests")
 	if err != nil {
 		return nil, err
 	}
-	backupEtcdDir, err := constants.CreateTimestampDirForKubeadm("kubeadm-backup-etcd")
+	backupEtcdDir, err := constants.CreateTimestampDirForKubeadm(kubernetesDir, "kubeadm-backup-etcd")
 	if err != nil {
 		return nil, err
 	}
 
-	return NewKubeStaticPodPathManager(realManifestDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir, saveManifestsDir, saveEtcdDir), nil
+	return NewKubeStaticPodPathManager(kubernetesDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir, saveManifestsDir, saveEtcdDir), nil
 }
 
 // MoveFile should move a file from oldPath to newPath
 func (spm *KubeStaticPodPathManager) MoveFile(oldPath, newPath string) error {
 	return os.Rename(oldPath, newPath)
+}
+
+// KubernetesDir should point to the directory Kubernetes owns for storing various configuration files
+func (spm *KubeStaticPodPathManager) KubernetesDir() string {
+	return spm.kubernetesDir
 }
 
 // RealManifestPath gets the file path for the component in the "real" static pod manifest directory used by the kubelet
@@ -202,7 +213,7 @@ func upgradeComponent(component string, renewCerts bool, waiter apiclient.Waiter
 	// if certificate renewal should be performed
 	if renewCerts {
 		// renew all the certificates used by the current component
-		if err := renewCertsByComponent(cfg, constants.KubernetesDir, component); err != nil {
+		if err := renewCertsByComponent(cfg, pathMgr.KubernetesDir(), component); err != nil {
 			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to renew certificates for component %q", component), pathMgr, recoverEtcd)
 		}
 	}
@@ -452,7 +463,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 
 	if renewCerts {
 		// renew the certificate embedded in the admin.conf file
-		err := renewEmbeddedCertsByName(cfg, constants.KubernetesDir, constants.AdminKubeConfigFileName)
+		err := renewEmbeddedCertsByName(cfg, pathMgr.KubernetesDir(), constants.AdminKubeConfigFileName)
 		if err != nil {
 			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.AdminKubeConfigFileName), pathMgr, false)
 		}

@@ -228,6 +228,7 @@ func (config *DirectClientConfig) getUserIdentificationPartialConfig(configAuthI
 	// blindly overwrite existing values based on precedence
 	if len(configAuthInfo.Token) > 0 {
 		mergedConfig.BearerToken = configAuthInfo.Token
+		mergedConfig.BearerTokenFile = configAuthInfo.TokenFile
 	} else if len(configAuthInfo.TokenFile) > 0 {
 		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
@@ -491,6 +492,7 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		}
 		if token := config.overrides.AuthInfo.Token; len(token) > 0 {
 			icc.BearerToken = token
+			icc.BearerTokenFile = ""
 		}
 		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
 			icc.TLSClientConfig.CAFile = certificateAuthorityFile

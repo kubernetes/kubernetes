@@ -41,7 +41,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		if len(secretNeedClean) > 0 {
 			By("delete the bootstrap token secret")
 			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(secretNeedClean, &metav1.DeleteOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			secretNeedClean = ""
 		}
 	})
@@ -52,22 +52,22 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 	It("should sign the new added bootstrap tokens", func() {
 		By("create a new bootstrap token secret")
 		tokenId, err := GenerateTokenId()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("wait for the bootstrap token secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	It("should resign the bootstrap tokens when the clusterInfo ConfigMap updated [Serial][Disruptive]", func() {
 		By("create a new bootstrap token secret")
 		tokenId, err := GenerateTokenId()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		secret, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
@@ -76,49 +76,49 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
 
 		cfgMap, err := f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		signedToken, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenId]
 		Expect(ok).Should(Equal(true))
 
 		By("update the cluster-info ConfigMap")
 		originalData := cfgMap.Data[bootstrapapi.KubeConfigKey]
 		updatedKubeConfig, err := randBytes(20)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		cfgMap.Data[bootstrapapi.KubeConfigKey] = updatedKubeConfig
 		_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(cfgMap)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		defer func() {
 			By("update back the cluster-info ConfigMap")
 			cfgMap, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			cfgMap.Data[bootstrapapi.KubeConfigKey] = originalData
 			_, err = f.ClientSet.CoreV1().ConfigMaps(metav1.NamespacePublic).Update(cfgMap)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		}()
 
 		By("wait for signed bootstrap token updated")
 		err = WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c, tokenId, signedToken)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	It("should delete the signed bootstrap tokens from clusterInfo ConfigMap when bootstrap token is deleted", func() {
 		By("create a new bootstrap token secret")
 		tokenId, err := GenerateTokenId()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenId, "tokenSecret")
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("wait for the bootstrap secret be signed")
 		err = WaitforSignedClusterInfoByBootStrapToken(c, tokenId)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("delete the bootstrap token secret")
 		err = c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(bootstrapapi.BootstrapTokenSecretPrefix+tokenId, &metav1.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("wait for the bootstrap token removed from cluster-info ConfigMap")
 		err = WaitForSignedClusterInfoByBootstrapTokenToDisappear(c, tokenId)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 })

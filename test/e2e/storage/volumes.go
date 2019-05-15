@@ -15,10 +15,11 @@ limitations under the License.
 */
 
 // This test is volumes test for configmap.
+
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -36,13 +37,13 @@ var _ = utils.SIGDescribe("Volumes", func() {
 	var cs clientset.Interface
 	var namespace *v1.Namespace
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		namespace = f.Namespace
 	})
 
-	Describe("ConfigMap", func() {
-		It("should be mountable", func() {
+	ginkgo.Describe("ConfigMap", func() {
+		ginkgo.It("should be mountable", func() {
 			config := volume.TestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "configmap",

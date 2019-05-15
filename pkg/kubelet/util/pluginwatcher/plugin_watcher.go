@@ -155,14 +155,17 @@ func (w *Watcher) Stop() error {
 	close(w.stopCh)
 
 	c := make(chan struct{})
+	var once sync.Once
+	closeFunc := func() { close(c) }
 	go func() {
-		defer close(c)
+		defer once.Do(closeFunc)
 		w.wg.Wait()
 	}()
 
 	select {
 	case <-c:
 	case <-time.After(11 * time.Second):
+		once.Do(closeFunc)
 		return fmt.Errorf("timeout on stopping watcher")
 	}
 
