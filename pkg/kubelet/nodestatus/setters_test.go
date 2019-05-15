@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -55,12 +56,13 @@ const (
 // TODO(mtaufen): below is ported from the old kubelet_node_status_test.go code, potentially add more test coverage for NodeAddress setter in future
 func TestNodeAddress(t *testing.T) {
 	cases := []struct {
-		name              string
-		hostnameOverride  bool
-		nodeIP            net.IP
-		nodeAddresses     []v1.NodeAddress
-		expectedAddresses []v1.NodeAddress
-		shouldError       bool
+		name                  string
+		hostnameOverride      bool
+		nodeIP                net.IP
+		externalCloudProvider bool
+		nodeAddresses         []v1.NodeAddress
+		expectedAddresses     []v1.NodeAddress
+		shouldError           bool
 	}{
 		{
 			name:   "A single InternalIP",
@@ -193,6 +195,17 @@ func TestNodeAddress(t *testing.T) {
 			shouldError:      false,
 		},
 		{
+			name:                  "cloud provider is external",
+			nodeIP:                net.ParseIP("10.0.0.1"),
+			nodeAddresses:         []v1.NodeAddress{},
+			externalCloudProvider: true,
+			expectedAddresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
+				{Type: v1.NodeHostName, Address: testKubeletHostname},
+			},
+			shouldError: false,
+		},
+		{
 			name: "cloud doesn't report hostname, no override, detected hostname mismatch",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
@@ -241,6 +254,9 @@ func TestNodeAddress(t *testing.T) {
 			existingNode := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Annotations: make(map[string]string)},
 				Spec:       v1.NodeSpec{},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{},
+				},
 			}
 
 			nodeIP := testCase.nodeIP
@@ -248,13 +264,21 @@ func TestNodeAddress(t *testing.T) {
 				return nil
 			}
 			hostname := testKubeletHostname
-			externalCloudProvider := false
-			cloud := &fakecloud.Cloud{
-				Addresses: testCase.nodeAddresses,
-				Err:       nil,
-			}
+
 			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
 				return testCase.nodeAddresses, nil
+			}
+
+			// cloud provider is expected to be nil if external provider is set
+			var cloud cloudprovider.Interface
+			if testCase.externalCloudProvider {
+				cloud = nil
+			} else {
+				cloud = &fakecloud.Cloud{
+					Addresses: testCase.nodeAddresses,
+					Err:       nil,
+				}
+
 			}
 
 			// construct setter
@@ -262,7 +286,7 @@ func TestNodeAddress(t *testing.T) {
 				nodeIPValidator,
 				hostname,
 				testCase.hostnameOverride,
-				externalCloudProvider,
+				testCase.externalCloudProvider,
 				cloud,
 				nodeAddressesFunc)
 
