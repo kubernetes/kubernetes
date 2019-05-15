@@ -46,9 +46,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -1895,7 +1895,7 @@ func setDaemonSetCritical(ds *apps.DaemonSet) {
 	if ds.Spec.Template.ObjectMeta.Annotations == nil {
 		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
 	}
-	ds.Spec.Template.ObjectMeta.Annotations[kubelettypes.CriticalPodAnnotationKey] = ""
+	ds.Spec.Template.ObjectMeta.Annotations[scheduling.CriticalPodAnnotationKey] = ""
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {

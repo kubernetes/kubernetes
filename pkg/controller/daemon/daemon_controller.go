@@ -18,6 +18,7 @@ package daemon
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"reflect"
 	"sort"
 	"sync"
@@ -52,7 +53,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -1480,7 +1480,7 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []pred
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
-	critical := kubelettypes.IsCriticalPod(pod)
+	critical := scheduling.IsCriticalPod(pod)
 
 	fit, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	if err != nil {

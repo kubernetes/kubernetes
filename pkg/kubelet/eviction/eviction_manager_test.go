@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -1155,7 +1156,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 	// Mark the pod as critical
 	pods[0].Annotations = map[string]string{
-		kubelettypes.CriticalPodAnnotationKey:  "",
+		scheduling.CriticalPodAnnotationKey:    "",
 		kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 	}
 	pods[0].Namespace = kubeapi.NamespaceSystem

@@ -33,7 +33,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -183,7 +182,7 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 		// Remove when no longer needed.
 		if len(pod.Spec.PriorityClassName) == 0 &&
 			utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-			kubelettypes.IsCritical(a.GetNamespace(), pod.Annotations) {
+			scheduling.IsCritical(a.GetNamespace(), pod.Annotations) {
 			pod.Spec.PriorityClassName = scheduling.SystemClusterCritical
 		}
 		if len(pod.Spec.PriorityClassName) == 0 {

@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -143,11 +143,11 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 	if critical {
 		pod.ObjectMeta.Namespace = kubeapi.NamespaceSystem
 		pod.ObjectMeta.Annotations = map[string]string{
-			kubelettypes.CriticalPodAnnotationKey: "",
+			scheduling.CriticalPodAnnotationKey: "",
 		}
-		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeTrue(), "pod should be a critical pod")
+		Expect(scheduling.IsCritical(pod.Namespace, pod.Annotations)).To(BeTrue(), "pod should be a critical pod")
 	} else {
-		Expect(kubelettypes.IsCritical(pod.Namespace, pod.Annotations)).To(BeFalse(), "pod should not be a critical pod")
+		Expect(scheduling.IsCritical(pod.Namespace, pod.Annotations)).To(BeFalse(), "pod should not be a critical pod")
 	}
 	return pod
 }

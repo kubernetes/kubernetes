@@ -18,6 +18,7 @@ package preemption
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"math"
 
 	"k8s.io/api/core/v1"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 )
@@ -61,7 +61,7 @@ func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPod
 // HandleAdmissionFailure gracefully handles admission rejection, and, in some cases,
 // to allow admission of the pod despite its previous failure.
 func (c *CriticalPodAdmissionHandler) HandleAdmissionFailure(admitPod *v1.Pod, failureReasons []predicates.PredicateFailureReason) (bool, []predicates.PredicateFailureReason, error) {
-	if !kubetypes.IsCriticalPod(admitPod) {
+	if !scheduling.IsCriticalPod(admitPod) {
 		return false, failureReasons, nil
 	}
 	// InsufficientResourceError is not a reason to reject a critical pod.
@@ -228,7 +228,7 @@ func (a admissionRequirementList) toString() string {
 // can be preempted by preemptor pod.
 func sortPodsByQOS(preemptor *v1.Pod, pods []*v1.Pod) (bestEffort, burstable, guaranteed []*v1.Pod) {
 	for _, pod := range pods {
-		if kubetypes.Preemptable(preemptor, pod) {
+		if scheduling.Preemptable(preemptor, pod) {
 			switch v1qos.GetPodQOS(pod) {
 			case v1.PodQOSBestEffort:
 				bestEffort = append(bestEffort, pod)

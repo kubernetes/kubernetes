@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -173,7 +174,7 @@ func TestIsCriticalPod(t *testing.T) {
 		},
 	}
 	for i, data := range cases {
-		actual := IsCriticalPod(&data.pod)
+		actual := scheduling.IsCriticalPod(&data.pod)
 		if actual != data.expected {
 			t.Errorf("IsCriticalPod result wrong:\nexpected: %v\nactual: %v for test[%d] with Annotations: %v",
 				data.expected, actual, i, data.pod.Annotations)
@@ -199,7 +200,7 @@ func TestIsCriticalPodBasedOnPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		actual := IsCriticalPodBasedOnPriority(test.priority)
+		actual := scheduling.IsCriticalPodBasedOnPriority(test.priority)
 		if actual != test.expected {
 			t.Errorf("IsCriticalPodBased on priority should have returned %v for test %v but got %v", test.expected, test.description, actual)
 		}

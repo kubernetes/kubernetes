@@ -29,7 +29,6 @@ import (
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -431,7 +430,7 @@ func getTestPods() map[string]*v1.Pod {
 		}),
 	}
 	allPods[critical].Namespace = kubeapi.NamespaceSystem
-	allPods[critical].Annotations[kubetypes.CriticalPodAnnotationKey] = ""
+	allPods[critical].Annotations[scheduling.CriticalPodAnnotationKey] = ""
 
 	allPods[clusterCritical].Namespace = kubeapi.NamespaceSystem
 	allPods[clusterCritical].Spec.PriorityClassName = scheduling.SystemClusterCritical

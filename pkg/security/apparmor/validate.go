@@ -28,8 +28,14 @@ import (
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpath "k8s.io/utils/path"
+)
+
+const (
+	// different container runtimes
+	// need to be in sync with pkg/kubelet/types/constants.go
+	DockerContainerRuntime = "docker"
+	RemoteContainerRuntime = "remote"
 )
 
 // Whether AppArmor should be disabled by default.
@@ -112,7 +118,7 @@ func validateHost(runtime string) error {
 	}
 
 	// Check runtime support. Currently only Docker is supported.
-	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
+	if runtime != DockerContainerRuntime && runtime != RemoteContainerRuntime {
 		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q.", runtime)
 	}
 

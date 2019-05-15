@@ -18,6 +18,7 @@ package eviction
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"sort"
 	"sync"
 	"time"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
@@ -135,7 +135,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if kubelettypes.IsCriticalPod(attrs.Pod) {
+	if scheduling.IsCriticalPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 	// the node has memory pressure, admit if not best-effort
@@ -553,7 +553,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		// need mirrorPod to check its "priority" value; static pod doesn't carry it
 		if mirrorPod, ok := m.mirrorPodFunc(pod); ok && mirrorPod != nil {
 			// skip only when it's a static and critical pod
-			if kubelettypes.IsCriticalPod(mirrorPod) {
+			if scheduling.IsCriticalPod(mirrorPod) {
 				klog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
 				return false
 			}
