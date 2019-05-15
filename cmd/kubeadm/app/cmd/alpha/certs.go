@@ -19,14 +19,16 @@ package alpha
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -36,14 +38,16 @@ import (
 
 var (
 	genericCertRenewLongDesc = normalizer.LongDesc(`
-		Renew the %[1]s, and save them into %[2]s.cert and %[2]s.key files.
+	Renew the %s.
 
-    Extra attributes such as SANs will be based on the existing certificates, there is no need to resupply them.
-`)
-	genericCertRenewEmbeddedLongDesc = normalizer.LongDesc(`
-Renew the certificate embedded in the kubeconfig file %s.
+	Renewals run unconditionally, regardless of certificate expiration date; extra attributes such as SANs will 
+	be based on the existing file/certificates, there is no need to resupply them.
 
-Kubeconfig attributes and certificate extra attributes such as SANs will be based on the existing kubeconfig/certificates, there is no need to resupply them.
+	Renewal by default tries to use the certificate authority in the local PKI managed by kubeadm; as alternative
+	it is possible to use K8s certificate API for certificate renewal, or as a last option, to generate a CSR request.
+
+	After renewal, in order to make changes effective, is is required to restart control-plane components and
+	eventually re-distribute the renewed certificate in case the file is used elsewhere.
 `)
 
 	allLongDesc = normalizer.LongDesc(`
@@ -78,17 +82,17 @@ func newCmdCertsRenewal() *cobra.Command {
 	return cmd
 }
 
-type renewConfig struct {
+type renewFlags struct {
 	cfgPath        string
 	kubeconfigPath string
 	cfg            kubeadmapiv1beta2.InitConfiguration
 	useAPI         bool
-	useCSR         bool
+	csrOnly        bool
 	csrPath        string
 }
 
 func getRenewSubCommands(kdir string) []*cobra.Command {
-	cfg := &renewConfig{
+	flags := &renewFlags{
 		cfg: kubeadmapiv1beta2.InitConfiguration{
 			ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
 				// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
@@ -97,45 +101,28 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 		},
 	}
 	// Default values for the cobra help text
-	kubeadmscheme.Scheme.Default(&cfg.cfg)
+	kubeadmscheme.Scheme.Default(&flags.cfg)
 
-	certTree, err := certsphase.GetDefaultCertList().AsMap().CertTree()
+	// Get a renewal manager for a generic Cluster configuration, that is used only for getting
+	// the list of certificates for building subcommands
+	rm, err := renewal.NewManager(&kubeadmapi.ClusterConfiguration{}, "")
 	kubeadmutil.CheckErr(err)
 
 	cmdList := []*cobra.Command{}
 	funcList := []func(){}
 
-	for caCert, certs := range certTree {
-		// Don't offer to renew CAs; would cause serious consequences
-		for _, cert := range certs {
-			// get the cobra.Command skeleton for this command
-			cmd := generateCertRenewalCommand(cert, cfg)
-			// get the implementation of renewing this certificate
-			renewalFunc := func(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func() {
-				return func() { renewCert(cert, caCert, cfg) }
-			}(cert, caCert)
-			// install the implementation into the command
-			cmd.Run = func(*cobra.Command, []string) { renewalFunc() }
-			cmdList = append(cmdList, cmd)
-			// Collect renewal functions for `renew all`
-			funcList = append(funcList, renewalFunc)
-		}
-	}
-
-	kubeconfigs := []string{
-		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.ControllerManagerKubeConfigFileName,
-		kubeadmconstants.SchedulerKubeConfigFileName,
-		//NB. we are escluding KubeletKubeConfig from renewal because management of this certificate is delegated to kubelet
-	}
-
-	for _, k := range kubeconfigs {
+	for _, handler := range rm.Certificates() {
 		// get the cobra.Command skeleton for this command
-		cmd := generateEmbeddedCertRenewalCommand(k, cfg)
+		cmd := &cobra.Command{
+			Use:   handler.Name,
+			Short: fmt.Sprintf("Renew the %s", handler.LongName),
+			Long:  fmt.Sprintf(genericCertRenewLongDesc, handler.LongName),
+		}
+		addFlags(cmd, flags)
 		// get the implementation of renewing this certificate
-		renewalFunc := func(kdir, k string) func() {
-			return func() { renewEmbeddedCert(kdir, k, cfg) }
-		}(kdir, k)
+		renewalFunc := func(handler *renewal.CertificateRenewHandler) func() {
+			return func() { renewCert(flags, kdir, handler) }
+		}(handler)
 		// install the implementation into the command
 		cmd.Run = func(*cobra.Command, []string) { renewalFunc() }
 		cmdList = append(cmdList, cmd)
@@ -153,134 +140,60 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 			}
 		},
 	}
-	addFlags(allCmd, cfg)
+	addFlags(allCmd, flags)
 
 	cmdList = append(cmdList, allCmd)
 	return cmdList
 }
 
-func addFlags(cmd *cobra.Command, cfg *renewConfig) {
-	options.AddConfigFlag(cmd.Flags(), &cfg.cfgPath)
-	options.AddCertificateDirFlag(cmd.Flags(), &cfg.cfg.CertificatesDir)
-	options.AddKubeConfigFlag(cmd.Flags(), &cfg.kubeconfigPath)
-	options.AddCSRFlag(cmd.Flags(), &cfg.useCSR)
-	options.AddCSRDirFlag(cmd.Flags(), &cfg.csrPath)
-	cmd.Flags().BoolVar(&cfg.useAPI, "use-api", cfg.useAPI, "Use the Kubernetes certificate API to renew certificates")
+func addFlags(cmd *cobra.Command, flags *renewFlags) {
+	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
+	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
+	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
+	options.AddCSRFlag(cmd.Flags(), &flags.csrOnly)
+	options.AddCSRDirFlag(cmd.Flags(), &flags.csrPath)
+	cmd.Flags().BoolVar(&flags.useAPI, "use-api", flags.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
-func renewCert(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert, cfg *renewConfig) {
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfg.cfgPath, &cfg.cfg)
+func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenewHandler) {
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &flags.cfg)
 	kubeadmutil.CheckErr(err)
 
-	// if the renewal operation is set to generate only CSR request
-	if cfg.useCSR {
-		// trigger CSR generation in the csrPath, or if this one is missing, in the CertificateDir
-		path := cfg.csrPath
-		if path == "" {
-			path = cfg.cfg.CertificatesDir
+	// Get a renewal manager for the given cluster configuration
+	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
+	kubeadmutil.CheckErr(err)
+
+	// if the renewal operation is set to generate CSR request only
+	if flags.csrOnly {
+		// checks a path for storing CSR request is given
+		if flags.csrPath == "" {
+			kubeadmutil.CheckErr(errors.New("please provide a path where CSR request should be stored"))
 		}
-		err := certsphase.CreateCSR(cert, internalcfg, path)
+		err := rm.CreateRenewCSR(handler.Name, flags.csrPath)
 		kubeadmutil.CheckErr(err)
 		return
 	}
 
 	// otherwise, the renewal operation has to actually renew a certificate
 
-	var externalCA bool
-	switch caCert.BaseName {
-	case kubeadmconstants.CACertAndKeyBaseName:
-		// Check if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
-		externalCA, _ = certsphase.UsingExternalCA(&internalcfg.ClusterConfiguration)
-	case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
-		// Check if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
-		externalCA, _ = certsphase.UsingExternalFrontProxyCA(&internalcfg.ClusterConfiguration)
-	default:
-		externalCA = false
-	}
-
-	if !externalCA {
-		renewer, err := getRenewer(cfg, caCert.BaseName)
-		kubeadmutil.CheckErr(err)
-
-		err = renewal.RenewExistingCert(internalcfg.CertificatesDir, cert.BaseName, renewer)
-		kubeadmutil.CheckErr(err)
-
-		fmt.Printf("Certificate %s renewed\n", cert.Name)
-		return
-	}
-
-	fmt.Printf("Detected external %s, certificate %s can't be renewed\n", cert.CAName, cert.Name)
-}
-
-func renewEmbeddedCert(kdir, k string, cfg *renewConfig) {
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfg.cfgPath, &cfg.cfg)
-	kubeadmutil.CheckErr(err)
-
-	// if the renewal operation is set to generate only CSR request
-	if cfg.useCSR {
-		// trigger CSR generation in the csrPath, or if this one is missing, in the CertificateDir
-		path := cfg.csrPath
-		if path == "" {
-			path = cfg.cfg.CertificatesDir
-		}
-		err := certsphase.CreateCSR(nil, internalcfg, path)
-		kubeadmutil.CheckErr(err)
-		return
-	}
-
-	// otherwise, the renewal operation has to actually renew a certificate
-
-	// Check if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
-	externalCA, _ := certsphase.UsingExternalCA(&internalcfg.ClusterConfiguration)
-
-	if !externalCA {
-		renewer, err := getRenewer(cfg, certsphase.KubeadmCertRootCA.BaseName)
-		kubeadmutil.CheckErr(err)
-
-		err = renewal.RenewEmbeddedClientCert(kdir, k, renewer)
-		kubeadmutil.CheckErr(err)
-
-		fmt.Printf("Certificate embedded in %s renewed\n", k)
-		return
-	}
-
-	fmt.Printf("Detected external CA, certificate embedded in %s can't be renewed\n", k)
-}
-
-func generateCertRenewalCommand(cert *certsphase.KubeadmCert, cfg *renewConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   cert.Name,
-		Short: fmt.Sprintf("Renew the %s", cert.LongName),
-		Long:  fmt.Sprintf(genericCertRenewLongDesc, cert.LongName, cert.BaseName),
-	}
-	addFlags(cmd, cfg)
-	return cmd
-}
-
-func generateEmbeddedCertRenewalCommand(k string, cfg *renewConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   k,
-		Short: fmt.Sprintf("Renew the certificate embedded in %s", k),
-		Long:  fmt.Sprintf(genericCertRenewEmbeddedLongDesc, k),
-	}
-	addFlags(cmd, cfg)
-	return cmd
-}
-
-func getRenewer(cfg *renewConfig, caCertBaseName string) (renewal.Interface, error) {
-	if cfg.useAPI {
-		kubeConfigPath := cmdutil.GetKubeConfigPath(cfg.kubeconfigPath)
+	// renew the certificate using the requested renew method
+	if flags.useAPI {
+		// renew using K8s certificate API
+		kubeConfigPath := cmdutil.GetKubeConfigPath(flags.kubeconfigPath)
 		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigPath)
-		if err != nil {
-			return nil, err
+		kubeadmutil.CheckErr(err)
+
+		err = rm.RenewUsingCSRAPI(handler.Name, client)
+		kubeadmutil.CheckErr(err)
+	} else {
+		// renew using local certificate authorities.
+		// this operation can't complete in case the certificate key is not provided (external CA)
+		renewed, err := rm.RenewUsingLocalCA(handler.Name)
+		kubeadmutil.CheckErr(err)
+		if !renewed {
+			fmt.Printf("Detected external %s, %s can't be renewed\n", handler.CABaseName, handler.LongName)
+			return
 		}
-		return renewal.NewCertsAPIRenawal(client), nil
 	}
-
-	caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.cfg.CertificatesDir, caCertBaseName)
-	if err != nil {
-		return nil, err
-	}
-
-	return renewal.NewFileRenewal(caCert, caKey), nil
+	fmt.Printf("%s renewed\n", handler.LongName)
 }
