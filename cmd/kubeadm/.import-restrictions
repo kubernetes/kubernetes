@@ -33,7 +33,8 @@
 		{
 			"SelectorRegexp": "k8s[.]io/kubernetes/cmd",
 			"AllowedPrefixes": [
-				"k8s.io/kubernetes/cmd/kubeadm"
+				"k8s.io/kubernetes/cmd/kubeadm",
+				"k8s.io/kubernetes/cmd/kubelet"
 			]
 		},
 		{

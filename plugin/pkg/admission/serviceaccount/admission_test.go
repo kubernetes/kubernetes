@@ -33,7 +33,6 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
-	kubelet "k8s.io/kubernetes/cmd/kubelet/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -92,7 +91,7 @@ func TestIgnoresMirrorPod(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				kubelet.ConfigMirrorAnnotationKey: "true",
+				corev1.MirrorPodAnnotationKey: "true",
 			},
 		},
 		Spec: api.PodSpec{
@@ -112,7 +111,7 @@ func TestRejectsMirrorPodWithServiceAccount(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				kubelet.ConfigMirrorAnnotationKey: "true",
+				corev1.MirrorPodAnnotationKey: "true",
 			},
 		},
 		Spec: api.PodSpec{
@@ -130,7 +129,7 @@ func TestRejectsMirrorPodWithSecretVolumes(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				kubelet.ConfigMirrorAnnotationKey: "true",
+				corev1.MirrorPodAnnotationKey: "true",
 			},
 		},
 		Spec: api.PodSpec{
@@ -150,7 +149,7 @@ func TestRejectsMirrorPodWithServiceAccountTokenVolumeProjections(t *testing.T) 
 	pod := &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
-				kubelet.ConfigMirrorAnnotationKey: "true",
+				corev1.MirrorPodAnnotationKey: "true",
 			},
 		},
 		Spec: api.PodSpec{

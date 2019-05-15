@@ -34,7 +34,6 @@ import (
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog"
-	kubeletapis "k8s.io/kubernetes/cmd/kubelet/pkg/apis"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
@@ -463,7 +462,7 @@ func (c *nodePlugin) getForbiddenUpdateLabels(modifiedLabels sets.String) sets.S
 			forbiddenLabels.Insert(label)
 		}
 		// forbid kubelets from setting unknown kubernetes.io and k8s.io labels on update
-		if isKubernetesLabel(label) && !kubeletapis.IsKubeletLabel(label) {
+		if isKubernetesLabel(label) && !isKubeletLabel(label) {
 			// TODO: defer to label policy once available
 			forbiddenLabels.Insert(label)
 		}

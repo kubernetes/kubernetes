@@ -11,7 +11,6 @@ go_library(
         "defaults.go",
         "defaults_linux.go",
         "defaults_others.go",
-        "doc.go",
         "register.go",
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",

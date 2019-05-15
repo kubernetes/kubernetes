@@ -19,7 +19,6 @@ go_library(
         "//cmd/kubelet/pkg/apis/config:go_default_library",
         "//cmd/kubelet/pkg/apis/config/v1beta1:go_default_library",
         "//cmd/kubelet/pkg/apis/config/validation:go_default_library",
-        "//cmd/kubelet/pkg/config:go_default_library",
         "//pkg/proxy/apis/config:go_default_library",
         "//pkg/proxy/apis/config/v1alpha1:go_default_library",
         "//pkg/proxy/apis/config/validation:go_default_library",

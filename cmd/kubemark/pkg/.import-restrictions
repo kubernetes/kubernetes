@@ -4,7 +4,8 @@
 		"SelectorRegexp": "k8s[.]io/kubernetes/cmd",
 		"AllowedPrefixes": [
 		    "k8s.io/kubernetes/cmd/kube-proxy/app",
-		    "k8s.io/kubernetes/cmd/kubelet/app"
+		    "k8s.io/kubernetes/cmd/kubelet/app",
+		    "k8s.io/kubernetes/cmd/kubelet/pkg"
 		],
 		"ForbiddenPrefixes": [
 		]

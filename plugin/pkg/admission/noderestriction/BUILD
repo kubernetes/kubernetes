@@ -8,10 +8,12 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["admission.go"],
+    srcs = [
+        "admission.go",
+        "well_known_labels.go",
+    ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/noderestriction",
     deps = [
-        "//cmd/kubelet/pkg/apis:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/coordination:go_default_library",
@@ -41,7 +43,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubelet/pkg/apis:go_default_library",
         "//pkg/apis/authentication:go_default_library",
         "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",

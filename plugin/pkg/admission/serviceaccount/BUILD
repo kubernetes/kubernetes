@@ -40,7 +40,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubelet/pkg/types:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
