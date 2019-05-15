@@ -50,11 +50,11 @@ func cleanupJob(f *framework.Framework, job *batch.Job) {
 		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
 	}
 	_, err := jobutil.UpdateJobWithRetries(c, ns, job.Name, removeFinalizerFunc)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	jobutil.WaitForJobGone(c, ns, job.Name, wait.ForeverTestTimeout)
 
 	err = jobutil.WaitForAllJobPodsGone(c, ns, job.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 }
 
 func testFinishedJob(f *framework.Framework) {
@@ -73,19 +73,19 @@ func testFinishedJob(f *framework.Framework) {
 
 	e2elog.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := jobutil.CreateJob(c, ns, job)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	e2elog.Logf("Wait for the Job to finish")
 	err = jobutil.WaitForJobFinish(c, ns, job.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	e2elog.Logf("Wait for TTL after finished controller to delete the Job")
 	err = jobutil.WaitForJobDeleting(c, ns, job.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	e2elog.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = jobutil.GetJob(c, ns, job.Name)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	finishTime := jobutil.FinishTime(job)
 	finishTimeUTC := finishTime.UTC()
 	gomega.Expect(finishTime.IsZero()).NotTo(gomega.BeTrue())
