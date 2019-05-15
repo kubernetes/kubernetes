@@ -90,6 +90,16 @@ func buildKubeletArgMap(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket
 	}
 
+	if opts.registerTaintsUsingFlags {
+		if labels, ok := kubeletFlags["node-labels"]; ok {
+			if !strings.Contains(kubeletFlags["node-labels"], constants.LabelNodeRoleNode) {
+				kubeletFlags["node-labels"] = fmt.Sprintf("%s,%s=", labels, constants.LabelNodeRoleNode)
+			}
+		} else {
+			kubeletFlags["node-labels"] = fmt.Sprintf("%s=", constants.LabelNodeRoleNode)
+		}
+	}
+
 	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range opts.nodeRegOpts.Taints {

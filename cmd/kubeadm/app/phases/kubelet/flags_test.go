@@ -215,6 +215,7 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				defaultHostname:          "foo",
 			},
 			expected: map[string]string{
+				"node-labels":                "node-role.kubernetes.io/node=",
 				"container-runtime":          "remote",
 				"container-runtime-endpoint": "/var/run/containerd.sock",
 				"register-with-taints":       "foo=bar:baz,key=val:eff",
