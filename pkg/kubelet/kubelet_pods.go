@@ -868,8 +868,9 @@ func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) []v1.Secret {
 	return pullSecrets
 }
 
-// podIsTerminated returns true if pod is in the terminated state ("Failed" or "Succeeded").
-func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
+// podStatusIsTerminal reports when the specified pod has no running containers or is no longer accepting
+// spec changes.
+func (kl *Kubelet) podAndContainersAreTerminal(pod *v1.Pod) (containersTerminal, podWorkerTerminal bool) {
 	// Check the cached pod status which was set after the last sync.
 	status, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok {
@@ -878,11 +879,28 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 		// restarted.
 		status = pod.Status
 	}
-	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
+	// A pod transitions into failed or succeeded from either container lifecycle (RestartNever container
+	// fails) or due to external events like deletion or eviction. A terminal pod *should* have no running
+	// containers, but to know that the pod has completed its lifecycle you must wait for containers to also
+	// be terminal.
+	containersTerminal = notRunning(status.ContainerStatuses)
+	// The kubelet must accept config changes from the pod spec until it has reached a point where changes would
+	// have no effect on any running container.
+	podWorkerTerminal = status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && containersTerminal)
+	return
 }
 
-// IsPodTerminated returns true if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
-// or if the pod has been deleted or removed
+// podIsTerminated returns true if the provided pod is in a terminal phase ("Failed", "Succeeded") or
+// has been deleted and has no running containers. This corresponds to when a pod must accept changes to
+// its pod spec (e.g. terminating containers allow grace period to be shortened).
+func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
+	_, podWorkerTerminal := kl.podAndContainersAreTerminal(pod)
+	return podWorkerTerminal
+}
+
+// IsPodTerminated returns true if the pod with the provided UID is in a terminal phase ("Failed",
+// "Succeeded") or has been deleted and has no running containers. This corresponds to when a pod must
+// accept changes to its pod spec (e.g. terminating containers allow grace period to be shortened)
 func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
 	pod, podFound := kl.podManager.GetPodByUID(uid)
 	if !podFound {
