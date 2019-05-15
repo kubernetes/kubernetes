@@ -335,7 +335,11 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 	if err != nil {
 		return nil, err
 	}
-	return csr.WaitForCertificate(client, req, 3600*time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3600*time.Second)
+	defer cancel()
+
+	return csr.WaitForCertificate(ctx, client, req)
 }
 
 // This digest should include all the relevant pieces of the CSR we care about.
