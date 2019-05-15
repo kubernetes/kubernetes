@@ -811,14 +811,32 @@ Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 #   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function Configure-CniNetworking {
+  $CNI_RELEASE_VERSION = 'v0.8.0'
   if ((ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -or
       (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
-    MustDownload-File -OutFile ${env:CNI_DIR}\windows-cni-plugins.zip `
-      -URLs "https://github.com/yujuhong/gce-k8s-windows-testing/raw/master/windows-cni-plugins.zip"
-    rm ${env:CNI_DIR}\*.exe
-    Expand-Archive ${env:CNI_DIR}\windows-cni-plugins.zip ${env:CNI_DIR}
-    mv ${env:CNI_DIR}\bin\*.exe ${env:CNI_DIR}\
-    rmdir ${env:CNI_DIR}\bin
+    $tmp_dir = 'C:\cni_tmp'
+    New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
+
+    $release_url = ('https://github.com/containernetworking/plugins/releases/' +
+        'download/' + $CNI_RELEASE_VERSION + '/')
+    $sha_url = ($release_url +
+        "cni-plugins-windows-amd64-$CNI_RELEASE_VERSION.tgz.sha1")
+    $tgz_url = ($release_url +
+        "cni-plugins-windows-amd64-$CNI_RELEASE_VERSION.tgz")
+    MustDownload-File -URLs $sha_url -OutFile $tmp_dir\cni-plugins.sha1
+    $sha1_val = ($(Get-Content $tmp_dir\cni-plugins.sha1) -split ' ',2)[0]
+    MustDownload-File `
+        -URLs $tgz_url `
+        -OutFile $tmp_dir\cni-plugins.tgz `
+        -Hash $sha1_val
+
+    Push-Location $tmp_dir
+    # tar can only extract in the current directory.
+    tar -xvf $tmp_dir\cni-plugins.tgz
+    Move-Item -Force host-local.exe ${env:CNI_DIR}\
+    Move-Item -Force win-bridge.exe ${env:CNI_DIR}\
+    Pop-Location
+    Remove-Item -Force -Recurse $tmp_dir
   }
   if (-not ((Test-Path ${env:CNI_DIR}\win-bridge.exe) -and `
             (Test-Path ${env:CNI_DIR}\host-local.exe))) {
