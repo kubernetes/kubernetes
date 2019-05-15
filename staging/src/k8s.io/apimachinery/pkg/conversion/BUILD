@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "converter_test.go",
+        "deep_equal_test.go",
         "helper_test.go",
     ],
     embed = [":go_default_library"],
@@ -30,7 +31,11 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/conversion",
     importpath = "k8s.io/apimachinery/pkg/conversion",
-    deps = ["//staging/src/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp/cmpopts:go_default_library",
+    ],
 )
 
 filegroup(
