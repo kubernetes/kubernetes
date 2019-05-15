@@ -126,16 +126,7 @@ func setupScheduler(
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-<<<<<<< HEAD
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{
-=======
-	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
-		legacyscheme.Scheme,
-		v1.EventSource{Component: v1.DefaultSchedulerName},
-	)
-	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
->>>>>>> origin
 		Interface: cs.CoreV1().Events(""),
 	})
 
