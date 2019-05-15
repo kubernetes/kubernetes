@@ -29,9 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	vevents "k8s.io/kubernetes/pkg/volume/events"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/utils/keymutex"
@@ -467,7 +467,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 				return fmt.Errorf("failed to check fsGroup for %s (%v)", m.globalPath, err)
 			}
 			if fsGroupNew != fsGroupOld {
-				m.plugin.recorder.Eventf(m.pod, v1.EventTypeWarning, events.WarnAlreadyMountedVolume, "The requested fsGroup is %d, but the volume %s has GID %d. The volume may not be shareable.", fsGroupNew, m.volName, fsGroupOld)
+				m.plugin.recorder.Eventf(m.pod, v1.EventTypeWarning, vevents.WarnAlreadyMountedVolume, "The requested fsGroup is %d, but the volume %s has GID %d. The volume may not be shareable.", fsGroupNew, m.volName, fsGroupOld)
 			}
 		}
 

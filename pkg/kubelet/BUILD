@@ -109,6 +109,7 @@ go_library(
         "//pkg/util/taints:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi:go_default_library",
+        "//pkg/volume/events:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/exec:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",

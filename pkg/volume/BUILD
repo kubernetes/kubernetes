@@ -84,6 +84,7 @@ filegroup(
         "//pkg/volume/csi:all-srcs",
         "//pkg/volume/downwardapi:all-srcs",
         "//pkg/volume/emptydir:all-srcs",
+        "//pkg/volume/events:all-srcs",
         "//pkg/volume/fc:all-srcs",
         "//pkg/volume/flexvolume:all-srcs",
         "//pkg/volume/flocker:all-srcs",

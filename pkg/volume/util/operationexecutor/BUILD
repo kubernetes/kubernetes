@@ -16,10 +16,10 @@ go_library(
     deps = [
         "//pkg/controller/volume/expand/cache:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/kubelet/events:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi:go_default_library",
+        "//pkg/volume/events:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/nestedpendingoperations:go_default_library",
         "//pkg/volume/util/types:go_default_library",

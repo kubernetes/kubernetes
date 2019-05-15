@@ -36,10 +36,10 @@ import (
 	"k8s.io/klog"
 	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
-	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	vevents "k8s.io/kubernetes/pkg/volume/events"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -360,7 +360,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		// Successful attach event is useful for user debugging
 		simpleMsg, _ := volumeToAttach.GenerateMsg("AttachVolume.Attach succeeded", "")
 		for _, pod := range volumeToAttach.ScheduledPods {
-			og.recorder.Eventf(pod, v1.EventTypeNormal, kevents.SuccessfulAttachVolume, simpleMsg)
+			og.recorder.Eventf(pod, v1.EventTypeNormal, vevents.SuccessfulAttachVolume, simpleMsg)
 		}
 		klog.Infof(volumeToAttach.GenerateMsgDetailed("AttachVolume.Attach succeeded", ""))
 
@@ -378,7 +378,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
 			for _, pod := range volumeToAttach.ScheduledPods {
-				og.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, (*err).Error())
+				og.recorder.Eventf(pod, v1.EventTypeWarning, vevents.FailedAttachVolume, (*err).Error())
 			}
 		}
 	}
@@ -749,7 +749,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
-			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, (*err).Error())
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, vevents.FailedMountVolume, (*err).Error())
 		}
 	}
 
@@ -790,7 +790,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOp
 			if volumeToMount.VolumeSpec.ReadOnly {
 				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem failed", "requested read-only file system")
 				klog.Warningf(detailedMsg)
-				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
+				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, vevents.FileSystemResizeFailed, simpleMsg)
 				return true, nil
 			}
 			rsOpts.VolumeSpec = volumeToMount.VolumeSpec
@@ -807,7 +807,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOp
 				return false, nil
 			}
 			simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.resizeFileSystem succeeded", "")
-			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, vevents.FileSystemResizeSuccess, simpleMsg)
 			klog.Infof(detailedMsg)
 			// File system resize succeeded, now update the PVC's Capacity to match the PV's
 			err = util.MarkFSResizeFinished(pvc, pv.Spec.Capacity, og.kubeClient)
@@ -1020,7 +1020,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	affinityErr := checkNodeAffinity(og, volumeToMount)
 	if affinityErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NodeAffinity check failed", affinityErr)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, vevents.FailedMountVolume, eventErr.Error())
 		return volumetypes.GeneratedOperations{}, detailedErr
 	}
 	blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
@@ -1029,7 +1029,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		volume.VolumeOptions{})
 	if newMapperErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, eventErr.Error())
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, vevents.FailedMapVolume, eventErr.Error())
 		return volumetypes.GeneratedOperations{}, detailedErr
 	}
 
@@ -1118,13 +1118,13 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// Device mapping for global map path succeeded
 		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("globalMapPath %q", globalMapPath))
 		verbosity := klog.Level(4)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, vevents.SuccessfulMountVolume, simpleMsg)
 		klog.V(verbosity).Infof(detailedMsg)
 
 		// Device mapping for pod device map path succeeded
 		simpleMsg, detailedMsg = volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("volumeMapPath %q", volumeMapPath))
 		verbosity = klog.Level(1)
-		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
+		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, vevents.SuccessfulMountVolume, simpleMsg)
 		klog.V(verbosity).Infof(detailedMsg)
 
 		// Update actual state of world
@@ -1147,7 +1147,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
-			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, (*err).Error())
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, vevents.FailedMapVolume, (*err).Error())
 		}
 	}
 
@@ -1550,7 +1550,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				return detailedErr, detailedErr
 			}
 			successMsg := fmt.Sprintf("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
-			og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeNormal, kevents.VolumeResizeSuccess, successMsg)
+			og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeNormal, vevents.VolumeResizeSuccess, successMsg)
 		} else {
 			err := resizeMap.MarkForFSResize(pvcWithResizeRequest)
 			if err != nil {
@@ -1564,7 +1564,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
-			og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
+			og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, vevents.VolumeResizeFailed, (*err).Error())
 		}
 	}
 
@@ -1639,7 +1639,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
-			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
+			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, vevents.VolumeResizeFailed, (*err).Error())
 		}
 	}
 

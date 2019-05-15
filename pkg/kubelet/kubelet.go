@@ -112,6 +112,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	vevents "k8s.io/kubernetes/pkg/volume/events"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
@@ -1650,7 +1651,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if !kl.podIsTerminated(pod) {
 		// Wait for volumes to attach/mount
 		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, vevents.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
 			klog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
 			return err
 		}

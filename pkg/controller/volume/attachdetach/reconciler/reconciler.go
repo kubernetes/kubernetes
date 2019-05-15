@@ -32,9 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
-	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/events"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -320,7 +320,7 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 		// We did not find any pods that requests the volume. The pod must have been deleted already.
 		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", "Volume is already exclusively attached to one node and can't be attached to another")
 		for _, pod := range volumeToAttach.ScheduledPods {
-			rc.recorder.Eventf(pod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+			rc.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedAttachVolume, simpleMsg)
 		}
 		// Log detailed message to system admin
 		nodeList := strings.Join(otherNodesStr, ", ")
@@ -357,7 +357,7 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 			msg = fmt.Sprintf("Volume is already used by %d pod(s) in different namespaces", otherPods)
 		}
 		simpleMsg, _ := volumeToAttach.GenerateMsg("Multi-Attach error", msg)
-		rc.recorder.Eventf(scheduledPod, v1.EventTypeWarning, kevents.FailedAttachVolume, simpleMsg)
+		rc.recorder.Eventf(scheduledPod, v1.EventTypeWarning, events.FailedAttachVolume, simpleMsg)
 	}
 
 	// Log all pods for system admin
