@@ -159,6 +159,21 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	/*
+		Release : v1.15
+		Testname: Pod liveness probe, using tcp socket, no restart
+		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
+	*/
+	It("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
+		livenessProbe := &v1.Probe{
+			Handler:             tcpSocketHandler(8080),
+			InitialDelaySeconds: 15,
+			FailureThreshold:    1,
+		}
+		pod := livenessPodSpec(nil, livenessProbe)
+		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+	})
+
+	/*
 		Release : v1.9
 		Testname: Pod liveness probe, using http endpoint, multiple restarts (slow)
 		Description: A Pod is created with liveness probe on http endpoint /healthz. The http handler on the /healthz will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1. The liveness probe must fail again after restart once the http handler for /healthz enpoind on the Pod returns an http error after 10 seconds from the start. Restart counts MUST increment everytime health check fails, measure upto 5 restart.
@@ -347,6 +362,14 @@ func httpGetHandler(path string, port int) v1.Handler {
 	return v1.Handler{
 		HTTPGet: &v1.HTTPGetAction{
 			Path: path,
+			Port: intstr.FromInt(port),
+		},
+	}
+}
+
+func tcpSocketHandler(port int) v1.Handler {
+	return v1.Handler{
+		TCPSocket: &v1.TCPSocketAction{
 			Port: intstr.FromInt(port),
 		},
 	}
