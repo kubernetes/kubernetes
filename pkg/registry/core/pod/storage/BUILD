@@ -55,7 +55,7 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",
         "//pkg/apis/policy:go_default_library",
-        "//pkg/kubelet/client:go_default_library",
+        "//pkg/client/kubelet:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",

@@ -54,6 +54,7 @@ filegroup(
         "//pkg/auth/nodeidentifier:all-srcs",
         "//pkg/capabilities:all-srcs",
         "//pkg/client/conditions:all-srcs",
+        "//pkg/client/kubelet:all-srcs",
         "//pkg/client/leaderelectionconfig:all-srcs",
         "//pkg/client/metrics/prometheus:all-srcs",
         "//pkg/client/testdata:all-srcs",

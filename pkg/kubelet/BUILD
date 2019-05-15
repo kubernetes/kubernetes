@@ -274,7 +274,6 @@ filegroup(
         "//pkg/kubelet/certificate:all-srcs",
         "//pkg/kubelet/checkpoint:all-srcs",
         "//pkg/kubelet/checkpointmanager:all-srcs",
-        "//pkg/kubelet/client:all-srcs",
         "//pkg/kubelet/cloudresource:all-srcs",
         "//pkg/kubelet/cm:all-srcs",
         "//pkg/kubelet/config:all-srcs",

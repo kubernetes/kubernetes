@@ -17,10 +17,10 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/client/kubelet:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
-        "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
         "//pkg/serviceaccount:go_default_library",
@@ -46,8 +46,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//pkg/client/kubelet:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
-        "//pkg/kubelet/client:go_default_library",
         "//pkg/master/reconcilers:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",

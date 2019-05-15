@@ -31,12 +31,17 @@ go_test(
     name = "go_default_test",
     srcs = [
         "httpstream_test.go",
+        "portfoward_test.go",
         "websocket_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/portforward:go_default_library",
+        "//staging/src/k8s.io/client-go/transport/spdy:go_default_library",
     ],
 )
 

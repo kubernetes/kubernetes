@@ -9,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kubelet_client.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/client",
+    importpath = "k8s.io/kubernetes/pkg/client/kubelet",
     deps = [
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
