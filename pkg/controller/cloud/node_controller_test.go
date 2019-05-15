@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/kubernetes/pkg/apis/core"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +34,6 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 
 	"github.com/stretchr/testify/assert"
@@ -582,7 +582,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels:            map[string]string{},
 					Annotations: map[string]string{
-						kubeletapis.AnnotationProvidedIPAddr: "10.0.0.1",
+						core.AnnotationProvidedIPAddr: "10.0.0.1",
 					},
 				},
 				Status: v1.NodeStatus{

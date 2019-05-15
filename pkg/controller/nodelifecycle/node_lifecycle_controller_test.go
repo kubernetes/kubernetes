@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -2993,16 +2992,16 @@ func TestReconcileNodeLabels(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelOS:   "linux",
-						kubeletapis.LabelArch: "amd64",
+						betaLabelOS:   "linux",
+						betaLabelArch: "amd64",
 					},
 				},
 			},
 			ExpectedLabels: map[string]string{
-				kubeletapis.LabelOS:   "linux",
-				kubeletapis.LabelArch: "amd64",
-				v1.LabelOSStable:      "linux",
-				v1.LabelArchStable:    "amd64",
+				betaLabelOS:        "linux",
+				betaLabelArch:      "amd64",
+				v1.LabelOSStable:   "linux",
+				v1.LabelArchStable: "amd64",
 			},
 		},
 		{
@@ -3012,18 +3011,18 @@ func TestReconcileNodeLabels(t *testing.T) {
 					Name:              "node0",
 					CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					Labels: map[string]string{
-						kubeletapis.LabelOS:   "linux",
-						kubeletapis.LabelArch: "amd64",
-						v1.LabelOSStable:      "windows",
-						v1.LabelArchStable:    "arm",
+						betaLabelOS:        "linux",
+						betaLabelArch:      "amd64",
+						v1.LabelOSStable:   "windows",
+						v1.LabelArchStable: "arm",
 					},
 				},
 			},
 			ExpectedLabels: map[string]string{
-				kubeletapis.LabelOS:   "linux",
-				kubeletapis.LabelArch: "amd64",
-				v1.LabelOSStable:      "linux",
-				v1.LabelArchStable:    "amd64",
+				betaLabelOS:        "linux",
+				betaLabelArch:      "amd64",
+				v1.LabelOSStable:   "linux",
+				v1.LabelArchStable: "amd64",
 			},
 		},
 	}

@@ -26,6 +26,7 @@ import (
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -78,7 +78,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				if node.ObjectMeta.Annotations == nil {
 					node.ObjectMeta.Annotations = make(map[string]string)
 				}
-				node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = nodeIP.String()
+				node.ObjectMeta.Annotations[core.AnnotationProvidedIPAddr] = nodeIP.String()
 			}
 			// We rely on the external cloud provider to supply the addresses.
 			return nil

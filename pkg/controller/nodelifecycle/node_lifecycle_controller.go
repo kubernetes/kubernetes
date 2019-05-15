@@ -54,12 +54,25 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+)
+
+const (
+	// Should march the annotations in pkg/kubelet/apis/well_known_labels.go
+	// betaLabelOS is a label to indicate the operating system of the node.
+	// The OS labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta OS labels in Kubernetes 1.18.
+	betaLabelOS = "beta.kubernetes.io/os"
+	// betaLabelArch is a label to indicate the architecture of the node.
+	// The Arch labels are promoted to GA in 1.14. kubelet applies both beta
+	// and GA labels to ensure backward compatibility.
+	// TODO: stop applying the beta Arch labels in Kubernetes 1.18.
+	betaLabelArch = "beta.kubernetes.io/arch"
 )
 
 func init() {
@@ -145,7 +158,7 @@ var labelReconcileInfo = []struct {
 		// the source of truth.
 		// TODO(#73084): switch to using the stable label as the source of
 		// truth in v1.18.
-		primaryKey:            kubeletapis.LabelOS,
+		primaryKey:            betaLabelOS,
 		secondaryKey:          v1.LabelOSStable,
 		ensureSecondaryExists: true,
 	},
@@ -154,7 +167,7 @@ var labelReconcileInfo = []struct {
 		// the source of truth.
 		// TODO(#73084): switch to using the stable label as the source of
 		// truth in v1.18.
-		primaryKey:            kubeletapis.LabelArch,
+		primaryKey:            betaLabelArch,
 		secondaryKey:          v1.LabelArchStable,
 		ensureSecondaryExists: true,
 	},
