@@ -129,6 +129,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 
 	// Delete the namespace if it is already finalized.
 	if d.deleteNamespaceWhenDone && finalized(namespace) {
+		// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
 		return d.deleteNamespace(namespace)
 	}
 
@@ -155,6 +156,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 
 	// Check if we can delete now.
 	if d.deleteNamespaceWhenDone && finalized(namespace) {
+		// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
 		return d.deleteNamespace(namespace)
 	}
 	return nil
