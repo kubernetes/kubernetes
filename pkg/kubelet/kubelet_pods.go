@@ -869,6 +869,19 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
+// podInTerminatedPhase returns true if pod is in the terminated state ("Failed" or "Succeeded").
+func (kl *Kubelet) podInTerminatedPhase(pod *v1.Pod) bool {
+	// Check the cached pod status which was set after the last sync.
+	status, ok := kl.statusManager.GetPodStatus(pod.UID)
+	if !ok {
+		// If there is no cached status, use the status from the
+		// apiserver. This is useful if kubelet has recently been
+		// restarted.
+		status = pod.Status
+	}
+	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded
+}
+
 // IsPodTerminated returns true if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
 // or if the pod has been deleted or removed
 func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
