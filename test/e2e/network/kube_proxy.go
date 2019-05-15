@@ -295,7 +295,7 @@ var _ = SIGDescribe("Network", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "startup-script",
-						Image: "gcr.io/google-containers/startup-script:v1",
+						Image: imageutils.GetE2EImage(imageutils.StartupScript),
 						Command: []string{
 							"bash", "-c", "while true; do sleep 2; nc boom-server 9000& done",
 						},

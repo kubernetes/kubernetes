@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var (
@@ -145,7 +146,7 @@ func StackdriverExporterPod(podName, namespace, podLabel, metricName string, met
 func stackdriverExporterContainerSpec(name string, namespace string, metricName string, metricValue int64) corev1.Container {
 	return corev1.Container{
 		Name:            name,
-		Image:           "k8s.gcr.io/sd-dummy-exporter:v0.2.0",
+		Image:           imageutils.GetE2EImage(imageutils.SdDummyExporter),
 		ImagePullPolicy: corev1.PullPolicy("Always"),
 		Command: []string{
 			"/bin/sh",
@@ -214,7 +215,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 		Containers: []corev1.Container{
 			{
 				Name:            "prometheus-exporter",
-				Image:           "k8s.gcr.io/prometheus-dummy-exporter:v0.1.0",
+				Image:           imageutils.GetE2EImage(imageutils.PrometheusDummyExporter),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/prometheus_dummy_exporter", "--metric-name=" + metricName,
 					fmt.Sprintf("--metric-value=%v", metricValue), fmt.Sprintf("=--port=%d", port)},
@@ -222,7 +223,7 @@ func prometheusExporterPodSpec(metricName string, metricValue int64, port int32)
 			},
 			{
 				Name:            "prometheus-to-sd",
-				Image:           "k8s.gcr.io/prometheus-to-sd:v0.5.0",
+				Image:           imageutils.GetE2EImage(imageutils.PrometheusToSd),
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command: []string{"/monitor", fmt.Sprintf("--source=:http://localhost:%d", port),
 					"--stackdriver-prefix=custom.googleapis.com", "--pod-id=$(POD_ID)", "--namespace-id=$(POD_NAMESPACE)"},
