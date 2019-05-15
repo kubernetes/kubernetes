@@ -42,7 +42,6 @@ type Watcher struct {
 	stopCh         chan interface{}
 	fs             utilfs.Filesystem
 	fsWatcher      *fsnotify.Watcher
-	wg             sync.WaitGroup
 
 	mutex       sync.Mutex
 	handlers    map[string]PluginHandler
@@ -116,10 +115,7 @@ func (w *Watcher) Start() error {
 		}
 	}
 
-	w.wg.Add(1)
 	go func(fsWatcher *fsnotify.Watcher) {
-		defer w.wg.Done()
-
 		for {
 			select {
 			case event := <-fsWatcher.Events:
@@ -153,25 +149,7 @@ func (w *Watcher) Start() error {
 // Stop stops probing the creation of plugin sockets at the path
 func (w *Watcher) Stop() error {
 	close(w.stopCh)
-
-	c := make(chan struct{})
-	var once sync.Once
-	closeFunc := func() { close(c) }
-	go func() {
-		defer once.Do(closeFunc)
-		w.wg.Wait()
-	}()
-
-	select {
-	case <-c:
-	case <-time.After(11 * time.Second):
-		once.Do(closeFunc)
-		return fmt.Errorf("timeout on stopping watcher")
-	}
-
-	w.fsWatcher.Close()
-
-	return nil
+	return w.fsWatcher.Close()
 }
 
 func (w *Watcher) init() error {
