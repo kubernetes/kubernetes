@@ -51,7 +51,7 @@
 #  - Document functions using proper syntax:
 #    https://technet.microsoft.com/en-us/library/hh847834(v=wps.620).aspx
 
-$INFRA_CONTAINER = "e2eteam/pause:3.1"
+$INFRA_CONTAINER = 'mcr.microsoft.com/k8s/core/pause:1.0.0'
 $GCE_METADATA_SERVER = "169.254.169.254"
 # The "management" interface is used by the kubelet and by Windows pods to talk
 # to the rest of the Kubernetes cluster *without NAT*. This interface does not
@@ -1054,6 +1054,23 @@ function Verify-WorkerServices {
               "$(& ${env:NODE_DIR}\kubectl.exe get nodes | Out-String)")
   Verify_GceMetadataServerRouteIsPresent
   Log_Todo "run more verification commands."
+}
+
+# Pulls the infra/pause container image onto the node so that it will be
+# immediately available when the kubelet tries to run pods.
+# TODO(pjh): downloading the container container image may take a few minutes;
+# figure out how to run this in the background while perform the rest of the
+# node startup steps!
+function Pull-InfraContainer {
+  $name, $label = $INFRA_CONTAINER -split ':',2
+  if (-not ("$(& docker image list)" -match "$name.*$label")) {
+    & docker pull $INFRA_CONTAINER
+    if (!$?) {
+      throw "Error running 'docker pull $INFRA_CONTAINER'"
+    }
+  }
+  $inspect = "$(& docker inspect $INFRA_CONTAINER | Out-String)"
+  Log-Output "Infra/pause container:`n$inspect"
 }
 
 # Add a registry key for docker in EventLog so that log messages are mapped
