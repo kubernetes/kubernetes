@@ -58,7 +58,7 @@ func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
-					Name:  "vector-addition-cuda8",
+					Name:  "vector-addition-cuda10",
 					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd),
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{
@@ -67,7 +67,7 @@ func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
 					},
 				},
 				{
-					Name:  "vector-addition-cuda10",
+					Name:  "vector-addition-cuda10-1",
 					Image: imageutils.GetE2EImage(imageutils.CudaVectorAdd2),
 					Resources: v1.ResourceRequirements{
 						Limits: v1.ResourceList{

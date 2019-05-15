@@ -205,8 +205,8 @@ func initImageConfigs() map[int]Config {
 	configs[AuditProxy] = Config{e2eRegistry, "audit-proxy", "1.0"}
 	configs[BusyBox] = Config{dockerLibraryRegistry, "busybox", "1.29"}
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
-	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
-	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
+	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
+	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "3.0"}
 	configs[Dnsutils] = Config{e2eRegistry, "dnsutils", "1.1"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
 	configs[EntrypointTester] = Config{e2eRegistry, "entrypoint-tester", "1.0"}
