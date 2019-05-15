@@ -166,6 +166,11 @@ type Store struct {
 	// ReturnDeletedObject determines whether the Store returns the object
 	// that was deleted. Otherwise, return a generic success status response.
 	ReturnDeletedObject bool
+	// ShouldDeleteDuringUpdate is an optional function to determine whether
+	// an update from existing to obj should result in a delete.
+	// If specified, this is checked in addition to standard finalizer,
+	// deletionTimestamp, and deletionGracePeriodSeconds checks.
+	ShouldDeleteDuringUpdate func(ctx context.Context, key string, obj, existing runtime.Object) bool
 	// ExportStrategy implements resource-specific behavior during export,
 	// optional. Exported objects are not decorated.
 	ExportStrategy rest.RESTExportStrategy
@@ -388,10 +393,12 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	return out, nil
 }
 
-// shouldDeleteDuringUpdate checks if a Update is removing all the object's
-// finalizers. If so, it further checks if the object's
-// DeletionGracePeriodSeconds is 0.
-func (e *Store) shouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing runtime.Object) bool {
+// ShouldDeleteDuringUpdate is the default function for
+// checking if an object should be deleted during an update.
+// It checks if the new object has no finalizers,
+// the existing object's deletionTimestamp is set, and
+// the existing object's deletionGracePeriodSeconds is 0 or nil
+func ShouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing runtime.Object) bool {
 	newMeta, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -402,7 +409,16 @@ func (e *Store) shouldDeleteDuringUpdate(ctx context.Context, key string, obj, e
 		utilruntime.HandleError(err)
 		return false
 	}
-	return len(newMeta.GetFinalizers()) == 0 && oldMeta.GetDeletionGracePeriodSeconds() != nil && *oldMeta.GetDeletionGracePeriodSeconds() == 0
+	if len(newMeta.GetFinalizers()) > 0 {
+		// don't delete with finalizers remaining in the new object
+		return false
+	}
+	if oldMeta.GetDeletionTimestamp() == nil {
+		// don't delete if the existing object hasn't had a delete request made
+		return false
+	}
+	// delete if the existing object has no grace period or a grace period of 0
+	return oldMeta.GetDeletionGracePeriodSeconds() == nil || *oldMeta.GetDeletionGracePeriodSeconds() == 0
 }
 
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
@@ -533,7 +549,9 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				return nil, nil, err
 			}
 		}
-		if e.shouldDeleteDuringUpdate(ctx, key, obj, existing) {
+		// Check the default delete-during-update conditions, and store-specific conditions if provided
+		if ShouldDeleteDuringUpdate(ctx, key, obj, existing) &&
+			(e.ShouldDeleteDuringUpdate == nil || e.ShouldDeleteDuringUpdate(ctx, key, obj, existing)) {
 			deleteObj = obj
 			return nil, nil, errEmptiedFinalizers
 		}
