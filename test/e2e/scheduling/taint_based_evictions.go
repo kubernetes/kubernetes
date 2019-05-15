@@ -28,7 +28,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 func newUnreachableNoExecuteTaint() *v1.Taint {
@@ -52,7 +52,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 	var cs clientset.Interface
 	var ns string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 		// skip if TaintBasedEvictions is not enabled
@@ -72,10 +72,10 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 	// When network issue recovers, it's expected to see:
 	// 5. node lifecycle manager generate a status change: [NodeReady=true, status=ConditionTrue]
 	// 6. node.kubernetes.io/unreachable=:NoExecute taint is taken off the node
-	It("Checks that the node becomes unreachable", func() {
+	ginkgo.It("Checks that the node becomes unreachable", func() {
 		// find an available node
 		nodeName := GetNodeThatCanRunPod(f)
-		By("Finding an available node " + nodeName)
+		ginkgo.By("Finding an available node " + nodeName)
 
 		// pod0 is a pod with unschedulable=:NoExecute toleration, and tolerationSeconds=0s
 		// pod1 is a pod with unschedulable=:NoExecute toleration, and tolerationSeconds=200s
@@ -83,7 +83,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		base := "taint-based-eviction"
 		tolerationSeconds := []int64{0, 200}
 		numPods := len(tolerationSeconds) + 1
-		By(fmt.Sprintf("Preparing %v pods", numPods))
+		ginkgo.By(fmt.Sprintf("Preparing %v pods", numPods))
 		pods := make([]*v1.Pod, numPods)
 		zero := int64(0)
 		// build pod0, pod1
@@ -108,7 +108,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 			NodeName: nodeName,
 		})
 
-		By("Verifying all pods are running properly")
+		ginkgo.By("Verifying all pods are running properly")
 		for _, pod := range pods {
 			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
 		}
@@ -121,7 +121,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		}
 		node := nodeList.Items[0]
 
-		By(fmt.Sprintf("Blocking traffic from node %s to the master", nodeName))
+		ginkgo.By(fmt.Sprintf("Blocking traffic from node %s to the master", nodeName))
 		host, err := framework.GetNodeExternalIP(&node)
 		// TODO(Huang-Wei): make this case work for local provider
 		// if err != nil {
@@ -132,19 +132,19 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		taint := newUnreachableNoExecuteTaint()
 
 		defer func() {
-			By(fmt.Sprintf("Unblocking traffic from node %s to the master", node.Name))
+			ginkgo.By(fmt.Sprintf("Unblocking traffic from node %s to the master", node.Name))
 			for _, masterAddress := range masterAddresses {
 				framework.UnblockNetwork(host, masterAddress)
 			}
 
-			if CurrentGinkgoTestDescription().Failed {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.Failf("Current e2e test has failed, so return from here.")
 				return
 			}
 
-			By(fmt.Sprintf("Expecting to see node %q becomes Ready", nodeName))
+			ginkgo.By(fmt.Sprintf("Expecting to see node %q becomes Ready", nodeName))
 			framework.WaitForNodeToBeReady(cs, nodeName, time.Minute*1)
-			By("Expecting to see unreachable=:NoExecute taint is taken off")
+			ginkgo.By("Expecting to see unreachable=:NoExecute taint is taken off")
 			err := framework.WaitForNodeHasTaintOrNot(cs, nodeName, taint, false, time.Second*30)
 			framework.ExpectNoError(err)
 		}()
@@ -153,15 +153,15 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 			framework.BlockNetwork(host, masterAddress)
 		}
 
-		By(fmt.Sprintf("Expecting to see node %q becomes NotReady", nodeName))
+		ginkgo.By(fmt.Sprintf("Expecting to see node %q becomes NotReady", nodeName))
 		if !framework.WaitForNodeToBeNotReady(cs, nodeName, time.Minute*3) {
 			framework.Failf("node %q doesn't turn to NotReady after 3 minutes", nodeName)
 		}
-		By("Expecting to see unreachable=:NoExecute taint is applied")
+		ginkgo.By("Expecting to see unreachable=:NoExecute taint is applied")
 		err = framework.WaitForNodeHasTaintOrNot(cs, nodeName, taint, true, time.Second*30)
 		framework.ExpectNoError(err)
 
-		By("Expecting pod0 to be evicted immediately")
+		ginkgo.By("Expecting pod0 to be evicted immediately")
 		err = framework.WaitForPodCondition(cs, ns, pods[0].Name, "pod0 terminating", time.Second*15, func(pod *v1.Pod) (bool, error) {
 			// as node is unreachable, pod0 is expected to be in Terminating status
 			// rather than getting deleted
@@ -172,7 +172,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		})
 		framework.ExpectNoError(err)
 
-		By("Expecting pod2 to be updated with a toleration with tolerationSeconds=300")
+		ginkgo.By("Expecting pod2 to be updated with a toleration with tolerationSeconds=300")
 		err = framework.WaitForPodCondition(cs, ns, pods[2].Name, "pod2 updated with tolerationSeconds=300", time.Second*15, func(pod *v1.Pod) (bool, error) {
 			if seconds, err := getTolerationSeconds(pod.Spec.Tolerations); err == nil {
 				return seconds == 300, nil
@@ -181,7 +181,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		})
 		framework.ExpectNoError(err)
 
-		By("Expecting pod1 to be unchanged")
+		ginkgo.By("Expecting pod1 to be unchanged")
 		livePod1, err := cs.CoreV1().Pods(pods[1].Namespace).Get(pods[1].Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		seconds, err := getTolerationSeconds(livePod1.Spec.Tolerations)
