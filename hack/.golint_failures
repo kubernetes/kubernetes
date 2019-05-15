@@ -50,7 +50,6 @@ pkg/apis/rbac/validation
 pkg/apis/storage
 pkg/apis/storage/v1
 pkg/apis/storage/v1beta1
-pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/photon
 pkg/controller
 pkg/controller/apis/config/v1alpha1

@@ -32,8 +32,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -52,8 +52,8 @@ func defaultExternalService() *v1.Service {
 
 func alwaysReady() bool { return true }
 
-func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset) {
-	cloud := &fakecloud.FakeCloud{}
+func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
+	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
 	client := fake.NewSimpleClientset()
@@ -166,7 +166,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				t.Errorf("unexpected client actions: %v", actions)
 			}
 		} else {
-			var balancer *fakecloud.FakeBalancer
+			var balancer *fakecloud.Balancer
 			for k := range cloud.Balancers {
 				if balancer == nil {
 					b := cloud.Balancers[k]
@@ -205,7 +205,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 	table := []struct {
 		services            []*v1.Service
-		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
+		expectedUpdateCalls []fakecloud.UpdateBalancerCall
 	}{
 		{
 			// No services present: no calls should be made.
@@ -225,7 +225,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			services: []*v1.Service{
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
@@ -236,7 +236,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s1", "555", v1.ServiceTypeLoadBalancer),
 				newService("s2", "666", v1.ServiceTypeLoadBalancer),
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "444", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s1", "555", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
@@ -250,7 +250,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s3", "999", v1.ServiceTypeLoadBalancer),
 				newService("s4", "123", v1.ServiceTypeClusterIP),
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
@@ -261,7 +261,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "234", v1.ServiceTypeLoadBalancer),
 				nil,
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
@@ -527,7 +527,7 @@ func TestSyncService(t *testing.T) {
 func TestProcessServiceDeletion(t *testing.T) {
 
 	var controller *ServiceController
-	var cloud *fakecloud.FakeCloud
+	var cloud *fakecloud.Cloud
 	// Add a global svcKey name
 	svcKey := "external-balancer"
 

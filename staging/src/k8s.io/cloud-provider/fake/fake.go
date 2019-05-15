@@ -31,8 +31,8 @@ import (
 
 const defaultProviderName = "fake"
 
-// FakeBalancer is a fake storage of balancer information
-type FakeBalancer struct {
+// Balancer is a fake storage of balancer information
+type Balancer struct {
 	Name           string
 	Region         string
 	LoadBalancerIP string
@@ -40,21 +40,22 @@ type FakeBalancer struct {
 	Hosts          []*v1.Node
 }
 
-type FakeUpdateBalancerCall struct {
+// UpdateBalancerCall represents a fake call to update load balancers
+type UpdateBalancerCall struct {
 	Service *v1.Service
 	Hosts   []*v1.Node
 }
 
-var _ cloudprovider.Interface = (*FakeCloud)(nil)
-var _ cloudprovider.Instances = (*FakeCloud)(nil)
-var _ cloudprovider.LoadBalancer = (*FakeCloud)(nil)
-var _ cloudprovider.Routes = (*FakeCloud)(nil)
-var _ cloudprovider.Zones = (*FakeCloud)(nil)
-var _ cloudprovider.PVLabeler = (*FakeCloud)(nil)
-var _ cloudprovider.Clusters = (*FakeCloud)(nil)
+var _ cloudprovider.Interface = (*Cloud)(nil)
+var _ cloudprovider.Instances = (*Cloud)(nil)
+var _ cloudprovider.LoadBalancer = (*Cloud)(nil)
+var _ cloudprovider.Routes = (*Cloud)(nil)
+var _ cloudprovider.Zones = (*Cloud)(nil)
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+var _ cloudprovider.Clusters = (*Cloud)(nil)
 
-// FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
-type FakeCloud struct {
+// Cloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
+type Cloud struct {
 	Exists bool
 	Err    error
 
@@ -73,9 +74,9 @@ type FakeCloud struct {
 	ClusterList   []string
 	MasterName    string
 	ExternalIP    net.IP
-	Balancers     map[string]FakeBalancer
-	UpdateCalls   []FakeUpdateBalancerCall
-	RouteMap      map[string]*FakeRoute
+	Balancers     map[string]Balancer
+	UpdateCalls   []UpdateBalancerCall
+	RouteMap      map[string]*Route
 	Lock          sync.Mutex
 	Provider      string
 	addCallLock   sync.Mutex
@@ -85,12 +86,13 @@ type FakeCloud struct {
 	RequestDelay time.Duration
 }
 
-type FakeRoute struct {
+// Route is a representation of an advanced routing rule.
+type Route struct {
 	ClusterName string
 	Route       cloudprovider.Route
 }
 
-func (f *FakeCloud) addCall(desc string) {
+func (f *Cloud) addCall(desc string) {
 	f.addCallLock.Lock()
 	defer f.addCallLock.Unlock()
 
@@ -99,29 +101,32 @@ func (f *FakeCloud) addCall(desc string) {
 	f.Calls = append(f.Calls, desc)
 }
 
-// ClearCalls clears internal record of method calls to this FakeCloud.
-func (f *FakeCloud) ClearCalls() {
+// ClearCalls clears internal record of method calls to this Cloud.
+func (f *Cloud) ClearCalls() {
 	f.Calls = []string{}
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
-func (f *FakeCloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
+func (f *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder, stop <-chan struct{}) {
 }
 
-func (f *FakeCloud) ListClusters(ctx context.Context) ([]string, error) {
+// ListClusters lists the names of the available clusters.
+func (f *Cloud) ListClusters(ctx context.Context) ([]string, error) {
 	return f.ClusterList, f.Err
 }
 
-func (f *FakeCloud) Master(ctx context.Context, name string) (string, error) {
+// Master gets back the address (either DNS name or IP address) of the master node for the cluster.
+func (f *Cloud) Master(ctx context.Context, name string) (string, error) {
 	return f.MasterName, f.Err
 }
 
-func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
+// Clusters returns a clusters interface.  Also returns true if the interface is supported, false otherwise.
+func (f *Cloud) Clusters() (cloudprovider.Clusters, bool) {
 	return f, true
 }
 
 // ProviderName returns the cloud provider ID.
-func (f *FakeCloud) ProviderName() string {
+func (f *Cloud) ProviderName() string {
 	if f.Provider == "" {
 		return defaultProviderName
 	}
@@ -129,33 +134,35 @@ func (f *FakeCloud) ProviderName() string {
 }
 
 // HasClusterID returns true if the cluster has a clusterID
-func (f *FakeCloud) HasClusterID() bool {
+func (f *Cloud) HasClusterID() bool {
 	return true
 }
 
 // LoadBalancer returns a fake implementation of LoadBalancer.
 // Actually it just returns f itself.
-func (f *FakeCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+func (f *Cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return f, true
 }
 
 // Instances returns a fake implementation of Instances.
 //
 // Actually it just returns f itself.
-func (f *FakeCloud) Instances() (cloudprovider.Instances, bool) {
+func (f *Cloud) Instances() (cloudprovider.Instances, bool) {
 	return f, true
 }
 
-func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
+// Zones returns a zones interface. Also returns true if the interface is supported, false otherwise.
+func (f *Cloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
 
-func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
+// Routes returns a routes interface along with whether the interface is supported.
+func (f *Cloud) Routes() (cloudprovider.Routes, bool) {
 	return f, true
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
-func (f *FakeCloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
+func (f *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
 
@@ -163,17 +170,17 @@ func (f *FakeCloud) GetLoadBalancer(ctx context.Context, clusterName string, ser
 }
 
 // GetLoadBalancerName is a stub implementation of LoadBalancer.GetLoadBalancerName.
-func (f *FakeCloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
+func (f *Cloud) GetLoadBalancerName(ctx context.Context, clusterName string, service *v1.Service) string {
 	// TODO: replace DefaultLoadBalancerName to generate more meaningful loadbalancer names.
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
+func (f *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
-		f.Balancers = make(map[string]FakeBalancer)
+		f.Balancers = make(map[string]Balancer)
 	}
 
 	name := f.GetLoadBalancerName(ctx, clusterName, service)
@@ -185,7 +192,7 @@ func (f *FakeCloud) EnsureLoadBalancer(ctx context.Context, clusterName string, 
 	}
 	region := zone.Region
 
-	f.Balancers[name] = FakeBalancer{name, region, spec.LoadBalancerIP, spec.Ports, nodes}
+	f.Balancers[name] = Balancer{name, region, spec.LoadBalancerIP, spec.Ports, nodes}
 
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
@@ -195,38 +202,42 @@ func (f *FakeCloud) EnsureLoadBalancer(ctx context.Context, clusterName string, 
 
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
-func (f *FakeCloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+func (f *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	f.addCall("update")
-	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, nodes})
+	f.UpdateCalls = append(f.UpdateCalls, UpdateBalancerCall{service, nodes})
 	return f.Err
 }
 
 // EnsureLoadBalancerDeleted is a test-spy implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 // It adds an entry "delete" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
+func (f *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	f.addCall("delete")
 	return f.Err
 }
 
-func (f *FakeCloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
+// AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
+// expected format for the key is standard ssh-keygen format: <protocol> <blob>
+func (f *Cloud) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
 	return cloudprovider.NotImplemented
 }
 
-// Implementation of Instances.CurrentNodeName
-func (f *FakeCloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
+// CurrentNodeName returns the name of the node we are currently running on
+// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
+func (f *Cloud) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return types.NodeName(hostname), nil
 }
 
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
 // It adds an entry "node-addresses" into the internal method call record.
-func (f *FakeCloud) NodeAddresses(ctx context.Context, instance types.NodeName) ([]v1.NodeAddress, error) {
+func (f *Cloud) NodeAddresses(ctx context.Context, instance types.NodeName) ([]v1.NodeAddress, error) {
 	f.addCall("node-addresses")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
 	return f.Addresses, f.Err
 }
 
-func (f *FakeCloud) SetNodeAddresses(nodeAddresses []v1.NodeAddress) {
+// SetNodeAddresses sets the addresses for a node
+func (f *Cloud) SetNodeAddresses(nodeAddresses []v1.NodeAddress) {
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
 	f.Addresses = nodeAddresses
@@ -234,7 +245,7 @@ func (f *FakeCloud) SetNodeAddresses(nodeAddresses []v1.NodeAddress) {
 
 // NodeAddressesByProviderID is a test-spy implementation of Instances.NodeAddressesByProviderID.
 // It adds an entry "node-addresses-by-provider-id" into the internal method call record.
-func (f *FakeCloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
+func (f *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	f.addCall("node-addresses-by-provider-id")
 	f.addressesMux.Lock()
 	defer f.addressesMux.Unlock()
@@ -242,39 +253,39 @@ func (f *FakeCloud) NodeAddressesByProviderID(ctx context.Context, providerID st
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
-func (f *FakeCloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
+func (f *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
 	return f.ExtID[nodeName], nil
 }
 
 // InstanceType returns the type of the specified instance.
-func (f *FakeCloud) InstanceType(ctx context.Context, instance types.NodeName) (string, error) {
+func (f *Cloud) InstanceType(ctx context.Context, instance types.NodeName) (string, error) {
 	f.addCall("instance-type")
 	return f.InstanceTypes[instance], nil
 }
 
 // InstanceTypeByProviderID returns the type of the specified instance.
-func (f *FakeCloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
+func (f *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	f.addCall("instance-type-by-provider-id")
 	return f.InstanceTypes[types.NodeName(providerID)], nil
 }
 
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
-func (f *FakeCloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+func (f *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-exists-by-provider-id")
 	return f.ExistsByProviderID, f.ErrByProviderID
 }
 
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes
-func (f *FakeCloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
+func (f *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-shutdown-by-provider-id")
 	return f.NodeShutdown, f.ErrShutdownByProviderID
 }
 
 // List is a test-spy implementation of Instances.List.
 // It adds an entry "list" into the internal method call record.
-func (f *FakeCloud) List(filter string) ([]types.NodeName, error) {
+func (f *Cloud) List(filter string) ([]types.NodeName, error) {
 	f.addCall("list")
 	result := []types.NodeName{}
 	for _, machine := range f.Machines {
@@ -285,7 +296,11 @@ func (f *FakeCloud) List(filter string) ([]types.NodeName, error) {
 	return result, f.Err
 }
 
-func (f *FakeCloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
+// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+// In most cases, this method is called from the kubelet querying a local metadata service to acquire its zone.
+// For the case of external cloud providers, use GetZoneByProviderID or GetZoneByNodeName since GetZone
+// can no longer be called from the kubelets.
+func (f *Cloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	f.addCall("get-zone")
 	return f.Zone, f.Err
 }
@@ -293,7 +308,7 @@ func (f *FakeCloud) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 // GetZoneByProviderID implements Zones.GetZoneByProviderID
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (f *FakeCloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
+func (f *Cloud) GetZoneByProviderID(ctx context.Context, providerID string) (cloudprovider.Zone, error) {
 	f.addCall("get-zone-by-provider-id")
 	return f.Zone, f.Err
 }
@@ -301,12 +316,13 @@ func (f *FakeCloud) GetZoneByProviderID(ctx context.Context, providerID string) 
 // GetZoneByNodeName implements Zones.GetZoneByNodeName
 // This is particularly useful in external cloud providers where the kubelet
 // does not initialize node data.
-func (f *FakeCloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
+func (f *Cloud) GetZoneByNodeName(ctx context.Context, nodeName types.NodeName) (cloudprovider.Zone, error) {
 	f.addCall("get-zone-by-node-name")
 	return f.Zone, f.Err
 }
 
-func (f *FakeCloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
+// ListRoutes lists all managed routes that belong to the specified clusterName
+func (f *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("list-routes")
@@ -320,7 +336,10 @@ func (f *FakeCloud) ListRoutes(ctx context.Context, clusterName string) ([]*clou
 	return routes, f.Err
 }
 
-func (f *FakeCloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
+// CreateRoute creates the described managed route
+// route.Name will be ignored, although the cloud-provider may use nameHint
+// to create a more user-meaningful name.
+func (f *Cloud) CreateRoute(ctx context.Context, clusterName string, nameHint string, route *cloudprovider.Route) error {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("create-route")
@@ -329,7 +348,7 @@ func (f *FakeCloud) CreateRoute(ctx context.Context, clusterName string, nameHin
 		f.Err = fmt.Errorf("route %q already exists", name)
 		return f.Err
 	}
-	fakeRoute := FakeRoute{}
+	fakeRoute := Route{}
 	fakeRoute.Route = *route
 	fakeRoute.Route.Name = name
 	fakeRoute.ClusterName = clusterName
@@ -337,7 +356,9 @@ func (f *FakeCloud) CreateRoute(ctx context.Context, clusterName string, nameHin
 	return nil
 }
 
-func (f *FakeCloud) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
+// DeleteRoute deletes the specified managed route
+// Route should be as returned by ListRoutes
+func (f *Cloud) DeleteRoute(ctx context.Context, clusterName string, route *cloudprovider.Route) error {
 	f.Lock.Lock()
 	defer f.Lock.Unlock()
 	f.addCall("delete-route")
@@ -350,8 +371,9 @@ func (f *FakeCloud) DeleteRoute(ctx context.Context, clusterName string, route *
 	return nil
 }
 
-func (c *FakeCloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
-	if val, ok := c.VolumeLabelMap[pv.Name]; ok {
+// GetLabelsForVolume returns the labels for a PersistentVolume
+func (f *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume) (map[string]string, error) {
+	if val, ok := f.VolumeLabelMap[pv.Name]; ok {
 		return val, nil
 	}
 	return nil, fmt.Errorf("label not found for volume")
