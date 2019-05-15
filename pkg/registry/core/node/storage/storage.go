@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -44,12 +44,12 @@ type NodeStorage struct {
 	Status *StatusREST
 	Proxy  *noderest.ProxyREST
 
-	KubeletConnectionInfo client.ConnectionInfoGetter
+	KubeletConnectionInfo kubeletclient.ConnectionInfoGetter
 }
 
 type REST struct {
 	*genericregistry.Store
-	connection     client.ConnectionInfoGetter
+	connection     kubeletclient.ConnectionInfoGetter
 	proxyTransport http.RoundTripper
 }
 
@@ -75,7 +75,7 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 }
 
 // NewStorage returns a NodeStorage object that will work against nodes.
-func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
+func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig kubeletclient.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Node{} },
 		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
@@ -103,7 +103,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 	proxyREST := &noderest.ProxyREST{Store: store, ProxyTransport: proxyTransport}
 
 	// Build a NodeGetter that looks up nodes using the REST handler
-	nodeGetter := client.NodeGetterFunc(func(ctx context.Context, nodeName string, options metav1.GetOptions) (*v1.Node, error) {
+	nodeGetter := kubeletclient.NodeGetterFunc(func(ctx context.Context, nodeName string, options metav1.GetOptions) (*v1.Node, error) {
 		obj, err := nodeREST.Get(ctx, nodeName, &options)
 		if err != nil {
 			return nil, err
@@ -120,7 +120,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		}
 		return externalNode, nil
 	})
-	connectionInfoGetter, err := client.NewNodeConnectionInfoGetter(nodeGetter, kubeletClientConfig)
+	connectionInfoGetter, err := kubeletclient.NewNodeConnectionInfoGetter(nodeGetter, kubeletClientConfig)
 	if err != nil {
 		return nil, err
 	}

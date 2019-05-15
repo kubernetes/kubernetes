@@ -32,8 +32,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubelet/client"
-
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	// install all api groups for testing
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
@@ -392,10 +391,10 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 }
 
 type mockConnectionInfoGetter struct {
-	info *client.ConnectionInfo
+	info *kubeletclient.ConnectionInfo
 }
 
-func (g mockConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*client.ConnectionInfo, error) {
+func (g mockConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*kubeletclient.ConnectionInfo, error) {
 	return g.info, nil
 }
 
@@ -403,7 +402,7 @@ func TestPortForwardLocation(t *testing.T) {
 	ctx := genericapirequest.NewDefaultContext()
 	tcs := []struct {
 		in          *api.Pod
-		info        *client.ConnectionInfo
+		info        *kubeletclient.ConnectionInfo
 		opts        *api.PodPortForwardOptions
 		expectedErr error
 		expectedURL *url.URL
@@ -425,7 +424,7 @@ func TestPortForwardLocation(t *testing.T) {
 					NodeName: "node1",
 				},
 			},
-			info:        &client.ConnectionInfo{},
+			info:        &kubeletclient.ConnectionInfo{},
 			opts:        &api.PodPortForwardOptions{},
 			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1"},
 		},
@@ -439,7 +438,7 @@ func TestPortForwardLocation(t *testing.T) {
 					NodeName: "node1",
 				},
 			},
-			info:        &client.ConnectionInfo{},
+			info:        &kubeletclient.ConnectionInfo{},
 			opts:        &api.PodPortForwardOptions{Ports: []int32{80}},
 			expectedURL: &url.URL{Host: ":", Path: "/portForward/ns/pod1", RawQuery: "port=80"},
 		},

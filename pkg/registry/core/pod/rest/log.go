@@ -27,13 +27,13 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 )
 
 // LogREST implements the log endpoint for a Pod
 type LogREST struct {
-	KubeletConn client.ConnectionInfoGetter
+	KubeletConn kubeletclient.ConnectionInfoGetter
 	Store       *genericregistry.Store
 }
 

@@ -42,7 +42,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
@@ -287,7 +287,7 @@ func getContainerNames(containers []api.Container) string {
 // and only one container is present in the pod, that container is used.
 func LogLocation(
 	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
+	connInfo kubeletclient.ConnectionInfoGetter,
 	ctx context.Context,
 	name string,
 	opts *api.PodLogOptions,
@@ -423,7 +423,7 @@ func streamParams(params url.Values, opts runtime.Object) error {
 // and only one container is present in the pod, that container is used.
 func AttachLocation(
 	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
+	connInfo kubeletclient.ConnectionInfoGetter,
 	ctx context.Context,
 	name string,
 	opts *api.PodAttachOptions,
@@ -435,7 +435,7 @@ func AttachLocation(
 // and only one container is present in the pod, that container is used.
 func ExecLocation(
 	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
+	connInfo kubeletclient.ConnectionInfoGetter,
 	ctx context.Context,
 	name string,
 	opts *api.PodExecOptions,
@@ -445,7 +445,7 @@ func ExecLocation(
 
 func streamLocation(
 	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
+	connInfo kubeletclient.ConnectionInfoGetter,
 	ctx context.Context,
 	name string,
 	opts runtime.Object,
@@ -504,7 +504,7 @@ func streamLocation(
 // PortForwardLocation returns the port-forward URL for a pod.
 func PortForwardLocation(
 	getter ResourceGetter,
-	connInfo client.ConnectionInfoGetter,
+	connInfo kubeletclient.ConnectionInfoGetter,
 	ctx context.Context,
 	name string,
 	opts *api.PodPortForwardOptions,

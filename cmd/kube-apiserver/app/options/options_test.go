@@ -33,8 +33,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 )
 

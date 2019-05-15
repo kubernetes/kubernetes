@@ -28,7 +28,7 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 

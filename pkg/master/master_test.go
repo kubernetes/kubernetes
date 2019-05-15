@@ -54,7 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
-	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/master/storageversionhashdata"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"

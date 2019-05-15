@@ -31,7 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
-	"k8s.io/kubernetes/pkg/kubelet/client"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 )
 
@@ -82,7 +82,7 @@ var upgradeableMethods = []string{"GET", "POST"}
 // AttachREST implements the attach subresource for a Pod
 type AttachREST struct {
 	Store       *genericregistry.Store
-	KubeletConn client.ConnectionInfoGetter
+	KubeletConn kubeletclient.ConnectionInfoGetter
 }
 
 // Implement Connecter
@@ -119,7 +119,7 @@ func (r *AttachREST) ConnectMethods() []string {
 // ExecREST implements the exec subresource for a Pod
 type ExecREST struct {
 	Store       *genericregistry.Store
-	KubeletConn client.ConnectionInfoGetter
+	KubeletConn kubeletclient.ConnectionInfoGetter
 }
 
 // Implement Connecter
@@ -156,7 +156,7 @@ func (r *ExecREST) ConnectMethods() []string {
 // PortForwardREST implements the portforward subresource for a Pod
 type PortForwardREST struct {
 	Store       *genericregistry.Store
-	KubeletConn client.ConnectionInfoGetter
+	KubeletConn kubeletclient.ConnectionInfoGetter
 }
 
 // Implement Connecter

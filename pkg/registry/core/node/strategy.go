@@ -38,8 +38,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	kubeletclient "k8s.io/kubernetes/pkg/client/kubelet"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
@@ -206,7 +206,7 @@ func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.
-func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+func ResourceLocation(getter ResourceGetter, connection kubeletclient.ConnectionInfoGetter, proxyTransport http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
 	schemeReq, name, portReq, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
