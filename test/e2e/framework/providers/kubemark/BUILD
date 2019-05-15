@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/providers/kubemark",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubemark:go_default_library",
+        "//cmd/kubemark/pkg:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",

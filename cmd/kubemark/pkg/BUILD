@@ -12,7 +12,7 @@ go_library(
         "hollow_kubelet.go",
         "hollow_proxy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubemark",
+    importpath = "k8s.io/kubernetes/cmd/kubemark/pkg",
     deps = [
         "//cmd/kube-proxy/app:go_default_library",
         "//cmd/kubelet/app:go_default_library",

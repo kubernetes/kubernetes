@@ -23,7 +23,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/kubemark"
+	"k8s.io/kubernetes/cmd/kubemark/pkg"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/onsi/gomega"
