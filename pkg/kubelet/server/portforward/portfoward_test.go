@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package portforward
 
 import (
 	"bytes"
@@ -32,9 +32,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
-	. "k8s.io/client-go/tools/portforward"
+	portforwardclient "k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 )
 
 // fakePortForwarder simulates port forwarding for testing. It implements
@@ -49,7 +48,7 @@ type fakePortForwarder struct {
 	send map[int32]string
 }
 
-var _ portforward.PortForwarder = &fakePortForwarder{}
+var _ PortForwarder = &fakePortForwarder{}
 
 func (pf *fakePortForwarder) PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error {
 	defer stream.Close()
@@ -84,7 +83,7 @@ func fakePortForwardServer(t *testing.T, testName string, serverSends, expectedF
 			received: make(map[int32]string),
 			send:     serverSends,
 		}
-		portforward.ServePortForward(w, req, pf, "pod", "uid", nil, 0, 10*time.Second, portforward.SupportedProtocols)
+		ServePortForward(w, req, pf, "pod", "uid", nil, 0, 10*time.Second, SupportedProtocols)
 
 		for port, expected := range expectedFromClient {
 			actual, ok := pf.received[port]
@@ -141,7 +140,7 @@ func TestForwardPorts(t *testing.T) {
 		stopChan := make(chan struct{}, 1)
 		readyChan := make(chan struct{})
 
-		pf, err := New(dialer, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
+		pf, err := portforwardclient.New(dialer, test.ports, stopChan, readyChan, os.Stdout, os.Stderr)
 		if err != nil {
 			t.Fatalf("%s: unexpected error calling New: %v", testName, err)
 		}
@@ -213,7 +212,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 	defer close(stopChan1)
 	readyChan1 := make(chan struct{})
 
-	pf1, err := New(dialer, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
+	pf1, err := portforwardclient.New(dialer, []string{"5555"}, stopChan1, readyChan1, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf1: %v", err)
 	}
@@ -222,7 +221,7 @@ func TestForwardPortsReturnsErrorWhenAllBindsFailed(t *testing.T) {
 
 	stopChan2 := make(chan struct{}, 1)
 	readyChan2 := make(chan struct{})
-	pf2, err := New(dialer, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
+	pf2, err := portforwardclient.New(dialer, []string{"5555"}, stopChan2, readyChan2, os.Stdout, os.Stderr)
 	if err != nil {
 		t.Fatalf("error creating pf2: %v", err)
 	}

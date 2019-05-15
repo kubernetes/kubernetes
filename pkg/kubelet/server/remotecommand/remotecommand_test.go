@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package remotecommand
 
 import (
 	"bytes"
@@ -40,7 +40,6 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 
 type fakeExecutor struct {
@@ -122,13 +121,13 @@ func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, ex
 			exec:         exec,
 		}
 
-		opts, err := remotecommand.NewOptions(req)
+		opts, err := NewOptions(req)
 		require.NoError(t, err)
 		if exec {
 			cmd := req.URL.Query()[api.ExecCommandParam]
-			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)
+			ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)
 		} else {
-			remotecommand.ServeAttach(w, req, executor, "pod", "uid", "container", opts, 0, 10*time.Second, serverProtocols)
+			ServeAttach(w, req, executor, "pod", "uid", "container", opts, 0, 10*time.Second, serverProtocols)
 		}
 
 		if e, a := strings.Repeat(stdinData, messageCount), executor.stdinReceived.String(); e != a {
