@@ -407,6 +407,7 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
+// GetFitPredicateFunctions id exported to be used by the scheduler.
 func GetFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]predicates.FitPredicate, error) {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()
@@ -430,6 +431,7 @@ func GetFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 	return fitPredicates, nil
 }
 
+// GetPriorityMetadataProducer id exported to be used by the scheduler.
 func GetPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -440,6 +442,7 @@ func GetPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMet
 	return priorityMetadataProducer(args), nil
 }
 
+// GetPredicateMetadataProducer id exported to be used by the scheduler.
 func GetPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
@@ -450,6 +453,7 @@ func GetPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateM
 	return predicateMetadataProducer(args), nil
 }
 
+// GetPriorityFunctionConfigs id exported to be used by the scheduler.
 func GetPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()

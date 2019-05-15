@@ -478,7 +478,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 	}, nil
 }
 
-// getBinderFunc returns a func which returns an extender that supports bind or a default binder based on the given pod.
+// GetBinderFunc returns a func which returns an extender that supports bind or a default binder based on the given pod.
 func GetBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerExtender) func(pod *v1.Pod) Binder {
 	var extenderBinder algorithm.SchedulerExtender
 	for i := range extenders {

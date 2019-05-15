@@ -117,7 +117,6 @@ type Scheduler struct {
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
-
 func (sched *Scheduler) Cache() internalcache.Cache {
 	return sched.SchedulerCache
 }
