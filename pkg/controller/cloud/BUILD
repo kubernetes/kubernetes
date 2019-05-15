@@ -46,6 +46,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/testutil:go_default_library",
         "//pkg/scheduler/api:go_default_library",
