@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -87,6 +88,8 @@ func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer val
 }
 
 func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+	debug.PrintStack()
+
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
 		client:        c,
