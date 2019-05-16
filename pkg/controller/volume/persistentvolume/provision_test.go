@@ -433,7 +433,7 @@ func TestProvisionSync(t *testing.T) {
 			noerrors, wrapTestWithCSIMigrationProvisionCalls(testSyncClaim),
 		},
 		{
-			// volume provisioned and available
+			// volume provisioned and available, binding metric should have been reported
 			// in this case, NO normal event with external provisioner should be issued
 			"11-22 - external provisioner with volume available",
 			newVolumeArray("volume11-22", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal),
@@ -490,8 +490,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// should issue an ExternalProvisioning event to signal that some external provisioner
 				// is working on provisioning the PV, also add the operation start timestamp into local cache
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
-				operationTsKey := ctrl.createOperationTimestampCacheKey("provision", "default/claim12-2")
-				if _, exists := ctrl.operationTimestamps.Get(operationTsKey); exists {
+				if ctrl.existsOperationTimestamp("provision", "default/claim12-2") {
 					volume := newVolume("pvc-uid12-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classExternal)
 					ctrl.volumes.store.Add(volume) // add the volume to controller
 					reactor.AddVolume(volume)
@@ -528,8 +527,7 @@ func TestProvisionMultiSync(t *testing.T) {
 				// should issue an ExternalProvisioning event to signal that some external provisioner
 				// is working on provisioning the PV, also add the operation start timestamp into local cache
 				// operationTimestamps. Rely on the existences of the start time stamp to create a PV for binding
-				operationTsKey := ctrl.createOperationTimestampCacheKey("provision", "default/claim12-4")
-				if _, exists := ctrl.operationTimestamps.Get(operationTsKey); exists {
+				if ctrl.existsOperationTimestamp("provision", "default/claim12-4") {
 					volume := newVolume("pvc-uid12-4", "1Gi", "uid12-4", "claim12-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classExternal, pvutil.AnnBoundByController)
 					ctrl.volumes.store.Add(volume) // add the volume to controller
 					reactor.AddVolume(volume)

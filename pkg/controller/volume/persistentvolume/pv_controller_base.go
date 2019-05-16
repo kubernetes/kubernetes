@@ -256,12 +256,11 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 	_ = ctrl.claims.Delete(claim)
 	claimKey := claimToClaimKey(claim)
 	klog.V(4).Infof("claim %q deleted", claimKey)
-	// clean any possible unfinished provision/prebinding start timestamp from cache
+	// clean any possible unfinished provision/prebinding/binding start timestamp from cache
 	// Unit test [5-8] [5-9]
-	provisionTsKey := ctrl.createOperationTimestampCacheKey("provision", claimKey)
-	prebindingTsKey := ctrl.createOperationTimestampCacheKey("prebinding", claimKey)
-	ctrl.operationTimestamps.Delete(provisionTsKey)
-	ctrl.operationTimestamps.Delete(prebindingTsKey)
+	ctrl.deleteOperationTimestamp("provision", claimKey)
+	ctrl.deleteOperationTimestamp("binding", claimKey)
+	ctrl.deleteOperationTimestamp("prebinding", claimKey)
 
 	volumeName := claim.Spec.VolumeName
 	if volumeName == "" {
