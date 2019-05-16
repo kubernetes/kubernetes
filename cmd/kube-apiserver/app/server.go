@@ -257,7 +257,24 @@ func CreateNodeDialer(s completedServerRunOptions) (tunneler.Tunneler, *http.Tra
 		proxyDialerFn = nodeTunneler.Dial
 	}
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+	proxyTLSClientConfig := &tls.Config{
+		InsecureSkipVerify: true,
+	}
+	if len(s.ProxyClientCertFile) > 0 && len(s.ProxyClientKeyFile) > 0 {
+		certBytes, err := ioutil.ReadFile(s.ProxyClientCertFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read proxy certificate: %v", err)
+		}
+		keyBytes, err := ioutil.ReadFile(s.ProxyClientKeyFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read proxy key: %v", err)
+		}
+		cert, err := tls.X509KeyPair(certBytes, keyBytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse proxy key and certificate: %v", err)
+		}
+		proxyTLSClientConfig.Certificates = []tls.Certificate{cert}
+	}
 	proxyTransport := utilnet.SetTransportDefaults(&http.Transport{
 		DialContext:     proxyDialerFn,
 		TLSClientConfig: proxyTLSClientConfig,
