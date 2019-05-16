@@ -18,6 +18,7 @@ go_test(
         "rbac_test.go",
         "svcaccttoken_test.go",
     ],
+    rundir = ".",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
