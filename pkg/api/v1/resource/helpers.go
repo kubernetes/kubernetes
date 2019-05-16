@@ -177,6 +177,11 @@ func findContainerInPod(pod *v1.Pod, containerName string) (*v1.Container, error
 			return &container, nil
 		}
 	}
+	for _, container := range pod.Spec.InitContainers {
+		if container.Name == containerName {
+			return &container, nil
+		}
+	}
 	return nil, fmt.Errorf("container %s not found", containerName)
 }
 

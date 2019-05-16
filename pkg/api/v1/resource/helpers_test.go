@@ -137,6 +137,72 @@ func TestExtractResourceValue(t *testing.T) {
 			pod:           getPod("foo", "", "", "10Mi", "100Mi"),
 			expectedValue: "104857600",
 		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "limits.cpu",
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "", "9", "", ""),
+			expectedValue: "9",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.cpu",
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "", "", "", ""),
+			expectedValue: "0",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.cpu",
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "8", "", "", ""),
+			expectedValue: "8",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.cpu",
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "100m", "", "", ""),
+			expectedValue: "1",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.cpu",
+				Divisor:  resource.MustParse("100m"),
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "1200m", "", "", ""),
+			expectedValue: "12",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.memory",
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "", "", "100Mi", ""),
+			expectedValue: "104857600",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "requests.memory",
+				Divisor:  resource.MustParse("1Mi"),
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "", "", "100Mi", "1Gi"),
+			expectedValue: "100",
+		},
+		{
+			fs: &v1.ResourceFieldSelector{
+				Resource: "limits.memory",
+			},
+			cName:         "init-foo",
+			pod:           getPod("foo", "", "", "10Mi", "100Mi"),
+			expectedValue: "104857600",
+		},
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
@@ -172,6 +238,12 @@ func getPod(cname, cpuRequest, cpuLimit, memoryRequest, memoryLimit string) *v1.
 			Containers: []v1.Container{
 				{
 					Name:      cname,
+					Resources: resources,
+				},
+			},
+			InitContainers: []v1.Container{
+				{
+					Name:      "init-" + cname,
 					Resources: resources,
 				},
 			},
