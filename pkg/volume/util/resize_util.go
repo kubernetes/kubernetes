@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/resizefs"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 var (
@@ -95,6 +96,43 @@ func MarkResizeInProgress(
 	newPVC := pvc.DeepCopy()
 	newPVC = MergeResizeConditionOnPVC(newPVC, conditions)
 	return PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+}
+
+// MarkResizeInProgressWithResizer marks cloudprovider resizing as in progress
+// and also annotates the PVC with the name of the resizer.
+func MarkResizeInProgressWithResizer(
+	pvc *v1.PersistentVolumeClaim,
+	resizerName string,
+	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	// Mark PVC as Resize Started
+	progressCondition := v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimResizing,
+		Status:             v1.ConditionTrue,
+		LastTransitionTime: metav1.Now(),
+	}
+	conditions := []v1.PersistentVolumeClaimCondition{progressCondition}
+	newPVC := pvc.DeepCopy()
+	newPVC = MergeResizeConditionOnPVC(newPVC, conditions)
+	newPVC = setResizer(newPVC, resizerName)
+	return PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+}
+
+// SetClaimResizer sets resizer annotation on PVC
+func SetClaimResizer(
+	pvc *v1.PersistentVolumeClaim,
+	resizerName string,
+	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	newPVC := pvc.DeepCopy()
+	newPVC = setResizer(newPVC, resizerName)
+	return PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+}
+
+func setResizer(pvc *v1.PersistentVolumeClaim, resizerName string) *v1.PersistentVolumeClaim {
+	if val, ok := pvc.Annotations[volumetypes.VolumeResizerKey]; ok && val == resizerName {
+		return pvc
+	}
+	metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, volumetypes.VolumeResizerKey, resizerName)
+	return pvc
 }
 
 // MarkForFSResize marks file system resizing as pending

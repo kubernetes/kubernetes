@@ -50,3 +50,10 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	defer runtime.RecoverFromPanic(&detailedErr)
 	return o.OperationFunc()
 }
+
+const (
+	// VolumeResizerKey is key that will be used to store resizer used
+	// for resizing PVC. The generated key/value pair will be added
+	// as a annotation to the PVC.
+	VolumeResizerKey = "volume.kubernetes.io/storage-resizer"
+)
