@@ -120,7 +120,7 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "experimental-control-plane",
+		Use:     "control-plane",
 		Short:   "Upgrade the control plane instance deployed on this node. IMPORTANT. This command should be executed after executing `kubeadm upgrade apply` on another control plane instance",
 		Long:    upgradeNodeConfigLongDesc,
 		Example: upgradeNodeConfigExample,

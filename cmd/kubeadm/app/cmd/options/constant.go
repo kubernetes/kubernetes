@@ -117,7 +117,7 @@ const (
 	FileDiscovery = "discovery-file"
 
 	// ControlPlane flag instruct kubeadm to create a new control plane instance on this node
-	ControlPlane = "experimental-control-plane"
+	ControlPlane = "control-plane"
 
 	// UploadCerts flag instruct kubeadm to upload certificates
 	UploadCerts = "experimental-upload-certs"
