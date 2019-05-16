@@ -314,3 +314,39 @@ func TestHTTPProbeChecker_NonLocalRedirects(t *testing.T) {
 		})
 	}
 }
+
+func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
+	hostHeader := "www.example.com"
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redirect":
+			http.Redirect(w, r, "/success", http.StatusFound)
+		case "/success":
+			if r.Host != hostHeader {
+				w.WriteHeader(http.StatusOK)
+			} else {
+				http.Error(w, "", http.StatusBadRequest)
+			}
+		default:
+			http.Error(w, "", http.StatusInternalServerError)
+		}
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	t.Run("local", func(t *testing.T) {
+		prober := New(false)
+		target, err := url.Parse(server.URL + "/redirect")
+		require.NoError(t, err)
+		result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
+		assert.Equal(t, probe.Success, result)
+	})
+	t.Run("nonlocal", func(t *testing.T) {
+		prober := New(true)
+		target, err := url.Parse(server.URL + "/redirect")
+		require.NoError(t, err)
+		result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
+		assert.Equal(t, probe.Success, result)
+	})
+}
