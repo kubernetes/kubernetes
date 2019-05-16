@@ -1158,8 +1158,8 @@ type Fields struct {
 
 // Table is a tabular representation of a set of API resources. The server transforms the
 // object into a set of preferred columns for quickly reviewing the objects.
-// +protobuf=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +protobuf=false
 type Table struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -1309,5 +1309,5 @@ type PartialObjectMetadataList struct {
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items contains each of the included items.
-	Items []*PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

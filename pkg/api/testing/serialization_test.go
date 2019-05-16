@@ -387,7 +387,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		}
 		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
 		outEvent := &metav1.WatchEvent{}
-		res, _, err = sr.Decode(nil, outEvent)
+		_, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {
 			t.Fatalf("%v: %#v", err, outEvent)
 		}

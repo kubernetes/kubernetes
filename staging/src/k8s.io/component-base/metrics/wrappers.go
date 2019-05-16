@@ -56,6 +56,16 @@ type CounterVecMetric interface {
 	With(prometheus.Labels) CounterMetric
 }
 
+// GaugeMetric is an interface which defines a subset of the interface provided by prometheus.Gauge
+type GaugeMetric interface {
+	Set(float64)
+}
+
+// ObserverMetric captures individual observations.
+type ObserverMetric interface {
+	Observe(float64)
+}
+
 // PromRegistry is an interface which implements a subset of prometheus.Registerer and
 // prometheus.Gatherer interfaces
 type PromRegistry interface {

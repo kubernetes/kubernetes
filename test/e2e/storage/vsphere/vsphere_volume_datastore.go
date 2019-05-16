@@ -21,8 +21,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -52,7 +51,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		namespace    string
 		scParameters map[string]string
 	)
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
@@ -64,12 +63,12 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		}
 	})
 
-	It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func() {
-		By("Invoking Test for invalid datastore")
+	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func() {
+		ginkgo.By("Invoking Test for invalid datastore")
 		scParameters[Datastore] = InvalidDatastore
 		scParameters[DiskFormat] = ThinDisk
 		err := invokeInvalidDatastoreTestNeg(client, namespace, scParameters)
-		Expect(err).To(HaveOccurred())
+		framework.ExpectError(err)
 		errorMsg := `Failed to provision volume with StorageClass \"` + DatastoreSCName + `\": Datastore ` + InvalidDatastore + ` not found`
 		if !strings.Contains(err.Error(), errorMsg) {
 			framework.ExpectNoError(err, errorMsg)
@@ -78,19 +77,19 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 })
 
 func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string, scParameters map[string]string) error {
-	By("Creating Storage Class With Invalid Datastore")
+	ginkgo.By("Creating Storage Class With Invalid Datastore")
 	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(DatastoreSCName, scParameters, nil))
 	framework.ExpectNoError(err, fmt.Sprintf("Failed to create storage class with err: %v", err))
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
-	By("Creating PVC using the Storage Class")
+	ginkgo.By("Creating PVC using the Storage Class")
 	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
-	By("Expect claim to fail provisioning volume")
+	ginkgo.By("Expect claim to fail provisioning volume")
 	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
-	Expect(err).To(HaveOccurred())
+	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)

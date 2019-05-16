@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -249,7 +249,7 @@ func TestNodeAddress(t *testing.T) {
 			}
 			hostname := testKubeletHostname
 			externalCloudProvider := false
-			cloud := &fakecloud.FakeCloud{
+			cloud := &fakecloud.Cloud{
 				Addresses: testCase.nodeAddresses,
 				Err:       nil,
 			}

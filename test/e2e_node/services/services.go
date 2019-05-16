@@ -121,8 +121,8 @@ func RunE2EServices(t *testing.T) {
 const (
 	// services.log is the combined log of all services
 	servicesLogFile = "services.log"
-	// LOG_VERBOSITY_LEVEL is consistent with the level used in a cluster e2e test.
-	LOG_VERBOSITY_LEVEL = "4"
+	// LogVerbosityLevel is consistent with the level used in a cluster e2e test.
+	LogVerbosityLevel = "4"
 )
 
 // startInternalServices starts the internal services in a separate process.

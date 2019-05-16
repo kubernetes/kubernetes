@@ -38,8 +38,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -55,7 +55,7 @@ const (
 
 var _ = SIGDescribe("Proxy", func() {
 	version := "v1"
-	Context("version "+version, func() {
+	ginkgo.Context("version "+version, func() {
 		options := framework.Options{
 			ClientQPS: -1.0,
 		}
@@ -116,12 +116,12 @@ var _ = SIGDescribe("Proxy", func() {
 					},
 				},
 			})
-			Expect(err).NotTo(HaveOccurred())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			// Make an RC with a single pod. The 'porter' image is
 			// a simple server which serves the values of the
 			// environmental variables below.
-			By("starting an echo server on multiple ports")
+			ginkgo.By("starting an echo server on multiple ports")
 			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
 				Client:       f.ClientSet,
@@ -160,10 +160,10 @@ var _ = SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
+			gomega.Expect(framework.RunRC(cfg)).NotTo(gomega.HaveOccurred())
 			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
-			Expect(endpoints.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(HaveOccurred())
+			gomega.Expect(endpoints.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(gomega.HaveOccurred())
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
@@ -212,7 +212,7 @@ var _ = SIGDescribe("Proxy", func() {
 			e2elog.Logf("setup took %v, starting test cases", d)
 			numberTestCases := len(expectations)
 			totalAttempts := numberTestCases * proxyAttempts
-			By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
+			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
 
 			for i := 0; i < proxyAttempts; i++ {
 				wg.Add(numberTestCases)
@@ -297,25 +297,25 @@ func pickNode(cs clientset.Interface) (string, error) {
 
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	node, err := pickNode(f.ClientSet)
-	Expect(err).NotTo(HaveOccurred())
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
 		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
-			e2elog.Logf("Failed proxying node logs due to service unavailable: %v", err)
+			e2elog.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
-			Expect(err).NotTo(HaveOccurred())
-			Expect(status).To(Equal(http.StatusOK))
-			Expect(d).To(BeNumerically("<", proxyHTTPCallTimeout))
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}
 	if serviceUnavailableErrors > 0 {
 		e2elog.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
-	Expect(serviceUnavailableErrors).To(BeNumerically("<", maxFailures))
+	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
 }

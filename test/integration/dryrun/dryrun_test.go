@@ -19,7 +19,8 @@ package dryrun
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,8 +30,11 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
+	"k8s.io/kubernetes/test/integration/framework"
 )
 
 // Only add kinds to this list when this a virtual resource with get and create verbs that doesn't actually
@@ -206,10 +210,29 @@ func DryRunDeleteTest(t *testing.T, rsc dynamic.ResourceInterface, name string) 
 func TestDryRun(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DryRun, true)()
 
-	master := etcd.StartRealMasterOrDie(t)
-	defer master.Cleanup()
+	// start API server
+	s, err := kubeapiservertesting.StartTestServer(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--runtime-config=extensions/v1beta1/deployments=true,extensions/v1beta1/daemonsets=true,extensions/v1beta1/replicasets=true,extensions/v1beta1/podsecuritypolicies=true,extensions/v1beta1/networkpolicies=true",
+	}, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.TearDownFn()
 
-	if _, err := master.Client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
+	client, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create CRDs so we can make sure that custom resources do not get lost
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(s.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+	if _, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -225,7 +248,13 @@ func TestDryRun(t *testing.T) {
 		dryrunData[resource] = data
 	}
 
-	for _, resourceToTest := range master.Resources {
+	// gather resources to test
+	_, resources, err := client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
+	}
+
+	for _, resourceToTest := range etcd.GetResources(t, resources) {
 		t.Run(resourceToTest.Mapping.Resource.String(), func(t *testing.T) {
 			mapping := resourceToTest.Mapping
 			gvk := resourceToTest.Mapping.GroupVersionKind
@@ -242,7 +271,7 @@ func TestDryRun(t *testing.T) {
 				t.Fatalf("no test data for %s.  Please add a test for your new type to etcd.GetEtcdStorageData().", gvResource)
 			}
 
-			rsc, obj, err := etcd.JSONToUnstructured(testData.Stub, testNamespace, mapping, master.Dynamic)
+			rsc, obj, err := etcd.JSONToUnstructured(testData.Stub, testNamespace, mapping, dynamicClient)
 			if err != nil {
 				t.Fatalf("failed to unmarshal stub (%v): %v", testData.Stub, err)
 			}

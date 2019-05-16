@@ -39,7 +39,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -186,8 +186,8 @@ func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[stri
 			fmt.Sprintf("should update url map for host %v to expose a single url: %v", updateURLMapHost, updateURLMapPath),
 			func() {
 				var pathToFail string
-				jig.Update(func(ing *extensions.Ingress) {
-					newRules := []extensions.IngressRule{}
+				jig.Update(func(ing *networkingv1beta1.Ingress) {
+					newRules := []networkingv1beta1.IngressRule{}
 					for _, rule := range ing.Spec.Rules {
 						if rule.Host != updateURLMapHost {
 							newRules = append(newRules, rule)
@@ -195,11 +195,11 @@ func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[stri
 						}
 						existingPath := rule.IngressRuleValue.HTTP.Paths[0]
 						pathToFail = existingPath.Path
-						newRules = append(newRules, extensions.IngressRule{
+						newRules = append(newRules, networkingv1beta1.IngressRule{
 							Host: updateURLMapHost,
-							IngressRuleValue: extensions.IngressRuleValue{
-								HTTP: &extensions.HTTPIngressRuleValue{
-									Paths: []extensions.HTTPIngressPath{
+							IngressRuleValue: networkingv1beta1.IngressRuleValue{
+								HTTP: &networkingv1beta1.HTTPIngressRuleValue{
+									Paths: []networkingv1beta1.HTTPIngressPath{
 										{
 											Path:    updateURLMapPath,
 											Backend: existingPath.Backend,
@@ -223,14 +223,14 @@ func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[stri
 		tests = append(tests, ConformanceTests{
 			fmt.Sprintf("should update SSL certificate with modified hostname %v", updatedTLSHost),
 			func() {
-				jig.Update(func(ing *extensions.Ingress) {
-					newRules := []extensions.IngressRule{}
+				jig.Update(func(ing *networkingv1beta1.Ingress) {
+					newRules := []networkingv1beta1.IngressRule{}
 					for _, rule := range ing.Spec.Rules {
 						if rule.Host != tlsHost {
 							newRules = append(newRules, rule)
 							continue
 						}
-						newRules = append(newRules, extensions.IngressRule{
+						newRules = append(newRules, networkingv1beta1.IngressRule{
 							Host:             updatedTLSHost,
 							IngressRuleValue: rule.IngressRuleValue,
 						})
@@ -368,7 +368,7 @@ type TestJig struct {
 
 	RootCAs map[string][]byte
 	Address string
-	Ingress *extensions.Ingress
+	Ingress *networkingv1beta1.Ingress
 	// class is the value of the annotation keyed under
 	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
 	// this jig.
@@ -436,9 +436,9 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 }
 
 // runCreate runs the required command to create the given ingress.
-func (j *TestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+func (j *TestJig) runCreate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Create(ing)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Create(ing)
 	}
 	// Use kubemci to create a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
@@ -450,9 +450,9 @@ func (j *TestJig) runCreate(ing *extensions.Ingress) (*extensions.Ingress, error
 }
 
 // runUpdate runs the required command to update the given ingress.
-func (j *TestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress, error) {
+func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.Ingress, error) {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Update(ing)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Update(ing)
 	}
 	// Use kubemci to update a multicluster ingress.
 	// kubemci does not have an update command. We use "create --force" to update an existing ingress.
@@ -465,11 +465,11 @@ func (j *TestJig) runUpdate(ing *extensions.Ingress) (*extensions.Ingress, error
 }
 
 // Update retrieves the ingress, performs the passed function, and then updates it.
-func (j *TestJig) Update(update func(ing *extensions.Ingress)) {
+func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 	var err error
 	ns, name := j.Ingress.Namespace, j.Ingress.Name
 	for i := 0; i < 3; i++ {
-		j.Ingress, err = j.Client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+		j.Ingress, err = j.Client.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get ingress %s/%s: %v", ns, name, err)
 		}
@@ -493,8 +493,8 @@ func (j *TestJig) AddHTTPS(secretName string, hosts ...string) {
 	_, cert, _, err := createTLSSecret(j.Client, j.Ingress.Namespace, secretName, hosts...)
 	framework.ExpectNoError(err)
 	j.Logger.Infof("Updating ingress %v to also use secret %v for TLS termination", j.Ingress.Name, secretName)
-	j.Update(func(ing *extensions.Ingress) {
-		ing.Spec.TLS = append(ing.Spec.TLS, extensions.IngressTLS{Hosts: hosts, SecretName: secretName})
+	j.Update(func(ing *networkingv1beta1.Ingress) {
+		ing.Spec.TLS = append(ing.Spec.TLS, networkingv1beta1.IngressTLS{Hosts: hosts, SecretName: secretName})
 	})
 	j.RootCAs[secretName] = cert
 }
@@ -504,8 +504,8 @@ func (j *TestJig) SetHTTPS(secretName string, hosts ...string) {
 	_, cert, _, err := createTLSSecret(j.Client, j.Ingress.Namespace, secretName, hosts...)
 	framework.ExpectNoError(err)
 	j.Logger.Infof("Updating ingress %v to only use secret %v for TLS termination", j.Ingress.Name, secretName)
-	j.Update(func(ing *extensions.Ingress) {
-		ing.Spec.TLS = []extensions.IngressTLS{{Hosts: hosts, SecretName: secretName}}
+	j.Update(func(ing *networkingv1beta1.Ingress) {
+		ing.Spec.TLS = []networkingv1beta1.IngressTLS{{Hosts: hosts, SecretName: secretName}}
 	})
 	j.RootCAs = map[string][]byte{secretName: cert}
 }
@@ -513,14 +513,14 @@ func (j *TestJig) SetHTTPS(secretName string, hosts ...string) {
 // RemoveHTTPS updates the ingress to not use this secret for TLS.
 // Note: Does not delete the secret.
 func (j *TestJig) RemoveHTTPS(secretName string) {
-	newTLS := []extensions.IngressTLS{}
+	newTLS := []networkingv1beta1.IngressTLS{}
 	for _, ingressTLS := range j.Ingress.Spec.TLS {
 		if secretName != ingressTLS.SecretName {
 			newTLS = append(newTLS, ingressTLS)
 		}
 	}
 	j.Logger.Infof("Updating ingress %v to not use secret %v for TLS termination", j.Ingress.Name, secretName)
-	j.Update(func(ing *extensions.Ingress) {
+	j.Update(func(ing *networkingv1beta1.Ingress) {
 		ing.Spec.TLS = newTLS
 	})
 	delete(j.RootCAs, secretName)
@@ -551,16 +551,16 @@ func (j *TestJig) TryDeleteIngress() {
 	j.tryDeleteGivenIngress(j.Ingress)
 }
 
-func (j *TestJig) tryDeleteGivenIngress(ing *extensions.Ingress) {
+func (j *TestJig) tryDeleteGivenIngress(ing *networkingv1beta1.Ingress) {
 	if err := j.runDelete(ing); err != nil {
 		j.Logger.Infof("Error while deleting the ingress %v/%v with class %s: %v", ing.Namespace, ing.Name, j.Class, err)
 	}
 }
 
 // runDelete runs the required command to delete the given ingress.
-func (j *TestJig) runDelete(ing *extensions.Ingress) error {
+func (j *TestJig) runDelete(ing *networkingv1beta1.Ingress) error {
 	if j.Class != MulticlusterIngressClassValue {
-		return j.Client.ExtensionsV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
+		return j.Client.NetworkingV1beta1().Ingresses(ing.Namespace).Delete(ing.Name, nil)
 	}
 	// Use kubemci to delete a multicluster ingress.
 	filePath := framework.TestContext.OutputDir + "/mci.yaml"
@@ -600,7 +600,7 @@ func getIngressAddress(client clientset.Interface, ns, name, class string) ([]st
 	if class == MulticlusterIngressClassValue {
 		return getIngressAddressFromKubemci(name)
 	}
-	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+	ing, err := client.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -635,7 +635,7 @@ func (j *TestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName strin
 	return address, err
 }
 
-func (j *TestJig) pollIngressWithCert(ing *extensions.Ingress, address string, knownHosts []string, cert []byte, waitForNodePort bool, timeout time.Duration) error {
+func (j *TestJig) pollIngressWithCert(ing *networkingv1beta1.Ingress, address string, knownHosts []string, cert []byte, waitForNodePort bool, timeout time.Duration) error {
 	// Check that all rules respond to a simple GET.
 	knownHostsSet := sets.NewString(knownHosts...)
 	for _, rules := range ing.Spec.Rules {
@@ -695,7 +695,7 @@ func (j *TestJig) WaitForIngressToStable() {
 // http or https). If waitForNodePort is true, the NodePort of the Service
 // is verified before verifying the Ingress. NodePort is currently a
 // requirement for cloudprovider Ingress.
-func (j *TestJig) WaitForGivenIngressWithTimeout(ing *extensions.Ingress, waitForNodePort bool, timeout time.Duration) error {
+func (j *TestJig) WaitForGivenIngressWithTimeout(ing *networkingv1beta1.Ingress, waitForNodePort bool, timeout time.Duration) error {
 	// Wait for the loadbalancer IP.
 	address, err := j.WaitForIngressAddress(j.Client, ing.Namespace, ing.Name, timeout)
 	if err != nil {
@@ -864,15 +864,15 @@ func (cont *NginxIngressController) Init() {
 	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
 
-func generateBacksideHTTPSIngressSpec(ns string) *extensions.Ingress {
-	return &extensions.Ingress{
+func generateBacksideHTTPSIngressSpec(ns string) *networkingv1beta1.Ingress {
+	return &networkingv1beta1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "echoheaders-https",
 			Namespace: ns,
 		},
-		Spec: extensions.IngressSpec{
+		Spec: networkingv1beta1.IngressSpec{
 			// Note kubemci requires a default backend.
-			Backend: &extensions.IngressBackend{
+			Backend: &networkingv1beta1.IngressBackend{
 				ServiceName: "echoheaders-https",
 				ServicePort: intstr.IntOrString{
 					Type:   intstr.Int,
@@ -939,7 +939,7 @@ func generateBacksideHTTPSDeploymentSpec() *apps.Deployment {
 }
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
-func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*apps.Deployment, *v1.Service, *extensions.Ingress, error) {
+func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace string, staticIPName string) (*apps.Deployment, *v1.Service, *networkingv1beta1.Ingress, error) {
 	deployCreated, err := cs.AppsV1().Deployments(namespace).Create(generateBacksideHTTPSDeploymentSpec())
 	if err != nil {
 		return nil, nil, nil, err
@@ -963,7 +963,7 @@ func (j *TestJig) SetUpBacksideHTTPSIngress(cs clientset.Interface, namespace st
 }
 
 // DeleteTestResource deletes given deployment, service and ingress.
-func (j *TestJig) DeleteTestResource(cs clientset.Interface, deploy *apps.Deployment, svc *v1.Service, ing *extensions.Ingress) []error {
+func (j *TestJig) DeleteTestResource(cs clientset.Interface, deploy *apps.Deployment, svc *v1.Service, ing *networkingv1beta1.Ingress) []error {
 	var errs []error
 	if ing != nil {
 		if err := j.runDelete(ing); err != nil {

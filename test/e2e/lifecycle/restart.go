@@ -29,7 +29,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 func nodeNames(nodes []v1.Node) []string {
@@ -54,14 +53,14 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		numNodes, err = framework.NumberOfRegisteredNodes(f.ClientSet)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		systemNamespace = metav1.NamespaceSystem
 
 		ginkgo.By("ensuring all nodes are ready")
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		e2elog.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
 		ginkgo.By("ensuring all pods are running and ready")
@@ -87,11 +86,11 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 	ginkgo.It("should restart all nodes and ensure all nodes and pods recover", func() {
 		ginkgo.By("restarting all of the nodes")
 		err := common.RestartNodes(f.ClientSet, originalNodes)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		ginkgo.By("ensuring all nodes are ready after the restart")
 		nodesAfter, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		e2elog.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 
 		// Make sure that we have the same number of nodes. We're not checking
@@ -108,7 +107,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		ginkgo.By("ensuring the same number of pods are running and ready after restart")
 		podCheckStart := time.Now()
 		podNamesAfter, err := framework.WaitForNRestartablePods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
 		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()

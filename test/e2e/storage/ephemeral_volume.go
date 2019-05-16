@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var (
@@ -46,13 +46,13 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 
 	f := framework.NewDefaultFramework("pv")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 	})
 
-	Describe("When pod refers to non-existent ephemeral storage", func() {
+	ginkgo.Describe("When pod refers to non-existent ephemeral storage", func() {
 		for _, testSource := range invalidEphemeralSource("pod-ephm-test") {
-			It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
+			ginkgo.It(fmt.Sprintf("should allow deletion of pod with invalid volume : %s", testSource.volumeType), func() {
 				pod := testEphemeralVolumePod(f, testSource.volumeType, testSource.source)
 				pod, err := c.CoreV1().Pods(f.Namespace.Name).Create(pod)
 				framework.ExpectNoError(err)

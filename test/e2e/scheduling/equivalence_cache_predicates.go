@@ -31,8 +31,9 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
 
@@ -48,7 +49,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	var ns string
 	f := framework.NewDefaultFramework("equivalence-cache")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 
@@ -61,7 +62,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		// cannot be run in parallel with any other test that touches Nodes or Pods.
 		// It is so because we need to have precise control on what's running in the cluster.
 		systemPods, err := framework.GetPodsInNamespace(cs, ns, map[string]string{})
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		systemPodsNo = 0
 		for _, pod := range systemPods {
 			if !masterNodes.Has(pod.Spec.NodeName) && pod.DeletionTimestamp == nil {
@@ -70,7 +71,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		}
 
 		err = framework.WaitForPodsRunningReady(cs, api.NamespaceSystem, int32(systemPodsNo), int32(systemPodsNo), framework.PodReadyBeforeTimeout, map[string]string{})
-		Expect(err).NotTo(HaveOccurred())
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		for _, node := range nodeList.Items {
 			e2elog.Logf("\nLogging pods the kubelet thinks is on node %v before test", node.Name)
@@ -83,16 +84,16 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	// When a replica pod (with HostPorts) is scheduled to a node, it will invalidate GeneralPredicates cache on this node,
 	// so that subsequent replica pods with same host port claim will be rejected.
 	// We enforce all replica pods bind to the same node so there will always be conflicts.
-	It("validates GeneralPredicates is properly invalidated when a pod is scheduled [Slow]", func() {
-		By("Launching a RC with two replica pods with HostPorts")
+	ginkgo.It("validates GeneralPredicates is properly invalidated when a pod is scheduled [Slow]", func() {
+		ginkgo.By("Launching a RC with two replica pods with HostPorts")
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 		rcName := "host-port"
 
 		// bind all replicas to same node
 		nodeSelector := map[string]string{"kubernetes.io/hostname": nodeName}
 
-		By("One pod should be scheduled, the other should be rejected")
-		// CreateNodeSelectorPods creates RC with host port 4312
+		ginkgo.By("One pod should be scheduled, the other should be rejected")
+		// CreateNodeSelectorPods creates RC with host port 4321
 		WaitForSchedulerAfterAction(f, func() error {
 			err := CreateNodeSelectorPods(f, rcName, 2, nodeSelector, false)
 			return err
@@ -105,11 +106,11 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	// This test verifies that MatchInterPodAffinity works as expected.
 	// In equivalence cache, it does not handle inter pod affinity (anti-affinity) specially (unless node label changed),
 	// because current predicates algorithm will ensure newly scheduled pod does not break existing affinity in cluster.
-	It("validates pod affinity works properly when new replica pod is scheduled", func() {
+	ginkgo.It("validates pod affinity works properly when new replica pod is scheduled", func() {
 		// create a pod running with label {security: S1}, and choose this node
 		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
 
-		By("Trying to apply a random label on the found node.")
+		ginkgo.By("Trying to apply a random label on the found node.")
 		// we need to use real failure domains, since scheduler only know them
 		k := "failure-domain.beta.kubernetes.io/zone"
 		v := "equivalence-e2e-test"
@@ -118,7 +119,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		// restore the node label
 		defer framework.AddOrUpdateLabelOnNode(cs, nodeName, k, oldValue)
 
-		By("Trying to schedule RC with Pod Affinity should success.")
+		ginkgo.By("Trying to schedule RC with Pod Affinity should success.")
 		framework.WaitForStableCluster(cs, masterNodes)
 		affinityRCName := "with-pod-affinity-" + string(uuid.NewUUID())
 		replica := 2
@@ -154,10 +155,10 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(framework.WaitForControlledPodsRunning(cs, ns, affinityRCName, api.Kind("ReplicationController")))
 
-		By("Remove node failure domain label")
+		ginkgo.By("Remove node failure domain label")
 		framework.RemoveLabelOffNode(cs, nodeName, k)
 
-		By("Trying to schedule another equivalent Pod should fail due to node label has been removed.")
+		ginkgo.By("Trying to schedule another equivalent Pod should fail due to node label has been removed.")
 		// use scale to create another equivalent pod and wait for failure event
 		WaitForSchedulerAfterAction(f, func() error {
 			err := framework.ScaleRC(f.ClientSet, f.ScalesGetter, ns, affinityRCName, uint(replica+1), false)
@@ -168,17 +169,17 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 	})
 
 	// This test verifies that MatchInterPodAffinity (anti-affinity) is respected as expected.
-	It("validates pod anti-affinity works properly when new replica pod is scheduled", func() {
-		By("Launching two pods on two distinct nodes to get two node names")
+	ginkgo.It("validates pod anti-affinity works properly when new replica pod is scheduled", func() {
+		ginkgo.By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, "host-port")
 		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		Expect(len(podList.Items)).To(Equal(2))
+		gomega.Expect(len(podList.Items)).To(gomega.Equal(2))
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
-		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
+		gomega.Expect(nodeNames[0]).ToNot(gomega.Equal(nodeNames[1]))
 
-		By("Applying a random label to both nodes.")
+		ginkgo.By("Applying a random label to both nodes.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "equivalence-e2etest"
 		for _, nodeName := range nodeNames {
@@ -187,7 +188,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			defer framework.RemoveLabelOffNode(cs, nodeName, k)
 		}
 
-		By("Trying to launch a pod with the service label on the selected nodes.")
+		ginkgo.By("Trying to launch a pod with the service label on the selected nodes.")
 		// run a pod with label {"service": "S1"} and expect it to be running
 		runPausePod(f, pausePodConfig{
 			Name:         "with-label-" + string(uuid.NewUUID()),
@@ -195,7 +196,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 			NodeSelector: map[string]string{k: v}, // only launch on our two nodes
 		})
 
-		By("Trying to launch RC with podAntiAffinity on these two nodes should be rejected.")
+		ginkgo.By("Trying to launch RC with podAntiAffinity on these two nodes should be rejected.")
 		labelRCName := "with-podantiaffinity-" + string(uuid.NewUUID())
 		replica := 2
 		labelsMap := map[string]string{
@@ -269,8 +270,9 @@ func getRCWithInterPodAffinityNodeSelector(name string, labelsMap map[string]str
 	}
 }
 
+// CreateNodeSelectorPods creates RC with host port 4321 and defines node selector
 func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nodeSelector map[string]string, expectRunning bool) error {
-	By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
+	ginkgo.By(fmt.Sprintf("Running RC which reserves host port and defines node selector"))
 
 	config := &testutils.RCConfig{
 		Client:       f.ClientSet,

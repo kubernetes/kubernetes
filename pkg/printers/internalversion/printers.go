@@ -539,12 +539,12 @@ func translateTimestampUntil(timestamp metav1.Time) string {
 }
 
 var (
-	podSuccessConditions = []metav1beta1.TableRowCondition{{Type: metav1beta1.RowCompleted, Status: metav1beta1.ConditionTrue, Reason: string(api.PodSucceeded), Message: "The pod has completed successfully."}}
-	podFailedConditions  = []metav1beta1.TableRowCondition{{Type: metav1beta1.RowCompleted, Status: metav1beta1.ConditionTrue, Reason: string(api.PodFailed), Message: "The pod failed."}}
+	podSuccessConditions = []metav1.TableRowCondition{{Type: metav1.RowCompleted, Status: metav1.ConditionTrue, Reason: string(api.PodSucceeded), Message: "The pod has completed successfully."}}
+	podFailedConditions  = []metav1.TableRowCondition{{Type: metav1.RowCompleted, Status: metav1.ConditionTrue, Reason: string(api.PodFailed), Message: "The pod failed."}}
 )
 
-func printPodList(podList *api.PodList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
-	rows := make([]metav1beta1.TableRow, 0, len(podList.Items))
+func printPodList(podList *api.PodList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(podList.Items))
 	for i := range podList.Items {
 		r, err := printPod(&podList.Items[i], options)
 		if err != nil {
@@ -555,7 +555,7 @@ func printPodList(podList *api.PodList, options printers.PrintOptions) ([]metav1
 	return rows, nil
 }
 
-func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1.TableRow, error) {
 	restarts := 0
 	totalContainers := len(pod.Spec.Containers)
 	readyContainers := 0
@@ -565,7 +565,7 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1beta1.TableR
 		reason = pod.Status.Reason
 	}
 
-	row := metav1beta1.TableRow{
+	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: pod},
 	}
 

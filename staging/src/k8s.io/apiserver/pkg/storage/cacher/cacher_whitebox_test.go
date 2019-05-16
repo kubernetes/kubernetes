@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -678,12 +678,16 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 			t.Fatalf("failure to update version of object (%d) %#v", bookmark.ResourceVersion, bookmark.Object)
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(2)
 		go func() {
 			cacher.dispatchEvent(bookmark)
+			wg.Done()
 		}()
 
 		go func() {
 			w.Stop()
+			wg.Done()
 		}()
 
 		done := make(chan struct{})
@@ -700,5 +704,6 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 			t.Fatal("receive result timeout")
 		}
 		w.Stop()
+		wg.Wait()
 	}
 }

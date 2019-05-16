@@ -16,7 +16,10 @@ limitations under the License.
 
 package workflow
 
-import "github.com/spf13/pflag"
+import (
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+)
 
 // Phase provides an implementation of a workflow phase that allows
 // creation of new phases by simply instantiating a variable of this type.
@@ -71,6 +74,10 @@ type Phase struct {
 	// Nb. if two or phases have the same local flags, please consider using local flags in the parent command
 	// or additional flags defined in the phase runner.
 	LocalFlags *pflag.FlagSet
+
+	// ArgsValidator defines the positional arg function to be used for validating args for this phase
+	// If not set a phase will adopt the args of the top level command.
+	ArgsValidator cobra.PositionalArgs
 }
 
 // AppendPhase adds the given phase to the nested, ordered sequence of phases.

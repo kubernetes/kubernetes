@@ -551,6 +551,12 @@ func TestBadTar(t *testing.T) {
 	}
 }
 
+// clean prevents path traversals by stripping them out.
+// This is adapted from https://golang.org/src/net/http/fs.go#L74
+func clean(fileName string) string {
+	return path.Clean(string(os.PathSeparator) + fileName)
+}
+
 func TestClean(t *testing.T) {
 	tests := []struct {
 		input   string

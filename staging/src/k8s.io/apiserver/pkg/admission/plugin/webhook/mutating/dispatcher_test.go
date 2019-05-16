@@ -122,7 +122,7 @@ func TestDispatch(t *testing.T) {
 				plugin: &Plugin{},
 			}
 			attr := generic.VersionedAttributes{
-				Attributes:         admission.NewAttributesRecord(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), false, nil),
+				Attributes:         admission.NewAttributesRecord(test.out, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", admission.Operation(""), nil, false, nil),
 				VersionedOldObject: nil,
 				VersionedObject:    test.in,
 			}

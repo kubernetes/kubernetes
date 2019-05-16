@@ -60,7 +60,7 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+targetVersion,
 		"STORAGE_BACKEND="+targetStorage,
-		"TEST_ETCD_IMAGE=3.3.10-0")
+		"TEST_ETCD_IMAGE=3.3.10-1")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -80,7 +80,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.3.10-0")
+			"TEST_ETCD_IMAGE=3.3.10-1")
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
 		// implicit etcd upgrades to simulate the user entering "y".

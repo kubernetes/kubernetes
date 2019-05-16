@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
@@ -404,7 +404,7 @@ func verifyVSphereVolumesAccessible(c clientset.Interface, pod *v1.Pod, persiste
 		// Verify disks are attached to the node
 		isAttached, err := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, nodeName)
 		framework.ExpectNoError(err)
-		Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
+		gomega.Expect(isAttached).To(gomega.BeTrue(), fmt.Sprintf("disk %v is not attached with the node", pv.Spec.VsphereVolume.VolumePath))
 		// Verify Volumes are accessible
 		filepath := filepath.Join("/mnt/", fmt.Sprintf("volume%v", index+1), "/emptyFile.txt")
 		_, err = framework.LookForStringInPodExec(namespace, pod.Name, []string{"/bin/touch", filepath}, "", time.Minute)
@@ -441,7 +441,7 @@ func verifyVolumeCreationOnRightZone(persistentvolumes []*v1.PersistentVolume, n
 				}
 			}
 		}
-		Expect(commonDatastores).To(ContainElement(datastoreRef.Value), "PV was created in an unsupported zone.")
+		gomega.Expect(commonDatastores).To(gomega.ContainElement(datastoreRef.Value), "PV was created in an unsupported zone.")
 	}
 }
 
@@ -631,7 +631,7 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 	var nodeVM mo.VirtualMachine
 	err := vmObject.Properties(ctx, vmObject.Reference(), []string{"config.files"}, &nodeVM)
 	framework.ExpectNoError(err)
-	Expect(nodeVM.Config).NotTo(BeNil())
+	gomega.Expect(nodeVM.Config).NotTo(gomega.BeNil())
 
 	vmxPath = nodeVM.Config.Files.VmPathName
 	e2elog.Logf("vmx file path is %s", vmxPath)
@@ -643,7 +643,7 @@ func verifyReadyNodeCount(client clientset.Interface, expectedNodes int) bool {
 	numNodes := 0
 	for i := 0; i < 36; i++ {
 		nodeList := framework.GetReadySchedulableNodesOrDie(client)
-		Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+		gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty(), "Unable to find ready and schedulable Node")
 
 		numNodes = len(nodeList.Items)
 		if numNodes == expectedNodes {
@@ -777,7 +777,7 @@ func getUUIDFromProviderID(providerID string) string {
 // GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos() []*NodeInfo {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	Expect(nodeList.Items).NotTo(BeEmpty(), "Unable to find ready and schedulable Node")
+	gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty(), "Unable to find ready and schedulable Node")
 	var nodesInfo []*NodeInfo
 	for _, node := range nodeList.Items {
 		nodeInfo := TestContext.NodeMapper.GetNodeInfo(node.Name)
@@ -793,7 +793,7 @@ func GetReadySchedulableNodeInfos() []*NodeInfo {
 // and it's associated NodeInfo object is returned.
 func GetReadySchedulableRandomNodeInfo() *NodeInfo {
 	nodesInfo := GetReadySchedulableNodeInfos()
-	Expect(nodesInfo).NotTo(BeEmpty())
+	gomega.Expect(nodesInfo).NotTo(gomega.BeEmpty())
 	return nodesInfo[rand.Int()%len(nodesInfo)]
 }
 
@@ -815,7 +815,7 @@ func invokeVCenterServiceControl(command, service, host string) error {
 func expectVolumeToBeAttached(nodeName, volumePath string) {
 	isAttached, err := diskIsAttached(volumePath, nodeName)
 	framework.ExpectNoError(err)
-	Expect(isAttached).To(BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
+	gomega.Expect(isAttached).To(gomega.BeTrue(), fmt.Sprintf("disk: %s is not attached with the node", volumePath))
 }
 
 // expectVolumesToBeAttached checks if the given Volumes are attached to the
@@ -824,7 +824,7 @@ func expectVolumesToBeAttached(pods []*v1.Pod, volumePaths []string) {
 	for i, pod := range pods {
 		nodeName := pod.Spec.NodeName
 		volumePath := volumePaths[i]
-		By(fmt.Sprintf("Verifying that volume %v is attached to node %v", volumePath, nodeName))
+		ginkgo.By(fmt.Sprintf("Verifying that volume %v is attached to node %v", volumePath, nodeName))
 		expectVolumeToBeAttached(nodeName, volumePath)
 	}
 }
@@ -835,7 +835,7 @@ func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []str
 	for i, pod := range pods {
 		podName := pod.Name
 		filePath := filePaths[i]
-		By(fmt.Sprintf("Verifying that file %v is accessible on pod %v", filePath, podName))
+		ginkgo.By(fmt.Sprintf("Verifying that file %v is accessible on pod %v", filePath, podName))
 		verifyFilesExistOnVSphereVolume(namespace, podName, filePath)
 	}
 }
@@ -861,7 +861,7 @@ func expectFileContentsToMatch(namespace string, pods []*v1.Pod, filePaths []str
 	for i, pod := range pods {
 		podName := pod.Name
 		filePath := filePaths[i]
-		By(fmt.Sprintf("Matching file content for %v on pod %v", filePath, podName))
+		ginkgo.By(fmt.Sprintf("Matching file content for %v on pod %v", filePath, podName))
 		expectFileContentToMatch(namespace, podName, filePath, contents[i])
 	}
 }

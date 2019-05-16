@@ -35,7 +35,7 @@ import (
 
 const message = "Preempted in order to admit critical pod"
 
-// CriticalPodAdmissionFailureHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
+// CriticalPodAdmissionHandler is an AdmissionFailureHandler that handles admission failure for Critical Pods.
 // If the ONLY admission failures are due to insufficient resources, then CriticalPodAdmissionHandler evicts pods
 // so that the critical pod can be admitted.  For evictions, the CriticalPodAdmissionHandler evicts a set of pods that
 // frees up the required resource requests.  The set of pods is designed to minimize impact, and is prioritized according to the ordering:

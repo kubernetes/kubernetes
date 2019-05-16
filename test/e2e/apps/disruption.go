@@ -30,7 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -163,22 +165,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 
 			// Locate a running pod.
-			var pod v1.Pod
-			err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-				podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
-				if err != nil {
-					return false, err
-				}
-
-				for i := range podList.Items {
-					if podList.Items[i].Status.Phase == v1.PodRunning {
-						pod = podList.Items[i]
-						return true, nil
-					}
-				}
-
-				return false, nil
-			})
+			pod, err := locateRunningPod(cs, ns)
 			framework.ExpectNoError(err)
 
 			e := &policy.Eviction{
@@ -189,10 +176,6 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 
 			if c.shouldDeny {
-				// Since disruptionAllowed starts out false, wait at least 60s hoping that
-				// this gives the controller enough time to have truly set the status.
-				time.Sleep(timeout)
-
 				err = cs.CoreV1().Pods(ns).Evict(e)
 				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
 			} else {
@@ -214,6 +197,34 @@ var _ = SIGDescribe("DisruptionController", func() {
 			}
 		})
 	}
+
+	ginkgo.It("should block an eviction until the PDB is updated to allow it", func() {
+		ginkgo.By("Creating a pdb that targets all three pods in a test replica set")
+		createPDBMinAvailableOrDie(cs, ns, intstr.FromInt(3))
+		createReplicaSetOrDie(cs, ns, 3, false)
+
+		ginkgo.By("First trying to evict a pod which shouldn't be evictable")
+		pod, err := locateRunningPod(cs, ns)
+		framework.ExpectNoError(err)
+
+		waitForPodsOrDie(cs, ns, 3) // make sure that they are running and so would be evictable with a different pdb
+		e := &policy.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: ns,
+			},
+		}
+		err = cs.CoreV1().Pods(ns).Evict(e)
+		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+
+		ginkgo.By("Updating the pdb to allow a pod to be evicted")
+		updatePDBMinAvailableOrDie(cs, ns, intstr.FromInt(2))
+
+		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
+		waitForPodsOrDie(cs, ns, 3)
+		err = cs.CoreV1().Pods(ns).Evict(e)
+		framework.ExpectNoError(err) // the eviction is now allowed
+	})
 })
 
 func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.IntOrString) {
@@ -228,7 +239,8 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "Waiting for the pdb to be created with minAvailable %d in namespace %s", minAvailable.IntVal, ns)
+	waitForPdbToBeProcessed(cs, ns)
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
@@ -243,7 +255,25 @@ func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavail
 		},
 	}
 	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
-	framework.ExpectNoError(err)
+	framework.ExpectNoError(err, "Waiting for the pdb to be created with maxUnavailable %d in namespace %s", maxUnavailable.IntVal, ns)
+	waitForPdbToBeProcessed(cs, ns)
+}
+
+func updatePDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.IntOrString) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		old, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		old.Spec.MinAvailable = &minAvailable
+		if _, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Update(old); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	framework.ExpectNoError(err, "Waiting for the pdb update to be processed in namespace %s", ns)
+	waitForPdbToBeProcessed(cs, ns)
 }
 
 func createPodsOrDie(cs kubernetes.Interface, ns string, n int) {
@@ -281,7 +311,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			return false, fmt.Errorf("pods is nil")
 		}
 		if len(pods.Items) < n {
-			framework.Logf("pods: %v < %v", len(pods.Items), n)
+			e2elog.Logf("pods: %v < %v", len(pods.Items), n)
 			return false, nil
 		}
 		ready := 0
@@ -291,7 +321,7 @@ func waitForPodsOrDie(cs kubernetes.Interface, ns string, n int) {
 			}
 		}
 		if ready < n {
-			framework.Logf("running pods: %v < %v", ready, n)
+			e2elog.Logf("running pods: %v < %v", ready, n)
 			return false, nil
 		}
 		return true, nil
@@ -333,4 +363,39 @@ func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclu
 
 	_, err := cs.AppsV1().ReplicaSets(ns).Create(rs)
 	framework.ExpectNoError(err, "Creating replica set %q in namespace %q", rs.Name, ns)
+}
+
+func locateRunningPod(cs kubernetes.Interface, ns string) (pod *v1.Pod, err error) {
+	ginkgo.By("locating a running pod")
+	err = wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		for i := range podList.Items {
+			if podList.Items[i].Status.Phase == v1.PodRunning {
+				pod = &podList.Items[i]
+				return true, nil
+			}
+		}
+
+		return false, nil
+	})
+	return pod, err
+}
+
+func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string) {
+	ginkgo.By("Waiting for the pdb to be processed")
+	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
+		pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if pdb.Status.ObservedGeneration < pdb.Generation {
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err, "Waiting for the pdb to be processed in namespace %s", ns)
 }

@@ -34,6 +34,7 @@ type attributesRecord struct {
 	resource    schema.GroupVersionResource
 	subresource string
 	operation   Operation
+	options     runtime.Object
 	dryRun      bool
 	object      runtime.Object
 	oldObject   runtime.Object
@@ -45,7 +46,7 @@ type attributesRecord struct {
 	annotationsLock sync.RWMutex
 }
 
-func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, dryRun bool, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
 	return &attributesRecord{
 		kind:        kind,
 		namespace:   namespace,
@@ -53,6 +54,7 @@ func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind s
 		resource:    resource,
 		subresource: subresource,
 		operation:   operation,
+		options:     operationOptions,
 		dryRun:      dryRun,
 		object:      object,
 		oldObject:   oldObject,
@@ -82,6 +84,10 @@ func (record *attributesRecord) GetSubresource() string {
 
 func (record *attributesRecord) GetOperation() Operation {
 	return record.operation
+}
+
+func (record *attributesRecord) GetOperationOptions() runtime.Object {
+	return record.options
 }
 
 func (record *attributesRecord) IsDryRun() bool {
