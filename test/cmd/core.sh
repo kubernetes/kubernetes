@@ -30,7 +30,7 @@ run_configmap_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-configmaps namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq '"$id_field"' \"test-configmaps\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-configmaps\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-configmaps
   # Post-condition: namespace 'test-configmaps' is created.
@@ -38,8 +38,8 @@ run_configmap_tests() {
 
   ### Create a generic configmap in a specific namespace
   # Pre-condition: configmap test-configmap and test-binary-configmap does not exist
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq '"$id_field"' \"test-configmap\" }}found{{end}}{{end}}:' ':'
-  kube::test::get_object_assert 'configmaps' '{{range.items}}{{ if eq '"$id_field"' \"test-binary-configmap\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
+  kube::test::get_object_assert 'configmaps' "{{range.items}}{{ if eq $id_field \\\"test-binary-configmap\\\" }}found{{end}}{{end}}:" ':'
 
   # Command
   kubectl create configmap test-configmap --from-literal=key1=value1 --namespace=test-configmaps
@@ -208,7 +208,7 @@ run_pod_tests() {
   # Detailed tests for describe pod output
     ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq '"$id_field"' \"test-kubectl-describe-pod\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-kubectl-describe-pod\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-kubectl-describe-pod
   # Post-condition: namespace 'test-secrets' is created.
@@ -226,7 +226,7 @@ run_pod_tests() {
   ### Create a generic configmap
   # Pre-condition: CONFIGMAP test-configmap does not exist
   #kube::test::get_object_assert 'configmap/test-configmap --namespace=test-kubectl-describe-pod' "{{$id_field}}" ''
-  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' '{{range.items}}{{ if eq '"$id_field"' \"test-configmap\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{ if eq $id_field \\\"test-configmap\\\" }}found{{end}}{{end}}:" ':'
 
   #kube::test::get_object_assert 'configmaps --namespace=test-kubectl-describe-pod' "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
@@ -710,7 +710,7 @@ run_secrets_test() {
 
   ### Create a new namespace
   # Pre-condition: the test-secrets namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq '"$id_field"' \"test-secrets\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-secrets\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-secrets
   # Post-condition: namespace 'test-secrets' is created.
@@ -813,7 +813,7 @@ run_service_accounts_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-service-accounts namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq '"$id_field"' \"test-service-accounts\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"test-service-accounts\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-service-accounts
   # Post-condition: namespace 'test-service-accounts' is created.
@@ -1330,7 +1330,7 @@ run_namespace_tests() {
   if kube::test::if_supports_resource "${pods:?}" ; then
     ### Create a new namespace
     # Pre-condition: the other namespace does not exist
-    kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq '"$id_field"' \"other\" }}found{{end}}{{end}}:' ':'
+    kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq $id_field \\\"other\\\" }}found{{end}}{{end}}:" ':'
     # Command
     kubectl create namespace other
     # Post-condition: namespace 'other' is created.
