@@ -59,7 +59,9 @@ func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregat
 	c := &AggregationController{
 		openAPIAggregationManager: openAPIAggregationManager,
 		queue: workqueue.NewNamedRateLimitingQueue(
-			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay), "APIServiceOpenAPIAggregationControllerQueue1"),
+			workqueue.NewItemExponentialFailureRateLimiter(successfulUpdateDelay, failedUpdateMaxExpDelay),
+			"open_api_aggregation_controller",
+		),
 		downloader: downloader,
 	}
 
