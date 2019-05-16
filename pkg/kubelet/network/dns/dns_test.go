@@ -478,6 +478,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 	testSvcDomain := fmt.Sprintf("svc.%s", testClusterDNSDomain)
 	testNsSvcDomain := fmt.Sprintf("%s.svc.%s", testPodNamespace, testClusterDNSDomain)
 	testNdotsOptionValue := "3"
+	testTimeoutOptionValue := "5"
 	testHostNameserver := "8.8.8.8"
 	testHostDomain := "host.domain"
 
@@ -488,7 +489,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 		},
 	}
 
-	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\n", testHostNameserver, testHostDomain))
+	resolvConfContent := []byte(fmt.Sprintf("nameserver %s\nsearch %s\noptions timeout:%s", testHostNameserver, testHostDomain, testTimeoutOptionValue))
 	tmpfile, err := ioutil.TempFile("", "tmpResolvConf")
 	if err != nil {
 		t.Fatal(err)
@@ -546,7 +547,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "timeout:5", "debug"},
 			},
 		},
 		{
@@ -564,7 +565,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testClusterNameserver, "10.0.0.11"},
 				Searches: []string{testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "timeout:5", "debug"},
 			},
 		},
 		{
@@ -581,7 +582,7 @@ func TestGetPodDNSCustom(t *testing.T) {
 			expectedDNSConfig: &runtimeapi.DNSConfig{
 				Servers:  []string{testHostNameserver, "10.0.0.11"},
 				Searches: []string{testHostDomain, "my.domain"},
-				Options:  []string{"ndots:3", "debug"},
+				Options:  []string{"ndots:3", "timeout:5", "debug"},
 			},
 		},
 	}

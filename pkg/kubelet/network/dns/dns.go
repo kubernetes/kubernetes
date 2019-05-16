@@ -310,6 +310,22 @@ func mergeDNSOptions(existingDNSConfigOptions []string, dnsConfigOptions []v1.Po
 	return options
 }
 
+func dnsOptionsToPodDNSConfigOptions(dnsOptions []string) []v1.PodDNSConfigOption {
+	opts := make([]v1.PodDNSConfigOption, 0, len(dnsOptions))
+	for _, op := range dnsOptions {
+		var opt v1.PodDNSConfigOption
+		if index := strings.Index(op, ":"); index != -1 {
+			val := op[index+1:]
+			opt.Name = op[:index]
+			opt.Value = &val
+		} else {
+			opt.Name = op
+		}
+		opts = append(opts, opt)
+	}
+	return opts
+}
+
 // appendDNSConfig appends DNS servers, search paths and options given by
 // PodDNSConfig to the existing DNS config. Duplicated entries will be merged.
 // This assumes existingDNSConfig and dnsConfig are not nil.
@@ -348,7 +364,7 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 				dnsConfig.Servers = append(dnsConfig.Servers, ip.String())
 			}
 			dnsConfig.Searches = c.generateSearchesForDNSClusterFirst(dnsConfig.Searches, pod)
-			dnsConfig.Options = defaultDNSOptions
+			dnsConfig.Options = mergeDNSOptions(defaultDNSOptions, dnsOptionsToPodDNSConfigOptions(dnsConfig.Options))
 			break
 		}
 		// clusterDNS is not known. Pod with ClusterDNSFirst Policy cannot be created.
