@@ -1447,7 +1447,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	fakeClient.Fake.PrependWatchReactor("volumeattachments", core.DefaultWatchReactor(fakeWatcher, nil))
 
 	// Start informer for CSIDrivers.
-	factory := informers.NewSharedInformerFactory(fakeClient, csiResyncPeriod)
+	factory := informers.NewSharedInformerFactory(fakeClient, CsiResyncPeriod)
 	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
 	factory.Start(wait.NeverStop)
@@ -1474,7 +1474,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Wait until the informer in CSI volume plugin has all CSIDrivers.
-		wait.PollImmediate(testInformerSyncPeriod, testInformerSyncTimeout, func() (bool, error) {
+		wait.PollImmediate(TestInformerSyncPeriod, TestInformerSyncTimeout, func() (bool, error) {
 			return csiDriverInformer.Informer().HasSynced(), nil
 		})
 	}
