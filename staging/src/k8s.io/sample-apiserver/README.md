@@ -24,19 +24,26 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 `sample-apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/sample-apiserver.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
+## Fetch Dependencies
+
+Using `godep` will work.
+
+Using Go modules (`GO111MODULE=on`) will enable `go build` to work,
+without putting dependencies anywhere obvious.
+
 ## Normal Build and Deploy
 
 ### Changes to the Types
 
 If you change the API object type definitions in any of the
 `pkg/apis/.../types.go` files then you will need to update the files
-generated from the type definitions.  There is no convenient script to
-do this in the context of `$GOPATH/src/k8s.io/sample-apiserver`.
-However, if you have fetched the whole `k8s.io/kubernetes` repository
-then there _is_ a convenient script that you can use.  With
-`$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/sample-apiserver` as
-your current working directory, invoke `hack/update-codegen.sh`; the
-script takes no arguments.
+generated from the type definitions.  To do this, invoke
+`hack/update-codegen.sh` with `sample-apiserver` as your current
+working directory; the script takes no arguments.  But this requires
+certain dependencies to appear on your `$GOPATH` or in a local
+`vendor` directory.  If you used Go modules then issue the command `go
+mod vendor` before `hack/update-codegen.sh`, to first create a local
+`vendor` directory with the needed dependencies.
 
 ### Build the Binary
 
