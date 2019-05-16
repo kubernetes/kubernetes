@@ -75,6 +75,10 @@ var (
 	defaultExcludeMasterFromStandardLB = true
 	// Outbound SNAT is enabled by default.
 	defaultDisableOutboundSNAT = false
+	// This is equivalent to executing a command only once and not retrying + backing off
+	backoffBypass = wait.Backoff{
+		Steps: 1,
+	}
 )
 
 // Config holds the configuration parsed from the --cloud-config flag
@@ -291,9 +295,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	}
 
 	// Conditionally configure resource request backoff
-	resourceRequestBackoff := wait.Backoff{
-		Steps: 1,
-	}
+	resourceRequestBackoff := backoffBypass
 	if config.CloudProviderBackoff {
 		// Assign backoff defaults if no configuration was passed in
 		if config.CloudProviderBackoffRetries == 0 {
@@ -320,12 +322,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 				Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
 				Jitter:   config.CloudProviderBackoffJitter,
 			}
+			klog.V(2).Infof("Azure cloudprovider using backoff configuration: retries=%d, exponent=%f, duration=%d, jitter=%f",
+				config.CloudProviderBackoffRetries,
+				config.CloudProviderBackoffExponent,
+				config.CloudProviderBackoffDuration,
+				config.CloudProviderBackoffJitter)
 		}
-		klog.V(2).Infof("Azure cloudprovider using try backoff: retries=%d, exponent=%f, duration=%d, jitter=%f",
-			config.CloudProviderBackoffRetries,
-			config.CloudProviderBackoffExponent,
-			config.CloudProviderBackoffDuration,
-			config.CloudProviderBackoffJitter)
 	} else {
 		// CloudProviderBackoffRetries will be set to 1 by default as the requirements of Azure SDK.
 		config.CloudProviderBackoffRetries = 1

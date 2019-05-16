@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,6 +35,12 @@ type fakeDataObj struct{}
 type fakeDataSource struct {
 	called int
 	data   map[string]*fakeDataObj
+	lock   sync.Mutex
+}
+
+type fakeDataSourceVirtualMachine struct {
+	called int
+	data   map[string]*compute.VirtualMachine
 	lock   sync.Mutex
 }
 
@@ -57,9 +64,39 @@ func (fake *fakeDataSource) set(data map[string]*fakeDataObj) {
 	fake.called = 0
 }
 
+func (fake *fakeDataSourceVirtualMachine) get(key string) (interface{}, error) {
+	fake.lock.Lock()
+	defer fake.lock.Unlock()
+
+	fake.called = fake.called + 1
+	if v, ok := fake.data[key]; ok {
+		return v, nil
+	}
+
+	return nil, nil
+}
+
+func (fake *fakeDataSourceVirtualMachine) set(data map[string]*compute.VirtualMachine) {
+	fake.lock.Lock()
+	defer fake.lock.Unlock()
+
+	fake.data = data
+	fake.called = 0
+}
+
 func newFakeCache(t *testing.T) (*fakeDataSource, *timedCache) {
 	dataSource := &fakeDataSource{
 		data: make(map[string]*fakeDataObj),
+	}
+	getter := dataSource.get
+	cache, err := newTimedcache(fakeCacheTTL, getter)
+	assert.NoError(t, err)
+	return dataSource, cache
+}
+
+func newFakeCacheVirtualMachine(t *testing.T) (*fakeDataSourceVirtualMachine, *timedCache) {
+	dataSource := &fakeDataSourceVirtualMachine{
+		data: make(map[string]*compute.VirtualMachine),
 	}
 	getter := dataSource.get
 	cache, err := newTimedcache(fakeCacheTTL, getter)

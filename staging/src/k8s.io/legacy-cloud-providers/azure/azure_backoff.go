@@ -32,18 +32,13 @@ import (
 	"k8s.io/klog"
 )
 
-// requestBackoff if backoff is disabled in cloud provider it
-// returns a new Backoff object steps = 1
-// This is to make sure that the requested command executes
-// at least once
+// requestBackoff returns a wait.Backoff object
+// If backoff is disabled in cloud provider a "bypass" backoff object will be returned
 func (az *Cloud) requestBackoff() (resourceRequestBackoff wait.Backoff) {
 	if az.CloudProviderBackoff {
 		return az.resourceRequestBackoff
 	}
-	resourceRequestBackoff = wait.Backoff{
-		Steps: 1,
-	}
-	return resourceRequestBackoff
+	return backoffBypass
 }
 
 // Event creates a event for the specified object.
