@@ -1,6 +1,5 @@
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
-cmd/kube-controller-manager/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
 pkg/apis/abac/latest
@@ -171,7 +170,6 @@ pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
-pkg/kubelet/oom
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/prober
@@ -287,7 +285,6 @@ pkg/security/podsecuritypolicy/user
 pkg/security/podsecuritypolicy/util
 pkg/serviceaccount
 pkg/ssh
-pkg/util/bandwidth
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env
@@ -597,7 +594,6 @@ test/e2e
 test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
-test/e2e/framework
 test/e2e/lifecycle/bootstrap
 test/e2e/scalability
 test/e2e/storage/drivers
@@ -608,5 +604,4 @@ test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/remote
 test/e2e_node/runner/remote
-test/e2e_node/services
 test/utils
