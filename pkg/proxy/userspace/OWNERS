@@ -1,15 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- thockin
-- dcbw
-- danwinship
+- sig-network-approvers
 reviewers:
-- thockin
+- sig-network-reviewers
 - lavalamp
 - smarterclayton
-- freehan
-- dcbw
-- danwinship
 labels:
 - sig/network

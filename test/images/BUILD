@@ -18,6 +18,7 @@ filegroup(
         "//test/images/echoserver:all-srcs",
         "//test/images/entrypoint-tester:all-srcs",
         "//test/images/fakegitserver:all-srcs",
+        "//test/images/inclusterclient:all-srcs",
         "//test/images/liveness:all-srcs",
         "//test/images/logs-generator:all-srcs",
         "//test/images/metadata-concealment:all-srcs",

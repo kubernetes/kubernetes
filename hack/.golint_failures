@@ -50,7 +50,6 @@ pkg/apis/rbac/validation
 pkg/apis/storage
 pkg/apis/storage/v1
 pkg/apis/storage/v1beta1
-pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/photon
 pkg/controller
 pkg/controller/apis/config/v1alpha1
@@ -592,12 +591,8 @@ staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
-staging/src/k8s.io/sample-apiserver/pkg/apiserver
-staging/src/k8s.io/sample-apiserver/pkg/cmd/server
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller
-staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1
 test/e2e
 test/e2e/autoscaling
 test/e2e/chaosmonkey
@@ -605,7 +600,6 @@ test/e2e/common
 test/e2e/framework
 test/e2e/lifecycle/bootstrap
 test/e2e/scalability
-test/e2e/scheduling
 test/e2e/storage/drivers
 test/e2e/storage/testsuites
 test/e2e/storage/utils

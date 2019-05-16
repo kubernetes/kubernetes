@@ -465,6 +465,12 @@ github.com/google/certificate-transparency-go/jsonclient
 github.com/google/certificate-transparency-go/tls
 github.com/google/certificate-transparency-go/x509
 github.com/google/certificate-transparency-go/x509/pkix
+# github.com/google/go-cmp v0.3.0 => github.com/google/go-cmp v0.3.0
+github.com/google/go-cmp/cmp
+github.com/google/go-cmp/cmp/internal/diff
+github.com/google/go-cmp/cmp/internal/flags
+github.com/google/go-cmp/cmp/internal/function
+github.com/google/go-cmp/cmp/internal/value
 # github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 github.com/google/gofuzz
 # github.com/google/uuid v1.0.0 => github.com/google/uuid v1.0.0
@@ -1530,6 +1536,7 @@ k8s.io/client-go/util/testing
 k8s.io/client-go/util/workqueue
 # k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
 k8s.io/cloud-provider
+k8s.io/cloud-provider/fake
 k8s.io/cloud-provider/node/helpers
 k8s.io/cloud-provider/service/helpers
 k8s.io/cloud-provider/volume

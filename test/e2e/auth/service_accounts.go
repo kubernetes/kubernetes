@@ -19,6 +19,8 @@ package auth
 import (
 	"fmt"
 	"path"
+	"regexp"
+	"strings"
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -38,6 +40,7 @@ import (
 )
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
+var inClusterClientImage = imageutils.GetE2EImage(imageutils.InClusterClient)
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
@@ -410,4 +413,138 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 		}
 	})
+
+	ginkgo.It("should support InClusterConfig with token rotation [Slow] [Feature:TokenRequestProjection]", func() {
+		cfg, err := framework.LoadConfig()
+		framework.ExpectNoError(err)
+
+		if _, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "kube-root-ca.crt",
+			},
+			Data: map[string]string{
+				"ca.crt": string(cfg.TLSClientConfig.CAData),
+			},
+		}); err != nil && !apierrors.IsAlreadyExists(err) {
+			framework.Failf("Unexpected err creating kube-ca-crt: %v", err)
+		}
+
+		tenMin := int64(10 * 60)
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "inclusterclient"},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "inclusterclient",
+					Image: inClusterClientImage,
+					VolumeMounts: []v1.VolumeMount{{
+						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
+						Name:      "kube-api-access-e2e",
+						ReadOnly:  true,
+					}},
+				}},
+				RestartPolicy:      v1.RestartPolicyNever,
+				ServiceAccountName: "default",
+				Volumes: []v1.Volume{{
+					Name: "kube-api-access-e2e",
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
+								{
+									ServiceAccountToken: &v1.ServiceAccountTokenProjection{
+										Path:              "token",
+										ExpirationSeconds: &tenMin,
+									},
+								},
+								{
+									ConfigMap: &v1.ConfigMapProjection{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: "kube-root-ca.crt",
+										},
+										Items: []v1.KeyToPath{
+											{
+												Key:  "ca.crt",
+												Path: "ca.crt",
+											},
+										},
+									},
+								},
+								{
+									DownwardAPI: &v1.DownwardAPIProjection{
+										Items: []v1.DownwardAPIVolumeFile{
+											{
+												Path: "namespace",
+												FieldRef: &v1.ObjectFieldSelector{
+													APIVersion: "v1",
+													FieldPath:  "metadata.namespace",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}},
+			},
+		}
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectNoError(err)
+
+		framework.Logf("created pod")
+		if !framework.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
+			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
+		}
+
+		framework.Logf("pod is ready")
+
+		var logs string
+		if err := wait.Poll(1*time.Minute, 20*time.Minute, func() (done bool, err error) {
+			framework.Logf("polling logs")
+			logs, err = framework.GetPodLogs(f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
+			if err != nil {
+				framework.Logf("Error pulling logs: %v", err)
+				return false, nil
+			}
+			tokenCount, err := parseInClusterClientLogs(logs)
+			if err != nil {
+				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
+			}
+			if tokenCount < 2 {
+				framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
+				return false, nil
+			}
+			return true, nil
+		}); err != nil {
+			framework.Failf("Unexpected error: %v\n%s", err, logs)
+		}
+	})
 })
+
+var reportLogsParser = regexp.MustCompile("([a-zA-Z0-9-_]*)=([a-zA-Z0-9-_]*)$")
+
+func parseInClusterClientLogs(logs string) (int, error) {
+	seenTokens := map[string]struct{}{}
+
+	lines := strings.Split(logs, "\n")
+	for _, line := range lines {
+		parts := reportLogsParser.FindStringSubmatch(line)
+		if len(parts) != 3 {
+			continue
+		}
+
+		key, value := parts[1], parts[2]
+		switch key {
+		case "authz_header":
+			if value == "<empty>" {
+				return 0, fmt.Errorf("saw empty Authorization header")
+			}
+			seenTokens[value] = struct{}{}
+		case "status":
+			if value == "failed" {
+				return 0, fmt.Errorf("saw status=failed")
+			}
+		}
+	}
+
+	return len(seenTokens), nil
+}

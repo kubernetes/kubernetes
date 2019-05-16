@@ -18,7 +18,9 @@ package plugins
 
 import (
 	"fmt"
+
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -39,8 +41,8 @@ func NewOpenStackCinderCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree Cinder storage class parameters to CSI storage class
-func (t *osCinderCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
-	return scParameters, nil
+func (t *osCinderCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	return sc, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with Cinder set from in-tree
