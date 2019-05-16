@@ -19,7 +19,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # If called directly, exit.
@@ -32,10 +32,6 @@ fi
 
 SILENT=${SILENT:-true}
 ALL=${FORCE_ALL:-false}
-V=""
-if [[ "${SILENT}" != "true" ]]; then
-	V="-v"
-fi
 
 trap 'exit 1' SIGINT
 
@@ -59,10 +55,10 @@ BASH_TARGETS="
 	update-gofmt"
 
 for t in ${BASH_TARGETS}; do
-	echo -e "${color_yellow}Running ${t}${color_norm}"
+	echo -e "${color_yellow:?}Running ${t}${color_norm:?}"
 	if ${SILENT} ; then
 		if ! bash "${KUBE_ROOT}/hack/${t}.sh" 1> /dev/null; then
-			echo -e "${color_red}Running ${t} FAILED${color_norm}"
+			echo -e "${color_red:?}Running ${t} FAILED${color_norm}"
 			if ! ${ALL}; then
 				exit 1
 			fi
@@ -77,4 +73,4 @@ for t in ${BASH_TARGETS}; do
 	fi
 done
 
-echo -e "${color_green}Update scripts completed successfully${color_norm}"
+echo -e "${color_green:?}Update scripts completed successfully${color_norm}"
