@@ -590,7 +590,6 @@ staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-test/e2e
 test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
