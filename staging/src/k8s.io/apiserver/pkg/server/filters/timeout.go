@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -179,6 +180,10 @@ func (tw *baseTimeoutWriter) Write(p []byte) (int, error) {
 	if tw.hijacked {
 		return 0, http.ErrHijacked
 	}
+	fmt.Printf("fiddle - timeout.go write: %v\n", string(p))
+	// klog.Stacks(false)
+	debug.PrintStack()
+	fmt.Println("==============================")
 
 	tw.wroteHeader = true
 	return tw.w.Write(p)
@@ -200,6 +205,11 @@ func (tw *baseTimeoutWriter) Flush() {
 func (tw *baseTimeoutWriter) WriteHeader(code int) {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
+
+	fmt.Printf("fiddle - timeout.go writeHeader: %v\n", code)
+	// klog.Stacks(false)
+	// debug.PrintStack()
+	fmt.Println("==============================")
 
 	// if code != http.StatusInternalServerError && (tw.timedOut || tw.wroteHeader || tw.hijacked) {
 	if tw.timedOut || tw.wroteHeader || tw.hijacked {

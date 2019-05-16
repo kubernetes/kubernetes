@@ -846,6 +846,25 @@ func stacks(all bool) []byte {
 	return trace
 }
 
+// stacks is a wrapper for runtime.Stack that attempts to recover the data for all goroutines.
+func Stacks(all bool) []byte {
+	// We don't know how big the traces are, so grow a few times if they don't fit. Start large, though.
+	n := 10000
+	if all {
+		n = 100000
+	}
+	var trace []byte
+	for i := 0; i < 5; i++ {
+		trace = make([]byte, n)
+		nbytes := runtime.Stack(trace, all)
+		if nbytes < len(trace) {
+			return trace[:nbytes]
+		}
+		n *= 2
+	}
+	return trace
+}
+
 // logExitFunc provides a simple mechanism to override the default behavior
 // of exiting on error. Used in testing and to guarantee we reach a required exit
 // for fatal logs. Instead, exit could be a function rather than a method but that

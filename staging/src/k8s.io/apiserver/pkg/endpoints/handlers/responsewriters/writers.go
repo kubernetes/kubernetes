@@ -46,7 +46,17 @@ type httpResponseWriterWithInit struct {
 }
 
 func (w httpResponseWriterWithInit) Write(b []byte) (n int, err error) {
+	fmt.Printf("fiddle - writers.go write:\n %v\n", string(b))
+	// klog.Stacks(false)
+	// debug.PrintStack()
+	fmt.Println("==============================")
+
 	if !w.hasWritten {
+		fmt.Printf("fiddle - writers.go writeHeader: %v:\n %v\n", w.statusCode, string(b))
+		// klog.Stacks(false)
+		// debug.PrintStack()
+		fmt.Println("==============================")
+
 		w.innerW.Header().Set("Content-Type", w.mediaType)
 		w.innerW.WriteHeader(w.statusCode)
 		w.hasWritten = true
@@ -102,6 +112,7 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, innerW http.Resp
 
 	err := encoder.Encode(object, w)
 	if req.URL.String() == "/api/v1/pods?timeout=100ms" {
+		// klog.Stacks(true)
 		err = fmt.Errorf("aaron-prindle-injected-1: tcp broken")
 	}
 	if err != nil {

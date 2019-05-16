@@ -160,6 +160,11 @@ func (rl *respLogger) Header() http.Header {
 // Write implements http.ResponseWriter.
 func (rl *respLogger) Write(b []byte) (int, error) {
 	if !rl.statusRecorded {
+		fmt.Printf("fiddle - httplog.go write: %v\n %v\n", http.StatusOK, string(b))
+		// klog.Stacks(true)
+		// debug.PrintStack()
+		fmt.Println("==============================")
+
 		rl.recordStatus(http.StatusOK) // Default if WriteHeader hasn't been called
 	}
 	if rl.captureErrorOutput {
@@ -180,6 +185,11 @@ func (rl *respLogger) Flush() {
 
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
+	fmt.Printf("fiddle - httplog.go writeHeader: %v\n", status)
+	// klog.Stacks(true)
+	// debug.PrintStack()
+	fmt.Println("==============================")
+
 	rl.recordStatus(status)
 	rl.w.WriteHeader(status)
 }
