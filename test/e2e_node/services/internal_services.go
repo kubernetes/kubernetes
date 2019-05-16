@@ -60,7 +60,7 @@ func (es *e2eServices) start(t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	err = es.startApiServer(es.etcdStorage)
+	err = es.startAPIServer(es.etcdStorage)
 	if err != nil {
 		return err
 	}
@@ -116,8 +116,8 @@ func (es *e2eServices) startEtcd(t *testing.T) error {
 	return nil
 }
 
-// startApiServer starts the embedded API server or returns an error.
-func (es *e2eServices) startApiServer(etcdStorage *storagebackend.Config) error {
+// startAPIServer starts the embedded API server or returns an error.
+func (es *e2eServices) startAPIServer(etcdStorage *storagebackend.Config) error {
 	klog.Info("Starting API server")
 	es.apiServer = NewAPIServer(*etcdStorage)
 	return es.apiServer.Start()
