@@ -69,7 +69,8 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	ginkgo.It("should resolve DNS of partial qualified names for the cluster ", func() {
+	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
+	ginkgo.It("should resolve DNS of partial qualified names for the cluster [LinuxOnly]", func() {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
@@ -171,7 +172,8 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	ginkgo.It("should resolve DNS of partial qualified names for services ", func() {
+	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
+	ginkgo.It("should resolve DNS of partial qualified names for services [LinuxOnly]", func() {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
