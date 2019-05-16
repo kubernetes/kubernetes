@@ -172,7 +172,7 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 }
 
 func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Object) error {
-	if err := os.MkdirAll(filepath.Dir(filename), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(filename), 0750); err != nil {
 		return err
 	}
 
@@ -191,7 +191,7 @@ func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Obj
 		return err
 	}
 
-	err = os.Chmod(f.Name(), 0755)
+	err = os.Chmod(f.Name(), 0660)
 	if err != nil {
 		return err
 	}
