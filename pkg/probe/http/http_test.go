@@ -316,14 +316,15 @@ func TestHTTPProbeChecker_NonLocalRedirects(t *testing.T) {
 }
 
 func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
-	hostHeader := "www.example.com"
+	successHostHeader := "www.success.com"
+	failHostHeader := "www.fail.com"
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/redirect":
 			http.Redirect(w, r, "/success", http.StatusFound)
 		case "/success":
-			if r.Host != hostHeader {
+			if r.Host == successHostHeader {
 				w.WriteHeader(http.StatusOK)
 			} else {
 				http.Error(w, "", http.StatusBadRequest)
@@ -335,18 +336,29 @@ func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	t.Run("local", func(t *testing.T) {
-		prober := New(false)
-		target, err := url.Parse(server.URL + "/redirect")
-		require.NoError(t, err)
-		result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
-		assert.Equal(t, probe.Success, result)
-	})
-	t.Run("nonlocal", func(t *testing.T) {
-		prober := New(true)
-		target, err := url.Parse(server.URL + "/redirect")
-		require.NoError(t, err)
-		result, _, _ := prober.Probe(target, nil, wait.ForeverTestTimeout)
-		assert.Equal(t, probe.Success, result)
-	})
+	testCases := map[string]struct {
+		hostHeader     string
+		expectedResult probe.Result
+	}{
+		"success": {successHostHeader, probe.Success},
+		"fail":    {failHostHeader, probe.Failure},
+	}
+	for desc, test := range testCases {
+		headers := http.Header{}
+		headers.Add("Host", test.hostHeader)
+		t.Run(desc+"local", func(t *testing.T) {
+			prober := New(false)
+			target, err := url.Parse(server.URL + "/redirect")
+			require.NoError(t, err)
+			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
+			assert.Equal(t, test.expectedResult, result)
+		})
+		t.Run(desc+"nonlocal", func(t *testing.T) {
+			prober := New(true)
+			target, err := url.Parse(server.URL + "/redirect")
+			require.NoError(t, err)
+			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
+			assert.Equal(t, test.expectedResult, result)
+		})
+	}
 }
