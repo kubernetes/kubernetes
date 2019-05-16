@@ -186,23 +186,21 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 	dInfo := driver.GetDriverInfo()
 	f := config.Framework
 	cs := f.ClientSet
-	fsType := pattern.FsType
-	volType := pattern.VolType
 
 	// Create volume for pre-provisioned volume tests
-	r.volume = CreateVolume(driver, config, volType)
+	r.volume = CreateVolume(driver, config, pattern.VolType)
 
-	switch volType {
+	switch pattern.VolType {
 	case testpatterns.InlineVolume:
 		e2elog.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-			r.volSource = iDriver.GetVolumeSource(false, fsType, r.volume)
+			r.volSource = iDriver.GetVolumeSource(false, pattern.FsType, r.volume)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		e2elog.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
+			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, pattern.FsType, r.volume)
 			if pvSource != nil {
 				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false, pattern.VolMode)
 			}
@@ -212,7 +210,14 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 		e2elog.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			claimSize := dDriver.GetClaimSize()
-			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
+			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, pattern.FsType)
+
+			if pattern.BindingMode != "" {
+				r.sc.VolumeBindingMode = &pattern.BindingMode
+			}
+			if pattern.AllowExpansion != false {
+				r.sc.AllowVolumeExpansion = &pattern.AllowExpansion
+			}
 
 			ginkgo.By("creating a StorageClass " + r.sc.Name)
 			var err error
@@ -226,11 +231,11 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
 	default:
-		e2elog.Failf("genericVolumeTestResource doesn't support: %s", volType)
+		e2elog.Failf("genericVolumeTestResource doesn't support: %s", pattern.VolType)
 	}
 
 	if r.volSource == nil {
-		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, volType)
+		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 	}
 
 	return &r
@@ -239,10 +244,9 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 // cleanupResource cleans up genericVolumeTestResource
 func (r *genericVolumeTestResource) cleanupResource() {
 	f := r.config.Framework
-	volType := r.pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
-		switch volType {
+		switch r.pattern.VolType {
 		case testpatterns.PreprovisionedPV:
 			ginkgo.By("Deleting pv and pvc")
 			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {

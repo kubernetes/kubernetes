@@ -127,7 +127,9 @@ const (
 	// - NodeStageVolume in the spec
 	CapMultiPODs Capability = "multipods"
 
-	CapRWX Capability = "RWX" // support ReadWriteMany access modes
+	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
+	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
+	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
 )
 
 // DriverInfo represents static information about a TestDriver.

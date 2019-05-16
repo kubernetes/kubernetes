@@ -10,6 +10,7 @@ go_library(
         "snapshottable.go",
         "subpath.go",
         "testdriver.go",
+        "volume_expand.go",
         "volume_io.go",
         "volumemode.go",
         "volumes.go",
