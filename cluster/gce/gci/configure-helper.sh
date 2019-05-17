@@ -2847,7 +2847,7 @@ function wait-till-apiserver-ready() {
 
 function ensure-bootstrap-kubectl-auth {
   # Creating an authenticated kubeconfig is only necessary if the insecure port is disabled.
-  if [[ -n "${KUBE_BOOTSTRAP_TOKEN}" ]]; then
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
     create-kubeconfig "cluster-bootstrap" ${KUBE_BOOTSTRAP_TOKEN}
     export KUBECONFIG=/etc/srv/kubernetes/cluster-bootstrap/kubeconfig
   fi
