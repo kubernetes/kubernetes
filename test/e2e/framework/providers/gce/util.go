@@ -28,7 +28,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func recreateNodes(c clientset.Interface, nodes []v1.Node) error {
+// RecreateNodes recreates the given nodes in a managed instance group.
+func RecreateNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Build mapping from zone to nodes in that zone.
 	nodeNamesByZone := make(map[string][]string)
 	for i := range nodes {
@@ -63,13 +64,14 @@ func recreateNodes(c clientset.Interface, nodes []v1.Node) error {
 		framework.Logf("Recreating instance group %s.", instanceGroup)
 		stdout, stderr, err := framework.RunCmd("gcloud", args...)
 		if err != nil {
-			return fmt.Errorf("error restarting nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
+			return fmt.Errorf("error recreating nodes: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
 		}
 	}
 	return nil
 }
 
-func waitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout time.Duration) error {
+// WaitForNodeBootIdsToChange waits for the boot ids of the given nodes to change in order to verify the node has been recreated.
+func WaitForNodeBootIdsToChange(c clientset.Interface, nodes []v1.Node, timeout time.Duration) error {
 	errMsg := []string{}
 	for i := range nodes {
 		node := &nodes[i]
