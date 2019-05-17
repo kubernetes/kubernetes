@@ -234,6 +234,7 @@ func NewCacherFromConfig(config Config) *Cacher {
 	cacher.stopWg.Add(1)
 	go func() {
 		defer cacher.stopWg.Done()
+		defer cacher.terminateAllWatchers()
 		wait.Until(
 			func() {
 				if !cacher.isStopped() {
