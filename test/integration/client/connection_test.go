@@ -19,7 +19,6 @@ package client
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"os/exec"
 	"regexp"
 	"testing"
@@ -39,14 +38,14 @@ import (
 func TestReconnectBrokenTCP(t *testing.T) {
 	// TODO: remove env setting when kubernetes/client-go#374 is fixed
 	// use http to detect non-responding tcp connection
-	defer func() {
-		if err := os.Setenv("DISABLE_HTTP2", ""); err != nil {
-			t.Fatalf("failed to re-enable http2: %v", err)
-		}
-	}()
-	if err := os.Setenv("DISABLE_HTTP2", "true"); err != nil {
-		t.Fatalf("failed to disable http2: %v", err)
-	}
+	// defer func() {
+	// 	if err := os.Setenv("DISABLE_HTTP2", ""); err != nil {
+	// 		t.Fatalf("failed to re-enable http2: %v", err)
+	// 	}
+	// }()
+	// if err := os.Setenv("DISABLE_HTTP2", "true"); err != nil {
+	// 	t.Fatalf("failed to disable http2: %v", err)
+	// }
 
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
