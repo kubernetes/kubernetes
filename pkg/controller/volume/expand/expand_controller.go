@@ -100,11 +100,11 @@ func NewExpandController(
 		pvcsSynced: pvcInformer.Informer().HasSynced,
 		pvLister:   pvInformer.Lister(),
 		pvSynced:   pvInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "expand"),
+		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "volume_expand"),
 	}
 
 	if err := expc.volumePluginMgr.InitPlugins(plugins, nil, expc); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for Expand Controller : %+v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for Expand Controller : %+v", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -156,7 +156,7 @@ func (expc *expandController) enqueuePVC(obj interface{}) {
 	if pvc.Status.Phase == v1.ClaimBound && size.Cmp(statusSize) > 0 {
 		key, err := kcache.DeletionHandlingMetaNamespaceKeyFunc(pvc)
 		if err != nil {
-			runtime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", pvc, err))
+			runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", pvc, err))
 			return
 		}
 		expc.queue.Add(key)
@@ -202,7 +202,7 @@ func (expc *expandController) syncHandler(key string) error {
 		return err
 	}
 	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.UID != pv.Spec.ClaimRef.UID {
-		err := fmt.Errorf("Persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
+		err := fmt.Errorf("persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
 		klog.V(4).Infof("%v", err)
 		return err
 	}
@@ -217,7 +217,7 @@ func (expc *expandController) syncHandler(key string) error {
 			eventType = v1.EventTypeWarning
 		}
 		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
-		klog.V(3).Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
+		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
 		return err
 	}
 
