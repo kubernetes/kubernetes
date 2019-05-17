@@ -49,7 +49,7 @@ if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
     NODE_ACCELERATORS=""
 fi
 
-NETWORK=${KUBE_GCE_NETWORK:-e2e}
+NETWORK=${KUBE_GCE_NETWORK:-default}
 if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
   SUBNETWORK="${SUBNETWORK:-${NETWORK}-custom-subnet}"
 fi
