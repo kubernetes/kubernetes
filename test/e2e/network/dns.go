@@ -20,11 +20,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -454,51 +452,13 @@ var _ = SIGDescribe("DNS", func() {
 		}
 	})
 
-	ginkgo.It("should support configurable pod resolv.conf", func() {
-		ginkgo.By("Preparing a test DNS service with injected DNS names...")
-		testInjectedIP := "1.1.1.1"
-		testDNSNameShort := "notexistname"
-		testSearchPath := "resolv.conf.local"
-		testDNSNameFull := fmt.Sprintf("%s.%s", testDNSNameShort, testSearchPath)
-
-		corednsConfig := generateCoreDNSConfigmap(f.Namespace.Name, map[string]string{
-			testDNSNameFull: testInjectedIP,
-		})
-		corednsConfig, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(context.TODO(), corednsConfig, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "unable to create test configMap %s", corednsConfig.Name)
-
-		defer func() {
-			framework.Logf("Deleting configmap %s...", corednsConfig.Name)
-			err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(context.TODO(), corednsConfig.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "Failed to delete configmap %s: %v", corednsConfig.Name)
-		}()
-
-		testServerPod := generateCoreDNSServerPod(corednsConfig)
-		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testServerPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "failed to create pod: %s", testServerPod.Name)
-		framework.Logf("Created pod %v", testServerPod)
-		defer func() {
-			framework.Logf("Deleting pod %s...", testServerPod.Name)
-			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), testServerPod.Name, *metav1.NewDeleteOptions(0)); err != nil {
-				framework.Failf("ginkgo.Failed to delete pod %s: %v", testServerPod.Name, err)
-			}
-		}()
-		err = e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, testServerPod.Name, f.Namespace.Name)
-		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testServerPod.Name)
-
-		// Retrieve server pod IP.
-		testServerPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), testServerPod.Name, metav1.GetOptions{})
-		framework.ExpectNoError(err, "failed to get pod %v", testServerPod.Name)
-		testServerIP := testServerPod.Status.PodIP
-		framework.Logf("testServerIP is %s", testServerIP)
-
+	ginkgo.It("should support configurable pod ndots [LinuxOnly]", func() {
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testUtilsPod := e2epod.NewAgnhostPod(f.Namespace.Name, "e2e-dns-utils", nil, nil, nil)
 		testUtilsPod.Spec.DNSPolicy = v1.DNSNone
 		testNdotsValue := "2"
 		testUtilsPod.Spec.DNSConfig = &v1.PodDNSConfig{
-			Nameservers: []string{testServerIP},
-			Searches:    []string{testSearchPath},
+			Nameservers: []string{"127.0.0.1"},
 			Options: []v1.PodDNSConfigOption{
 				{
 					Name:  "ndots",
@@ -506,7 +466,7 @@ var _ = SIGDescribe("DNS", func() {
 				},
 			},
 		}
-		testUtilsPod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod, metav1.CreateOptions{})
+		testUtilsPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), testUtilsPod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create pod: %s", testUtilsPod.Name)
 		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {
@@ -529,41 +489,11 @@ var _ = SIGDescribe("DNS", func() {
 			CaptureStdout: true,
 			CaptureStderr: true,
 		})
-		framework.ExpectNoError(err, "failed to examine resolv,conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
+		framework.ExpectNoError(err, "failed to examine resolv.conf file on pod, stdout: %v, stderr: %v, err: %v", stdout, stderr, err)
 		if !strings.Contains(stdout, "ndots:2") {
-			framework.Failf("customized DNS options not found in resolv.conf, got: %s", stdout)
+			framework.Failf("customized DNS options not found in resolv.conf, got: %q", stdout)
 		}
 
-		ginkgo.By("Verifying customized name server and search path are working...")
-		// Do dig on not-exist-dns-name and see if the injected DNS record is returned.
-		// This verifies both:
-		// - Custom search path is appended.
-		// - DNS query is sent to the specified server.
-		cmd = []string{"dig", "+short", "+search", testDNSNameShort}
-		digFunc := func() (bool, error) {
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
-				Command:       cmd,
-				Namespace:     f.Namespace.Name,
-				PodName:       testUtilsPod.Name,
-				ContainerName: testUtilsPod.Spec.Containers[0].Name,
-				CaptureStdout: true,
-				CaptureStderr: true,
-			})
-			if err != nil {
-				framework.Logf("ginkgo.Failed to execute dig command, stdout:%v, stderr: %v, err: %v", stdout, stderr, err)
-				return false, nil
-			}
-			res := strings.Split(stdout, "\n")
-			if len(res) != 1 || res[0] != testInjectedIP {
-				framework.Logf("Expect command `%v` to return %s, got: %v", cmd, testInjectedIP, res)
-				return false, nil
-			}
-			return true, nil
-		}
-		err = wait.PollImmediate(5*time.Second, 3*time.Minute, digFunc)
-		framework.ExpectNoError(err, "failed to verify customized name server and search path")
-
-		// TODO: Add more test cases for other DNSPolicies.
 	})
 
 })
