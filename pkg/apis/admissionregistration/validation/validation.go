@@ -245,6 +245,10 @@ func validateValidatingWebhook(hook *admissionregistration.ValidatingWebhook, fl
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
 
+	if hook.ObjectSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector"))...)
+	}
+
 	cc := hook.ClientConfig
 	switch {
 	case (cc.URL == nil) == (cc.Service == nil):
@@ -280,6 +284,9 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, fldPat
 
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	}
+	if hook.ObjectSelector != nil {
+		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.ObjectSelector, fldPath.Child("objectSelector"))...)
 	}
 	if hook.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*hook.ReinvocationPolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *hook.ReinvocationPolicy, supportedReinvocationPolicies.List()))
