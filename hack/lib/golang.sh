@@ -163,10 +163,10 @@ kube::golang::dedup() {
 # to readonly.
 # The configured vars will only contain platforms allowed by the
 # KUBE_SUPPORTED* vars at the top of this file.
-declare -a -g KUBE_SERVER_PLATFORMS
-declare -a -g KUBE_CLIENT_PLATFORMS
-declare -a -g KUBE_NODE_PLATFORMS
-declare -a -g KUBE_TEST_PLATFORMS
+declare -a KUBE_SERVER_PLATFORMS
+declare -a KUBE_CLIENT_PLATFORMS
+declare -a KUBE_NODE_PLATFORMS
+declare -a KUBE_TEST_PLATFORMS
 kube::golang::setup_platforms() {
   if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
     # KUBE_BUILD_PLATFORMS needs to be read into an array before the next
@@ -219,7 +219,7 @@ kube::golang::setup_platforms() {
       KUBE_CLIENT_PLATFORMS=(
         darwin/amd64
         linux/amd64
-      ) 
+      )
       readonly KUBE_CLIENT_PLATFORMS
     else
       KUBE_TEST_PLATFORMS=(linux/amd64)
