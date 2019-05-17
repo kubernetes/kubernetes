@@ -218,7 +218,7 @@ func testPodSELinuxLabeling(f *framework.Framework, hostIPC bool, hostPID bool) 
 	gomega.Expect(content).To(gomega.ContainSubstring(testContent))
 
 	foundPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	// Confirm that the file can be accessed from a second
 	// pod using host_path with the same MCS label

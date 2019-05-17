@@ -166,13 +166,13 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 		},
 	}
 	rtnPod, err := c.CoreV1().Pods(ns).Create(pod)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	err = f.WaitForPodReady(rtnPod.Name) // running & ready
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	rtnPod, err = c.CoreV1().Pods(ns).Get(rtnPod.Name, metav1.GetOptions{}) // return fresh pod
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	return rtnPod
 }
 
@@ -189,7 +189,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	mountDir := filepath.Join(podDir, "volumes", "kubernetes.io~nfs")
 	// use ip rather than hostname in GCE
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 
 	condMsg := "deleted"
 	if !expectClean {
@@ -216,7 +216,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 		e2elog.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.Poll(poll, timeout, func() (bool, error) {
 			result, err := e2essh.NodeExec(nodeIP, test.cmd, framework.TestContext.Provider)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 			e2essh.LogResult(result)
 			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
 			if expectClean && ok { // keep trying
@@ -227,7 +227,7 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 			}
 			return true, nil // done, host is as expected
 		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), fmt.Sprintf("Host (%v) cleanup error: %v. Expected %q to be %v", nodeIP, err, test.feature, condMsg))
+		framework.ExpectNoError(err, fmt.Sprintf("Host (%v) cleanup error: %v. Expected %q to be %v", nodeIP, err, test.feature, condMsg))
 	}
 
 	if expectClean {
@@ -317,20 +317,21 @@ var _ = SIGDescribe("kubelet", func() {
 				ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
 				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
-				gomega.Expect(framework.RunRC(testutils.RCConfig{
+				err := framework.RunRC(testutils.RCConfig{
 					Client:       f.ClientSet,
 					Name:         rcName,
 					Namespace:    f.Namespace.Name,
 					Image:        imageutils.GetPauseImageName(),
 					Replicas:     totalPods,
 					NodeSelector: nodeLabels,
-				})).NotTo(gomega.HaveOccurred())
+				})
+				framework.ExpectNoError(err)
 				// Perform a sanity check so that we know all desired pods are
 				// running on the nodes according to kubelet. The timeout is set to
 				// only 30 seconds here because framework.RunRC already waited for all pods to
 				// transition to the running status.
-				gomega.Expect(waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, totalPods,
-					time.Second*30)).NotTo(gomega.HaveOccurred())
+				err = waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, totalPods, time.Second*30)
+				framework.ExpectNoError(err)
 				if resourceMonitor != nil {
 					resourceMonitor.LogLatest()
 				}
@@ -345,8 +346,8 @@ var _ = SIGDescribe("kubelet", func() {
 				//   - a bug in graceful termination (if it is enabled)
 				//   - docker slow to delete pods (or resource problems causing slowness)
 				start := time.Now()
-				gomega.Expect(waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, 0,
-					itArg.timeout)).NotTo(gomega.HaveOccurred())
+				err = waitTillNPodsRunningOnNodes(f.ClientSet, nodeNames, rcName, ns, 0, itArg.timeout)
+				framework.ExpectNoError(err)
 				e2elog.Logf("Deleting %d pods on %d nodes completed in %v after the RC was deleted", totalPods, len(nodeNames),
 					time.Since(start))
 				if resourceMonitor != nil {
@@ -396,9 +397,9 @@ var _ = SIGDescribe("kubelet", func() {
 
 			ginkgo.AfterEach(func() {
 				err := framework.DeletePodWithWait(f, c, pod)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "AfterEach: Failed to delete client pod ", pod.Name)
+				framework.ExpectNoError(err, "AfterEach: Failed to delete client pod ", pod.Name)
 				err = framework.DeletePodWithWait(f, c, nfsServerPod)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
+				framework.ExpectNoError(err, "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
 			})
 
 			// execute It blocks from above table of tests
