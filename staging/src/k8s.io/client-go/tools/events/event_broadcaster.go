@@ -130,7 +130,7 @@ func (e *eventBroadcasterImpl) recordToSink(event *v1beta1.Event, clock clock.Cl
 			if isIsomorphic {
 				if isomorphicEvent.Series != nil {
 					isomorphicEvent.Series.Count++
-					isomorphicEvent.EventTime = metav1.MicroTime{Time: clock.Now()}
+					isomorphicEvent.Series.LastObservedTime = metav1.MicroTime{Time: clock.Now()}
 					return nil
 				}
 				isomorphicEvent.Series = &v1beta1.EventSeries{
