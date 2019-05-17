@@ -17,8 +17,6 @@ limitations under the License.
 package pruning
 
 import (
-	"fmt"
-
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
@@ -50,7 +48,6 @@ func prune(x interface{}, s *structuralschema.Structural) {
 			} else {
 				delete(x, k)
 			}
-			fmt.Printf("deleting %q => %#v\n", k, x)
 		}
 	case []interface{}:
 		if s == nil {
