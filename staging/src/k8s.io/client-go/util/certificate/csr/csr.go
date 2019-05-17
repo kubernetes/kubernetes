@@ -82,7 +82,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 }
 
 // WaitForCertificate waits for a certificate to be issued until timeout, or returns an error.
-func WaitForCertificate(client certificatesclient.CertificateSigningRequestInterface, req *certificates.CertificateSigningRequest, timeout time.Duration) (certData []byte, err error) {
+func WaitForCertificate(ctx context.Context, client certificatesclient.CertificateSigningRequestInterface, req *certificates.CertificateSigningRequest) (certData []byte, err error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", req.Name).String()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -94,8 +94,6 @@ func WaitForCertificate(client certificatesclient.CertificateSigningRequestInter
 			return client.Watch(options)
 		},
 	}
-	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
-	defer cancel()
 	event, err := watchtools.UntilWithSync(
 		ctx,
 		lw,
