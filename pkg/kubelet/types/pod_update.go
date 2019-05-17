@@ -147,7 +147,7 @@ func (sp SyncPodType) String() string {
 // to make admission and scheduling decisions.
 func IsCriticalPod(pod *v1.Pod) bool {
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
+		if pod != nil && pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
 			return true
 		}
 	}
