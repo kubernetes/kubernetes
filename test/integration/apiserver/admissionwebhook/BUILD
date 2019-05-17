@@ -7,6 +7,7 @@ go_test(
         "broken_webhook_test.go",
         "main_test.go",
     ],
+    rundir = ".",
     tags = [
         "etcd",
         "integration",
