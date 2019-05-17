@@ -230,7 +230,7 @@ function check-curl-proxy-code()
 function kubectl-with-retry()
 {
   ERROR_FILE="${KUBE_TEMP}/kubectl-error"
-  preserve_err_file=${PRESERVE_ERR_FILE-false}
+  preserve_err_file=${PRESERVE_ERR_FILE:-false}
   for count in {0..3}; do
     kubectl "$@" 2> ${ERROR_FILE} || true
     if grep -q "the object has been modified" "${ERROR_FILE}"; then
