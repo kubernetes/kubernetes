@@ -92,7 +92,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claimQueue:                    workqueue.NewNamed("claims"),
 		volumeQueue:                   workqueue.NewNamed("volumes"),
 		resyncPeriod:                  p.SyncPeriod,
-		operationTimestamps:           cache.NewThreadSafeStore(cache.Indexers{}, cache.Indices{}),
+		operationTimestamps:           metrics.NewOperationStartTimeCache(),
 	}
 
 	// Prober is nil because PV is not aware of Flexvolume.
@@ -211,8 +211,11 @@ func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume
 	_ = ctrl.volumes.store.Delete(volume)
 
 	// record deletion metric if a deletion start timestamp is in the cache
-	// the following call will be a no-op if there is nothing for this volume in the cache
-	ctrl.recordMetric("delete", volume.Name, nil)
+	// the following calls will be a no-op if there is nothing for this volume in the cache
+	metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, nil)
+	// end of operation lifecycle, clean up operation cache
+	ctrl.operationTimestamps.Delete(volume.Name)
+
 	if volume.Spec.ClaimRef == nil {
 		return
 	}
@@ -256,11 +259,9 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 	_ = ctrl.claims.Delete(claim)
 	claimKey := claimToClaimKey(claim)
 	klog.V(4).Infof("claim %q deleted", claimKey)
-	// clean any possible unfinished provision/prebinding/binding start timestamp from cache
+	// clean any possible unfinished provision start timestamp from cache
 	// Unit test [5-8] [5-9]
-	ctrl.deleteOperationTimestamp("provision", claimKey)
-	ctrl.deleteOperationTimestamp("binding", claimKey)
-	ctrl.deleteOperationTimestamp("prebinding", claimKey)
+	ctrl.operationTimestamps.Delete(claimKey)
 
 	volumeName := claim.Spec.VolumeName
 	if volumeName == "" {

@@ -18,10 +18,12 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
+	metricutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -197,4 +199,77 @@ func RecordVolumeOperationErrorMetric(pluginName, opName string) {
 		pluginName = "N/A"
 	}
 	volumeOperationErrorsMetric.WithLabelValues(pluginName, opName).Inc()
+}
+
+// operationTimestamp stores the start time of an operation by an operator
+type operationTimestamp struct {
+	operator  string
+	operation string
+	startTs   time.Time
+}
+
+func newOperationTimestamp(operatorName, operationName string) *operationTimestamp {
+	return &operationTimestamp{
+		operator:  operatorName,
+		operation: operationName,
+		startTs:   time.Now(),
+	}
+}
+
+// OperationStartTimeCache concurrent safe cache for operation start timestamps
+type OperationStartTimeCache struct {
+	cache sync.Map // [string]operationTimestamp
+}
+
+func NewOperationStartTimeCache() OperationStartTimeCache {
+	return OperationStartTimeCache{
+		cache: sync.Map{}, //[string]operationTimestamp {}
+	}
+}
+
+// LoadOrStore returns directly if there exists an entry with the key. Otherwise, it
+// creates a new operation timestamp using operationName, operatorName, and current timestamp
+// and stores the operation timestamp with the key
+func (c *OperationStartTimeCache) AddIfNotExist(key, operatorName, operationName string) {
+	ts := newOperationTimestamp(operatorName, operationName)
+	c.cache.LoadOrStore(key, ts)
+}
+
+// Delete deletes a value for a key.
+func (c *OperationStartTimeCache) Delete(key string) {
+	c.cache.Delete(key)
+}
+
+// Store creates an operationTimestamp with current time, and stores it for a key
+func (c *OperationStartTimeCache) Store(key, operatorName, operationName string) {
+	ts := newOperationTimestamp(operatorName, operationName)
+	c.cache.Store(key, ts)
+}
+
+// Load returns the value stored in the cache for a key, or nil no value is found
+// the ok result will be TRUE only if both the following conditions have been met
+// 1. there exists a value in the cache with the key
+// 2. the value can be cast into *operatioTimestamp
+func (c *OperationStartTimeCache) Load(key string) (*operationTimestamp, bool) {
+	obj, exists := c.cache.Load(key)
+	if !exists {
+		return nil, exists
+	}
+	ts, ok := obj.(*operationTimestamp)
+	return ts, ok
+}
+
+// RecordMetric records either an error count metric or a latency metric if there
+// exists a start timestamp entry in the cache
+func RecordMetric(key string, c *OperationStartTimeCache, err error) {
+	ts, exists := c.Load(key)
+	if !exists {
+		return
+	}
+	if err != nil {
+		RecordVolumeOperationErrorMetric(ts.operator, ts.operation)
+	} else {
+		timeTaken := time.Since(ts.startTs).Seconds()
+		metricutil.RecordOperationLatencyMetric(ts.operator, ts.operation, timeTaken)
+	}
 }
