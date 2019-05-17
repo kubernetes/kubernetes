@@ -456,7 +456,6 @@ func TestHandlePortConflicts(t *testing.T) {
 			},
 		},
 	}}
-
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
@@ -466,7 +465,6 @@ func TestHandlePortConflicts(t *testing.T) {
 	}
 	testClusterDNSDomain := "TEST"
 	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
-
 	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "newpod", "foo", spec),
@@ -475,6 +473,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	// Make sure the Pods are in the reverse order of creation time.
 	pods[1].CreationTimestamp = metav1.NewTime(time.Now())
 	pods[0].CreationTimestamp = metav1.NewTime(time.Now().Add(1 * time.Second))
+
 	// The newer pod should be rejected.
 	notfittingPod := pods[0]
 	fittingPod := pods[1]
@@ -484,6 +483,54 @@ func TestHandlePortConflicts(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+}
+
+// Tests serial pod admit that we handle port conflicts correctly by setting the failed status in status map.
+func TestHandleSerialPodAdmit(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+	recorder := record.NewFakeRecorder(20)
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      string("testNode"),
+		UID:       types.UID("testNode"),
+		Namespace: "",
+	}
+	testClusterDNSDomain := "TEST"
+	kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
+	notfittingPod := []*v1.Pod{
+		podWithUIDNameNsSpec("123456789", "newpod", "foo", spec),
+	}
+	fittingPod := []*v1.Pod{
+		podWithUIDNameNsSpec("987654321", "oldpod", "foo", spec),
+	}
+
+	// Make sure the Pods are in the reverse order of creation time.
+	notfittingPod[0].CreationTimestamp = metav1.NewTime(time.Now().Add(2 * time.Second))
+	fittingPod[0].CreationTimestamp = metav1.NewTime(time.Now().Add(1 * time.Second))
+
+	kl.HandlePodAdditions(notfittingPod)
+	status, found := kl.statusManager.GetPodStatus(notfittingPod[0].UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", notfittingPod[0].UID)
+	require.Equal(t, v1.PodPending, status.Phase)
+
+	kl.HandlePodAdditions(fittingPod)
+	status, found = kl.statusManager.GetPodStatus(fittingPod[0].UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod[0].UID)
+	require.Equal(t, v1.PodFailed, status.Phase)
 }
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
