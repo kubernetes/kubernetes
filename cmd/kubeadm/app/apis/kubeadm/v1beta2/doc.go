@@ -110,6 +110,7 @@ limitations under the License.
 //
 // - LocalAPIEndpoint, that represents the endpoint of the instance of the API server to be deployed on this node;
 // use it e.g. to customize the API server advertise address.
+// LocalAPIEndpoint.advertiseAddress - It will be also used as fallback option for etcd advertise address.
 //
 //     apiVersion: kubeadm.k8s.io/v1beta2
 //     kind: ClusterConfiguration
