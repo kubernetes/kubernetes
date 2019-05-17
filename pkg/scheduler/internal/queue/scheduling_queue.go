@@ -774,17 +774,22 @@ func (npm *nominatedPodMap) delete(p *v1.Pod) {
 func (npm *nominatedPodMap) update(oldPod, newPod *v1.Pod) {
 	// In some cases, an Update event with no "NominatedNode" present is received right
 	// after a node("NominatedNode") is reserved for this pod in memory.
-	// If we go updating (delete and add) it, it actually un-reserves the node since
-	// the newPod doesn't carry Status.NominatedNodeName.
-	// In this case, during this time other low-priority pods have chances to take space which
-	// was reserved for the nominatedPod.
-	if len(oldPod.Status.NominatedNodeName) == 0 && len(newPod.Status.NominatedNodeName) == 0 {
-		return
+	// In this case, we need to keep reserving the NominatedNode when updating the pod pointer.
+	nodeName := ""
+	// We won't fall into below `if` block if the Update event represents:
+	// (1) NominatedNode info is added
+	// (2) NominatedNode info is updated
+	// (3) NominatedNode info is removed
+	if NominatedNodeName(oldPod) == "" && NominatedNodeName(newPod) == "" {
+		if nnn, ok := npm.nominatedPodToNode[oldPod.UID]; ok {
+			// This is the only case we should continue reserving the NominatedNode
+			nodeName = nnn
+		}
 	}
-	// We update once the nominatedNodeName gets changed, to ensure
+	// We update irrespective of the nominatedNodeName changed or not, to ensure
 	// that pod pointer is updated.
 	npm.delete(oldPod)
-	npm.add(newPod, "")
+	npm.add(newPod, nodeName)
 }
 
 func (npm *nominatedPodMap) podsForNode(nodeName string) []*v1.Pod {
