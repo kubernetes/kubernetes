@@ -229,7 +229,8 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, fsGroup)
+	errOwner := volume.SetVolumeOwnership(ed, fsGroup)
+	klog.Errorf("set up volume onwership failed %v", errOwner)
 
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())

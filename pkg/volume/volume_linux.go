@@ -69,8 +69,10 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 		}
 
 		err = os.Chown(path, int(stat.Uid), int(*fsGroup))
+		klog.Infof("change ownership for path %s with uid %d, fsGroup %d", path, int(stat.Uid), int(*fsGroup))
 		if err != nil {
 			klog.Errorf("Chown failed on %v: %v", path, err)
+			return err
 		}
 
 		mask := rwMask
