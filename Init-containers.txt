@@ -1,0 +1,54 @@
+pod.beta.kubernetes.io/init-containers: '[
+    {
+        "name": "init-myservice",
+        "image": "busybox",
+        "command": ["sh", "-c", "mkdir /tmp/jack/ && touch cd /tmp/jack && touch a b c"],
+        "volumeMounts": [{
+          "mountPath": "/tmp/jack",
+          "name": "confdir"
+        }]
+    }
+]'
+
+kind: "Deployment"
+apiVersion: "extensions/v1beta1"
+metadata:
+  name: "test"
+  labels:
+    name: "test"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: "test"
+  template:
+    metadata:
+      name: "test"
+      labels:
+        name: "test"
+    spec:
+      initContainers:
+        - name: sleep
+          image: debian:stretch
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - 'echo "create by init-container" > /dir/file'
+          volumeMounts:
+            - mountPath: /dir
+              name: shared
+      containers:
+        - name: test
+          image: debian:stretch
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - "cat /dir/file && sleep 99999s"
+          volumeMounts:
+            - mountPath: /dir
+              name: shared
+      volumes:
+        - name: shared
+          emptyDir: {}
