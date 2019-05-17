@@ -34,11 +34,11 @@ BADSYMBOLS=(
 )
 
 # b/c hyperkube binds everything simply check that for bad symbols
-SYMBOLS="$(nm "${KUBE_OUTPUT_HOSTBIN}/hyperkube")"
+SYMBOLS="$(go tool nm "${KUBE_OUTPUT_HOSTBIN}/hyperkube")"
 
 RESULT=0
 for BADSYMBOL in "${BADSYMBOLS[@]}"; do
-  if FOUND=$(echo "$SYMBOLS" | grep "$BADSYMBOL"); then
+  if FOUND=$(echo "${SYMBOLS}" | grep "${BADSYMBOL}"); then
     echo "Found bad symbol '${BADSYMBOL}':"
     echo "$FOUND"
     RESULT=1
