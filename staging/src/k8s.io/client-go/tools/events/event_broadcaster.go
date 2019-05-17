@@ -83,8 +83,8 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration) EventBroadcaste
 // TODO: add test for refreshExistingEventSeries
 func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	// TODO: Investigate whether lock contention won't be a problem
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
 		if event.Series != nil {
 			if recordedEvent, retry := recordEvent(e.sink, event); !retry {
@@ -100,9 +100,9 @@ func (e *eventBroadcasterImpl) finishSeries() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for isomorphicKey, event := range e.eventCache {
-		eventSerie := event.Series
-		if eventSerie != nil {
-			if eventSerie.LastObservedTime.Time.Add(finishTime).Before(time.Now()) {
+		eventSeries := event.Series
+		if eventSeries != nil {
+			if eventSeries.LastObservedTime.Time.Add(finishTime).Before(time.Now()) {
 				if _, retry := recordEvent(e.sink, event); !retry {
 					delete(e.eventCache, isomorphicKey)
 				}
@@ -174,8 +174,8 @@ func (e *eventBroadcasterImpl) attemptRecording(event *v1beta1.Event) *v1beta1.E
 func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 	var newEvent *v1beta1.Event
 	var err error
-	isEventSerie := event.Series != nil
-	if isEventSerie {
+	isEventSeries := event.Series != nil
+	if isEventSeries {
 		patch, err := createPatchBytesForSeries(event)
 		if err != nil {
 			klog.Errorf("Unable to calculate diff, no merge is possible: %v", err)
@@ -184,7 +184,7 @@ func recordEvent(sink EventSink, event *v1beta1.Event) (*v1beta1.Event, bool) {
 		newEvent, err = sink.Patch(event, patch)
 	}
 	// Update can fail because the event may have been removed and it no longer exists.
-	if !isEventSerie || (isEventSerie && util.IsKeyNotFoundError(err)) {
+	if !isEventSeries || (isEventSeries && util.IsKeyNotFoundError(err)) {
 		// Making sure that ResourceVersion is empty on creation
 		event.ResourceVersion = ""
 		newEvent, err = sink.Create(event)
