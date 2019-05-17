@@ -225,12 +225,28 @@ type Webhook struct {
 	// }
 	//
 	// See
-	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+	// https://kubernetes.io/docs/concepts/overview/working-with-objects/labels
 	// for more examples of label selectors.
 	//
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
+
+	// The object selector applies to an Object's labels. For CREATE and
+	// UPDATE, the object is the new object. For DELETE, it is existing
+	// object (passed as oldObject in the admissionRequest). For
+	// sub-resources, if the subresource accepts the whole object and apply
+	// the changes to object's labels (e.g. pods/status) the labels on the
+	// new object will be used otherwise (e.g. pods/proxy) the labels on
+	// the existing parent object will be used. If subresource does not
+	// have a parent object, the webhook call may fail or skipped based on
+	// the failure policy.
+	// The Object's labels are extracted at the admission time before
+	// running any admission webhooks and will be used for all webhooks
+	// during the admission process.
+	// Default to the empty LabelSelector, which matches everything.
+	// +optional
+	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty"`
 
 	// SideEffects states whether this webhookk has side effects.
 	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
