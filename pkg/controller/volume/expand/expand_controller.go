@@ -228,7 +228,7 @@ func (expc *expandController) syncHandler(key string) error {
 
 	class, err := expc.classLister.Get(claimClass)
 	if err != nil {
-		klog.V(4).Infof("volume expansion is not supported for PVC: %s,  can not find StorageClass %s", util.ClaimToClaimKey(pvc), claimClass)
+		klog.V(4).Infof("volume expansion is not supported for PVC: %s;can not find StorageClass %s", util.ClaimToClaimKey(pvc), claimClass)
 		return nil
 	}
 
@@ -297,7 +297,7 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting expand controller")
 	defer klog.Infof("Shutting down expand controller")
 
-	if !controller.WaitForCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced) {
+	if !controller.WaitForCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced, expc.classListerSynced) {
 		return
 	}
 

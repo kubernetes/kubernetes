@@ -66,6 +66,17 @@ go_test(
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/attachdetach/testing:go_default_library",
+        "//pkg/features:go_default_library",
+        "//pkg/volume:go_default_library",
+        "//pkg/volume/awsebs:go_default_library",
+        "//pkg/volume/util/operationexecutor:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/storage/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
     ],
 )
