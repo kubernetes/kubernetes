@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/proxy/config:go_default_library",
+        "//pkg/proxy/metrics:go_default_library",
         "//pkg/proxy/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

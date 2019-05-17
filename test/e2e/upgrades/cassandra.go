@@ -100,8 +100,10 @@ func (t *CassandraUpgradeTest) Setup(f *framework.Framework) {
 	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 dummy users")
-	gomega.Expect(t.addUser("Alice")).NotTo(gomega.HaveOccurred())
-	gomega.Expect(t.addUser("Bob")).NotTo(gomega.HaveOccurred())
+	err = t.addUser("Alice")
+	framework.ExpectNoError(err)
+	err = t.addUser("Bob")
+	framework.ExpectNoError(err)
 	t.successfulWrites = 2
 
 	ginkgo.By("Verifying that the users exist")

@@ -263,12 +263,14 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// NewCmdConfigUpload returns cobra.Command for "kubeadm config upload" command
+// NewCmdConfigUpload (Deprecated) returns cobra.Command for "kubeadm config upload" command
+// Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "upload",
-		Short: "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster",
-		RunE:  cmdutil.SubCmdRunE("upload"),
+		Deprecated: "please see kubeadm init phase upload-config",
+		Use:        "upload",
+		Short:      "Upload configuration about the current state, so that 'kubeadm upgrade' can later know how to configure the upgraded cluster",
+		RunE:       cmdutil.SubCmdRunE("upload"),
 	}
 
 	cmd.AddCommand(NewCmdConfigUploadFromFile(out, kubeConfigFile))
@@ -299,11 +301,13 @@ func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 
 // NewCmdConfigUploadFromFile verifies given Kubernetes config file and returns cobra.Command for
 // "kubeadm config upload from-file" command
+// Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	var cfgPath string
 	cmd := &cobra.Command{
-		Use:   "from-file",
-		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration",
+		Deprecated: "please see kubeadm init phase upload-config",
+		Use:        "from-file",
+		Short:      "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can upload configuration to the ConfigMap in the cluster using the same config file you gave to 'kubeadm init'.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and used the --config option, you need to run this command with the
@@ -335,6 +339,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 }
 
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
+// Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiv1beta2.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(cfg)
@@ -342,8 +347,9 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 	var featureGatesString string
 
 	cmd := &cobra.Command{
-		Use:   "from-flags",
-		Short: "Create the in-cluster configuration file for the first time from using flags",
+		Deprecated: "please see kubeadm init phase upload-config",
+		Use:        "from-flags",
+		Short:      "Create the in-cluster configuration file for the first time from using flags",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using this command, you can upload configuration to the ConfigMap in the cluster using the same flags you gave to 'kubeadm init'.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and set certain flags, you need to run this command with the

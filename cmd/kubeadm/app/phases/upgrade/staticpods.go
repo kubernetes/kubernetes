@@ -178,7 +178,7 @@ func (spm *KubeStaticPodPathManager) CleanupDirs() error {
 	return utilerrors.NewAggregate(errlist)
 }
 
-func upgradeComponent(component string, renewCerts bool, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, beforePodHash string, recoverManifests map[string]string) error {
+func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, beforePodHash string, recoverManifests map[string]string) error {
 	// Special treatment is required for etcd case, when rollbackOldManifests should roll back etcd
 	// manifests only for the case when component is Etcd
 	recoverEtcd := false
@@ -211,9 +211,9 @@ func upgradeComponent(component string, renewCerts bool, waiter apiclient.Waiter
 	}
 
 	// if certificate renewal should be performed
-	if renewCerts {
+	if certsRenewMgr != nil {
 		// renew all the certificates used by the current component
-		if err := renewCertsByComponent(cfg, pathMgr.KubernetesDir(), component); err != nil {
+		if err := renewCertsByComponent(cfg, component, certsRenewMgr); err != nil {
 			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to renew certificates for component %q", component), pathMgr, recoverEtcd)
 		}
 	}
@@ -256,7 +256,7 @@ func upgradeComponent(component string, renewCerts bool, waiter apiclient.Waiter
 }
 
 // performEtcdStaticPodUpgrade performs upgrade of etcd, it returns bool which indicates fatal error or not and the actual error.
-func performEtcdStaticPodUpgrade(renewCerts bool, client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
+func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientset.Interface, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.InitConfiguration, recoverManifests map[string]string, oldEtcdClient, newEtcdClient etcdutil.ClusterInterrogator) (bool, error) {
 	// Add etcd static pod spec only if external etcd is not configured
 	if cfg.Etcd.External != nil {
 		return false, errors.New("external etcd detected, won't try to change any etcd state")
@@ -320,7 +320,7 @@ func performEtcdStaticPodUpgrade(renewCerts bool, client clientset.Interface, wa
 	retryInterval := 15 * time.Second
 
 	// Perform etcd upgrade using common to all control plane components function
-	if err := upgradeComponent(constants.Etcd, renewCerts, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
+	if err := upgradeComponent(constants.Etcd, certsRenewMgr, waiter, pathMgr, cfg, beforeEtcdPodHash, recoverManifests); err != nil {
 		fmt.Printf("[upgrade/etcd] Failed to upgrade etcd: %v\n", err)
 		// Since upgrade component failed, the old etcd manifest has either been restored or was never touched
 		// Now we need to check the health of etcd cluster if it is up with old manifest
@@ -433,13 +433,21 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 		}
 	}
 
+	var certsRenewMgr *renewal.Manager
+	if renewCerts {
+		certsRenewMgr, err = renewal.NewManager(&cfg.ClusterConfiguration, pathMgr.KubernetesDir())
+		if err != nil {
+			return errors.Wrap(err, "failed to create the certificate renewal manager")
+		}
+	}
+
 	// etcd upgrade is done prior to other control plane components
 	if !isExternalEtcd && etcdUpgrade {
 		// set the TLS upgrade flag for all components
 		fmt.Printf("[upgrade/etcd] Upgrading to TLS for %s\n", constants.Etcd)
 
 		// Perform etcd upgrade using common to all control plane components function
-		fatal, err := performEtcdStaticPodUpgrade(renewCerts, client, waiter, pathMgr, cfg, recoverManifests, oldEtcdClient, newEtcdClient)
+		fatal, err := performEtcdStaticPodUpgrade(certsRenewMgr, client, waiter, pathMgr, cfg, recoverManifests, oldEtcdClient, newEtcdClient)
 		if err != nil {
 			if fatal {
 				return err
@@ -456,16 +464,21 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 	}
 
 	for _, component := range constants.ControlPlaneComponents {
-		if err = upgradeComponent(component, renewCerts, waiter, pathMgr, cfg, beforePodHashMap[component], recoverManifests); err != nil {
+		if err = upgradeComponent(component, certsRenewMgr, waiter, pathMgr, cfg, beforePodHashMap[component], recoverManifests); err != nil {
 			return err
 		}
 	}
 
 	if renewCerts {
 		// renew the certificate embedded in the admin.conf file
-		err := renewEmbeddedCertsByName(cfg, pathMgr.KubernetesDir(), constants.AdminKubeConfigFileName)
+		renewed, err := certsRenewMgr.RenewUsingLocalCA(constants.AdminKubeConfigFileName)
 		if err != nil {
 			return rollbackOldManifests(recoverManifests, errors.Wrapf(err, "failed to upgrade the %s certificates", constants.AdminKubeConfigFileName), pathMgr, false)
+		}
+
+		if !renewed {
+			// if not error, but not renewed because of external CA detected, inform the user
+			fmt.Printf("[upgrade/staticpods] External CA detected, %s certificate can't be renewed\n", constants.AdminKubeConfigFileName)
 		}
 	}
 
@@ -514,121 +527,57 @@ func rollbackEtcdData(cfg *kubeadmapi.InitConfiguration, pathMgr StaticPodPathMa
 
 // renewCertsByComponent takes charge of renewing certificates used by a specific component before
 // the static pod of the component is upgraded
-func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, kubernetesDir, component string) error {
-	// if the cluster is using a local etcd
-	if cfg.Etcd.Local != nil {
-		if component == constants.Etcd || component == constants.KubeAPIServer {
-			// try to load the etcd CA
-			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertEtcdCA.BaseName)
-			if err != nil {
-				return errors.Wrapf(err, "failed to upgrade the %s CA certificate and key", constants.Etcd)
-			}
-			// create a renewer for certificates signed by etcd CA
-			renewer := renewal.NewFileRenewal(caCert, caKey)
-			// then, if upgrading the etcd component, renew all the certificates signed by etcd CA and used
-			// by etcd itself (the etcd-server, the etcd-peer and the etcd-healthcheck-client certificate)
-			if component == constants.Etcd {
-				for _, cert := range []*certsphase.KubeadmCert{
-					&certsphase.KubeadmCertEtcdServer,
-					&certsphase.KubeadmCertEtcdPeer,
-					&certsphase.KubeadmCertEtcdHealthcheck,
-				} {
-					fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
-					if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
-						return errors.Wrapf(err, "failed to renew %s certificates", cert.Name)
-					}
-				}
-			}
-			// if upgrading the apiserver component, renew the certificate signed by etcd CA and used
-			// by the apiserver (the apiserver-etcd-client certificate)
-			if component == constants.KubeAPIServer {
-				cert := certsphase.KubeadmCertEtcdAPIClient
-				fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
-				if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
-					return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
-				}
+func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, certsRenewMgr *renewal.Manager) error {
+	var certificates []string
+
+	// if etcd, only in case of local etcd, renew server, peer and health check certificate
+	if component == constants.Etcd {
+		if cfg.Etcd.Local != nil {
+			certificates = []string{
+				certsphase.KubeadmCertEtcdServer.Name,
+				certsphase.KubeadmCertEtcdPeer.Name,
+				certsphase.KubeadmCertEtcdHealthcheck.Name,
 			}
 		}
 	}
+
+	// if apiserver, renew apiserver serving certificate, kubelet and front-proxy client certificate.
+	//if local etcd, renew also the etcd client certificate
 	if component == constants.KubeAPIServer {
-		// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
-		// if not, then CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
-		// and used the apis server (the apiserver certificate and the apiserver-kubelet-client certificate)
-		externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
-		if !externalCA {
-			// try to load ca
-			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertRootCA.BaseName)
-			if err != nil {
-				return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.KubeAPIServer)
-			}
-			// create a renewer for certificates signed by CA
-			renewer := renewal.NewFileRenewal(caCert, caKey)
-			// renew the certificates
-			for _, cert := range []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertAPIServer,
-				&certsphase.KubeadmCertKubeletClient,
-			} {
-				fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
-				if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
-					return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
-				}
-			}
+		certificates = []string{
+			certsphase.KubeadmCertAPIServer.Name,
+			certsphase.KubeadmCertKubeletClient.Name,
+			certsphase.KubeadmCertFrontProxyClient.Name,
 		}
-
-		// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
-		// if not, then Front-Proxy CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
-		// and used the apis server (the front-proxy-client certificate)
-		externalFrontProxyCA, _ := certsphase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
-		if !externalFrontProxyCA {
-			// try to load front-proxy-ca
-			caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertFrontProxyCA.BaseName)
-			if err != nil {
-				return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.KubeAPIServer)
-			}
-			// create a renewer for certificates signed by Front-Proxy CA
-			renewer := renewal.NewFileRenewal(caCert, caKey)
-			// renew the certificates
-			cert := certsphase.KubeadmCertFrontProxyClient
-			fmt.Printf("[upgrade/staticpods] Renewing %q certificate\n", cert.BaseName)
-			if err := renewal.RenewExistingCert(cfg.CertificatesDir, cert.BaseName, renewer); err != nil {
-				return errors.Wrapf(err, "failed to renew %s certificate and key", cert.Name)
-			}
+		if cfg.Etcd.Local != nil {
+			certificates = append(certificates, certsphase.KubeadmCertEtcdAPIClient.Name)
 		}
 	}
+
+	// if controller-manager, renew the certificate embedded in the controller-manager kubeConfig file
 	if component == constants.KubeControllerManager {
-		// renew the certificate embedded in the controller-manager.conf file
-		err := renewEmbeddedCertsByName(cfg, kubernetesDir, constants.ControllerManagerKubeConfigFileName)
-		if err != nil {
-			return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.ControllerManagerKubeConfigFileName)
+		certificates = []string{
+			constants.ControllerManagerKubeConfigFileName,
 		}
 	}
-	if component == constants.KubeScheduler {
-		// renew the certificate embedded in the scheduler.conf file
-		err := renewEmbeddedCertsByName(cfg, kubernetesDir, constants.SchedulerKubeConfigFileName)
-		if err != nil {
-			return errors.Wrapf(err, "failed to upgrade the %s certificates", constants.SchedulerKubeConfigFileName)
-		}
-	}
-	return nil
-}
 
-func renewEmbeddedCertsByName(cfg *kubeadmapi.InitConfiguration, kubernetesDir, kubeConfigFile string) error {
-	// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
-	// if not, then CA is managed by kubeadm, so it is possible to renew all the certificates signed by ca
-	// and used by the apis server (the apiserver certificate and the apiserver-kubelet-client certificate)
-	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
-	if !externalCA {
-		// try to load ca
-		caCert, caKey, err := certsphase.LoadCertificateAuthority(cfg.CertificatesDir, certsphase.KubeadmCertRootCA.BaseName)
-		if err != nil {
-			return errors.Wrapf(err, "failed to upgrade the %s certificates", kubeConfigFile)
+	// if scheduler, renew the certificate embedded in the scheduler kubeConfig file
+	if component == constants.KubeScheduler {
+		certificates = []string{
+			constants.SchedulerKubeConfigFileName,
 		}
-		// create a renewer for certificates signed by CA
-		renewer := renewal.NewFileRenewal(caCert, caKey)
-		// renew the certificate embedded in the controller-manager.conf file
-		fmt.Printf("[upgrade/staticpods] Renewing certificate embedded in %q \n", kubeConfigFile)
-		if err := renewal.RenewEmbeddedClientCert(kubernetesDir, kubeConfigFile, renewer); err != nil {
-			return errors.Wrapf(err, "failed to renew certificate embedded in %s", kubeConfigFile)
+	}
+
+	// renew the selected components
+	for _, cert := range certificates {
+		fmt.Printf("[upgrade/staticpods] Renewing %s certificate\n", cert)
+		renewed, err := certsRenewMgr.RenewUsingLocalCA(cert)
+		if err != nil {
+			return err
+		}
+		if !renewed {
+			// if not error, but not renewed because of external CA detected, inform the user
+			fmt.Printf("[upgrade/staticpods] External CA detected, %s certificate can't be renewed\n", cert)
 		}
 	}
 

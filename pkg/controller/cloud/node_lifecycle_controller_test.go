@@ -30,8 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/klog"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -39,7 +39,7 @@ func Test_NodesDeleted(t *testing.T) {
 	testcases := []struct {
 		name        string
 		fnh         *testutil.FakeNodeHandler
-		fakeCloud   *fakecloud.FakeCloud
+		fakeCloud   *fakecloud.Cloud
 		deleteNodes []*v1.Node
 	}{
 		{
@@ -66,7 +66,7 @@ func Test_NodesDeleted(t *testing.T) {
 				DeletedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
 			},
 			deleteNodes: []*v1.Node{
@@ -100,7 +100,7 @@ func Test_NodesDeleted(t *testing.T) {
 				DeletedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
 				ErrByProviderID:    errors.New("err!"),
 			},
@@ -133,7 +133,7 @@ func Test_NodesDeleted(t *testing.T) {
 				DeletedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: true,
 			},
 			deleteNodes: []*v1.Node{},
@@ -162,7 +162,7 @@ func Test_NodesDeleted(t *testing.T) {
 				DeletedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
 			},
 			deleteNodes: []*v1.Node{
@@ -193,7 +193,7 @@ func Test_NodesDeleted(t *testing.T) {
 				DeletedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:       false,
 				ExistsByProviderID: true,
 				ExtID: map[types.NodeName]string{
@@ -229,7 +229,7 @@ func Test_NodesDeleted(t *testing.T) {
 				DeletedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				ExistsByProviderID: false,
 			},
 			deleteNodes: []*v1.Node{},
@@ -270,7 +270,7 @@ func Test_NodesShutdown(t *testing.T) {
 	testcases := []struct {
 		name         string
 		fnh          *testutil.FakeNodeHandler
-		fakeCloud    *fakecloud.FakeCloud
+		fakeCloud    *fakecloud.Cloud
 		updatedNodes []*v1.Node
 	}{
 		{
@@ -297,7 +297,7 @@ func Test_NodesShutdown(t *testing.T) {
 				UpdatedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,
 				ErrShutdownByProviderID: nil,
 			},
@@ -349,7 +349,7 @@ func Test_NodesShutdown(t *testing.T) {
 				UpdatedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            false,
 				ErrShutdownByProviderID: errors.New("err!"),
 			},
@@ -379,7 +379,7 @@ func Test_NodesShutdown(t *testing.T) {
 				UpdatedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            false,
 				ErrShutdownByProviderID: nil,
 			},
@@ -409,7 +409,7 @@ func Test_NodesShutdown(t *testing.T) {
 				UpdatedNodes: []*v1.Node{},
 				Clientset:    fake.NewSimpleClientset(),
 			},
-			fakeCloud: &fakecloud.FakeCloud{
+			fakeCloud: &fakecloud.Cloud{
 				NodeShutdown:            true,
 				ErrShutdownByProviderID: nil,
 			},

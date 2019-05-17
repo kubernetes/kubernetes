@@ -127,4 +127,7 @@ const (
 
 	// SkipCertificateKeyPrint flag instruct kubeadm to skip printing certificate key used to encrypt certs by 'kubeadm init'.
 	SkipCertificateKeyPrint = "skip-certificate-key-print"
+
+	// ForceReset flag instruct kubeadm to reset the node without prompting for confirmation
+	ForceReset = "force"
 )

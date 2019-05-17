@@ -67,7 +67,7 @@ func testHostIP(podClient *framework.PodClient, pod *v1.Pod) {
 	t := time.Now()
 	for {
 		p, err := podClient.Get(pod.Name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get pod %q", pod.Name)
+		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 		if p.Status.HostIP != "" {
 			e2elog.Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
 			break
@@ -218,7 +218,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
+		framework.ExpectNoError(err, "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
@@ -256,7 +256,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
+		framework.ExpectNoError(err, "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
 		ginkgo.By("verifying pod creation was observed")
@@ -279,11 +279,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 		// save the running pod
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to GET scheduled pod")
+		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(30))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 
 		ginkgo.By("verifying the kubelet observed the termination notice")
 		gomega.Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
@@ -335,7 +335,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
+		framework.ExpectNoError(err, "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
 	})
 
@@ -373,7 +373,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
+		framework.ExpectNoError(err, "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
 		ginkgo.By("updating the pod")
@@ -388,7 +388,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
+		framework.ExpectNoError(err, "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 		e2elog.Logf("Pod update OK")
 	})
@@ -427,7 +427,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pods")
+		framework.ExpectNoError(err, "failed to query for pods")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
 		ginkgo.By("updating the pod")
@@ -491,7 +491,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service")
+		framework.ExpectNoError(err, "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
 		podName := "client-envvars-" + string(uuid.NewUUID())
@@ -538,7 +538,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	*/
 	framework.ConformanceIt("should support remote command execution over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "unable to get base config")
+		framework.ExpectNoError(err, "unable to get base config")
 
 		ginkgo.By("creating the pod")
 		name := "pod-exec-websocket-" + string(uuid.NewUUID())
@@ -620,7 +620,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	*/
 	framework.ConformanceIt("should support retrieving logs from the container over websockets [NodeConformance]", func() {
 		config, err := framework.LoadConfig()
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "unable to get base config")
+		framework.ExpectNoError(err, "unable to get base config")
 
 		ginkgo.By("creating the pod")
 		name := "pod-logs-websocket-" + string(uuid.NewUUID())
@@ -798,14 +798,15 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		validatePodReadiness := func(expectReady bool) {
-			gomega.Expect(wait.Poll(time.Second, maxReadyStatusUpdateTolerance, func() (bool, error) {
+			err := wait.Poll(time.Second, maxReadyStatusUpdateTolerance, func() (bool, error) {
 				podReady := podClient.PodIsReady(podName)
 				res := expectReady == podReady
 				if !res {
 					e2elog.Logf("Expect the Ready condition of pod %q to be %v, but got %v", podName, expectReady, podReady)
 				}
 				return res, nil
-			})).NotTo(gomega.HaveOccurred())
+			})
+			framework.ExpectNoError(err)
 		}
 
 		ginkgo.By("submitting the pod to kubernetes")

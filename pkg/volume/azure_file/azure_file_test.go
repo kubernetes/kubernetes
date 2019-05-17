@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -119,7 +119,7 @@ func TestPluginWithoutCloudProvider(t *testing.T) {
 func TestPluginWithOtherCloudProvider(t *testing.T) {
 	tmpDir := getTestTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	cloud := &fakecloud.FakeCloud{}
+	cloud := &fakecloud.Cloud{}
 	testPlugin(t, tmpDir, volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, cloud))
 }
 

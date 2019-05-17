@@ -33,7 +33,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // State partially cloned from webserver.go
@@ -192,11 +191,11 @@ var _ = SIGDescribe("PreStop", func() {
 
 		var err error
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to GET scheduled pod")
+		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 
 		//wait up to graceful termination period seconds
 		time.Sleep(30 * time.Second)
@@ -205,9 +204,9 @@ var _ = SIGDescribe("PreStop", func() {
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 			client, err := framework.NodeProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get the pods of the node")
+			framework.ExpectNoError(err, "failed to get the pods of the node")
 			err = client.Into(result)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to parse the pods of the node")
+			framework.ExpectNoError(err, "failed to parse the pods of the node")
 
 			for _, kubeletPod := range result.Items {
 				if pod.Name != kubeletPod.Name {

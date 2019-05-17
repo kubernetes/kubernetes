@@ -266,7 +266,7 @@ func TestPodAdmission(t *testing.T) {
 			pod := test.pod
 			pod.Spec.Tolerations = test.podTolerations
 
-			err = handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, false, nil), nil)
+			err = handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 			if test.admit && err != nil {
 				t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
 			} else if !test.admit && err == nil {
@@ -343,7 +343,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 	}
 
 	// if the update of initialized pod is not ignored, an error will be returned because the pod's Tolerations conflicts with namespace's Tolerations.
-	err = handler.Admit(admission.NewAttributesRecord(pod, pod, api.Kind("Pod").WithVersion("version"), "testNamespace", pod.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, false, nil), nil)
+	err = handler.Admit(admission.NewAttributesRecord(pod, pod, api.Kind("Pod").WithVersion("version"), "testNamespace", pod.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}

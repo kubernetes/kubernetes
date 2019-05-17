@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 			framework.Skipf("No sysctl support in Docker <1.12")
 		}
@@ -85,16 +85,16 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 
 		By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Checking that the pod succeeded")
 		Expect(pod.Status.Phase).To(Equal(v1.PodSucceeded))
 
 		By("Getting logs from the pod")
 		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Checking that the sysctl is actually updated")
 		Expect(log).To(ContainSubstring("kernel.shm_rmid_forced = 1"))
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 			framework.Skipf("No sysctl support in Docker <1.12")
 		}
@@ -128,16 +128,16 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 
 		By("Waiting for pod completion")
 		err = f.WaitForPodNoLongerRunning(pod.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Checking that the pod succeeded")
 		Expect(pod.Status.Phase).To(Equal(v1.PodSucceeded))
 
 		By("Getting logs from the pod")
 		log, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("Checking that the sysctl is actually updated")
 		Expect(log).To(ContainSubstring("kernel.shm_rmid_forced = 1"))
@@ -197,7 +197,7 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		// failed pods without running containers. This would create a race as the pod
 		// might have already been deleted here.
 		ev, err := f.PodClient().WaitForErrorEventOrSuccess(pod)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 			framework.Skipf("No sysctl support in Docker <1.12")
 		}

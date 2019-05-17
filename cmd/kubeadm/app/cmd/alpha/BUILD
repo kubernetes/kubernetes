@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/validation:go_default_library",
@@ -20,7 +21,6 @@ go_library(
         "//cmd/kubeadm/app/cmd/util:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
-        "//cmd/kubeadm/app/phases/certs:go_default_library",
         "//cmd/kubeadm/app/phases/certs/renewal:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",
         "//cmd/kubeadm/app/phases/kubelet:go_default_library",
