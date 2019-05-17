@@ -507,6 +507,10 @@ func getVolumeOpsFromMetricsForPlugin(ms metrics.Metrics, pluginName string) opC
 }
 
 func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
+	if !framework.ProviderIs("gce", "gke", "aws") {
+		return opCounts{}
+	}
+
 	nodeLimit := 25
 
 	metricsGrabber, err := metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
