@@ -260,7 +260,7 @@ var (
 	// KubeadmCertKubeletClient is the definition of the cert used by the API server to access the kubelet.
 	KubeadmCertKubeletClient = KubeadmCert{
 		Name:     "apiserver-kubelet-client",
-		LongName: "Client certificate for the API server to connect to kubelet",
+		LongName: "certificate for the API server to connect to kubelet",
 		BaseName: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
 		CAName:   "ca",
 		config: certutil.Config{
@@ -284,7 +284,7 @@ var (
 	KubeadmCertFrontProxyClient = KubeadmCert{
 		Name:     "front-proxy-client",
 		BaseName: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
-		LongName: "client for the front proxy",
+		LongName: "certificate for the front proxy client",
 		CAName:   "front-proxy-ca",
 		config: certutil.Config{
 			CommonName: kubeadmconstants.FrontProxyClientCertCommonName,
@@ -322,7 +322,7 @@ var (
 	// KubeadmCertEtcdPeer is the definition of the cert used by etcd peers to access each other.
 	KubeadmCertEtcdPeer = KubeadmCert{
 		Name:     "etcd-peer",
-		LongName: "credentials for etcd nodes to communicate with each other",
+		LongName: "certificate for etcd nodes to communicate with each other",
 		BaseName: kubeadmconstants.EtcdPeerCertAndKeyBaseName,
 		CAName:   "etcd-ca",
 		config: certutil.Config{
@@ -336,7 +336,7 @@ var (
 	// KubeadmCertEtcdHealthcheck is the definition of the cert used by Kubernetes to check the health of the etcd server.
 	KubeadmCertEtcdHealthcheck = KubeadmCert{
 		Name:     "etcd-healthcheck-client",
-		LongName: "client certificate for liveness probes to healtcheck etcd",
+		LongName: "certificate for liveness probes to healtcheck etcd",
 		BaseName: kubeadmconstants.EtcdHealthcheckClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
 		config: certutil.Config{
@@ -348,7 +348,7 @@ var (
 	// KubeadmCertEtcdAPIClient is the definition of the cert used by the API server to access etcd.
 	KubeadmCertEtcdAPIClient = KubeadmCert{
 		Name:     "apiserver-etcd-client",
-		LongName: "client apiserver uses to access etcd",
+		LongName: "certificate the apiserver uses to access etcd",
 		BaseName: kubeadmconstants.APIServerEtcdClientCertAndKeyBaseName,
 		CAName:   "etcd-ca",
 		config: certutil.Config{

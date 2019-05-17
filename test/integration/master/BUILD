@@ -21,6 +21,7 @@ go_test(
         "synthetic_master_test.go",
     ],
     embed = [":go_default_library"],
+    rundir = ".",
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",

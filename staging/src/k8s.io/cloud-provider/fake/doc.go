@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package renewal
-
-import (
-	"crypto"
-	"crypto/x509"
-
-	certutil "k8s.io/client-go/util/cert"
-)
-
-// Interface represents a standard way to renew a certificate.
-type Interface interface {
-	Renew(*certutil.Config) (*x509.Certificate, crypto.Signer, error)
-}
+// Package fake is a test-double implementation of cloudprovider
+// Interface, LoadBalancer and Instances. It is useful for testing.
+package fake // import "k8s.io/cloud-provider/fake"

@@ -26,18 +26,18 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("GKE local SSD [Feature:GKELocalSSD]", func() {
 
 	f := framework.NewDefaultFramework("localssd")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gke")
 	})
 
-	It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
+	ginkgo.It("should write and read from node local SSD [Feature:GKELocalSSD]", func() {
 		e2elog.Logf("Start local SSD test")
 		createNodePoolWithLocalSsds("np-ssd")
 		doTestWriteAndReadToLocalSsd(f)

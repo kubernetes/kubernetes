@@ -84,7 +84,7 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(NewCmdConfig(out))
 	cmds.AddCommand(NewCmdInit(out, nil))
 	cmds.AddCommand(NewCmdJoin(out, nil))
-	cmds.AddCommand(NewCmdReset(in, out))
+	cmds.AddCommand(NewCmdReset(in, out, nil))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))

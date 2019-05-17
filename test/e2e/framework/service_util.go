@@ -76,12 +76,16 @@ const (
 	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
 	LoadBalancerCleanupTimeout = 15 * time.Minute
 
+	// LoadBalancerPollTimeout is the time required by the loadbalancer to poll.
 	// On average it takes ~6 minutes for a single backend to come online in GCE.
-	LoadBalancerPollTimeout  = 15 * time.Minute
+	LoadBalancerPollTimeout = 15 * time.Minute
+	// LoadBalancerPollInterval is the interval value in which the loadbalancer polls.
 	LoadBalancerPollInterval = 30 * time.Second
 
+	// LargeClusterMinNodesNumber is the number of nodes which a large cluster consists of.
 	LargeClusterMinNodesNumber = 100
 
+	// MaxNodesForEndpointsTests is the max number for testing endpoints.
 	// Don't test with more than 3 nodes.
 	// Many tests create an endpoint per node, in large clusters, this is
 	// resource and time intensive.
@@ -236,6 +240,7 @@ func (j *ServiceTestJig) CreateServiceWithServicePort(labels map[string]string, 
 	return j.Client.CoreV1().Services(namespace).Create(service)
 }
 
+// ChangeServiceType updates the given service's ServiceType to the given newType.
 func (j *ServiceTestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
 	ingressIP := ""
 	svc := j.UpdateServiceOrFail(namespace, name, func(s *v1.Service) {
@@ -318,6 +323,7 @@ func (j *ServiceTestJig) CreateLoadBalancerService(namespace, serviceName string
 	return svc
 }
 
+// GetNodeAddresses returns a list of addresses of the given addressType for the given node
 func GetNodeAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []string) {
 	for j := range node.Status.Addresses {
 		nodeAddress := &node.Status.Addresses[j]
@@ -328,6 +334,7 @@ func GetNodeAddresses(node *v1.Node, addressType v1.NodeAddressType) (ips []stri
 	return
 }
 
+// CollectAddresses returns a list of addresses of the given addressType for the given list of nodes
 func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []string {
 	ips := []string{}
 	for i := range nodes.Items {
@@ -336,6 +343,7 @@ func CollectAddresses(nodes *v1.NodeList, addressType v1.NodeAddressType) []stri
 	return ips
 }
 
+// GetNodePublicIps returns a public IP list of nodes.
 func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	nodes := GetReadySchedulableNodesOrDie(c)
 
@@ -347,6 +355,7 @@ func GetNodePublicIps(c clientset.Interface) ([]string, error) {
 	return ips, nil
 }
 
+// PickNodeIP picks one public node IP
 func PickNodeIP(c clientset.Interface) string {
 	publicIps, err := GetNodePublicIps(c)
 	ExpectNoError(err)
@@ -415,6 +424,7 @@ func (j *ServiceTestJig) GetNodes(maxNodesForTest int) (nodes *v1.NodeList) {
 	return nodes
 }
 
+// GetNodesNames returns a list of names of the first maxNodesForTest nodes
 func (j *ServiceTestJig) GetNodesNames(maxNodesForTest int) []string {
 	nodes := j.GetNodes(maxNodesForTest)
 	nodesNames := []string{}
@@ -424,6 +434,7 @@ func (j *ServiceTestJig) GetNodesNames(maxNodesForTest int) []string {
 	return nodesNames
 }
 
+// WaitForEndpointOnNode waits for a service endpoint on the given node.
 func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string) {
 	err := wait.PollImmediate(Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
@@ -451,6 +462,7 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 	ExpectNoError(err)
 }
 
+// SanityCheckService performs sanity checks on the given service
 func (j *ServiceTestJig) SanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
 	if svc.Spec.Type != svcType {
 		Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
@@ -533,6 +545,7 @@ func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func
 	return svc
 }
 
+// WaitForNewIngressIPOrFail waits for the given service to get a new ingress IP, or fails after the given timeout
 func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *v1.Service {
 	Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
@@ -548,6 +561,7 @@ func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP s
 	return service
 }
 
+// ChangeServiceNodePortOrFail changes node ports of the given service.
 func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, initial int) *v1.Service {
 	var err error
 	var service *v1.Service
@@ -571,6 +585,7 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 	return service
 }
 
+// WaitForLoadBalancerOrFail waits the given service to have a LoadBalancer, or fails after the given timeout
 func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *v1.Service {
 	Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
@@ -579,6 +594,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeo
 	return service
 }
 
+// WaitForLoadBalancerDestroyOrFail waits the given service to destroy a LoadBalancer, or fails after the given timeout
 func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *v1.Service {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
@@ -658,6 +674,7 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 	return rc
 }
 
+// AddRCAntiAffinity adds AntiAffinity to the given ReplicationController.
 func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 	var replicas int32 = 2
 
@@ -677,6 +694,7 @@ func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 		})
 }
 
+// CreatePDBOrFail returns a PodDisruptionBudget for the given ReplicationController, or fails if a PodDisruptionBudget isn't ready
 func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
 	pdb := j.newPDBTemplate(namespace, rc)
 	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
@@ -733,6 +751,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 	return result
 }
 
+// Scale scales pods to the given replicas
 func (j *ServiceTestJig) Scale(namespace string, replicas int) {
 	rc := j.Name
 	scale, err := j.Client.CoreV1().ReplicationControllers(namespace).GetScale(rc, metav1.GetOptions{})
@@ -839,6 +858,7 @@ func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool
 	return pod
 }
 
+// LaunchNetexecPodOnNode launches a netexec pod on the given node.
 func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName string, httpPort, udpPort int32, hostNetwork bool) {
 	Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
 	pod := newNetexecPodSpec(podName, httpPort, udpPort, hostNetwork)
@@ -887,10 +907,12 @@ func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podNa
 	Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
 }
 
+// TestReachableHTTP tests that the given host serves HTTP on the given port.
 func (j *ServiceTestJig) TestReachableHTTP(host string, port int, timeout time.Duration) {
 	j.TestReachableHTTPWithRetriableErrorCodes(host, port, []int{}, timeout)
 }
 
+// TestReachableHTTPWithRetriableErrorCodes tests that the given host serves HTTP on the given port with the given retriableErrCodes.
 func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeHTTP(host, port, "/echo?msg=hello",
@@ -913,6 +935,7 @@ func (j *ServiceTestJig) TestReachableHTTPWithRetriableErrorCodes(host string, p
 	}
 }
 
+// TestNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
 func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeHTTP(host, port, "/", nil)
@@ -927,6 +950,7 @@ func (j *ServiceTestJig) TestNotReachableHTTP(host string, port int, timeout tim
 	}
 }
 
+// TestRejectedHTTP tests that the given host rejects a HTTP request on the given port.
 func (j *ServiceTestJig) TestRejectedHTTP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeHTTP(host, port, "/", nil)
@@ -941,6 +965,7 @@ func (j *ServiceTestJig) TestRejectedHTTP(host string, port int, timeout time.Du
 	}
 }
 
+// TestReachableUDP tests that the given host serves UDP on the given port.
 func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{
@@ -958,6 +983,7 @@ func (j *ServiceTestJig) TestReachableUDP(host string, port int, timeout time.Du
 	}
 }
 
+// TestNotReachableUDP tests that the given host doesn't serve UDP on the given port.
 func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
@@ -971,6 +997,7 @@ func (j *ServiceTestJig) TestNotReachableUDP(host string, port int, timeout time
 	}
 }
 
+// TestRejectedUDP tests that the given host rejects a UDP request on the given port.
 func (j *ServiceTestJig) TestRejectedUDP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
 		result := PokeUDP(host, port, "echo hello", &UDPPokeParams{Timeout: 3 * time.Second})
@@ -984,6 +1011,7 @@ func (j *ServiceTestJig) TestRejectedUDP(host string, port int, timeout time.Dur
 	}
 }
 
+// GetHTTPContent returns the content of the given url by HTTP.
 func (j *ServiceTestJig) GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
 	var body bytes.Buffer
 	if pollErr := wait.PollImmediate(Poll, timeout, func() (bool, error) {
@@ -1028,6 +1056,7 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 	return false, fmt.Errorf("unexpected HTTP response code %s from health check responder at %s", resp.Status, url)
 }
 
+// TestHTTPHealthCheckNodePort tests a HTTP connection by the given request to the given host and port.
 func (j *ServiceTestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
 	count := 0
 	condition := func() (bool, error) {
@@ -1063,6 +1092,7 @@ type ServiceTestFixture struct {
 	Image    string
 }
 
+// NewServerTest creates a new ServiceTestFixture for the tests.
 func NewServerTest(client clientset.Interface, namespace string, serviceName string) *ServiceTestFixture {
 	t := &ServiceTestFixture{}
 	t.Client = client
@@ -1127,6 +1157,7 @@ func (t *ServiceTestFixture) DeleteService(serviceName string) error {
 	return err
 }
 
+// Cleanup cleans all ReplicationControllers and Services which this object holds.
 func (t *ServiceTestFixture) Cleanup() []error {
 	var errs []error
 	for rcName := range t.rcs {
@@ -1175,6 +1206,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	return errs
 }
 
+// GetIngressPoint returns a host on which ingress serves.
 func GetIngressPoint(ing *v1.LoadBalancerIngress) string {
 	host := ing.IP
 	if host == "" {
@@ -1206,6 +1238,7 @@ func UpdateService(c clientset.Interface, namespace, serviceName string, update 
 	return service, err
 }
 
+// GetContainerPortsByPodUID returns a PortsByPodUID map on the given endpoints.
 func GetContainerPortsByPodUID(endpoints *v1.Endpoints) PortsByPodUID {
 	m := PortsByPodUID{}
 	for _, ss := range endpoints.Subsets {
@@ -1222,7 +1255,10 @@ func GetContainerPortsByPodUID(endpoints *v1.Endpoints) PortsByPodUID {
 	return m
 }
 
+// PortsByPodName maps pod name to ports.
 type PortsByPodName map[string][]int
+
+// PortsByPodUID maps UID to ports.
 type PortsByPodUID map[types.UID][]int
 
 func translatePodNameToUIDOrFail(c clientset.Interface, ns string, expectedEndpoints PortsByPodName) PortsByPodUID {
@@ -1261,6 +1297,7 @@ func validatePortsOrFail(endpoints PortsByPodUID, expectedEndpoints PortsByPodUI
 	}
 }
 
+// ValidateEndpointsOrFail validates that the given service exists and is served by the given expectedEndpoints.
 func ValidateEndpointsOrFail(c clientset.Interface, namespace, serviceName string, expectedEndpoints PortsByPodName) {
 	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
 	i := 1
@@ -1348,6 +1385,7 @@ func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string
 	return podNames, serviceIP, nil
 }
 
+// StopServeHostnameService stops the given service.
 func StopServeHostnameService(clientset clientset.Interface, ns, name string) error {
 	if err := DeleteRCAndWaitForGC(clientset, ns, name); err != nil {
 		return err
@@ -1439,6 +1477,7 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 	return nil
 }
 
+// VerifyServeHostnameServiceDown verifies that the given service isn't served.
 func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceIP string, servicePort int) error {
 	ipPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
 	// The current versions of curl included in CentOS and RHEL distros
@@ -1466,6 +1505,7 @@ func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zo
 	TestContext.CloudConfig.Provider.CleanupServiceResources(c, loadBalancerName, region, zone)
 }
 
+// DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
 	Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := RunKubectl(
@@ -1473,6 +1513,7 @@ func DescribeSvc(ns string) {
 	Logf(desc)
 }
 
+// CreateServiceSpec returns a Service object for testing.
 func CreateServiceSpec(serviceName, externalName string, isHeadless bool, selector map[string]string) *v1.Service {
 	headlessService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1502,6 +1543,7 @@ func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(sv
 	return TestContext.CloudConfig.Provider.EnableAndDisableInternalLB()
 }
 
+// GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
 func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
 	if nodes := GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > LargeClusterMinNodesNumber {
 		return LoadBalancerCreateTimeoutLarge

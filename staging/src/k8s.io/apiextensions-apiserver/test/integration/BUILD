@@ -14,6 +14,7 @@ go_test(
         "change_test.go",
         "finalization_test.go",
         "objectmeta_test.go",
+        "pruning_test.go",
         "registration_test.go",
         "subresources_test.go",
         "table_test.go",
@@ -54,6 +55,7 @@ go_test(
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

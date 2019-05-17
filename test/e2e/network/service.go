@@ -108,7 +108,7 @@ var _ = SIGDescribe("Services", func() {
 	*/
 	framework.ConformanceIt("should provide secure master service ", func() {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to fetch the service object for the service named kubernetes")
+		framework.ExpectNoError(err, "failed to fetch the service object for the service named kubernetes")
 	})
 
 	/*
@@ -128,7 +128,7 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("creating service " + serviceName + " in namespace " + ns)
 		defer func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 		ports := []v1.ServicePort{{
 			Port:       80,
@@ -136,7 +136,7 @@ var _ = SIGDescribe("Services", func() {
 		}}
 		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
 
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service with ServicePorts in namespace: %s", ns)
+		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
 
 		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
 
@@ -144,7 +144,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			for name := range names {
 				err := cs.CoreV1().Pods(ns).Delete(name, nil)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s in namespace: %s", name, ns)
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
 			}
 		}()
 
@@ -181,7 +181,7 @@ var _ = SIGDescribe("Services", func() {
 
 		defer func() {
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 
 		labels := map[string]string{"foo": "bar"}
@@ -203,7 +203,7 @@ var _ = SIGDescribe("Services", func() {
 			},
 		}
 		_, err := jig.CreateServiceWithServicePort(labels, ns, ports)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service with ServicePorts in namespace: %s", ns)
+		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
 		port1 := 100
 		port2 := 101
 		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
@@ -212,7 +212,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			for name := range names {
 				err := cs.CoreV1().Pods(ns).Delete(name, nil)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s in namespace: %s", name, ns)
+				framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", name, ns)
 			}
 		}()
 
@@ -272,7 +272,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the sourceip test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 		serviceIP := tcpService.Spec.ClusterIP
 		e2elog.Logf("sourceip-test cluster ip: %s", serviceIP)
@@ -293,7 +293,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the echo server pod")
 			err := cs.CoreV1().Pods(ns).Delete(serverPodName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s on node: %s", serverPodName, node1.Name)
+			framework.ExpectNoError(err, "failed to delete pod: %s on node: %s", serverPodName, node1.Name)
 		}()
 
 		// Waiting for service to expose endpoint.
@@ -322,13 +322,13 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating service1 in namespace " + ns)
 		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service1"), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 		ginkgo.By("creating service2 in namespace " + ns)
 		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service2"), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
 		hosts, err := e2essh.NodeSSHHosts(cs)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to find external/internal IPs for every node")
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
@@ -352,7 +352,7 @@ var _ = SIGDescribe("Services", func() {
 		// Start another service and verify both are up.
 		ginkgo.By("creating service3 in namespace " + ns)
 		podNames3, svc3IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service3"), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc3IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc3IP, ns)
 
 		if svc2IP == svc3IP {
 			framework.Failf("service IPs conflict: %v", svc2IP)
@@ -379,20 +379,20 @@ var _ = SIGDescribe("Services", func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, svc1))
 		}()
 		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService(svc1), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 
 		defer func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, svc2))
 		}()
 		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService(svc2), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
 
 		hosts, err := e2essh.NodeSSHHosts(cs)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to find external/internal IPs for every node")
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
@@ -432,10 +432,10 @@ var _ = SIGDescribe("Services", func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service1"))
 		}()
 		podNames1, svc1IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service1"), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1IP, ns)
 
 		hosts, err := e2essh.NodeSSHHosts(cs)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to find external/internal IPs for every node")
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
@@ -459,7 +459,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.ExpectNoError(framework.StopServeHostnameService(f.ClientSet, ns, "service2"))
 		}()
 		podNames2, svc2IP, err := framework.StartServeHostnameService(cs, getServeHostnameService("service2"), ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2IP, ns)
 
 		if svc1IP == svc2IP {
 			framework.Failf("VIPs conflict: %v", svc1IP)
@@ -527,7 +527,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating a second namespace")
 		namespacePtr, err := f.CreateNamespace("services", nil)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace")
+		framework.ExpectNoError(err, "failed to create namespace")
 		ns2 := namespacePtr.Name // LB2 in ns2 on UDP
 		e2elog.Logf("namespace for UDP test: %s", ns2)
 
@@ -592,7 +592,7 @@ var _ = SIGDescribe("Services", func() {
 			ginkgo.By("creating a static load balancer IP")
 			staticIPName = fmt.Sprintf("e2e-external-lb-test-%s", framework.RunID)
 			gceCloud, err := gce.GetGCECloud()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get GCE cloud provider")
+			framework.ExpectNoError(err, "failed to get GCE cloud provider")
 
 			err = gceCloud.ReserveRegionAddress(&compute.Address{Name: staticIPName}, gceCloud.Region())
 			defer func() {
@@ -603,9 +603,9 @@ var _ = SIGDescribe("Services", func() {
 					}
 				}
 			}()
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create region address: %s", staticIPName)
+			framework.ExpectNoError(err, "failed to create region address: %s", staticIPName)
 			reservedAddr, err := gceCloud.GetRegionAddress(staticIPName, gceCloud.Region())
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get region address: %s", staticIPName)
+			framework.ExpectNoError(err, "failed to get region address: %s", staticIPName)
 
 			requestedIP = reservedAddr.Address
 			e2elog.Logf("Allocated static load balancer IP: %s", requestedIP)
@@ -649,7 +649,7 @@ var _ = SIGDescribe("Services", func() {
 			ginkgo.By("demoting the static IP to ephemeral")
 			if staticIPName != "" {
 				gceCloud, err := gce.GetGCECloud()
-				gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to get GCE cloud provider")
+				framework.ExpectNoError(err, "failed to get GCE cloud provider")
 				// Deleting it after it is attached "demotes" it to an
 				// ephemeral IP, which can be auto-released.
 				if err := gceCloud.DeleteRegionAddress(staticIPName, gceCloud.Region()); err != nil {
@@ -880,7 +880,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the updating NodePorts test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
 		svcPort := int(tcpService.Spec.Ports[0].Port)
@@ -927,7 +927,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the ExternalName to ClusterIP test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 		ginkgo.By("changing the ExternalName service to type=ClusterIP")
@@ -951,7 +951,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the ExternalName to NodePort test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(externalNameService, v1.ServiceTypeExternalName)
 		ginkgo.By("changing the ExternalName service to type=NodePort")
@@ -975,7 +975,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the ClusterIP to ExternalName test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(clusterIPService, v1.ServiceTypeClusterIP)
 		ginkgo.By("changing the ClusterIP service to type=ExternalName")
@@ -999,7 +999,7 @@ var _ = SIGDescribe("Services", func() {
 		defer func() {
 			e2elog.Logf("Cleaning up the NodePort to ExternalName test service")
 			err := cs.CoreV1().Services(ns).Delete(serviceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service %s in namespace %s", serviceName, ns)
+			framework.ExpectNoError(err, "failed to delete service %s in namespace %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(nodePortService, v1.ServiceTypeNodePort)
 		ginkgo.By("changing the NodePort service to type=ExternalName")
@@ -1049,7 +1049,7 @@ var _ = SIGDescribe("Services", func() {
 			},
 		}
 		result, err := t.CreateService(service)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if len(result.Spec.Ports) != 2 {
 			framework.Failf("got unexpected len(Spec.Ports) for new service: %v", result)
@@ -1079,7 +1079,7 @@ var _ = SIGDescribe("Services", func() {
 		service := t.BuildServiceSpec()
 		service.Spec.Type = v1.ServiceTypeNodePort
 		result, err := t.CreateService(service)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s in namespace: %s", serviceName1, ns)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName1, ns)
 
 		if result.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", result)
@@ -1106,11 +1106,11 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("deleting service " + serviceName1 + " to release NodePort")
 		err = t.DeleteService(serviceName1)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName1, ns)
+		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName1, ns)
 
 		ginkgo.By("creating service " + serviceName2 + " with no-longer-conflicting NodePort")
 		_, err = t.CreateService(service2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s in namespace: %s", serviceName1, ns)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName1, ns)
 	})
 
 	ginkgo.It("should check NodePort out-of-range", func() {
@@ -1132,7 +1132,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		service, err := t.CreateService(service)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
@@ -1168,7 +1168,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By(fmt.Sprintf("creating service "+serviceName+" with out-of-range NodePort %d", outOfRangeNodePort))
 		service = t.BuildServiceSpec()
@@ -1200,7 +1200,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("creating service " + serviceName + " with type NodePort in namespace " + ns)
 		service, err := t.CreateService(service)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 
 		if service.Spec.Type != v1.ServiceTypeNodePort {
 			framework.Failf("got unexpected Spec.Type for new service: %v", service)
@@ -1219,7 +1219,7 @@ var _ = SIGDescribe("Services", func() {
 
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
 		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
@@ -1241,7 +1241,7 @@ var _ = SIGDescribe("Services", func() {
 		service.Spec.Type = v1.ServiceTypeNodePort
 		service.Spec.Ports[0].NodePort = nodePort
 		service, err = t.CreateService(service)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create service: %s in namespace: %s", serviceName, ns)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
 
 	ginkgo.It("should create endpoints for unready pods", func() {
@@ -1413,9 +1413,9 @@ var _ = SIGDescribe("Services", func() {
 		dropPodName := framework.CreateExecPodOrFail(cs, namespace, "execpod-drop", nil)
 
 		acceptPod, err := cs.CoreV1().Pods(namespace).Get(acceptPodName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to fetch pod: %s in namespace: %s", acceptPodName, namespace)
+		framework.ExpectNoError(err, "failed to fetch pod: %s in namespace: %s", acceptPodName, namespace)
 		dropPod, err := cs.CoreV1().Pods(namespace).Get(dropPodName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to fetch pod: %s in namespace: %s", dropPodName, namespace)
+		framework.ExpectNoError(err, "failed to fetch pod: %s in namespace: %s", dropPodName, namespace)
 
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
 		// This container is an nginx container listening on port 80
@@ -1433,7 +1433,8 @@ var _ = SIGDescribe("Services", func() {
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err = cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
@@ -1615,7 +1616,8 @@ var _ = SIGDescribe("Services", func() {
 			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeNodePort
 			})
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err = cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, framework.LoadBalancerCreateTimeoutDefault)
@@ -1743,17 +1745,17 @@ var _ = SIGDescribe("Services", func() {
 		svcDisabled := getServeHostnameService("service-disabled")
 		svcDisabled.ObjectMeta.Labels = serviceProxyNameLabels
 		_, svcDisabledIP, err := framework.StartServeHostnameService(cs, svcDisabled, ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svcDisabledIP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcDisabledIP, ns)
 
 		ginkgo.By("creating service in namespace " + ns)
 		svcToggled := getServeHostnameService("service")
 		podToggledNames, svcToggledIP, err := framework.StartServeHostnameService(cs, svcToggled, ns, numPods)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service: %s in the namespace: %s", svcToggledIP, ns)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcToggledIP, ns)
 
 		jig := framework.NewServiceTestJig(cs, svcToggled.ObjectMeta.Name)
 
 		hosts, err := e2essh.NodeSSHHosts(cs)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to find external/internal IPs for every node")
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
 		}
@@ -1834,7 +1836,7 @@ var _ = SIGDescribe("Services", func() {
 			}
 			return true, errors.New("expected wget call to fail")
 		}); pollErr != nil {
-			gomega.Expect(pollErr).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(pollErr)
 		}
 	})
 
@@ -1887,9 +1889,11 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 			// Make sure we didn't leak the health check node port.
 			threshold := 2
 			for _, ips := range jig.GetEndpointNodes(svc) {
-				gomega.Expect(jig.TestHTTPHealthCheckNodePort(ips[0], healthCheckNodePort, "/healthz", framework.KubeProxyEndpointLagTimeout, false, threshold)).NotTo(gomega.HaveOccurred())
+				err := jig.TestHTTPHealthCheckNodePort(ips[0], healthCheckNodePort, "/healthz", framework.KubeProxyEndpointLagTimeout, false, threshold)
+				framework.ExpectNoError(err)
 			}
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		svcTCPPort := int(svc.Spec.Ports[0].Port)
@@ -1913,7 +1917,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 
 		svc := jig.CreateOnlyLocalNodePortService(namespace, serviceName, true)
 		defer func() {
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		tcpNodePort := int(svc.Spec.Ports[0].NodePort)
@@ -1951,7 +1956,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		healthCheckNodePort := int(svc.Spec.HealthCheckNodePort)
@@ -1990,7 +1996,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 				port := strconv.Itoa(healthCheckNodePort)
 				ipPort := net.JoinHostPort(publicIP, port)
 				e2elog.Logf("Health checking %s, http://%s%s, expectedSuccess %v", nodes.Items[n].Name, ipPort, path, expectedSuccess)
-				gomega.Expect(jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)).NotTo(gomega.HaveOccurred())
+				err := jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, path, framework.KubeProxyEndpointLagTimeout, expectedSuccess, threshold)
+				framework.ExpectNoError(err)
 			}
 			framework.ExpectNoError(framework.DeleteRCAndWaitForGC(f.ClientSet, namespace, serviceName))
 		}
@@ -2006,7 +2013,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		ingressIP := framework.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
@@ -2022,7 +2030,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		})
 		defer func() {
 			err := cs.CoreV1().Pods(namespace).Delete(execPodName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s", execPodName)
+			framework.ExpectNoError(err, "failed to delete pod: %s", execPodName)
 		}()
 		execPod, err := f.ClientSet.CoreV1().Pods(namespace).Get(execPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -2059,7 +2067,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		serviceLBNames = append(serviceLBNames, cloudprovider.DefaultLoadBalancerName(svc))
 		defer func() {
 			jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, loadBalancerCreateTimeout)
-			gomega.Expect(cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)).NotTo(gomega.HaveOccurred())
+			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
+			framework.ExpectNoError(err)
 		}()
 
 		// save the health check node port because it disappears when ESIPP is turned off.
@@ -2161,7 +2170,7 @@ func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeNam
 	defer func() {
 		e2elog.Logf("Cleaning up the exec pod")
 		err := c.CoreV1().Pods(ns).Delete(execPodName, nil)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s", execPodName)
+		framework.ExpectNoError(err, "failed to delete pod: %s", execPodName)
 	}()
 	execPod, err := f.ClientSet.CoreV1().Pods(ns).Get(execPodName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -2217,13 +2226,13 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	serviceType := svc.Spec.Type
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	_, _, err := framework.StartServeHostnameService(cs, svc, ns, numPods)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service in the namespace: %s", ns)
+	framework.ExpectNoError(err, "failed to create replication controller with service in the namespace: %s", ns)
 	defer func() {
 		framework.StopServeHostnameService(cs, ns, serviceName)
 	}()
 	jig := framework.NewServiceTestJig(cs, serviceName)
 	svc, err = jig.Client.CoreV1().Services(ns).Get(serviceName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to fetch service: %s in namespace: %s", serviceName, ns)
+	framework.ExpectNoError(err, "failed to fetch service: %s in namespace: %s", serviceName, ns)
 	var svcIP string
 	if serviceType == v1.ServiceTypeNodePort {
 		nodes := framework.GetReadySchedulableNodesOrDie(cs)
@@ -2239,10 +2248,10 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	defer func() {
 		e2elog.Logf("Cleaning up the exec pod")
 		err := cs.CoreV1().Pods(ns).Delete(execPodName, nil)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod: %s in namespace: %s", execPodName, ns)
+		framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", execPodName, ns)
 	}()
 	execPod, err := cs.CoreV1().Pods(ns).Get(execPodName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to fetch pod: %s in namespace: %s", execPodName, ns)
+	framework.ExpectNoError(err, "failed to fetch pod: %s in namespace: %s", execPodName, ns)
 
 	if !isTransitionTest {
 		gomega.Expect(framework.CheckAffinity(jig, execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
@@ -2276,7 +2285,7 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	ginkgo.By("creating service in namespace " + ns)
 	svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 	_, _, err := framework.StartServeHostnameService(cs, svc, ns, numPods)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create replication controller with service in the namespace: %s", ns)
+	framework.ExpectNoError(err, "failed to create replication controller with service in the namespace: %s", ns)
 	jig := framework.NewServiceTestJig(cs, serviceName)
 	ginkgo.By("waiting for loadbalancer for service " + ns + "/" + serviceName)
 	svc = jig.WaitForLoadBalancerOrFail(ns, serviceName, framework.LoadBalancerCreateTimeoutDefault)

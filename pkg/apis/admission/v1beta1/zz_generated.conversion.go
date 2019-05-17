@@ -90,6 +90,9 @@ func autoConvert_v1beta1_AdmissionRequest_To_admission_AdmissionRequest(in *v1be
 		return err
 	}
 	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Options, &out.Options, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -117,6 +120,9 @@ func autoConvert_admission_AdmissionRequest_To_v1beta1_AdmissionRequest(in *admi
 		return err
 	}
 	out.DryRun = (*bool)(unsafe.Pointer(in.DryRun))
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Options, &out.Options, s); err != nil {
+		return err
+	}
 	return nil
 }
 

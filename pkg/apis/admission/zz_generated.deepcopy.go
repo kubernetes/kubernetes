@@ -42,6 +42,9 @@ func (in *AdmissionRequest) DeepCopyInto(out *AdmissionRequest) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.Options != nil {
+		out.Options = in.Options.DeepCopyObject()
+	}
 	return
 }
 

@@ -17,6 +17,7 @@ limitations under the License.
 package certificate
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
@@ -148,9 +149,13 @@ type CSRClientFunc func(current *tls.Certificate) (certificatesclient.Certificat
 func (e *NoCertKeyError) Error() string { return string(*e) }
 
 type manager struct {
-	getTemplate     func() *x509.CertificateRequest
-	lastRequestLock sync.Mutex
-	lastRequest     *x509.CertificateRequest
+	getTemplate func() *x509.CertificateRequest
+
+	// lastRequestLock guards lastRequestCancel and lastRequest
+	lastRequestLock   sync.Mutex
+	lastRequestCancel context.CancelFunc
+	lastRequest       *x509.CertificateRequest
+
 	dynamicTemplate bool
 	usages          []certificates.KeyUsage
 	forceRotation   bool
@@ -261,7 +266,8 @@ func (m *manager) Start() {
 			case <-timer.C:
 				// unblock when deadline expires
 			case <-templateChanged:
-				if reflect.DeepEqual(m.getLastRequest(), m.getTemplate()) {
+				_, lastRequestTemplate := m.getLastRequest()
+				if reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
 					// if the template now matches what we last requested, restart the rotation deadline loop
 					return
 				}
@@ -289,10 +295,19 @@ func (m *manager) Start() {
 	if m.dynamicTemplate {
 		go wait.Until(func() {
 			// check if the current template matches what we last requested
-			if !m.certSatisfiesTemplate() && !reflect.DeepEqual(m.getLastRequest(), m.getTemplate()) {
+			lastRequestCancel, lastRequestTemplate := m.getLastRequest()
+
+			if !m.certSatisfiesTemplate() && !reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
 				// if the template is different, queue up an interrupt of the rotation deadline loop.
 				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
-				templateChanged <- struct{}{}
+				if lastRequestCancel != nil {
+					// if we're currently waiting on a submitted request that no longer matches what we want, stop waiting
+					lastRequestCancel()
+				}
+				select {
+				case templateChanged <- struct{}{}:
+				case <-m.stopCh:
+				}
 			}
 		}, time.Second, m.stopCh)
 	}
@@ -386,12 +401,15 @@ func (m *manager) rotateCerts() (bool, error) {
 		return false, m.updateServerError(err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), certificateWaitTimeout)
+	defer cancel()
+
 	// Once we've successfully submitted a CSR for this template, record that we did so
-	m.setLastRequest(template)
+	m.setLastRequest(cancel, template)
 
 	// Wait for the certificate to be signed. This interface and internal timout
 	// is a remainder after the old design using raw watch wrapped with backoff.
-	crtPEM, err := csr.WaitForCertificate(client, req, certificateWaitTimeout)
+	crtPEM, err := csr.WaitForCertificate(ctx, client, req)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Certificate request was not signed: %v", err))
 		return false, nil
@@ -561,14 +579,15 @@ func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byt
 	return template, csrPEM, keyPEM, privateKey, nil
 }
 
-func (m *manager) getLastRequest() *x509.CertificateRequest {
+func (m *manager) getLastRequest() (context.CancelFunc, *x509.CertificateRequest) {
 	m.lastRequestLock.Lock()
 	defer m.lastRequestLock.Unlock()
-	return m.lastRequest
+	return m.lastRequestCancel, m.lastRequest
 }
 
-func (m *manager) setLastRequest(r *x509.CertificateRequest) {
+func (m *manager) setLastRequest(cancel context.CancelFunc, r *x509.CertificateRequest) {
 	m.lastRequestLock.Lock()
 	defer m.lastRequestLock.Unlock()
+	m.lastRequestCancel = cancel
 	m.lastRequest = r
 }

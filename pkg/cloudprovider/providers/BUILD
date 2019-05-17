@@ -36,7 +36,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/cloudprovider/providers/cloudstack:all-srcs",
-        "//pkg/cloudprovider/providers/fake:all-srcs",
         "//pkg/cloudprovider/providers/openstack:all-srcs",
         "//pkg/cloudprovider/providers/ovirt:all-srcs",
         "//pkg/cloudprovider/providers/photon:all-srcs",

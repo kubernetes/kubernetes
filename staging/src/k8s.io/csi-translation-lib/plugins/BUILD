@@ -13,6 +13,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume:go_default_library",
     ],
@@ -34,6 +35,13 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["aws_ebs_test.go"],
+    srcs = [
+        "aws_ebs_test.go",
+        "gce_pd_test.go",
+    ],
     embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/storage/v1:go_default_library",
+    ],
 )

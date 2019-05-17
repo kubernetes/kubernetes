@@ -23,18 +23,18 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = framework.KubeDescribe("GKE node pools [Feature:GKENodePool]", func() {
 
 	f := framework.NewDefaultFramework("node-pools")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gke")
 	})
 
-	It("should create a cluster with multiple node pools [Feature:GKENodePool]", func() {
+	ginkgo.It("should create a cluster with multiple node pools [Feature:GKENodePool]", func() {
 		e2elog.Logf("Start create node pool test")
 		testCreateDeleteNodePool(f, "test-pool")
 	})

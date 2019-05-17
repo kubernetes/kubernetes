@@ -46,7 +46,7 @@ message ConversionRequest {
 // ConversionResponse describes a conversion response.
 message ConversionResponse {
   // `uid` is an identifier for the individual request/response.
-  // This should be copied over from the corresponding AdmissionRequest.
+  // This should be copied over from the corresponding ConversionRequest.
   optional string uid = 1;
 
   // `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
@@ -247,6 +247,12 @@ message CustomResourceDefinitionSpec {
   // `conversion` defines conversion settings for the CRD.
   // +optional
   optional CustomResourceConversion conversion = 9;
+
+  // preserveUnknownFields disables pruning of object fields which are not
+  // specified in the OpenAPI schema. apiVersion, kind, metadata and known
+  // fields inside metadata are always preserved.
+  // Defaults to true in v1beta and will default to false in v1.
+  optional bool preserveUnknownFields = 10;
 }
 
 // CustomResourceDefinitionStatus indicates the state of the CustomResourceDefinition

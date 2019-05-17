@@ -61,7 +61,8 @@ type AdmissionRequest struct {
 	// Namespace is the namespace associated with the request (if any).
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,6,opt,name=namespace"`
-	// Operation is the operation being performed
+	// Operation is the operation being performed. This may be different than the operation
+	// requested. e.g. a patch can result in either a CREATE or UPDATE Operation.
 	Operation Operation `json:"operation" protobuf:"bytes,7,opt,name=operation"`
 	// UserInfo is information about the requesting user
 	UserInfo authenticationv1.UserInfo `json:"userInfo" protobuf:"bytes,8,opt,name=userInfo"`
@@ -75,6 +76,13 @@ type AdmissionRequest struct {
 	// Defaults to false.
 	// +optional
 	DryRun *bool `json:"dryRun,omitempty" protobuf:"varint,11,opt,name=dryRun"`
+	// Options is the operation option structure of the operation being performed.
+	// e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be
+	// different than the options the caller provided. e.g. for a patch request the performed
+	// Operation might be a CREATE, in which case the Options will a
+	// `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.
+	// +optional
+	Options runtime.RawExtension `json:"options,omitempty" protobuf:"bytes,12,opt,name=options"`
 }
 
 // AdmissionResponse describes an admission response.

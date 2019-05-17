@@ -208,6 +208,7 @@ func TestAdmission(t *testing.T) {
 			api.Resource("persistentvolumeclaims").WithVersion("version"),
 			"", // subresource
 			admission.Create,
+			&metav1.CreateOptions{},
 			false, // dryRun
 			nil,   // userInfo
 		)

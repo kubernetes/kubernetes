@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/pointer"
 )
 
 var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
@@ -68,6 +69,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if obj.Conversion.Strategy == apiextensions.WebhookConverter && len(obj.Conversion.ConversionReviewVersions) == 0 {
 				obj.Conversion.ConversionReviewVersions = []string{"v1beta1"}
+			}
+			if obj.PreserveUnknownFields == nil {
+				obj.PreserveUnknownFields = pointer.BoolPtr(true)
 			}
 		},
 		func(obj *apiextensions.CustomResourceDefinition, c fuzz.Continue) {

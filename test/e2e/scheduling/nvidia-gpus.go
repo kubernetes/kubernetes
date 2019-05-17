@@ -30,8 +30,8 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -42,7 +42,7 @@ const (
 
 var (
 	gpuResourceName v1.ResourceName
-	dsYamlUrl       string
+	dsYamlURL       string
 )
 
 func makeCudaAdditionDevicePluginTestPod() *v1.Pod {
@@ -116,21 +116,22 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 	return gpusAvailable
 }
 
+// SetupNVIDIAGPUNode install Nvidia Drivers and wait for Nvidia GPUs to be available on nodes
 func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
 	logOSImages(f)
 
-	dsYamlUrlFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
-	if dsYamlUrlFromEnv != "" {
-		dsYamlUrl = dsYamlUrlFromEnv
+	dsYamlURLFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
+	if dsYamlURLFromEnv != "" {
+		dsYamlURL = dsYamlURLFromEnv
 	} else {
-		dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
+		dsYamlURL = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml"
 	}
 	gpuResourceName = gpu.NVIDIAGPUResourceName
 
-	e2elog.Logf("Using %v", dsYamlUrl)
+	e2elog.Logf("Using %v", dsYamlURL)
 	// Creates the DaemonSet that installs Nvidia Drivers.
-	ds, err := framework.DsFromManifest(dsYamlUrl)
-	Expect(err).NotTo(HaveOccurred())
+	ds, err := framework.DsFromManifest(dsYamlURL)
+	gomega.Expect(err).NotTo(gomega.HaveOccurred())
 	ds.Namespace = f.Namespace.Name
 	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ds)
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
@@ -155,9 +156,9 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 
 	// Wait for Nvidia GPUs to be available on nodes
 	e2elog.Logf("Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
-	Eventually(func() bool {
+	gomega.Eventually(func() bool {
 		return areGPUsAvailableOnAllSchedulableNodes(f)
-	}, driverInstallTimeout, time.Second).Should(BeTrue())
+	}, driverInstallTimeout, time.Second).Should(gomega.BeTrue())
 
 	return rsgather
 }
@@ -185,7 +186,7 @@ func testNvidiaGPUs(f *framework.Framework) {
 
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
-	It("run Nvidia GPU Device Plugin tests", func() {
+	ginkgo.It("run Nvidia GPU Device Plugin tests", func() {
 		testNvidiaGPUs(f)
 	})
 })

@@ -17,6 +17,7 @@ limitations under the License.
 package renewal
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -27,7 +28,7 @@ import (
 
 	certsapi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
 	certstype "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 	csrutil "k8s.io/client-go/util/certificate/csr"
@@ -38,20 +39,20 @@ const certAPIPrefixName = "kubeadm-cert"
 
 var watchTimeout = 5 * time.Minute
 
-// CertsAPIRenewal creates new certificates using the certs API
-type CertsAPIRenewal struct {
+// APIRenewer define a certificate renewer implementation that uses the K8s certificate API
+type APIRenewer struct {
 	client certstype.CertificatesV1beta1Interface
 }
 
-// NewCertsAPIRenawal takes a Kubernetes interface and returns a renewal Interface.
-func NewCertsAPIRenawal(client kubernetes.Interface) Interface {
-	return &CertsAPIRenewal{
+// NewAPIRenewer a new certificate renewer implementation that uses the K8s certificate API
+func NewAPIRenewer(client clientset.Interface) *APIRenewer {
+	return &APIRenewer{
 		client: client.CertificatesV1beta1(),
 	}
 }
 
-// Renew takes a certificate using the cert and key.
-func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
+// Renew a certificate using the K8s certificate API
+func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Signer, error) {
 	reqTmp := &x509.CertificateRequest{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -97,7 +98,10 @@ func (r *CertsAPIRenewal) Renew(cfg *certutil.Config) (*x509.Certificate, crypto
 
 	fmt.Printf("[certs] Certificate request %q created\n", req.Name)
 
-	certData, err := csrutil.WaitForCertificate(r.client.CertificateSigningRequests(), req, watchTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), watchTimeout)
+	defer cancel()
+
+	certData, err := csrutil.WaitForCertificate(ctx, r.client.CertificateSigningRequests(), req)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "certificate failed to appear")
 	}
