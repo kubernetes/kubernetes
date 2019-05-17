@@ -211,138 +211,73 @@ func TestDropDisabledSnapshotDataSource(t *testing.T) {
 	}
 }
 
-func TestDropDisabledPVCDataSource(t *testing.T) {
-	pvcWithoutDataSource := func() *core.PersistentVolumeClaim {
-		return &core.PersistentVolumeClaim{
-			Spec: core.PersistentVolumeClaimSpec{
-				DataSource: nil,
-			},
-		}
-	}
+// TestPVCDataSourceSpecFilter checks to ensure the DropDisabledFields function behaves correctly for PVCDataSource featuregate
+func TestPVCDataSourceSpecFilter(t *testing.T) {
 	apiGroup := ""
-	pvcWithDataSource := func() *core.PersistentVolumeClaim {
-		return &core.PersistentVolumeClaim{
-			Spec: core.PersistentVolumeClaimSpec{
-				DataSource: &core.TypedLocalObjectReference{
-					APIGroup: &apiGroup,
-					Kind:     "PersistentVolumeClaim",
-					Name:     "test_clone",
-				},
-			},
-		}
-	}
-
-	pvcInfo := []struct {
-		description   string
-		hasDataSource bool
-		pvc           func() *core.PersistentVolumeClaim
-	}{
-		{
-			description:   "pvc without DataSource",
-			hasDataSource: false,
-			pvc:           pvcWithoutDataSource,
+	validSpec := core.PersistentVolumeClaimSpec{
+		DataSource: &core.TypedLocalObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     "PersistentVolumeClaim",
+			Name:     "test_clone",
 		},
-		{
-			description:   "pvc with DataSource",
-			hasDataSource: true,
-			pvc:           pvcWithDataSource,
-		},
-		{
-			description:   "is nil",
-			hasDataSource: false,
-			pvc:           func() *core.PersistentVolumeClaim { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldpvcInfo := range pvcInfo {
-			for _, newpvcInfo := range pvcInfo {
-				oldPvcHasDataSource, oldpvc := oldpvcInfo.hasDataSource, oldpvcInfo.pvc()
-				newPvcHasDataSource, newpvc := newpvcInfo.hasDataSource, newpvcInfo.pvc()
-				if newpvc == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pvc %v, new pvc %v", enabled, oldpvcInfo.description, newpvcInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumePVCDataSource, enabled)()
-
-					var oldpvcSpec *core.PersistentVolumeClaimSpec
-					if oldpvc != nil {
-						oldpvcSpec = &oldpvc.Spec
-					}
-					DropDisabledFields(&newpvc.Spec, oldpvcSpec)
-
-					// old pvc should never be changed
-					if !reflect.DeepEqual(oldpvc, oldpvcInfo.pvc()) {
-						t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldpvc, oldpvcInfo.pvc()))
-					}
-
-					switch {
-					case enabled || oldPvcHasDataSource:
-						// new pvc should not be changed if the feature is enabled, or if the old pvc had DataSource
-						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
-						}
-					case newPvcHasDataSource:
-						// new pvc should be changed
-						if reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc was not changed")
-						}
-						// new pvc should not have DataSource
-						if !reflect.DeepEqual(newpvc, pvcWithoutDataSource()) {
-							t.Errorf("new pvc had DataSource: %v", diff.ObjectReflectDiff(newpvc, pvcWithoutDataSource()))
-						}
-					default:
-						// new pvc should not need to be changed
-						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
-// TestDropInvalidPVCDataSource checks specifically for invalid APIGroup settings for PVCDataSource
-func TestDropInvalidPVCDataSource(t *testing.T) {
-	apiGroup := ""
-	pvcWithDataSource := func() *core.PersistentVolumeClaim {
-		return &core.PersistentVolumeClaim{
-			Spec: core.PersistentVolumeClaimSpec{
-				DataSource: &core.TypedLocalObjectReference{
-					APIGroup: &apiGroup,
-					Kind:     "PersistentVolumeClaim",
-					Name:     "test_clone",
-				},
-			},
-		}
 	}
 
 	invalidAPIGroup := "invalid.pvc.api.group"
-	pvcWithInvalidDataSource := func() *core.PersistentVolumeClaim {
-		return &core.PersistentVolumeClaim{
-			Spec: core.PersistentVolumeClaimSpec{
-				DataSource: &core.TypedLocalObjectReference{
-					APIGroup: &invalidAPIGroup,
-					Kind:     "PersistentVolumeClaim",
-					Name:     "test_clone_invalid",
-				},
-			},
-		}
-	}
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumePVCDataSource, true)()
-	validPvc := pvcWithDataSource()
-	originalDS := validPvc.Spec.DataSource
-	DropDisabledFields(&validPvc.Spec, nil)
-	if validPvc.Spec.DataSource == nil {
-		t.Errorf("valid PVC DataSource was dropped: Kind: %s, APIGroup: %s, Name: %s\n", originalDS.Kind, *originalDS.APIGroup, originalDS.Name)
+	invalidSpec := core.PersistentVolumeClaimSpec{
+		DataSource: &core.TypedLocalObjectReference{
+			APIGroup: &invalidAPIGroup,
+			Kind:     "PersistentVolumeClaim",
+			Name:     "test_clone_invalid",
+		},
 	}
 
-	invalidPvc := pvcWithInvalidDataSource()
-	originalDS = invalidPvc.Spec.DataSource
-	DropDisabledFields(&invalidPvc.Spec, nil)
-	if invalidPvc.Spec.DataSource != nil {
-		t.Errorf("invalid PVC DataSource was not dropped: Kind: %s, APIGroup: %s, Name: %s\n", originalDS.Kind, *originalDS.APIGroup, originalDS.Name)
+	var tests = map[string]struct {
+		spec        core.PersistentVolumeClaimSpec
+		gateEnabled bool
+		want        *core.TypedLocalObjectReference
+	}{
+		"enabled with empty ds": {
+			spec:        core.PersistentVolumeClaimSpec{},
+			gateEnabled: true,
+			want:        nil,
+		},
+		"enabled with invalid spec": {
+			spec:        invalidSpec,
+			gateEnabled: true,
+			want:        nil,
+		},
+		"enabled with valid spec": {
+			spec:        validSpec,
+			gateEnabled: true,
+			want:        validSpec.DataSource,
+		},
+		"disabled with invalid spec": {
+			spec:        invalidSpec,
+			gateEnabled: false,
+			want:        nil,
+		},
+		"disabled with valid spec": {
+			spec:        validSpec,
+			gateEnabled: false,
+			want:        nil,
+		},
+		"diabled with empty ds": {
+			spec:        core.PersistentVolumeClaimSpec{},
+			gateEnabled: false,
+			want:        nil,
+		},
 	}
+
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumePVCDataSource, test.gateEnabled)()
+			DropDisabledFields(&test.spec, nil)
+			if test.spec.DataSource != test.want {
+				t.Errorf("expected drop datasource condition was not met, test: %s, gateEnabled: %v, spec: %v, expected: %v", testName, test.gateEnabled, test.spec, test.want)
+			}
+
+		})
+
+	}
+
 }
