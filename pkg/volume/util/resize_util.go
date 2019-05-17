@@ -59,24 +59,24 @@ func UpdatePVSize(
 
 	oldData, err := json.Marshal(pvClone)
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling old PV %q with error : %v", pvClone.Name, err)
+		return fmt.Errorf("unexpected error marshaling old PV %q with error : %v", pvClone.Name, err)
 	}
 
 	pvClone.Spec.Capacity[v1.ResourceStorage] = newSize
 
 	newData, err := json.Marshal(pvClone)
 	if err != nil {
-		return fmt.Errorf("Unexpected error marshaling new PV %q with error : %v", pvClone.Name, err)
+		return fmt.Errorf("unexpected error marshaling new PV %q with error : %v", pvClone.Name, err)
 	}
 
 	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvClone)
 	if err != nil {
-		return fmt.Errorf("Error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
+		return fmt.Errorf("error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
 	}
 
 	_, err = kubeClient.CoreV1().PersistentVolumes().Patch(pvClone.Name, types.StrategicMergePatchType, patchBytes)
 	if err != nil {
-		return fmt.Errorf("Error Patching PV %q with error : %v", pvClone.Name, err)
+		return fmt.Errorf("error Patching PV %q with error : %v", pvClone.Name, err)
 	}
 	return nil
 }
@@ -144,13 +144,13 @@ func PatchPVCStatus(
 	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
 	patchBytes, err := createPVCPatch(oldPVC, newPVC)
 	if err != nil {
-		return nil, fmt.Errorf("PatchPVCStatus failed to patch PVC %q: %v", oldPVC.Name, err)
+		return nil, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %v", oldPVC.Name, err)
 	}
 
 	updatedClaim, updateErr := kubeClient.CoreV1().PersistentVolumeClaims(oldPVC.Namespace).
 		Patch(oldPVC.Name, types.StrategicMergePatchType, patchBytes, "status")
 	if updateErr != nil {
-		return nil, fmt.Errorf("PatchPVCStatus failed to patch PVC %q: %v", oldPVC.Name, updateErr)
+		return nil, fmt.Errorf("patchPVCStatus failed to patch PVC %q: %v", oldPVC.Name, updateErr)
 	}
 	return updatedClaim, nil
 }
