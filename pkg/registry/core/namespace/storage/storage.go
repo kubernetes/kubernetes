@@ -33,6 +33,7 @@ import (
 	storageerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -68,6 +69,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *Finaliz
 		UpdateStrategy:      namespace.Strategy,
 		DeleteStrategy:      namespace.Strategy,
 		ReturnDeletedObject: true,
+
+		ShouldDeleteDuringUpdate: ShouldDeleteNamespaceDuringUpdate,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -236,6 +239,16 @@ func (r *REST) Delete(ctx context.Context, name string, options *metav1.DeleteOp
 		return nil, false, err
 	}
 	return r.store.Delete(ctx, name, options)
+}
+
+// ShouldDeleteNamespaceDuringUpdate adds namespace-specific spec.finalizer checks on top of the default generic ShouldDeleteDuringUpdate behavior
+func ShouldDeleteNamespaceDuringUpdate(ctx context.Context, key string, obj, existing runtime.Object) bool {
+	ns, ok := obj.(*api.Namespace)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected type %T", obj))
+		return false
+	}
+	return len(ns.Spec.Finalizers) == 0 && genericregistry.ShouldDeleteDuringUpdate(ctx, key, obj, existing)
 }
 
 func shouldHaveOrphanFinalizer(options *metav1.DeleteOptions, haveOrphanFinalizer bool) bool {
