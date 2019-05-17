@@ -1325,12 +1325,6 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 		return pluginName, false, fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
 	}
 
-	// This metric recording is no longer necessary as a more accurate end
-	// to end latency should have been captured by "volume_operation_total_seconds"
-	// recorded when apiserver issues an "VolumeDeleted" event
-	// meanwhile, doDeleteVolume could be called from "provisionClaimOperation"
-	// when intree plugin faces error, which is not really a deletion operation
-	// leave it here for now for backward compatibility
 	opComplete := util.OperationCompleteHook(pluginName, "volume_delete")
 	err = deleter.Delete()
 	opComplete(&err)
@@ -1389,8 +1383,6 @@ func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName stri
 
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
-// TODO: the following function could be removed along with deprecation of
-//       in-tree workflow
 func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	claim *v1.PersistentVolumeClaim,
 	plugin vol.ProvisionableVolumePlugin,
@@ -1481,12 +1473,6 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	}
 	allowedTopologies := storageClass.AllowedTopologies
 
-	// This metric recording is no longer necessary as a more accurate end
-	// to end latency should have been captured by "volume_operation_total_seconds"
-	// recorded when apiserver issues an "VolumeDeleted" event
-	// meanwhile, doDeleteVolume could be called from "provisionClaimOperation"
-	// when intree plugin faces error, which is not really a deletion operation
-	// leave it here for now for backward compatibility
 	opComplete := util.OperationCompleteHook(plugin.GetPluginName(), "volume_provision")
 	volume, err = provisioner.Provision(selectedNode, allowedTopologies)
 	opComplete(&err)

@@ -209,7 +209,7 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 // deleteVolume runs in worker thread and handles "volume deleted" event.
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
 	_ = ctrl.volumes.store.Delete(volume)
-
+	klog.V(4).Infof("volume %q deleted", volume.Name)
 	// record deletion metric if a deletion start timestamp is in the cache
 	// the following calls will be a no-op if there is nothing for this volume in the cache
 	metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, nil)
@@ -219,12 +219,10 @@ func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume
 	if volume.Spec.ClaimRef == nil {
 		return
 	}
-
-	claimKey := claimrefToClaimKey(volume.Spec.ClaimRef)
-	klog.V(4).Infof("volume %q deleted", volume.Name)
 	// sync the claim when its volume is deleted. Explicitly syncing the
 	// claim here in response to volume deletion prevents the claim from
 	// waiting until the next sync period for its Lost status.
+	claimKey := claimrefToClaimKey(volume.Spec.ClaimRef)
 	klog.V(5).Infof("deleteVolume[%s]: scheduling sync of claim %q", volume.Name, claimKey)
 	ctrl.claimQueue.Add(claimKey)
 }
