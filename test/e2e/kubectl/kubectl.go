@@ -2261,14 +2261,14 @@ func startLocalProxy() (srv *httptest.Server, logs *bytes.Buffer) {
 func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCrd) error {
 	ns := fmt.Sprintf("--namespace=%v", namespace)
 	ginkgo.By("successfully create CR")
-	if _, err := framework.RunKubectlInput(resource, ns, "create", "-f", "-"); err != nil {
+	if _, err := framework.RunKubectlInput(resource, ns, "create", "--validate=true", "-f", "-"); err != nil {
 		return fmt.Errorf("failed to create CR %s in namespace %s: %v", resource, ns, err)
 	}
 	if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
 		return fmt.Errorf("failed to delete CR %s: %v", name, err)
 	}
 	ginkgo.By("successfully apply CR")
-	if _, err := framework.RunKubectlInput(resource, ns, "apply", "-f", "-"); err != nil {
+	if _, err := framework.RunKubectlInput(resource, ns, "apply", "--validate=true", "-f", "-"); err != nil {
 		return fmt.Errorf("failed to apply CR %s in namespace %s: %v", resource, ns, err)
 	}
 	if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, name); err != nil {
