@@ -163,7 +163,7 @@ var _ = Describe("[sig-storage] Downward API volume", func() {
 		podClient.CreateSync(pod)
 
 		pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "Failed to get pod %q", pod.Name)
+		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
