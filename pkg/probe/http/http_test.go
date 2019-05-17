@@ -347,14 +347,16 @@ func TestHTTPProbeChecker_HostHeaderPreservedAfterRedirect(t *testing.T) {
 		headers := http.Header{}
 		headers.Add("Host", test.hostHeader)
 		t.Run(desc+"local", func(t *testing.T) {
-			prober := New(false)
+			followNonLocalRedirects := false
+			prober := New(followNonLocalRedirects)
 			target, err := url.Parse(server.URL + "/redirect")
 			require.NoError(t, err)
 			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
 			assert.Equal(t, test.expectedResult, result)
 		})
 		t.Run(desc+"nonlocal", func(t *testing.T) {
-			prober := New(true)
+			followNonLocalRedirects := true
+			prober := New(followNonLocalRedirects)
 			target, err := url.Parse(server.URL + "/redirect")
 			require.NoError(t, err)
 			result, _, _ := prober.Probe(target, headers, wait.ForeverTestTimeout)
