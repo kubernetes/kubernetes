@@ -130,6 +130,54 @@ type CodecFactoryOptions struct {
 	Pretty bool
 }
 
+// CodecFactoryOptionsMutator takes a pointer to an options struct and then modifies it.
+// Functions implementing this type can be passed to the NewCodecFactory() constructor.
+type CodecFactoryOptionsMutator func(*CodecFactoryOptions)
+
+// EnablePretty enables including a pretty serializer along with the non-pretty one
+func EnablePretty(options *CodecFactoryOptions) {
+	options.Pretty = true
+}
+
+// DisablePretty disables including a pretty serializer along with the non-pretty one
+func DisablePretty(options *CodecFactoryOptions) {
+	options.Pretty = false
+}
+
+// EnableStrict enables configuring all serializers in strict mode
+func EnableStrict(options *CodecFactoryOptions) {
+	options.Strict = true
+}
+
+// DisableStrict disables configuring all serializers in strict mode
+func DisableStrict(options *CodecFactoryOptions) {
+	options.Strict = false
+}
+
+// NewCodecFactory provides methods for retrieving serializers for the supported wire formats
+// and conversion wrappers to define preferred internal and external versions. In the future,
+// as the internal version is used less, callers may instead use a defaulting serializer and
+// only convert objects which are shared internally (Status, common API machinery).
+//
+// Mutators can be passed to change the CodecFactoryOptions before construction of the factory.
+// It is recommended to explicitly pass mutators instead of relying on defaults.
+// Legacy Behavior: when no mutators are passed, `WithPretty` is enabled and `WithStrict` is disabled.
+//
+// TODO: allow other codecs to be compiled in?
+// TODO: accept a scheme interface
+func NewCodecFactory(scheme *runtime.Scheme, mutators ...CodecFactoryOptionsMutator) CodecFactory {
+	options := CodecFactoryOptions{}
+	if len(mutators) == 0 {
+		// Legacy behavior
+		EnablePretty(&options)
+		DisableStrict(&options)
+	}
+	for _, fn := range mutators {
+		fn(&options)
+	}
+	return NewCodecFactoryWithOptions(scheme, options)
+}
+
 // NewCodecFactoryWithOptions provides methods for retrieving serializers for the supported wire formats
 // and conversion wrappers to define preferred internal and external versions. In the future,
 // as the internal version is used less, callers may instead use a defaulting serializer and
@@ -139,17 +187,6 @@ type CodecFactoryOptions struct {
 func NewCodecFactoryWithOptions(scheme *runtime.Scheme, options CodecFactoryOptions) CodecFactory {
 	serializers := newSerializersForScheme(scheme, json.DefaultMetaFactory, options)
 	return newCodecFactory(scheme, serializers)
-}
-
-// NewCodecFactory provides methods for retrieving serializers for the supported wire formats
-// and conversion wrappers to define preferred internal and external versions. In the future,
-// as the internal version is used less, callers may instead use a defaulting serializer and
-// only convert objects which are shared internally (Status, common API machinery).
-// TODO: allow other codecs to be compiled in?
-// TODO: accept a scheme interface
-// Deprecated: use NewCodecFactoryWithOptions() instead
-func NewCodecFactory(scheme *runtime.Scheme) CodecFactory {
-	return NewCodecFactoryWithOptions(scheme, CodecFactoryOptions{Strict: false, Pretty: true})
 }
 
 // newCodecFactory is a helper for testing that allows a different metafactory to be specified.
