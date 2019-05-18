@@ -58,7 +58,6 @@ var (
 
 const (
 	defaultPodAttachTimeout = 60 * time.Second
-	defaultPodLogsTimeout   = 20 * time.Second
 )
 
 // AttachOptions declare the arguments accepted by the Attach command

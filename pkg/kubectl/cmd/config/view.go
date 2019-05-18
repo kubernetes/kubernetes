@@ -65,8 +65,6 @@ var (
 
 		# Get the password for the e2e user
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
-
-	defaultOutputFormat = "yaml"
 )
 
 // NewCmdConfigView returns a Command instance for 'config view' sub command

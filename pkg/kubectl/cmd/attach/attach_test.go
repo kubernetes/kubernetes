@@ -58,6 +58,7 @@ func fakeAttachablePodFn(pod *corev1.Pod) polymorphichelpers.AttachablePodForObj
 }
 
 func TestPodAndContainerAttach(t *testing.T) {
+	defaultPodLogsTimeout := 20 * time.Second
 	tests := []struct {
 		name                  string
 		args                  []string
