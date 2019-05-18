@@ -35,7 +35,7 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/auth"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 )
