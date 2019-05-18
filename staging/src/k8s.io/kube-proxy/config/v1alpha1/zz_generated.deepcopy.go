@@ -36,6 +36,11 @@ func (in *KubeProxyConfiguration) DeepCopyInto(out *KubeProxyConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	if in.ClusterCIDR != nil {
+		in, out := &in.ClusterCIDR, &out.ClusterCIDR
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	out.ClientConnection = in.ClientConnection
 	in.IPTables.DeepCopyInto(&out.IPTables)
 	in.IPVS.DeepCopyInto(&out.IPVS)

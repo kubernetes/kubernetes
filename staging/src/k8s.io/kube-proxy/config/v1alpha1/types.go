@@ -116,7 +116,7 @@ type KubeProxyConfiguration struct {
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
-	ClusterCIDR string `json:"clusterCIDR"`
+	ClusterCIDR []string `json:"clusterCIDR"`
 	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
