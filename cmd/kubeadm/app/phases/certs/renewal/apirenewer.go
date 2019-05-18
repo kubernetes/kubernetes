@@ -17,6 +17,7 @@ limitations under the License.
 package renewal
 
 import (
+	"context"
 	"crypto"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -97,7 +98,10 @@ func (r *APIRenewer) Renew(cfg *certutil.Config) (*x509.Certificate, crypto.Sign
 
 	fmt.Printf("[certs] Certificate request %q created\n", req.Name)
 
-	certData, err := csrutil.WaitForCertificate(r.client.CertificateSigningRequests(), req, watchTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), watchTimeout)
+	defer cancel()
+
+	certData, err := csrutil.WaitForCertificate(ctx, r.client.CertificateSigningRequests(), req)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "certificate failed to appear")
 	}

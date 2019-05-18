@@ -31,7 +31,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -70,13 +69,14 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
-	gomega.Expect(framework.RunRC(testutils.RCConfig{
+	err := framework.RunRC(testutils.RCConfig{
 		Client:    f.ClientSet,
 		Name:      rcName,
 		Namespace: f.Namespace.Name,
 		Image:     imageutils.GetPauseImageName(),
 		Replicas:  totalPods,
-	})).NotTo(gomega.HaveOccurred())
+	})
+	framework.ExpectNoError(err)
 
 	// Log once and flush the stats.
 	rm.LogLatest()
@@ -103,7 +103,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	ginkgo.By("Reporting overall resource usage")
 	logPodsOnNodes(f.ClientSet, nodeNames.List())
 	usageSummary, err := rm.GetLatest()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
 	e2elog.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result

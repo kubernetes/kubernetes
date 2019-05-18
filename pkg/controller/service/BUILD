@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "patch.go",
         "service_controller.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/service",
@@ -20,8 +21,10 @@ go_library(
         "//pkg/util/metrics:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
@@ -39,7 +42,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["service_controller_test.go"],
+    srcs = [
+        "patch_test.go",
+        "service_controller_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/api/testapi:go_default_library",

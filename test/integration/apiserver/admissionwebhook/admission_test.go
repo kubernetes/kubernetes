@@ -113,6 +113,9 @@ var (
 		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
 		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},
 		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
+
+		gvr("random.numbers.com", "v1", "integers"): {"create": testPruningRandomNumbers},
+		gvr("custom.fancy.com", "v2", "pants"):      {"create": testNoPruningCustomFancy},
 	}
 
 	// admissionExemptResources lists objects which are exempt from admission validation/mutation,
@@ -729,16 +732,6 @@ func testNamespaceDelete(c *testContext) {
 		c.t.Error(err)
 		return
 	}
-
-	// then run the final delete and make sure admission is called again
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, false, true)
-	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
-	if err != nil {
-		c.t.Error(err)
-		return
-	}
-	c.admissionHolder.verify(c.t)
-
 	// verify namespace is gone
 	obj, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
 	if err == nil || !errors.IsNotFound(err) {
@@ -928,6 +921,46 @@ func testSubresourceProxy(c *testContext) {
 		}
 		// verify the result
 		c.admissionHolder.verify(c.t)
+	}
+}
+
+func testPruningRandomNumbers(c *testContext) {
+	testResourceCreate(c)
+
+	cr2pant, err := c.client.Resource(c.gvr).Get("fortytwo", metav1.GetOptions{})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	foo, found, err := unstructured.NestedString(cr2pant.Object, "foo")
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+	if found {
+		c.t.Errorf("expected .foo to be pruned, but got: %s", foo)
+	}
+}
+
+func testNoPruningCustomFancy(c *testContext) {
+	testResourceCreate(c)
+
+	cr2pant, err := c.client.Resource(c.gvr).Get("cr2pant", metav1.GetOptions{})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	foo, _, err := unstructured.NestedString(cr2pant.Object, "foo")
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	// check that no pruning took place
+	if expected, got := "test", foo; expected != got {
+		c.t.Errorf("expected /foo to be %q, got: %q", expected, got)
 	}
 }
 

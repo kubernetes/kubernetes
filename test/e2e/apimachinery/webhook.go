@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/api/admissionregistration/v1beta1"
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -46,6 +46,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -143,7 +144,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer testcrd.CleanUp()
 		webhookCleanup := registerWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testCustomResourceWebhook(f, testcrd.Crd, testcrd.GetV1DynamicClient())
+		testCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"])
 	})
 
 	ginkgo.It("Should unconditionally reject operations on fail closed webhook", func() {
@@ -180,7 +181,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		defer testcrd.CleanUp()
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
-		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.GetV1DynamicClient())
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], false)
 	})
 
 	ginkgo.It("Should deny crd creation", func() {
@@ -191,7 +192,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 	})
 
 	ginkgo.It("Should mutate custom resource with different stored version", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRDWithV1Storage(f)
+		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f)
 		if err != nil {
 			return
 		}
@@ -199,6 +200,35 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
 		testMultiVersionCustomResourceWebhook(f, testcrd)
+	})
+
+	ginkgo.It("Should mutate custom resource with pruning", func() {
+		const prune = true
+		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f, func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
+			crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
+					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						"data": {
+							Type: "object",
+							Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								"mutation-start":   {Type: "string"},
+								"mutation-stage-1": {Type: "string"},
+								// mutation-stage-2 is intentionally missing such that it is pruned
+							},
+						},
+					},
+				},
+			}
+		})
+		if err != nil {
+			return
+		}
+		defer testcrd.CleanUp()
+		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
+		defer webhookCleanup()
+		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], prune)
 	})
 
 	ginkgo.It("Should deny crd creation", func() {
@@ -1217,9 +1247,9 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.APIGroup},
-						APIVersions: testcrd.GetAPIVersions(),
-						Resources:   []string{testcrd.GetPluralName()},
+						APIGroups:   []string{testcrd.Crd.Spec.Group},
+						APIVersions: servedAPIVersions(testcrd.Crd),
+						Resources:   []string{testcrd.Crd.Spec.Names.Plural},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -1259,9 +1289,9 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create, v1beta1.Update},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.APIGroup},
-						APIVersions: testcrd.GetAPIVersions(),
-						Resources:   []string{testcrd.GetPluralName()},
+						APIGroups:   []string{testcrd.Crd.Spec.Group},
+						APIVersions: servedAPIVersions(testcrd.Crd),
+						Resources:   []string{testcrd.Crd.Spec.Names.Plural},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -1279,9 +1309,9 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{v1beta1.Create},
 					Rule: v1beta1.Rule{
-						APIGroups:   []string{testcrd.APIGroup},
-						APIVersions: testcrd.GetAPIVersions(),
-						Resources:   []string{testcrd.GetPluralName()},
+						APIGroups:   []string{testcrd.Crd.Spec.Group},
+						APIVersions: servedAPIVersions(testcrd.Crd),
+						Resources:   []string{testcrd.Crd.Spec.Names.Plural},
 					},
 				}},
 				ClientConfig: v1beta1.WebhookClientConfig{
@@ -1328,7 +1358,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 	}
 }
 
-func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface, prune bool) {
 	ginkgo.By("Creating a custom resource that should be mutated by the webhook")
 	crName := "cr-instance-1"
 	cr := &unstructured.Unstructured{
@@ -1349,7 +1379,9 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 	expectedCRData := map[string]interface{}{
 		"mutation-start":   "yes",
 		"mutation-stage-1": "yes",
-		"mutation-stage-2": "yes",
+	}
+	if !prune {
+		expectedCRData["mutation-stage-2"] = "yes"
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
 		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
@@ -1357,7 +1389,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 }
 
 func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.TestCrd) {
-	customResourceClient := testcrd.GetV1DynamicClient()
+	customResourceClient := testcrd.DynamicClients["v1"]
 	ginkgo.By("Creating a custom resource while v1 is storage version")
 	crName := "cr-instance-1"
 	cr := &unstructured.Unstructured{
@@ -1446,12 +1478,6 @@ func testCRDDenyWebhook(f *framework.Framework) {
 			Storage: true,
 		},
 	}
-	testcrd := &crd.TestCrd{
-		Name:     name,
-		Kind:     kind,
-		APIGroup: group,
-		Versions: apiVersions,
-	}
 
 	// Creating a custom resource definition for use by assorted tests.
 	config, err := framework.LoadConfig()
@@ -1466,19 +1492,19 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	}
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: testcrd.GetMetaName(),
+			Name: name + "s." + group,
 			Labels: map[string]string{
 				"webhook-e2e-test": "webhook-disallow",
 			},
 		},
 		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:    testcrd.APIGroup,
-			Versions: testcrd.Versions,
+			Group:    group,
+			Versions: apiVersions,
 			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
-				Plural:   testcrd.GetPluralName(),
-				Singular: testcrd.Name,
-				Kind:     testcrd.Kind,
-				ListKind: testcrd.GetListName(),
+				Singular: name,
+				Kind:     kind,
+				ListKind: kind + "List",
+				Plural:   name + "s",
 			},
 			Scope: apiextensionsv1beta1.NamespaceScoped,
 		},
@@ -1486,7 +1512,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 
 	// create CRD
 	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create custom resource definition %s should be denied by webhook", testcrd.GetMetaName())
+	gomega.Expect(err).To(gomega.HaveOccurred(), "create custom resource definition %s should be denied by webhook", crd.Name)
 	expectedErrMsg := "the crd contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -1572,4 +1598,35 @@ func testSlowWebhookTimeoutNoError(f *framework.Framework) {
 	gomega.Expect(err).To(gomega.BeNil())
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(name, &metav1.DeleteOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
+}
+
+// createAdmissionWebhookMultiVersionTestCRDWithV1Storage creates a new CRD specifically
+// for the admissin webhook calling test.
+func createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f *framework.Framework, opts ...crd.Option) (*crd.TestCrd, error) {
+	group := fmt.Sprintf("%s-multiversion-crd-test.k8s.io", f.BaseName)
+	return crd.CreateMultiVersionTestCRD(f, group, append([]crd.Option{func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
+		crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+			{
+				Name:    "v1",
+				Served:  true,
+				Storage: true,
+			},
+			{
+				Name:    "v2",
+				Served:  true,
+				Storage: false,
+			},
+		}
+	}}, opts...)...)
+}
+
+// servedAPIVersions returns the API versions served by the CRD.
+func servedAPIVersions(crd *apiextensionsv1beta1.CustomResourceDefinition) []string {
+	ret := []string{}
+	for _, v := range crd.Spec.Versions {
+		if v.Served {
+			ret = append(ret, v.Name)
+		}
+	}
+	return ret
 }
