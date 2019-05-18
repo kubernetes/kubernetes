@@ -415,6 +415,8 @@ func (p *csiPlugin) NewMounter(
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
 
+	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
+
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
 	volData := map[string]string{
