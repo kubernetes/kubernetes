@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -238,6 +239,8 @@ type ConfigFactoryArgs struct {
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
+	Plugins                        *config.Plugins
+	PluginConfig                   []config.PluginConfig
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
@@ -248,8 +251,8 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		stopEverything = wait.NeverStop
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-	// TODO(bsalamat): config files should be passed to the framework.
-	framework, err := framework.NewFramework(args.Registry, nil)
+
+	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
