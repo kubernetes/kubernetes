@@ -300,6 +300,18 @@ spec:
             items:
             - key: Corefile
               path: Corefile
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values:
+                  - kube-dns
+              topologyKey: kubernetes.io/hostname
 `
 
 	// CoreDNSConfigMap is the CoreDNS ConfigMap manifest
