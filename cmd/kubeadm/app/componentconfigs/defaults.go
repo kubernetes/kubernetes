@@ -88,9 +88,11 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	}
 
 	// Enforce security-related kubelet options
-
 	// Require all clients to the kubelet API to have client certs signed by the cluster CA
-	externalkubeletcfg.Authentication.X509.ClientCAFile = filepath.Join(internalcfg.CertificatesDir, constants.CACertName)
+	if externalkubeletcfg.Authentication.X509.ClientCAFile == "" {
+		// Set it to default path
+		externalkubeletcfg.Authentication.X509.ClientCAFile = filepath.Join(internalcfg.CertificatesDir, constants.CACertName)
+	}
 	externalkubeletcfg.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(false)
 
 	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server
