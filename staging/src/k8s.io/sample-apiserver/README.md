@@ -24,12 +24,47 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 `sample-apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/sample-apiserver.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
-## Fetch Dependencies
+## Fetch sample-apiserver and its dependencies
 
-Using `godep` will work.
+Like the rest of Kubernetes, sample-apiserver has used
+[godep](https://github.com/tools/godep) and `$GOPATH` for years and is
+now adopting go 1.11 modules.  There are thus two alternative ways to
+go about fetching this demo and its dependencies.
 
-Using Go modules (`GO111MODULE=on`) will enable `go build` to work,
-without putting dependencies anywhere obvious.
+### Fetch with godep
+
+When NOT using go 1.11 modules, you can use the following commands.
+
+```sh
+go get -d k8s.io/sample-apiserver
+cd $GOPATH/src/k8s.io/sample-apiserver  # assuming your GOPATH has just one entry
+godep restore
+```
+
+### When using go 1.11 modules
+
+When using go 1.11 modules (`GO111MODULE=on`), issue the following
+commands --- starting in whatever working directory you like.
+
+```sh
+git clone https://github.com/kubernetes/sample-apiserver.git
+cd sample-apiserver
+```
+
+Note, however, that if you intend to
+[generate code](#changes-to-the-types) then you will also need the
+code-generator repo to exist in an old-style location.  One easy way
+to do this is to use the command `go mod vendor` to create and
+popdulate the `vendor` directory.
+
+### A Note on kubernetes/kubernetes
+
+If you are developing Kubernetes according to
+https://github.com/kubernetes/community/blob/master/contributors/guide/github-workflow.md
+then you already have a copy of this demo in
+`kubernetes/staging/src/k8s.io/sample-apiserver` and its dependencies
+--- including the code generator --- are in usable locations.
+
 
 ## Normal Build and Deploy
 
@@ -37,13 +72,10 @@ without putting dependencies anywhere obvious.
 
 If you change the API object type definitions in any of the
 `pkg/apis/.../types.go` files then you will need to update the files
-generated from the type definitions.  To do this, invoke
-`hack/update-codegen.sh` with `sample-apiserver` as your current
-working directory; the script takes no arguments.  But this requires
-certain dependencies to appear on your `$GOPATH` or in a local
-`vendor` directory.  If you used Go modules then issue the command `go
-mod vendor` before `hack/update-codegen.sh`, to first create a local
-`vendor` directory with the needed dependencies.
+generated from the type definitions.  To do this, first
+[create the vendor directory if necessary](#when-using-go-111-modules)
+and then invoke `hack/update-codegen.sh` with `sample-apiserver` as
+your current working directory; the script takes no arguments.
 
 ### Build the Binary
 
@@ -64,15 +96,6 @@ suitable.
 docker build -t MYPREFIX/kube-sample-apiserver:MYTAG ./artifacts/simple-image
 docker push MYPREFIX/kube-sample-apiserver:MYTAG
 ```
-
-
-### Build Binary and Container Image from Current Master Source
-
-There is a Dockerfile at
-https://github.com/kubernetes/kubernetes/blob/master/test/images/sample-apiserver/Dockerfile
-that will build the binary, and a container image with that binary,
-from the current `master` branch.
-
 
 ### Deploy into a Kubernetes Cluster
 
