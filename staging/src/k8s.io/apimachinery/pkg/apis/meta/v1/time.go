@@ -164,13 +164,14 @@ func (_ Time) OpenAPISchemaType() []string { return []string{"string"} }
 func (_ Time) OpenAPISchemaFormat() string { return "date-time" }
 
 // MarshalQueryParameter converts to a URL query parameter value
+// Use RFC3339Nano to ensure milliseconds supporting.
 func (t Time) MarshalQueryParameter() (string, error) {
 	if t.IsZero() {
 		// Encode unset/nil objects as an empty string
 		return "", nil
 	}
 
-	return t.UTC().Format(time.RFC3339), nil
+	return t.UTC().Format(time.RFC3339Nano), nil
 }
 
 // Fuzz satisfies fuzz.Interface.
