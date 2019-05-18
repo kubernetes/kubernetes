@@ -59,7 +59,7 @@ type eventKey struct {
 
 type eventBroadcasterImpl struct {
 	*watch.Broadcaster
-	mu            sync.RWMutex
+	mu            sync.Mutex
 	eventCache    map[eventKey]*v1beta1.Event
 	sleepDuration time.Duration
 	sink          EventSink
