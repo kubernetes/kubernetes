@@ -419,6 +419,26 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 	return claims
 }
 
+// volumeWithAnnotation saves given annotation into given volume.
+// Meant to be used to compose volume specified inline in a test.
+func volumeWithAnnotation(name, value string, volume *v1.PersistentVolume) *v1.PersistentVolume {
+	if volume.Annotations == nil {
+		volume.Annotations = map[string]string{name: value}
+	} else {
+		volume.Annotations[name] = value
+	}
+	return volume
+}
+
+// volumesWithAnnotation saves given annotation into given volumes.
+// Meant to be used to compose volumes specified inline in a test.
+func volumesWithAnnotation(name, value string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
+	for _, volume := range volumes {
+		volumeWithAnnotation(name, value, volume)
+	}
+	return volumes
+}
+
 // claimWithAccessMode saves given access into given claims.
 // Meant to be used to compose claims specified inline in a test.
 func claimWithAccessMode(modes []v1.PersistentVolumeAccessMode, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {

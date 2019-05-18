@@ -54,6 +54,15 @@ var storageOperationStatusMetric = prometheus.NewCounterVec(
 	[]string{"volume_plugin", "operation_name", "status"},
 )
 
+var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name:    "volume_operation_total_seconds",
+		Help:    "Storage operation end to end duration in seconds",
+		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+	},
+	[]string{"volume_plugin", "operation_name"},
+)
+
 func init() {
 	registerMetrics()
 }
@@ -62,6 +71,7 @@ func registerMetrics() {
 	prometheus.MustRegister(storageOperationMetric)
 	prometheus.MustRegister(storageOperationErrorMetric)
 	prometheus.MustRegister(storageOperationStatusMetric)
+	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
@@ -94,4 +104,10 @@ func GetFullQualifiedPluginNameForVolume(pluginName string, spec *volume.Spec) s
 		return fmt.Sprintf("%s:%s", pluginName, spec.PersistentVolume.Spec.CSI.Driver)
 	}
 	return pluginName
+}
+
+// RecordOperationLatencyMetric records the end to end latency for certain operation
+// into metric volume_operation_total_seconds
+func RecordOperationLatencyMetric(plugin, operationName string, secondsTaken float64) {
+	storageOperationEndToEndLatencyMetric.WithLabelValues(plugin, operationName).Observe(secondsTaken)
 }
