@@ -869,6 +869,96 @@ var _ = SIGDescribe("StatefulSet", func() {
 			appTester.run()
 		})
 	})
+
+	framework.KubeDescribe("When stuck at failing init container", func() {
+		ssName := "ss"
+		labels := map[string]string{
+			"foo": "bar",
+			"baz": "blah",
+		}
+		headlessSvcName := "test"
+		var ss *apps.StatefulSet
+
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
+			headlessService := framework.CreateServiceSpec(headlessSvcName, "", true, labels)
+			_, err := c.CoreV1().Services(ns).Create(headlessService)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.AfterEach(func() {
+			if ginkgo.CurrentGinkgoTestDescription().Failed {
+				framework.DumpDebugInfo(c, ns)
+			}
+			e2elog.Logf("Deleting all statefulset in ns %v", ns)
+			framework.DeleteAllStatefulSets(c, ns)
+		})
+
+		ginkgo.It("should redeploy after update", func() {
+			ss = &apps.StatefulSet{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "StatefulSet",
+					APIVersion: "apps/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ssName,
+					Namespace: ns,
+				},
+				Spec: apps.StatefulSetSpec{
+					Selector: &metav1.LabelSelector{
+						MatchLabels: labels,
+					},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      labels,
+							Annotations: map[string]string{},
+						},
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:    "busybox",
+									Image:   "busybox",
+									Command: []string{"sh", "-c"},
+									Args:    []string{"false"},
+								},
+							},
+							Containers: []v1.Container{
+								{
+									Name:    "busybox",
+									Image:   "busybox",
+									Command: []string{"sh", "-c"},
+									Args:    []string{`while true; do echo "hello world"; sleep 5; done`},
+								},
+							},
+						},
+					},
+					ServiceName: headlessSvcName,
+				},
+			}
+
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			framework.SkipIfNoDefaultStorageClass(c)
+			*(ss.Spec.Replicas) = 1
+			sst := framework.NewStatefulSetTester(c)
+
+			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("Updating stateful set template: update init container"))
+			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+				update.Spec.Template.Spec.InitContainers = []v1.Container{
+					{
+						Name:    "busybox",
+						Image:   "busybox",
+						Command: []string{"sh", "-c"},
+						Args:    []string{"true"},
+					},
+				}
+			})
+			framework.ExpectNoError(err)
+			sst.WaitForRunningAndReady(1, ss)
+		})
+	})
 })
 
 func kubectlExecWithRetries(args ...string) (out string) {
