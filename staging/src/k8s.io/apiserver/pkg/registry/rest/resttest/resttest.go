@@ -257,7 +257,7 @@ func (t *Tester) delete(ctx context.Context, obj runtime.Object) error {
 	if !ok {
 		return fmt.Errorf("Expected deleting storage, got %v", t.storage)
 	}
-	_, _, err = deleter.Delete(ctx, objectMeta.GetName(), nil)
+	_, _, err = deleter.Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, nil)
 	return err
 }
 
@@ -840,7 +840,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 	if dryRun {
 		opts.DryRun = []string{metav1.DryRunAll}
 	}
-	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), opts)
+	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, opts)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -866,7 +866,7 @@ func (t *Tester) testDeleteNoGraceful(obj runtime.Object, createFn CreateFunc, g
 func (t *Tester) testDeleteNonExist(obj runtime.Object, opts metav1.DeleteOptions) {
 	objectMeta := t.getObjectMetaOrFail(obj)
 
-	_, _, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.GetName(), &opts)
+	_, _, err := t.storage.(rest.GracefulDeleter).Delete(t.TestContext(), objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -886,12 +886,12 @@ func (t *Tester) testDeleteWithUID(obj runtime.Object, createFn CreateFunc, getF
 		t.Errorf("unexpected error: %v", err)
 	}
 	opts.Preconditions = metav1.NewPreconditionDeleteOptions("UID1111").Preconditions
-	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &opts)
+	obj, _, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewPreconditionDeleteOptions("UID0000"))
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewPreconditionDeleteOptions("UID0000"))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -923,14 +923,14 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 		t.Errorf("unexpected error: %v", err)
 	}
 	opts.Preconditions = metav1.NewRVDeletionPrecondition("RV1111").Preconditions
-	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &opts)
+	obj, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if wasDeleted {
 		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.GetName())
 	}
-	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewRVDeletionPrecondition("RV0000"))
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewRVDeletionPrecondition("RV0000"))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -962,7 +962,7 @@ func (t *Tester) testDeleteDryRunGracefulHasdefault(obj runtime.Object, createFn
 		t.Errorf("unexpected error: %v", err)
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	object, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
+	object, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -973,7 +973,7 @@ func (t *Tester) testDeleteDryRunGracefulHasdefault(obj runtime.Object, createFn
 	if objectMeta.GetDeletionTimestamp() == nil || objectMeta.GetDeletionGracePeriodSeconds() == nil || *objectMeta.GetDeletionGracePeriodSeconds() != expectedGrace {
 		t.Errorf("unexpected deleted meta: %#v", objectMeta)
 	}
-	_, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &metav1.DeleteOptions{})
+	_, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -989,7 +989,7 @@ func (t *Tester) testDeleteGracefulHasDefault(obj runtime.Object, createFn Creat
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.GetGeneration()
-	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), &metav1.DeleteOptions{})
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1023,7 +1023,7 @@ func (t *Tester) testDeleteGracefulWithValue(obj runtime.Object, createFn Create
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.GetGeneration()
-	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(expectedGrace+2))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(expectedGrace+2))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1057,7 +1057,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.GetGeneration()
-	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(expectedGrace))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1069,7 +1069,7 @@ func (t *Tester) testDeleteGracefulExtend(obj runtime.Object, createFn CreateFun
 	}
 
 	// second delete duration is ignored
-	_, wasDeleted, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(expectedGrace+2))
+	_, wasDeleted, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(expectedGrace+2))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1099,7 +1099,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
 	generation := objectMeta.GetGeneration()
-	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(expectedGrace))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1111,7 +1111,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 	}
 
 	// second delete is immediate, resource is deleted
-	out, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(0))
+	out, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(0))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1141,7 +1141,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 		t.Errorf("unexpected error: %v", err)
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), nil)
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1167,7 +1167,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 		bigGrace = 2 * expectedGrace
 	}
 	objectMeta := t.getObjectMetaOrFail(foo)
-	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(bigGrace))
+	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(bigGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1182,7 +1182,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	deletionTimestamp := *objectMeta.GetDeletionTimestamp()
 
 	// second delete duration is ignored
-	_, wasDeleted, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), metav1.NewDeleteOptions(expectedGrace))
+	_, wasDeleted, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewDeleteOptions(expectedGrace))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
