@@ -588,7 +588,7 @@ function create-master-auth {
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "system:cluster-bootstrap,uid:system:cluster-bootstrap,system:masters"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "gcp:kube-bootstrap,uid:gcp:kube-bootstrap,system:masters"
   fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
@@ -1506,7 +1506,7 @@ function compute-master-manifest-variables {
   INSECURE_PORT_MAPPING=""
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
     INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
-  fi 
+  fi
 }
 
 # A helper function that bind mounts kubelet dirs for running mount in a chroot
@@ -2846,11 +2846,12 @@ function wait-till-apiserver-ready() {
   done
 }
 
-function ensure-bootstrap-kubectl-auth {
-  # Creating an authenticated kubeconfig is only necessary if the insecure port is disabled.
+function ensure-master-bootstrap-kubectl-auth {
+  # By default, `kubectl` uses http://localhost:8080
+  # If the insecure port is disabled, kubectl will need to use an admin-authenticated kubeconfig.
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
-    create-kubeconfig "cluster-bootstrap" ${KUBE_BOOTSTRAP_TOKEN}
-    export KUBECONFIG=/etc/srv/kubernetes/cluster-bootstrap/kubeconfig
+    create-kubeconfig "kube-bootstrap" "${KUBE_BOOTSTRAP_TOKEN}"
+    export KUBECONFIG=/etc/srv/kubernetes/kube-bootstrap/kubeconfig
   fi
 }
 
@@ -2971,13 +2972,13 @@ function main() {
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
-    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
-  fi
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
   ADDON_MANAGER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
+  fi
 
   setup-os-params
   config-ip-firewall
@@ -2990,7 +2991,7 @@ function main() {
     create-node-pki
     create-master-pki
     create-master-auth
-    ensure-bootstrap-kubectl-auth
+    ensure-master-bootstrap-kubectl-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
