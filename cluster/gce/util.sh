@@ -782,8 +782,8 @@ function construct-linux-kubelet-flags {
   if [[ -n "${NODE_TAINTS:-}" ]]; then
     flags+=" --register-with-taints=${NODE_TAINTS}"
   fi
-  if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
-    flags+=" --container-runtime=${CONTAINER_RUNTIME}"
+  if [[ "${CONTAINER_RUNTIME:-}" != "docker" ]]; then
+    flags+=" --container-runtime=remote"
   fi
   if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
     flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
