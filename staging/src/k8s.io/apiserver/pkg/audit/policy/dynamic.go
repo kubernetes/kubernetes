@@ -41,14 +41,15 @@ func ConvertDynamicPolicyToInternal(p *v1alpha1.Policy) *audit.Policy {
 
 // NewDynamicChecker returns a new dynamic policy checker
 func NewDynamicChecker() Checker {
-	return &dynamicPolicyChecker{}
+	return &DynamicPolicyChecker{}
 }
 
-type dynamicPolicyChecker struct{}
+// DynamicPolicyChecker is a policy checker for the dynamic audit backend.
+type DynamicPolicyChecker struct{}
 
 // LevelAndStages returns returns a fixed level of the full event, this is so that the downstream policy
 // can be applied per sink.
 // TODO: this needs benchmarking before the API moves to beta to determine the effect this has on the apiserver
-func (d *dynamicPolicyChecker) LevelAndStages(authorizer.Attributes) (audit.Level, []audit.Stage) {
+func (d *DynamicPolicyChecker) LevelAndStages(authorizer.Attributes) (audit.Level, []audit.Stage) {
 	return audit.LevelRequestResponse, []audit.Stage{}
 }

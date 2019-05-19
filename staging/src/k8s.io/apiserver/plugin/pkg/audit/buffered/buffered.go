@@ -50,6 +50,9 @@ type BatchConfig struct {
 
 	// Whether the delegate backend should be called asynchronously.
 	AsyncDelegate bool
+
+	// Whether to deep copy the event before sending it to the queue.
+	DeepCopy bool
 }
 
 type bufferedBackend struct {
@@ -67,6 +70,9 @@ type bufferedBackend struct {
 
 	// Whether the delegate backend should be called asynchronously.
 	asyncDelegate bool
+
+	// Whether to deep copy the event before sending it to the queue.
+	deepCopy bool
 
 	// Channel to signal that the batching routine has processed all remaining events and exited.
 	// Once `shutdownCh` is closed no new events will be sent to the delegate backend.
@@ -97,6 +103,7 @@ func NewBackend(delegate audit.Backend, config BatchConfig) audit.Backend {
 		maxBatchSize:    config.MaxBatchSize,
 		maxBatchWait:    config.MaxBatchWait,
 		asyncDelegate:   config.AsyncDelegate,
+		deepCopy:        config.DeepCopy,
 		shutdownCh:      make(chan struct{}),
 		wg:              sync.WaitGroup{},
 		throttle:        throttle,
@@ -272,6 +279,9 @@ func (b *bufferedBackend) ProcessEvents(ev ...*auditinternal.Event) bool {
 	for i, e := range ev {
 		evIndex = i
 
+		if b.deepCopy {
+			e = e.DeepCopy()
+		}
 		select {
 		case b.buffer <- e:
 		default:

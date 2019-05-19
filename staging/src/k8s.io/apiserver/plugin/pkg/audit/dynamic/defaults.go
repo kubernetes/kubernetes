@@ -42,5 +42,6 @@ func NewDefaultWebhookBatchConfig() *bufferedplugin.BatchConfig {
 		ThrottleQPS:    defaultBatchThrottleQPS,
 		ThrottleBurst:  defaultBatchThrottleBurst,
 		AsyncDelegate:  true,
+		DeepCopy:       false,
 	}
 }

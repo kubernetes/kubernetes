@@ -27,6 +27,7 @@ import (
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
+	auditpolicy "k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 )
 
@@ -36,6 +37,8 @@ func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, 
 	if sink == nil || policy == nil {
 		return failedHandler
 	}
+	// check if dynamic audit is enabled
+	_, dynamicEnabled := policy.(*auditpolicy.DynamicPolicyChecker)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		req, ev, omitStages, err := createAuditEventAndAttachToContext(req, policy)
 		if err != nil {
@@ -52,7 +55,7 @@ func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, 
 		ev.ResponseStatus.Message = getAuthMethods(req)
 		ev.Stage = auditinternal.StageResponseStarted
 
-		rw := decorateResponseWriter(w, ev, sink, omitStages)
+		rw := decorateResponseWriter(w, ev, sink, omitStages, dynamicEnabled)
 		failedHandler.ServeHTTP(rw, req)
 	})
 }

@@ -92,14 +92,14 @@ func (*fancyResponseWriter) Flush() {}
 func (*fancyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) { return nil, nil, nil }
 
 func TestConstructResponseWriter(t *testing.T) {
-	actual := decorateResponseWriter(&simpleResponseWriter{}, nil, nil, nil)
+	actual := decorateResponseWriter(&simpleResponseWriter{}, nil, nil, nil, false)
 	switch v := actual.(type) {
 	case *auditResponseWriter:
 	default:
 		t.Errorf("Expected auditResponseWriter, got %v", reflect.TypeOf(v))
 	}
 
-	actual = decorateResponseWriter(&fancyResponseWriter{}, nil, nil, nil)
+	actual = decorateResponseWriter(&fancyResponseWriter{}, nil, nil, nil, false)
 	switch v := actual.(type) {
 	case *fancyResponseWriterDelegator:
 	default:
@@ -109,7 +109,7 @@ func TestConstructResponseWriter(t *testing.T) {
 
 func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, nil, nil, false)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.WriteHeader(42)
@@ -123,7 +123,7 @@ func TestDecorateResponseWriterWithoutChannel(t *testing.T) {
 
 func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, nil, nil)
+	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, nil, nil, false)
 
 	// write status. This will not block because firstEventSentCh is nil
 	actual.Write([]byte("foo"))
@@ -138,7 +138,7 @@ func TestDecorateResponseWriterWithImplicitWrite(t *testing.T) {
 func TestDecorateResponseWriterChannel(t *testing.T) {
 	sink := &fakeAuditSink{}
 	ev := &auditinternal.Event{}
-	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, sink, nil)
+	actual := decorateResponseWriter(&simpleResponseWriter{}, ev, sink, nil, false)
 
 	done := make(chan struct{})
 	go func() {

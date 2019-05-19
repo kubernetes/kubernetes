@@ -672,6 +672,7 @@ func defaultWebhookBatchConfig() pluginbuffered.BatchConfig {
 		ThrottleBurst:  defaultBatchThrottleBurst,
 
 		AsyncDelegate: true,
+		DeepCopy:      true,
 	}
 }
 
@@ -685,5 +686,6 @@ func defaultLogBatchConfig() pluginbuffered.BatchConfig {
 		ThrottleEnable: false,
 		// Asynchronous log threads just create lock contention.
 		AsyncDelegate: false,
+		DeepCopy:      true,
 	}
 }
