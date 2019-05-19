@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apirenewer.go",
+        "expiration.go",
         "filerenewer.go",
         "manager.go",
         "readwriter.go",
@@ -32,6 +33,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "apirenewer_test.go",
+        "expiration_test.go",
         "filerenewer_test.go",
         "manager_test.go",
         "readwriter_test.go",
