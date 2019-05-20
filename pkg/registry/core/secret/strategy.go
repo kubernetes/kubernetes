@@ -106,7 +106,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	return labels.Set(secret.Labels), SelectableFields(secret), nil
 }
 
-// Matcher returns a generic matcher for a given label and field selector.
+// Matcher returns a selection predicate for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) pkgstorage.SelectionPredicate {
 	return pkgstorage.SelectionPredicate{
 		Label:       label,

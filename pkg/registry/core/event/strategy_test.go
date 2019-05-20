@@ -49,7 +49,7 @@ func TestGetAttrs(t *testing.T) {
 		Source: api.EventSource{Component: "test"},
 		Type:   api.EventTypeNormal,
 	}
-	field := EventToSelectableFields(eventA)
+	field := ToSelectableFields(eventA)
 	expect := fields.Set{
 		"metadata.name":                  "f0118",
 		"metadata.namespace":             "default",
@@ -70,7 +70,7 @@ func TestGetAttrs(t *testing.T) {
 }
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
-	fset := EventToSelectableFields(&api.Event{})
+	fset := ToSelectableFields(&api.Event{})
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		"v1",
 		"Event",
