@@ -222,7 +222,6 @@ func (dsw *desiredStateOfWorld) AddPod(
 			"no node with the name %q exists in the list of managed nodes",
 			nodeName)
 	}
-
 	attachableVolumePlugin, err := dsw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 	if err != nil || attachableVolumePlugin == nil {
 		if attachableVolumePlugin == nil {

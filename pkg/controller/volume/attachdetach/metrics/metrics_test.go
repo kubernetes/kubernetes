@@ -118,7 +118,8 @@ func TestVolumesInUseMetricCollection(t *testing.T) {
 		nil,
 		fakeVolumePluginMgr,
 		csimigration.NewPluginManager(csiTranslator),
-		csiTranslator)
+		csiTranslator,
+		nil)
 	nodeUseMap := metricCollector.getVolumeInUseCount()
 	if len(nodeUseMap) < 1 {
 		t.Errorf("Expected one volume in use got %d", len(nodeUseMap))
@@ -159,7 +160,8 @@ func TestTotalVolumesMetricCollection(t *testing.T) {
 		dsw,
 		fakeVolumePluginMgr,
 		csimigration.NewPluginManager(csiTranslator),
-		csiTranslator)
+		csiTranslator,
+		nil)
 
 	totalVolumesMap := metricCollector.getTotalVolumesCount()
 	if len(totalVolumesMap) != 2 {
