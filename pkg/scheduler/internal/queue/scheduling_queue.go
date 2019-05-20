@@ -344,9 +344,13 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		boTime, found := p.podBackoff.GetBackoffTime(nsNameForPod(pod))
 		if !found {
 			klog.Errorf("Unable to find backoff value for pod %v in backoffQ", nsNameForPod(pod))
-			p.podBackoffQ.Pop()
-			p.activeQ.Add(rawPodInfo)
-			defer p.cond.Broadcast()
+			_, err := p.podBackoffQ.Pop()
+			if err != nil {
+				klog.Errorf("Unable to pop pod %v from backoffQ.", nsNameForPod(pod))
+			} else {
+				p.activeQ.Add(rawPodInfo)
+				defer p.cond.Broadcast()
+			}
 			continue
 		}
 
