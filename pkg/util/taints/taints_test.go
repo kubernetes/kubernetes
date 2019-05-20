@@ -68,7 +68,7 @@ func TestTaintsVar(t *testing.T) {
 		args := append([]string{"test"}, strings.Fields(c.f)...)
 		cli := pflag.NewFlagSet("test", pflag.ContinueOnError)
 		var taints []api.Taint
-		cli.Var(NewTaintsVar(&taints), "t", "bar")
+		cli.Var(NewTaintsFlag(&taints), "t", "bar")
 
 		err := cli.Parse(args)
 		if err == nil && c.err {

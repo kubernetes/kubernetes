@@ -91,19 +91,22 @@ func validateTaintEffect(effect v1.TaintEffect) error {
 	return nil
 }
 
-// NewTaintsVar wraps []api.Taint in a struct that implements flag.Value to allow taints to be
-// bound to command line flags.
-func NewTaintsVar(ptr *[]api.Taint) taintsVar {
-	return taintsVar{
+// NewTaintsFlag returns a Flag that wraps an []api.Taint that implements flag.Value
+func NewTaintsFlag(ptr *[]api.Taint) Flag {
+	return Flag{
 		ptr: ptr,
 	}
 }
 
-type taintsVar struct {
+// Flag wraps []api.Taint in a struct that implements flag.Value to allow taints to be
+// bound to command line flags.
+type Flag struct {
 	ptr *[]api.Taint
 }
 
-func (t taintsVar) Set(s string) error {
+// Set parses a comma-separated list of taints and assigns them to the underlying
+// []api.Taint
+func (t Flag) Set(s string) error {
 	if len(s) == 0 {
 		*t.ptr = nil
 		return nil
@@ -121,7 +124,8 @@ func (t taintsVar) Set(s string) error {
 	return nil
 }
 
-func (t taintsVar) String() string {
+// String returns a comma-separated string representing the underling []api.Taint
+func (t Flag) String() string {
 	if len(*t.ptr) == 0 {
 		return ""
 	}
@@ -132,7 +136,8 @@ func (t taintsVar) String() string {
 	return strings.Join(taints, ",")
 }
 
-func (t taintsVar) Type() string {
+// Type returns the underlying type of this flag
+func (t Flag) Type() string {
 	return "[]api.Taint"
 }
 
