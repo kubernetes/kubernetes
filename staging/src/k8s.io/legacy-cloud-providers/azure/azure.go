@@ -322,12 +322,12 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 				Duration: time.Duration(config.CloudProviderBackoffDuration) * time.Second,
 				Jitter:   config.CloudProviderBackoffJitter,
 			}
-			klog.V(2).Infof("Azure cloudprovider using backoff configuration: retries=%d, exponent=%f, duration=%d, jitter=%f",
-				config.CloudProviderBackoffRetries,
-				config.CloudProviderBackoffExponent,
-				config.CloudProviderBackoffDuration,
-				config.CloudProviderBackoffJitter)
 		}
+		klog.V(2).Infof("Azure cloudprovider using backoff configuration: retries=%d, exponent=%f, duration=%d, jitter=%f",
+			config.CloudProviderBackoffRetries,
+			config.CloudProviderBackoffExponent,
+			config.CloudProviderBackoffDuration,
+			config.CloudProviderBackoffJitter)
 	} else {
 		// CloudProviderBackoffRetries will be set to 1 by default as the requirements of Azure SDK.
 		config.CloudProviderBackoffRetries = 1
