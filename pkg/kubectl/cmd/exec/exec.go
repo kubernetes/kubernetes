@@ -151,8 +151,8 @@ type ExecOptions struct {
 	ResourceName string
 	Command      []string
 
-	FullCmdName       string
-	SuggestedCmdUsage string
+	ParentCommandName       string
+	EnableSuggestedCmdUsage bool
 
 	Builder          func() *resource.Builder
 	ExecutablePodFn  polymorphichelpers.AttachablePodForObjectFunc
@@ -200,10 +200,10 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
-		p.FullCmdName = cmdParent.CommandPath()
+		p.ParentCommandName = cmdParent.CommandPath()
 	}
-	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe %s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.ResourceName, p.Namespace)
+	if len(p.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.EnableSuggestedCmdUsage = true
 	}
 
 	p.Config, err = f.ToRESTConfig()
@@ -322,11 +322,10 @@ func (p *ExecOptions) Run() error {
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
 		if len(pod.Spec.Containers) > 1 {
-			usageString := fmt.Sprintf("Defaulting container name to %s.", pod.Spec.Containers[0].Name)
-			if len(p.SuggestedCmdUsage) > 0 {
-				usageString = fmt.Sprintf("%s\n%s", usageString, p.SuggestedCmdUsage)
+			fmt.Fprintf(p.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
+			if p.EnableSuggestedCmdUsage {
+				fmt.Fprintf(p.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", p.ParentCommandName, pod.Name, p.Namespace)
 			}
-			fmt.Fprintf(p.ErrOut, "%s\n", usageString)
 		}
 		containerName = pod.Spec.Containers[0].Name
 	}
