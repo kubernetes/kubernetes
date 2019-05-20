@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package nosnatproxy
 
 import (
 	"fmt"
@@ -22,10 +22,24 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/spf13/pflag"
-	cliflag "k8s.io/component-base/cli/flag"
+	"github.com/spf13/cobra"
 	"k8s.io/component-base/logs"
 )
+
+// CmdNoSnatTestProxy is used by agnhost Cobra.
+var CmdNoSnatTestProxy = &cobra.Command{
+	Use:   "no-snat-test-proxy",
+	Short: "Creates a proxy for the /checknosnat endpoint",
+	Long:  `Creates the /checknosnat endpoint which proxies the request to the given target (/checknosnat?target=target_ip&ips=ip1,ip2) and returns its response, or a 500 response on error.`,
+	Args:  cobra.MaximumNArgs(1),
+	Run:   main,
+}
+
+var port string
+
+func init() {
+	CmdNoSnatTestProxy.Flags().StringVar(&port, "port", "31235", "The port to serve /checknosnat endpoint on.")
+}
 
 // This Pod's /checknosnat takes `target` and `ips` arguments, and queries {target}/checknosnat?ips={ips}
 
@@ -33,21 +47,11 @@ type masqTestProxy struct {
 	Port string
 }
 
-func newMasqTestProxy() *masqTestProxy {
-	return &masqTestProxy{
-		Port: "31235",
+func main(cmd *cobra.Command, args []string) {
+	m := &masqTestProxy{
+		Port: port,
 	}
-}
 
-func (m *masqTestProxy) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat endpoint on.")
-}
-
-func main() {
-	m := newMasqTestProxy()
-	m.AddFlags(pflag.CommandLine)
-
-	cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

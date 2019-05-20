@@ -23,10 +23,16 @@ import (
 
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/images/agnhost/dns"
+	"k8s.io/kubernetes/test/images/agnhost/fakegitserver"
+	"k8s.io/kubernetes/test/images/agnhost/liveness"
+	"k8s.io/kubernetes/test/images/agnhost/logs-generator"
 	"k8s.io/kubernetes/test/images/agnhost/net"
 	"k8s.io/kubernetes/test/images/agnhost/netexec"
 	"k8s.io/kubernetes/test/images/agnhost/nettest"
+	"k8s.io/kubernetes/test/images/agnhost/no-snat-test"
+	"k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
 	"k8s.io/kubernetes/test/images/agnhost/pause"
+	"k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
 	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
 
@@ -35,10 +41,16 @@ func main() {
 	rootCmd.AddCommand(dns.CmdDNSSuffix)
 	rootCmd.AddCommand(dns.CmdDNSServerList)
 	rootCmd.AddCommand(dns.CmdEtcHosts)
+	rootCmd.AddCommand(fakegitserver.CmdFakeGitServer)
+	rootCmd.AddCommand(liveness.CmdLiveness)
+	rootCmd.AddCommand(logsgen.CmdLogsGenerator)
 	rootCmd.AddCommand(net.CmdNet)
 	rootCmd.AddCommand(netexec.CmdNetexec)
 	rootCmd.AddCommand(nettest.CmdNettest)
+	rootCmd.AddCommand(nosnat.CmdNoSnatTest)
+	rootCmd.AddCommand(nosnatproxy.CmdNoSnatTestProxy)
 	rootCmd.AddCommand(pause.CmdPause)
+	rootCmd.AddCommand(portforwardtester.CmdPortForwardTester)
 	rootCmd.AddCommand(webhook.CmdWebhook)
 
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to

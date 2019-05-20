@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package nosnat
 
 import (
 	"fmt"
@@ -24,10 +24,28 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/pflag"
-	cliflag "k8s.io/component-base/cli/flag"
+	"github.com/spf13/cobra"
 	"k8s.io/component-base/logs"
 )
+
+// CmdNoSnatTest is used by agnhost Cobra.
+var CmdNoSnatTest = &cobra.Command{
+	Use:   "no-snat-test",
+	Short: "Creates the /checknosnat and /whoami endpoints",
+	Long: `Serves the following endpoints on the given port (defaults to "8080").
+
+- /whoami - returns the request's IP address.
+- /checknosnat - queries  "ip/whoami" for each provided IP ("/checknosnat?ips=ip1,ip2"),
+  and if all the response bodies match the "POD_IP" environment variable, it will return a 200 response, 500 otherwise.`,
+	Args: cobra.MaximumNArgs(1),
+	Run:  main,
+}
+
+var port string
+
+func init() {
+	CmdNoSnatTest.Flags().StringVar(&port, "port", "8080", "The port to serve /checknosnat and /whoami endpoints on.")
+}
 
 // ip = target for /whoami query
 // rip = returned ip
@@ -38,21 +56,11 @@ type masqTester struct {
 	Port string
 }
 
-func newMasqTester() *masqTester {
-	return &masqTester{
-		Port: "8080",
+func main(cmd *cobra.Command, args []string) {
+	m := &masqTester{
+		Port: port,
 	}
-}
 
-func (m *masqTester) AddFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&m.Port, "port", m.Port, "The port to serve /checknosnat and /whoami endpoints on.")
-}
-
-func main() {
-	m := newMasqTester()
-	m.AddFlags(pflag.CommandLine)
-
-	cliflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 

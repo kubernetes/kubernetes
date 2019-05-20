@@ -17,18 +17,8 @@ cases for the same tested behaviour.
 
 ## Usage
 
-The `agnhost` binary is a CLI with the following subcommands:
-
-- `dns-suffix`: It will output the host's configured DNS suffix list, separated by commas.
-- `dns-server-list`: It will output the host's configured DNS servers, separated by commas.
-- `etc-hosts`: It will output the contents of host's `hosts` file. This file's location
-  is `/etc/hosts` on Linux, while on Windows it is `C:/Windows/System32/drivers/etc/hosts`.
-- `pause`: It will pause the execution of the binary. This can be used for containers
-  which have to be kept in a `Running` state for various purposes, including executing
-  other `agnhost` commands.
-- `help`: Prints the binary's help menu. Additionally, it can be followed by another
-  subcommand in order to get more information about that subcommand, including its
-  possible arguments.
+The `agnhost` binary has several subcommands which are can be used to test different
+Kubernetes features; their behaviour and output is not affected by the underlying OS.
 
 For example, let's consider the following `pod.yaml` file:
 
@@ -73,6 +63,123 @@ created with the `pause` argument instead, allowing us execute multiple commands
 ```
 
 The `agnhost` binary is a CLI with the following subcommands:
+
+
+### dns-server-list
+
+It will output the host's configured DNS servers, separated by commas.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost dns-server-list
+```
+
+
+### dns-suffix
+
+It will output the host's configured DNS suffix list, separated by commas.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost dns-suffix
+```
+
+
+### etc-hosts
+
+It will output the contents of host's `hosts` file. This file's location is `/etc/hosts`
+on Linux, while on Windows it is `C:/Windows/System32/drivers/etc/hosts`.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost etc-hosts
+```
+
+
+### fake-gitserver
+
+Fakes a git server. When doing `git clone localhost:8000`, you will clone an empty git
+repo named `8000` on local. You can also use `git clone localhost:8000 my-repo-name` to
+rename that repo.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost fake-gitserver
+```
+
+
+### help
+
+Prints the binary's help menu. Additionally, it can be followed by another subcommand
+in order to get more information about that subcommand, including its possible arguments.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost help
+```
+
+
+### liveness
+
+Starts a simple server that is alive for 10 seconds, then reports unhealthy for the rest
+of its (hopefully) short existence.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost liveness
+```
+
+
+### logs-generator
+
+The `logs-generator` subcommand is a tool to create predictable load on the logs delivery system.
+It generates random lines with predictable format and predictable average length.
+Each line can be later uniquely identified to ensure logs delivery.
+
+Tool is parametrized with the total number of number that should be generated and the duration of
+the generation process. For example, if you want to create a throughput of 100 lines per second
+for a minute, you set total number of lines to 6000 and duration to 1 minute.
+
+Parameters are passed through environment variables. There are no defaults, you should always
+set up container parameters. Total number of line is parametrized through env variable
+`LOGS_GENERATOR_LINES_TOTAL` and duration in go format is parametrized through env variable
+`LOGS_GENERATOR_DURATION`.
+
+Inside the container all log lines are written to the stdout.
+
+Each line is on average 100 bytes long and follows this pattern:
+
+```
+2000-12-31T12:59:59Z <id> <method> /api/v1/namespaces/<namespace>/endpoints/<random_string> <random_number>
+```
+
+Where `<id>` refers to the number from 0 to `total_lines - 1`, which is unique for each
+line in a given run of the container.
+
+Examples:
+
+```console
+docker run -i \
+  gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+  logs-generator --log-lines-total 10 --run-duration 1
+```
+
+```console
+kubectl run logs-generator \
+  --generator=run-pod/v1 \
+  --image=gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+  --restart=Never \
+  -- logs-generator -t 10 -d 1
+```
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/logs-generator/README.md?pixel)]()
+
 
 ### net
 
@@ -173,6 +280,93 @@ Usage:
     kubectl exec test-agnhost -- /agnhost nettest [--port <port>] [--peers <peers>] [--service <service>] [--namespace <namespace>] [--delay-shutdown <delay>]
 ```
 
+
+### no-snat-test
+
+The subcommand requires the following environment variables to be set, and they should be
+valid IP addresses:
+
+- `POD_IP`
+- `NODE_IP`
+
+Serves the following endpoints on the given port (defaults to `8080`).
+
+- `/whoami` - returns the request's IP address.
+- `/checknosnat` - queries  `ip/whoami` for each provided IP (`/checknosnat?ips=ip1,ip2`),
+  and if all the response bodies match the `POD_IP`, it will return a 200 response, 500 otherwise.
+
+Usage:
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+      --restart=Never \
+      --env "POD_IP=<POD_IP>" \
+      --env "NODE_IP=<NODE_IP>" \
+      -- no-snat-test [--port <port>]
+```
+
+
+### no-snat-test-proxy
+
+Serves the `/checknosnat` endpoint on the given port (defaults to `31235`). The endpoint
+proxies the request to the given `target` (`/checknosnat?target=target_ip&ips=ip1,ip2`
+-> `target_ip/checknosnat?ips=ip1,ip2`) and will return the same status as the status
+as the proxied request, or 500 on error.
+
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost no-snat-test-proxy [--port <port>]
+```
+
+
+### pause
+
+It will pause the execution of the binary. This can be used for containers
+which have to be kept in a `Running` state for various purposes, including
+executing other `agnhost` commands.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost pause
+```
+
+
+### port-forward-tester
+
+Listens for TCP connections on a given address and port, optionally checks the data received,
+and sends a configurable number of data chunks, with a configurable interval between chunks.
+
+The subcommand is using the following environment variables:
+
+- `BIND_ADDRESS` (optional): The address on which it will start listening for TCP connections (default value: `localhost`)
+- `BIND_PORT`: The port on which it will start listening for TCP connections.
+- `EXPECTED_CLIENT_DATA` (optional): If set, it will check that the request sends the same exact data.
+- `CHUNKS`: How many chunks of data to write in the response.
+- `CHUNK_SIZE`: The expected size of each written chunk of data. If it does not match the actual size of the written data, it will exit with the exit code `4`.
+- `CHUNK_INTERVAL`: The amount of time to wait in between chunks.
+
+Usage:
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+      --restart=Never \
+      --env "BIND_ADDRESS=localhost" \
+      --env "BIND_PORT=8080" \
+      --env "EXPECTED_CLIENT_DATA='Hello there!'" \
+      --env "CHUNKS=1" \
+      --env "CHUNK_SIZE=10" \
+      --env "CHUNK_INTERVAL=1" \
+      -- port-forward-tester
+```
+
+
 ### webhook (Kubernetes External Admission Webhook)
 
 The subcommand tests MutatingAdmissionWebhook and ValidatingAdmissionWebhook. After deploying
@@ -191,6 +385,6 @@ Usage:
 
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.1` for Linux
-containers, and `e2eteam/agnhost:2.1` for Windows containers. In the future, the same
+The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:1.1` for Linux
+containers, and `e2eteam/agnhost:1.1` for Windows containers. In the future, the same
 repository can be used for both OSes.

@@ -16,7 +16,8 @@ limitations under the License.
 
 // A simple server that is alive for 10 seconds, then reports unhealthy for
 // the rest of its (hopefully) short existence.
-package main
+
+package liveness
 
 import (
 	"fmt"
@@ -24,9 +25,20 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
-func main() {
+// CmdLiveness is used by agnhost Cobra.
+var CmdLiveness = &cobra.Command{
+	Use:   "liveness",
+	Short: "Starts a server that is alive for 10 seconds",
+	Long:  "A simple server that is alive for 10 seconds, then reports unhealthy for the rest of its (hopefully) short existence",
+	Args:  cobra.MaximumNArgs(0),
+	Run:   main,
+}
+
+func main(cmd *cobra.Command, args []string) {
 	started := time.Now()
 	http.HandleFunc("/started", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)

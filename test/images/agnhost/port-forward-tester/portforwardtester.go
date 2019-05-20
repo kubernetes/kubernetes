@@ -26,7 +26,8 @@ limitations under the License.
 // Log messages are written to stdout at various stages of the binary's execution.
 // Test code can retrieve this container's log and validate that the expected
 // behavior is taking place.
-package main
+
+package portforwardtester
 
 import (
 	"fmt"
@@ -35,6 +36,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 func getEnvInt(name string) int {
@@ -58,7 +61,26 @@ func getEnvInt(name string) int {
 // This timeout is somewhat arbitrary (~latency around the planet).
 const rstAvoidanceDelay = 500 * time.Millisecond
 
-func main() {
+// CmdPortForwardTester is used by agnhost Cobra.
+var CmdPortForwardTester = &cobra.Command{
+	Use:   "port-forward-tester",
+	Short: "Creates a TCP server that sends chunks of data",
+	Long: `Listens for TCP connections on a given address and port, optionally checks the data received,
+and sends a configurable number of data chunks, with a configurable interval between chunks.
+
+The subcommand is using the following environment variables:
+
+- BIND_ADDRESS (optional): The address on which it will start listening for TCP connections (default value: localhost)
+- BIND_PORT: The port on which it will start listening for TCP connections.
+- EXPECTED_CLIENT_DATA (optional): If set, it will check that the request sends the same exact data.
+- CHUNKS: How many chunks of data to write in the response.
+- CHUNK_SIZE: The expected size of each written chunk of data. If it does not match the actual size of the written data, it will exit with the exit code 4.
+- CHUNK_INTERVAL: The amount of time to wait in between chunks.`,
+	Args: cobra.MaximumNArgs(0),
+	Run:  main,
+}
+
+func main(cmd *cobra.Command, args []string) {
 	bindAddress := os.Getenv("BIND_ADDRESS")
 	if bindAddress == "" {
 		bindAddress = "localhost"

@@ -2,19 +2,14 @@ package(default_visibility = ["//visibility:public"])
 
 load(
     "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
     "go_library",
-)
-
-go_binary(
-    name = "port-forward-tester",
-    embed = [":go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["portforwardtester.go"],
-    importpath = "k8s.io/kubernetes/test/images/port-forward-tester",
+    srcs = ["gitserver.go"],
+    importpath = "k8s.io/kubernetes/test/images/agnhost/fakegitserver",
+    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
 )
 
 filegroup(
