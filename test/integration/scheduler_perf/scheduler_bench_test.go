@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -220,9 +219,8 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	schedulerConfigFactory, finalFunc := mustSetupScheduler()
+	c, finalFunc := mustSetupScheduler()
 	defer finalFunc()
-	c := schedulerConfigFactory.GetClient()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		c,
@@ -239,12 +237,14 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	podCreator := testutils.NewTestPodCreator(c, config)
 	podCreator.CreatePods()
 
+	options := metav1.ListOptions{}
+	options.FieldSelector = "spec.nodeName!="
 	for {
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := c.CoreV1().Pods("").List(options)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
-		if len(scheduled) >= numExistingPods {
+		if len(scheduled.Items) >= numExistingPods {
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -258,11 +258,11 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	for {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := c.CoreV1().Pods("").List(options)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
-		if len(scheduled) >= numExistingPods+b.N {
+		if len(scheduled.Items) >= numExistingPods+b.N {
 			break
 		}
 		// Note: This might introduce slight deviation in accuracy of benchmark results.
