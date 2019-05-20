@@ -120,6 +120,7 @@ func (o *RestartOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
+// Validate checks validation of 'rollout restart' options
 func (o *RestartOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")

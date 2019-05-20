@@ -130,7 +130,6 @@ pkg/kubectl/cmd/plugin
 pkg/kubectl/cmd/portforward
 pkg/kubectl/cmd/replace
 pkg/kubectl/cmd/rollingupdate
-pkg/kubectl/cmd/rollout
 pkg/kubectl/cmd/run
 pkg/kubectl/cmd/scale
 pkg/kubectl/cmd/set

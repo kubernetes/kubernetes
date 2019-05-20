@@ -120,6 +120,7 @@ func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	return nil
 }
 
+// Validate checks validation of 'rollout resume' options
 func (o *ResumeOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")

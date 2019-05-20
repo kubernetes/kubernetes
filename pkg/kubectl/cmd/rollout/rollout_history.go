@@ -43,8 +43,8 @@ var (
 		kubectl rollout history daemonset/abc --revision=3`)
 )
 
-// RolloutHistoryOptions holds the options for 'rollout history' sub command
-type RolloutHistoryOptions struct {
+// HistoryOptions holds the options for 'rollout history' sub command
+type HistoryOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
@@ -62,9 +62,9 @@ type RolloutHistoryOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewRolloutHistoryOptions returns an initialized RolloutHistoryOptions instance
-func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHistoryOptions {
-	return &RolloutHistoryOptions{
+// NewHistoryOptions returns an initialized HistoryOptions instance
+func NewHistoryOptions(streams genericclioptions.IOStreams) *HistoryOptions {
+	return &HistoryOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		IOStreams:  streams,
 	}
@@ -72,7 +72,7 @@ func NewRolloutHistoryOptions(streams genericclioptions.IOStreams) *RolloutHisto
 
 // NewCmdRolloutHistory returns a Command instance for RolloutHistory sub command
 func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewRolloutHistoryOptions(streams)
+	o := NewHistoryOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
@@ -101,7 +101,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericclioptions.IOStreams
 }
 
 // Complete completes al the required options
-func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *HistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 
 	var err error
@@ -122,7 +122,7 @@ func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, 
 }
 
 // Validate makes sure all the provided values for command-line options are valid
-func (o *RolloutHistoryOptions) Validate() error {
+func (o *HistoryOptions) Validate() error {
 	if len(o.Resources) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
@@ -134,7 +134,7 @@ func (o *RolloutHistoryOptions) Validate() error {
 }
 
 // Run performs the execution of 'rollout history' sub command
-func (o *RolloutHistoryOptions) Run() error {
+func (o *HistoryOptions) Run() error {
 
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).

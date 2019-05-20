@@ -60,8 +60,8 @@ var (
 		kubectl rollout status deployment/nginx`)
 )
 
-// RolloutStatusOptions holds the command-line options for 'rollout status' sub command
-type RolloutStatusOptions struct {
+// StatusOptions holds the command-line options for 'rollout status' sub command
+type StatusOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 
 	Namespace        string
@@ -80,9 +80,9 @@ type RolloutStatusOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewRolloutStatusOptions returns an initialized RolloutStatusOptions instance
-func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatusOptions {
-	return &RolloutStatusOptions{
+// NewStatusOptions returns an initialized StatusOptions instance
+func NewStatusOptions(streams genericclioptions.IOStreams) *StatusOptions {
+	return &StatusOptions{
 		PrintFlags:      genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme),
 		FilenameOptions: &resource.FilenameOptions{},
 		IOStreams:       streams,
@@ -93,7 +93,7 @@ func NewRolloutStatusOptions(streams genericclioptions.IOStreams) *RolloutStatus
 
 // NewCmdRolloutStatus returns a Command instance for the 'rollout status' sub command
 func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewRolloutStatusOptions(streams)
+	o := NewStatusOptions(streams)
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
@@ -121,7 +121,7 @@ func NewCmdRolloutStatus(f cmdutil.Factory, streams genericclioptions.IOStreams)
 }
 
 // Complete completes all the required options
-func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error {
+func (o *StatusOptions) Complete(f cmdutil.Factory, args []string) error {
 	o.Builder = f.NewBuilder
 
 	var err error
@@ -147,7 +147,7 @@ func (o *RolloutStatusOptions) Complete(f cmdutil.Factory, args []string) error 
 }
 
 // Validate makes sure all the provided values for command-line options are valid
-func (o *RolloutStatusOptions) Validate() error {
+func (o *StatusOptions) Validate() error {
 	if len(o.BuilderArgs) == 0 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
 		return fmt.Errorf("required resource not specified")
 	}
@@ -160,7 +160,7 @@ func (o *RolloutStatusOptions) Validate() error {
 }
 
 // Run performs the execution of 'rollout status' sub command
-func (o *RolloutStatusOptions) Run() error {
+func (o *StatusOptions) Run() error {
 	r := o.Builder().
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		NamespaceParam(o.Namespace).DefaultNamespace().
