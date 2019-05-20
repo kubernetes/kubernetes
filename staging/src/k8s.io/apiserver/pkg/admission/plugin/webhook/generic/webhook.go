@@ -24,6 +24,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
@@ -127,7 +128,7 @@ func (a *Webhook) ValidateInitialization() error {
 
 // shouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
 // or an error if an error was encountered during evaluation.
-func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (*WebhookInvocation, *apierrors.StatusError) {
+func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
 	var err *apierrors.StatusError
 	var invocation *WebhookInvocation
 	for _, r := range h.Rules {
@@ -140,6 +141,36 @@ func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) 
 				Kind:        attr.GetKind(),
 			}
 			break
+		}
+	}
+	if invocation == nil && h.MatchPolicy != nil && *h.MatchPolicy == v1beta1.Equivalent {
+		attrWithOverride := &attrWithResourceOverride{Attributes: attr}
+		equivalents := o.GetEquivalentResourceMapper().EquivalentResourcesFor(attr.GetResource(), attr.GetSubresource())
+		// honor earlier rules first
+	OuterLoop:
+		for _, r := range h.Rules {
+			// see if the rule matches any of the equivalent resources
+			for _, equivalent := range equivalents {
+				if equivalent == attr.GetResource() {
+					// exclude attr.GetResource(), which we already checked
+					continue
+				}
+				attrWithOverride.resource = equivalent
+				m := rules.Matcher{Rule: r, Attr: attrWithOverride}
+				if m.Matches() {
+					kind := o.GetEquivalentResourceMapper().KindFor(equivalent, attr.GetSubresource())
+					if kind.Empty() {
+						return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert to %v: unknown kind", equivalent))
+					}
+					invocation = &WebhookInvocation{
+						Webhook:     h,
+						Resource:    equivalent,
+						Subresource: attr.GetSubresource(),
+						Kind:        kind,
+					}
+					break OuterLoop
+				}
+			}
 		}
 	}
 
@@ -155,6 +186,13 @@ func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) 
 	return invocation, nil
 }
 
+type attrWithResourceOverride struct {
+	admission.Attributes
+	resource schema.GroupVersionResource
+}
+
+func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { return a.resource }
+
 // Dispatch is called by the downstream Validate or Admit methods.
 func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfaces) error {
 	if rules.IsWebhookConfigurationResource(attr) {
@@ -169,7 +207,7 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 
 	var relevantHooks []*WebhookInvocation
 	for i := range hooks {
-		invocation, err := a.shouldCallHook(&hooks[i], attr)
+		invocation, err := a.shouldCallHook(&hooks[i], attr, o)
 		if err != nil {
 			return err
 		}
