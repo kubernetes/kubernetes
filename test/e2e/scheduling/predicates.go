@@ -385,9 +385,13 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 
-	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
-	// non-nil NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.
-	ginkgo.It("validates that NodeAffinity is respected if not matching", func() {
+	/*
+		Release : v1.16
+		Testname: Scheduler, NodeAffinity not matching
+		Description: Create a Pod with a NodeAffinity set to a value that does not match a node in the cluster. Since there are no nodes matching
+		the criteria the Pod MUST not be scheduled.
+	*/
+	framework.ConformanceIt("validates that NodeAffinity is respected if not matching", func() {
 		ginkgo.By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
@@ -426,9 +430,13 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, 0, 1, ns)
 	})
 
-	// Keep the same steps with the test on NodeSelector,
-	// but specify Affinity in Pod.Spec.Affinity, instead of NodeSelector.
-	ginkgo.It("validates that required NodeAffinity setting is respected if matching", func() {
+	/*
+		Release : v1.16
+		Testname: Scheduler, Node Affinity matching
+		Description: Create a label on the node {k: v}. Then create a Pod with a NodeAffinity set to {k: v}. Check to see if the Pod is scheduled.
+		When the NodeAffinity matches then Pod MUST be scheduled on that node.
+	*/
+	framework.ConformanceIt("validates that required NodeAffinity setting is respected if matching", func() {
 		nodeName := GetNodeThatCanRunPod(f)
 
 		ginkgo.By("Trying to apply a random label on the found node.")
