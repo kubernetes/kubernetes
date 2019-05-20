@@ -366,8 +366,7 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 // flushUnschedulableQLeftover moves pod which stays in unschedulableQ longer than the durationStayUnschedulableQ
 // to activeQ.
 func (p *PriorityQueue) flushUnschedulableQLeftover() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
+	p.lock.RLock()
 
 	var podsToMove []*framework.PodInfo
 	currentTime := p.clock.Now()
@@ -377,8 +376,11 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}
+	p.lock.RUnlock()
 
 	if len(podsToMove) > 0 {
+		p.lock.Lock()
+		defer p.lock.Unlock()
 		p.movePodsToActiveQueue(podsToMove)
 	}
 }
