@@ -102,7 +102,7 @@ type DesiredStateOfWorld interface {
 	// mounted and attached for terminated pods
 	GetKeepTerminatedPodVolumesForNode(k8stypes.NodeName) bool
 
-	// Mark multiattach error as reported to prevent spamming multiple
+	// Mark multi-attach error as reported to prevent spamming multiple
 	// events for same error
 	SetMultiAttachError(v1.UniqueVolumeName, k8stypes.NodeName)
 
