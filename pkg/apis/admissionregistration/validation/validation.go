@@ -231,6 +231,9 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
 	}
+	if hook.MatchPolicy != nil && !supportedMatchPolicies.Has(string(*hook.MatchPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, supportedMatchPolicies.List()))
+	}
 	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
 	}
@@ -257,6 +260,11 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 var supportedFailurePolicies = sets.NewString(
 	string(admissionregistration.Ignore),
 	string(admissionregistration.Fail),
+)
+
+var supportedMatchPolicies = sets.NewString(
+	string(admissionregistration.Exact),
+	string(admissionregistration.Equivalent),
 )
 
 var supportedSideEffectClasses = sets.NewString(
