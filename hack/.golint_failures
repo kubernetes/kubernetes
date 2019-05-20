@@ -305,7 +305,6 @@ pkg/util/selinux
 pkg/util/sysctl
 pkg/util/sysctl/testing
 pkg/util/system
-pkg/util/taints
 pkg/util/tolerations
 pkg/version/verflag
 pkg/volume
