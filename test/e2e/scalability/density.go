@@ -54,22 +54,28 @@ import (
 )
 
 const (
+	// PodStartupLatencyThreshold holds the latency threashold for pod startup
 	PodStartupLatencyThreshold = 5 * time.Second
-	MinSaturationThreshold     = 2 * time.Minute
+	// MinSaturationThreshold holds the minimum staturation threashold
+	MinSaturationThreshold = 2 * time.Minute
+	// MinPodsPerSecondThroughput holds the minimum pod/sec throughput
 	MinPodsPerSecondThroughput = 8
-	DensityPollInterval        = 10 * time.Second
-	MinPodStartupMeasurements  = 500
+	// DensityPollInterval holds the desity of polling interval
+	DensityPollInterval = 10 * time.Second
+	// MinPodStartupMeasurements holds the minimum number of measurements related to pod-startup
+	MinPodStartupMeasurements = 500
 )
 
-// Maximum container failures this test tolerates before failing.
+// MaxContainerFailures holds the maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
 
-// Maximum no. of missing measurements related to pod-startup that the test tolerates.
+// MaxMissingPodStartupMeasurements holds the maximum number of missing measurements related to pod-startup that the test tolerates.
 var MaxMissingPodStartupMeasurements = 0
 
 // Number of nodes in the cluster (computed inside BeforeEach).
 var nodeCount = 0
 
+// DensityTestConfig holds the configurations for e2e scalability tests
 type DensityTestConfig struct {
 	Configs      []testutils.RunObjectConfig
 	ClientSets   []clientset.Interface
