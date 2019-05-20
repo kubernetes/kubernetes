@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 // A small utility to just serve the hostname on TCP and/or UDP.
-package main
+
+package servehostname
 
 import (
 	"flag"
@@ -27,19 +28,38 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/spf13/cobra"
 )
+
+// CmdServeHostname is used by agnhost Cobra.
+var CmdServeHostname = &cobra.Command{
+	Use:   "serve-hostname",
+	Short: "Serves the hostname",
+	Long:  `Serves the hostname through HTTP / TCP / UDP on the given port.`,
+	Args:  cobra.MaximumNArgs(4),
+	Run:   main,
+}
 
 var (
-	doTCP   = flag.Bool("tcp", false, "Serve raw over TCP.")
-	doUDP   = flag.Bool("udp", false, "Serve raw over UDP.")
-	doHTTP  = flag.Bool("http", true, "Serve HTTP.")
-	doClose = flag.Bool("close", false, "Close connection per each HTTP request")
-	port    = flag.Int("port", 9376, "Port number.")
+	doTCP   bool
+	doUDP   bool
+	doHTTP  bool
+	doClose bool
+	port    int
 )
 
-func main() {
+func init() {
+	CmdServeHostname.Flags().BoolVar(&doTCP, "tcp", false, "Serve raw over TCP.")
+	CmdServeHostname.Flags().BoolVar(&doUDP, "udp", false, "Serve raw over UDP.")
+	CmdServeHostname.Flags().BoolVar(&doHTTP, "http", true, "Serve HTTP.")
+	CmdServeHostname.Flags().BoolVar(&doClose, "close", false, "Close connection per each HTTP request.")
+	CmdServeHostname.Flags().IntVar(&port, "tcp", 9376, "Port number.")
+}
+
+func main(cmd *cobra.Command, args []string) {
 	flag.Parse()
-	if *doHTTP && (*doTCP || *doUDP) {
+	if doHTTP && (doTCP || doUDP) {
 		log.Fatalf("Can't server TCP/UDP mode and HTTP mode at the same time")
 	}
 
@@ -48,8 +68,8 @@ func main() {
 		log.Fatalf("Error from os.Hostname(): %s", err)
 	}
 
-	if *doTCP {
-		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	if doTCP {
+		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 		if err != nil {
 			log.Fatalf("Error from net.Listen(): %s", err)
 		}
@@ -65,8 +85,8 @@ func main() {
 			}
 		}()
 	}
-	if *doUDP {
-		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", *port))
+	if doUDP {
+		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
 		if err != nil {
 			log.Fatalf("Error from net.ResolveUDPAddr(): %s", err)
 		}
@@ -86,11 +106,11 @@ func main() {
 			}
 		}()
 	}
-	if *doHTTP {
+	if doHTTP {
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("HTTP request from %s", r.RemoteAddr)
 
-			if *doClose {
+			if doClose {
 				// Add this header to force to close the connection after serving the request.
 				w.Header().Add("Connection", "close")
 			}
@@ -99,10 +119,10 @@ func main() {
 		})
 		go func() {
 			// Run in a closure so http.ListenAndServe doesn't block
-			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+			log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 		}()
 	}
-	log.Printf("Serving on port %d.\n", *port)
+	log.Printf("Serving on port %d.\n", port)
 	signals := make(chan os.Signal)
 	signal.Notify(signals, syscall.SIGTERM)
 	sig := <-signals

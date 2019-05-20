@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
 	"k8s.io/kubernetes/test/images/agnhost/pause"
 	"k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
+	"k8s.io/kubernetes/test/images/agnhost/serve-hostname"
 	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
 
@@ -51,6 +52,7 @@ func main() {
 	rootCmd.AddCommand(nosnatproxy.CmdNoSnatTestProxy)
 	rootCmd.AddCommand(pause.CmdPause)
 	rootCmd.AddCommand(portforwardtester.CmdPortForwardTester)
+	rootCmd.AddCommand(servehostname.CmdServeHostname)
 	rootCmd.AddCommand(webhook.CmdWebhook)
 
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to

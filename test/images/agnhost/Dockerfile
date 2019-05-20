@@ -24,7 +24,8 @@ RUN apk --update add curl netcat-openbsd iproute2 && rm -rf /var/cache/apk/*
 
 # PORT 8080 needed by: netexec, nettest
 # PORT 8081 needed by: netexec
-EXPOSE 8080 8081
+# PORT 9376 needed by: serve-hostname
+EXPOSE 8080 8081 9376
 
 # from netexec
 RUN mkdir /uploads
