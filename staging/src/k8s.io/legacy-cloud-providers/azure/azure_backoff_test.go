@@ -280,27 +280,40 @@ func TestListVirtualMachinesWithRetry(t *testing.T) {
 		expectedErr error
 	}
 	numVMs := 8
-	getClusterResources(az, numVMs, 4)
 	cases := []struct {
 		cloud    *Cloud
 		expected expectedResponse
+		addVMs   int
 	}{
-		// List vms
+		// Initial (zero vms in cloud) test
 		{
 			cloud: az,
 			expected: expectedResponse{
 				expectedErr: nil,
 			},
 		},
+		// Add vms to cloud to get responses back from List operation
+		{
+			cloud: az,
+			expected: expectedResponse{
+				expectedErr: nil,
+			},
+			addVMs: numVMs,
+		},
 	}
 
 	for _, c := range cases {
+		var expectedVMs int
+		if c.addVMs > 0 {
+			getClusterResources(az, numVMs, 4)
+			expectedVMs = numVMs
+		}
 		vms, err := c.cloud.ListVirtualMachinesWithRetry("rg")
 		if c.expected.expectedErr != err {
 			t.Fatalf("Expected err to be %s, instead got %s", c.expected.expectedErr, err)
 		}
-		if len(vms) != numVMs {
-			t.Fatalf("Expected %d vms from ListVirtualMachinesWithRetry(rg), instead got %d", numVMs, len(vms))
+		if len(vms) != expectedVMs {
+			t.Fatalf("Expected %d vms from ListVirtualMachinesWithRetry(rg), instead got %d", expectedVMs, len(vms))
 		}
 	}
 }
@@ -311,27 +324,40 @@ func TestListVirtualMachines(t *testing.T) {
 		expectedErr error
 	}
 	numVMs := 8
-	getClusterResources(az, numVMs, 4)
 	cases := []struct {
 		cloud    *Cloud
 		expected expectedResponse
+		addVMs   int
 	}{
-		// List vms
+		// Initial (zero vms in cloud) test
 		{
 			cloud: az,
 			expected: expectedResponse{
 				expectedErr: nil,
 			},
 		},
+		// Add vms to cloud to get responses back from List operation
+		{
+			cloud: az,
+			expected: expectedResponse{
+				expectedErr: nil,
+			},
+			addVMs: numVMs,
+		},
 	}
 
 	for _, c := range cases {
+		var expectedVMs int
+		if c.addVMs > 0 {
+			getClusterResources(az, numVMs, 4)
+			expectedVMs = numVMs
+		}
 		vms, err := c.cloud.ListVirtualMachines("rg")
 		if c.expected.expectedErr != err {
 			t.Fatalf("Expected err to be %s, instead got %s", c.expected.expectedErr, err)
 		}
-		if len(vms) != numVMs {
-			t.Fatalf("Expected %d vms from ListVirtualMachines(rg), instead got %d", numVMs, len(vms))
+		if len(vms) != expectedVMs {
+			t.Fatalf("Expected %d vms from ListVirtualMachines(rg), instead got %d", expectedVMs, len(vms))
 		}
 	}
 }
