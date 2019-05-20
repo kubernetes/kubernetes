@@ -9,6 +9,10 @@ go_library(
     name = "go_default_library",
     srcs = ["initsystem.go"],
     importpath = "k8s.io/kubernetes/pkg/util/initsystem",
+    deps = [
+        "//vendor/golang.org/x/sys/windows/svc:go_default_library",
+        "//vendor/golang.org/x/sys/windows/svc/mgr:go_default_library",
+    ],
 )
 
 filegroup(
