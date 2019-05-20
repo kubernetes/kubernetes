@@ -45,13 +45,18 @@ type ExponentialBackoff struct {
 	durationBeforeRetry time.Duration
 }
 
+func NewExponentialBackoff() ExponentialBackoff {
+	return ExponentialBackoff{
+		lastErrorTime: time.Now(),
+	}
+}
+
 // SafeToRetry returns an error if the durationBeforeRetry period for the given
 // lastErrorTime has not yet expired. Otherwise it returns nil.
 func (expBackoff *ExponentialBackoff) SafeToRetry(operationName string) error {
 	if time.Since(expBackoff.lastErrorTime) <= expBackoff.durationBeforeRetry {
 		return NewExponentialBackoffError(operationName, *expBackoff)
 	}
-
 	return nil
 }
 
@@ -75,6 +80,11 @@ func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(operationNam
 		expBackoff.lastErrorTime.Add(expBackoff.durationBeforeRetry),
 		expBackoff.durationBeforeRetry,
 		expBackoff.lastError)
+}
+
+// ElapsedTime returns the elapsed time since its start or last error
+func (expBackoff *ExponentialBackoff) ElapsedTime(operationName string) time.Duration {
+	return time.Since(expBackoff.lastErrorTime)
 }
 
 // NewExponentialBackoffError returns a new instance of ExponentialBackoff error.

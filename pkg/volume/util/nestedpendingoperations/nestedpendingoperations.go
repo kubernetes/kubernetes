@@ -108,6 +108,8 @@ func (grm *nestedPendingOperations) Run(
 		if previousOp.operationPending {
 			// Operation is pending
 			operationKey := getOperationKey(volumeName, podName)
+			klog.V(5).Infof("operationKey[%s] is still in progress, ignoring new operation on pod/volume(%s/%s)", operationKey, podName, volumeName)
+			klog.V(5).Infof("time has elapsed for the pending operation %s is %s", operationKey, previousOp.expBackoff.ElapsedTime(operationKey))
 			return NewAlreadyExistsError(operationKey)
 		}
 
@@ -119,7 +121,7 @@ func (grm *nestedPendingOperations) Run(
 			}
 			// previous operation and new operation are different. reset op. name and exp. backoff
 			grm.operations[previousOpIndex].operationName = generatedOperations.OperationName
-			grm.operations[previousOpIndex].expBackoff = exponentialbackoff.ExponentialBackoff{}
+			grm.operations[previousOpIndex].expBackoff = exponentialbackoff.NewExponentialBackoff()
 		}
 
 		// Update existing operation to mark as pending.
@@ -134,7 +136,7 @@ func (grm *nestedPendingOperations) Run(
 				volumeName:       volumeName,
 				podName:          podName,
 				operationName:    generatedOperations.OperationName,
-				expBackoff:       exponentialbackoff.ExponentialBackoff{},
+				expBackoff:       exponentialbackoff.NewExponentialBackoff(),
 			})
 	}
 
