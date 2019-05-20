@@ -745,6 +745,7 @@ function construct-linux-kubelet-flags {
       #TODO(mikedanese): allow static pods to start before creating a client
       #flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
+      flags+=" --register-with-taints=node-role.kubernetes.io/master=:NoSchedule"
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       flags+=" --register-schedulable=false"
     fi
@@ -1060,6 +1061,18 @@ ETCD_APISERVER_SERVER_KEY: $(yaml-quote ${ETCD_APISERVER_SERVER_KEY_BASE64:-})
 ETCD_APISERVER_SERVER_CERT: $(yaml-quote ${ETCD_APISERVER_SERVER_CERT_BASE64:-})
 ETCD_APISERVER_CLIENT_KEY: $(yaml-quote ${ETCD_APISERVER_CLIENT_KEY_BASE64:-})
 ETCD_APISERVER_CLIENT_CERT: $(yaml-quote ${ETCD_APISERVER_CLIENT_CERT_BASE64:-})
+PROXY_SERVER_CA_KEY: $(yaml-quote ${PROXY_SERVER_CA_KEY_BASE64:-})
+PROXY_SERVER_CA_CERT: $(yaml-quote ${PROXY_SERVER_CA_CERT_BASE64:-})
+PROXY_SERVER_CERT: $(yaml-quote ${PROXY_SERVER_CERT_BASE64:-})
+PROXY_SERVER_KEY: $(yaml-quote ${PROXY_SERVER_KEY_BASE64:-})
+PROXY_SERVER_CLIENT_CERT: $(yaml-quote ${PROXY_SERVER_CLIENT_CERT_BASE64:-})
+PROXY_SERVER_CLIENT_KEY: $(yaml-quote ${PROXY_SERVER_CLIENT_KEY_BASE64:-})
+PROXY_AGENT_CA_KEY: $(yaml-quote ${PROXY_AGENT_CA_KEY_BASE64:-})
+PROXY_AGENT_CA_CERT: $(yaml-quote ${PROXY_AGENT_CA_CERT_BASE64:-})
+PROXY_AGENT_CERT: $(yaml-quote ${PROXY_AGENT_CERT_BASE64:-})
+PROXY_AGENT_KEY: $(yaml-quote ${PROXY_AGENT_KEY_BASE64:-})
+PROXY_AGENT_CLIENT_CERT: $(yaml-quote ${PROXY_AGENT_CLIENT_CERT_BASE64:-})
+PROXY_AGENT_CLIENT_KEY: $(yaml-quote ${PROXY_AGENT_CLIENT_KEY_BASE64:-})
 EOF
 }
 
@@ -1200,6 +1213,13 @@ EOF
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
     cat >>$file <<EOF
 REMOUNT_VOLUME_PLUGIN_DIR: $(yaml-quote ${REMOUNT_VOLUME_PLUGIN_DIR:-true})
+EOF
+  fi
+  if [[ "${master}" == "false" ]]; then
+    cat >>$file <<EOF
+PROXY_AGENT_CA_CERT: $(yaml-quote ${PROXY_AGENT_CA_CERT_BASE64:-})
+PROXY_AGENT_CLIENT_KEY: $(yaml-quote ${PROXY_AGENT_CLIENT_KEY_BASE64:-})
+PROXY_AGENT_CLIENT_CERT: $(yaml-quote ${PROXY_AGENT_CLIENT_CERT_BASE64:-})
 EOF
   fi
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
@@ -1538,6 +1558,7 @@ function create-certs {
   setup-easyrsa
   PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
   AGGREGATOR_PRIMARY_CN="${primary_cn}" AGGREGATOR_SANS="${sans}" generate-aggregator-certs
+  NETWORK_PROXY_PRIMARY_CN="${primary_cn}" NETWORK_PROXY_SANS="${sans}" generate-network-proxy-certs
 
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
@@ -1559,6 +1580,22 @@ function create-certs {
   REQUESTHEADER_CA_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
   PROXY_CLIENT_CERT_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/issued/proxy-client.crt" | base64 | tr -d '\r\n')
   PROXY_CLIENT_KEY_BASE64=$(cat "${AGGREGATOR_CERT_DIR}/pki/private/proxy-client.key" | base64 | tr -d '\r\n')
+
+  # Setting up the Kubernetes API Server Network Proxy auth.
+  # This includes certs for both API Server to Proxy and
+  # Agent to Proxy.
+  PROXY_SERVER_CA_KEY_BASE64=$(cat "${PROXY_SERVER_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
+  PROXY_SERVER_CA_CERT_BASE64=$(cat "${PROXY_SERVER_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  PROXY_SERVER_CERT_BASE64=$(cat "${PROXY_SERVER_CERT_DIR}/pki/issued/server.crt" | base64 | tr -d '\r\n')
+  PROXY_SERVER_KEY_BASE64=$(cat "${PROXY_SERVER_CERT_DIR}/pki/private/server.key" | base64 | tr -d '\r\n')
+  PROXY_SERVER_CLIENT_CERT_BASE64=$(cat "${PROXY_SERVER_CERT_DIR}/pki/issued/client.crt" | base64 | tr -d '\r\n')
+  PROXY_SERVER_CLIENT_KEY_BASE64=$(cat "${PROXY_SERVER_CERT_DIR}/pki/private/client.key" | base64 | tr -d '\r\n')
+  PROXY_AGENT_CA_KEY_BASE64=$(cat "${PROXY_AGENT_CERT_DIR}/pki/private/ca.key" | base64 | tr -d '\r\n')
+  PROXY_AGENT_CA_CERT_BASE64=$(cat "${PROXY_AGENT_CERT_DIR}/pki/ca.crt" | base64 | tr -d '\r\n')
+  PROXY_AGENT_CERT_BASE64=$(cat "${PROXY_AGENT_CERT_DIR}/pki/issued/server.crt" | base64 | tr -d '\r\n')
+  PROXY_AGENT_KEY_BASE64=$(cat "${PROXY_AGENT_CERT_DIR}/pki/private/server.key" | base64 | tr -d '\r\n')
+  PROXY_AGENT_CLIENT_CERT_BASE64=$(cat "${PROXY_AGENT_CERT_DIR}/pki/issued/client.crt" | base64 | tr -d '\r\n')
+  PROXY_AGENT_CLIENT_KEY_BASE64=$(cat "${PROXY_AGENT_CERT_DIR}/pki/private/client.key" | base64 | tr -d '\r\n')
 }
 
 # Set up easy-rsa directory structure.
@@ -1579,9 +1616,15 @@ function setup-easyrsa {
     mkdir easy-rsa-master/kubelet
     cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/kubelet
     mkdir easy-rsa-master/aggregator
-    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator) &>${cert_create_debug_output} || true
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/aggregator
+    mkdir easy-rsa-master/proxy-server
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/proxy-server
+    mkdir easy-rsa-master/proxy-agent
+    cp -r easy-rsa-master/easyrsa3/* easy-rsa-master/proxy-agent) &>${cert_create_debug_output} || true
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   AGGREGATOR_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/aggregator"
+  PROXY_SERVER_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/proxy-server"
+  PROXY_AGENT_CERT_DIR="${KUBE_TEMP}/easy-rsa-master/proxy-agent"
   if [ ! -x "${CERT_DIR}/easyrsa" -o ! -x "${AGGREGATOR_CERT_DIR}/easyrsa" ]; then
     # TODO(roberthbailey,porridge): add better error handling here,
     # see https://github.com/kubernetes/kubernetes/issues/55229
@@ -1715,7 +1758,112 @@ function generate-aggregator-certs {
   fi
 }
 
+# Runs the easy RSA commands to generate server side certificate files
+# for the network proxy. This includes both server side to both
+# proxy-server and proxy-agent.
+# The generated files are in ${PROXY_SERVER_CERT_DIR} and
+# ${PROXY_AGENT_CERT_DIR}
 #
+# Assumed vars
+#   KUBE_TEMP
+#   NETWORK_PROXY_CERT_DIR
+#   NETWORK_PROXY_PRIMARY_CN: Primary canonical name
+#   NETWORK_PROXY_SANS: Subject alternate names
+#
+function generate-network-proxy-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    # Make the client <-> proxy-server server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/proxy-server"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${NETWORK_PROXY_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="IP:127.0.0.1,${NETWORK_PROXY_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
+    # create the network-proxy server cert with the correct groups
+    echo '{"CN":"network-proxy","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-server
+    #mv "server-key.pem" "pki/private/server.key"
+    #mv "server.pem" "pki/issued/server.crt"
+    #mv "client-key.pem" "pki/private/client.key"
+    #mv "client.pem" "pki/issued/client.crt"
+    rm -f "proxy-server.csr"
+
+    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
+    #./easyrsa --dn-mode=org \
+    #  --req-cn=proxy-clientcfg --req-org=system:aggregator \
+    #  --req-c= --req-st= --req-city= --req-email= --req-ou= \
+    #  build-client-full proxy-clientcfg nopass
+
+    # Make the agent <-> proxy-server server side certificates.
+    cd "${KUBE_TEMP}/easy-rsa-master/proxy-agent"
+    ./easyrsa init-pki
+    # this puts the cert into pki/ca.crt and the key into pki/private/ca.key
+    ./easyrsa --batch "--req-cn=${NETWORK_PROXY_PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${NETWORK_PROXY_SANS}" build-server-full server nopass
+    ./easyrsa build-client-full client nopass
+
+    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
+
+    # make the config for the signer
+    echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
+    # create the network-proxy server cert with the correct groups
+    echo '{"CN":"network-proxy","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-agent
+    #mv "server-key.pem" "pki/private/server.key"
+    #mv "server.pem" "pki/issued/server.crt"
+    #mv "client-key.pem" "pki/private/client.key"
+    #mv "client.pem" "pki/issued/client.crt"
+    rm -f "proxy-agent.csr"
+
+    echo `ls ${PROXY_SERVER_CERT_DIR}/pki/`
+    echo `ls ${PROXY_SERVER_CERT_DIR}/pki/private/`
+    echo `ls ${PROXY_SERVER_CERT_DIR}/pki/issued/`
+    echo `ls ${PROXY_AGENT_CERT_DIR}/pki/`
+    echo `ls ${PROXY_AGENT_CERT_DIR}/pki/private/`
+    echo `ls ${PROXY_AGENT_CERT_DIR}/pki/issued/`
+    echo "completed main certificate section") &>${cert_create_debug_output} || true
+
+    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
+    #./easyrsa --dn-mode=org \
+    #  --req-cn=proxy-clientcfg --req-org=system:aggregator \
+    #  --req-c= --req-st= --req-city= --req-email= --req-ou= \
+    #  build-client-full proxy-clientcfg nopass) &>${cert_create_debug_output} || true
+    #
+  local output_file_missing=0
+  local output_file
+  for output_file in \
+    "${PROXY_SERVER_CERT_DIR}/pki/private/ca.key" \
+    "${PROXY_SERVER_CERT_DIR}/pki/ca.crt" \
+    "${PROXY_SERVER_CERT_DIR}/pki/issued/server.crt" \
+    "${PROXY_SERVER_CERT_DIR}/pki/private/server.key" \
+    "${PROXY_SERVER_CERT_DIR}/pki/issued/client.crt" \
+    "${PROXY_SERVER_CERT_DIR}/pki/private/client.key" \
+    "${PROXY_AGENT_CERT_DIR}/pki/private/ca.key" \
+    "${PROXY_AGENT_CERT_DIR}/pki/ca.crt" \
+    "${PROXY_AGENT_CERT_DIR}/pki/issued/server.crt" \
+    "${PROXY_AGENT_CERT_DIR}/pki/private/server.key" \
+    "${PROXY_AGENT_CERT_DIR}/pki/issued/client.crt" \
+    "${PROXY_AGENT_CERT_DIR}/pki/private/client.key"
+  do
+    if [[ ! -s "${output_file}" ]]; then
+      echo "Expected file ${output_file} not created" >&2
+      output_file_missing=1
+    fi
+  done
+  if (( $output_file_missing )); then
+    # TODO(roberthbailey,porridge): add better error handling here,
+    # see https://github.com/kubernetes/kubernetes/issues/55229
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate proxy-server certificates: Aborting ===" >&2
+    exit 2
+  fi
+}
+
 # Using provided master env, extracts value from provided key.
 #
 # Args:
@@ -1755,6 +1903,16 @@ function parse-master-env() {
   ETCD_APISERVER_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_SERVER_CERT")
   ETCD_APISERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_KEY")
   ETCD_APISERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "ETCD_APISERVER_CLIENT_CERT")
+  PROXY_SERVER_CA_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_SERVER_CA_KEY")
+  PROXY_SERVER_CA_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_SERVER_CA_CERT")
+  PROXY_SERVER_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_SERVER_CERT")
+  PROXY_SERVER_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_SERVER_KEY")
+  PROXY_SERVER_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_SERVER_CLIENT_CERT")
+  PROXY_SERVER_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_SERVER_CLIENT_KEY")
+  PROXY_AGENT_CA_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_AGENT_CA_KEY")
+  PROXY_AGENT_CA_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_AGENT_CA_CERT")
+  PROXY_AGENT_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_AGENT_CERT")
+  PROXY_AGENT_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_AGENT_KEY")
 }
 
 # Update or verify required gcloud components are installed
@@ -2492,6 +2650,13 @@ function create-master() {
     --target-tags "${MASTER_TAG}" \
     --allow tcp:443 &
 
+  echo "Configuring firewall for apiserver network proxy"
+  gcloud compute firewall-rules create "${MASTER_NAME}-network-proxy" \
+    --project "${NETWORK_PROJECT}" \
+    --network "${NETWORK}" \
+    --target-tags "${MASTER_TAG}" \
+    --allow tcp:8132 &
+
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.
   gcloud compute disks create "${MASTER_NAME}-pd" \
@@ -3176,7 +3341,7 @@ function kube-down() {
   # If there are no more remaining master replicas, we should delete all remaining network resources.
   if [[ "${REMAINING_MASTER_COUNT}" -eq 0 ]]; then
     # Delete firewall rule for the master, etcd servers, and nodes.
-    delete-firewall-rules "${MASTER_NAME}-https" "${MASTER_NAME}-etcd" "${NODE_TAG}-all"
+    delete-firewall-rules "${MASTER_NAME}-https" "${MASTER_NAME}-etcd" "${NODE_TAG}-all" "${MASTER_NAME}-network-proxy"
     # Delete the master's reserved IP
     if gcloud compute addresses describe "${MASTER_NAME}-ip" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
       gcloud compute addresses delete \

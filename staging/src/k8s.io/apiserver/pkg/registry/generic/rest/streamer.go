@@ -17,9 +17,16 @@ limitations under the License.
 package rest
 
 import (
+	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"k8s.io/klog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -61,11 +68,75 @@ func (s *LocationStreamer) InputStream(ctx context.Context, apiVersion, acceptHe
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
+	proxyAddress := "127.0.0.1:8131"
+	requestAddress := s.Location.Host
+	klog.Warningf("Sending request to %q.", requestAddress)
+
+	clientCert := "/etc/srv/kubernetes/pki/proxy-server/client.crt"
+	clientKey := "/etc/srv/kubernetes/pki/proxy-server/client.key"
+	caCert := "/etc/srv/kubernetes/pki/proxy-server/ca.crt"
+	clientCerts, err := tls.LoadX509KeyPair(clientCert, clientKey)
+	if err != nil {
+		return nil, false, "", fmt.Errorf("failed to read key pair %s & %s, got %v", clientCert, clientKey, err)
+	}
+	certPool := x509.NewCertPool()
+	certBytes, err := ioutil.ReadFile(caCert)
+	if err != nil {
+		return nil, false, "", fmt.Errorf("failed to read cert file %s, got %v", caCert, err)
+	}
+	ok := certPool.AppendCertsFromPEM(certBytes)
+	if !ok {
+		return nil, false, "", fmt.Errorf("failed to append CA cert to the cert pool")
+	}
+
+	proxyConn, err := tls.Dial("tcp", proxyAddress,
+		&tls.Config {
+			ServerName: "kubernetes-master",
+			Certificates: []tls.Certificate{clientCerts},
+			RootCAs: certPool,
+			//InsecureSkipVerify: true,
+		},
+	)
+	if err != nil {
+		return nil, false, "",fmt.Errorf("dialing proxy %q failed: %v", proxyAddress, err)
+	}
+	fmt.Fprintf(proxyConn, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", requestAddress, "127.0.0.1")
+	br := bufio.NewReader(proxyConn)
+	res, err := http.ReadResponse(br, nil)
+	if err != nil {
+		return nil, false, "", fmt.Errorf("reading HTTP response from CONNECT to %s via proxy %s failed: %v",
+			requestAddress, proxyAddress, err)
+	}
+	if res.StatusCode != 200 {
+		return nil, false, "", fmt.Errorf("proxy error from %s while dialing %s: %v", proxyAddress, requestAddress, res.Status)
+	}
+
+	// It's safe to discard the bufio.Reader here and return the
+	// original TCP conn directly because we only use this for
+	// TLS, and in TLS the client speaks first, so we know there's
+	// no unbuffered data. But we can double-check.
+	if br.Buffered() > 0 {
+		return nil, false, "", fmt.Errorf("unexpected %d bytes of buffered data from CONNECT proxy %q",
+			br.Buffered(), proxyAddress)
+	}
+
+	if httpTransport, ok := transport.(*http.Transport); ok {
+		httpTransport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return proxyConn, nil
+		}
+		klog.Warningf("About to proxy request %s over %s.", s.Location.String(), proxyAddress)
+	} else {
+		klog.Warningf("Failed to set proxy on transport as transport is type %T.", transport)
+	}
+
 	client := &http.Client{
 		Transport:     transport,
 		CheckRedirect: s.RedirectChecker,
 	}
 	req, err := http.NewRequest("GET", s.Location.String(), nil)
+	if err != nil {
+		return nil, false, "", fmt.Errorf("failed to construct request for %s, got %v", s.Location.String(), err)
+	}
 	// Pass the parent context down to the request to ensure that the resources
 	// will be release properly.
 	req = req.WithContext(ctx)

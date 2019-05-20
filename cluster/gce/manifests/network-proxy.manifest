@@ -1,0 +1,79 @@
+{
+"apiVersion": "v1",
+"kind": "Pod",
+"metadata": {
+  "name":"network-proxy",
+  "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": "",
+    "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
+  }
+},
+"spec":{
+"hostNetwork": true,
+"containers": [
+    {
+    "name": "network-proxy-container",
+    "image": "gcr.io/wfender-test/proxy-server:latest",
+    "resources": {
+      "requests": {
+        "cpu": "{{ cpulimit }}"
+      }
+    },
+    "command": [
+              "/proxy-server"
+    ],
+    "args": [
+      {{params}}
+    ],
+    {{container_env}}
+    "livenessProbe": {
+      "httpGet": {
+        "scheme": "HTTP",
+        "host": "127.0.0.1",
+        "port": {{admin_port}},
+        "path": "/healthz"
+      },
+      "initialDelaySeconds": {{ liveness_probe_initial_delay }},
+      "timeoutSeconds": 60
+    },
+    "ports": [
+      { "name": "serverport",
+        "containerPort": {{ server_port }},
+        "hostPort": {{ server_port }}
+      },
+      { "name": "agentport",
+        "containerPort": {{ agent_port }},
+        "hostPort": {{ agent_port }}
+      },
+      { "name": "adminport",
+        "containerPort": {{ admin_port }},
+        "hostPort": {{ admin_port }}
+      }
+        ],
+    "volumeMounts": [
+      { "name": "varlognetworkproxy",
+        "mountPath": "/var/log/network-proxy.log",
+        "readOnly": false
+      },
+      { "name": "pki",
+        "mountPath": "/etc/srv/kubernetes/pki",
+        "readOnly": true
+      }
+    ]
+    }
+],
+"volumes": [
+  { "name": "varlognetworkproxy",
+    "hostPath": {
+        "path": "/var/log/network-proxy.log",
+        "type": "FileOrCreate"
+    }
+  },
+  { "name": "pki",
+    "hostPath": {
+        "path": "/etc/srv/kubernetes/pki"
+    }
+  }
+]
+}}

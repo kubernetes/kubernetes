@@ -25,6 +25,24 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+function convert-manifest-params {
+  # A helper function to convert the manifest args from a string to a list of
+  # flag arguments.
+  # Old format:
+  #   command=["/bin/sh", "-c", "exec KUBE_EXEC_BINARY --param1=val1 --param2-val2"].
+  # New format:
+  #   command=["KUBE_EXEC_BINARY"]  # No shell dependencies.
+  #   args=["--param1=val1", "--param2-val2"]
+  IFS=' ' read -ra FLAGS <<< "$1"
+  params=""
+  for flag in "${FLAGS[@]}"; do
+    params+="\n\"$flag\","
+  done
+  if [ ! -z $params ]; then
+    echo "${params::-1}"  #  drop trailing comma
+  fi
+}
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -495,6 +513,14 @@ function create-node-pki {
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
+
+  mkdir -p "${pki_dir}/proxy-agent"
+  PROXY_AGENT_CA_CERT_PATH="${pki_dir}/proxy-agent/ca.crt"
+  PROXY_AGENT_CLIENT_KEY_PATH="${pki_dir}/proxy-agent/client.key"
+  PROXY_AGENT_CLIENT_CERT_PATH="${pki_dir}/proxy-agent/client.crt"
+  write-pki-data "${PROXY_AGENT_CA_CERT}" "${PROXY_AGENT_CA_CERT_PATH}"
+  write-pki-data "${PROXY_AGENT_CLIENT_KEY}" "${PROXY_AGENT_CLIENT_KEY_PATH}"
+  write-pki-data "${PROXY_AGENT_CLIENT_CERT}" "${PROXY_AGENT_CLIENT_CERT_PATH}"
 }
 
 function create-master-pki {
@@ -557,6 +583,42 @@ function create-master-pki {
 
     PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
     write-pki-data "${PROXY_CLIENT_CERT}" "${PROXY_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ ! -z "${PROXY_SERVER_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/proxy-server
+    PROXY_SERVER_CA_KEY_PATH="${pki_dir}/proxy-server/ca.key"
+    write-pki-data "${PROXY_SERVER_CA_KEY}" "${PROXY_SERVER_CA_KEY_PATH}"
+
+    PROXY_SERVER_CA_CERT_PATH="${pki_dir}/proxy-server/ca.crt"
+    write-pki-data "${PROXY_SERVER_CA_CERT}" "${PROXY_SERVER_CA_CERT_PATH}"
+
+    PROXY_SERVER_KEY_PATH="${pki_dir}/proxy-server/server.key"
+    write-pki-data "${PROXY_SERVER_KEY}" "${PROXY_SERVER_KEY_PATH}"
+
+    PROXY_SERVER_CERT_PATH="${pki_dir}/proxy-server/server.crt"
+    write-pki-data "${PROXY_SERVER_CERT}" "${PROXY_SERVER_CERT_PATH}"
+
+    PROXY_SERVER_CLIENT_KEY_PATH="${pki_dir}/proxy-server/client.key"
+    write-pki-data "${PROXY_SERVER_CLIENT_KEY}" "${PROXY_SERVER_CLIENT_KEY_PATH}"
+
+    PROXY_SERVER_CLIENT_CERT_PATH="${pki_dir}/proxy-server/client.crt"
+    write-pki-data "${PROXY_SERVER_CLIENT_CERT}" "${PROXY_SERVER_CLIENT_CERT_PATH}"
+  fi
+
+  if [[ ! -z "${PROXY_AGENT_CA_CERT:-}" ]]; then
+    mkdir -p "${pki_dir}"/proxy-agent
+    PROXY_AGENT_CA_KEY_PATH="${pki_dir}/proxy-agent/ca.key"
+    write-pki-data "${PROXY_AGENT_CA_KEY}" "${PROXY_AGENT_CA_KEY_PATH}"
+
+    PROXY_AGENT_CA_CERT_PATH="${pki_dir}/proxy-agent/ca.crt"
+    write-pki-data "${PROXY_AGENT_CA_CERT}" "${PROXY_AGENT_CA_CERT_PATH}"
+
+    PROXY_AGENT_KEY_PATH="${pki_dir}/proxy-agent/server.key"
+    write-pki-data "${PROXY_AGENT_KEY}" "${PROXY_AGENT_KEY_PATH}"
+
+    PROXY_AGENT_CERT_PATH="${pki_dir}/proxy-agent/server.crt"
+    write-pki-data "${PROXY_AGENT_CERT}" "${PROXY_AGENT_CERT_PATH}"
   fi
 }
 
@@ -1137,6 +1199,10 @@ function create-master-etcd-apiserver-auth {
    fi
 }
 
+function create-master-network-proxy-apiserver-auth {
+  echo TODO: implement create-master-network-proxy-apiserver-auth
+}
+
 function assemble-docker-flags {
   echo "Assemble docker command line flags"
   local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -1471,6 +1537,49 @@ function start-etcd-servers {
 
   prepare-log-file /var/log/etcd-events.log
   prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
+}
+
+# Replaces the variables in the network-proxy manifest file with the real values, and then
+# copy the file to the manifest dir
+# $1: value for variable "cpulimit"
+# $2: value for variable "server_port"
+# $3: value for variable "agent_port"
+# $4: value for bariable "admin_port"
+function prepare-network-proxy-manifest {
+  local -r temp_file="/tmp/network-proxy.manifest"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/network-proxy.manifest" "${temp_file}"
+  sed -i -e "s@{{ *cpulimit *}}@$1@g" "${temp_file}"
+  params+=" --log-file=/var/log/network-proxy.log"
+  params+=" --logtostderr=false"
+  params+=" --log-file-max-size=0"
+  params+=" --serverCaCert=${PROXY_SERVER_CA_CERT_PATH}"
+  params+=" --serverCert=${PROXY_SERVER_CERT_PATH}"
+  params+=" --serverKey=${PROXY_SERVER_KEY_PATH}"
+  params+=" --clusterCaCert=${PROXY_AGENT_CA_CERT_PATH}"
+  params+=" --clusterCert=${PROXY_AGENT_CERT_PATH}"
+  params+=" --clusterKey=${PROXY_AGENT_KEY_PATH}"
+  params+=" --mode=http-connect"
+  params+=" --serverPort=$2"
+  params+=" --agentPort=$3"
+  params+=" --adminPort=$4"
+  params="$(convert-manifest-params "${params}")"
+  sed -i -e "s@{{params}}@${params}@g" "${temp_file}"
+  local container_env=""
+  sed -i -e "s@{{container_env}}@${container_env}@g" ${temp_file}
+  sed -i -e "s@{{ *server_port *}}@$2@g" "${temp_file}"
+  sed -i -e "s@{{ *agent_port *}}@$3@g" "${temp_file}"
+  sed -i -e "s@{{ *admin_port *}}@$4@g" "${temp_file}"
+  sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
+  mv "${temp_file}" /etc/kubernetes/manifests
+}
+
+# Starts etcd server pod (and etcd-events pod if needed).
+# More specifically, it prepares dirs and files, sets the variable value
+# in the manifests, and copies them to /etc/kubernetes/manifests.
+function start-network-proxy-servers {
+  echo "Start network proxy pods"
+  prepare-log-file /var/log/kube-proxy.log
+  prepare-network-proxy-manifest "40m" "8131" "8132" "8133"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -2613,6 +2722,9 @@ EOF
       setup-addon-manifests "addons" "node-termination-handler"
       setup-node-termination-handler-manifest
   fi
+  # Setting up the network-agent daemonset
+  setup-addon-manifests "addons" "apiserver-network-proxy"
+  setup-apiserver-network-proxy-manifest
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     # Create a new directory for the DNS addon and prepend a "0" on the name.
     # Prepending "0" to the directory ensures that add-on manager
@@ -2709,6 +2821,11 @@ function setup-node-termination-handler-manifest {
     if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
         sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
     fi
+}
+
+function setup-apiserver-network-proxy-manifest {
+    local -r manifest="/etc/kubernetes/addons/apiserver-network-proxy/daemonset.yaml"
+    sed -i "s|__APISERVER_IP__|${KUBERNETES_MASTER_NAME}|g" "${manifest}"
 }
 
 # Setups manifests for ingress controller and gce-specific policies for service controller.
@@ -2992,6 +3109,7 @@ function main() {
     create-master-pki
     create-master-auth
     ensure-master-bootstrap-kubectl-auth
+    create-master-network-proxy-apiserver-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -3025,6 +3143,7 @@ function main() {
       start-etcd-empty-dir-cleanup-pod
     fi
     start-kube-apiserver
+    start-network-proxy-servers
     start-kube-controller-manager
     start-kube-scheduler
     wait-till-apiserver-ready

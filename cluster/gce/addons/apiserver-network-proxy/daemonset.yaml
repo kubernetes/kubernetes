@@ -1,0 +1,61 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: proxy-agent
+  namespace: kube-system
+  name: proxy-agent
+spec:
+  selector:
+    matchLabels:
+      k8s-app: proxy-agent
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s-app: proxy-agent
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      priorityClassName: system-cluster-critical
+      # Necessary to reboot node
+      hostPID: true
+      volumes:
+        - name: varlognetworkagent
+          hostPath:
+            path: /var/log/network-agent.log
+            type: FileOrCreate
+        - name: pki
+          hostPath:
+            path: /etc/srv/kubernetes/pki
+      containers:
+        - image: gcr.io/wfender-test/proxy-agent:latest
+          name: proxy-agent
+          command: ["/proxy-agent"]
+          args: ["--log-file=/var/log/network-agent.log", "--logtostderr=false", "--log-file-max-size=0", "--caCert=/etc/srv/kubernetes/pki/proxy-agent/ca.crt", "--agentCert=/etc/srv/kubernetes/pki/proxy-agent/client.crt", "--agentKey=/etc/srv/kubernetes/pki/proxy-agent/client.key", "--proxyServerHost=__APISERVER_IP__", "--proxyServerPort=8132"]
+          securityContext:
+            capabilities:
+              # Necessary to reboot node
+              add: ["SYS_BOOT"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            limits:
+              cpu: 50m
+              memory: 30Mi
+          volumeMounts:
+            - name: pki
+              mountPath: /etc/srv/kubernetes/pki
+            - name: varlognetworkagent
+              mountPath: /var/log/network-agent.log
+              readOnly: false
