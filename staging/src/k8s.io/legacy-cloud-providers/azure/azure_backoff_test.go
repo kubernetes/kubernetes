@@ -226,6 +226,7 @@ func TestRequestBackoff(t *testing.T) {
 }
 
 func TestGetVirtualMachineWithRetry(t *testing.T) {
+	az := getTestCloud()
 	type expectedResponse struct {
 		expectedVM  compute.VirtualMachine
 		expectedErr error
@@ -233,26 +234,23 @@ func TestGetVirtualMachineWithRetry(t *testing.T) {
 	explicitVMNameValue := "bar"
 	dataSource, fakeCache := newFakeCacheVirtualMachine(t)
 	dataSource.set(map[string]*compute.VirtualMachine{explicitVMNameValue: &compute.VirtualMachine{Name: &explicitVMNameValue}})
+	az.vmCache = fakeCache
 	cases := []struct {
 		cloud    *Cloud
 		vmName   types.NodeName
 		expected expectedResponse
 	}{
-		// Backoff not enabled, get non-existent vm
+		// Get non-existent vm
 		{
-			cloud: &Cloud{
-				vmCache: fakeCache,
-			},
+			cloud:  az,
 			vmName: "foo",
 			expected: expectedResponse{
 				expectedErr: cloudprovider.InstanceNotFound,
 			},
 		},
-		// Backoff not enabled, get existent vm
+		// Get existent vm
 		{
-			cloud: &Cloud{
-				vmCache: fakeCache,
-			},
+			cloud:  az,
 			vmName: types.NodeName(explicitVMNameValue),
 			expected: expectedResponse{
 				expectedVM: compute.VirtualMachine{
@@ -272,6 +270,68 @@ func TestGetVirtualMachineWithRetry(t *testing.T) {
 			if *c.expected.expectedVM.Name != *vm.Name {
 				t.Fatalf("Expected vm Name to be %s, instead got %s", *c.expected.expectedVM.Name, *vm.Name)
 			}
+		}
+	}
+}
+
+func TestListVirtualMachinesWithRetry(t *testing.T) {
+	az := getTestCloud()
+	type expectedResponse struct {
+		expectedErr error
+	}
+	numVMs := 8
+	getClusterResources(az, numVMs, 4)
+	cases := []struct {
+		cloud    *Cloud
+		expected expectedResponse
+	}{
+		// List vms
+		{
+			cloud: az,
+			expected: expectedResponse{
+				expectedErr: nil,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		vms, err := c.cloud.ListVirtualMachinesWithRetry("rg")
+		if c.expected.expectedErr != err {
+			t.Fatalf("Expected err to be %s, instead got %s", c.expected.expectedErr, err)
+		}
+		if len(vms) != numVMs {
+			t.Fatalf("Expected %d vms from ListVirtualMachinesWithRetry(rg), instead got %d", numVMs, len(vms))
+		}
+	}
+}
+
+func TestListVirtualMachines(t *testing.T) {
+	az := getTestCloud()
+	type expectedResponse struct {
+		expectedErr error
+	}
+	numVMs := 8
+	getClusterResources(az, numVMs, 4)
+	cases := []struct {
+		cloud    *Cloud
+		expected expectedResponse
+	}{
+		// List vms
+		{
+			cloud: az,
+			expected: expectedResponse{
+				expectedErr: nil,
+			},
+		},
+	}
+
+	for _, c := range cases {
+		vms, err := c.cloud.ListVirtualMachines("rg")
+		if c.expected.expectedErr != err {
+			t.Fatalf("Expected err to be %s, instead got %s", c.expected.expectedErr, err)
+		}
+		if len(vms) != numVMs {
+			t.Fatalf("Expected %d vms from ListVirtualMachines(rg), instead got %d", numVMs, len(vms))
 		}
 	}
 }
