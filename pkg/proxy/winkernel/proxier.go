@@ -1149,8 +1149,27 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).Infof("Hns LoadBalancer resource created for nodePort resources %v, Id [%s]", svcInfo.clusterIP, hnsLoadBalancer.hnsID)
 		}
 
+		if svcInfo.onlyNodeLocalEndpoints {
+			// Only apply externalIPs policy for local endpoints.
+			localEndpoints := []endpointsInfo{}
+			for _, ep := range hnsEndpoints {
+				if ep.isLocal {
+					localEndpoints = append(localEndpoints, ep)
+				}
+			}
+			if len(localEndpoints) != len(hnsEndpoints) {
+				hnsEndpoints = localEndpoints
+			}
+		}
+
 		// Create a Load Balancer Policy for each external IP
 		for _, externalIP := range svcInfo.externalIPs {
+			if len(hnsEndpoints) == 0 && externalIP.hnsID != "" {
+				// Delete existing policy if no endpoints now.
+				hns.deleteLoadBalancer(externalIP.hnsID)
+				continue
+			}
+
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
@@ -1171,6 +1190,12 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		// Create a Load Balancer Policy for each loadbalancer ingress
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
+			if len(hnsEndpoints) == 0 && lbIngressIP.hnsID != "" {
+				// Delete existing policy if no endpoints now.
+				hns.deleteLoadBalancer(lbIngressIP.hnsID)
+				continue
+			}
+
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
