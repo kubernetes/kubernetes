@@ -76,6 +76,7 @@ go_test(
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/phases/certs:go_default_library",
+        "//cmd/kubeadm/app/phases/certs/renewal:go_default_library",
         "//cmd/kubeadm/app/phases/controlplane:go_default_library",
         "//cmd/kubeadm/app/phases/etcd:go_default_library",
         "//cmd/kubeadm/app/phases/kubeconfig:go_default_library",

@@ -16,12 +16,15 @@ limitations under the License.
 
 // Package leaderelection implements leader election of a set of endpoints.
 // It uses an annotation in the endpoints object to store the record of the
-// election state.
+// election state. This implementation does not guarantee that only one
+// client is acting as a leader (a.k.a. fencing).
 //
-// This implementation does not guarantee that only one client is acting as a
-// leader (a.k.a. fencing). A client observes timestamps captured locally to
-// infer the state of the leader election. Thus the implementation is tolerant
-// to arbitrary clock skew, but is not tolerant to arbitrary clock skew rate.
+// A client observes timestamps captured locally to infer the state of the
+// leader election. Thus the implementation is tolerant to arbitrary clock
+// skew, but is not tolerant to arbitrary clock skew rate. Timestamp(renew time)
+// is not meaningful if it was collected on another machine. The implementation
+// of this client only acts on locally collected timestamps and cannot rely on
+// the accuracy of timestamp in the record for correctness.
 //
 // However the level of tolerance to skew rate can be configured by setting
 // RenewDeadline and LeaseDuration appropriately. The tolerance expressed as a
@@ -104,7 +107,15 @@ type LeaderElectionConfig struct {
 
 	// LeaseDuration is the duration that non-leader candidates will
 	// wait to force acquire leadership. This is measured against time of
-	// last observed ack.
+	// last observed ack. A client needs to wait a full LeaseDuration without
+	// observing a change to the record before it can attempt to take over even
+	// when a client with a different identity against the record's starts and
+	// the renew time in the record is older than LeaseDuration. A.k.a., when
+	// all clients are shutdown and after at least a LeaseDuration, clients
+	// started with different identities against the record's must wait a full
+	// LeaseDuration before acquiring a lock. Thus LeaseDuration should be as
+	// short as possible to avoid a possible long waiting. LeaseDuration is 15
+	// seconds in core Kubernetes components.
 	LeaseDuration time.Duration
 	// RenewDeadline is the duration that the acting master will retry
 	// refreshing leadership before giving up.

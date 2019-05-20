@@ -73,6 +73,12 @@ type CustomResourceDefinitionSpec struct {
 
 	// `conversion` defines conversion settings for the CRD.
 	Conversion *CustomResourceConversion
+
+	// preserveUnknownFields disables pruning of object fields which are not
+	// specified in the OpenAPI schema. apiVersion, kind, metadata and known
+	// fields inside metadata are always preserved.
+	// Defaults to true in v1beta and will default to false in v1.
+	PreserveUnknownFields *bool
 }
 
 // CustomResourceConversion describes how to convert different versions of a CR.

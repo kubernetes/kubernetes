@@ -191,6 +191,8 @@ func New(client clientset.Interface,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
 	registry framework.Registry,
+	plugins *kubeschedulerconfig.Plugins,
+	pluginConfig []kubeschedulerconfig.PluginConfig,
 	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
@@ -204,7 +206,7 @@ func New(client clientset.Interface,
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
 	// TODO(bsalamat): config files should be passed to the framework.
-	framework, err := framework.NewFramework(registry, nil)
+	framework, err := framework.NewFramework(registry, plugins, pluginConfig)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
@@ -214,7 +216,7 @@ func New(client clientset.Interface,
 		storageClassLister = storageClassInformer.Lister()
 	}
 
-	podQueue := internalqueue.NewSchedulingQueue(stopEverything)
+	podQueue := internalqueue.NewSchedulingQueue(stopEverything, framework)
 	// Setup volume binder
 	volumeBinder := volumebinder.NewVolumeBinder(client, nodeInformer, pvcInformer, pvInformer, storageClassInformer, time.Duration(options.bindTimeoutSeconds)*time.Second)
 	scheduledPodsHasSynced := podInformer.Informer().HasSynced

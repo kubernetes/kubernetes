@@ -12,6 +12,7 @@ go_test(
         "dryrun_test.go",
         "main_test.go",
     ],
+    rundir = ".",
     tags = [
         "etcd",
         "integration",

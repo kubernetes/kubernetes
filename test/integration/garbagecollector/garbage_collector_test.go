@@ -38,11 +38,13 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -229,6 +231,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		t.Fatalf("failed to create dynamicClient: %v", err)
 	}
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
@@ -236,7 +239,7 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 		restMapper,
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
-		sharedInformers,
+		controller.NewInformerFactory(sharedInformers, dynamicInformers),
 		alwaysStarted,
 	)
 	if err != nil {
@@ -966,9 +969,24 @@ func TestCRDDeletionCascading(t *testing.T) {
 
 	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
 
-	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
-
+	t.Logf("First pass CRD cascading deletion")
 	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	testCRDDeletion(t, ctx, ns, definition, resourceClient)
+
+	t.Logf("Second pass CRD cascading deletion")
+	accessor := meta.NewAccessor()
+	accessor.SetResourceVersion(definition, "")
+	_, err := apiextensionstestserver.CreateNewCustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
+	}
+	testCRDDeletion(t, ctx, ns, definition, resourceClient)
+}
+
+func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definition *apiextensionsv1beta1.CustomResourceDefinition, resourceClient dynamic.ResourceInterface) {
+	clientSet, apiExtensionClient := ctx.clientSet, ctx.apiExtensionClient
+
+	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
 	// Create a custom owner resource.
 	owner, err := resourceClient.Create(newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})

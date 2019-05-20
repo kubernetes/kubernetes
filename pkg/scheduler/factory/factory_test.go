@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -256,7 +257,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer close(stopCh)
 
 	timestamp := time.Now()
-	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp))
+	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
 
@@ -496,6 +497,8 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		bindTimeoutSeconds,
 		stopCh,
 		framework.NewRegistry(),
+		nil,
+		[]config.PluginConfig{},
 	})
 }
 

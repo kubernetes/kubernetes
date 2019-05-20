@@ -121,11 +121,12 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			// Verify PV is Present, after PVC is deleted and PV status should be Failed.
 			pv, err := c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
-			gomega.Expect(framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)).NotTo(gomega.HaveOccurred())
+			err = framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Verify the volume is attached to the node")
 			isVolumeAttached, verifyDiskAttachedError := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
-			gomega.Expect(verifyDiskAttachedError).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(verifyDiskAttachedError)
 			gomega.Expect(isVolumeAttached).To(gomega.BeTrue())
 
 			ginkgo.By("Verify the volume is accessible and available in the pod")
@@ -136,7 +137,8 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
 
 			ginkgo.By("Verify PV is detached from the node after Pod is deleted")
-			gomega.Expect(waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)).NotTo(gomega.HaveOccurred())
+			err = waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
+			framework.ExpectNoError(err)
 
 			ginkgo.By("Verify PV should be deleted automatically")
 			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))

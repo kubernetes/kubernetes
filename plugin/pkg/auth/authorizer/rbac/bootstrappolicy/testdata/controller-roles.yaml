@@ -1117,6 +1117,7 @@ items:
     resources:
     - services/status
     verbs:
+    - patch
     - update
   - apiGroups:
     - ""

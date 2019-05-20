@@ -41,7 +41,12 @@ func admitConfigMaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 		return nil
 	}
 
-	raw := ar.Request.Object.Raw
+	var raw []byte
+	if ar.Request.Operation == v1beta1.Delete {
+		raw = ar.Request.OldObject.Raw
+	} else {
+		raw = ar.Request.Object.Raw
+	}
 	configmap := corev1.ConfigMap{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &configmap); err != nil {
@@ -51,10 +56,17 @@ func admitConfigMaps(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
 	reviewResponse := v1beta1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 	for k, v := range configmap.Data {
-		if k == "webhook-e2e-test" && v == "webhook-disallow" {
+		if k == "webhook-e2e-test" && v == "webhook-disallow" &&
+			(ar.Request.Operation == v1beta1.Create || ar.Request.Operation == v1beta1.Update) {
 			reviewResponse.Allowed = false
 			reviewResponse.Result = &metav1.Status{
 				Reason: "the configmap contains unwanted key and value",
+			}
+		}
+		if k == "webhook-e2e-test" && v == "webhook-nondeletable" && ar.Request.Operation == v1beta1.Delete {
+			reviewResponse.Allowed = false
+			reviewResponse.Result = &metav1.Status{
+				Reason: "the configmap cannot be deleted because it contains unwanted key and value",
 			}
 		}
 	}

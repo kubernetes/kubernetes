@@ -166,7 +166,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 			// Locate a running pod.
 			pod, err := locateRunningPod(cs, ns)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			e := &policy.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
@@ -205,7 +205,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 		ginkgo.By("First trying to evict a pod which shouldn't be evictable")
 		pod, err := locateRunningPod(cs, ns)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		waitForPodsOrDie(cs, ns, 3) // make sure that they are running and so would be evictable with a different pdb
 		e := &policy.Eviction{
@@ -223,7 +223,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		ginkgo.By("Trying to evict the same pod we tried earlier which should now be evictable")
 		waitForPodsOrDie(cs, ns, 3)
 		err = cs.CoreV1().Pods(ns).Evict(e)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred()) // the eviction is now allowed
+		framework.ExpectNoError(err) // the eviction is now allowed
 	})
 })
 

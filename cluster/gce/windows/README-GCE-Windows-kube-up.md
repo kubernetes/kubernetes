@@ -62,6 +62,7 @@ plane only runs on Linux.
 export NUM_NODES=2  # number of Linux nodes
 export NUM_WINDOWS_NODES=2
 export KUBE_GCE_ENABLE_IP_ALIASES=true
+export LOGGING_STACKDRIVER_RESOURCE_TYPES=new
 ```
 
 Now bring up a cluster using one of the following two methods:

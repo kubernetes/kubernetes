@@ -95,6 +95,16 @@ var Everything = SelectionPredicate{
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
 
+// ValidateObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. The function may NOT transform the provided
+// object.
+type ValidateObjectFunc func(obj runtime.Object) error
+
+// ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
+func ValidateAllObjectFunc(obj runtime.Object) error {
+	return nil
+}
+
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
 	// Specifies the target UID.
@@ -153,7 +163,7 @@ type Interface interface {
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.
-	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
+	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions, validateDeletion ValidateObjectFunc) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.

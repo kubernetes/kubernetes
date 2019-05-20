@@ -81,6 +81,7 @@
   - "./vendor/k8s.io/client-go/tools/leaderelection/resourcelock"
   - "./vendor/k8s.io/client-go/tools/portforward"
   - "./vendor/k8s.io/client-go/tools/record"
+  - "./vendor/k8s.io/client-go/tools/events"
   - "./vendor/k8s.io/client-go/tools/reference"
   - "./vendor/k8s.io/client-go/tools/remotecommand"
   allowedImports:

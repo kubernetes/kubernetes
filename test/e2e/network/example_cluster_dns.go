@@ -33,7 +33,6 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -84,7 +83,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			var err error
 			namespaceName := fmt.Sprintf("dnsexample%d", i)
 			namespaces[i], err = f.CreateNamespace(namespaceName, nil)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create namespace: %s", namespaceName)
+			framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 		}
 
 		for _, ns := range namespaces {
@@ -106,13 +105,13 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(options)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to list pods in namespace: %s", ns.Name)
+			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
 			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "waiting for all pods to respond")
+			framework.ExpectNoError(err, "waiting for all pods to respond")
 			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
 			err = framework.ServiceResponding(c, ns.Name, backendSvcName)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "waiting for the service to respond")
+			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 
 		// Now another tricky part:
@@ -134,7 +133,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
 		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "waiting for output from pod exec")
+		framework.ExpectNoError(err, "waiting for output from pod exec")
 
 		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
 
@@ -153,7 +152,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait for pods to print their result
 		for _, ns := range namespaces {
 			_, err := framework.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "pod %s failed to print result in logs", frontendPodName)
+			framework.ExpectNoError(err, "pod %s failed to print result in logs", frontendPodName)
 		}
 	})
 })
@@ -165,10 +164,10 @@ func getNsCmdFlag(ns *v1.Namespace) string {
 // pass enough context with the 'old' parameter so that it replaces what your really intended.
 func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	f, err := os.Open(inputFile)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to open file: %s", inputFile)
+	framework.ExpectNoError(err, "failed to open file: %s", inputFile)
 	defer f.Close()
 	data, err := ioutil.ReadAll(f)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to read from file: %s", inputFile)
+	framework.ExpectNoError(err, "failed to read from file: %s", inputFile)
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
 }

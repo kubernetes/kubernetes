@@ -69,7 +69,7 @@ func (a *cpuAccumulator) freeSockets() []int {
 // - socket ID, ascending
 // - core ID, ascending
 func (a *cpuAccumulator) freeCores() []int {
-	socketIDs := a.details.Sockets().ToSlice()
+	socketIDs := a.details.Sockets().ToSliceNoSort()
 	sort.Slice(socketIDs,
 		func(i, j int) bool {
 			iCores := a.details.CoresInSocket(socketIDs[i]).Filter(a.isCoreFree)

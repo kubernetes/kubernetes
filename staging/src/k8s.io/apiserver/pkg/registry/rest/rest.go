@@ -148,6 +148,7 @@ type TableConvertor interface {
 // RESTful object.
 type GracefulDeleter interface {
 	// Delete finds a resource in the storage and deletes it.
+	// The delete attempt is validated by the deleteValidation first.
 	// If options are provided, the resource will attempt to honor them or return an invalid
 	// request error.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
@@ -156,18 +157,19 @@ type GracefulDeleter interface {
 	// information about deletion.
 	// It also returns a boolean which is set to true if the resource was instantly
 	// deleted or false if it will be deleted asynchronously.
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error)
+	Delete(ctx context.Context, name string, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error)
 }
 
 // CollectionDeleter is an object that can delete a collection
 // of RESTful resources.
 type CollectionDeleter interface {
 	// DeleteCollection selects all resources in the storage matching given 'listOptions'
-	// and deletes them. If 'options' are provided, the resource will attempt to honor
-	// them or return an invalid request error.
+	// and deletes them. The delete attempt is validated by the deleteValidation first.
+	// If 'options' are provided, the resource will attempt to honor them or return an
+	// invalid request error.
 	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
 	// return an error after it. On success, returns a list of deleted objects.
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
+	DeleteCollection(ctx context.Context, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
 // Creater is an object that can create an instance of a RESTful object.

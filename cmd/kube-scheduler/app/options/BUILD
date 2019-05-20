@@ -70,6 +70,7 @@ go_test(
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",

@@ -24,7 +24,7 @@ import (
 
 	"reflect"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -309,55 +309,21 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(key string, service *v1.Ser
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
-	// Write the state if changed
-	// TODO: Be careful here ... what if there were other changes to the service?
+	// If there are any changes to the status then patch the service.
 	if !v1helper.LoadBalancerStatusEqual(previousState, newState) {
 		// Make a copy so we don't mutate the shared informer cache
-		service = service.DeepCopy()
+		updated := service.DeepCopy()
+		updated.Status.LoadBalancer = *newState
 
-		// Update the status on the copy
-		service.Status.LoadBalancer = *newState
-
-		if err := s.persistUpdate(service); err != nil {
-			// TODO: This logic needs to be revisited. We might want to retry on all the errors, not just conflicts.
-			if errors.IsConflict(err) {
-				return fmt.Errorf("not persisting update to service '%s/%s' that has been changed since we received it: %v", service.Namespace, service.Name, err)
-			}
-			runtime.HandleError(fmt.Errorf("failed to persist service %q updated status to apiserver, even after retries. Giving up: %v", key, err))
-			return nil
+		if _, err := patch(s.kubeClient.CoreV1(), service, updated); err != nil {
+			return fmt.Errorf("failed to patch status for service %s: %v", key, err)
 		}
+		klog.V(4).Infof("Successfully patched status for service %s", key)
 	} else {
-		klog.V(2).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
+		klog.V(4).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
 	}
 
 	return nil
-}
-
-func (s *ServiceController) persistUpdate(service *v1.Service) error {
-	var err error
-	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
-		if err == nil {
-			return nil
-		}
-		// If the object no longer exists, we don't want to recreate it. Just bail
-		// out so that we can process the delete, which we should soon be receiving
-		// if we haven't already.
-		if errors.IsNotFound(err) {
-			klog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
-				service.Namespace, service.Name, err)
-			return nil
-		}
-		// TODO: Try to resolve the conflict if the change was unrelated to load
-		// balancer status. For now, just pass it up the stack.
-		if errors.IsConflict(err) {
-			return err
-		}
-		klog.Warningf("Failed to persist updated LoadBalancerStatus to service '%s/%s' after creating its load balancer: %v",
-			service.Namespace, service.Name, err)
-		time.Sleep(clientRetryInterval)
-	}
-	return err
 }
 
 func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {

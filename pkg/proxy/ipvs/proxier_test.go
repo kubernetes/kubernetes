@@ -2486,7 +2486,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				fp.OnEndpointsAdd(tc.previousEndpoints[i])
 			}
 		}
-		proxy.UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		fp.endpointsMap.Update(fp.endpointsChanges)
 		compareEndpointsMaps(t, tci, fp.endpointsMap, tc.oldEndpoints)
 
 		// Now let's call appropriate handlers to get to state we want to be.
@@ -2506,7 +2506,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 				fp.OnEndpointsUpdate(prev, curr)
 			}
 		}
-		result := proxy.UpdateEndpointsMap(fp.endpointsMap, fp.endpointsChanges)
+		result := fp.endpointsMap.Update(fp.endpointsChanges)
 		newMap := fp.endpointsMap
 		compareEndpointsMaps(t, tci, newMap, tc.expectedResult)
 		if len(result.StaleEndpoints) != len(tc.expectedStaleEndpoints) {

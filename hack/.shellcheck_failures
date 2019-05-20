@@ -23,8 +23,6 @@
 ./hack/lib/version.sh
 ./hack/make-rules/make-help.sh
 ./hack/make-rules/test.sh
-./hack/make-rules/update.sh
-./hack/make-rules/verify.sh
 ./hack/pin-dependency.sh
 ./hack/test-integration.sh
 ./hack/update-vendor.sh

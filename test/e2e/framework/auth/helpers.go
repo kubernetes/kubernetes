@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -68,15 +67,6 @@ func WaitForNamedAuthorizationUpdate(c v1beta1authorization.SubjectAccessReviews
 
 	err := wait.Poll(policyCachePollInterval, policyCachePollTimeout, func() (bool, error) {
 		response, err := c.SubjectAccessReviews().Create(review)
-		// GKE doesn't enable the SAR endpoint.  Without this endpoint, we cannot determine if the policy engine
-		// has adjusted as expected.  In this case, simply wait one second and hope it's up to date
-		// TODO: Should have a check for the provider here but that introduces too tight of
-		// coupling with the `framework` package. See: https://github.com/kubernetes/kubernetes/issues/76726
-		if apierrors.IsNotFound(err) {
-			logf("SubjectAccessReview endpoint is missing")
-			time.Sleep(1 * time.Second)
-			return true, nil
-		}
 		if err != nil {
 			return false, err
 		}

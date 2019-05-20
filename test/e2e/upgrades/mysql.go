@@ -110,8 +110,10 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
-	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
-	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
