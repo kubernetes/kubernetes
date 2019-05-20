@@ -24,6 +24,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 : "${KUBE_CONFIG_FILE:="config-test.sh"}"
 
 export KUBECTL KUBE_CONFIG_FILE
+export KUBE_CONTAINER_RUNTIME=containerd
+set -x
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
