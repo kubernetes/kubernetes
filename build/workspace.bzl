@@ -28,11 +28,16 @@ _CNI_TARBALL_ARCH_SHA256 = {
 
 CRI_TOOLS_VERSION = "1.14.0"
 _CRI_TARBALL_ARCH_SHA256 = {
-    "amd64": "483c90a9fe679590df4332ba807991c49232e8cd326c307c575ecef7fe22327b",
-    "arm": "9910cecfd6558239ba015323066c7233d8371af359b9ddd0b2a35d5223bcf945",
-    "arm64": "f76b3d00a272c8d210e9a45f77d07d3770bee310d99c4fd9a72d6f55278882e5",
-    "ppc64le": "1e2cd11a1e025ed9755521cf13bb1bda986afa0052597a9bb44d31e62583413b",
-    "s390x": "8b7b5749cba88ef337997ae90aa04380e3cab2c040b44b505b2fcd691c4935e4",
+    "linux": {
+        "amd64": "483c90a9fe679590df4332ba807991c49232e8cd326c307c575ecef7fe22327b",
+        "arm": "9910cecfd6558239ba015323066c7233d8371af359b9ddd0b2a35d5223bcf945",
+        "arm64": "f76b3d00a272c8d210e9a45f77d07d3770bee310d99c4fd9a72d6f55278882e5",
+        "ppc64le": "1e2cd11a1e025ed9755521cf13bb1bda986afa0052597a9bb44d31e62583413b",
+        "s390x": "8b7b5749cba88ef337997ae90aa04380e3cab2c040b44b505b2fcd691c4935e4",
+    },
+    "windows": {
+        "amd64": "1f2d2e6612e930ff77640a10308a2cd40393a449a35b2dfbfeb06ae8d31e072d",
+    },
 }
 
 ETCD_VERSION = "3.3.10"
@@ -60,13 +65,14 @@ def cni_tarballs():
         )
 
 def cri_tarballs():
-    for arch, sha in _CRI_TARBALL_ARCH_SHA256.items():
-        http_file(
-            name = "cri_tools_%s" % arch,
-            downloaded_file_path = "cri_tools.tgz",
-            sha256 = sha,
-            urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-linux-%s.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION, arch)),
-        )
+    for os in _CRI_TARBALL_ARCH_SHA256:
+        for arch, sha in _CRI_TARBALL_ARCH_SHA256[os].items():
+            http_file(
+                name = "cri_tools_%s" % arch,
+                downloaded_file_path = "cri_tools.tgz",
+                sha256 = sha,
+                urls = mirror("https://github.com/kubernetes-incubator/cri-tools/releases/download/v%s/crictl-v%s-%s-%s.tar.gz" % (CRI_TOOLS_VERSION, CRI_TOOLS_VERSION, os, arch)),
+            )
 
 # Use go get -u github.com/estesp/manifest-tool to find these values
 _DEBIAN_BASE_DIGEST = {
