@@ -30,58 +30,58 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1.MutatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfiguration(obj.(*v1.MutatingWebhookConfiguration))
+		SetObjectDefaultsMutatingWebhookConfiguration(obj.(*v1.MutatingWebhookConfiguration))
 	})
 	scheme.AddTypeDefaultingFunc(&v1.MutatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_MutatingWebhookConfigurationList(obj.(*v1.MutatingWebhookConfigurationList))
+		SetObjectDefaultsMutatingWebhookConfigurationList(obj.(*v1.MutatingWebhookConfigurationList))
 	})
 	scheme.AddTypeDefaultingFunc(&v1.ValidatingWebhookConfiguration{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfiguration(obj.(*v1.ValidatingWebhookConfiguration))
+		SetObjectDefaultsValidatingWebhookConfiguration(obj.(*v1.ValidatingWebhookConfiguration))
 	})
 	scheme.AddTypeDefaultingFunc(&v1.ValidatingWebhookConfigurationList{}, func(obj interface{}) {
-		SetObjectDefaults_ValidatingWebhookConfigurationList(obj.(*v1.ValidatingWebhookConfigurationList))
+		SetObjectDefaultsValidatingWebhookConfigurationList(obj.(*v1.ValidatingWebhookConfigurationList))
 	})
 	return nil
 }
 
-func SetObjectDefaults_MutatingWebhookConfiguration(in *v1.MutatingWebhookConfiguration) {
+func SetObjectDefaultsMutatingWebhookConfiguration(in *v1.MutatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
-		SetDefaults_MutatingWebhook(a)
+		SetDefaultsMutatingWebhook(a)
 		if a.ClientConfig.Service != nil {
-			SetDefaults_ServiceReference(a.ClientConfig.Service)
+			SetDefaultsServiceReference(a.ClientConfig.Service)
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			SetDefaults_Rule(&b.Rule)
+			SetDefaultsRule(&b.Rule)
 		}
 	}
 }
 
-func SetObjectDefaults_MutatingWebhookConfigurationList(in *v1.MutatingWebhookConfigurationList) {
+func SetObjectDefaultsMutatingWebhookConfigurationList(in *v1.MutatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
-		SetObjectDefaults_MutatingWebhookConfiguration(a)
+		SetObjectDefaultsMutatingWebhookConfiguration(a)
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfiguration(in *v1.ValidatingWebhookConfiguration) {
+func SetObjectDefaultsValidatingWebhookConfiguration(in *v1.ValidatingWebhookConfiguration) {
 	for i := range in.Webhooks {
 		a := &in.Webhooks[i]
-		SetDefaults_ValidatingWebhook(a)
+		SetDefaultsValidatingWebhook(a)
 		if a.ClientConfig.Service != nil {
-			SetDefaults_ServiceReference(a.ClientConfig.Service)
+			SetDefaultsServiceReference(a.ClientConfig.Service)
 		}
 		for j := range a.Rules {
 			b := &a.Rules[j]
-			SetDefaults_Rule(&b.Rule)
+			SetDefaultsRule(&b.Rule)
 		}
 	}
 }
 
-func SetObjectDefaults_ValidatingWebhookConfigurationList(in *v1.ValidatingWebhookConfigurationList) {
+func SetObjectDefaultsValidatingWebhookConfigurationList(in *v1.ValidatingWebhookConfigurationList) {
 	for i := range in.Items {
 		a := &in.Items[i]
-		SetObjectDefaults_ValidatingWebhookConfiguration(a)
+		SetObjectDefaultsValidatingWebhookConfiguration(a)
 	}
 }

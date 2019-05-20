@@ -27,7 +27,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingWebhook) {
+// SetDefaultsValidatingWebhook sets defaults for ValidatingWebhook
+func SetDefaultsValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1beta1.Ignore
 		obj.FailurePolicy = &policy
@@ -59,7 +60,8 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingW
 	}
 }
 
-func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebhook) {
+// SetDefaultsMutatingWebhook sets defaults for ValidatingMutatingWebhook
+func SetDefaultsMutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1beta1.Ignore
 		obj.FailurePolicy = &policy
@@ -95,15 +97,16 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebho
 	}
 }
 
-func SetDefaults_Rule(obj *admissionregistrationv1beta1.Rule) {
+// SetDefaultsRule sets defaults for Webhook's Rule
+func SetDefaultsRule(obj *admissionregistrationv1beta1.Rule) {
 	if obj.Scope == nil {
 		s := admissionregistrationv1beta1.AllScopes
 		obj.Scope = &s
 	}
 }
 
-// SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
-func SetDefaults_ServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
+// SetDefaultsServiceReference sets defaults for Webhook's ServiceReference
+func SetDefaultsServiceReference(obj *admissionregistrationv1beta1.ServiceReference) {
 	if obj.Port == nil {
 		obj.Port = utilpointer.Int32Ptr(443)
 	}

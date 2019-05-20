@@ -3,8 +3,6 @@ cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
 pkg/apis/admission
-pkg/apis/admissionregistration/v1
-pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
 pkg/apis/apps
 pkg/apis/apps/v1
