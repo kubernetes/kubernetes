@@ -121,6 +121,9 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// Context is used to handle deadlines and cancellation for requests.
+	Context context.Context
+
 	// Dial specifies the dial function for creating unencrypted TCP connections.
 	Dial func(ctx context.Context, network, address string) (net.Conn, error)
 
@@ -298,8 +301,15 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 			httpClient.Timeout = config.Timeout
 		}
 	}
+	client, err := NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	if config.Context != nil {
+		return client.WithContext(config.Context), nil
+	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	return client, nil
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -333,7 +343,15 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	client, err := NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	if config.Context != nil {
+		return client.WithContext(config.Context), nil
+	}
+
+	return client, nil
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
@@ -426,6 +444,26 @@ func InClusterConfig() (*Config, error) {
 		BearerToken:     string(token),
 		BearerTokenFile: tokenFile,
 	}, nil
+}
+
+// WithContext sets the context for the config.
+func (c *Config) WithContext(ctx context.Context) *Config {
+	c.Context = ctx
+	return c
+}
+
+// InClusterConfig returns a config object which uses the service account
+// kubernetes gives to pods. It's intended for clients that expect to be
+// running inside a pod running on kubernetes. It will return ErrNotInCluster
+// if called from a process not running in a kubernetes environment.
+// The context passed to this function will be used for request cancellation
+// and to handle deadlines and timeouts.
+func InClusterConfigWithContext(ctx context.Context) (*Config, error) {
+	config, err := InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+	return config.WithContext(ctx), nil
 }
 
 // IsConfigTransportTLS returns true if and only if the provided

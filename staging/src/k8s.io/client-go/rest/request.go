@@ -142,6 +142,12 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 	return r
 }
 
+// WithContext allows to set a context for the request that will be used for timeouts, deadlines and cancellations.
+func (r *Request) WithContext(ctx context.Context) *Request {
+	r.ctx = ctx
+	return r
+}
+
 // Prefix adds segments to the relative beginning to the request path. These
 // items will be placed before the optional Namespace, Resource, or Name sections.
 // Setting AbsPath will clear any previously set Prefix segments

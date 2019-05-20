@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
 	"mime"
 	"net/http"
@@ -78,6 +79,9 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+
+	// ctx is used to handle timeouts and cancellation of requests.
+	ctx context.Context
 }
 
 type Serializers struct {
@@ -133,6 +137,12 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 		return nil
 	}
 	return c.Throttle
+}
+
+// WithContext returns a REST client with context set.
+func (c *RESTClient) WithContext(ctx context.Context) *RESTClient {
+	c.ctx = ctx
+	return c
 }
 
 // readExpBackoffConfig handles the internal logic of determining what the
@@ -221,10 +231,18 @@ func createSerializers(config ContentConfig) (*Serializers, error) {
 func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
+	var request *Request
+
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, 0)
+		request = NewRequest(nil, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, 0)
+	} else {
+		request = NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.Client.Timeout)
 	}
-	return NewRequest(c.Client, verb, c.base, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle, c.Client.Timeout)
+
+	if c.ctx != nil {
+		return request.WithContext(c.ctx)
+	}
+	return request
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
