@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
@@ -94,6 +94,11 @@ type Config struct {
 	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	// TODO: move into SecureServing(WithLoopback) as soon as insecure serving is gone
 	LoopbackClientConfig *restclient.Config
+
+	// EgressSelector provides a lookup mechanism for dialing outbound connections.
+	// It does so based on a EgressSelectorConfiguration which was read at startup.
+	EgressSelector *EgressSelector
+
 	// RuleResolver is required to get the list of rules that apply to a given user
 	// in a given namespace
 	RuleResolver authorizer.RuleResolver
