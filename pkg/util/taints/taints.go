@@ -350,6 +350,9 @@ func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []
 	return
 }
 
+// TaintSetFilter calls the filter function fn on each item in
+// the taints slice, returning a slice containing the elements
+// where the filter function returned true
 func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
 	res := []v1.Taint{}
 
