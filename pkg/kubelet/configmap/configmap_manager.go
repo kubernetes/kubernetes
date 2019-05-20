@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Manager interface provides methods for Kubelet to manage ConfigMap.
 type Manager interface {
 	// Get configmap by configmap namespace and name.
 	GetConfigMap(namespace, name string) (*v1.ConfigMap, error)
@@ -54,6 +55,7 @@ type simpleConfigMapManager struct {
 	kubeClient clientset.Interface
 }
 
+// NewSimpleConfigMapManager creates a new ConfigMapManager instance.
 func NewSimpleConfigMapManager(kubeClient clientset.Interface) Manager {
 	return &simpleConfigMapManager{kubeClient: kubeClient}
 }
