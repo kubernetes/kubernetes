@@ -14,20 +14,44 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package dns
 
 import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"os/exec"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 )
+
+// CmdDNSSuffix is used by agnhost Cobra.
+var CmdDNSSuffix = &cobra.Command{
+	Use:   "dns-suffix",
+	Short: "Prints the host's DNS suffix list",
+	Long:  `Prints the DNS suffixes of this host.`,
+	Args:  cobra.MaximumNArgs(0),
+	Run:   printDNSSuffixList,
+}
+
+// CmdDNSServerList is used by agnhost Cobra.
+var CmdDNSServerList = &cobra.Command{
+	Use:   "dns-server-list",
+	Short: "Prints the host's DNS Server list",
+	Long:  `Prints the DNS Server list of this host.`,
+	Args:  cobra.MaximumNArgs(0),
+	Run:   printDNSServerList,
+}
+
+// CmdEtcHosts is used by agnhost Cobra.
+var CmdEtcHosts = &cobra.Command{
+	Use:   "etc-hosts",
+	Short: "Prints the host's /etc/hosts file",
+	Long:  `Prints the "hosts" file of this host."`,
+	Args:  cobra.MaximumNArgs(0),
+	Run:   printHostsFile,
+}
 
 func printDNSSuffixList(cmd *cobra.Command, args []string) {
 	dnsSuffixList := getDNSSuffixList()
@@ -41,30 +65,6 @@ func printDNSServerList(cmd *cobra.Command, args []string) {
 
 func printHostsFile(cmd *cobra.Command, args []string) {
 	fmt.Println(readFile(etcHostsFile))
-}
-
-func pause(cmd *cobra.Command, args []string) {
-	sigCh := make(chan os.Signal)
-	done := make(chan int, 1)
-	signal.Notify(sigCh, syscall.SIGINT)
-	signal.Notify(sigCh, syscall.SIGTERM)
-	signal.Notify(sigCh, syscall.SIGKILL)
-	go func() {
-		sig := <-sigCh
-		switch sig {
-		case syscall.SIGINT:
-			done <- 1
-			os.Exit(1)
-		case syscall.SIGTERM:
-			done <- 2
-			os.Exit(2)
-		case syscall.SIGKILL:
-			done <- 0
-			os.Exit(0)
-		}
-	}()
-	result := <-done
-	fmt.Printf("exiting %d\n", result)
 }
 
 func readFile(fileName string) string {
