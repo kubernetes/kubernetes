@@ -329,6 +329,9 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 	return false
 }
 
+// TaintSetDiff returns the set of taints that you would need to
+// add to t2 (as taintsToAdd), or remove from t2 (as taintsToRemove),
+// to sync t2 with t1
 func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
 	for _, taint := range t1 {
 		if !TaintExists(t2, &taint) {
