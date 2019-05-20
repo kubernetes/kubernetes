@@ -30,8 +30,11 @@ import (
 )
 
 const (
-	MODIFIED  = "modified"
-	TAINTED   = "tainted"
+	// MODIFIED indicates that ReorganizeTaints added and removed taints
+	MODIFIED = "modified"
+	// TAINTED indicates that ReorganizeTaints added new taints
+	TAINTED = "tainted"
+	// UNTAINTED indicates that ReorganizeTaints did not add taints
 	UNTAINTED = "untainted"
 )
 
