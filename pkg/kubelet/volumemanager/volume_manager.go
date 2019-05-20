@@ -154,7 +154,8 @@ func NewVolumeManager(
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
-	keepTerminatedPodVolumes bool) VolumeManager {
+	keepTerminatedPodVolumes bool,
+	volumeOperationMaxBackoff time.Duration) VolumeManager {
 
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
@@ -166,7 +167,8 @@ func NewVolumeManager(
 			volumePluginMgr,
 			recorder,
 			checkNodeCapabilitiesBeforeMount,
-			volumepathhandler.NewBlockVolumePathHandler())),
+			volumepathhandler.NewBlockVolumePathHandler()),
+			volumeOperationMaxBackoff),
 	}
 
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(

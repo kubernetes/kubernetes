@@ -315,6 +315,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 						RegistryPullQPS:             5,
 						HairpinMode:                 "promiscuous-bridge",
 						NodeLeaseDurationSeconds:    40,
+						VolumeOperationMaxBackOff:   metav1.Duration{Duration: 30 * time.Second},
 					},
 				},
 			},

@@ -325,7 +325,8 @@ func newTestKubeletWithImageList(
 		kubelet.getPodsDir(),
 		kubelet.recorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
-		false /* keepTerminatedPodVolumes */)
+		false, /* keepTerminatedPodVolumes */
+		30*time.Second /* maxBackoffTime */)
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */

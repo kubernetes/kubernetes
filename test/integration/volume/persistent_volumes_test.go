@@ -57,6 +57,7 @@ import (
 //
 const defaultObjectCount = 100
 const defaultSyncPeriod = 1 * time.Second
+const defaultVolumeOperationMaxBackOff = 30 * time.Second
 
 const provisionerPluginName = "kubernetes.io/mock-provisioner"
 
@@ -1137,6 +1138,7 @@ func createClients(ns *v1.Namespace, t *testing.T, s *httptest.Server, syncPerio
 			PodInformer:               informers.Core().V1().Pods(),
 			NodeInformer:              informers.Core().V1().Nodes(),
 			EnableDynamicProvisioning: true,
+			VolumeOperationMaxBackoff: defaultVolumeOperationMaxBackOff,
 		})
 	if err != nil {
 		t.Fatalf("Failed to construct PersistentVolumes: %v", err)

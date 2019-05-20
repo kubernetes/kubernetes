@@ -52,12 +52,15 @@ type OperationExecutor interface {
 	UnregisterPlugin(socketPath string, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
 }
 
+const defaultMaxBackoffDuration = 2*time.Minute + 2*time.Second
+
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
 	operationGenerator OperationGenerator) OperationExecutor {
 
 	return &operationExecutor{
-		pendingOperations:  goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
+		pendingOperations: goroutinemap.NewGoRoutineMap(true, /* exponentialBackOffOnError */
+			defaultMaxBackoffDuration),
 		operationGenerator: operationGenerator,
 	}
 }

@@ -49,7 +49,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -356,7 +356,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
 	bootstrapCheckpointPath string,
-	nodeStatusMaxImages int32) (*Kubelet, error) {
+	nodeStatusMaxImages int32,
+	volumeOperationMaxBackoff metav1.Duration) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -815,7 +816,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.getPodsDir(),
 		kubeDeps.Recorder,
 		experimentalCheckNodeCapabilitiesBeforeMount,
-		keepTerminatedPodVolumes)
+		keepTerminatedPodVolumes,
+		volumeOperationMaxBackoff.Duration)
 
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)

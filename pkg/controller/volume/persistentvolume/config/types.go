@@ -28,6 +28,8 @@ type PersistentVolumeBinderControllerConfiguration struct {
 	PVClaimBinderSyncPeriod metav1.Duration
 	// volumeConfiguration holds configuration for volume related features.
 	VolumeConfiguration VolumeConfiguration
+	// VolumeOperationMaxBackoff is the max backOff time of volume operations
+	VolumeOperationMaxBackoff metav1.Duration
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

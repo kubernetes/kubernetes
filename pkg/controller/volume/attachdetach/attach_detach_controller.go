@@ -41,7 +41,7 @@ import (
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -112,7 +112,8 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+	volumeOperationMaxBackoff time.Duration) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -171,7 +172,8 @@ func NewAttachDetachController(
 			&adc.volumePluginMgr,
 			recorder,
 			false, // flag for experimental binary check for volume mount
-			blkutil))
+			blkutil),
+			volumeOperationMaxBackoff)
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer.Lister(), adc.actualStateOfWorld)
 

@@ -115,6 +115,7 @@ func autoConvert_v1alpha1_PersistentVolumeBinderControllerConfiguration_To_confi
 	if err := Convert_v1alpha1_VolumeConfiguration_To_config_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
+	out.VolumeOperationMaxBackoff = in.VolumeOperationMaxBackoff
 	return nil
 }
 
@@ -123,6 +124,7 @@ func autoConvert_config_PersistentVolumeBinderControllerConfiguration_To_v1alpha
 	if err := Convert_config_VolumeConfiguration_To_v1alpha1_VolumeConfiguration(&in.VolumeConfiguration, &out.VolumeConfiguration, s); err != nil {
 		return err
 	}
+	out.VolumeOperationMaxBackoff = in.VolumeOperationMaxBackoff
 	return nil
 }
 

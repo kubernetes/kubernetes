@@ -38,7 +38,9 @@ func RecommendedDefaultPersistentVolumeBinderControllerConfiguration(obj *kubect
 	if obj.PVClaimBinderSyncPeriod == zero {
 		obj.PVClaimBinderSyncPeriod = metav1.Duration{Duration: 15 * time.Second}
 	}
-
+	if obj.VolumeOperationMaxBackoff == zero {
+		obj.VolumeOperationMaxBackoff = metav1.Duration{Duration: 2*time.Minute + 2*time.Second}
+	}
 	// Use the default VolumeConfiguration options.
 	RecommendedDefaultVolumeConfiguration(&obj.VolumeConfiguration)
 }

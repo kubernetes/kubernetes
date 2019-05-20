@@ -25,6 +25,7 @@ func (in *PersistentVolumeBinderControllerConfiguration) DeepCopyInto(out *Persi
 	*out = *in
 	out.PVClaimBinderSyncPeriod = in.PVClaimBinderSyncPeriod
 	out.VolumeConfiguration = in.VolumeConfiguration
+	out.VolumeOperationMaxBackoff = in.VolumeOperationMaxBackoff
 	return
 }
 

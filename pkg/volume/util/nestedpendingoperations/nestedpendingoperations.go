@@ -27,6 +27,7 @@ package nestedpendingoperations
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"k8s.io/api/core/v1"
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -71,10 +72,12 @@ type NestedPendingOperations interface {
 }
 
 // NewNestedPendingOperations returns a new instance of NestedPendingOperations.
-func NewNestedPendingOperations(exponentialBackOffOnError bool) NestedPendingOperations {
+func NewNestedPendingOperations(exponentialBackOffOnError bool,
+	volumeOperationMaxBackoff time.Duration) NestedPendingOperations {
 	g := &nestedPendingOperations{
 		operations:                []operation{},
 		exponentialBackOffOnError: exponentialBackOffOnError,
+		volumeOperationMaxBackoff: volumeOperationMaxBackoff,
 	}
 	g.cond = sync.NewCond(&g.lock)
 	return g
@@ -85,6 +88,7 @@ type nestedPendingOperations struct {
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
 	lock                      sync.RWMutex
+	volumeOperationMaxBackoff time.Duration
 }
 
 type operation struct {
@@ -118,8 +122,9 @@ func (grm *nestedPendingOperations) Run(
 				return backOffErr
 			}
 			// previous operation and new operation are different. reset op. name and exp. backoff
+			expBackoff := exponentialbackoff.NewExponentialBackoff(grm.volumeOperationMaxBackoff)
 			grm.operations[previousOpIndex].operationName = generatedOperations.OperationName
-			grm.operations[previousOpIndex].expBackoff = exponentialbackoff.ExponentialBackoff{}
+			grm.operations[previousOpIndex].expBackoff = *expBackoff
 		}
 
 		// Update existing operation to mark as pending.
@@ -128,13 +133,14 @@ func (grm *nestedPendingOperations) Run(
 		grm.operations[previousOpIndex].podName = podName
 	} else {
 		// Create a new operation
+		expBackoff := exponentialbackoff.NewExponentialBackoff(grm.volumeOperationMaxBackoff)
 		grm.operations = append(grm.operations,
 			operation{
 				operationPending: true,
 				volumeName:       volumeName,
 				podName:          podName,
 				operationName:    generatedOperations.OperationName,
-				expBackoff:       exponentialbackoff.ExponentialBackoff{},
+				expBackoff:       *expBackoff,
 			})
 	}
 

@@ -66,6 +66,7 @@ type ControllerParameters struct {
 	NodeInformer              coreinformers.NodeInformer
 	EventRecorder             record.EventRecorder
 	EnableDynamicProvisioning bool
+	VolumeOperationMaxBackoff time.Duration
 }
 
 // NewController creates a new PersistentVolume controller
@@ -83,7 +84,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claims:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    p.KubeClient,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
+		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */, p.VolumeOperationMaxBackoff),
 		cloud:                         p.Cloud,
 		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
 		clusterName:                   p.ClusterName,

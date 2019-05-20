@@ -189,6 +189,10 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 
 func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler, bool, error) {
+	if ctx.ComponentConfig.PersistentVolumeBinderController.VolumeOperationMaxBackoff.Duration < time.Second {
+		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option volume-operation-max-backoff-time")
+	}
+
 	params := persistentvolumecontroller.ControllerParameters{
 		KubeClient:                ctx.ClientBuilder.ClientOrDie("persistent-volume-binder"),
 		SyncPeriod:                ctx.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
@@ -201,6 +205,7 @@ func startPersistentVolumeBinderController(ctx ControllerContext) (http.Handler,
 		PodInformer:               ctx.InformerFactory.Core().V1().Pods(),
 		NodeInformer:              ctx.InformerFactory.Core().V1().Nodes(),
 		EnableDynamicProvisioning: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration.EnableDynamicProvisioning,
+		VolumeOperationMaxBackoff: ctx.ComponentConfig.PersistentVolumeBinderController.VolumeOperationMaxBackoff.Duration,
 	}
 	volumeController, volumeControllerErr := persistentvolumecontroller.NewController(params)
 	if volumeControllerErr != nil {
@@ -230,6 +235,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
+			ctx.ComponentConfig.PersistentVolumeBinderController.VolumeOperationMaxBackoff.Duration,
 		)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)

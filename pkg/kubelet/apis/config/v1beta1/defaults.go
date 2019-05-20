@@ -217,6 +217,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.ConfigMapAndSecretChangeDetectionStrategy == "" {
 		obj.ConfigMapAndSecretChangeDetectionStrategy = kubeletconfigv1beta1.WatchChangeDetectionStrategy
 	}
+	if obj.VolumeOperationMaxBackOff == zeroDuration {
+		obj.VolumeOperationMaxBackOff = metav1.Duration{Duration: 2*time.Minute + 2*time.Second}
+	}
 	if obj.EnforceNodeAllocatable == nil {
 		obj.EnforceNodeAllocatable = DefaultNodeAllocatableEnforcement
 	}

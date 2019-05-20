@@ -666,6 +666,12 @@ type KubeletConfiguration struct {
 	// Default: "Watch"
 	// +optional
 	ConfigMapAndSecretChangeDetectionStrategy ResourceChangeDetectionStrategy `json:"configMapAndSecretChangeDetectionStrategy,omitempty"`
+	// VolumeOperationMaxBackOff sets max backoff to volume options, e.g. attach, verify.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// lowering it may increase the stress of nodes.
+	// Defaults: 2m2s
+	// +optional
+	VolumeOperationMaxBackOff metav1.Duration `json:"volumeOperationMaxBackoff,omitempty"`
 
 	/* the following fields are meant for Node Allocatable */
 

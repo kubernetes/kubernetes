@@ -278,7 +278,8 @@ func TestAddFlags(t *testing.T) {
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
 			&persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
-				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},
+				PVClaimBinderSyncPeriod:   metav1.Duration{Duration: 30 * time.Second},
+				VolumeOperationMaxBackoff: metav1.Duration{Duration: 2*time.Minute + 2*time.Second},
 				VolumeConfiguration: persistentvolumeconfig.VolumeConfiguration{
 					EnableDynamicProvisioning:  false,
 					EnableHostPathProvisioning: true,

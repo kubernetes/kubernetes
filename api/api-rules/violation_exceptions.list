@@ -143,6 +143,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,N
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,UnhealthyZoneThreshold
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,PVClaimBinderSyncPeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeConfiguration
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeBinderControllerConfiguration,VolumeOperationMaxBackoff
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,IncrementTimeoutHostPath
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,IncrementTimeoutNFS
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,PersistentVolumeRecyclerConfiguration,MaximumRetry
@@ -168,6 +169,7 @@ API rule violation: names_match,k8s.io/kube-proxy/config/v1alpha1,KubeProxyConfi
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesDropBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,IPTablesMasqueradeBit
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig
+API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,VolumeOperationMaxBackOff
 API rule violation: names_match,k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,Generic
 API rule violation: names_match,k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,KubeCloudShared
 API rule violation: names_match,k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1,CloudControllerManagerConfiguration,NodeStatusUpdateFrequency

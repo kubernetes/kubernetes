@@ -111,6 +111,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.ServerTLSBootstrap && !localFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: ServerTLSBootstrap %v requires feature gate RotateKubeletServerCertificate", kc.ServerTLSBootstrap))
 	}
+	if kc.VolumeOperationMaxBackOff.Duration < time.Second {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: VolumeOperationMaxBackOff %v (--volume-operation-max-backoff-time) must be 1s or greater", kc.VolumeOperationMaxBackOff))
+	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
 		case kubetypes.NodeAllocatableEnforcementKey:

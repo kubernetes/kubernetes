@@ -150,11 +150,12 @@ type OperationExecutor interface {
 
 // NewOperationExecutor returns a new instance of OperationExecutor.
 func NewOperationExecutor(
-	operationGenerator OperationGenerator) OperationExecutor {
-
+	operationGenerator OperationGenerator,
+	volumeOperationMaxBackoff time.Duration) OperationExecutor {
 	return &operationExecutor{
 		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
-			true /* exponentialBackOffOnError */),
+			true, /* exponentialBackOffOnError */
+			volumeOperationMaxBackoff),
 		operationGenerator: operationGenerator,
 	}
 }

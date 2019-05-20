@@ -161,6 +161,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			(*out)[key] = val
 		}
 	}
+	out.VolumeOperationMaxBackOff = in.VolumeOperationMaxBackOff
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved
 		*out = make(map[string]string, len(*in))

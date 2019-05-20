@@ -437,7 +437,8 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		nil, /* prober */
 		false,
 		5*time.Second,
-		timers)
+		timers,
+		30*time.Second)
 
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
@@ -457,6 +458,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		PodInformer:               informers.Core().V1().Pods(),
 		NodeInformer:              informers.Core().V1().Nodes(),
 		EnableDynamicProvisioning: false,
+		VolumeOperationMaxBackoff: 30 * time.Second,
 	}
 	pvCtrl, err := persistentvolume.NewController(params)
 	if err != nil {

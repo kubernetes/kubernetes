@@ -31,18 +31,19 @@ import (
 )
 
 const (
-	numVolumesToMount                    = 2
-	numAttachableVolumesToUnmount        = 2
-	numNonAttachableVolumesToUnmount     = 2
-	numDevicesToUnmount                  = 2
-	numVolumesToAttach                   = 2
-	numVolumesToDetach                   = 2
-	numVolumesToVerifyAttached           = 2
-	numVolumesToVerifyControllerAttached = 2
-	numVolumesToMap                      = 2
-	numAttachableVolumesToUnmap          = 2
-	numNonAttachableVolumesToUnmap       = 2
-	numDevicesToUnmap                    = 2
+	numVolumesToMount                                  = 2
+	numAttachableVolumesToUnmount                      = 2
+	numNonAttachableVolumesToUnmount                   = 2
+	numDevicesToUnmount                                = 2
+	numVolumesToAttach                                 = 2
+	numVolumesToDetach                                 = 2
+	numVolumesToVerifyAttached                         = 2
+	numVolumesToVerifyControllerAttached               = 2
+	numVolumesToMap                                    = 2
+	numAttachableVolumesToUnmap                        = 2
+	numNonAttachableVolumesToUnmap                     = 2
+	numDevicesToUnmap                                  = 2
+	volumeOperationMaxBackoff            time.Duration = 30 * time.Second
 )
 
 var _ OperationGenerator = &fakeOperationGenerator{}
@@ -634,7 +635,7 @@ loop:
 
 func setup() (chan interface{}, chan interface{}, OperationExecutor) {
 	ch, quit := make(chan interface{}), make(chan interface{})
-	return ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit))
+	return ch, quit, NewOperationExecutor(newFakeOperationGenerator(ch, quit), volumeOperationMaxBackoff)
 }
 
 // This function starts by writing to ch and blocks on the quit channel

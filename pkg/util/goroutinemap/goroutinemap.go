@@ -24,6 +24,7 @@ package goroutinemap
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	k8sRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog"
@@ -60,10 +61,12 @@ type GoRoutineMap interface {
 }
 
 // NewGoRoutineMap returns a new instance of GoRoutineMap.
-func NewGoRoutineMap(exponentialBackOffOnError bool) GoRoutineMap {
+func NewGoRoutineMap(exponentialBackOffOnError bool,
+	volumeOperationMaxBackoff time.Duration) GoRoutineMap {
 	g := &goRoutineMap{
 		operations:                make(map[string]operation),
 		exponentialBackOffOnError: exponentialBackOffOnError,
+		volumeOperationMaxBackoff: volumeOperationMaxBackoff,
 	}
 
 	g.cond = sync.NewCond(&g.lock)
@@ -75,6 +78,7 @@ type goRoutineMap struct {
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
 	lock                      sync.RWMutex
+	volumeOperationMaxBackoff time.Duration
 }
 
 // operation holds the state of a single goroutine.
@@ -99,12 +103,18 @@ func (grm *goRoutineMap) Run(
 		if err := existingOp.expBackoff.SafeToRetry(operationName); err != nil {
 			return err
 		}
+		grm.operations[operationName] = operation{
+			operationPending: true,
+			expBackoff:       existingOp.expBackoff,
+		}
+	} else {
+		expBackoff := exponentialbackoff.NewExponentialBackoff(grm.volumeOperationMaxBackoff)
+		grm.operations[operationName] = operation{
+			operationPending: true,
+			expBackoff:       *expBackoff,
+		}
 	}
 
-	grm.operations[operationName] = operation{
-		operationPending: true,
-		expBackoff:       existingOp.expBackoff,
-	}
 	go func() (err error) {
 		// Handle unhandled panics (very unlikely)
 		defer k8sRuntime.HandleCrash()

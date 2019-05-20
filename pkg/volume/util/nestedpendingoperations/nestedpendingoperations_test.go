@@ -42,11 +42,14 @@ const (
 	// wait for an operation to complete (each successive failure results in
 	// exponential backoff).
 	initialOperationWaitTimeLong time.Duration = 500 * time.Millisecond
+
+	// volumeOperationMaxBackoff is the max backOff time of volume operations
+	volumeOperationMaxBackoff time.Duration = 30 * time.Second
 )
 
 func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation := func() (error, error) { return nil, nil }
 
@@ -61,7 +64,7 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_TwoOps(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volume1Name := v1.UniqueVolumeName("volume1-name")
 	volume2Name := v1.UniqueVolumeName("volume2-name")
 	operation := func() (error, error) { return nil, nil }
@@ -82,7 +85,7 @@ func Test_NewGoRoutineMap_Positive_TwoOps(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_TwoSubOps(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1PodName := types.UniquePodName("operation1-podname")
 	operation2PodName := types.UniquePodName("operation2-podname")
@@ -104,7 +107,7 @@ func Test_NewGoRoutineMap_Positive_TwoSubOps(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation := func() (error, error) { return nil, nil }
 
@@ -119,7 +122,7 @@ func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateCallbackFunc(operation1DoneCh)
@@ -151,7 +154,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletes(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletesWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateCallbackFunc(operation1DoneCh)
@@ -183,7 +186,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstCompletesWithExpBackoff(t *
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1 := generatePanicFunc()
 	err1 := grm.Run(volumeName, "" /* operationSubName */, types.GeneratedOperations{OperationFunc: operation1})
@@ -213,7 +216,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanics(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanicsWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1 := generatePanicFunc()
 	err1 := grm.Run(volumeName, "" /* operationSubName */, types.GeneratedOperations{OperationFunc: operation1})
@@ -243,7 +246,7 @@ func Test_NewGoRoutineMap_Positive_SecondOpAfterFirstPanicsWithExpBackoff(t *tes
 
 func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
@@ -267,7 +270,7 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletes(t *testing.T) {
 
 func Test_NewGoRoutineMap_Negative_SecondThirdOpWithDifferentNames(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	op1Name := "mount_volume"
 	operation1 := generateErrorFunc()
@@ -308,7 +311,7 @@ func Test_NewGoRoutineMap_Negative_SecondThirdOpWithDifferentNames(t *testing.T)
 
 func Test_NewGoRoutineMap_Negative_SecondSubOpBeforeFirstCompletes2(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operationPodName := types.UniquePodName("operation-podname")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
@@ -333,7 +336,7 @@ func Test_NewGoRoutineMap_Negative_SecondSubOpBeforeFirstCompletes2(t *testing.T
 
 func Test_NewGoRoutineMap_Negative_SecondSubOpBeforeFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operationPodName := types.UniquePodName("operation-podname")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
@@ -358,7 +361,7 @@ func Test_NewGoRoutineMap_Negative_SecondSubOpBeforeFirstCompletes(t *testing.T)
 
 func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletesWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
@@ -382,7 +385,7 @@ func Test_NewGoRoutineMap_Negative_SecondOpBeforeFirstCompletesWithExpBackoff(t 
 
 func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
@@ -426,7 +429,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletes(t *testing.T) {
 
 func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *testing.T) {
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
@@ -471,7 +474,7 @@ func Test_NewGoRoutineMap_Positive_ThirdOpAfterFirstCompletesWithExpBackoff(t *t
 func Test_NewGoRoutineMap_Positive_WaitEmpty(t *testing.T) {
 	// Test than Wait() on empty GoRoutineMap always succeeds without blocking
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 
 	// Act
 	waitDoneCh := make(chan interface{}, 1)
@@ -490,7 +493,7 @@ func Test_NewGoRoutineMap_Positive_WaitEmpty(t *testing.T) {
 func Test_NewGoRoutineMap_Positive_WaitEmptyWithExpBackoff(t *testing.T) {
 	// Test than Wait() on empty GoRoutineMap always succeeds without blocking
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 
 	// Act
 	waitDoneCh := make(chan interface{}, 1)
@@ -509,7 +512,7 @@ func Test_NewGoRoutineMap_Positive_WaitEmptyWithExpBackoff(t *testing.T) {
 func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
 	// Test that Wait() really blocks until the last operation succeeds
 	// Arrange
-	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(false /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)
@@ -538,7 +541,7 @@ func Test_NewGoRoutineMap_Positive_Wait(t *testing.T) {
 func Test_NewGoRoutineMap_Positive_WaitWithExpBackoff(t *testing.T) {
 	// Test that Wait() really blocks until the last operation succeeds
 	// Arrange
-	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */)
+	grm := NewNestedPendingOperations(true /* exponentialBackOffOnError */, volumeOperationMaxBackoff)
 	volumeName := v1.UniqueVolumeName("volume-name")
 	operation1DoneCh := make(chan interface{}, 0 /* bufferSize */)
 	operation1 := generateWaitFunc(operation1DoneCh)

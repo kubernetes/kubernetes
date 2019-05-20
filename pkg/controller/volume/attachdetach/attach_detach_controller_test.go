@@ -51,7 +51,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		nil, /* prober */
 		false,
 		5*time.Second,
-		DefaultTimerConfig)
+		DefaultTimerConfig,
+		30*time.Second)
 
 	// Assert
 	if err != nil {
@@ -227,7 +228,9 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 		prober,
 		false,
 		1*time.Second,
-		DefaultTimerConfig)
+		DefaultTimerConfig,
+		// volumeOperationMaxBackoff is the max backOff time of volume operations
+		30*time.Second)
 
 	if err != nil {
 		t.Fatalf("Run failed with error. Expected: <no error> Actual: <%v>", err)

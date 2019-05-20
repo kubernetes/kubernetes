@@ -40,6 +40,8 @@ const (
 	syncLoopPeriod            time.Duration = 100 * time.Minute
 	maxWaitForUnmountDuration time.Duration = 50 * time.Millisecond
 	resyncPeriod              time.Duration = 5 * time.Minute
+	// volumeOperationMaxBackoff is the max backOff time of volume operations
+	volumeOperationMaxBackoff time.Duration = 30 * time.Second
 )
 
 // Calls Run()
@@ -57,7 +59,8 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewNodeStatusUpdater(
 		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
@@ -93,7 +96,8 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -145,7 +149,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -218,7 +223,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -291,7 +297,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -367,7 +374,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -460,7 +468,8 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -551,7 +560,8 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -618,7 +628,8 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 		volumePluginMgr,
 		fakeRecorder,
 		false, /* checkNodeCapabilitiesBeforeMount */
-		fakeHandler))
+		fakeHandler),
+		volumeOperationMaxBackoff)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
@@ -724,7 +735,8 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			volumePluginMgr,
 			fakeRecorder,
 			false, /* checkNodeCapabilitiesBeforeMount */
-			fakeHandler))
+			fakeHandler),
+			volumeOperationMaxBackoff)
 		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 		rc := NewReconciler(
 			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
