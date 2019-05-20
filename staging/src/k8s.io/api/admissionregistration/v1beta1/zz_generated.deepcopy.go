@@ -257,6 +257,11 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 		*out = new(FailurePolicyType)
 		**out = **in
 	}
+	if in.MatchPolicy != nil {
+		in, out := &in.MatchPolicy, &out.MatchPolicy
+		*out = new(MatchPolicyType)
+		**out = **in
+	}
 	if in.NamespaceSelector != nil {
 		in, out := &in.NamespaceSelector, &out.NamespaceSelector
 		*out = new(v1.LabelSelector)
