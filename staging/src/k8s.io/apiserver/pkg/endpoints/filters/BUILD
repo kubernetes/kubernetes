@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "audit_bench_test.go",
         "audit_test.go",
         "authentication_test.go",
         "authn_audit_test.go",
@@ -34,6 +35,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 
