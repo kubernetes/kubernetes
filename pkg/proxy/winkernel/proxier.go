@@ -91,6 +91,14 @@ type loadBalancerInfo struct {
 	hnsID string
 }
 
+type loadBalancerFlags struct {
+	isILB          bool
+	isDSR          bool
+	localRoutedVIP bool
+	useMUX         bool
+	preserveDIP    bool
+}
+
 // internal struct for string service information
 type serviceInfo struct {
 	clusterIP                net.IP
@@ -111,6 +119,7 @@ type serviceInfo struct {
 	policyApplied            bool
 	remoteEndpoint           *endpointsInfo
 	hns                      HostNetworkService
+	preserveDIP              bool
 }
 
 type hnsNetworkInfo struct {
@@ -204,6 +213,14 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP && service.Spec.SessionAffinityConfig != nil {
 		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
 	}
+
+	klog.Infof("Service %q preserve-destination: %v", svcPortName.NamespacedName.String(), service.Annotations["preserve-destination"])
+
+	preserveDIP := service.Annotations["preserve-destination"] == "true"
+	err := hcn.DSRSupported()
+	if err != nil {
+		preserveDIP = false
+	}
 	info := &serviceInfo{
 		clusterIP: net.ParseIP(service.Spec.ClusterIP),
 		port:      int(port.Port),
@@ -219,6 +236,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *v1.ServicePort, ser
 		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
 		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
 		hns:                      hns,
+		preserveDIP:              preserveDIP,
 	}
 
 	copy(info.loadBalancerSourceRanges, service.Spec.LoadBalancerSourceRanges)
@@ -513,7 +531,7 @@ func NewProxier(
 	var hns HostNetworkService
 	hns = hnsV1{}
 	supportedFeatures := hcn.GetSupportedFeatures()
-	if supportedFeatures.RemoteSubnet {
+	if supportedFeatures.Api.V2 {
 		hns = hnsV2{}
 	}
 
@@ -999,6 +1017,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		var hnsEndpoints []endpointsInfo
+		var hnsLocalEndpoints []endpointsInfo
 		klog.V(4).Infof("====Applying Policy for %s====", svcName)
 		// Create Remote endpoints for every endpoint, corresponding to the service
 		containsPublicIP := false
@@ -1087,6 +1106,9 @@ func (proxier *Proxier) syncProxyRules() {
 			// Save the hnsId for reference
 			LogJson(newHnsEndpoint, "Hns Endpoint resource", 1)
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
+			if newHnsEndpoint.isLocal {
+				hnsLocalEndpoints = append(hnsLocalEndpoints, *newHnsEndpoint)
+			}
 			ep.hnsID = newHnsEndpoint.hnsID
 			ep.refCount++
 			Log(ep, "Endpoint resource found", 3)
@@ -1112,8 +1134,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		hnsLoadBalancer, err := hns.getLoadBalancer(
 			hnsEndpoints,
-			false,
-			proxier.isDSR,
+			loadBalancerFlags{isDSR: proxier.isDSR},
 			sourceVip,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
@@ -1132,8 +1153,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if svcInfo.nodePort > 0 {
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				hnsEndpoints,
-				false,
-				false,
+				loadBalancerFlags{localRoutedVIP: true},
 				sourceVip,
 				"",
 				Enum(svcInfo.protocol),
@@ -1154,8 +1174,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Try loading existing policies, if already available
 			hnsLoadBalancer, err = hns.getLoadBalancer(
 				hnsEndpoints,
-				false,
-				false,
+				loadBalancerFlags{},
 				sourceVip,
 				externalIP.ip,
 				Enum(svcInfo.protocol),
@@ -1172,10 +1191,13 @@ func (proxier *Proxier) syncProxyRules() {
 		// Create a Load Balancer Policy for each loadbalancer ingress
 		for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 			// Try loading existing policies, if already available
+			lbIngressEndpoints := hnsEndpoints
+			if svcInfo.preserveDIP {
+				lbIngressEndpoints = hnsLocalEndpoints
+			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
-				hnsEndpoints,
-				false,
-				false,
+				lbIngressEndpoints,
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.protocol),

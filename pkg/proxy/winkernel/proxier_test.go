@@ -110,7 +110,7 @@ func (hns fakeHNS) createEndpoint(ep *endpointsInfo, networkName string) (*endpo
 func (hns fakeHNS) deleteEndpoint(hnsID string) error {
 	return nil
 }
-func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	return &loadBalancerInfo{
 		hnsID: guid,
 	}, nil
