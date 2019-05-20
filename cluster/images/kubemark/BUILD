@@ -4,7 +4,7 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_image", "cont
 
 container_image(
     name = "image",
-    base = "@debian-base-amd64//image",
+    base = "@debian-hyperkube-base-amd64//image",
     entrypoint = ["/kubemark"],
     files = ["//cmd/kubemark"],
     stamp = True,

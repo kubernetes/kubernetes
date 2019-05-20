@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM k8s.gcr.io/debian-base-amd64:0.4.1
-
-RUN clean-install bash
+FROM k8s.gcr.io/debian-hyperkube-base-amd64:0.12.1
 
 COPY kubemark /kubemark
