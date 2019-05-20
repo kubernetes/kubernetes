@@ -33,7 +33,7 @@ readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox
 
 # This will canonicalize the path
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)
-
+# shellcheck source=/dev/null
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Constants
@@ -172,11 +172,11 @@ function kube::build::docker_available_on_osx() {
     fi
 
     kube::log::status "No docker host is set. Checking options for setting one..."
-    if [[ -z "$(which docker-machine)" ]]; then
+    if [[ -z "$(command -v docker-machine)" ]]; then
       kube::log::status "It looks like you're running Mac OS X, yet neither Docker for Mac nor docker-machine can be found."
       kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
       return 1
-    elif [[ -n "$(which docker-machine)" ]]; then
+    elif [[ -n "$(command -v docker-machine)" ]]; then
       kube::build::prepare_docker_machine
     fi
   fi
@@ -235,7 +235,7 @@ function kube::build::is_gnu_sed() {
 }
 
 function kube::build::ensure_rsync() {
-  if [[ -z "$(which rsync)" ]]; then
+  if [[ -z "$(command -v  rsync)" ]]; then
     kube::log::error "Can't find 'rsync' in PATH, please fix and retry."
     return 1
   fi
@@ -263,7 +263,7 @@ function  kube::build::set_proxy() {
 }
 
 function kube::build::ensure_docker_in_path() {
-  if [[ -z "$(which docker)" ]]; then
+  if [[ -z "$(command -v  docker)" ]]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
     kube::log::error "See https://docs.docker.com/installation/#installation for installation instructions."
     return 1
@@ -277,10 +277,10 @@ function kube::build::ensure_tar() {
 
   # Find gnu tar if it is available, bomb out if not.
   TAR=tar
-  if which gtar &>/dev/null; then
+  if command -v gtar &>/dev/null; then
       TAR=gtar
   else
-      if which gnutar &>/dev/null; then
+      if command -v &>/dev/null; then
 	  TAR=gnutar
       fi
   fi
@@ -292,11 +292,11 @@ function kube::build::ensure_tar() {
 }
 
 function kube::build::has_docker() {
-  which docker &> /dev/null
+  command -v docker &> /dev/null
 }
 
 function kube::build::has_ip() {
-  which ip &> /dev/null && ip -Version | grep 'iproute2' &> /dev/null
+  command -v ip &> /dev/null && ip -Version | grep 'iproute2' &> /dev/null
 }
 
 # Detect if a specific image exists
@@ -364,7 +364,7 @@ function kube::build::short_hash() {
   }
 
   local short_hash
-  if which md5 >/dev/null 2>&1; then
+  if command -v md5 >/dev/null 2>&1; then
     short_hash=$(md5 -q -s "$1")
   else
     short_hash=$(echo -n "$1" | md5sum)
