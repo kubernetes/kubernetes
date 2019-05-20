@@ -77,6 +77,26 @@ generated from the type definitions.  To do this, first
 and then invoke `hack/update-codegen.sh` with `sample-apiserver` as
 your current working directory; the script takes no arguments.
 
+### Authentication plugins
+
+The normal build supports only a very spare selection of
+authentication methods.  There is a much larger set available in
+https://github.com/kubernetes/client-go/tree/master/plugin/pkg/client/auth
+.  If you want your server to support one of those, such as `oidc`,
+then add an import of the appropriate package to
+`sample-apiserver/main.go`.  Here is an example:
+
+``` go
+import _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+```
+
+Alternatively you could add support for all of them, with an import
+like this:
+
+``` go
+import _ "k8s.io/client-go/plugin/pkg/client/auth"
+```
+
 ### Build the Binary
 
 With `sample-apiserver` as your current working directory, issue the
@@ -123,48 +143,63 @@ only this superuser group is authorized.
 
 1. First we need a CA to later sign the client certificate:
 
-``` shell
-openssl req -nodes -new -x509 -keyout ca.key -out ca.crt
-```
+   ``` shell
+   openssl req -nodes -new -x509 -keyout ca.key -out ca.crt
+   ```
 
 2. Then we create a client cert signed by this CA for the user `development` in the superuser group
    `system:masters`:
 
-``` shell
-openssl req -out client.csr -new -newkey rsa:4096 -nodes -keyout client.key -subj "/CN=development/O=system:masters"
-openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
-```
+   ``` shell
+   openssl req -out client.csr -new -newkey rsa:4096 -nodes -keyout client.key -subj "/CN=development/O=system:masters"
+   openssl x509 -req -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 01 -out client.crt
+   ```
 
 3. As curl requires client certificates in p12 format with password, do the conversion:
 
-``` shell
-openssl pkcs12 -export -in ./client.crt -inkey ./client.key -out client.p12 -passout pass:password
-```
+   ``` shell
+   openssl pkcs12 -export -in ./client.crt -inkey ./client.key -out client.p12 -passout pass:password
+   ```
 
 4. With these keys and certs in-place, we start the server:
 
-``` shell
-etcd &
-sample-apiserver --secure-port 8443 --etcd-servers http://127.0.0.1:2379 --v=7 \
-	--client-ca-file ca.crt \
-	--kubeconfig ~/.kube/config \
-	--authentication-kubeconfig ~/.kube/config \
-	--authorization-kubeconfig ~/.kube/config
-```
+   ``` shell
+   etcd &
+   sample-apiserver --secure-port 8443 --etcd-servers http://127.0.0.1:2379 --v=7 \
+      --client-ca-file ca.crt \
+      --kubeconfig ~/.kube/config \
+      --authentication-kubeconfig ~/.kube/config \
+      --authorization-kubeconfig ~/.kube/config
+   ```
 
-The first kubeconfig is used for the shared informers to access Kubernetes resources. The second kubeconfig passed to `--authentication-kubeconfig` is used to satisfy the delegated authenticator. The third kubeconfig passed to `--authorized-kubeconfig` is used to satisfy the delegated authorizer. Neither the authenticator, nor the authorizer will actually be used: due to `--client-ca-file`, our development X.509 certificate is accepted and authenticates us as `system:masters` member. `system:masters` is the superuser group
-such that delegated authorization is skipped.
+   The first kubeconfig is used for the shared informers to access
+   Kubernetes resources. The second kubeconfig passed to
+   `--authentication-kubeconfig` is used to satisfy the delegated
+   authenticator. The third kubeconfig passed to
+   `--authorized-kubeconfig` is used to satisfy the delegated
+   authorizer. Neither the authenticator, nor the authorizer will
+   actually be used: due to `--client-ca-file`, our development X.509
+   certificate is accepted and authenticates us as `system:masters`
+   member. `system:masters` is the superuser group such that delegated
+   authorization is skipped.
 
 5. Use curl to access the server using the client certificate in p12 format for authentication:
 
-``` shell
-curl -fv -k --cert client.p12:password \
-	https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-```
+   ``` shell
+   curl -fv -k --cert client.p12:password \
+      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+   ```
+
+   Or use wget:
+   ``` shell
+   wget -O- --no-check-certificate \
+      --certificate client.crt --private-key client.key \
+      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+   ```
 
    Note: Recent OSX versions broke client certs with curl. On Mac try `brew install httpie` and then:
 
-``` shell
-http --verify=no --cert client.crt --cert-key client.key \
-	https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-```
+   ``` shell
+   http --verify=no --cert client.crt --cert-key client.key \
+      https://localhost:8443/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
+   ```
