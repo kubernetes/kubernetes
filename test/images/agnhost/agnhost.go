@@ -17,7 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"flag"
+
 	"github.com/spf13/cobra"
+
+	"k8s.io/klog"
+	"k8s.io/kubernetes/test/images/agnhost/net"
+	"k8s.io/kubernetes/test/images/agnhost/netexec"
+	"k8s.io/kubernetes/test/images/agnhost/nettest"
+	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
 
 func main() {
@@ -58,5 +66,16 @@ func main() {
 	rootCmd.AddCommand(cmdDNSServerList)
 	rootCmd.AddCommand(cmdEtcHosts)
 	rootCmd.AddCommand(cmdPause)
+
+	rootCmd.AddCommand(net.CmdNet)
+	rootCmd.AddCommand(netexec.CmdNetexec)
+	rootCmd.AddCommand(nettest.CmdNettest)
+	rootCmd.AddCommand(webhook.CmdWebhook)
+
+	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to
+	// accept them. This will also include them in the printed help.
+	loggingFlags := &flag.FlagSet{}
+	klog.InitFlags(loggingFlags)
+	rootCmd.PersistentFlags().AddGoFlagSet(loggingFlags)
 	rootCmd.Execute()
 }

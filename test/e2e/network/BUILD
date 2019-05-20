@@ -65,7 +65,7 @@ go_library(
         "//test/e2e/framework/providers/gce:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/network/scale:go_default_library",
-        "//test/images/net/nat:go_default_library",
+        "//test/images/agnhost/net/nat:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",

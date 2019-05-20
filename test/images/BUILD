@@ -23,9 +23,6 @@ filegroup(
         "//test/images/logs-generator:all-srcs",
         "//test/images/metadata-concealment:all-srcs",
         "//test/images/mounttest:all-srcs",
-        "//test/images/net:all-srcs",
-        "//test/images/netexec:all-srcs",
-        "//test/images/nettest:all-srcs",
         "//test/images/no-snat-test:all-srcs",
         "//test/images/no-snat-test-proxy:all-srcs",
         "//test/images/nonewprivs:all-srcs",
@@ -39,7 +36,6 @@ filegroup(
         "//test/images/sample-device-plugin:all-srcs",
         "//test/images/serve-hostname:all-srcs",
         "//test/images/test-webserver:all-srcs",
-        "//test/images/webhook:all-srcs",
     ],
     tags = ["automanaged"],
 )
