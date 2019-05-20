@@ -40,7 +40,9 @@ ADD porter/localhost.key localhost.key
 
 ADD agnhost agnhost
 
-# needed for the entrypoint-tester related tests.
+# needed for the entrypoint-tester related tests. Some of the entrypoint-tester related tests
+# overrides this image's entrypoint with agnhost-2 binary, and will verify that the correct
+# entrypoint is used by the containers.
 RUN ln -s agnhost agnhost-2
 
 ENTRYPOINT ["/agnhost"]

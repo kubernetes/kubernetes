@@ -31,8 +31,12 @@ var CmdEntrypointTester = &cobra.Command{
 	Run:   main,
 }
 
-// This program prints the arguments it's passed and exits.
+// This program prints all the executable's arguments and exits.
 func main(cmd *cobra.Command, args []string) {
+	// Some of the entrypoint-tester related tests overrides agnhost's default entrypoint
+	// with agnhost-2, and this function's args will only contain the subcommand's
+	// args (./agnhost entrypoint-tester these args), but we need to print *all* the
+	// args, which is why os.Args should be printed instead.
 	fmt.Printf("%v\n", os.Args)
 	os.Exit(0)
 }
