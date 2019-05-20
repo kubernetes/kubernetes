@@ -1,4 +1,0 @@
-amd64=k8s.gcr.io/ubuntu-slim:0.12
-arm=k8s.gcr.io/ubuntu-slim-arm:0.12
-arm64=k8s.gcr.io/ubuntu-slim-arm64:0.12
-ppc64le=k8s.gcr.io/ubuntu-slim-ppc64le:0.12
