@@ -14,6 +14,7 @@ go_library(
         "azure_blobDiskController.go",
         "azure_cache.go",
         "azure_client.go",
+        "azure_config.go",
         "azure_controller_common.go",
         "azure_controller_standard.go",
         "azure_controller_vmss.go",
@@ -39,6 +40,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
