@@ -125,21 +125,34 @@ func (a *Webhook) ValidateInitialization() error {
 	return nil
 }
 
-// ShouldCallHook makes a decision on whether to call the webhook or not by the attribute.
-func (a *Webhook) ShouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
-	var matches bool
+// shouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
+// or an error if an error was encountered during evaluation.
+func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (*WebhookInvocation, *apierrors.StatusError) {
+	var err *apierrors.StatusError
+	var invocation *WebhookInvocation
 	for _, r := range h.Rules {
 		m := rules.Matcher{Rule: r, Attr: attr}
 		if m.Matches() {
-			matches = true
+			invocation = &WebhookInvocation{
+				Webhook:     h,
+				Resource:    attr.GetResource(),
+				Subresource: attr.GetSubresource(),
+				Kind:        attr.GetKind(),
+			}
 			break
 		}
 	}
-	if !matches {
-		return false, nil
+
+	if invocation == nil {
+		return nil, nil
 	}
 
-	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	matches, err := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	if !matches || err != nil {
+		return nil, err
+	}
+
+	return invocation, nil
 }
 
 // Dispatch is called by the downstream Validate or Admit methods.
@@ -154,14 +167,14 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 
-	var relevantHooks []*v1beta1.Webhook
+	var relevantHooks []*WebhookInvocation
 	for i := range hooks {
-		call, err := a.ShouldCallHook(&hooks[i], attr)
+		invocation, err := a.shouldCallHook(&hooks[i], attr)
 		if err != nil {
 			return err
 		}
-		if call {
-			relevantHooks = append(relevantHooks, &hooks[i])
+		if invocation != nil {
+			relevantHooks = append(relevantHooks, invocation)
 		}
 	}
 
@@ -170,23 +183,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 		return nil
 	}
 
-	// convert the object to the external version before sending it to the webhook
-	versionedAttr := VersionedAttributes{
-		Attributes: attr,
-	}
-	if oldObj := attr.GetOldObject(); oldObj != nil {
-		out, err := ConvertToGVK(oldObj, attr.GetKind(), o)
-		if err != nil {
-			return apierrors.NewInternalError(err)
-		}
-		versionedAttr.VersionedOldObject = out
-	}
-	if obj := attr.GetObject(); obj != nil {
-		out, err := ConvertToGVK(obj, attr.GetKind(), o)
-		if err != nil {
-			return apierrors.NewInternalError(err)
-		}
-		versionedAttr.VersionedObject = out
-	}
-	return a.dispatcher.Dispatch(ctx, &versionedAttr, o, relevantHooks)
+	return a.dispatcher.Dispatch(ctx, attr, o, relevantHooks)
 }
