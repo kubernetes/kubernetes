@@ -562,7 +562,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
 test/e2e/lifecycle/bootstrap
-test/e2e/scalability
 test/e2e/storage/vsphere
 test/e2e_kubeadm
 test/e2e_node
