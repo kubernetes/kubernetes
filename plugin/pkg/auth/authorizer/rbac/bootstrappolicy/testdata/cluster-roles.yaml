@@ -371,6 +371,7 @@ items:
     - nodes
     verbs:
     - get
+    - list
     - patch
   - apiGroups:
     - ""
