@@ -195,10 +195,13 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 
 		config, err := LoadFromFile(filename)
+
 		if os.IsNotExist(err) {
 			// skip missing files
+			errlist = append(errlist, fmt.Errorf("No such file or directory %s", filename))
 			continue
 		}
+
 		if err != nil {
 			errlist = append(errlist, fmt.Errorf("Error loading config file \"%s\": %v", filename, err))
 			continue
