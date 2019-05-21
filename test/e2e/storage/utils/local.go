@@ -36,23 +36,23 @@ import (
 type LocalVolumeType string
 
 const (
-	// A simple directory as local volume
+	// LocalVolumeDirectory reprensents a simple directory as local volume
 	LocalVolumeDirectory LocalVolumeType = "dir"
-	// Like LocalVolumeDirectory but it's a symbolic link to directory
+	// LocalVolumeDirectoryLink is like LocalVolumeDirectory but it's a symbolic link to directory
 	LocalVolumeDirectoryLink LocalVolumeType = "dir-link"
-	// Like LocalVolumeDirectory but bind mounted
+	// LocalVolumeDirectoryBindMounted is like LocalVolumeDirectory but bind mounted
 	LocalVolumeDirectoryBindMounted LocalVolumeType = "dir-bindmounted"
-	// Like LocalVolumeDirectory but it's a symbolic link to self bind mounted directory
+	// LocalVolumeDirectoryLinkBindMounted is like LocalVolumeDirectory but it's a symbolic link to self bind mounted directory
 	// Note that bind mounting at symbolic link actually mounts at directory it
 	// links to
 	LocalVolumeDirectoryLinkBindMounted LocalVolumeType = "dir-link-bindmounted"
-	// Use temporary filesystem as local volume
+	// LocalVolumeTmpfs represents a temporary filesystem to be used as local volume
 	LocalVolumeTmpfs LocalVolumeType = "tmpfs"
-	// Block device, creates a local file, and maps it as a block device
+	// LocalVolumeBlock represents a Block device, creates a local file, and maps it as a block device
 	LocalVolumeBlock LocalVolumeType = "block"
-	// Filesystem backed by a block device
+	// LocalVolumeBlockFS represents a filesystem backed by a block device
 	LocalVolumeBlockFS LocalVolumeType = "blockfs"
-	// Use GCE Local SSD as local volume, this is a filesystem
+	// LocalVolumeGCELocalSSD represents a Filesystem backed by GCE Local SSD as local volume
 	LocalVolumeGCELocalSSD LocalVolumeType = "gce-localssd-scsi-fs"
 )
 

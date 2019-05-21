@@ -40,13 +40,18 @@ import (
 	uexec "k8s.io/utils/exec"
 )
 
+// KubeletOpt type definition
 type KubeletOpt string
 
 const (
-	NodeStateTimeout            = 1 * time.Minute
-	KStart           KubeletOpt = "start"
-	KStop            KubeletOpt = "stop"
-	KRestart         KubeletOpt = "restart"
+	// NodeStateTimeout defines Timeout
+	NodeStateTimeout = 1 * time.Minute
+	// KStart defines start value
+	KStart KubeletOpt = "start"
+	// KStop defines stop value
+	KStop KubeletOpt = "stop"
+	// KRestart defines restart value
+	KRestart KubeletOpt = "restart"
 )
 
 const (
@@ -205,7 +210,7 @@ func TestKubeletRestartsAndRestoresMount(c clientset.Interface, f *framework.Fra
 	e2elog.Logf("Volume mount detected on pod %s and written file %s is readable post-restart.", clientPod.Name, file)
 }
 
-// TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
+// TestVolumeUnmountsFromDeletedPodWithForceOption tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 // forceDelete is true indicating whether the pod is forcefully deleted.
 func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
 	nodeIP, err := framework.GetHostExternalAddress(c, clientPod)
@@ -276,7 +281,7 @@ func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framew
 	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false)
 }
 
-// TestVolumeUnmountsFromFoceDeletedPod tests that a volume unmounts if the client pod was forcefully deleted while the kubelet was down.
+// TestVolumeUnmountsFromForceDeletedPod tests that a volume unmounts if the client pod was forcefully deleted while the kubelet was down.
 func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
 	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false)
 }
@@ -328,6 +333,7 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
+// StartExternalProvisioner create external provisioner pod
 func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
 	podClient := c.CoreV1().Pods(ns)
 
@@ -401,6 +407,7 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 	return pod
 }
 
+// PrivilegedTestPSPClusterRoleBinding test Pod Security Policy Role bindings
 func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 	namespace string,
 	teardown bool,
@@ -448,6 +455,7 @@ func PrivilegedTestPSPClusterRoleBinding(client clientset.Interface,
 	}
 }
 
+// CheckVolumeModeOfPath check mode of volume
 func CheckVolumeModeOfPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
 		// Check if block exists
@@ -464,6 +472,7 @@ func CheckVolumeModeOfPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path st
 	}
 }
 
+// CheckReadWriteToPath check that path can b e read and written
 func CheckReadWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
 		// random -> file1
@@ -490,6 +499,7 @@ func CheckReadWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path str
 	}
 }
 
+// genBinDataFromSeed generate binData with random seed
 func genBinDataFromSeed(len int, seed int64) []byte {
 	binData := make([]byte, len)
 	rand.Seed(seed)
@@ -502,6 +512,7 @@ func genBinDataFromSeed(len int, seed int64) []byte {
 	return binData
 }
 
+// CheckReadFromPath validate that file can be properly read.
 func CheckReadFromPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
 	var pathForVolMode string
 	if volMode == v1.PersistentVolumeBlock {
@@ -516,6 +527,7 @@ func CheckReadFromPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string
 	VerifyExecInPodSucceed(pod, fmt.Sprintf("dd if=%s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, len, sum))
 }
 
+// CheckWriteToPath that file can be properly written.
 func CheckWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string, len int, seed int64) {
 	var pathForVolMode string
 	if volMode == v1.PersistentVolumeBlock {
