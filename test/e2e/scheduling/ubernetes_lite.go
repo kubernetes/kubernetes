@@ -52,7 +52,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should spread the pods of a service across zones", func() {
-		SpreadServiceOrFail(f, (2*zoneCount)+1, image)
+		SpreadServiceOrFail(f, (2*zoneCount)+1)
 	})
 
 	ginkgo.It("should spread the pods of a replication controller across zones", func() {
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 
 // SpreadServiceOrFail check that the pods comprising a service
 // get spread evenly across available zones
-func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string) {
+func SpreadServiceOrFail(f *framework.Framework, replicaCount int) {
 	// First create the service
 	serviceName := "test-service"
 	serviceSpec := &v1.Service{
@@ -199,6 +199,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 						{
 							Name:  name,
 							Image: image,
+							Args:  []string{"serve-hostname"},
 							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 						},
 					},

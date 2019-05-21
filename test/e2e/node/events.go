@@ -61,6 +61,7 @@ var _ = SIGDescribe("Events", func() {
 					{
 						Name:  "p",
 						Image: framework.ServeHostnameImage,
+						Args:  []string{"serve-hostname"},
 						Ports: []v1.ContainerPort{{ContainerPort: 80}},
 					},
 				},

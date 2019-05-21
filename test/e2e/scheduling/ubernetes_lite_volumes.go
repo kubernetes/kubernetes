@@ -38,7 +38,6 @@ var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
 	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
-	image := framework.ServeHostnameImage
 	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		if zoneCount <= 0 {
@@ -51,16 +50,16 @@ var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	ginkgo.It("should schedule pods in the same zones as statically provisioned PVs", func() {
-		PodsUseStaticPVsOrFail(f, (2*zoneCount)+1, image)
+		PodsUseStaticPVsOrFail(f, (2*zoneCount)+1)
 	})
 
 	ginkgo.It("should only be allowed to provision PDs in zones where nodes exist", func() {
-		OnlyAllowNodeZones(f, zoneCount, image)
+		OnlyAllowNodeZones(f, zoneCount)
 	})
 })
 
 // OnlyAllowNodeZones tests that GetAllCurrentZones returns only zones with Nodes
-func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
+func OnlyAllowNodeZones(f *framework.Framework, zoneCount int) {
 	gceCloud, err := gce.GetGCECloud()
 	framework.ExpectNoError(err)
 
@@ -183,7 +182,7 @@ type staticPVTestConfig struct {
 
 // PodsUseStaticPVsOrFail Check that the pods using statically
 // created PVs get scheduled to the same zone that the PV is in.
-func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) {
+func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int) {
 	var err error
 	c := f.ClientSet
 	ns := f.Namespace.Name

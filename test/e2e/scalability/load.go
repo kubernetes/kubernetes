@@ -179,21 +179,21 @@ var _ = SIGDescribe("Load capacity", func() {
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: api.Kind("ReplicationController")},
 		// Tests for other resource types
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment")},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: batch.Kind("Job")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: batch.Kind("Job")},
 		// Test scheduling when daemons are preset
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Test with configmaps
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: randomKind},
 		// Test with quotas
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), quotas: true},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind, quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: api.Kind("ReplicationController"), quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: []string{"/agnhost", "serve-hostname"}, kind: randomKind, quotas: true},
 	}
 
 	isCanonical := func(test *Load) bool {

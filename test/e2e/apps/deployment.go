@@ -269,7 +269,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	rsRevision := "3546343826724305832"
 	annotations := make(map[string]string)
 	annotations[deploymentutil.RevisionAnnotation] = rsRevision
-	rs := newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage)
+	rs := newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage, nil)
 	rs.Annotations = annotations
 	e2elog.Logf("Creating replica set %q (going to be adopted)", rs.Name)
 	_, err := c.AppsV1().ReplicaSets(ns).Create(rs)
@@ -349,7 +349,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	rsName := "test-cleanup-controller"
 	replicas := int32(1)
 	revisionHistoryLimit := utilpointer.Int32Ptr(0)
-	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage))
+	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, replicas, rsPodLabels, NginxImageName, NginxImage, nil))
 	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
@@ -420,7 +420,7 @@ func testRolloverDeployment(f *framework.Framework) {
 
 	rsName := "test-rollover-controller"
 	rsReplicas := int32(1)
-	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage))
+	_, err := c.AppsV1().ReplicaSets(ns).Create(newRS(rsName, rsReplicas, rsPodLabels, NginxImageName, NginxImage, nil))
 	framework.ExpectNoError(err)
 	// Verify that the required pods have come up.
 	err = e2epod.VerifyPodsRunning(c, ns, podName, false, rsReplicas)

@@ -209,7 +209,7 @@ const (
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
 	configs[CRDConversionWebhook] = Config{e2eRegistry, "crd-conversion-webhook", "1.13rev2"}
-	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.1"}
+	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.2"}
 	configs[Alpine] = Config{dockerLibraryRegistry, "alpine", "3.7"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
