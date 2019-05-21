@@ -233,23 +233,27 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup)
 
+	// If setting up the quota fails, just log a message but don't actually error out.
+	// We'll use the old du mechanism in this case, at least until we support
+	// enforcement.
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
-	}
-	if mounterArgs.DesiredSize != nil {
-		hasQuotas, err := quota.SupportsQuotas(ed.mounter, dir)
-		if err != nil {
-			return fmt.Errorf("Unable to check for quota support on %s: %s", dir, err.Error())
-		}
-		if hasQuotas {
-			klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterArgs.DesiredSize, dir)
-			err := quota.AssignQuota(ed.mounter, dir, mounterArgs.PodUID, mounterArgs.DesiredSize)
+		if mounterArgs.DesiredSize != nil {
+			// Deliberately shadow the outer use of err as noted
+			// above.
+			hasQuotas, err := quota.SupportsQuotas(ed.mounter, dir)
 			if err != nil {
-				return fmt.Errorf("Set quota on %s failed %s", dir, err.Error())
+				klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
+			} else if hasQuotas {
+				klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterArgs.DesiredSize, dir)
+				err := quota.AssignQuota(ed.mounter, dir, mounterArgs.PodUID, mounterArgs.DesiredSize)
+				if err != nil {
+					klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
+				}
 			}
 		}
 	}
-	return nil
+	return err
 }
 
 // setupTmpfs creates a tmpfs mount at the specified directory.
