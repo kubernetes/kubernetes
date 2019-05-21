@@ -623,6 +623,7 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
     - endpoints
     - secrets
     - serviceaccounts
@@ -647,6 +648,7 @@ items:
   - apiGroups:
     - ""
     resources:
+    - configmaps
     - endpoints
     - secrets
     - serviceaccounts
