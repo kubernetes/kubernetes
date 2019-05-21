@@ -22,12 +22,12 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
+	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -80,7 +80,6 @@ func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, e
 	buf := bytes.NewBuffer(yamlBytes)
 	reader := utilyaml.NewYAMLReader(bufio.NewReader(buf))
 	for {
-		typeMetaInfo := runtime.TypeMeta{}
 		// Read one YAML document at a time, until io.EOF is returned
 		b, err := reader.Read()
 		if err == io.EOF {
@@ -92,31 +91,19 @@ func SplitYAMLDocuments(yamlBytes []byte) (map[schema.GroupVersionKind][]byte, e
 			break
 		}
 		// Deserialize the TypeMeta information of this byte slice
-		if err := yaml.Unmarshal(b, &typeMetaInfo); err != nil {
-			return nil, err
-		}
-		// Require TypeMeta information to be present
-		if len(typeMetaInfo.APIVersion) == 0 || len(typeMetaInfo.Kind) == 0 {
-			errs = append(errs, errors.New("invalid configuration: kind and apiVersion is mandatory information that needs to be specified in all YAML documents"))
-			continue
+		gvk, err := yamlserializer.DefaultMetaFactory.Interpret(b)
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid configuration: kind and apiVersion is mandatory information that needs to be specified in all YAML documents")
 		}
 		// Check whether the kind has been registered before. If it has, throw an error
-		if known := knownKinds[typeMetaInfo.Kind]; known {
-			errs = append(errs, errors.Errorf("invalid configuration: kind %q is specified twice in YAML file", typeMetaInfo.Kind))
+		if known := knownKinds[gvk.Kind]; known {
+			errs = append(errs, errors.Errorf("invalid configuration: kind %q is specified twice in YAML file", gvk.Kind))
 			continue
 		}
-		knownKinds[typeMetaInfo.Kind] = true
-
-		// Build a GroupVersionKind object from the deserialized TypeMeta object
-		gv, err := schema.ParseGroupVersion(typeMetaInfo.APIVersion)
-		if err != nil {
-			errs = append(errs, errors.Wrap(err, "unable to parse apiVersion"))
-			continue
-		}
-		gvk := gv.WithKind(typeMetaInfo.Kind)
+		knownKinds[gvk.Kind] = true
 
 		// Save the mapping between the gvk and the bytes that object consists of
-		gvkmap[gvk] = b
+		gvkmap[*gvk] = b
 	}
 	if err := errorsutil.NewAggregate(errs); err != nil {
 		return nil, err
