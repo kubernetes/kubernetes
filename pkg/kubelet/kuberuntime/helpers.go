@@ -178,6 +178,16 @@ func BuildContainerLogsDirectory(podNamespace, podName string, podUID types.UID,
 
 // BuildPodLogsDirectory builds absolute log directory path for a pod sandbox.
 func BuildPodLogsDirectory(podNamespace, podName string, podUID types.UID) string {
+	podNamespaceLength := len(podNamespace)
+	podNameLength := len(podName)
+	podUIDLength := len(string(podUID))
+	delimeterLength := 2
+	// 255 is the maximum number of characters for filenames on most modern filesystems.
+	// Even though we are creating a directory the directory name is limited to
+	// 255 characters as well.
+	if podNamespaceLength+podNameLength+podUIDLength+delimeterLength > 255 {
+		podName = podName[0 : 255-podNamespaceLength-podUIDLength-delimeterLength]
+	}
 	return filepath.Join(podLogsRootDirectory, strings.Join([]string{podNamespace, podName,
 		string(podUID)}, logPathDelimiter))
 }
