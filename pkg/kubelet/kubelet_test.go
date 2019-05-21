@@ -1604,7 +1604,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	for i, test := range tests {
 		kubelet.reasonCache = NewReasonCache()
 		for n, e := range test.reasons {
-			kubelet.reasonCache.add(pod.UID, n, e, "")
+			kubelet.reasonCache.Add(pod.UID, n, e, "")
 		}
 		pod.Spec.Containers = test.containers
 		pod.Status.ContainerStatuses = test.oldStatuses
@@ -1617,7 +1617,7 @@ func TestGenerateAPIPodStatusWithReasonCache(t *testing.T) {
 	for i, test := range tests {
 		kubelet.reasonCache = NewReasonCache()
 		for n, e := range test.reasons {
-			kubelet.reasonCache.add(pod.UID, n, e, "")
+			kubelet.reasonCache.Add(pod.UID, n, e, "")
 		}
 		pod.Spec.InitContainers = test.containers
 		pod.Status.InitContainerStatuses = test.oldStatuses
@@ -1667,8 +1667,8 @@ func TestGenerateAPIPodStatusWithDifferentRestartPolicies(t *testing.T) {
 			},
 		},
 	}
-	kubelet.reasonCache.add(pod.UID, "succeed", testErrorReason, "")
-	kubelet.reasonCache.add(pod.UID, "failed", testErrorReason, "")
+	kubelet.reasonCache.Add(pod.UID, "succeed", testErrorReason, "")
+	kubelet.reasonCache.Add(pod.UID, "failed", testErrorReason, "")
 	for c, test := range []struct {
 		restartPolicy                v1.RestartPolicy
 		expectedState                map[string]v1.ContainerState
