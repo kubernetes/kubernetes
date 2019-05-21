@@ -58,6 +58,8 @@ import (
 	"k8s.io/klog"
 )
 
+var frameworkRegistry = framework.NewRegistry()
+
 // NewSchedulerCommand creates a *cobra.Command object with default parameters
 func NewSchedulerCommand() *cobra.Command {
 	opts, err := options.NewOptions()
@@ -175,7 +177,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
-		framework.NewRegistry(),
+		frameworkRegistry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
@@ -325,4 +327,10 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 		}
 	}
 	return pathRecorderMux
+}
+
+// RegisterFrameworkPlugin adds a new plugin to the registry. If a plugin with the same name
+// exists, it returns an error.
+func RegisterFrameworkPlugin(name string, factory framework.PluginFactory) error {
+	return frameworkRegistry.Register(name, factory)
 }
