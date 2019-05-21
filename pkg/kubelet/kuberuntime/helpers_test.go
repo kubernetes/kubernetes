@@ -17,7 +17,9 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"path"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -393,5 +395,12 @@ func TestNamespacesForPod(t *testing.T) {
 		t.Logf("TestCase: %s", desc)
 		actual := namespacesForPod(test.input)
 		assert.Equal(t, test.expected, actual)
+	}
+}
+
+func TestMaxDirectoryLength(t *testing.T) {
+	dir := BuildPodLogsDirectory("namespace-a", strings.Repeat("a", 253), "b0b67e30-aa3b-4ea3-bd6e-cd2b0e61930e")
+	if len(path.Base(dir)) > 255 {
+		t.Fatal("Base name cannot exceed 255")
 	}
 }
