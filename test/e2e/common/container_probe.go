@@ -341,8 +341,8 @@ func livenessPodSpec(readinessProbe, livenessProbe *v1.Probe) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:           "liveness",
-					Image:          imageutils.GetE2EImage(imageutils.Liveness),
-					Command:        []string{"/server"},
+					Image:          imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:           []string{"liveness"},
 					LivenessProbe:  livenessProbe,
 					ReadinessProbe: readinessProbe,
 				},

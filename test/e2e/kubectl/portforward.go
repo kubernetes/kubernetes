@@ -84,7 +84,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 				},
 				{
 					Name:  "portforwardtester",
-					Image: imageutils.GetE2EImage(imageutils.PortForwardTester),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"port-forward-tester"},
 					Env: []v1.EnvVar{
 						{
 							Name:  "BIND_PORT",

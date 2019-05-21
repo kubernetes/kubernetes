@@ -470,8 +470,8 @@ func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:            "hostexec",
-					Image:           imageutils.GetE2EImage(imageutils.Hostexec),
+					Name:            "agnhost",
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
 					ImagePullPolicy: v1.PullIfNotPresent,
 				},
 			},
