@@ -73,6 +73,7 @@ define ALL_HELP_INFO
 #   GOFLAGS: Extra flags to pass to 'go' when building.
 #   GOLDFLAGS: Extra linking flags passed to 'go' when building.
 #   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   KUBE_BUILD_PLATFORMS: platform to build
 #
 # Example:
 #   make
@@ -91,6 +92,28 @@ all:
 else
 all: generated_files
 	hack/make-rules/build.sh $(WHAT)
+endif
+
+define BUILD_BINARY_HELP_INFO
+# Build binaries in container.
+#
+# Args:
+#   WHAT: Directory names to build.
+#   GOFLAGS: Extra flags to pass to 'go' when building.
+#   GOLDFLAGS: Extra linking flags passed to 'go' when building.
+#   GOGCFLAGS: Additional go compile flags passed to 'go' when building.
+#   KUBE_BUILD_PLATFORMS: platform to build
+#
+# Example:
+#   make build-binary-in-container WHAT=cmd/kubectl KUBE_BUILD_PLATFORMS="darwin/amd64 windows/amd64"
+endef
+.PHONY: build-binary-in-container
+ifeq ($(PRINT_HELP),y)
+build-binary-in-container:
+	@echo "$$ALL_HELP_INFO"
+else
+build-binary-in-container:
+	build/release-binary.sh $(WHAT)
 endif
 
 define GINKGO_HELP_INFO
