@@ -160,6 +160,7 @@ func TestCRDOpenAPI(t *testing.T) {
 			},
 			Validation: &apiextensionsv1beta1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+					Type: "object",
 					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 						"foo": {Type: "string"},
 					},

@@ -7,6 +7,7 @@ go_library(
         "convert.go",
         "goopenapi.go",
         "structural.go",
+        "unfold.go",
         "validation.go",
         "visitor.go",
         "zz_generated.deepcopy.go",
