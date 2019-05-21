@@ -107,6 +107,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 
 	ginkgo.It("Should be able to convert from CR v1 to CR v2", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
 				Strategy: v1beta1.WebhookConverter,
 				WebhookClientConfig: &v1beta1.WebhookClientConfig{
@@ -129,6 +130,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 
 	ginkgo.It("Should be able to convert a non homogeneous list of CRs", func() {
 		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+			crd.Spec.Versions = apiVersions
 			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
 				Strategy: v1beta1.WebhookConverter,
 				WebhookClientConfig: &v1beta1.WebhookClientConfig{
