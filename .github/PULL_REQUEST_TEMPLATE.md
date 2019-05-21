@@ -39,6 +39,7 @@ If no, just write "NONE" in the release-note block below.
 If yes, a release note is required:
 Enter your extended release note in the block below. If the PR requires additional action from users switching to the new release, include the string "action required".
 -->
-```release-note
+```
+NONE
 
 ```
