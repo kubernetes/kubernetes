@@ -96,6 +96,7 @@ current state towards the desired state. Examples of controllers that ship with
 Kubernetes today are the replication controller, endpoints controller, namespace
 controller, and serviceaccounts controller.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			defer close(s.ErrCh)
 			verflag.PrintAndExitIfRequested()
 			utilflag.PrintFlags(cmd.Flags())
 
@@ -103,6 +104,28 @@ controller, and serviceaccounts controller.`,
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
+			}
+
+			if len(c.ConfigFile) > 0 {
+				if s.Watcher != nil {
+					s.Watcher.Run()
+				}
+				// detect the file change in goroutine
+				go func() {
+					if err := <-s.ErrCh; err != nil {
+						syncErr := c.Sync()
+						fmt.Fprintf(os.Stderr, "sync kube-controller manager configMap with error: %v after we recive the channel event: %v\n", syncErr, err)
+						os.Exit(1)
+					}
+				}()
+
+			}
+			if len(c.WriteConfigTo) > 0 {
+				if err := config.WriteConfigFile(c.WriteConfigTo, &c.ComponentConfig); err != nil {
+					fmt.Fprintf(os.Stderr, "%v\n", err)
+					os.Exit(1)
+				}
+				klog.Infof("Wrote configuration to: %s\n", c.WriteConfigTo)
 			}
 
 			if err := Run(c.Complete(), wait.NeverStop); err != nil {

@@ -40,6 +40,7 @@ import (
 	kubectrlmgrconfigscheme "k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 
 	// add the kubernetes feature gates
 	_ "k8s.io/kubernetes/pkg/features"
@@ -83,6 +84,15 @@ type KubeControllerManagerOptions struct {
 	InsecureServing *apiserveroptions.DeprecatedInsecureServingOptionsWithLoopback
 	Authentication  *apiserveroptions.DelegatingAuthenticationOptions
 	Authorization   *apiserveroptions.DelegatingAuthorizationOptions
+
+	// ConfigFile is the location of the kube-controller manager server's configuration file.
+	ConfigFile string
+	// WriteConfigTo is the path where the current kube-controller manager server's configuration will be written.
+	WriteConfigTo string
+	// Watcher is used to watch on the update change of ConfigFile.
+	Watcher filesystem.FSWatcher
+	// ErrCh is the channel that errors will be sent.
+	ErrCh chan error
 
 	Master     string
 	Kubeconfig string
@@ -233,6 +243,8 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet("ttl-after-finished controller"))
 
 	fs := fss.FlagSet("misc")
+	fs.StringVar(&s.ConfigFile, "config", s.ConfigFile, "The path to the configuration file. Flags override values in this file.")
+	fs.StringVar(&s.WriteConfigTo, "write-config-to", s.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fss.FlagSet("generic"))
@@ -362,13 +374,17 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.Authentication.Validate()...)
 	errs = append(errs, s.Authorization.Validate()...)
 
+	if len(s.ConfigFile) > 0 && len(s.WriteConfigTo) == 0 {
+		errs = append(errs, fmt.Errorf("should not configure --write-config-to with nil once you set --config with %s", s.ConfigFile))
+
+	}
 	// TODO: validate component config, master and kubeconfig
 
 	return utilerrors.NewAggregate(errs)
 }
 
 // Config return a controller manager config objective
-func (s KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
+func (s *KubeControllerManagerOptions) Config(allControllers []string, disabledByDefaultControllers []string) (*kubecontrollerconfig.Config, error) {
 	if err := s.Validate(allControllers, disabledByDefaultControllers); err != nil {
 		return nil, err
 	}
@@ -403,8 +419,17 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		EventRecorder:        eventRecorder,
 		LeaderElectionClient: leaderElectionClient,
 	}
+
 	if err := s.ApplyTo(c); err != nil {
 		return nil, err
+	}
+
+	if len(s.ConfigFile) > 0 {
+		c.WriteConfigTo = s.WriteConfigTo
+		c.ConfigFile = s.ConfigFile
+		if err := s.initWatcher(); err != nil {
+			return nil, err
+		}
 	}
 
 	return c, nil
