@@ -246,7 +246,7 @@ type Webhook struct {
 	// during the admission process.
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
-	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty"`
+	ObjectSelector *metav1.LabelSelector `json:"objectSelector,omitempty" protobuf:"bytes,9,opt,name=objectSelector"`
 
 	// SideEffects states whether this webhookk has side effects.
 	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
