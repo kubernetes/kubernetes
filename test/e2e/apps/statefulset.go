@@ -789,7 +789,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}, framework.StatefulPodTimeout, 2*time.Second).Should(gomega.BeNil())
 		})
 
-		ginkgo.It("should have a working scale subresource", func() {
+		/*
+			Release : v1.15
+			Testname: StatefulSet, Replicas update
+			Description: StatefulSet subresource MUST get Scale and get updated the Statefulset scale subresource, then verify the Statefulset Replicas was modified and validate the updated Replicas of Statefulset
+		*/
+		framework.ConformanceIt("should have a working scale subresource", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			ss := framework.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
