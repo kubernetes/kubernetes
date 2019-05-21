@@ -66,6 +66,18 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
 	}
 
+	if containerSc.WindowsOptions != nil {
+		// only override fields that are set at the container level, not the whole thing
+		if effectiveSc.WindowsOptions == nil {
+			effectiveSc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		}
+		if containerSc.WindowsOptions.GMSACredentialSpecName != nil || containerSc.WindowsOptions.GMSACredentialSpec != nil {
+			// both GMSA fields go hand in hand
+			effectiveSc.WindowsOptions.GMSACredentialSpecName = containerSc.WindowsOptions.GMSACredentialSpecName
+			effectiveSc.WindowsOptions.GMSACredentialSpec = containerSc.WindowsOptions.GMSACredentialSpec
+		}
+	}
+
 	if containerSc.Capabilities != nil {
 		effectiveSc.Capabilities = new(v1.Capabilities)
 		*effectiveSc.Capabilities = *containerSc.Capabilities
@@ -120,6 +132,12 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 		synthesized.SELinuxOptions = &v1.SELinuxOptions{}
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
+
+	if pod.Spec.SecurityContext.WindowsOptions != nil {
+		synthesized.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		*synthesized.WindowsOptions = *pod.Spec.SecurityContext.WindowsOptions
+	}
+
 	if pod.Spec.SecurityContext.RunAsUser != nil {
 		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
