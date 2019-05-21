@@ -33,7 +33,9 @@ import (
 
 const testHostName = "test-hostname"
 const macAddress = "00-11-22-33-44-55"
-const clusterCIDR = []string{"192.168.1.0/24"}
+
+var clusterCIDR = []string{"192.168.1.0/24"}
+
 const destinationPrefix = "192.168.2.0/24"
 const providerAddress = "10.0.0.3"
 const guid = "123ABC"
@@ -118,7 +120,7 @@ func (hns fakeHNS) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR 
 func (hns fakeHNS) deleteLoadBalancer(hnsID string) error {
 	return nil
 }
-func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR string, hostname string, nodeIP net.IP, networkType string) *Proxier {
+func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clusterCIDR []string, hostname string, nodeIP net.IP, networkType string) *Proxier {
 	sourceVip := "192.168.1.2"
 	hnsNetworkInfo := &hnsNetworkInfo{
 		name:        "TestNetwork",

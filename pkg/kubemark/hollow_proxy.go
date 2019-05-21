@@ -84,7 +84,7 @@ func NewHollowProxyOrDie(
 			proxierMinSyncPeriod,
 			false,
 			0,
-			"10.0.0.0/8",
+			[]string{"10.0.0.0/8"},
 			nodeName,
 			utilnode.GetNodeIP(client, nodeName),
 			recorder,

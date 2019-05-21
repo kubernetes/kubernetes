@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -146,26 +147,26 @@ func TestEnsureProxyAddon(t *testing.T) {
 		simError       SimulatedError
 		expErrString   string
 		expBindAddr    string
-		expClusterCIDR string
+		expClusterCIDR []string
 	}{
 		{
 			name:           "Successful proxy addon",
 			simError:       NoError,
 			expErrString:   "",
 			expBindAddr:    "0.0.0.0",
-			expClusterCIDR: "5.6.7.8/24",
+			expClusterCIDR: []string{"5.6.7.8/24"},
 		}, {
 			name:           "Simulated service account error",
 			simError:       ServiceAccountError,
 			expErrString:   "error when creating kube-proxy service account",
 			expBindAddr:    "0.0.0.0",
-			expClusterCIDR: "5.6.7.8/24",
+			expClusterCIDR: []string{"5.6.7.8/24"},
 		}, {
 			name:           "IPv6 AdvertiseAddress address",
 			simError:       IPv6SetBindAddress,
 			expErrString:   "",
 			expBindAddr:    "::",
-			expClusterCIDR: "2001:101::/96",
+			expClusterCIDR: []string{"2001:101::/96"},
 		},
 	}
 
@@ -247,7 +248,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 					tc.expBindAddr,
 					intControlPlane.ComponentConfigs.KubeProxy.BindAddress)
 			}
-			if intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
+			if !reflect.DeepEqual(intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR, tc.expClusterCIDR) {
 				t.Errorf("%s test failed, expected: %s, got: %s",
 					tc.name,
 					tc.expClusterCIDR,

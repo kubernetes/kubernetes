@@ -43,8 +43,8 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 		Scheme.Convert(internalcfg.ComponentConfigs.KubeProxy, externalproxycfg, nil)
 	}
 
-	if externalproxycfg.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
-		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
+	if len(externalproxycfg.ClusterCIDR) == 0 && internalcfg.Networking.PodSubnet != "" {
+		externalproxycfg.ClusterCIDR[0] = internalcfg.Networking.PodSubnet
 	}
 
 	if externalproxycfg.ClientConnection.Kubeconfig == "" {
