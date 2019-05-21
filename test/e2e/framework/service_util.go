@@ -654,8 +654,8 @@ func (j *ServiceTestJig) newRCTemplate(namespace string) *v1.ReplicationControll
 					Containers: []v1.Container{
 						{
 							Name:  "netexec",
-							Image: imageutils.GetE2EImage(imageutils.Netexec),
-							Args:  []string{"--http-port=80", "--udp-port=80"},
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args:  []string{"netexec", "--http-port=80", "--udp-port=80"},
 							ReadinessProbe: &v1.Probe{
 								PeriodSeconds: 3,
 								Handler: v1.Handler{
@@ -836,8 +836,8 @@ func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool
 				{
 					Name:  "netexec",
 					Image: netexecImageName,
-					Command: []string{
-						"/netexec",
+					Args: []string{
+						"netexec",
 						fmt.Sprintf("--http-port=%d", httpPort),
 						fmt.Sprintf("--udp-port=%d", udpPort),
 					},
