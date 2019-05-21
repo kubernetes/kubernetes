@@ -41,12 +41,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 type testRESTMapper struct {
@@ -72,13 +74,15 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 		{Group: "tpr.io", Version: "v1", Resource: "unknown"}: {},
 	}
 	client := fake.NewSimpleClientset()
-	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
+	sharedInformers := informers.NewSharedInformerFactory(client, 0)
+	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, 0)
 	// No monitor will be constructed for the non-core resource, but the GC
 	// construction will not fail.
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
-	gc, err := NewGarbageCollector(dynamicClient, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
+	gc, err := NewGarbageCollector(dynamicClient, rm, twoResources, map[schema.GroupResource]struct{}{},
+		controller.NewInformerFactory(sharedInformers, dynamicInformers), alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,36 +431,6 @@ func TestDependentsRace(t *testing.T) {
 			gc.attemptToOrphanWorker()
 		}
 	}()
-}
-
-// test the list and watch functions correctly converts the ListOptions
-func TestGCListWatcher(t *testing.T) {
-	testHandler := &fakeActionHandler{}
-	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
-	defer srv.Close()
-	podResource := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	lw := listWatcher(dynamicClient, podResource)
-	lw.DisableChunking = true
-	if _, err := lw.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := lw.List(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
-		t.Fatal(err)
-	}
-	if e, a := 2, len(testHandler.actions); e != a {
-		t.Errorf("expect %d requests, got %d", e, a)
-	}
-	if e, a := "resourceVersion=1&watch=true", testHandler.actions[0].query; e != a {
-		t.Errorf("expect %s, got %s", e, a)
-	}
-	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
-		t.Errorf("expect %s, got %s", e, a)
-	}
 }
 
 func podToGCNode(pod *v1.Pod) *node {

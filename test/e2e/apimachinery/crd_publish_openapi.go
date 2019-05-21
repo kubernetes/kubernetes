@@ -345,16 +345,15 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 	}
 
 	crd, err := crd.CreateMultiVersionTestCRD(f, group, func(crd *v1beta1.CustomResourceDefinition) {
-		apiVersions := []v1beta1.CustomResourceDefinitionVersion{}
-		for _, version := range versions {
-			v := v1beta1.CustomResourceDefinitionVersion{
+		var apiVersions []v1beta1.CustomResourceDefinitionVersion
+		for i, version := range versions {
+			apiVersions = append(apiVersions, v1beta1.CustomResourceDefinitionVersion{
 				Name:    version,
 				Served:  true,
-				Storage: false,
-			}
-			apiVersions = append(apiVersions, v)
+				Storage: i == 0,
+			})
 		}
-		apiVersions[0].Storage = true
+		crd.Spec.Versions = apiVersions
 
 		crd.Spec.Validation = &v1beta1.CustomResourceValidation{
 			OpenAPIV3Schema: props,

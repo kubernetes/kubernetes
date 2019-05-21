@@ -68,8 +68,9 @@ type AttachOptions struct {
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
 
-	CommandName       string
-	SuggestedCmdUsage string
+	CommandName             string
+	ParentCommandName       string
+	EnableSuggestedCmdUsage bool
 
 	Pod *corev1.Pod
 
@@ -183,13 +184,12 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.Resources = args
 	o.restClientGetter = f
 
-	fullCmdName := ""
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
-		fullCmdName = cmdParent.CommandPath()
+		o.ParentCommandName = cmdParent.CommandPath()
 	}
-	if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		o.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, o.PodName, o.Namespace)
+	if len(o.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		o.EnableSuggestedCmdUsage = true
 	}
 
 	config, err := f.ToRESTConfig()
@@ -325,9 +325,9 @@ func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container,
 		return nil, fmt.Errorf("container not found (%s)", o.ContainerName)
 	}
 
-	if len(o.SuggestedCmdUsage) > 0 {
+	if o.EnableSuggestedCmdUsage {
 		fmt.Fprintf(o.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-		fmt.Fprintf(o.ErrOut, "%s\n", o.SuggestedCmdUsage)
+		fmt.Fprintf(o.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", o.ParentCommandName, o.PodName, o.Namespace)
 	}
 
 	klog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)

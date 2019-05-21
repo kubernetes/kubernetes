@@ -150,7 +150,7 @@ type FailDeleteUpdateStorage struct {
 	storage.Interface
 }
 
-func (f FailDeleteUpdateStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions) error {
+func (f FailDeleteUpdateStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
 	return storage.NewKeyNotFoundError(key, 0)
 }
 

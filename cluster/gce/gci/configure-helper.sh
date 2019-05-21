@@ -588,7 +588,7 @@ function create-master-auth {
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "system:cluster-bootstrap,uid:system:cluster-bootstrap,system:masters"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "gcp:kube-bootstrap,uid:gcp:kube-bootstrap,system:masters"
   fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
@@ -1506,7 +1506,7 @@ function compute-master-manifest-variables {
   INSECURE_PORT_MAPPING=""
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
     INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
-  fi 
+  fi
 }
 
 # A helper function that bind mounts kubelet dirs for running mount in a chroot
@@ -2846,12 +2846,80 @@ function wait-till-apiserver-ready() {
   done
 }
 
-function ensure-bootstrap-kubectl-auth {
-  # Creating an authenticated kubeconfig is only necessary if the insecure port is disabled.
+function ensure-master-bootstrap-kubectl-auth {
+  # By default, `kubectl` uses http://localhost:8080
+  # If the insecure port is disabled, kubectl will need to use an admin-authenticated kubeconfig.
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
-    create-kubeconfig "cluster-bootstrap" ${KUBE_BOOTSTRAP_TOKEN}
-    export KUBECONFIG=/etc/srv/kubernetes/cluster-bootstrap/kubeconfig
+    create-kubeconfig "kube-bootstrap" "${KUBE_BOOTSTRAP_TOKEN}"
+    export KUBECONFIG=/etc/srv/kubernetes/kube-bootstrap/kubeconfig
   fi
+}
+
+function setup-containerd {
+  echo "Generate containerd config"
+  local config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
+  mkdir -p "$(dirname "${config_path}")"
+  local cni_template_path="${KUBE_HOME}/cni.template"
+  cat > "${cni_template_path}" <<EOF
+{
+  "name": "k8s-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "ptp",
+      "mtu": 1460,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "{{.PodCIDR}}",
+        "routes": [
+          {
+            "dst": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+EOF
+  if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider is specified
+      # or netd is enabled.
+      cni_template_path=""
+    fi
+  fi
+  # Reuse docker group for containerd.
+  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  cat > "${config_path}" <<EOF
+# Kubernetes doesn't use containerd restart manager.
+disabled_plugins = ["restart"]
+
+[debug]
+  level = "${CONTAINERD_LOG_LEVEL:-"info"}"
+
+[grpc]
+  gid = ${containerd_gid}
+
+[plugins.cri]
+  stream_server_address = "127.0.0.1"
+  max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
+[plugins.cri.cni]
+  bin_dir = "${KUBE_HOME}/bin"
+  conf_dir = "/etc/cni/net.d"
+  conf_template = "${cni_template_path}"
+[plugins.cri.registry.mirrors."docker.io"]
+  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+EOF
+  chmod 644 "${config_path}"
+
+  echo "Restart containerd to load the config change"
+  systemctl restart containerd
 }
 
 ########### Main Function ###########
@@ -2904,13 +2972,13 @@ function main() {
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
-    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
-  fi
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
   ADDON_MANAGER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
+  fi
 
   setup-os-params
   config-ip-firewall
@@ -2923,7 +2991,7 @@ function main() {
     create-node-pki
     create-master-pki
     create-master-auth
-    ensure-bootstrap-kubectl-auth
+    ensure-master-bootstrap-kubectl-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -2941,9 +3009,12 @@ function main() {
   fi
 
   override-kubectl
+  container_runtime="${CONTAINER_RUNTIME:-docker}"
   # Run the containerized mounter once to pre-cache the container image.
-  if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
+  if [[ "${container_runtime}" == "docker" ]]; then
     assemble-docker-flags
+  elif [[ "${container_runtime}" == "containerd" ]]; then
+    setup-containerd
   fi
   start-kubelet
 

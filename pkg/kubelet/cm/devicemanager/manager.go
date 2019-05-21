@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -206,6 +207,11 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 
 	socketPath := filepath.Join(m.socketdir, m.socketname)
 	os.MkdirAll(m.socketdir, 0755)
+	if selinux.SELinuxEnabled() {
+		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
+			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", m.socketdir, err)
+		}
+	}
 
 	// Removes all stale sockets in m.socketdir. Device plugins can monitor
 	// this and use it as a signal to re-register with the new Kubelet.

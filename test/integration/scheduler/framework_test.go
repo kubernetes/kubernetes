@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -201,10 +202,23 @@ func TestReservePlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a reserve plugin.
 	registry := framework.Registry{reservePluginName: NewReservePlugin}
 
+	// Setup initial reserve plugin for testing.
+	reservePlugin := &schedulerconfig.Plugins{
+		Reserve: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: reservePluginName,
+				},
+			},
+		},
+	}
+	// Set empty plugin config for testing
+	emptyPluginConfig := []schedulerconfig.PluginConfig{}
+
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "reserve-plugin", nil),
-		false, nil, registry, false, time.Second)
+		false, nil, registry, reservePlugin, emptyPluginConfig, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -246,10 +260,27 @@ func TestPrebindPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a prebind plugin.
 	registry := framework.Registry{prebindPluginName: NewPrebindPlugin}
 
+	// Setup initial prebind plugin for testing.
+	preBindPlugin := &schedulerconfig.Plugins{
+		PreBind: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: prebindPluginName,
+				},
+			},
+		},
+	}
+	// Set reserve prebind config for testing
+	preBindPluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: prebindPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "prebind-plugin", nil),
-		false, nil, registry, false, time.Second)
+		false, nil, registry, preBindPlugin, preBindPluginConfig, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -323,10 +354,39 @@ func TestUnreservePlugin(t *testing.T) {
 		prebindPluginName:   NewPrebindPlugin,
 	}
 
+	// Setup initial unreserve and prebind plugin for testing.
+	plugins := &schedulerconfig.Plugins{
+		Unreserve: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: unreservePluginName,
+				},
+			},
+		},
+		PreBind: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: prebindPluginName,
+				},
+			},
+		},
+	}
+	// Set unreserve and prebind plugin config for testing
+	pluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: unreservePluginName,
+			Args: runtime.Unknown{},
+		},
+		{
+			Name: prebindPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
+
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "unreserve-plugin", nil),
-		false, nil, registry, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -404,10 +464,28 @@ func TestPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	registry := framework.Registry{permitPluginName: NewPermitPlugin}
 
+	// Setup initial permit plugin for testing.
+	plugins := &schedulerconfig.Plugins{
+		Permit: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: permitPluginName,
+				},
+			},
+		},
+	}
+	// Set permit plugin config for testing
+	pluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: permitPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
+
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "permit-plugin", nil),
-		false, nil, registry, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -495,10 +573,28 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	registry := framework.Registry{permitPluginName: NewPermitPlugin}
 
+	// Setup initial permit plugin for testing.
+	plugins := &schedulerconfig.Plugins{
+		Permit: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: permitPluginName,
+				},
+			},
+		},
+	}
+	// Set permit plugin config for testing
+	pluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: permitPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
+
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "permit-plugin", nil),
-		false, nil, registry, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, false, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet

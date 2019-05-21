@@ -426,7 +426,8 @@ func ShouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing run
 func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, dryRun bool) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	klog.V(6).Infof("going to delete %s from registry, triggered by update", name)
-	if err := e.Storage.Delete(ctx, key, out, preconditions, dryRun); err != nil {
+	// Using the rest.ValidateAllObjectFunc because the request is an UPDATE request and has already passed the admission for the UPDATE verb.
+	if err := e.Storage.Delete(ctx, key, out, preconditions, rest.ValidateAllObjectFunc, dryRun); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
@@ -800,7 +801,7 @@ func markAsDeleting(obj runtime.Object, now time.Time) (err error) {
 //    should be deleted immediately
 // 4. a new output object with the state that was updated
 // 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, deleteValidation rest.ValidateObjectFunc, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
 	out = e.NewFunc()
@@ -811,6 +812,9 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 		false, /* ignoreNotFound */
 		&preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
+			if err := deleteValidation(existing); err != nil {
+				return nil, err
+			}
 			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
 			if err != nil {
 				return nil, err
@@ -881,16 +885,17 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err
 	}
 	obj := e.NewFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
-	if err := e.Storage.Get(ctx, key, "", obj, false); err != nil {
+	if err = e.Storage.Get(ctx, key, "", obj, false); err != nil {
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
+
 	// support older consumers of delete by treating "nil" as delete immediately
 	if options == nil {
 		options = metav1.NewDeleteOptions(0)
@@ -924,7 +929,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	shouldUpdateFinalizers, _ := deletionFinalizersForGarbageCollection(ctx, e, accessor, options)
 	// TODO: remove the check, because we support no-op updates now.
 	if graceful || pendingFinalizers || shouldUpdateFinalizers {
-		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
+		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, deleteValidation, obj)
 	}
 
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
@@ -947,7 +952,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 	// delete immediately, or no graceful deletion supported
 	klog.V(6).Infof("going to delete %s from registry: ", name)
 	out = e.NewFunc()
-	if err := e.Storage.Delete(ctx, key, out, &preconditions, dryrun.IsDryRun(options.DryRun)); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, &preconditions, storage.ValidateObjectFunc(deleteValidation), dryrun.IsDryRun(options.DryRun)); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
@@ -972,7 +977,7 @@ func (e *Store) Delete(ctx context.Context, name string, options *metav1.DeleteO
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
 	if listOptions == nil {
 		listOptions = &metainternalversion.ListOptions{}
 	} else {
@@ -1025,7 +1030,7 @@ func (e *Store) DeleteCollection(ctx context.Context, options *metav1.DeleteOpti
 					errs <- err
 					return
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !kubeerr.IsNotFound(err) {
 					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return
