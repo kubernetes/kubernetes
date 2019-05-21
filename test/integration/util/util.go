@@ -131,6 +131,6 @@ func createSchedulerConfigurator(
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		StopCh: stopCh,
+		StopCh:                         stopCh,
 	})
 }
