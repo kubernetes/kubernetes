@@ -52,7 +52,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.ServeHostname)
+		privateimage := imageutils.GetConfig(imageutils.Agnhost)
 		privateimage.SetRegistry(imageutils.PrivateRegistry)
 		TestReplicationControllerServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
@@ -85,7 +85,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 	})
 })
 
-func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string) *v1.ReplicationController {
+func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageName string, image string, args []string) *v1.ReplicationController {
 	zero := int64(0)
 	return &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
@@ -103,6 +103,7 @@ func newRC(rsName string, replicas int32, rcPodLabels map[string]string, imageNa
 						{
 							Name:  imageName,
 							Image: image,
+							Args:  args,
 						},
 					},
 				},
@@ -123,7 +124,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	// The source for the Docker container kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
-	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image)
+	newRC := newRC(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
 	newRC.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(newRC)
 	framework.ExpectNoError(err)
@@ -200,7 +201,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
-	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage)
+	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
 	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(rc)
 	framework.ExpectNoError(err)
 
@@ -278,7 +279,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 
 	ginkgo.By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	framework.ExpectNoError(err)
@@ -307,7 +308,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
 	ginkgo.By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	framework.ExpectNoError(err)

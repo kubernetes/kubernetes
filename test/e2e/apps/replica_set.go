@@ -38,7 +38,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *appsv1.ReplicaSet {
+func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string, args []string) *appsv1.ReplicaSet {
 	zero := int64(0)
 	return &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -60,6 +60,7 @@ func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageNa
 						{
 							Name:  imageName,
 							Image: image,
+							Args:  args,
 						},
 					},
 				},
@@ -96,7 +97,7 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	ginkgo.It("should serve a basic image on each replica with a private image", func() {
 		// requires private images
 		framework.SkipUnlessProviderIs("gce", "gke")
-		privateimage := imageutils.GetConfig(imageutils.ServeHostname)
+		privateimage := imageutils.GetConfig(imageutils.Agnhost)
 		privateimage.SetRegistry(imageutils.PrivateRegistry)
 		testReplicaSetServeImageOrFail(f, "private", privateimage.GetE2EImage())
 	})
@@ -125,7 +126,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	// The source for the Docker containter kubernetes/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	e2elog.Logf("Creating ReplicaSet %s", name)
-	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image)
+	newRS := newRS(name, replicas, map[string]string{"name": name}, name, image, []string{"serve-hostname"})
 	newRS.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{ContainerPort: 9376}}
 	_, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(newRS)
 	framework.ExpectNoError(err)
@@ -202,7 +203,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
-	rs := newRS(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage)
+	rs := newRS(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage, nil)
 	rs, err = c.AppsV1().ReplicaSets(namespace).Create(rs)
 	framework.ExpectNoError(err)
 
@@ -281,7 +282,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 	ginkgo.By("When a replicaset with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, WebserverImage)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, WebserverImage, nil)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(rsSt)
 	framework.ExpectNoError(err)

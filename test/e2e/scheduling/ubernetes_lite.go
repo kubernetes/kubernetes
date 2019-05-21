@@ -56,7 +56,7 @@ var _ = SIGDescribe("Multi-AZ Clusters", func() {
 	})
 
 	ginkgo.It("should spread the pods of a replication controller across zones", func() {
-		SpreadRCOrFail(f, int32((2*zoneCount)+1), image)
+		SpreadRCOrFail(f, int32((2*zoneCount)+1), image, []string{"serve-hostname"})
 	})
 })
 
@@ -177,7 +177,7 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 
 // SpreadRCOrFail Check that the pods comprising a replication
 // controller get spread evenly across available zones
-func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
+func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, args []string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	ginkgo.By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
@@ -199,6 +199,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 						{
 							Name:  name,
 							Image: image,
+							Args:  args,
 							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 						},
 					},

@@ -219,7 +219,7 @@ var (
 	}
 
 	// ServeHostnameImage is a serve hostname image name.
-	ServeHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
+	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
 
 // GetServicesProxyRequest returns a request for a service proxy.

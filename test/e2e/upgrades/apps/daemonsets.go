@@ -68,6 +68,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 						{
 							Name:            daemonSetName,
 							Image:           image,
+							Args:            []string{"serve-hostname"},
 							Ports:           []v1.ContainerPort{{ContainerPort: 9376}},
 							SecurityContext: &v1.SecurityContext{},
 						},

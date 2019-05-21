@@ -44,13 +44,13 @@ const (
 // NodeImageWhiteList is a list of images used in node e2e test. These images will be prepulled
 // before test running so that the image pulling won't fail in actual test.
 var NodeImageWhiteList = sets.NewString(
+	imageutils.GetE2EImage(imageutils.Agnhost),
 	"google/cadvisor:latest",
 	"k8s.gcr.io/stress:v1",
 	busyboxImage,
 	"k8s.gcr.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Perl),
-	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	imageutils.GetPauseImageName(),
 	gpu.GetGPUDevicePluginImage(),
