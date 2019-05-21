@@ -118,7 +118,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		// Note that in 1.9 we will have backwards incompatible change to
 		// admission webhooks, so the image will be updated to 1.9 sometime in
 		// the development 1.9 cycle.
-		deployWebhookAndService(f, imageutils.GetE2EImage(imageutils.AdmissionWebhook), context)
+		deployWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -342,6 +342,7 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 			Name:         "sample-webhook",
 			VolumeMounts: mounts,
 			Args: []string{
+				"webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
 				"--alsologtostderr",

@@ -1272,7 +1272,7 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		t.Name = "slow-terminating-unready-pod"
-		t.Image = imageutils.GetE2EImage(imageutils.Netexec)
+		t.Image = imageutils.GetE2EImage(imageutils.Agnhost)
 		port := 80
 		terminateSeconds := int64(600)
 
@@ -1292,7 +1292,7 @@ var _ = SIGDescribe("Services", func() {
 			},
 		}
 		rcSpec := framework.RcByNameContainer(t.Name, 1, t.Image, t.Labels, v1.Container{
-			Args:  []string{fmt.Sprintf("--http-port=%d", port)},
+			Args:  []string{"netexec", fmt.Sprintf("--http-port=%d", port)},
 			Name:  t.Name,
 			Image: t.Image,
 			Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: v1.ProtocolTCP}},

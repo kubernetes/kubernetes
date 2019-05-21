@@ -49,7 +49,8 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "pod-handle-http-request",
-						Image: imageutils.GetE2EImage(imageutils.Netexec),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"netexec"},
 						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 8080,
