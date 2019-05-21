@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -309,6 +310,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 
 		ginkgo.By("mark a version not serverd")
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("%v", err)
+		}
 		crd.Crd.Spec.Versions[1].Served = false
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
@@ -579,9 +584,11 @@ properties:
     properties:
       dummy:
         description: Dummy property.
+        type: object
   status:
     description: Status of Waldo
     type: object
     properties:
       bars:
-        description: List of Bars and their statuses.`)
+        description: List of Bars and their statuses.
+        type: array`)
