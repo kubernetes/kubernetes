@@ -291,6 +291,7 @@ func (o *CreateOptions) raw(f cmdutil.Factory) error {
 		if err != nil {
 			return err
 		}
+		defer data.Close()
 	}
 	// TODO post content with stream.  Right now it ignores body content
 	result := restClient.Post().RequestURI(o.Raw).Body(data).Do()
