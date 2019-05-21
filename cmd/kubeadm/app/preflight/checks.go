@@ -143,8 +143,8 @@ func (sc ServiceCheck) Check() (warnings, errorList []error) {
 
 	if !initSystem.ServiceIsEnabled(sc.Service) {
 		warnings = append(warnings,
-			errors.Errorf("%s service is not enabled, please run 'systemctl enable %s.service'",
-				sc.Service, sc.Service))
+			errors.Errorf("%s service is not enabled, please run '%s'",
+				sc.Service, initSystem.EnableCommand(sc.Service)))
 	}
 
 	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
