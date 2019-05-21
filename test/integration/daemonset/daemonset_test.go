@@ -118,6 +118,8 @@ func setupScheduler(
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 		stopCh,
 		schedulerframework.NewRegistry(),
+		nil,
+		[]kubeschedulerconfig.PluginConfig{},
 		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout),

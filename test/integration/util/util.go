@@ -85,6 +85,8 @@ func StartScheduler(clientSet clientset.Interface) ShutdownFunc {
 		kubeschedulerconfig.SchedulerAlgorithmSource{Policy: &kubeschedulerconfig.SchedulerPolicySource{}},
 		stopCh,
 		schedulerframework.NewRegistry(),
+		nil,
+		[]kubeschedulerconfig.PluginConfig{},
 		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(false),
@@ -129,6 +131,6 @@ func createSchedulerConfigurator(
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		StopCh:                         stopCh,
+		StopCh: stopCh,
 	})
 }

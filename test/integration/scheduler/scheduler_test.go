@@ -617,6 +617,8 @@ func TestMultiScheduler(t *testing.T) {
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 		stopCh,
 		schedulerframework.NewRegistry(),
+		nil,
+		[]kubeschedulerconfig.PluginConfig{},
 		scheduler.WithName(fooScheduler),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(false),
