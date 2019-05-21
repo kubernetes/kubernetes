@@ -175,7 +175,7 @@ function gke-internal-master-start {
   echo "Internal GKE configuration start"
   configure_healthcheck_component
   configure_pdcsi_component
-  configure_machine_controller_component
+  configure_controller_manager_component
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
   start_vertical_pod_autoscaler
