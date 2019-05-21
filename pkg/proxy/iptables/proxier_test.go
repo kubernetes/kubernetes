@@ -373,7 +373,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		endpointsMap:             make(proxy.EndpointsMap),
 		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, nil, nil),
 		iptables:                 ipt,
-		clusterCIDR:              "10.0.0.0/24",
+		clusterCIDR:              []string{"10.0.0.0/24"},
 		hostname:                 testHostname,
 		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
@@ -931,7 +931,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	// set cluster CIDR to empty before test
-	fp.clusterCIDR = ""
+	fp.clusterCIDR = []string{}
 	onlyLocalNodePorts(t, fp, ipt)
 }
 

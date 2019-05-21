@@ -175,7 +175,8 @@ clientConnection:
   contentType: content-type
   kubeconfig: "/path/to/kubeconfig"
   qps: 7
-clusterCIDR: "%s"
+clusterCIDR:
+  - "%s"
 configSyncPeriod: 15s
 conntrack:
   max: 4
@@ -212,7 +213,7 @@ nodePortAddresses:
 		name               string
 		mode               string
 		bindAddress        string
-		clusterCIDR        string
+		clusterCIDR        []string
 		healthzBindAddress string
 		metricsBindAddress string
 	}{
@@ -220,7 +221,7 @@ nodePortAddresses:
 			name:               "iptables mode, IPv4 all-zeros bind address",
 			mode:               "iptables",
 			bindAddress:        "0.0.0.0",
-			clusterCIDR:        "1.2.3.0/24",
+			clusterCIDR:        []string{"1.2.3.0/24"},
 			healthzBindAddress: "1.2.3.4:12345",
 			metricsBindAddress: "2.3.4.5:23456",
 		},
@@ -228,7 +229,7 @@ nodePortAddresses:
 			name:               "iptables mode, non-zeros IPv4 config",
 			mode:               "iptables",
 			bindAddress:        "9.8.7.6",
-			clusterCIDR:        "1.2.3.0/24",
+			clusterCIDR:        []string{"1.2.3.0/24"},
 			healthzBindAddress: "1.2.3.4:12345",
 			metricsBindAddress: "2.3.4.5:23456",
 		},
@@ -239,7 +240,7 @@ nodePortAddresses:
 			name:               "iptables mode, IPv6 \"::\" bind address",
 			mode:               "iptables",
 			bindAddress:        "\"::\"",
-			clusterCIDR:        "fd00:1::0/64",
+			clusterCIDR:        []string{"fd00:1::0/64"},
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
@@ -251,7 +252,7 @@ nodePortAddresses:
 			name:               "iptables mode, IPv6 \"[::]\" bind address",
 			mode:               "iptables",
 			bindAddress:        "\"[::]\"",
-			clusterCIDR:        "fd00:1::0/64",
+			clusterCIDR:        []string{"fd00:1::0/64"},
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
@@ -261,7 +262,7 @@ nodePortAddresses:
 			name:               "iptables mode, IPv6 ::0 bind address",
 			mode:               "iptables",
 			bindAddress:        "::0",
-			clusterCIDR:        "fd00:1::0/64",
+			clusterCIDR:        []string{"fd00:1::0/64"},
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
@@ -269,7 +270,7 @@ nodePortAddresses:
 			name:               "ipvs mode, IPv6 config",
 			mode:               "ipvs",
 			bindAddress:        "2001:db8::1",
-			clusterCIDR:        "fd00:1::0/64",
+			clusterCIDR:        []string{"fd00:1::0/64"},
 			healthzBindAddress: "[fd00:1::5]:12345",
 			metricsBindAddress: "[fd00:2::5]:23456",
 		},
@@ -325,7 +326,7 @@ nodePortAddresses:
 		options := NewOptions()
 
 		yaml := fmt.Sprintf(
-			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
+			yamlTemplate, tc.bindAddress, tc.clusterCIDR[0],
 			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
 		config, err := options.loadConfig([]byte(yaml))
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)

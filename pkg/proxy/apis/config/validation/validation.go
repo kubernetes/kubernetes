@@ -66,9 +66,11 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
-	if config.ClusterCIDR != "" {
-		if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
-			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16)"))
+	if len(config.ClusterCIDR) != 0 {
+		for _, cidr := range config.ClusterCIDR {
+			if _, _, err := net.ParseCIDR(cidr); err != nil {
+				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), cidr, "must be a valid CIDR block (e.g. 10.100.0.0/16)"))
+			}
 		}
 	}
 

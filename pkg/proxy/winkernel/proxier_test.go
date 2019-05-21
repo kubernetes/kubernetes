@@ -33,7 +33,7 @@ import (
 
 const testHostName = "test-hostname"
 const macAddress = "00-11-22-33-44-55"
-const clusterCIDR = "192.168.1.0/24"
+const clusterCIDR = []string{"192.168.1.0/24"}
 const destinationPrefix = "192.168.2.0/24"
 const providerAddress = "10.0.0.3"
 const guid = "123ABC"

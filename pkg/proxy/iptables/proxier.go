@@ -34,7 +34,7 @@ import (
 
 	"k8s.io/klog"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -229,7 +229,7 @@ type Proxier struct {
 	masqueradeAll  bool
 	masqueradeMark string
 	exec           utilexec.Interface
-	clusterCIDR    string
+	clusterCIDR    []string
 	hostname       string
 	nodeIP         net.IP
 	portMapper     utilproxy.PortOpener
@@ -287,7 +287,7 @@ func NewProxier(ipt utiliptables.Interface,
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	clusterCIDR string,
+	clusterCIDR []string,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
@@ -319,8 +319,11 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(clusterCIDR) == 0 {
 		klog.Warning("clusterCIDR not specified, unable to distinguish between internal and external traffic")
-	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != ipt.IsIpv6() {
-		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, ipt.IsIpv6())
+	}
+	for _, cidr := range clusterCIDR {
+		if utilnet.IsIPv6CIDRString(cidr) != ipt.IsIpv6() {
+			return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", cidr, ipt.IsIpv6())
+		}
 	}
 
 	healthChecker := healthcheck.NewServer(hostname, recorder, nil, nil) // use default implementations of deps
@@ -865,7 +868,9 @@ func (proxier *Proxier) syncProxyRules() {
 				// routing to any node, and that node will bridge into the Service
 				// for you.  Since that might bounce off-node, we masquerade here.
 				// If/when we support "Local" policy for VIPs, we should update this.
-				writeLine(proxier.natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
+				for _, cidr := range proxier.clusterCIDR {
+					writeLine(proxier.natRules, append(args, "! -s", cidr, "-j", string(KubeMarkMasqChain))...)
+				}
 			}
 			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 		} else {
@@ -1224,13 +1229,15 @@ func (proxier *Proxier) syncProxyRules() {
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified
 		if len(proxier.clusterCIDR) > 0 {
-			args = append(args[:0],
-				"-A", string(svcXlbChain),
-				"-m", "comment", "--comment",
-				`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
-				"-s", proxier.clusterCIDR,
-				"-j", string(svcChain),
-			)
+			for _, cidr := range proxier.clusterCIDR {
+				args = append(args[:0],
+					"-A", string(svcXlbChain),
+					"-m", "comment", "--comment",
+					`"Redirect pods trying to reach external loadbalancer VIP to clusterIP"`,
+					"-s", cidr,
+					"-j", string(svcChain),
+				)
+			}
 			writeLine(proxier.natRules, args...)
 		}
 
@@ -1356,22 +1363,24 @@ func (proxier *Proxier) syncProxyRules() {
 		// accepted by the "kubernetes forwarding rules" rule above will be
 		// accepted, to be as specific as possible the traffic must be sourced
 		// or destined to the clusterCIDR (to/from a pod).
-		writeLine(proxier.filterRules,
-			"-A", string(kubeForwardChain),
-			"-s", proxier.clusterCIDR,
-			"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
-			"-m", "conntrack",
-			"--ctstate", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		)
-		writeLine(proxier.filterRules,
-			"-A", string(kubeForwardChain),
-			"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
-			"-d", proxier.clusterCIDR,
-			"-m", "conntrack",
-			"--ctstate", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		)
+		for _, cidr := range proxier.clusterCIDR {
+			writeLine(proxier.filterRules,
+				"-A", string(kubeForwardChain),
+				"-s", cidr,
+				"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
+				"-m", "conntrack",
+				"--ctstate", "RELATED,ESTABLISHED",
+				"-j", "ACCEPT",
+			)
+			writeLine(proxier.filterRules,
+				"-A", string(kubeForwardChain),
+				"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
+				"-d", cidr,
+				"-m", "conntrack",
+				"--ctstate", "RELATED,ESTABLISHED",
+				"-j", "ACCEPT",
+			)
+		}
 	}
 
 	// Write the end-of-table markers.

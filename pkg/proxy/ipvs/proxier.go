@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -203,7 +203,7 @@ type Proxier struct {
 	exec           utilexec.Interface
 	masqueradeAll  bool
 	masqueradeMark string
-	clusterCIDR    string
+	clusterCIDR    []string
 	hostname       string
 	nodeIP         net.IP
 	portMapper     utilproxy.PortOpener
@@ -305,7 +305,7 @@ func NewProxier(ipt utiliptables.Interface,
 	strictARP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
-	clusterCIDR string,
+	clusterCIDR []string,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,
@@ -393,8 +393,11 @@ func NewProxier(ipt utiliptables.Interface,
 
 	if len(clusterCIDR) == 0 {
 		klog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
-	} else if utilnet.IsIPv6CIDRString(clusterCIDR) != isIPv6 {
-		return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", clusterCIDR, isIPv6)
+	}
+	for _, cidr := range clusterCIDR {
+		if utilnet.IsIPv6CIDRString(cidr) != isIPv6 {
+			return nil, fmt.Errorf("clusterCIDR %s has incorrect IP version: expect isIPv6=%t", cidr, isIPv6)
+		}
 	}
 
 	if len(scheduler) == 0 {
@@ -1339,7 +1342,9 @@ func (proxier *Proxier) writeIptablesRules() {
 			// routing to any node, and that node will bridge into the Service
 			// for you.  Since that might bounce off-node, we masquerade here.
 			// If/when we support "Local" policy for VIPs, we should update this.
-			writeLine(proxier.natRules, append(args, "dst,dst", "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
+			for _, cidr := range proxier.clusterCIDR {
+				writeLine(proxier.natRules, append(args, "dst,dst", "! -s", cidr, "-j", string(KubeMarkMasqChain))...)
+			}
 		} else {
 			// Masquerade all OUTPUT traffic coming from a service ip.
 			// The kube dummy interface has all service VIPs assigned which
@@ -1415,22 +1420,24 @@ func (proxier *Proxier) writeIptablesRules() {
 		// accepted by the "kubernetes forwarding rules" rule above will be
 		// accepted, to be as specific as possible the traffic must be sourced
 		// or destined to the clusterCIDR (to/from a pod).
-		writeLine(proxier.filterRules,
-			"-A", string(KubeForwardChain),
-			"-s", proxier.clusterCIDR,
-			"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
-			"-m", "conntrack",
-			"--ctstate", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		)
-		writeLine(proxier.filterRules,
-			"-A", string(KubeForwardChain),
-			"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
-			"-d", proxier.clusterCIDR,
-			"-m", "conntrack",
-			"--ctstate", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		)
+		for _, cidr := range proxier.clusterCIDR {
+			writeLine(proxier.filterRules,
+				"-A", string(KubeForwardChain),
+				"-s", cidr,
+				"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod source rule"`,
+				"-m", "conntrack",
+				"--ctstate", "RELATED,ESTABLISHED",
+				"-j", "ACCEPT",
+			)
+			writeLine(proxier.filterRules,
+				"-A", string(KubeForwardChain),
+				"-m", "comment", "--comment", `"kubernetes forwarding conntrack pod destination rule"`,
+				"-d", cidr,
+				"-m", "conntrack",
+				"--ctstate", "RELATED,ESTABLISHED",
+				"-j", "ACCEPT",
+			)
+		}
 	}
 
 	// Write the end-of-table markers.

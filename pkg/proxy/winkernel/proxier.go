@@ -434,7 +434,7 @@ type Proxier struct {
 	// These are effectively const and do not need the mutex to be held.
 	masqueradeAll  bool
 	masqueradeMark string
-	clusterCIDR    string
+	clusterCIDR    []string
 	hostname       string
 	nodeIP         net.IP
 	recorder       record.EventRecorder
@@ -490,7 +490,7 @@ func NewProxier(
 	minSyncPeriod time.Duration,
 	masqueradeAll bool,
 	masqueradeBit int,
-	clusterCIDR string,
+	clusterCIDR []string,
 	hostname string,
 	nodeIP net.IP,
 	recorder record.EventRecorder,

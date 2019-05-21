@@ -154,7 +154,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		iptables:          ipt,
 		ipvs:              ipvs,
 		ipset:             ipset,
-		clusterCIDR:       "10.0.0.0/24",
+		clusterCIDR:       []string{"10.0.0.0/24"},
 		strictARP:         false,
 		hostname:          testHostname,
 		portsMap:          make(map[utilproxy.LocalPort]utilproxy.Closeable),
