@@ -69,7 +69,7 @@ var (
 	ErrVersionNotSupported = errors.New("Runtime api version is not supported")
 )
 
-// podStateProvider can determine if a pod is deleted ir terminated
+// podStateProvider can determine if a pod is deleted or terminated
 type podStateProvider interface {
 	IsPodDeleted(kubetypes.UID) bool
 	IsPodTerminated(kubetypes.UID) bool
