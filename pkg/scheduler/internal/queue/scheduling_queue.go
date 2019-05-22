@@ -381,7 +381,13 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	if len(podsToMove) > 0 {
 		p.lock.Lock()
 		defer p.lock.Unlock()
-		p.movePodsToActiveQueue(podsToMove)
+		var podsToMove2 []*framework.PodInfo
+		for _, podInfo := range podsToMove {
+			if pod := p.unschedulableQ.get(podInfo.Pod); pod != nil {
+				podsToMove2 = append(podsToMove2, podInfo)
+			}
+		}
+		p.movePodsToActiveQueue(podsToMove2)
 	}
 }
 
