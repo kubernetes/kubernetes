@@ -28,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var (
@@ -1153,6 +1154,34 @@ func TestCSINodeValidation(t *testing.T) {
 			},
 		},
 		{
+			// Volume limits being zero
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(0)},
+					},
+				},
+			},
+		},
+		{
+			// Volume limits with positive number
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(1)},
+					},
+				},
+			},
+		},
+		{
 			// topology key names with -, _, and dot .
 			ObjectMeta: metav1.ObjectMeta{Name: "foo8"},
 			Spec: storage.CSINodeSpec{
@@ -1369,6 +1398,20 @@ func TestCSINodeValidation(t *testing.T) {
 			},
 		},
 		{
+			// Volume limits with negative number
+			ObjectMeta: metav1.ObjectMeta{Name: "foo11"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(-1)},
+					},
+				},
+			},
+		},
+		{
 			// topology prefix should be lower case
 			ObjectMeta: metav1.ObjectMeta{Name: "foo14"},
 			Spec: storage.CSINodeSpec{
@@ -1409,6 +1452,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 					Name:         "io.kubernetes.storage.csi.driver-2",
 					NodeID:       nodeID,
 					TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 				},
 			},
 		},
@@ -1429,6 +1473,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 					},
 				},
 			},
@@ -1460,11 +1505,13 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 					},
 					{
 						Name:         "io.kubernetes.storage.csi.driver-3",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(30)},
 					},
 				},
 			},
@@ -1483,6 +1530,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.new-driver",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(30)},
 					},
 				},
 			},
@@ -1510,6 +1558,7 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
 					},
 				},
 			},
@@ -1521,13 +1570,90 @@ func TestCSINodeUpdateValidation(t *testing.T) {
 				Drivers: []storage.CSINodeDriver{
 					{
 						Name:         "io.kubernetes.storage.csi.driver-1",
-						NodeID:       "nodeB",
+						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
 					},
 					{
 						Name:         "io.kubernetes.storage.csi.driver-2",
 						NodeID:       nodeID,
 						TopologyKeys: []string{"company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to set a previously unset allocatable
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(10)},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(20)},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to update allocatable with a different volume limit
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: utilpointer.Int32Ptr(21)},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to update allocatable with an empty volume limit
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+						Allocatable:  &storage.VolumeNodeResources{Count: nil},
+					},
+				},
+			},
+		},
+		{
+			// invalid change trying to remove allocatable
+			ObjectMeta: metav1.ObjectMeta{Name: "foo1"},
+			Spec: storage.CSINodeSpec{
+				Drivers: []storage.CSINodeDriver{
+					{
+						Name:         "io.kubernetes.storage.csi.driver-1",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
+					},
+					{
+						Name:         "io.kubernetes.storage.csi.driver-2",
+						NodeID:       nodeID,
+						TopologyKeys: []string{"company.com/zone1", "company.com/zone2"},
 					},
 				},
 			},
