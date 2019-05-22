@@ -21,7 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -566,6 +567,47 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 
 	cache.nodeTree.RemoveNode(node)
 	cache.removeNodeImageStates(node)
+	return nil
+}
+
+func (cache *schedulerCache) AddCSINode(csiNode *storagev1beta1.CSINode) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	n, ok := cache.nodes[csiNode.Name]
+	if !ok {
+		n = newNodeInfoListItem(schedulernodeinfo.NewNodeInfo())
+		cache.nodes[csiNode.Name] = n
+	}
+	n.info.SetCSINode(csiNode)
+	cache.moveNodeInfoToHead(csiNode.Name)
+	return nil
+}
+
+func (cache *schedulerCache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	n, ok := cache.nodes[newCSINode.Name]
+	if !ok {
+		n = newNodeInfoListItem(schedulernodeinfo.NewNodeInfo())
+		cache.nodes[newCSINode.Name] = n
+	}
+	n.info.SetCSINode(newCSINode)
+	cache.moveNodeInfoToHead(newCSINode.Name)
+	return nil
+}
+
+func (cache *schedulerCache) RemoveCSINode(csiNode *storagev1beta1.CSINode) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	n, ok := cache.nodes[csiNode.Name]
+	if !ok {
+		return fmt.Errorf("node %v is not found", csiNode.Name)
+	}
+	n.info.SetCSINode(nil)
+	cache.moveNodeInfoToHead(csiNode.Name)
 	return nil
 }
 

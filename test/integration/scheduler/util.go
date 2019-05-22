@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -215,6 +215,7 @@ func initTestSchedulerWithOptions(
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Storage().V1().StorageClasses(),
+		context.informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
 	// set setPodInformer if provided.
