@@ -586,6 +586,9 @@ func NewProxier(
 		}
 	}
 
+	klog.V(3).Infof("Cleaning up all HNS Policy Lists")
+	deleteAllHnsLoadBalancerPolicy()
+
 	proxier := &Proxier{
 		portsMap:         make(map[localPort]closeable),
 		serviceMap:       make(proxyServiceMap),
@@ -672,20 +675,6 @@ func deleteAllHnsLoadBalancerPolicy() {
 		}
 	}
 
-}
-
-func getHnsNetworkInfo(hnsNetworkName string) (*hnsNetworkInfo, error) {
-	hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
-	if err != nil {
-		klog.Errorf("%v", err)
-		return nil, err
-	}
-
-	return &hnsNetworkInfo{
-		id:          hnsnetwork.Id,
-		name:        hnsnetwork.Name,
-		networkType: hnsnetwork.Type,
-	}, nil
 }
 
 // Sync is called to synchronize the proxier state to hns as soon as possible.
