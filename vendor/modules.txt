@@ -1581,7 +1581,7 @@ k8s.io/gengo/parser
 k8s.io/gengo/types
 # k8s.io/heapster v1.2.0-beta.1 => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog v0.3.0 => k8s.io/klog v0.3.0
+# k8s.io/klog v0.3.1 => k8s.io/klog v0.3.1
 k8s.io/klog
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration
