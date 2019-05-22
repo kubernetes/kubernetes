@@ -117,7 +117,8 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 }
 
 // MarkAllPodsNotReady updates ready status of all pods running on
-// given node from master return true if success
+// given node from master
+// return nil if success
 func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 	nodeName := node.Name
 	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
