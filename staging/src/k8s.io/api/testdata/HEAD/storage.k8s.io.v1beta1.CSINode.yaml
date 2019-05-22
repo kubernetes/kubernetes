@@ -33,7 +33,9 @@ metadata:
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
   drivers:
-  - name: "24"
+  - allocatable:
+      count: -1821918122
+    name: "24"
     nodeID: "25"
     topologyKeys:
     - "26"
