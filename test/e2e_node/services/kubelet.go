@@ -260,7 +260,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
 		"--v", LogVerbosityLevel, "--logtostderr",
-		"--allow-privileged=true",
 	)
 
 	// Apply test framework feature gates by default. This could also be overridden
