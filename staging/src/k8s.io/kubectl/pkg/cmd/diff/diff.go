@@ -56,7 +56,7 @@ var (
 
 		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. By default, the "diff" command available in your path will be
-		run with "-u" (unicode) and "-N" (treat new files as empty) options.`))
+		run with "-u" (unified diff) and "-N" (treat absent files as empty) options.`))
 	diffExample = templates.Examples(i18n.T(`
 		# Diff resources included in pod.json.
 		kubectl diff -f pod.json
