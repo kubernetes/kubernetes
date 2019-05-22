@@ -25,15 +25,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
 	f := framework.NewDefaultFramework("autoscaling")
 
 	SIGDescribe("Autoscaling a service", func() {
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			// Check if Cloud Autoscaler is enabled by trying to get its ConfigMap.
 			_, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Get("cluster-autoscaler-status", metav1.GetOptions{})
 			if err != nil {
@@ -41,12 +41,12 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 			}
 		})
 
-		Context("from 1 pod and 3 nodes to 8 pods and >=4 nodes", func() {
+		ginkgo.Context("from 1 pod and 3 nodes to 8 pods and >=4 nodes", func() {
 			const nodesNum = 3       // Expect there to be 3 nodes before and after the test.
 			var nodeGroupName string // Set by BeforeEach, used by AfterEach to scale this node group down after the test.
 			var nodes *v1.NodeList   // Set by BeforeEach, used by Measure to calculate CPU request based on node's sizes.
 
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				// Make sure there is only 1 node group, otherwise this test becomes useless.
 				nodeGroups := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")
 				if len(nodeGroups) != 1 {
@@ -64,10 +64,10 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.
 				nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 				schedulableCount := len(nodes.Items)
-				Expect(schedulableCount).To(Equal(nodeGroupSize), "not all nodes are schedulable")
+				gomega.Expect(schedulableCount).To(gomega.Equal(nodeGroupSize), "not all nodes are schedulable")
 			})
 
-			AfterEach(func() {
+			ginkgo.AfterEach(func() {
 				// Attempt cleanup only if a node group was targeted for scale up.
 				// Otherwise the test was probably skipped and we'll get a gcloud error due to invalid parameters.
 				if len(nodeGroupName) > 0 {
@@ -77,7 +77,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				}
 			})
 
-			Measure("takes less than 15 minutes", func(b Benchmarker) {
+			ginkgo.Measure("takes less than 15 minutes", func(b ginkgo.Benchmarker) {
 				// Measured over multiple samples, scaling takes 10 +/- 2 minutes, so 15 minutes should be fully sufficient.
 				const timeToWait = 15 * time.Minute
 
@@ -85,8 +85,8 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// This test expects that 8 pods will not fit in 'nodesNum' nodes, but will fit in >='nodesNum'+1 nodes.
 				// Make it so that 'nodesNum' pods fit perfectly per node.
 				nodeCpus := nodes.Items[0].Status.Allocatable[v1.ResourceCPU]
-				nodeCpuMillis := (&nodeCpus).MilliValue()
-				cpuRequestMillis := int64(nodeCpuMillis / nodesNum)
+				nodeCPUMillis := (&nodeCpus).MilliValue()
+				cpuRequestMillis := int64(nodeCPUMillis / nodesNum)
 
 				// Start the service we want to scale and wait for it to be up and running.
 				nodeMemoryBytes := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
@@ -99,10 +99,10 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 
 				// Enable Horizontal Pod Autoscaler with 50% target utilization and
 				// scale up the CPU usage to trigger autoscaling to 8 pods for target to be satisfied.
-				targetCpuUtilizationPercent := int32(50)
-				hpa := common.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCpuUtilizationPercent, 1, 10)
+				targetCPUUtilizationPercent := int32(50)
+				hpa := common.CreateCPUHorizontalPodAutoscaler(resourceConsumer, targetCPUUtilizationPercent, 1, 10)
 				defer common.DeleteHorizontalPodAutoscaler(resourceConsumer, hpa.Name)
-				cpuLoad := 8 * cpuRequestMillis * int64(targetCpuUtilizationPercent) / 100 // 8 pods utilized to the target level
+				cpuLoad := 8 * cpuRequestMillis * int64(targetCPUUtilizationPercent) / 100 // 8 pods utilized to the target level
 				resourceConsumer.ConsumeCPU(int(cpuLoad))
 
 				// Measure the time it takes for the service to scale to 8 pods with 50% CPU utilization each.
