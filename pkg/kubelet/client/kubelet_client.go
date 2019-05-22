@@ -32,7 +32,7 @@ import (
 )
 
 type KubeletClientConfig struct {
-	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
+	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints
 	Port         uint
 	ReadOnlyPort uint
 	EnableHttps  bool
