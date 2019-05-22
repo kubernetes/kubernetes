@@ -164,7 +164,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			description: "cpu manager add - no error",
 			updateErr:   nil,
 			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(3, 4),
+			expCPUSet:   cpuset.NewCPUSet(2, 3),
 			expErr:      nil,
 		},
 		{
@@ -173,14 +173,14 @@ func TestCPUManagerAdd(t *testing.T) {
 			policy: &mockPolicy{
 				err: fmt.Errorf("fake reg error"),
 			},
-			expCPUSet: cpuset.NewCPUSet(1, 2, 3, 4),
+			expCPUSet: cpuset.NewCPUSet(0, 1, 2, 3),
 			expErr:    fmt.Errorf("fake reg error"),
 		},
 		{
 			description: "cpu manager add - container update error",
 			updateErr:   fmt.Errorf("fake update error"),
 			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(1, 2, 3, 4),
+			expCPUSet:   cpuset.NewCPUSet(0, 1, 2, 3),
 			expErr:      fmt.Errorf("fake update error"),
 		},
 	}
@@ -190,7 +190,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			policy: testCase.policy,
 			state: &mockState{
 				assignments:   state.ContainerCPUAssignments{},
-				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4),
+				defaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3),
 			},
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
