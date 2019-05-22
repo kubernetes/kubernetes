@@ -547,7 +547,13 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 
 // Provision a gce instance using image
 func createInstance(imageConfig *internalGCEImage) (string, error) {
-	klog.V(1).Infof("Creating instance %+v", *imageConfig)
+	p, err := computeService.Projects.Get(*project).Do()
+	if err != nil {
+		return "", fmt.Errorf("failed to get project info %q", *project)
+	}
+	// Use default service account
+	serviceAccount := p.DefaultServiceAccount
+	klog.V(1).Infof("Creating instance %+v with service account %q", *imageConfig, serviceAccount)
 	name := imageToInstanceName(imageConfig)
 	i := &compute.Instance{
 		Name:        name,
@@ -572,6 +578,14 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				},
 			},
 		},
+		ServiceAccounts: []*compute.ServiceAccount{
+			{
+				Email: serviceAccount,
+				Scopes: []string{
+					"https://www.googleapis.com/auth/cloud-platform",
+				},
+			},
+		},
 	}
 
 	for _, accelerator := range imageConfig.resources.Accelerators {
@@ -591,7 +605,6 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		i.GuestAccelerators = append(i.GuestAccelerators, ac)
 	}
 
-	var err error
 	i.Metadata = imageConfig.metadata
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
