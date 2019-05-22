@@ -164,7 +164,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			description: "cpu manager add - no error",
 			updateErr:   nil,
 			policy:      testPolicy,
-			expCPUSet:   cpuset.NewCPUSet(2, 3),
+			expCPUSet:   cpuset.NewCPUSet(3),
 			expErr:      nil,
 		},
 		{
@@ -199,7 +199,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			podStatusProvider: mockPodStatusProvider{},
 		}
 
-		pod := makePod("2", "2")
+		pod := makePod("3", "3")
 		container := &pod.Spec.Containers[0]
 		err := mgr.AddContainer(pod, container, "fakeID")
 		if !reflect.DeepEqual(err, testCase.expErr) {
