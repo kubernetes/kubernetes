@@ -174,8 +174,8 @@ func (v *visitor) comment(x *ast.BasicLit) string {
 			//if we fail to open the file to compare the content we just assume the
 			//proximity of the comment and apply it.
 			myf, err := os.Open(v.FileSet.File(x.Pos()).Name())
-			defer myf.Close()
 			if err == nil {
+				defer myf.Close()
 				if _, err := myf.Seek(int64(comm.End()), 0); err == nil {
 					if _, err := myf.Read(b1); err == nil {
 						if strings.Compare(strings.Trim(string(b1), "\t \r\n"), "framework.ConformanceIt(\"") == 0 {
