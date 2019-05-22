@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -722,7 +723,11 @@ func PrioritizeNodes(
 		}
 	}
 
-	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
+	cores := runtime.NumCPU()
+	if cores < 16 {
+		cores = 16
+	}
+	workqueue.ParallelizeUntil(context.TODO(), cores, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		for i := range priorityConfigs {
 			if priorityConfigs[i].Function != nil {
