@@ -50,21 +50,21 @@ func (RuntimeClassList) SwaggerDoc() map[string]string {
 var map_RuntimeClassSpec = map[string]string{
 	"":               "RuntimeClassSpec is a specification of a RuntimeClass. It contains parameters that are required to describe the RuntimeClass to the Container Runtime Interface (CRI) implementation, as well as any other components that need to understand how the pod will be run. The RuntimeClassSpec is immutable.",
 	"runtimeHandler": "RuntimeHandler specifies the underlying runtime and configuration that the CRI implementation will use to handle pods of this class. The possible values are specific to the node & CRI configuration.  It is assumed that all handlers are available on every node, and handlers of the same name are equivalent on every node. For example, a handler called \"runc\" might specify that the runc OCI runtime (using native Linux containers) will be used to run the containers in a pod. The RuntimeHandler must conform to the DNS Label (RFC 1123) requirements and is immutable.",
-	"topology":       "Topology describes the set of nodes in the cluster that support this RuntimeClass. The rules are applied applied to pods running with this RuntimeClass and semantically merged with other scheduling constraints on the pod. If topology is nil, this RuntimeClass is assumed to be supported by all nodes.",
+	"scheduling":     "Scheduling holds the scheduling constraints to ensure that pods running with this RuntimeClass are scheduled to nodes that support it. If scheduling is nil, this RuntimeClass is assumed to be supported by all nodes.",
 }
 
 func (RuntimeClassSpec) SwaggerDoc() map[string]string {
 	return map_RuntimeClassSpec
 }
 
-var map_Topology = map[string]string{
-	"":             "Topology specifies the scheduling constraints for nodes supporting a RuntimeClass.",
-	"nodeSelector": "NodeSelector selects the set of nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The NodeSelector is intersected (AND) with a pod's other NodeAffinity or NodeSelector requirements. A nil NodeSelector selects all nodes.",
-	"tolerations":  "Tolerations are appended (excluding duplicates) to pods running with this RuntimeClass during admission, effectively unioning the set of nodes tolerated by the pod and the RuntimeClass.",
+var map_Scheduling = map[string]string{
+	"":             "Scheduling specifies the scheduling constraints for nodes supporting a RuntimeClass.",
+	"nodeSelector": "nodeSelector lists labels that must be present on nodes that support this RuntimeClass. Pods using this RuntimeClass can only be scheduled to a node matched by this selector. The RuntimeClass nodeSelector is merged with a pod's existing nodeSelector. Any conflicts will cause the pod to be rejected in admission.",
+	"tolerations":  "tolerations are appended (excluding duplicates) to pods running with this RuntimeClass during admission, effectively unioning the set of nodes tolerated by the pod and the RuntimeClass.",
 }
 
-func (Topology) SwaggerDoc() map[string]string {
-	return map_Topology
+func (Scheduling) SwaggerDoc() map[string]string {
+	return map_Scheduling
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
