@@ -128,22 +128,15 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 	}
 }
 
-func TestValidateTopology(t *testing.T) {
+func TestValidateScheduling(t *testing.T) {
 	tests := []struct {
 		name       string
-		topology   *node.Topology
+		scheduling *node.Scheduling
 		expectErrs int
 	}{{
-		name: "valid topology",
-		topology: &node.Topology{
-			NodeSelector: &core.NodeSelector{
-				NodeSelectorTerms: []core.NodeSelectorTerm{{
-					MatchExpressions: []core.NodeSelectorRequirement{{
-						Key:      "valid",
-						Operator: core.NodeSelectorOpExists,
-					}},
-				}},
-			},
+		name: "valid scheduling",
+		scheduling: &node.Scheduling{
+			NodeSelector: map[string]string{"valid": "yes"},
 			Tolerations: []core.Toleration{{
 				Key:      "valid",
 				Operator: core.TolerationOpExists,
@@ -151,24 +144,17 @@ func TestValidateTopology(t *testing.T) {
 			}},
 		},
 	}, {
-		name:     "empty topology",
-		topology: &node.Topology{},
+		name:       "empty scheduling",
+		scheduling: &node.Scheduling{},
 	}, {
 		name: "invalid nodeSelector",
-		topology: &node.Topology{
-			NodeSelector: &core.NodeSelector{
-				NodeSelectorTerms: []core.NodeSelectorTerm{{
-					MatchExpressions: []core.NodeSelectorRequirement{{
-						Key:      "not a valid key!!!",
-						Operator: core.NodeSelectorOpExists,
-					}},
-				}},
-			},
+		scheduling: &node.Scheduling{
+			NodeSelector: map[string]string{"not a valid key!!!": "nope"},
 		},
 		expectErrs: 1,
 	}, {
 		name: "invalid toleration",
-		topology: &node.Topology{
+		scheduling: &node.Scheduling{
 			Tolerations: []core.Toleration{{
 				Key:      "valid",
 				Operator: core.TolerationOpExists,
@@ -181,16 +167,9 @@ func TestValidateTopology(t *testing.T) {
 		},
 		expectErrs: 1,
 	}, {
-		name: "invalid topology",
-		topology: &node.Topology{
-			NodeSelector: &core.NodeSelector{
-				NodeSelectorTerms: []core.NodeSelectorTerm{{
-					MatchExpressions: []core.NodeSelectorRequirement{{
-						Key:      "not a valid label key!!!",
-						Operator: core.NodeSelectorOpExists,
-					}},
-				}},
-			},
+		name: "invalid scheduling",
+		scheduling: &node.Scheduling{
+			NodeSelector: map[string]string{"not a valid key!!!": "nope"},
 			Tolerations: []core.Toleration{{
 				Key:      "valid",
 				Operator: core.TolerationOpExists,
@@ -209,7 +188,7 @@ func TestValidateTopology(t *testing.T) {
 			rc := &node.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Handler:    "bar",
-				Topology:   test.topology,
+				Scheduling: test.scheduling,
 			}
 			assert.Len(t, ValidateRuntimeClass(rc), test.expectErrs)
 		})

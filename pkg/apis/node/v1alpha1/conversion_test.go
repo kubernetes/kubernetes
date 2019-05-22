@@ -41,15 +41,8 @@ func TestRuntimeClassConversion(t *testing.T) {
 			internal: &node.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Handler:    handler,
-				Topology: &node.Topology{
-					NodeSelector: &core.NodeSelector{
-						NodeSelectorTerms: []core.NodeSelectorTerm{{
-							MatchExpressions: []core.NodeSelectorRequirement{{
-								Key:      "extra-soft",
-								Operator: core.NodeSelectorOpExists,
-							}},
-						}},
-					},
+				Scheduling: &node.Scheduling{
+					NodeSelector: map[string]string{"extra-soft": "true"},
 					Tolerations: []core.Toleration{{
 						Key:      "stinky",
 						Operator: core.TolerationOpExists,
@@ -61,15 +54,8 @@ func TestRuntimeClassConversion(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,
-					Topology: &v1alpha1.Topology{
-						NodeSelector: &corev1.NodeSelector{
-							NodeSelectorTerms: []corev1.NodeSelectorTerm{{
-								MatchExpressions: []corev1.NodeSelectorRequirement{{
-									Key:      "extra-soft",
-									Operator: corev1.NodeSelectorOpExists,
-								}},
-							}},
-						},
+					Scheduling: &v1alpha1.Scheduling{
+						NodeSelector: map[string]string{"extra-soft": "true"},
 						Tolerations: []corev1.Toleration{{
 							Key:      "stinky",
 							Operator: corev1.TolerationOpExists,
@@ -79,17 +65,17 @@ func TestRuntimeClassConversion(t *testing.T) {
 				},
 			},
 		},
-		"empty-topology": {
+		"empty-scheduling": {
 			internal: &node.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Handler:    handler,
-				Topology:   &node.Topology{},
+				Scheduling: &node.Scheduling{},
 			},
 			external: &v1alpha1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec: v1alpha1.RuntimeClassSpec{
 					RuntimeHandler: handler,
-					Topology:       &v1alpha1.Topology{},
+					Scheduling:     &v1alpha1.Scheduling{},
 				},
 			},
 		},

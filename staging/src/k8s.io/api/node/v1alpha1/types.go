@@ -60,28 +60,26 @@ type RuntimeClassSpec struct {
 	// and is immutable.
 	RuntimeHandler string `json:"runtimeHandler" protobuf:"bytes,1,opt,name=runtimeHandler"`
 
-	// Topology describes the set of nodes in the cluster that support this
-	// RuntimeClass. The rules are applied applied to pods running with this
-	// RuntimeClass and semantically merged with other scheduling constraints on
-	// the pod.
-	// If topology is nil, this RuntimeClass is assumed to be supported by all
+	// Scheduling holds the scheduling constraints to ensure that pods running
+	// with this RuntimeClass are scheduled to nodes that support it.
+	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
 	// nodes.
 	// +optional
-	Topology *Topology `json:"topology,omitempty" protobuf:"bytes,3,opt,name=topology"`
+	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,3,opt,name=scheduling"`
 }
 
-// Topology specifies the scheduling constraints for nodes supporting a
+// Scheduling specifies the scheduling constraints for nodes supporting a
 // RuntimeClass.
-type Topology struct {
-	// NodeSelector selects the set of nodes that support this RuntimeClass.
-	// Pods using this RuntimeClass can only be scheduled to a node matched by
-	// this selector. The NodeSelector is intersected (AND) with a pod's other
-	// NodeAffinity or NodeSelector requirements.
-	// A nil NodeSelector selects all nodes.
+type Scheduling struct {
+	// nodeSelector lists labels that must be present on nodes that support this
+	// RuntimeClass. Pods using this RuntimeClass can only be scheduled to a
+	// node matched by this selector. The RuntimeClass nodeSelector is merged
+	// with a pod's existing nodeSelector. Any conflicts will cause the pod to
+	// be rejected in admission.
 	// +optional
-	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
 
-	// Tolerations are appended (excluding duplicates) to pods running with this
+	// tolerations are appended (excluding duplicates) to pods running with this
 	// RuntimeClass during admission, effectively unioning the set of nodes
 	// tolerated by the pod and the RuntimeClass.
 	// +optional
