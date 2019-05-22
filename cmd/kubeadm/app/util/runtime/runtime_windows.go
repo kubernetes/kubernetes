@@ -1,7 +1,7 @@
 // +build windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,11 +16,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package util
+
+import (
+	winio "github.com/Microsoft/go-winio"
+)
 
 const (
-	// DefaultCACertPath defines default location of CA certificate on Windows
-	DefaultCACertPath = "C:/etc/kubernetes/pki/ca.crt"
-	// DefaultUrlScheme defines default socket url prefix
-	DefaultUrlScheme = "npipe"
+	dockerSocket     = "//./pipe/docker_engine"         // The Docker socket is not CRI compatible
+	containerdSocket = "//./pipe/containerd-containerd" // Proposed containerd named pipe for Windows
 )
+
+// isExistingSocket checks if path exists and is domain socket
+func isExistingSocket(path string) bool {
+	_, err := winio.DialPipe(path, nil)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
