@@ -39,6 +39,8 @@ go_library(
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//cmd/kubeadm/app/util:go_default_library",
+            "//pkg/proxy/ipvs:go_default_library",
+            "//pkg/util/ipset:go_default_library",
         ],
         "//conditions:default": [],
     }),

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -67,7 +68,7 @@ func mysqlKubectlCreate(ns, file string) {
 
 func (t *MySQLUpgradeTest) getServiceIP(f *framework.Framework, ns, svcName string) string {
 	svc, err := f.ClientSet.CoreV1().Services(ns).Get(svcName, metav1.GetOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ingress := svc.Status.LoadBalancer.Ingress
 	if len(ingress) == 0 {
 		return ""
@@ -100,21 +101,23 @@ func (t *MySQLUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.countNames(); err != nil {
-			framework.Logf("Service endpoint is up but isn't responding")
+			e2elog.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
-	framework.Logf("Service endpoint is up")
+	framework.ExpectNoError(err)
+	e2elog.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 names to the database")
-	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
-	gomega.Expect(t.addName(strconv.Itoa(t.nextWrite))).NotTo(gomega.HaveOccurred())
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
+	err = t.addName(strconv.Itoa(t.nextWrite))
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Verifying that the 2 names have been inserted")
 	count, err := t.countNames()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(count).To(gomega.Equal(2))
 }
 
@@ -126,7 +129,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	go wait.Until(func() {
 		_, err := t.countNames()
 		if err != nil {
-			framework.Logf("Error while trying to read data: %v", err)
+			e2elog.Logf("Error while trying to read data: %v", err)
 			readFailure++
 		} else {
 			readSuccess++
@@ -136,7 +139,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	wait.Until(func() {
 		err := t.addName(strconv.Itoa(t.nextWrite))
 		if err != nil {
-			framework.Logf("Error while trying to write data: %v", err)
+			e2elog.Logf("Error while trying to write data: %v", err)
 			writeFailure++
 		} else {
 			writeSuccess++
@@ -144,10 +147,10 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	}, framework.Poll, done)
 
 	t.successfulWrites = writeSuccess
-	framework.Logf("Successful reads: %d", readSuccess)
-	framework.Logf("Successful writes: %d", writeSuccess)
-	framework.Logf("Failed reads: %d", readFailure)
-	framework.Logf("Failed writes: %d", writeFailure)
+	e2elog.Logf("Successful reads: %d", readSuccess)
+	e2elog.Logf("Successful writes: %d", writeSuccess)
+	e2elog.Logf("Failed reads: %d", readFailure)
+	e2elog.Logf("Failed writes: %d", writeFailure)
 
 	// TODO: Not sure what the ratio defining a successful test run should be. At time of writing the
 	// test, failures only seem to happen when a race condition occurs (read/write starts, doesn't
@@ -166,7 +169,7 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 // Teardown performs one final check of the data's availability.
 func (t *MySQLUpgradeTest) Teardown(f *framework.Framework) {
 	count, err := t.countNames()
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(count >= t.successfulWrites).To(gomega.BeTrue())
 }
 

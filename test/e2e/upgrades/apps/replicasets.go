@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
 	"github.com/onsi/ginkgo"
@@ -55,12 +56,12 @@ func (r *ReplicaSetUpgradeTest) Setup(f *framework.Framework) {
 	nginxImage := imageutils.GetE2EImage(imageutils.Nginx)
 
 	ginkgo.By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, ns))
-	replicaSet := framework.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
+	replicaSet := replicaset.NewReplicaSet(rsName, ns, 1, map[string]string{"test": "upgrade"}, "nginx", nginxImage)
 	rs, err := c.AppsV1().ReplicaSets(ns).Create(replicaSet)
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready", rsName))
-	framework.ExpectNoError(framework.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(replicaset.WaitForReadyReplicaSet(c, ns, rsName))
 
 	r.UID = rs.UID
 }
@@ -84,17 +85,17 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	}
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after upgrade", rsName))
-	framework.ExpectNoError(framework.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(replicaset.WaitForReadyReplicaSet(c, ns, rsName))
 
 	// Verify the upgraded RS is active by scaling up the RS to scaleNum and ensuring all pods are Ready
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset %s to %d", rsName, scaleNum))
-	_, err = framework.UpdateReplicaSetWithRetries(c, ns, rsName, func(rs *apps.ReplicaSet) {
+	_, err = replicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(rs *apps.ReplicaSet) {
 		*rs.Spec.Replicas = scaleNum
 	})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after scaling", rsName))
-	framework.ExpectNoError(framework.WaitForReadyReplicaSet(c, ns, rsName))
+	framework.ExpectNoError(replicaset.WaitForReadyReplicaSet(c, ns, rsName))
 }
 
 // Teardown cleans up any remaining resources.

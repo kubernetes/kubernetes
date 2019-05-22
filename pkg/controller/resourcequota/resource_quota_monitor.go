@@ -69,7 +69,7 @@ type event struct {
 type QuotaMonitor struct {
 	// each monitor list/watches a resource and determines if we should replenish quota
 	monitors    monitors
-	monitorLock sync.Mutex
+	monitorLock sync.RWMutex
 	// informersStarted is closed after after all of the controllers have been initialized and are running.
 	// After that it is safe to start them here, before that it is not.
 	informersStarted <-chan struct{}
@@ -86,7 +86,7 @@ type QuotaMonitor struct {
 	resourceChanges workqueue.RateLimitingInterface
 
 	// interfaces with informers
-	informerFactory InformerFactory
+	informerFactory controller.InformerFactory
 
 	// list of resources to ignore
 	ignoredResources map[schema.GroupResource]struct{}
@@ -101,7 +101,7 @@ type QuotaMonitor struct {
 	registry quota.Registry
 }
 
-func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
+func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory controller.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
 	return &QuotaMonitor{
 		informersStarted:  informersStarted,
 		informerFactory:   informerFactory,
@@ -280,15 +280,17 @@ func (qm *QuotaMonitor) StartMonitors() {
 // true at one time, and then later return false if all monitors were
 // reconstructed.
 func (qm *QuotaMonitor) IsSynced() bool {
-	qm.monitorLock.Lock()
-	defer qm.monitorLock.Unlock()
+	qm.monitorLock.RLock()
+	defer qm.monitorLock.RUnlock()
 
 	if len(qm.monitors) == 0 {
+		klog.V(4).Info("quota monitor not synced: no monitors")
 		return false
 	}
 
-	for _, monitor := range qm.monitors {
+	for resource, monitor := range qm.monitors {
 		if !monitor.controller.HasSynced() {
+			klog.V(4).Infof("quota monitor not synced: %v", resource)
 			return false
 		}
 	}

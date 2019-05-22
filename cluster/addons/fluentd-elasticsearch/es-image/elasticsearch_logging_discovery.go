@@ -24,13 +24,13 @@ import (
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/klog"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
 func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, error) {
@@ -48,7 +48,7 @@ func buildConfigFromEnvs(masterURL, kubeconfigPath string) (*restclient.Config, 
 		&clientcmd.ConfigOverrides{ClusterInfo: clientapi.Cluster{Server: masterURL}}).ClientConfig()
 }
 
-func flattenSubsets(subsets []api.EndpointSubset) []string {
+func flattenSubsets(subsets []corev1.EndpointSubset) []string {
 	ips := []string{}
 	for _, ss := range subsets {
 		for _, addr := range ss.Addresses {
@@ -75,13 +75,13 @@ func main() {
 	namespace := metav1.NamespaceSystem
 	envNamespace := os.Getenv("NAMESPACE")
 	if envNamespace != "" {
-		if _, err := client.Core().Namespaces().Get(envNamespace, metav1.GetOptions{}); err != nil {
+		if _, err := client.CoreV1().Namespaces().Get(envNamespace, metav1.GetOptions{}); err != nil {
 			klog.Fatalf("%s namespace doesn't exist: %v", envNamespace, err)
 		}
 		namespace = envNamespace
 	}
 
-	var elasticsearch *api.Service
+	var elasticsearch *corev1.Service
 	serviceName := os.Getenv("ELASTICSEARCH_SERVICE_NAME")
 	if serviceName == "" {
 		serviceName = "elasticsearch-logging"
@@ -90,7 +90,7 @@ func main() {
 	// Look for endpoints associated with the Elasticsearch logging service.
 	// First wait for the service to become available.
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		elasticsearch, err = client.Core().Services(namespace).Get(serviceName, metav1.GetOptions{})
+		elasticsearch, err = client.CoreV1().Services(namespace).Get(serviceName, metav1.GetOptions{})
 		if err == nil {
 			break
 		}
@@ -102,12 +102,12 @@ func main() {
 		return
 	}
 
-	var endpoints *api.Endpoints
+	var endpoints *corev1.Endpoints
 	addrs := []string{}
 	// Wait for some endpoints.
 	count, _ := strconv.Atoi(os.Getenv("MINIMUM_MASTER_NODES"))
 	for t := time.Now(); time.Since(t) < 5*time.Minute; time.Sleep(10 * time.Second) {
-		endpoints, err = client.Core().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
+		endpoints, err = client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			continue
 		}

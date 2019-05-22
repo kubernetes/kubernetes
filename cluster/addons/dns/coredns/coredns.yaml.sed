@@ -64,10 +64,11 @@ data:
     .:53 {
         errors
         health
+        ready
         kubernetes $DNS_DOMAIN in-addr.arpa ip6.arpa {
             pods insecure
-            upstream
             fallthrough in-addr.arpa ip6.arpa
+            ttl 30
         }
         prometheus :9153
         forward . /etc/resolv.conf
@@ -115,11 +116,11 @@ spec:
         beta.kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.3.1
+        image: k8s.gcr.io/coredns:1.5.0
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            memory: 170Mi
+            memory: $DNS_MEMORY_LIMIT
           requests:
             cpu: 100m
             memory: 70Mi
@@ -149,8 +150,8 @@ spec:
           failureThreshold: 5
         readinessProbe:
           httpGet:
-            path: /health
-            port: 8080
+            path: /ready
+            port: 8181
             scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false

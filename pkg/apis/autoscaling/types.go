@@ -226,8 +226,11 @@ type MetricTarget struct {
 type MetricTargetType string
 
 var (
-	UtilizationMetricType  MetricTargetType = "Utilization"
-	ValueMetricType        MetricTargetType = "Value"
+	// UtilizationMetricType is a possible value for MetricTarget.Type.
+	UtilizationMetricType MetricTargetType = "Utilization"
+	// ValueMetricType is a possible value for MetricTarget.Type.
+	ValueMetricType MetricTargetType = "Value"
+	// AverageValueMetricType is a possible value for MetricTarget.Type.
 	AverageValueMetricType MetricTargetType = "AverageValue"
 )
 
@@ -373,13 +376,13 @@ type ExternalMetricStatus struct {
 	Current MetricValueStatus
 }
 
+// MetricValueStatus indicates the current value of a metric.
 type MetricValueStatus struct {
 	Value              *resource.Quantity
 	AverageValue       *resource.Quantity
 	AverageUtilization *int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // HorizontalPodAutoscaler is the configuration for a horizontal pod

@@ -11,15 +11,15 @@ go_library(
     srcs = ["manifest.go"],
     importpath = "k8s.io/kubernetes/test/e2e/manifest",
     deps = [
-        "//cmd/kubeadm/app/util:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/networking/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
     ],
 )
@@ -41,5 +41,5 @@ go_test(
     name = "go_default_test",
     srcs = ["manifest_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/api/extensions/v1beta1:go_default_library"],
+    deps = ["//staging/src/k8s.io/api/networking/v1beta1:go_default_library"],
 )

@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
 	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
@@ -47,6 +48,8 @@ import (
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var (
@@ -104,10 +107,10 @@ func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage
 		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      v,
-		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   GetAttrs,
+		NewFunc:        func() runtime.Object { return &example.Pod{} },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
 	}
@@ -119,6 +122,12 @@ func makeTestPod(name string) *example.Pod {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
 		Spec:       DeepEqualSafePodSpec(),
 	}
+}
+
+func createPod(s storage.Interface, obj *example.Pod) error {
+	key := "pods/" + obj.Namespace + "/" + obj.Name
+	out := &example.Pod{}
+	return s.Create(context.TODO(), key, obj, out, 0)
 }
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
@@ -250,7 +259,7 @@ func TestList(t *testing.T) {
 	updatePod(t, etcdStorage, podFooNS2, nil)
 
 	deleted := example.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil, storage.ValidateAllObjectFunc); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -512,7 +521,7 @@ func TestFiltering(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
 	deleted := example.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil, storage.ValidateAllObjectFunc); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -690,5 +699,212 @@ func TestRandomWatchDeliver(t *testing.T) {
 			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
 		}
 		watched++
+	}
+}
+
+func TestCacherListerWatcher(t *testing.T) {
+	prefix := "pods"
+	fn := func() runtime.Object { return &example.PodList{} }
+	server, store := newEtcdTestStorage(t, prefix)
+	defer server.Terminate(t)
+
+	podFoo := makeTestPod("foo")
+	podBar := makeTestPod("bar")
+	podBaz := makeTestPod("baz")
+
+	_ = updatePod(t, store, podFoo, nil)
+	_ = updatePod(t, store, podBar, nil)
+	_ = updatePod(t, store, podBaz, nil)
+
+	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn)
+
+	obj, err := lw.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	pl, ok := obj.(*example.PodList)
+	if !ok {
+		t.Fatalf("Expected PodList but got %v", pl)
+	}
+	if len(pl.Items) != 3 {
+		t.Errorf("Expected PodList of length 3 but got %d", len(pl.Items))
+	}
+}
+
+func TestCacherListerWatcherPagination(t *testing.T) {
+	prefix := "pods"
+	fn := func() runtime.Object { return &example.PodList{} }
+	server, store := newEtcdTestStorage(t, prefix)
+	defer server.Terminate(t)
+
+	podFoo := makeTestPod("foo")
+	podBar := makeTestPod("bar")
+	podBaz := makeTestPod("baz")
+
+	_ = updatePod(t, store, podFoo, nil)
+	_ = updatePod(t, store, podBar, nil)
+	_ = updatePod(t, store, podBaz, nil)
+
+	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn)
+
+	obj1, err := lw.List(metav1.ListOptions{Limit: 2})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	limit1, ok := obj1.(*example.PodList)
+	if !ok {
+		t.Fatalf("Expected PodList but got %v", limit1)
+	}
+	if len(limit1.Items) != 2 {
+		t.Errorf("Expected PodList of length 2 but got %d", len(limit1.Items))
+	}
+	if limit1.Continue == "" {
+		t.Errorf("Expected list to have Continue but got none")
+	}
+	obj2, err := lw.List(metav1.ListOptions{Limit: 2, Continue: limit1.Continue})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	limit2, ok := obj2.(*example.PodList)
+	if !ok {
+		t.Fatalf("Expected PodList but got %v", limit2)
+	}
+	if limit2.Continue != "" {
+		t.Errorf("Expected list not to have Continue, but got %s", limit1.Continue)
+	}
+
+	if limit1.Items[0].Name != podBar.Name {
+		t.Errorf("Expected list1.Items[0] to be %s but got %s", podBar.Name, limit1.Items[0].Name)
+	}
+	if limit1.Items[1].Name != podBaz.Name {
+		t.Errorf("Expected list1.Items[1] to be %s but got %s", podBaz.Name, limit1.Items[1].Name)
+	}
+	if limit2.Items[0].Name != podFoo.Name {
+		t.Errorf("Expected list2.Items[0] to be %s but got %s", podFoo.Name, limit2.Items[0].Name)
+	}
+
+}
+
+func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher, v := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(rv))
+
+	tests := []struct {
+		timeout            time.Duration
+		expected           bool
+		allowWatchBookmark bool
+	}{
+		{ // test old client won't get Bookmark event
+			timeout:            2 * time.Second,
+			expected:           false,
+			allowWatchBookmark: false,
+		},
+		{
+			timeout:            2 * time.Second,
+			expected:           true,
+			allowWatchBookmark: true,
+		},
+	}
+
+	for i, c := range tests {
+		pred := storage.Everything
+		pred.AllowWatchBookmarks = c.allowWatchBookmark
+		ctx, _ := context.WithTimeout(context.Background(), c.timeout)
+		watcher, err := cacher.Watch(ctx, "pods/ns/foo", startVersion, pred)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// Create events of other pods
+		updatePod(t, etcdStorage, makeTestPod(fmt.Sprintf("foo-whatever-%d", i)), nil)
+
+		// Now wait for Bookmark event
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok && c.expected {
+				t.Errorf("Unexpected object watched (no objects)")
+			}
+			if c.expected && event.Type != watch.Bookmark {
+				t.Errorf("Unexpected object watched %#v", event)
+			}
+		case <-time.After(time.Second * 3):
+			if c.expected {
+				t.Errorf("Unexpected object watched (timeout)")
+			}
+		}
+		watcher.Stop()
+	}
+}
+
+func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+
+	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher, v := newTestCacher(etcdStorage, 10)
+	defer cacher.Stop()
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+	ctx, _ := context.WithTimeout(context.Background(), 2*time.Second)
+	watcher, err := cacher.WatchList(ctx, "pods/ns", "0", pred)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		for i := 0; i < 100; i++ {
+			select {
+			case <-done:
+				return
+			default:
+				pod := fmt.Sprintf("foo-%d", i)
+				err := createPod(etcdStorage, makeTestPod(pod))
+				if err != nil {
+					t.Fatalf("failed to create pod %v", pod)
+				}
+				time.Sleep(time.Second / 100)
+			}
+		}
+	}()
+
+	bookmarkReceived := false
+	lastObservedResourceVersion := uint64(0)
+	for event := range watcher.ResultChan() {
+		rv, err := v.ObjectResourceVersion(event.Object)
+		if err != nil {
+			t.Fatalf("failed to parse resourceVersion from %#v", event)
+		}
+		if event.Type == watch.Bookmark {
+			bookmarkReceived = true
+			// bookmark event has a RV greater than or equal to the before one
+			if rv < lastObservedResourceVersion {
+				t.Fatalf("Unexpected bookmark resourceVersion %v less than observed %v)", rv, lastObservedResourceVersion)
+			}
+		} else {
+			// non-bookmark event has a RV greater than anything before
+			if rv <= lastObservedResourceVersion {
+				t.Fatalf("Unexpected event resourceVersion %v less than or equal to bookmark %v)", rv, lastObservedResourceVersion)
+			}
+		}
+		lastObservedResourceVersion = rv
+	}
+	// Make sure we have received a bookmark event
+	if !bookmarkReceived {
+		t.Fatalf("Unpexected error, we did not received a bookmark event")
 	}
 }

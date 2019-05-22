@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,13 +40,20 @@ import (
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1beta1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
+	"k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.10.0")
+
+const (
+	aggregatorServicePort = 7443
+)
 
 var _ = SIGDescribe("Aggregator", func() {
 	var ns string
@@ -57,7 +64,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want cleanTest to happen before the namespace cleanup AfterEach
 	// inserted by NewDefaultFramework, so we put this AfterEach in front
 	// of NewDefaultFramework.
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		cleanTest(c, aggrclient, ns)
 	})
 
@@ -66,10 +73,20 @@ var _ = SIGDescribe("Aggregator", func() {
 	// We want namespace initialization BeforeEach inserted by
 	// NewDefaultFramework to happen before this, so we put this BeforeEach
 	// after NewDefaultFramework.
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		aggrclient = f.AggregatorClient
+
+		if aggrclient == nil {
+			config, err := framework.LoadConfig()
+			if err != nil {
+				framework.Failf("could not load config: %v", err)
+			}
+			aggrclient, err = aggregatorclient.NewForConfig(config)
+			if err != nil {
+				framework.Failf("could not create aggregator client: %v", err)
+			}
+		}
 	})
 
 	/*
@@ -79,7 +96,7 @@ var _ = SIGDescribe("Aggregator", func() {
 	*/
 	framework.ConformanceIt("Should be able to support the 1.10 Sample API Server using the current Aggregator", func() {
 		// Testing a 1.10 version of the sample-apiserver
-		TestSampleAPIServer(f, imageutils.GetE2EImage(imageutils.APIServer))
+		TestSampleAPIServer(f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer))
 	})
 })
 
@@ -97,13 +114,12 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":sample-apiserver-reader", nil)
 }
 
-// A basic test if the sample-apiserver code from 1.10 and compiled against 1.10
+// TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image string) {
-	By("Registering the sample API server.")
+func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string) {
+	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
-	aggrclient := f.AggregatorClient
 
 	namespace := f.Namespace.Name
 	context := setupServerCert(namespace, "sample-api")
@@ -216,6 +232,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 		{
 			Name:  "etcd",
 			Image: etcdImage,
+			Command: []string{
+				"/usr/local/bin/etcd",
+			},
 		},
 	}
 	d := &apps.Deployment{
@@ -245,9 +264,9 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}
 	deployment, err := client.AppsV1().Deployments(namespace).Create(d)
 	framework.ExpectNoError(err, "creating deployment %s in namespace %s", deploymentName, namespace)
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", image)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s in %s to complete", image, deploymentName, namespace)
-	err = framework.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(client, namespace, deploymentName, "1", etcdImage)
 	framework.ExpectNoError(err, "waiting for the deployment of image %s in %s to complete", etcdImage, deploymentName, namespace)
 
 	// kubectl create -f service.yaml
@@ -263,7 +282,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Ports: []v1.ServicePort{
 				{
 					Protocol:   "TCP",
-					Port:       443,
+					Port:       aggregatorServicePort,
 					TargetPort: intstr.FromInt(443),
 				},
 			},
@@ -304,7 +323,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
 	// NOTE: aggregated apis should generally be set up in their own namespace (<aggregated-api-namespace>). As the test framework
 	// is setting up a new namespace, we are just using that.
-	err = framework.WaitForDeploymentComplete(client, deployment)
+	err = e2edeploy.WaitForDeploymentComplete(client, deployment)
 	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", namespace)
 
 	// kubectl create -f apiservice.yaml
@@ -314,6 +333,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 			Service: &apiregistrationv1beta1.ServiceReference{
 				Namespace: namespace,
 				Name:      "sample-api",
+				Port:      pointer.Int32Ptr(aggregatorServicePort),
 			},
 			Group:                "wardle.k8s.io",
 			Version:              "v1alpha1",
@@ -354,16 +374,16 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	}, "Waited %s for the sample-apiserver to be ready to handle requests.")
 	if err != nil {
 		currentAPIServiceJSON, _ := json.Marshal(currentAPIService)
-		framework.Logf("current APIService: %s", string(currentAPIServiceJSON))
+		e2elog.Logf("current APIService: %s", string(currentAPIServiceJSON))
 
 		currentPodsJSON, _ := json.Marshal(currentPods)
-		framework.Logf("current pods: %s", string(currentPodsJSON))
+		e2elog.Logf("current pods: %s", string(currentPodsJSON))
 
 		if currentPods != nil {
 			for _, pod := range currentPods.Items {
 				for _, container := range pod.Spec.Containers {
 					logs, err := framework.GetPodLogs(client, namespace, pod.Name, container.Name)
-					framework.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
+					e2elog.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
 				}
 			}
 		}
@@ -466,12 +486,12 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 }
 
 // pollTimed will call Poll but time how long Poll actually took.
-// It will then framework.logf the msg with the duration of the Poll.
+// It will then e2elog.Logf the msg with the duration of the Poll.
 // It is assumed that msg will contain one %s for the elapsed time.
 func pollTimed(interval, timeout time.Duration, condition wait.ConditionFunc, msg string) error {
 	defer func(start time.Time, msg string) {
 		elapsed := time.Since(start)
-		framework.Logf(msg, elapsed)
+		e2elog.Logf(msg, elapsed)
 	}(time.Now(), msg)
 	return wait.Poll(interval, timeout, condition)
 }

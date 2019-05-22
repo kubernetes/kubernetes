@@ -30,9 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/instrumentation/monitoring"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"golang.org/x/oauth2/google"
 )
 
@@ -44,13 +45,13 @@ const (
 )
 
 var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver)", func() {
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 	})
 
 	f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 
-	It("should scale down with Custom Metric of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale down with Custom Metric of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		// metric should cause scale down
 		metricValue := int64(100)
@@ -65,7 +66,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		tc.Run()
 	})
 
-	It("should scale down with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale down with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		// metric should cause scale down
 		metricValue := int64(100)
@@ -82,7 +83,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		tc.Run()
 	})
 
-	It("should scale down with External Metric with target value from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale down with External Metric with target value from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		// metric should cause scale down
 		metricValue := externalMetricValue
@@ -105,7 +106,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		tc.Run()
 	})
 
-	It("should scale down with External Metric with target average value from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale down with External Metric with target average value from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		// metric should cause scale down
 		metricValue := externalMetricValue
@@ -128,7 +129,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		tc.Run()
 	})
 
-	It("should scale down with Custom Metric of type Pod from Stackdriver with Prometheus [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale down with Custom Metric of type Pod from Stackdriver with Prometheus [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 2
 		// metric should cause scale down
 		metricValue := int64(100)
@@ -143,7 +144,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		tc.Run()
 	})
 
-	It("should scale up with two metrics of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale up with two metrics of type Pod from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 1
 		// metric 1 would cause a scale down, if not for metric 2
 		metric1Value := int64(100)
@@ -174,7 +175,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 		tc.Run()
 	})
 
-	It("should scale up with two External metrics from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
+	ginkgo.It("should scale up with two External metrics from Stackdriver [Feature:CustomMetricsAutoscaling]", func() {
 		initialReplicas := 1
 		// metric 1 would cause a scale down, if not for metric 2
 		metric1Value := externalMetricValue
@@ -215,6 +216,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: Custom Me
 	})
 })
 
+// CustomMetricTestCase is a struct for test cases.
 type CustomMetricTestCase struct {
 	framework       *framework.Framework
 	hpa             *as.HorizontalPodAutoscaler
@@ -225,8 +227,9 @@ type CustomMetricTestCase struct {
 	scaledReplicas  int
 }
 
+// Run starts test case.
 func (tc *CustomMetricTestCase) Run() {
-	projectId := framework.TestContext.CloudConfig.ProjectID
+	projectID := framework.TestContext.CloudConfig.ProjectID
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
@@ -237,7 +240,7 @@ func (tc *CustomMetricTestCase) Run() {
 	// and uncomment following lines:
 	/*
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
-		framework.Logf("Couldn't get application default credentials, %v", err)
+		e2elog.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
 			framework.Failf("Error accessing application default credentials, %v", err)
 		}
@@ -250,11 +253,11 @@ func (tc *CustomMetricTestCase) Run() {
 	}
 
 	// Set up a cluster: create a custom metric and set up k8s-sd adapter
-	err = monitoring.CreateDescriptors(gcmService, projectId)
+	err = monitoring.CreateDescriptors(gcmService, projectID)
 	if err != nil {
 		framework.Failf("Failed to create metric descriptor: %v", err)
 	}
-	defer monitoring.CleanupDescriptors(gcmService, projectId)
+	defer monitoring.CleanupDescriptors(gcmService, projectID)
 
 	err = monitoring.CreateAdapter(monitoring.AdapterDefault)
 	if err != nil {
@@ -442,7 +445,7 @@ func waitForReplicas(deploymentName, namespace string, cs clientset.Interface, t
 			framework.Failf("Failed to get replication controller %s: %v", deployment, err)
 		}
 		replicas := int(deployment.Status.ReadyReplicas)
-		framework.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
+		e2elog.Logf("waiting for %d replicas (current: %d)", desiredReplicas, replicas)
 		return replicas == desiredReplicas, nil // Expected number of replicas found. Exit.
 	})
 	if err != nil {

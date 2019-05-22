@@ -35,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/sample-apiserver/hack:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:all-srcs",
         "//staging/src/k8s.io/sample-apiserver/pkg/apis/wardle:all-srcs",

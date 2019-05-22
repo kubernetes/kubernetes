@@ -42,7 +42,7 @@ func NewFilteredDynamicSharedInformerFactory(client dynamic.Interface, defaultRe
 	return &dynamicSharedInformerFactory{
 		client:           client,
 		defaultResync:    defaultResync,
-		namespace:        metav1.NamespaceAll,
+		namespace:        namespace,
 		informers:        map[schema.GroupVersionResource]informers.GenericInformer{},
 		startedInformers: make(map[schema.GroupVersionResource]bool),
 		tweakListOptions: tweakListOptions,

@@ -61,15 +61,16 @@ const (
 	defaultPodLogsTimeout   = 20 * time.Second
 )
 
-// AttachOptions declare the arguments accepted by the Exec command
+// AttachOptions declare the arguments accepted by the Attach command
 type AttachOptions struct {
 	exec.StreamOptions
 
 	// whether to disable use of standard error when streaming output from tty
 	DisableStderr bool
 
-	CommandName       string
-	SuggestedCmdUsage string
+	CommandName             string
+	ParentCommandName       string
+	EnableSuggestedCmdUsage bool
 
 	Pod *corev1.Pod
 
@@ -84,6 +85,7 @@ type AttachOptions struct {
 	Config        *restclient.Config
 }
 
+// NewAttachOptions creates the options for attach
 func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 	return &AttachOptions{
 		StreamOptions: exec.StreamOptions{
@@ -94,6 +96,7 @@ func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
 	}
 }
 
+// NewCmdAttach returns the attach Cobra command
 func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAttachOptions(streams)
 	cmd := &cobra.Command{
@@ -120,6 +123,7 @@ type RemoteAttach interface {
 	Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error
 }
 
+// DefaultAttachFunc is the default AttachFunc used
 func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, raw bool, sizeQueue remotecommand.TerminalSizeQueue) func() error {
 	return func() error {
 		restClient, err := restclient.RESTClientFor(o.Config)
@@ -146,6 +150,7 @@ func DefaultAttachFunc(o *AttachOptions, containerToAttach *corev1.Container, ra
 // DefaultRemoteAttach is the standard implementation of attaching
 type DefaultRemoteAttach struct{}
 
+// Attach executes attach to a running container
 func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	exec, err := remotecommand.NewSPDYExecutor(config, method, url)
 	if err != nil {
@@ -179,13 +184,12 @@ func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	o.Resources = args
 	o.restClientGetter = f
 
-	fullCmdName := ""
 	cmdParent := cmd.Parent()
 	if cmdParent != nil {
-		fullCmdName = cmdParent.CommandPath()
+		o.ParentCommandName = cmdParent.CommandPath()
 	}
-	if len(fullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		o.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", fullCmdName, o.PodName, o.Namespace)
+	if len(o.ParentCommandName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		o.EnableSuggestedCmdUsage = true
 	}
 
 	config, err := f.ToRESTConfig()
@@ -321,9 +325,9 @@ func (o *AttachOptions) containerToAttachTo(pod *corev1.Pod) (*corev1.Container,
 		return nil, fmt.Errorf("container not found (%s)", o.ContainerName)
 	}
 
-	if len(o.SuggestedCmdUsage) > 0 {
+	if o.EnableSuggestedCmdUsage {
 		fmt.Fprintf(o.ErrOut, "Defaulting container name to %s.\n", pod.Spec.Containers[0].Name)
-		fmt.Fprintf(o.ErrOut, "%s\n", o.SuggestedCmdUsage)
+		fmt.Fprintf(o.ErrOut, "Use '%s describe pod/%s -n %s' to see all of the containers in this pod.\n", o.ParentCommandName, o.PodName, o.Namespace)
 	}
 
 	klog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)

@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.3.10
 # REVISION provides a version number fo this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -57,19 +57,19 @@ GOARM=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-	BASEIMAGE?=busybox
+    BASEIMAGE?=k8s.gcr.io/debian-base:v1.0.0
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=arm32v7/busybox
+    BASEIMAGE?=k8s.gcr.io/debian-base-arm:v1.0.0
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=arm64v8/busybox
+    BASEIMAGE?=k8s.gcr.io/debian-base-arm64:v1.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-	BASEIMAGE?=ppc64le/busybox
+    BASEIMAGE?=k8s.gcr.io/debian-base-ppc64le:v1.0.0
 endif
 ifeq ($(ARCH),s390x)
-	BASEIMAGE?=s390x/busybox
+    BASEIMAGE?=k8s.gcr.io/debian-base-s390x:v1.0.0
 endif
 
 build:

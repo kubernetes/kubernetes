@@ -18,9 +18,11 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2017-10-01/containerregistry"
@@ -31,16 +33,22 @@ import (
 	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure/auth"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/legacy-cloud-providers/azure/auth"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",
 	"Path to the file containing Azure container registry configuration information.")
 
-const dummyRegistryEmail = "name@contoso.com"
+const (
+	dummyRegistryEmail = "name@contoso.com"
+	maxReadLength      = 10 * 1 << 20 // 10MB
+)
 
-var containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
+var (
+	containerRegistryUrls = []string{"*.azurecr.io", "*.azurecr.cn", "*.azurecr.de", "*.azurecr.us"}
+	acrRE                 = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
+)
 
 // init registers the various means by which credentials may
 // be resolved on Azure.
@@ -117,9 +125,13 @@ func parseConfig(configReader io.Reader) (*auth.AzureAuthConfig, error) {
 		return &config, nil
 	}
 
-	configContents, err := ioutil.ReadAll(configReader)
+	limitedReader := &io.LimitedReader{R: configReader, N: maxReadLength}
+	configContents, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
+	}
+	if limitedReader.N <= 0 {
+		return nil, errors.New("the read limit is reached")
 	}
 	err = yaml.Unmarshal(configContents, &config)
 	if err != nil {
@@ -173,27 +185,17 @@ func (a *acrProvider) Enabled() bool {
 	return true
 }
 
-func (a *acrProvider) Provide() credentialprovider.DockerConfig {
+func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
+	klog.V(4).Infof("try to provide secret for image %s", image)
 	cfg := credentialprovider.DockerConfig{}
-	ctx, cancel := getContextWithCancel()
-	defer cancel()
 
 	if a.config.UseManagedIdentityExtension {
-		klog.V(4).Infof("listing registries")
-		result, err := a.registryClient.List(ctx)
-		if err != nil {
-			klog.Errorf("Failed to list registries: %v", err)
-			return cfg
-		}
-
-		for ix := range result {
-			loginServer := getLoginServer(result[ix])
-			klog.V(2).Infof("loginServer: %s", loginServer)
-			cred, err := getACRDockerEntryFromARMToken(a, loginServer)
-			if err != nil {
-				continue
+		if loginServer := parseACRLoginServerFromImage(image); loginServer == "" {
+			klog.V(4).Infof("image(%s) is not from ACR, skip MSI authentication", image)
+		} else {
+			if cred, err := getACRDockerEntryFromARMToken(a, loginServer); err == nil {
+				cfg[loginServer] = *cred
 			}
-			cfg[loginServer] = *cred
 		}
 	} else {
 		// Add our entry for each of the supported container registry URLs
@@ -221,6 +223,11 @@ func getLoginServer(registry containerregistry.Registry) string {
 }
 
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
+	// Run EnsureFresh to make sure the token is valid and does not expire
+	if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
+		klog.Errorf("Failed to ensure fresh service principal token: %v", err)
+		return nil, err
+	}
 	armAccessToken := a.servicePrincipalToken.OAuthToken()
 
 	klog.V(4).Infof("discovering auth redirects for: %s", loginServer)
@@ -246,6 +253,16 @@ func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credent
 	}, nil
 }
 
-func (a *acrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+// parseACRLoginServerFromImage takes image as parameter and returns login server of it.
+// Parameter `image` is expected in following format: foo.azurecr.io/bar/imageName:version
+// If the provided image is not an acr image, this function will return an empty string.
+func parseACRLoginServerFromImage(image string) string {
+	match := acrRE.FindAllString(image, -1)
+	if len(match) == 1 {
+		return match[0]
+	}
+	return ""
+}
+func (a *acrProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
 	return nil
 }

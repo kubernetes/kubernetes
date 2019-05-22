@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package linear provides common linear data structures.
-package linear
+package linear // import "gonum.org/v1/gonum/graph/internal/linear"

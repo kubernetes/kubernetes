@@ -69,7 +69,12 @@ func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse 
 		Data map[string]string
 	}{}
 
-	raw := ar.Request.Object.Raw
+	var raw []byte
+	if ar.Request.Operation == v1beta1.Delete {
+		raw = ar.Request.OldObject.Raw
+	} else {
+		raw = ar.Request.Object.Raw
+	}
 	err := json.Unmarshal(raw, &cr)
 	if err != nil {
 		klog.Error(err)
@@ -79,10 +84,17 @@ func admitCustomResource(ar v1beta1.AdmissionReview) *v1beta1.AdmissionResponse 
 	reviewResponse := v1beta1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 	for k, v := range cr.Data {
-		if k == "webhook-e2e-test" && v == "webhook-disallow" {
+		if k == "webhook-e2e-test" && v == "webhook-disallow" &&
+			(ar.Request.Operation == v1beta1.Create || ar.Request.Operation == v1beta1.Update) {
 			reviewResponse.Allowed = false
 			reviewResponse.Result = &metav1.Status{
 				Reason: "the custom resource contains unwanted data",
+			}
+		}
+		if k == "webhook-e2e-test" && v == "webhook-nondeletable" && ar.Request.Operation == v1beta1.Delete {
+			reviewResponse.Allowed = false
+			reviewResponse.Result = &metav1.Status{
+				Reason: "the custom resource cannot be deleted because it contains unwanted key and value",
 			}
 		}
 	}

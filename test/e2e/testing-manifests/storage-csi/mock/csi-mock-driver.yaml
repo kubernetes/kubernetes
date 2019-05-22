@@ -14,10 +14,8 @@ spec:
     spec:
       serviceAccountName: csi-mock
       containers:
-
-
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.0.1
+          image: quay.io/k8scsi/csi-provisioner:v1.1.0
           args:
             - "--provisioner=csi-hostpath"
             - "--csi-address=$(ADDRESS)"
@@ -29,10 +27,8 @@ spec:
           volumeMounts:
             - mountPath: /csi
               name: socket-dir
-
-
         - name: driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -51,8 +47,6 @@ spec:
             name: socket-dir
           - mountPath: /registration
             name: registration-dir
-
-
         - name: mock
           image: quay.io/k8scsi/mock-driver:v1.1.1
           env:

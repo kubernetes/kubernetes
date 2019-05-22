@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -34,10 +33,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -48,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/kubernetes/pkg/kubelet/util/logreduction"
 )
 
 const (
@@ -128,11 +128,7 @@ type kubeGenericRuntimeManager struct {
 	runtimeClassManager *runtimeclass.Manager
 
 	// Cache last per-container error message to reduce log spam
-	lastError map[string]string
-
-	// Time last per-container error message was printed
-	errorPrinted map[string]time.Time
-	errorMapLock sync.Mutex
+	logReduction *logreduction.LogReduction
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -187,8 +183,7 @@ func NewKubeGenericRuntimeManager(
 		internalLifecycle:   internalLifecycle,
 		legacyLogProvider:   legacyLogProvider,
 		runtimeClassManager: runtimeClassManager,
-		lastError:           make(map[string]string),
-		errorPrinted:        make(map[string]time.Time),
+		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
@@ -382,7 +377,7 @@ type containerToKillInfo struct {
 type podActions struct {
 	// Stop all running (regular and init) containers and the sandbox for the pod.
 	KillPod bool
-	// Whether need to create a new sandbox. If needed to kill pod and create a
+	// Whether need to create a new sandbox. If needed to kill pod and create
 	// a new pod sandbox, all init containers need to be purged (i.e., removed).
 	CreateSandbox bool
 	// The id of existing sandbox. It is used for starting containers in ContainersToStart.
@@ -850,17 +845,6 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	return
 }
 
-func (m *kubeGenericRuntimeManager) cleanupErrorTimeouts() {
-	m.errorMapLock.Lock()
-	defer m.errorMapLock.Unlock()
-	for name, timeout := range m.errorPrinted {
-		if time.Now().Sub(timeout) >= identicalErrorDelay {
-			delete(m.errorPrinted, name)
-			delete(m.lastError, name)
-		}
-	}
-}
-
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visible in Runtime.
 func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
@@ -909,19 +893,13 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 
 	// Get statuses of all containers visible in the pod.
 	containerStatuses, err := m.getPodContainerStatuses(uid, name, namespace)
-	m.errorMapLock.Lock()
-	defer m.errorMapLock.Unlock()
 	if err != nil {
-		lastMsg, ok := m.lastError[podFullName]
-		if !ok || err.Error() != lastMsg || time.Now().Sub(m.errorPrinted[podFullName]) >= identicalErrorDelay {
+		if m.logReduction.ShouldMessageBePrinted(err.Error(), podFullName) {
 			klog.Errorf("getPodContainerStatuses for pod %q failed: %v", podFullName, err)
-			m.errorPrinted[podFullName] = time.Now()
-			m.lastError[podFullName] = err.Error()
 		}
 		return nil, err
 	}
-	delete(m.errorPrinted, podFullName)
-	delete(m.lastError, podFullName)
+	m.logReduction.ClearID(podFullName)
 
 	return &kubecontainer.PodStatus{
 		ID:                uid,

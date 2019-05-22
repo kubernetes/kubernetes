@@ -23,7 +23,7 @@ import (
 )
 
 // allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,
-// but we don't want an client library (which must include types), depending on a server library
+// but we don't want a client library (which must include types), depending on a server library
 const allAuthenticated = "system:authenticated"
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

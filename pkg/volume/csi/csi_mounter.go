@@ -19,10 +19,10 @@ package csi
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"k8s.io/klog"
 
@@ -69,14 +69,14 @@ type csiMountMgr struct {
 	podUID         types.UID
 	options        volume.VolumeOptions
 	publishContext map[string]string
-	volume.MetricsNil
+	volume.MetricsProvider
 }
 
 // volume.Volume methods
 var _ volume.Volume = &csiMountMgr{}
 
 func (c *csiMountMgr) GetPath() string {
-	dir := path.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
+	dir := filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
 	klog.V(4).Info(log("mounter.GetPath generated [%s]", dir))
 	return dir
 }
@@ -292,8 +292,14 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		return nil, nil
 	}
+
+	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
+	if ok {
+		kletHost.WaitForCacheSync()
+	}
+
 	if c.plugin.csiDriverLister == nil {
-		return nil, errors.New("CSIDriver lister does not exist")
+		return nil, fmt.Errorf("CSIDriverLister not found")
 	}
 
 	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
@@ -435,7 +441,7 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 		}
 		// remove volume data file as well
 		volPath := path.Dir(mountPath)
-		dataFile := path.Join(volPath, volDataFileName)
+		dataFile := filepath.Join(volPath, volDataFileName)
 		klog.V(4).Info(log("also deleting volume info data file [%s]", dataFile))
 		if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {
 			klog.Error(log("failed to delete volume data file [%s]: %v", dataFile, err))

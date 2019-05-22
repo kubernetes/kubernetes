@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -35,7 +36,7 @@ import (
 // Slow by design (7 min)
 var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
 	f := framework.NewDefaultFramework("pod-garbage-collector")
-	It("should handle the creation of 1000 pods", func() {
+	ginkgo.It("should handle the creation of 1000 pods", func() {
 		var count int
 		for count < 1000 {
 			pod, err := createTerminatingPod(f)
@@ -48,11 +49,11 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 
 			count++
 			if count%50 == 0 {
-				framework.Logf("count: %v", count)
+				e2elog.Logf("count: %v", count)
 			}
 		}
 
-		framework.Logf("created: %v", count)
+		e2elog.Logf("created: %v", count)
 
 		// The gc controller polls every 30s and fires off a goroutine per
 		// pod to terminate.
@@ -61,15 +62,15 @@ var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]"
 		timeout := 2 * time.Minute
 		gcThreshold := 100
 
-		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
+		ginkgo.By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
 			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
-				framework.Logf("Failed to list pod %v", err)
+				e2elog.Logf("Failed to list pod %v", err)
 				return false, nil
 			}
 			if len(pods.Items) != gcThreshold {
-				framework.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
+				e2elog.Logf("Number of observed pods %v, waiting for %v", len(pods.Items), gcThreshold)
 				return false, nil
 			}
 			return true, nil

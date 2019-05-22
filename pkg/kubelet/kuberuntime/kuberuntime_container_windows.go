@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
@@ -36,12 +36,8 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config 
 	if err != nil {
 		return err
 	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) {
-		determineEffectiveSecurityContext(config, container, pod)
-	}
-
 	config.Windows = windowsConfig
+
 	return nil
 }
 
@@ -100,43 +96,11 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) &&
+		effectiveSc.WindowsOptions != nil &&
+		effectiveSc.WindowsOptions.GMSACredentialSpec != nil {
+		wc.SecurityContext.CredentialSpec = *effectiveSc.WindowsOptions.GMSACredentialSpec
+	}
 
 	return wc, nil
-}
-
-const (
-	// GMSASpecContainerAnnotationKey is the container annotation where we store the contents of the GMSA credential spec to use.
-	GMSASpecContainerAnnotationKey = "container.alpha.windows.kubernetes.io/gmsa-credential-spec"
-	// gMSAContainerSpecPodAnnotationKeySuffix is the suffix of the pod annotation where the GMSA webhook admission controller
-	// stores the contents of the GMSA credential spec for a given container (the full annotation being the container's name
-	// with this suffix appended).
-	gMSAContainerSpecPodAnnotationKeySuffix = "." + GMSASpecContainerAnnotationKey
-	// gMSAPodSpecPodAnnotationKey is the pod annotation where the GMSA webhook admission controller stores the contents of the GMSA
-	// credential spec to use for containers that do not have their own specific GMSA cred spec set via a
-	// gMSAContainerSpecPodAnnotationKeySuffix annotation as explained above
-	gMSAPodSpecPodAnnotationKey = "pod.alpha.windows.kubernetes.io/gmsa-credential-spec"
-)
-
-// determineEffectiveSecurityContext determines the effective GMSA credential spec and, if any, copies it to the container's
-// GMSASpecContainerAnnotationKey annotation.
-func determineEffectiveSecurityContext(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod) {
-	var containerCredSpec string
-
-	containerGMSAPodAnnotation := container.Name + gMSAContainerSpecPodAnnotationKeySuffix
-	if pod.Annotations[containerGMSAPodAnnotation] != "" {
-		containerCredSpec = pod.Annotations[containerGMSAPodAnnotation]
-	} else if pod.Annotations[gMSAPodSpecPodAnnotationKey] != "" {
-		containerCredSpec = pod.Annotations[gMSAPodSpecPodAnnotationKey]
-	}
-
-	if containerCredSpec != "" {
-		if config.Annotations == nil {
-			config.Annotations = make(map[string]string)
-		}
-		config.Annotations[GMSASpecContainerAnnotationKey] = containerCredSpec
-	} else {
-		// the annotation shouldn't be present, but let's err on the side of caution:
-		// it should only be set here and nowhere else
-		delete(config.Annotations, GMSASpecContainerAnnotationKey)
-	}
 }

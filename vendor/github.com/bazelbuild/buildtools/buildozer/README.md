@@ -92,6 +92,7 @@ Buildozer supports the following commands(`'command args'`):
   * `new <rule_kind> <rule_name> [(before|after) <relative_rule_name>]`: Add a
     new rule at the end of the BUILD file (before/after `<relative_rule>`).
   * `print <attr(s)>`
+  * `remove <attr>`: Removes attribute `attr`.
   * `remove <attr> <value(s)>`: Removes `value(s)` from the list `attr`. The
     wildcard `*` matches all attributes. Lists containing none of the `value(s)` are
     not modified.
@@ -100,6 +101,13 @@ Buildozer supports the following commands(`'command args'`):
   * `replace <attr> <old_value> <new_value>`: Replaces `old_value` with `new_value`
     in the list `attr`. Wildcard `*` matches all attributes. Lists not containing
     `old_value` are not modified.
+  * `substitute <attr> <old_regexp> <new_template>`: Replaces strings which
+    match `old_regexp` in the list `attr` according to `new_template`. Wildcard
+    `*` matches all attributes. The regular expression must follow
+    [RE2 syntax](https://github.com/google/re2/wiki/Syntax). `new_template` may
+    be a simple replacement string, but it may also expand numbered or named
+    groups using `$0` or `$x`. Lists without strings that match `old_regexp`
+    are not modified.
   * `set <attr> <value(s)>`: Sets the value of an attribute. If the attribute
     was already present, its old value is replaced.
   * `set_if_absent <attr> <value(s)>`: Sets the value of an attribute. If the
@@ -137,6 +145,9 @@ buildozer 'set kind java_library' //pkg:%gwt_module
 
 # Replace the dependency on pkg_v1 with a dependency on pkg_v2
 buildozer 'replace deps //pkg_v1 //pkg_v2' //pkg:rule
+
+# Replace all dependencies using regular expressions.
+buildozer 'substitute deps //old/(.*) //new/${1}' //pkg:rule
 
 # Delete the dependency on foo in every cc_library in the package
 buildozer 'remove deps foo' //pkg:%cc_library

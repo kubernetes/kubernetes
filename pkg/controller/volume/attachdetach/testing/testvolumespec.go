@@ -113,9 +113,7 @@ func CreateTestClient() *fake.Clientset {
 			}
 			obj.Items = append(obj.Items, pod)
 		}
-		for _, pod := range extraPods.Items {
-			obj.Items = append(obj.Items, pod)
-		}
+		obj.Items = append(obj.Items, extraPods.Items...)
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
@@ -310,8 +308,12 @@ func (plugin *TestPlugin) NewDetacher() (volume.Detacher, error) {
 	return &detacher, nil
 }
 
-func (plugin *TestPlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *TestPlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *TestPlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func (plugin *TestPlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {

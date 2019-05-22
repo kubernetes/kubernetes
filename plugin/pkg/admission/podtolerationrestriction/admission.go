@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,8 +131,9 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes, o admission.ObjectI
 			},
 		})
 	}
-	pod.Spec.Tolerations = finalTolerations
-
+	// Final merge of tolerations irrespective of pod type, if the user while creating pods gives
+	// conflicting tolerations(with same key+effect), the existing ones should be overwritten by latest one
+	pod.Spec.Tolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{})
 	return p.Validate(a, o)
 }
 func (p *podTolerationsPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
@@ -275,7 +275,7 @@ func extractNSTolerations(ns *corev1.Namespace, key string) ([]api.Toleration, e
 		return []api.Toleration{}, nil
 	}
 
-	var v1Tolerations []v1.Toleration
+	var v1Tolerations []corev1.Toleration
 	err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
 	if err != nil {
 		return nil, err

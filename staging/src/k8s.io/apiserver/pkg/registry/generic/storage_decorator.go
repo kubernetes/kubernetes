@@ -28,9 +28,9 @@ import (
 // and an associated DestroyFunc from given parameters.
 type StorageDecorator func(
 	config *storagebackend.Config,
-	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),
+	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
 	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
@@ -39,9 +39,9 @@ type StorageDecorator func(
 // without any decoration.
 func UndecoratedStorage(
 	config *storagebackend.Config,
-	objectType runtime.Object,
 	resourcePrefix string,
 	keyFunc func(obj runtime.Object) (string, error),
+	newFunc func() runtime.Object,
 	newListFunc func() runtime.Object,
 	getAttrsFunc storage.AttrFunc,
 	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {

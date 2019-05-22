@@ -1,3 +1,6 @@
+### Version 9.0.1  (Wed April 10 2019 Zihong Zheng <zihongz@google.com>)
+ - Update to use debian-base:v1.0.0.
+
 ### Version 9.0  (Wed January 16 2019 Jordan Liggitt <liggitt@google.com>)
  - Prune workload resources via apps/v1 APIs
  - Update kubectl to v1.13.2.

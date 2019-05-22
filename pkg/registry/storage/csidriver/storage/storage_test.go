@@ -19,7 +19,6 @@ package storage
 import (
 	"testing"
 
-	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -27,13 +26,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, storageapi.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, storageapi.SchemeGroupVersion.WithResource("csidrivers").GroupResource())
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,
 		Decorator:               generic.UndecoratedStorage,
@@ -59,11 +57,6 @@ func validNewCSIDriver(name string) *storageapi.CSIDriver {
 }
 
 func TestCreate(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1beta1
-		return
-	}
-
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -87,11 +80,6 @@ func TestCreate(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1beta1
-		return
-	}
-
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -101,6 +89,12 @@ func TestUpdate(t *testing.T) {
 	test.TestUpdate(
 		// valid
 		validNewCSIDriver("foo"),
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*storageapi.CSIDriver)
+			object.Labels = map[string]string{"a": "b"}
+			return object
+		},
 		//invalid update
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*storageapi.CSIDriver)
@@ -111,11 +105,6 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1beta1
-		return
-	}
-
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -124,11 +113,6 @@ func TestDelete(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1beta1
-		return
-	}
-
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -137,11 +121,6 @@ func TestGet(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1beta1
-		return
-	}
-
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
@@ -150,11 +129,6 @@ func TestList(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	if *testapi.Storage.GroupVersion() != storageapiv1beta1.SchemeGroupVersion {
-		// skip the test for all versions exception v1beta1
-		return
-	}
-
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()

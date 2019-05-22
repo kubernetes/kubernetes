@@ -32,8 +32,9 @@
     {{container_env}}
     "livenessProbe": {
       "httpGet": {
+        "scheme": "HTTPS",
         "host": "127.0.0.1",
-        "port": 8080,
+        "port": {{secure_port}},
         "path": "/healthz?exclude=etcd"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
@@ -41,21 +42,20 @@
     },
     "readinessProbe": {
       "httpGet": {
+        "scheme": "HTTPS",
         "host": "127.0.0.1",
-        "port": 8080,
+        "port": {{secure_port}},
         "path": "/healthz"
       },
       "periodSeconds": 1,
       "timeoutSeconds": 15
     },
     "ports":[
+      {{insecure_port_mapping}}
       { "name": "https",
-        "containerPort": {{secure_port}},
-        "hostPort": {{secure_port}}},{
-       "name": "local",
-        "containerPort": 8080,
-        "hostPort": 8080}
-        ],
+      "containerPort": {{secure_port}},
+      "hostPort": {{secure_port}}}
+    ],
     "volumeMounts": [
         {{kms_socket_mount}}
         {{encryption_provider_mount}}

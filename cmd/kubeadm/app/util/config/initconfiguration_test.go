@@ -26,20 +26,11 @@ import (
 
 	"github.com/pmezard/go-difflib/difflib"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-)
-
-const (
-	controlPlaneV1alpha3YAML          = "testdata/conversion/controlplane/v1alpha3.yaml"
-	controlPlaneV1alpha3YAMLNonLinux  = "testdata/conversion/controlplane/v1alpha3_non_linux.yaml"
-	controlPlaneV1beta1YAML           = "testdata/conversion/controlplane/v1beta1.yaml"
-	controlPlaneV1beta1YAMLNonLinux   = "testdata/conversion/controlplane/v1beta1_non_linux.yaml"
-	controlPlaneInternalYAML          = "testdata/conversion/controlplane/internal.yaml"
-	controlPlaneInternalYAMLNonLinux  = "testdata/conversion/controlplane/internal_non_linux.yaml"
-	controlPlaneIncompleteYAML        = "testdata/defaulting/controlplane/incomplete.yaml"
-	controlPlaneDefaultedYAML         = "testdata/defaulting/controlplane/defaulted.yaml"
-	controlPlaneDefaultedYAMLNonLinux = "testdata/defaulting/controlplane/defaulted_non_linux.yaml"
-	controlPlaneInvalidYAML           = "testdata/validation/invalid_controlplanecfg.yaml"
+	"sigs.k8s.io/yaml"
 )
 
 func diff(expected, actual []byte) string {
@@ -87,24 +78,21 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 			}, []byte(constants.YAMLDocumentSeparator)),
 		},
 		{
-			name:         "v1alpha3.partial1",
-			fileContents: cfgFiles["InitConfiguration_v1alpha3"],
-			expectErr:    true,
+			name:         "v1beta2.partial1",
+			fileContents: cfgFiles["InitConfiguration_v1beta2"],
 		},
 		{
-			name:         "v1alpha3.partial2",
-			fileContents: cfgFiles["ClusterConfiguration_v1alpha3"],
-			expectErr:    true,
+			name:         "v1beta2.partial2",
+			fileContents: cfgFiles["ClusterConfiguration_v1beta2"],
 		},
 		{
-			name: "v1alpha3.full",
+			name: "v1beta2.full",
 			fileContents: bytes.Join([][]byte{
-				cfgFiles["InitConfiguration_v1alpha3"],
-				cfgFiles["ClusterConfiguration_v1alpha3"],
+				cfgFiles["InitConfiguration_v1beta2"],
+				cfgFiles["ClusterConfiguration_v1beta2"],
 				cfgFiles["Kube-proxy_componentconfig"],
 				cfgFiles["Kubelet_componentconfig"],
 			}, []byte(constants.YAMLDocumentSeparator)),
-			expectErr: true,
 		},
 	}
 
@@ -138,12 +126,10 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 
 /*
 func TestInitConfigurationMarshallingFromFile(t *testing.T) {
-	controlPlaneV1alpha3YAMLAbstracted := controlPlaneV1alpha3YAML
 	controlPlaneV1beta1YAMLAbstracted := controlPlaneV1beta1YAML
 	controlPlaneInternalYAMLAbstracted := controlPlaneInternalYAML
 	controlPlaneDefaultedYAMLAbstracted := controlPlaneDefaultedYAML
 	if runtime.GOOS != "linux" {
-		controlPlaneV1alpha3YAMLAbstracted = controlPlaneV1alpha3YAMLNonLinux
 		controlPlaneV1beta1YAMLAbstracted = controlPlaneV1beta1YAMLNonLinux
 		controlPlaneInternalYAMLAbstracted = controlPlaneInternalYAMLNonLinux
 		controlPlaneDefaultedYAMLAbstracted = controlPlaneDefaultedYAMLNonLinux
@@ -156,11 +142,6 @@ func TestInitConfigurationMarshallingFromFile(t *testing.T) {
 	}{
 		// These tests are reading one file, loading it using LoadInitConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha3 -> internal
-			name:        "v1alpha3IsDeprecated",
-			in:          controlPlaneV1alpha3YAMLAbstracted,
-			expectedErr: true,
-		},
 		//{ // v1beta1 -> internal NB. test commented after changes required for upgrading to go v1.12
 		//	name:         "v1beta1ToInternal",
 		//	in:           controlPlaneV1beta1YAMLAbstracted,
@@ -302,6 +283,83 @@ apiVersion: foo.k8s.io/v1
 			actual := consistentOrderByteSlice(rt.in)
 			if !reflect.DeepEqual(rt.expected, actual) {
 				t2.Errorf("the expected and actual output differs.\n\texpected: %s\n\tout: %s\n", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestDefaultTaintsMarshaling(t *testing.T) {
+	tests := []struct {
+		desc             string
+		cfg              kubeadmapiv1beta2.InitConfiguration
+		expectedTaintCnt int
+	}{
+		{
+			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+			},
+			expectedTaintCnt: 1,
+		},
+		{
+			desc: "Uninitialized taints field produces a single taint (the master one)",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{},
+			},
+			expectedTaintCnt: 1,
+		},
+		{
+			desc: "Forsing taints to an empty slice produces no taints",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+					Taints: []v1.Taint{},
+				},
+			},
+			expectedTaintCnt: 0,
+		},
+		{
+			desc: "Custom taints are used",
+			cfg: kubeadmapiv1beta2.InitConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "kubeadm.k8s.io/v1beta2",
+					Kind:       constants.InitConfigurationKind,
+				},
+				NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+					Taints: []v1.Taint{
+						{Key: "taint1"},
+						{Key: "taint2"},
+					},
+				},
+			},
+			expectedTaintCnt: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			b, err := yaml.Marshal(tc.cfg)
+			if err != nil {
+				t.Fatalf("unexpected error while marshalling to YAML: %v", err)
+			}
+
+			cfg, err := BytesToInitConfiguration(b)
+			if err != nil {
+				t.Fatalf("unexpected error of BytesToInitConfiguration: %v\nconfig: %s", err, string(b))
+			}
+
+			if tc.expectedTaintCnt != len(cfg.NodeRegistration.Taints) {
+				t.Fatalf("unexpected taints count\nexpected: %d\ngot: %d\ntaints: %v", tc.expectedTaintCnt, len(cfg.NodeRegistration.Taints), cfg.NodeRegistration.Taints)
 			}
 		})
 	}

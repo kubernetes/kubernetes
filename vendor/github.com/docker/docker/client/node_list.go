@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -25,12 +25,12 @@ func (cli *Client) NodeList(ctx context.Context, options types.NodeListOptions) 
 	}
 
 	resp, err := cli.get(ctx, "/nodes", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return nil, err
 	}
 
 	var nodes []swarm.Node
 	err = json.NewDecoder(resp.body).Decode(&nodes)
-	ensureReaderClosed(resp)
 	return nodes, err
 }

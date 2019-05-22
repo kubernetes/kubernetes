@@ -139,7 +139,7 @@ type Properties struct {
 	Repeated bool
 	Packed   bool   // relevant for repeated primitives only
 	Enum     string // set for enum types only
-	proto3   bool   // whether this is known to be a proto3 field; set for []byte only
+	proto3   bool   // whether this is known to be a proto3 field
 	oneof    bool   // whether this is a oneof field
 
 	Default    string // default value
@@ -148,9 +148,9 @@ type Properties struct {
 	stype reflect.Type      // set for struct types only
 	sprop *StructProperties // set for struct types only
 
-	mtype    reflect.Type // set for map types only
-	mkeyprop *Properties  // set for map types only
-	mvalprop *Properties  // set for map types only
+	mtype      reflect.Type // set for map types only
+	MapKeyProp *Properties  // set for map types only
+	MapValProp *Properties  // set for map types only
 }
 
 // String formats the properties in the protobuf struct field tag style.
@@ -275,16 +275,16 @@ func (p *Properties) setFieldProps(typ reflect.Type, f *reflect.StructField, loc
 
 	case reflect.Map:
 		p.mtype = t1
-		p.mkeyprop = &Properties{}
-		p.mkeyprop.init(reflect.PtrTo(p.mtype.Key()), "Key", f.Tag.Get("protobuf_key"), nil, lockGetProp)
-		p.mvalprop = &Properties{}
+		p.MapKeyProp = &Properties{}
+		p.MapKeyProp.init(reflect.PtrTo(p.mtype.Key()), "Key", f.Tag.Get("protobuf_key"), nil, lockGetProp)
+		p.MapValProp = &Properties{}
 		vtype := p.mtype.Elem()
 		if vtype.Kind() != reflect.Ptr && vtype.Kind() != reflect.Slice {
 			// The value type is not a message (*T) or bytes ([]byte),
 			// so we need encoders for the pointer to this type.
 			vtype = reflect.PtrTo(vtype)
 		}
-		p.mvalprop.init(vtype, "Value", f.Tag.Get("protobuf_val"), nil, lockGetProp)
+		p.MapValProp.init(vtype, "Value", f.Tag.Get("protobuf_val"), nil, lockGetProp)
 	}
 
 	if p.stype != nil {

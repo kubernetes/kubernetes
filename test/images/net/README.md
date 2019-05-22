@@ -14,7 +14,7 @@ some "trivial" set of actions on a socket.
   should return the disposition of the test.
 
 Runners can be executed into two different ways, either through the
-the command-line or via an HTTP request:
+command-line or via an HTTP request:
 
 ## Command-line
 

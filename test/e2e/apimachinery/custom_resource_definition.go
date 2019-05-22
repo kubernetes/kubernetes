@@ -23,7 +23,7 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var crdVersion = utilversion.MustParseSemantic("v1.7.0")
@@ -32,15 +32,13 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
-	Context("Simple CustomResourceDefinition", func() {
+	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*
 			Release : v1.9
 			Testname: Custom Resource Definition, create
 			Description: Create a API extension client, define a random custom resource definition, create the custom resource. API server MUST be able to create the custom resource.
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
-
-			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
 
 			config, err := framework.LoadConfig()
 			if err != nil {

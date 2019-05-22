@@ -25,12 +25,13 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
-	nodeV1alpha3YAML   = "testdata/conversion/node/v1alpha3.yaml"
 	nodeV1beta1YAML    = "testdata/conversion/node/v1beta1.yaml"
+	nodeV1beta2YAML    = "testdata/conversion/node/v1beta2.yaml"
 	nodeInternalYAML   = "testdata/conversion/node/internal.yaml"
 	nodeIncompleteYAML = "testdata/defaulting/node/incomplete.yaml"
 	nodeDefaultedYAML  = "testdata/defaulting/node/defaulted.yaml"
@@ -45,11 +46,6 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 	}{
 		// These tests are reading one file, loading it using LoadJoinConfigurationFromFile that all of kubeadm is using for unmarshal of our API types,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1alpha3 -> internal
-			name:        "v1alpha3IsDeprecated",
-			in:          nodeV1alpha3YAML,
-			expectedErr: true,
-		},
 		{ // v1beta1 -> internal
 			name:         "v1beta1ToInternal",
 			in:           nodeV1beta1YAML,
@@ -62,15 +58,27 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			out:          nodeV1beta1YAML,
 			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
 		},
+		{ // v1beta2 -> internal
+			name:         "v1beta2ToInternal",
+			in:           nodeV1beta2YAML,
+			out:          nodeInternalYAML,
+			groupVersion: kubeadm.SchemeGroupVersion,
+		},
+		{ // v1beta2 -> internal -> v1beta2
+			name:         "v1beta2Tov1beta2",
+			in:           nodeV1beta2YAML,
+			out:          nodeV1beta2YAML,
+			groupVersion: kubeadmapiv1beta2.SchemeGroupVersion,
+		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadJoinConfigurationFromFile,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1beta1 -> default -> validate -> internal -> v1beta1
-			name:         "incompleteYAMLToDefaultedv1beta1",
+		{ // v1beta2 -> default -> validate -> internal -> v1beta2
+			name:         "incompleteYAMLToDefaultedv1beta2",
 			in:           nodeIncompleteYAML,
 			out:          nodeDefaultedYAML,
-			groupVersion: kubeadmapiv1beta1.SchemeGroupVersion,
+			groupVersion: kubeadmapiv1beta2.SchemeGroupVersion,
 		},
-		{ // v1beta1 -> validation should fail
+		{ // v1beta2 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          nodeInvalidYAML,
 			expectedErr: true,

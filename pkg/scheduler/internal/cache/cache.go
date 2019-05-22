@@ -122,8 +122,8 @@ func newNodeInfoListItem(ni *schedulernodeinfo.NodeInfo) *nodeInfoListItem {
 }
 
 // NewNodeInfoSnapshot initializes a NodeInfoSnapshot struct and returns it.
-func NewNodeInfoSnapshot() NodeInfoSnapshot {
-	return NodeInfoSnapshot{
+func NewNodeInfoSnapshot() *NodeInfoSnapshot {
+	return &NodeInfoSnapshot{
 		NodeInfoMap: make(map[string]*schedulernodeinfo.NodeInfo),
 	}
 }

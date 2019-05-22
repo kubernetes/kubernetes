@@ -121,7 +121,7 @@ func TestSet(t *testing.T) {
 		return
 	}
 
-	err = s.Check(testCert(t, testCertPEM))
+	err = s.CheckAny([]*x509.Certificate{testCert(t, testCertPEM)})
 	if err == nil {
 		t.Error("expected test cert to not be allowed (yet)")
 		return
@@ -133,13 +133,13 @@ func TestSet(t *testing.T) {
 		return
 	}
 
-	err = s.Check(testCert(t, testCertPEM))
+	err = s.CheckAny([]*x509.Certificate{testCert(t, testCertPEM)})
 	if err != nil {
 		t.Errorf("expected test cert to be allowed, but got back: %v", err)
 		return
 	}
 
-	err = s.Check(testCert(t, testCert2PEM))
+	err = s.CheckAny([]*x509.Certificate{testCert(t, testCert2PEM)})
 	if err == nil {
 		t.Error("expected the second test cert to be disallowed")
 		return

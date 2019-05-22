@@ -15,7 +15,7 @@
 //   import "google.golang.org/api/pubsub/v1"
 //   ...
 //   pubsubService, err := pubsub.New(oauthHttpClient)
-package pubsub
+package pubsub // import "google.golang.org/api/pubsub/v1"
 
 import (
 	"bytes"

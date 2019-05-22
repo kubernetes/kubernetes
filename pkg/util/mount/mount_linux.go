@@ -30,7 +30,6 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	utilexec "k8s.io/utils/exec"
 	utilio "k8s.io/utils/io"
@@ -81,7 +80,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
-	bind, bindOpts, bindRemountOpts := isBind(options)
+	bind, bindOpts, bindRemountOpts := IsBind(options)
 	if bind {
 		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts)
 		if err != nil {
@@ -90,8 +89,13 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts)
 	}
 	// The list of filesystems that require containerized mounter on GCI image cluster
-	fsTypesNeedMounter := sets.NewString("nfs", "glusterfs", "ceph", "cifs")
-	if fsTypesNeedMounter.Has(fstype) {
+	fsTypesNeedMounter := map[string]struct{}{
+		"nfs":       {},
+		"glusterfs": {},
+		"ceph":      {},
+		"cifs":      {},
+	}
+	if _, ok := fsTypesNeedMounter[fstype]; ok {
 		mounterPath = mounter.mounterPath
 	}
 	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options)
@@ -99,7 +103,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 
 // doMount runs the mount command. mounterPath is the path to mounter binary if containerized mounter is used.
 func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, target string, fstype string, options []string) error {
-	mountArgs := makeMountArgs(source, target, fstype, options)
+	mountArgs := MakeMountArgs(source, target, fstype, options)
 	if len(mounterPath) > 0 {
 		mountArgs = append([]string{mountCmd}, mountArgs...)
 		mountCmd = mounterPath
@@ -128,7 +132,7 @@ func (m *Mounter) doMount(mounterPath string, mountCmd string, source string, ta
 		//
 		// systemd-mount is not used because it's too new for older distros
 		// (CentOS 7, Debian Jessie).
-		mountCmd, mountArgs = addSystemdScope("systemd-run", target, mountCmd, mountArgs)
+		mountCmd, mountArgs = AddSystemdScope("systemd-run", target, mountCmd, mountArgs)
 	} else {
 		// No systemd-run on the host (or we failed to check it), assume kubelet
 		// does not run as a systemd service.
@@ -172,8 +176,9 @@ func detectSystemd() bool {
 	return true
 }
 
-// makeMountArgs makes the arguments to the mount(8) command.
-func makeMountArgs(source, target, fstype string, options []string) []string {
+// MakeMountArgs makes the arguments to the mount(8) command.
+// Implementation is shared with NsEnterMounter
+func MakeMountArgs(source, target, fstype string, options []string) []string {
 	// Build mount command as follows:
 	//   mount [-t $fstype] [-o $options] [$source] $target
 	mountArgs := []string{}
@@ -191,8 +196,9 @@ func makeMountArgs(source, target, fstype string, options []string) []string {
 	return mountArgs
 }
 
-// addSystemdScope adds "system-run --scope" to given command line
-func addSystemdScope(systemdRunPath, mountName, command string, args []string) (string, []string) {
+// AddSystemdScope adds "system-run --scope" to given command line
+// implementation is shared with NsEnterMounter
+func AddSystemdScope(systemdRunPath, mountName, command string, args []string) (string, []string) {
 	descriptionArg := fmt.Sprintf("--description=Kubernetes transient mount for %s", mountName)
 	systemdRunArgs := []string{descriptionArg, "--scope", "--", command}
 	return systemdRunPath, append(systemdRunArgs, args...)
@@ -211,7 +217,7 @@ func (mounter *Mounter) Unmount(target string) error {
 
 // List returns a list of all mounted filesystems.
 func (*Mounter) List() ([]MountPoint, error) {
-	return listProcMounts(procMountsPath)
+	return ListProcMounts(procMountsPath)
 }
 
 func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
@@ -219,14 +225,11 @@ func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
 	return ((mp.Path == dir) || (mp.Path == deletedDir))
 }
 
-func (mounter *Mounter) IsNotMountPoint(dir string) (bool, error) {
-	return isNotMountPoint(mounter, dir)
-}
-
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 // It is fast but not necessarily ALWAYS correct. If the path is in fact
 // a bind mount from one part of a mount to another it will not be detected.
-// mkdir /tmp/a /tmp/b; mount --bin /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
+// It also can not distinguish between mountpoints and symbolic links.
+// mkdir /tmp/a /tmp/b; mount --bind /tmp/a /tmp/b; IsLikelyNotMountPoint("/tmp/b")
 // will return true. When in fact /tmp/b is a mount point. If this situation
 // if of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
@@ -252,7 +255,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 // If open returns nil, return false with nil error.
 // Otherwise, return false with error
 func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return exclusiveOpenFailsOnDevice(pathname)
+	return ExclusiveOpenFailsOnDevice(pathname)
 }
 
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
@@ -263,7 +266,8 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 	return isDevice, err
 }
 
-func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
+// ExclusiveOpenFailsOnDevice is shared with NsEnterMounter
+func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	var isDevice bool
 	finfo, err := os.Stat(pathname)
 	if os.IsNotExist(err) {
@@ -301,14 +305,19 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 }
 
 //GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
-	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
+func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
+	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
 }
 
-// getDeviceNameFromMount find the device name from /proc/mounts in which
-// the mount path reference should match the given plugin directory. In case no mount path reference
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
+}
+
+// GetDeviceNameFromMountLinux find the device name from /proc/mounts in which
+// the mount path reference should match the given plugin mount directory. In case no mount path reference
 // matches, returns the volume name taken from its given mountPath
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
+// This implementation is shared with NsEnterMounter
+func GetDeviceNameFromMountLinux(mounter Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
@@ -318,10 +327,9 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 		klog.V(4).Infof("Directory %s is not mounted", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
-	basemountPath := path.Join(pluginDir, MountsInGlobalPDPath)
 	for _, ref := range refs {
-		if strings.HasPrefix(ref, basemountPath) {
-			volumeID, err := filepath.Rel(basemountPath, ref)
+		if strings.HasPrefix(ref, pluginMountDir) {
+			volumeID, err := filepath.Rel(pluginMountDir, ref)
 			if err != nil {
 				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
 				return "", err
@@ -333,7 +341,8 @@ func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (str
 	return path.Base(mountPath), nil
 }
 
-func listProcMounts(mountFilePath string) ([]MountPoint, error) {
+// ListProcMounts is shared with NsEnterMounter
+func ListProcMounts(mountFilePath string) ([]MountPoint, error) {
 	content, err := utilio.ConsistentRead(mountFilePath, maxListTries)
 	if err != nil {
 		return nil, err
@@ -379,7 +388,7 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 }
 
 func (mounter *Mounter) MakeRShared(path string) error {
-	return doMakeRShared(path, procMountInfoPath)
+	return DoMakeRShared(path, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
@@ -500,7 +509,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// GetDiskFormat uses 'blkid' to see if the given disk is unformated
+// GetDiskFormat uses 'blkid' to see if the given disk is unformatted
 func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
@@ -668,11 +677,11 @@ func findMountInfo(path, mountInfoPath string) (mountInfo, error) {
 	return *info, nil
 }
 
-// doMakeRShared is common implementation of MakeRShared on Linux. It checks if
+// DoMakeRShared is common implementation of MakeRShared on Linux. It checks if
 // path is shared and bind-mounts it as rshared if needed. mountCmd and
-// mountArgs are expected to contain mount-like command, doMakeRShared will add
+// mountArgs are expected to contain mount-like command, DoMakeRShared will add
 // '--bind <path> <path>' and '--make-rshared <path>' to mountArgs.
-func doMakeRShared(path string, mountInfoFilename string) error {
+func DoMakeRShared(path string, mountInfoFilename string) error {
 	shared, err := isShared(path, mountInfoFilename)
 	if err != nil {
 		return err
@@ -696,8 +705,8 @@ func doMakeRShared(path string, mountInfoFilename string) error {
 	return nil
 }
 
-// getSELinuxSupport is common implementation of GetSELinuxSupport on Linux.
-func getSELinuxSupport(path string, mountInfoFilename string) (bool, error) {
+// GetSELinux is common implementation of GetSELinuxSupport on Linux.
+func GetSELinux(path string, mountInfoFilename string) (bool, error) {
 	info, err := findMountInfo(path, mountInfoFilename)
 	if err != nil {
 		return false, err
@@ -731,11 +740,11 @@ func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return searchMountPoints(realpath, procMountInfoPath)
+	return SearchMountPoints(realpath, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return getSELinuxSupport(pathname, procMountInfoPath)
+	return GetSELinux(pathname, procMountInfoPath)
 }
 
 func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
@@ -743,15 +752,16 @@ func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return getFSGroup(realpath)
+	return GetFSGroupLinux(realpath)
 }
 
 func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
-	return getMode(pathname)
+	return GetModeLinux(pathname)
 }
 
-// This implementation is shared between Linux and NsEnterMounter
-func getFSGroup(pathname string) (int64, error) {
+// GetFSGroupLinux is shared between Linux and NsEnterMounter
+// pathname must already be evaluated for symlinks
+func GetFSGroupLinux(pathname string) (int64, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {
 		return 0, err
@@ -759,8 +769,8 @@ func getFSGroup(pathname string) (int64, error) {
 	return int64(info.Sys().(*syscall.Stat_t).Gid), nil
 }
 
-// This implementation is shared between Linux and NsEnterMounter
-func getMode(pathname string) (os.FileMode, error) {
+// GetModeLinux is shared between Linux and NsEnterMounter
+func GetModeLinux(pathname string) (os.FileMode, error) {
 	info, err := os.Stat(pathname)
 	if err != nil {
 		return 0, err
@@ -768,14 +778,14 @@ func getMode(pathname string) (os.FileMode, error) {
 	return info.Mode(), nil
 }
 
-// searchMountPoints finds all mount references to the source, returns a list of
+// SearchMountPoints finds all mount references to the source, returns a list of
 // mountpoints.
 // This function assumes source cannot be device.
 // Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
 // it's possible to mount a non-root path of a filesystem, so we need to use
 // root path and major:minor to represent mount source uniquely.
 // This implementation is shared between Linux and NsEnterMounter
-func searchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
+func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	mis, err := parseMountInfo(mountInfoPath)
 	if err != nil {
 		return nil, err

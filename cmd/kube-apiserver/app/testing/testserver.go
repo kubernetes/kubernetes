@@ -179,6 +179,8 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 
 	// from here the caller must call tearDown
 	result.ClientConfig = server.LoopbackClientConfig
+	result.ClientConfig.QPS = 1000
+	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
 	result.TearDownFn = tearDown
 

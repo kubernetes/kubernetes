@@ -20,16 +20,17 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -42,129 +43,158 @@ const (
 
 var _ = utils.SIGDescribe("Volume expand", func() {
 	var (
-		c           clientset.Interface
-		ns          string
-		err         error
-		pvc         *v1.PersistentVolumeClaim
-		resizableSc *storage.StorageClass
+		c               clientset.Interface
+		ns              string
+		err             error
+		pvc             *v1.PersistentVolumeClaim
+		storageClassVar *storage.StorageClass
 	)
 
 	f := framework.NewDefaultFramework("volume-expand")
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("aws", "gce")
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
-		test := testsuites.StorageClassTest{
-			Name:                 "default",
-			ClaimSize:            "2Gi",
-			AllowVolumeExpansion: true,
-		}
-		resizableSc, err = createStorageClass(test, ns, "resizing", c)
-		Expect(err).NotTo(HaveOccurred(), "Error creating resizable storage class")
-		Expect(resizableSc.AllowVolumeExpansion).NotTo(BeNil())
-		Expect(*resizableSc.AllowVolumeExpansion).To(BeTrue())
-
-		pvc = newClaim(test, ns, "default")
-		pvc.Spec.StorageClassName = &resizableSc.Name
-		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
-		Expect(err).NotTo(HaveOccurred(), "Error creating pvc")
 	})
 
-	AfterEach(func() {
-		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace))
-		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(resizableSc.Name, nil))
-	})
-
-	It("should not allow expansion of pvcs without AllowVolumeExpansion property", func() {
+	setupFunc := func(allowExpansion bool, blockVolume bool) (*v1.PersistentVolumeClaim, *storage.StorageClass, error) {
 		test := testsuites.StorageClassTest{
-			Name:      "no-expansion",
+			Name:      "default",
 			ClaimSize: "2Gi",
 		}
-		regularSC, err := createStorageClass(test, ns, "noexpand", c)
-		Expect(err).NotTo(HaveOccurred(), "Error creating non-expandable storage class")
+		if allowExpansion {
+			test.AllowVolumeExpansion = true
+		}
+		if blockVolume {
+			test.VolumeMode = v1.PersistentVolumeBlock
+		}
 
-		defer func() {
-			framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(regularSC.Name, nil))
-		}()
-		Expect(regularSC.AllowVolumeExpansion).To(BeNil())
+		sc, err := createStorageClass(test, ns, "resizing", c)
+		framework.ExpectNoError(err, "Error creating storage class for resizing")
 
-		noExpandPVC := newClaim(test, ns, "noexpand")
-		noExpandPVC.Spec.StorageClassName = &regularSC.Name
-		noExpandPVC, err = c.CoreV1().PersistentVolumeClaims(noExpandPVC.Namespace).Create(noExpandPVC)
-		Expect(err).NotTo(HaveOccurred(), "Error creating pvc")
+		tPVC := newClaim(test, ns, "default")
+		tPVC.Spec.StorageClassName = &sc.Name
+		tPVC, err = c.CoreV1().PersistentVolumeClaims(tPVC.Namespace).Create(tPVC)
+		if err != nil {
+			return nil, sc, err
+		}
+		return tPVC, sc, nil
+	}
 
-		defer func() {
-			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, noExpandPVC.Name, noExpandPVC.Namespace))
-		}()
-
-		pvcClaims := []*v1.PersistentVolumeClaim{noExpandPVC}
-		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
-		Expect(len(pvs)).To(Equal(1))
-
-		By("Expanding non-expandable pvc")
-		newSize := resource.MustParse("6Gi")
-		noExpandPVC, err = expandPVCSize(noExpandPVC, newSize, c)
-		Expect(err).To(HaveOccurred(), "While updating non-expandable PVC")
+	ginkgo.AfterEach(func() {
+		framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace))
+		framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(storageClassVar.Name, nil))
 	})
 
-	It("Verify if editing PVC allows resize", func() {
-		By("Waiting for pvc to be in bound phase")
+	ginkgo.It("should not allow expansion of pvcs without AllowVolumeExpansion property", func() {
+		pvc, storageClassVar, err = setupFunc(false /* allowExpansion */, false /*BlockVolume*/)
+		framework.ExpectNoError(err, "Error creating non-expandable PVC")
+
+		gomega.Expect(storageClassVar.AllowVolumeExpansion).To(gomega.BeNil())
+
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
-		Expect(err).NotTo(HaveOccurred(), "Failed waiting for PVC to be bound %v", err)
-		Expect(len(pvs)).To(Equal(1))
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		gomega.Expect(len(pvs)).To(gomega.Equal(1))
 
-		By("Creating a pod with dynamically provisioned volume")
-		pod, err := framework.CreatePod(c, ns, nil, pvcClaims, false, "")
-		Expect(err).NotTo(HaveOccurred(), "While creating pods for resizing")
-		defer func() {
-			err = framework.DeletePodWithWait(f, c, pod)
-			Expect(err).NotTo(HaveOccurred(), "while cleaning up pod already deleted in resize test")
-		}()
-
-		By("Expanding current pvc")
+		ginkgo.By("Expanding non-expandable pvc")
 		newSize := resource.MustParse("6Gi")
 		pvc, err = expandPVCSize(pvc, newSize, c)
-		Expect(err).NotTo(HaveOccurred(), "While updating pvc for more size")
-		Expect(pvc).NotTo(BeNil())
+		gomega.Expect(err).To(gomega.HaveOccurred(), "While updating non-expandable PVC")
+	})
+
+	ginkgo.It("Verify if editing PVC allows resize", func() {
+		pvc, storageClassVar, err = setupFunc(true /* allowExpansion */, false /*BlockVolume*/)
+		framework.ExpectNoError(err, "Error creating non-expandable PVC")
+
+		ginkgo.By("Waiting for pvc to be in bound phase")
+		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
+		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+
+		ginkgo.By("Creating a pod with dynamically provisioned volume")
+		pod, err := framework.CreatePod(c, ns, nil, pvcClaims, false, "")
+		framework.ExpectNoError(err, "While creating pods for resizing")
+		defer func() {
+			err = framework.DeletePodWithWait(f, c, pod)
+			framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
+		}()
+
+		ginkgo.By("Expanding current pvc")
+		newSize := resource.MustParse("6Gi")
+		pvc, err = expandPVCSize(pvc, newSize, c)
+		framework.ExpectNoError(err, "While updating pvc for more size")
+		gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 		if pvcSize.Cmp(newSize) != 0 {
 			framework.Failf("error updating pvc size %q", pvc.Name)
 		}
 
-		By("Waiting for cloudprovider resize to finish")
+		ginkgo.By("Waiting for cloudprovider resize to finish")
 		err = waitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
-		Expect(err).NotTo(HaveOccurred(), "While waiting for pvc resize to finish")
+		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
-		By("Checking for conditions on pvc")
+		ginkgo.By("Checking for conditions on pvc")
 		pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "While fetching pvc after controller resize")
+		framework.ExpectNoError(err, "While fetching pvc after controller resize")
 
 		inProgressConditions := pvc.Status.Conditions
-		Expect(len(inProgressConditions)).To(Equal(1), "pvc must have file system resize pending condition")
-		Expect(inProgressConditions[0].Type).To(Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
+		gomega.Expect(len(inProgressConditions)).To(gomega.Equal(1), "pvc must have file system resize pending condition")
+		gomega.Expect(inProgressConditions[0].Type).To(gomega.Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
 
-		By("Deleting the previously created pod")
+		ginkgo.By("Deleting the previously created pod")
 		err = framework.DeletePodWithWait(f, c, pod)
-		Expect(err).NotTo(HaveOccurred(), "while deleting pod for resizing")
+		framework.ExpectNoError(err, "while deleting pod for resizing")
 
-		By("Creating a new pod with same volume")
+		ginkgo.By("Creating a new pod with same volume")
 		pod2, err := framework.CreatePod(c, ns, nil, pvcClaims, false, "")
-		Expect(err).NotTo(HaveOccurred(), "while recreating pod for resizing")
+		framework.ExpectNoError(err, "while recreating pod for resizing")
 		defer func() {
 			err = framework.DeletePodWithWait(f, c, pod2)
-			Expect(err).NotTo(HaveOccurred(), "while cleaning up pod before exiting resizing test")
+			framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
 		}()
 
-		By("Waiting for file system resize to finish")
+		ginkgo.By("Waiting for file system resize to finish")
 		pvc, err = waitForFSResize(pvc, c)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for fs resize to finish")
+		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		Expect(len(pvcConditions)).To(Equal(0), "pvc should not have conditions")
+		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+	})
+
+	ginkgo.It("should allow expansion of block volumes", func() {
+		pvc, storageClassVar, err = setupFunc(true /*allowExpansion*/, true /*blockVolume*/)
+
+		ginkgo.By("Waiting for pvc to be in bound phase")
+		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
+		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+
+		ginkgo.By("Expanding current pvc")
+		newSize := resource.MustParse("6Gi")
+		pvc, err = expandPVCSize(pvc, newSize, c)
+		framework.ExpectNoError(err, "While updating pvc for more size")
+		gomega.Expect(pvc).NotTo(gomega.BeNil())
+
+		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+		if pvcSize.Cmp(newSize) != 0 {
+			framework.Failf("error updating pvc size %q", pvc.Name)
+		}
+
+		ginkgo.By("Waiting for cloudprovider resize to finish")
+		err = waitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
+		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
+
+		ginkgo.By("Waiting for file system resize to finish")
+		pvc, err = waitForFSResize(pvc, c)
+		framework.ExpectNoError(err, "while waiting for fs resize to finish")
+
+		pvcConditions := pvc.Status.Conditions
+		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
 	})
 })
 
@@ -192,7 +222,7 @@ func expandPVCSize(origPVC *v1.PersistentVolumeClaim, size resource.Quantity, c 
 		if err == nil {
 			return true, nil
 		}
-		framework.Logf("Error updating pvc %s with %v", pvcName, err)
+		e2elog.Logf("Error updating pvc %s with %v", pvcName, err)
 		return false, nil
 	})
 	return updatedPVC, waitErr

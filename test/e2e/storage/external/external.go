@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -38,6 +39,7 @@ import (
 
 // List of testSuites to be executed for each external driver.
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
 	testsuites.InitSubPathTestSuite,
@@ -101,7 +103,7 @@ func (t testDriverParameter) loadDriverDefinition(filename string) (*driverDefin
 	}
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
-	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), data, driver); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, driver); err != nil {
 		return nil, errors.Wrap(err, filename)
 	}
 	return driver, nil
@@ -233,14 +235,17 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 	}
 
 	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "load storage class from %s", d.StorageClass.FromFile)
+	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 	gomega.Expect(len(items)).To(gomega.Equal(1), "exactly one item from %s", d.StorageClass.FromFile)
 
 	err = f.PatchItems(items...)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "patch items")
+	framework.ExpectNoError(err, "patch items")
 
 	sc, ok := items[0].(*storagev1.StorageClass)
 	gomega.Expect(ok).To(gomega.BeTrue(), "storage class from %s", d.StorageClass.FromFile)
+	// Ensure that we can load more than once as required for
+	// GetDynamicProvisionStorageClass by adding a random suffix.
+	sc.Name = names.SimpleNameGenerator.GenerateName(sc.Name + "-")
 	if fsType != "" {
 		if sc.Parameters == nil {
 			sc.Parameters = map[string]string{}

@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,7 +295,7 @@ func (o *RollingUpdateOptions) Run() error {
 			return fmt.Errorf("%s contains a %v not a ReplicationController", filename, infos[0].Object.GetObjectKind().GroupVersionKind())
 		}
 		switch t := uncastVersionedObj.(type) {
-		case *v1.ReplicationController:
+		case *corev1.ReplicationController:
 			replicasDefaulted = t.Spec.Replicas == nil
 			newRc = t
 		}
@@ -310,7 +309,7 @@ func (o *RollingUpdateOptions) Run() error {
 	// than the old rc. This selector is the hash of the rc, with a suffix to provide uniqueness for
 	// same-image updates.
 	if len(o.Image) != 0 {
-		codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+		codec := scheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
 		newName := o.FindNewName(oldRc)
 		if newRc, err = kubectl.LoadExistingNextReplicationController(coreClient, o.Namespace, newName); err != nil {
 			return err

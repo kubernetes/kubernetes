@@ -25,14 +25,17 @@ import (
 
 var _ Validator = &OSValidator{}
 
+// OSValidator validates OS.
 type OSValidator struct {
 	Reporter Reporter
 }
 
+// Name is part of the system.Validator interface.
 func (o *OSValidator) Name() string {
 	return "os"
 }
 
+// Validate is part of the system.Validator interface.
 func (o *OSValidator) Validate(spec SysSpec) (error, error) {
 	os, err := exec.Command("uname").CombinedOutput()
 	if err != nil {

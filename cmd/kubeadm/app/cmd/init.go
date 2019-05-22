@@ -19,10 +19,8 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/template"
 
 	"github.com/lithammer/dedent"
@@ -33,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
@@ -63,11 +61,25 @@ var (
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
 		  https://kubernetes.io/docs/concepts/cluster-administration/addons/
 
-		You can now join any number of machines by running the following on each node
-		as root:
-
-		  {{.joinCommand}}
-
+		{{if .ControlPlaneEndpoint -}}
+		{{if .UploadCerts -}}
+		You can now join any number of the control-plane node running the following command on each as root:
+					  
+		  {{.joinControlPlaneCommand}}
+					
+		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
+		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use 
+		"kubeadm init phase upload-certs --experimental-upload-certs" to reload certs afterward.
+		  
+		{{else -}}
+		You can now join any number of control-plane nodes by copying certificate authorities 
+		and service account keys on each node and then running the following as root:
+				  
+		  {{.joinControlPlaneCommand}}	  
+		  
+		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
+						  
+		{{.joinWorkerCommand}}
 		`)))
 )
 
@@ -83,9 +95,8 @@ type initOptions struct {
 	featureGatesString      string
 	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
-	externalcfg             *kubeadmapiv1beta1.InitConfiguration
+	externalcfg             *kubeadmapiv1beta2.InitConfiguration
 	uploadCerts             bool
-	certificateKey          string
 	skipCertificateKeyPrint bool
 }
 
@@ -105,10 +116,8 @@ type initData struct {
 	dryRunDir               string
 	externalCA              bool
 	client                  clientset.Interface
-	waiter                  apiclient.Waiter
 	outputWriter            io.Writer
 	uploadCerts             bool
-	certificateKey          string
 	skipCertificateKeyPrint bool
 }
 
@@ -123,7 +132,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Run this command in order to set up the Kubernetes control plane.",
+		Short: "Run this command in order to set up the Kubernetes control plane",
 		Run: func(cmd *cobra.Command, args []string) {
 			c, err := initRunner.InitData(args)
 			kubeadmutil.CheckErr(err)
@@ -184,7 +193,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfiguration, featureGatesString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
@@ -205,10 +214,9 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		&cfg.Networking.DNSDomain, options.NetworkingDNSDomain, cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal".`,
 	)
-	flagSet.StringVar(
-		&cfg.KubernetesVersion, options.KubernetesVersion, cfg.KubernetesVersion,
-		`Choose a specific Kubernetes version for the control plane.`,
-	)
+
+	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
+
 	flagSet.StringVar(
 		&cfg.CertificatesDir, options.CertificatesDir, cfg.CertificatesDir,
 		`The path where to save and store the certificates.`,
@@ -221,9 +229,12 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta1.InitConfig
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
 	)
+	flagSet.StringVar(
+		&cfg.CertificateKey, options.CertificateKey, "",
+		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
+	)
 	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
-	flagSet.StringVar(featureGatesString, options.FeatureGatesString, *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
-		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
@@ -246,10 +257,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		&initOptions.uploadCerts, options.UploadCerts, initOptions.uploadCerts,
 		"Upload control-plane certificates to the kubeadm-certs Secret.",
 	)
-	flagSet.StringVar(
-		&initOptions.certificateKey, options.CertificateKey, "",
-		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
-	)
 	flagSet.BoolVar(
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",
@@ -259,7 +266,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalcfg := &kubeadmapiv1beta1.InitConfiguration{}
+	externalcfg := &kubeadmapiv1beta2.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 
 	// Create the options object for the bootstrap token-related flags, and override the default value for .Description
@@ -327,14 +334,22 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if options.dryRun {
-		if dryRunDir, err = ioutil.TempDir("", "kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-init-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}
 
-	// Checks if an external CA is provided by the user.
-	externalCA, _ := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
+	// Checks if an external CA is provided by the user (when the CA Cert is present but the CA Key is not)
+	externalCA, err := certsphase.UsingExternalCA(&cfg.ClusterConfiguration)
 	if externalCA {
+		// In case the certificates signed by CA (that should be provided by the user) are missing or invalid,
+		// returns, because kubeadm can't regenerate them without the CA Key
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid or incomplete external CA")
+		}
+
+		// Validate that also the required kubeconfig files exists and are invalid, because
+		// kubeadm can't regenerate them without the CA Key
 		kubeconfigDir := options.kubeconfigDir
 		if options.dryRun {
 			kubeconfigDir = dryRunDir
@@ -342,9 +357,20 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		if err := kubeconfigphase.ValidateKubeconfigsForExternalCA(kubeconfigDir, cfg); err != nil {
 			return nil, err
 		}
-		if options.uploadCerts {
-			return nil, errors.New("can't use externalCA mode and upload-certs")
+	}
+
+	// Checks if an external Front-Proxy CA is provided by the user (when the Front-Proxy CA Cert is present but the Front-Proxy CA Key is not)
+	externalFrontProxyCA, err := certsphase.UsingExternalFrontProxyCA(&cfg.ClusterConfiguration)
+	if externalFrontProxyCA {
+		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
+		// returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid or incomplete external front-proxy CA")
 		}
+	}
+
+	if options.uploadCerts && (externalCA || externalFrontProxyCA) {
+		return nil, errors.New("can't use upload-certs with an external CA or an external front-proxy CA")
 	}
 
 	return &initData{
@@ -359,7 +385,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		externalCA:              externalCA,
 		outputWriter:            out,
 		uploadCerts:             options.uploadCerts,
-		certificateKey:          options.certificateKey,
 		skipCertificateKeyPrint: options.skipCertificateKeyPrint,
 	}, nil
 }
@@ -371,12 +396,12 @@ func (d *initData) UploadCerts() bool {
 
 // CertificateKey returns the key used to encrypt the certs.
 func (d *initData) CertificateKey() string {
-	return d.certificateKey
+	return d.cfg.CertificateKey
 }
 
 // SetCertificateKey set the key used to encrypt the certs.
 func (d *initData) SetCertificateKey(key string) {
-	d.certificateKey = key
+	d.cfg.CertificateKey = key
 }
 
 // SkipCertificateKeyPrint returns the skipCertificateKeyPrint flag.
@@ -490,14 +515,22 @@ func (d *initData) Tokens() []string {
 }
 
 func printJoinCommand(out io.Writer, adminKubeConfigPath, token string, i *initData) error {
-	joinCommand, err := cmdutil.GetJoinCommand(adminKubeConfigPath, token, i.certificateKey, i.skipTokenPrint, i.uploadCerts, i.skipCertificateKeyPrint)
+	joinControlPlaneCommand, err := cmdutil.GetJoinControlPlaneCommand(adminKubeConfigPath, token, i.CertificateKey(), i.skipTokenPrint, i.skipCertificateKeyPrint)
 	if err != nil {
 		return err
 	}
 
-	ctx := map[string]string{
-		"KubeConfigPath": adminKubeConfigPath,
-		"joinCommand":    joinCommand,
+	joinWorkerCommand, err := cmdutil.GetJoinWorkerCommand(adminKubeConfigPath, token, i.skipTokenPrint)
+	if err != nil {
+		return err
+	}
+
+	ctx := map[string]interface{}{
+		"KubeConfigPath":          adminKubeConfigPath,
+		"ControlPlaneEndpoint":    i.Cfg().ControlPlaneEndpoint,
+		"UploadCerts":             i.uploadCerts,
+		"joinControlPlaneCommand": joinControlPlaneCommand,
+		"joinWorkerCommand":       joinWorkerCommand,
 	}
 
 	return initDoneTempl.Execute(out, ctx)

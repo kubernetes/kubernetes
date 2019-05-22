@@ -49,8 +49,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/remotecommand"
 	utiltesting "k8s.io/client-go/util/testing"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 
 	// Do some initialization to decode the query parameters correctly.
@@ -1665,4 +1665,25 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+}
+
+func TestTrimURLPath(t *testing.T) {
+	tests := []struct {
+		path, expected string
+	}{
+		{"", ""},
+		{"//", ""},
+		{"/pods", "pods"},
+		{"pods", "pods"},
+		{"pods/", "pods"},
+		{"good/", "good"},
+		{"pods/probes", "pods"},
+		{"metrics", "metrics"},
+		{"metrics/resource", "metrics/resource"},
+		{"metrics/hello", "metrics/hello"},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, test.expected, trimURLPath(test.path), fmt.Sprintf("path is: %s", test.path))
+	}
 }

@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/component-base/featuregate"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -88,7 +89,7 @@ type serviceAccount struct {
 
 	generateName func(string) string
 
-	featureGate utilfeature.FeatureGate
+	featureGate featuregate.FeatureGate
 }
 
 var _ admission.MutationInterface = &serviceAccount{}
@@ -118,31 +119,31 @@ func NewServiceAccount() *serviceAccount {
 	}
 }
 
-func (a *serviceAccount) SetExternalKubeClientSet(cl kubernetes.Interface) {
-	a.client = cl
+func (s *serviceAccount) SetExternalKubeClientSet(cl kubernetes.Interface) {
+	s.client = cl
 }
 
-func (a *serviceAccount) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (s *serviceAccount) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	serviceAccountInformer := f.Core().V1().ServiceAccounts()
-	a.serviceAccountLister = serviceAccountInformer.Lister()
+	s.serviceAccountLister = serviceAccountInformer.Lister()
 
 	secretInformer := f.Core().V1().Secrets()
-	a.secretLister = secretInformer.Lister()
+	s.secretLister = secretInformer.Lister()
 
-	a.SetReadyFunc(func() bool {
+	s.SetReadyFunc(func() bool {
 		return serviceAccountInformer.Informer().HasSynced() && secretInformer.Informer().HasSynced()
 	})
 }
 
 // ValidateInitialization ensures an authorizer is set.
-func (a *serviceAccount) ValidateInitialization() error {
-	if a.client == nil {
+func (s *serviceAccount) ValidateInitialization() error {
+	if s.client == nil {
 		return fmt.Errorf("missing client")
 	}
-	if a.secretLister == nil {
+	if s.secretLister == nil {
 		return fmt.Errorf("missing secretLister")
 	}
-	if a.serviceAccountLister == nil {
+	if s.serviceAccountLister == nil {
 		return fmt.Errorf("missing serviceAccountLister")
 	}
 	return nil

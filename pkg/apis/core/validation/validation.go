@@ -63,7 +63,7 @@ const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
-var fileModeErrorMsg string = "must be a number between 0 and 0777 (octal), both inclusive"
+var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = apimachineryvalidation.BannedOwners
@@ -1305,8 +1305,8 @@ func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) f
 	var supportedCachingModes = sets.NewString(string(core.AzureDataDiskCachingNone), string(core.AzureDataDiskCachingReadOnly), string(core.AzureDataDiskCachingReadWrite))
 	var supportedDiskKinds = sets.NewString(string(core.AzureSharedBlobDisk), string(core.AzureDedicatedBlobDisk), string(core.AzureManagedDisk))
 
-	diskUriSupportedManaged := []string{"/subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}"}
-	diskUriSupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
+	diskURISupportedManaged := []string{"/subscriptions/{sub-id}/resourcegroups/{group-name}/providers/microsoft.compute/disks/{disk-id}"}
+	diskURISupportedblob := []string{"https://{account-name}.blob.core.windows.net/{container-name}/{disk-name}.vhd"}
 
 	allErrs := field.ErrorList{}
 	if azure.DiskName == "" {
@@ -1327,11 +1327,11 @@ func validateAzureDisk(azure *core.AzureDiskVolumeSource, fldPath *field.Path) f
 
 	// validate that DiskUri is the correct format
 	if azure.Kind != nil && *azure.Kind == core.AzureManagedDisk && strings.Index(azure.DataDiskURI, "/subscriptions/") != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskUriSupportedManaged))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskURISupportedManaged))
 	}
 
 	if azure.Kind != nil && *azure.Kind != core.AzureManagedDisk && strings.Index(azure.DataDiskURI, "https://") != 0 {
-		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskUriSupportedblob))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("diskURI"), azure.DataDiskURI, diskURISupportedblob))
 	}
 
 	return allErrs
@@ -1476,6 +1476,19 @@ func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("controllerPublishSecretRef", "namespace"), ""))
 		} else {
 			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerPublishSecretRef.Namespace, fldPath.Child("namespace"))...)
+		}
+	}
+
+	if csi.ControllerExpandSecretRef != nil {
+		if len(csi.ControllerExpandSecretRef.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "name"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Name, fldPath.Child("name"))...)
+		}
+		if len(csi.ControllerExpandSecretRef.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("controllerExpandSecretRef", "namespace"), ""))
+		} else {
+			allErrs = append(allErrs, ValidateDNS1123Label(csi.ControllerExpandSecretRef.Namespace, fldPath.Child("namespace"))...)
 		}
 	}
 
@@ -1770,15 +1783,19 @@ func ValidatePersistentVolume(pv *core.PersistentVolume) field.ErrorList {
 // ValidatePersistentVolumeUpdate tests to see if the update is legal for an end user to make.
 // newPv is updated with fields that cannot be changed.
 func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.ErrorList {
-	allErrs := field.ErrorList{}
-	allErrs = ValidatePersistentVolume(newPv)
+	allErrs := ValidatePersistentVolume(newPv)
+
+	// if oldPV does not have ControllerExpandSecretRef then allow it to be set
+	if (oldPv.Spec.CSI != nil && oldPv.Spec.CSI.ControllerExpandSecretRef == nil) &&
+		(newPv.Spec.CSI != nil && newPv.Spec.CSI.ControllerExpandSecretRef != nil) {
+		newPv = newPv.DeepCopy()
+		newPv.Spec.CSI.ControllerExpandSecretRef = nil
+	}
 
 	// PersistentVolumeSource should be immutable after creation.
 	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
 	}
-	newPv.Status = oldPv.Status
-
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
@@ -2293,46 +2310,44 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 	devicepath := sets.NewString()
 	devicename := sets.NewString()
 
-	if devices != nil {
-		for i, dev := range devices {
-			idxPath := fldPath.Index(i)
-			devName := dev.Name
-			devPath := dev.DevicePath
-			didMatch, isPVC := isMatchedDevice(devName, volumes)
-			if len(devName) == 0 {
-				allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
-			}
-			if devicename.Has(devName) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must be unique"))
-			}
-			// Must be PersistentVolumeClaim volume source
-			if didMatch && !isPVC {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "can only use volume source type of PersistentVolumeClaim for block mode"))
-			}
-			if !didMatch {
-				allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), devName))
-			}
-			if len(devPath) == 0 {
-				allErrs = append(allErrs, field.Required(idxPath.Child("devicePath"), ""))
-			}
-			if devicepath.Has(devPath) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must be unique"))
-			}
-			if len(devPath) > 0 && len(validatePathNoBacksteps(devPath, fldPath.Child("devicePath"))) > 0 {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "can not contain backsteps ('..')"))
-			} else {
-				devicepath.Insert(devPath)
-			}
-			// check for overlap with VolumeMount
-			if deviceNameAlreadyExists(devName, volmounts) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must not already exist in volumeMounts"))
-			}
-			if devicePathAlreadyExists(devPath, volmounts) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must not already exist as a path in volumeMounts"))
-			}
-			if len(devName) > 0 {
-				devicename.Insert(devName)
-			}
+	for i, dev := range devices {
+		idxPath := fldPath.Index(i)
+		devName := dev.Name
+		devPath := dev.DevicePath
+		didMatch, isPVC := isMatchedDevice(devName, volumes)
+		if len(devName) == 0 {
+			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
+		}
+		if devicename.Has(devName) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must be unique"))
+		}
+		// Must be PersistentVolumeClaim volume source
+		if didMatch && !isPVC {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "can only use volume source type of PersistentVolumeClaim for block mode"))
+		}
+		if !didMatch {
+			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), devName))
+		}
+		if len(devPath) == 0 {
+			allErrs = append(allErrs, field.Required(idxPath.Child("devicePath"), ""))
+		}
+		if devicepath.Has(devPath) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must be unique"))
+		}
+		if len(devPath) > 0 && len(validatePathNoBacksteps(devPath, fldPath.Child("devicePath"))) > 0 {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "can not contain backsteps ('..')"))
+		} else {
+			devicepath.Insert(devPath)
+		}
+		// check for overlap with VolumeMount
+		if deviceNameAlreadyExists(devName, volmounts) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must not already exist in volumeMounts"))
+		}
+		if devicePathAlreadyExists(devPath, volmounts) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("devicePath"), devPath, "must not already exist as a path in volumeMounts"))
+		}
+		if len(devName) > 0 {
+			devicename.Insert(devName)
 		}
 	}
 	return allErrs
@@ -2704,6 +2719,10 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("searches"), dnsConfig.Searches, "must not have more than 256 characters (including spaces) in the search list"))
 		}
 		for i, search := range dnsConfig.Searches {
+			// it is fine to have a trailing dot
+			if strings.HasSuffix(search, ".") {
+				search = search[0 : len(search)-1]
+			}
 			allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
 		}
 		// Validate options.
@@ -3182,7 +3201,7 @@ func validatePreferAvoidPodsEntry(avoidPodEntry core.PreferAvoidPodsEntry, fldPa
 	if avoidPodEntry.PodSignature.PodController == nil {
 		allErrors = append(allErrors, field.Required(fldPath.Child("PodSignature"), ""))
 	} else {
-		if *(avoidPodEntry.PodSignature.PodController.Controller) != true {
+		if !*(avoidPodEntry.PodSignature.PodController.Controller) {
 			allErrors = append(allErrors,
 				field.Invalid(fldPath.Child("PodSignature").Child("PodController").Child("Controller"),
 					*(avoidPodEntry.PodSignature.PodController.Controller), "must point to a controller"))
@@ -3427,6 +3446,8 @@ func ValidatePodSecurityContext(securityContext *core.PodSecurityContext, spec *
 		if len(securityContext.Sysctls) != 0 {
 			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctls"))...)
 		}
+
+		allErrs = append(allErrs, validateWindowsSecurityContextOptions(securityContext.WindowsOptions, fldPath.Child("windowsOptions"))...)
 	}
 
 	return allErrs
@@ -4705,8 +4726,8 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
 	reqPath := fldPath.Child("requests")
-	limContainsCpuOrMemory := false
-	reqContainsCpuOrMemory := false
+	limContainsCPUOrMemory := false
+	reqContainsCPUOrMemory := false
 	limContainsHugePages := false
 	reqContainsHugePages := false
 	supportedQoSComputeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
@@ -4724,7 +4745,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 		}
 
 		if supportedQoSComputeResources.Has(string(resourceName)) {
-			limContainsCpuOrMemory = true
+			limContainsCPUOrMemory = true
 		}
 	}
 	for resourceName, quantity := range requirements.Requests {
@@ -4750,11 +4771,11 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 			reqContainsHugePages = true
 		}
 		if supportedQoSComputeResources.Has(string(resourceName)) {
-			reqContainsCpuOrMemory = true
+			reqContainsCPUOrMemory = true
 		}
 
 	}
-	if !limContainsCpuOrMemory && !reqContainsCpuOrMemory && (reqContainsHugePages || limContainsHugePages) {
+	if !limContainsCPUOrMemory && !reqContainsCPUOrMemory && (reqContainsHugePages || limContainsHugePages) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("HugePages require cpu or memory")))
 	}
 
@@ -5137,7 +5158,7 @@ func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *core.Endpoints) field.E
 	return allErrs
 }
 
-// ValidateSecurityContext ensure the security context contains valid settings
+// ValidateSecurityContext ensures the security context contains valid settings
 func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	//this should only be true for testing since SecurityContext is defaulted by the core
@@ -5180,6 +5201,42 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
 				}
 			}
+		}
+	}
+
+	allErrs = append(allErrs, validateWindowsSecurityContextOptions(sc.WindowsOptions, fldPath.Child("windowsOptions"))...)
+
+	return allErrs
+}
+
+// maxGMSACredentialSpecLength is the max length, in bytes, for the actual contents
+// of a GMSA cred spec. In general, those shouldn't be more than a few hundred bytes,
+// so we want to give plenty of room here while still providing an upper bound.
+const (
+	maxGMSACredentialSpecLengthInKiB = 64
+	maxGMSACredentialSpecLength      = maxGMSACredentialSpecLengthInKiB * 1024
+)
+
+func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityContextOptions, fieldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if windowsOptions == nil {
+		return allErrs
+	}
+
+	if windowsOptions.GMSACredentialSpecName != nil {
+		// gmsaCredentialSpecName must be the name of a custom resource
+		for _, msg := range validation.IsDNS1123Subdomain(*windowsOptions.GMSACredentialSpecName) {
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("gmsaCredentialSpecName"), windowsOptions.GMSACredentialSpecName, msg))
+		}
+	}
+
+	if windowsOptions.GMSACredentialSpec != nil {
+		if l := len(*windowsOptions.GMSACredentialSpec); l == 0 {
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("gmsaCredentialSpec"), windowsOptions.GMSACredentialSpec, "gmsaCredentialSpec cannot be an empty string"))
+		} else if l > maxGMSACredentialSpecLength {
+			errMsg := fmt.Sprintf("gmsaCredentialSpec size must be under %d KiB", maxGMSACredentialSpecLengthInKiB)
+			allErrs = append(allErrs, field.Invalid(fieldPath.Child("gmsaCredentialSpec"), windowsOptions.GMSACredentialSpec, errMsg))
 		}
 	}
 

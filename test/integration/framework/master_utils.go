@@ -27,16 +27,6 @@ import (
 
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
-	apps "k8s.io/api/apps/v1beta1"
-	auditreg "k8s.io/api/auditregistration/v1alpha1"
-	autoscaling "k8s.io/api/autoscaling/v1"
-	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
-	nodev1alpha1 "k8s.io/api/node/v1alpha1"
-	rbac "k8s.io/api/rbac/v1alpha1"
-	storage "k8s.io/api/storage/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	authauthenticator "k8s.io/apiserver/pkg/authentication/authenticator"
@@ -57,9 +47,8 @@ import (
 	"k8s.io/klog"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/batch"
-	policy "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/version"
@@ -242,7 +231,13 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 // NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
-	masterConfig := NewMasterConfig()
+	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
+}
+
+// NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
+// configured with the provided options.
+func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+	masterConfig := NewMasterConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 
@@ -252,70 +247,43 @@ func NewIntegrationTestMasterConfig() *master.Config {
 	return masterConfig
 }
 
-// NewMasterConfig returns a basic master config.
-func NewMasterConfig() *master.Config {
+// MasterConfigOptions are the configurable options for a new integration test master config.
+type MasterConfigOptions struct {
+	EtcdOptions *options.EtcdOptions
+}
+
+// DefaultEtcdOptions are the default EtcdOptions for use with integration tests.
+func DefaultEtcdOptions() *options.EtcdOptions {
 	// This causes the integration tests to exercise the etcd
 	// prefix code, so please don't change without ensuring
 	// sufficient coverage in other ways.
 	etcdOptions := options.NewEtcdOptions(storagebackend.NewDefaultConfig(uuid.New(), nil))
 	etcdOptions.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
+	return etcdOptions
+}
 
-	info, _ := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	ns := NewSingleContentTypeSerializer(legacyscheme.Scheme, info)
+// NewMasterConfig returns a basic master config.
+func NewMasterConfig() *master.Config {
+	return NewMasterConfigWithOptions(&MasterConfigOptions{})
+}
 
-	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(legacyscheme.Scheme)
-	// FIXME (soltysh): this GroupVersionResource override should be configurable
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: batch.GroupName, Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
-	// we also need to set both for the storage group and for volumeattachments, separately
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "volumeattachments"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csinodes"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
-	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: storage.GroupName, Resource: "csidrivers"}, schema.GroupVersion{Group: storage.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: storage.GroupName, Version: runtime.APIVersionInternal})
+// NewMasterConfigWithOptions returns a basic master config configured with the provided options.
+func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
+	etcdOptions := DefaultEtcdOptions()
+	if opts.EtcdOptions != nil {
+		etcdOptions = opts.EtcdOptions
+	}
 
-	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: v1.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: autoscaling.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: batch.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: apps.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: extensions.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: policy.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: rbac.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: certificates.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: storage.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: auditreg.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
-	storageFactory.SetSerializer(
-		schema.GroupResource{Group: nodev1alpha1.GroupName, Resource: serverstorage.AllResources},
-		"",
-		ns)
+	storageConfig := kubeapiserver.NewStorageFactoryConfig()
+	storageConfig.ApiResourceConfig = serverstorage.NewResourceConfig()
+	completedStorageConfig, err := storageConfig.Complete(etcdOptions)
+	if err != nil {
+		panic(err)
+	}
+	storageFactory, err := completedStorageConfig.New()
+	if err != nil {
+		panic(err)
+	}
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
@@ -325,7 +293,7 @@ func NewMasterConfig() *master.Config {
 	// TODO: get rid of these tests or port them to secure serving
 	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}
 
-	err := etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
+	err = etcdOptions.ApplyWithStorageFactoryTo(storageFactory, genericConfig)
 	if err != nil {
 		panic(err)
 	}

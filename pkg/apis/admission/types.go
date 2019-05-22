@@ -63,7 +63,8 @@ type AdmissionRequest struct {
 	// Namespace is the namespace associated with the request (if any).
 	// +optional
 	Namespace string
-	// Operation is the operation being performed
+	// Operation is the operation being performed. This may be different than the operation
+	// requested. e.g. a patch can result in either a CREATE or UPDATE Operation.
 	Operation Operation
 	// UserInfo is information about the requesting user
 	UserInfo authentication.UserInfo
@@ -78,6 +79,13 @@ type AdmissionRequest struct {
 	// Defaults to false.
 	// +optional
 	DryRun *bool
+	// Options is the operation option structure of the operation being performed.
+	// e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be
+	// different than the options the caller provided. e.g. for a patch request the performed
+	// Operation might be a CREATE, in which case the Options will a
+	// `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.
+	// +optional
+	Options runtime.Object
 }
 
 // AdmissionResponse describes an admission response.

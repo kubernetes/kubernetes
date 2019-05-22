@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubemark"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 )
 
 var (
@@ -34,28 +34,32 @@ var (
 )
 
 func init() {
-	framework.RegisterProvider("kubemark", NewProvider)
+	framework.RegisterProvider("kubemark", newProvider)
 }
 
-func NewProvider() (framework.ProviderInterface, error) {
+func newProvider() (framework.ProviderInterface, error) {
 	// Actual initialization happens when the e2e framework gets constructed.
 	return &Provider{}, nil
 }
 
+// Provider is a structure to handle Kubemark cluster for e2e testing
 type Provider struct {
 	framework.NullProvider
 	controller   *kubemark.KubemarkController
 	closeChannel chan struct{}
 }
 
+// ResizeGroup resizes an instance group
 func (p *Provider) ResizeGroup(group string, size int32) error {
 	return p.controller.SetNodeGroupSize(group, int(size))
 }
 
+// GetGroupNodes returns a node name for the specified node group
 func (p *Provider) GetGroupNodes(group string) ([]string, error) {
 	return p.controller.GetNodeNamesForNodeGroup(group)
 }
 
+// FrameworkBeforeEach prepares clients, configurations etc. for e2e testing
 func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 	if *kubemarkExternalKubeConfig != "" && p.controller == nil {
 		externalConfig, err := clientcmd.BuildConfigFromFlags("", *kubemarkExternalKubeConfig)
@@ -73,11 +77,12 @@ func (p *Provider) FrameworkBeforeEach(f *framework.Framework) {
 		p.controller, err = kubemark.NewKubemarkController(externalClient, externalInformerFactory, f.ClientSet, kubemarkNodeInformer)
 		framework.ExpectNoError(err)
 		externalInformerFactory.Start(p.closeChannel)
-		Expect(p.controller.WaitForCacheSync(p.closeChannel)).To(BeTrue())
+		gomega.Expect(p.controller.WaitForCacheSync(p.closeChannel)).To(gomega.BeTrue())
 		go p.controller.Run(p.closeChannel)
 	}
 }
 
+// FrameworkAfterEach cleans up after e2e testing
 func (p *Provider) FrameworkAfterEach(f *framework.Framework) {
 	if p.closeChannel != nil {
 		close(p.closeChannel)
@@ -86,6 +91,7 @@ func (p *Provider) FrameworkAfterEach(f *framework.Framework) {
 	}
 }
 
+// GroupSize returns the size of an instance group
 func (p *Provider) GroupSize(group string) (int, error) {
 	return p.controller.GetNodeGroupSize(group)
 }

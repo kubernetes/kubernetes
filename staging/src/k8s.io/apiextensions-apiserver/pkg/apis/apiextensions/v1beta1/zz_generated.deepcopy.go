@@ -283,6 +283,11 @@ func (in *CustomResourceDefinitionSpec) DeepCopyInto(out *CustomResourceDefiniti
 		*out = new(CustomResourceConversion)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PreserveUnknownFields != nil {
+		in, out := &in.PreserveUnknownFields, &out.PreserveUnknownFields
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -605,6 +610,11 @@ func (in *ServiceReference) DeepCopyInto(out *ServiceReference) {
 	if in.Path != nil {
 		in, out := &in.Path, &out.Path
 		*out = new(string)
+		**out = **in
+	}
+	if in.Port != nil {
+		in, out := &in.Port, &out.Port
+		*out = new(int32)
 		**out = **in
 	}
 	return

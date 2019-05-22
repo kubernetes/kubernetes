@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 )
@@ -28,7 +30,7 @@ import (
 var (
 	kind     = schema.GroupVersionKind{Group: "kgroup", Version: "kversion", Kind: "kind"}
 	resource = schema.GroupVersionResource{Group: "rgroup", Version: "rversion", Resource: "resource"}
-	attr     = admission.NewAttributesRecord(nil, nil, kind, "ns", "name", resource, "subresource", admission.Create, false, nil)
+	attr     = admission.NewAttributesRecord(nil, nil, kind, "ns", "name", resource, "subresource", admission.Create, &metav1.CreateOptions{}, false, nil)
 )
 
 func TestObserveAdmissionStep(t *testing.T) {
@@ -85,6 +87,7 @@ func TestWithMetrics(t *testing.T) {
 		name            string
 		ns              string
 		operation       admission.Operation
+		options         runtime.Object
 		handler         admission.Interface
 		admit, validate bool
 	}
@@ -93,6 +96,7 @@ func TestWithMetrics(t *testing.T) {
 			"both-interfaces-admit-and-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true, true},
 			true, true,
 		},
@@ -100,6 +104,7 @@ func TestWithMetrics(t *testing.T) {
 			"both-interfaces-dont-admit",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false, true},
 			false, true,
 		},
@@ -107,6 +112,7 @@ func TestWithMetrics(t *testing.T) {
 			"both-interfaces-admit-dont-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true, false},
 			true, false,
 		},
@@ -114,6 +120,7 @@ func TestWithMetrics(t *testing.T) {
 			"validate-interfaces-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&validatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true},
 			true, true,
 		},
@@ -121,6 +128,7 @@ func TestWithMetrics(t *testing.T) {
 			"validate-interfaces-dont-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&validatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false},
 			true, false,
 		},
@@ -128,6 +136,7 @@ func TestWithMetrics(t *testing.T) {
 			"mutating-interfaces-admit",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true},
 			true, true,
 		},
@@ -135,6 +144,7 @@ func TestWithMetrics(t *testing.T) {
 			"mutating-interfaces-dont-admit",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false},
 			false, true,
 		},
@@ -144,7 +154,7 @@ func TestWithMetrics(t *testing.T) {
 		h := WithMetrics(test.handler, Metrics.ObserveAdmissionController, test.name)
 
 		// test mutation
-		err := h.(admission.MutationInterface).Admit(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil), nil)
+		err := h.(admission.MutationInterface).Admit(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		if test.admit && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue
@@ -169,7 +179,7 @@ func TestWithMetrics(t *testing.T) {
 		}
 
 		// test validation
-		err = h.(admission.ValidationInterface).Validate(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil), nil)
+		err = h.(admission.ValidationInterface).Validate(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		if test.validate && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue

@@ -52,6 +52,7 @@ type applyFlags struct {
 	force              bool
 	dryRun             bool
 	etcdUpgrade        bool
+	renewCerts         bool
 	criSocket          string
 	imagePullTimeout   time.Duration
 }
@@ -67,13 +68,14 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		applyPlanFlags:   apf,
 		imagePullTimeout: defaultImagePullTimeout,
 		etcdUpgrade:      true,
+		renewCerts:       true,
 		// Don't set criSocket to a default value here, as this will override the setting in the stored config in RunApply below.
 	}
 
 	cmd := &cobra.Command{
 		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
-		Short:                 "Upgrade your Kubernetes cluster to the specified version.",
+		Short:                 "Upgrade your Kubernetes cluster to the specified version",
 		Run: func(cmd *cobra.Command, args []string) {
 			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
 			kubeadmutil.CheckErr(err)
@@ -88,8 +90,9 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	// Specify the valid flags specific for apply
 	cmd.Flags().BoolVarP(&flags.nonInteractiveMode, "yes", "y", flags.nonInteractiveMode, "Perform the upgrade and do not prompt for confirmation (non-interactive mode).")
 	cmd.Flags().BoolVarP(&flags.force, "force", "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
-	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output what actions would be performed.")
+	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
+	cmd.Flags().BoolVar(&flags.renewCerts, "certificate-renewal", flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
 
 	// The CRI socket flag is deprecated here, since it should be taken from the NodeRegistrationOptions for the current
@@ -231,30 +234,30 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	}
 
 	// Don't save etcd backup directory if etcd is HA, as this could cause corruption
-	return PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade)
+	return PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts)
 }
 
 // GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
-func GetPathManagerForUpgrade(internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
+func GetPathManagerForUpgrade(kubernetesDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
 	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
-	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory(), true, etcdUpgrade && !isHAEtcd)
+	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, true, etcdUpgrade && !isHAEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
-func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) error {
-	pathManager, err := GetPathManagerForUpgrade(internalcfg, etcdUpgrade)
+func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade, renewCerts bool) error {
+	pathManager, err := GetPathManagerForUpgrade(constants.KubernetesDir, internalcfg, etcdUpgrade)
 	if err != nil {
 		return err
 	}
 
 	// The arguments oldEtcdClient and newEtdClient, are uninitialized because passing in the clients allow for mocking the client during testing
-	return upgrade.StaticPodControlPlane(client, waiter, pathManager, internalcfg, etcdUpgrade, nil, nil)
+	return upgrade.StaticPodControlPlane(client, waiter, pathManager, internalcfg, etcdUpgrade, renewCerts, nil, nil)
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
 func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
 
-	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
+	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	if err != nil {
 		return err
 	}

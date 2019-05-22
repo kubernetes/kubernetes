@@ -40,10 +40,12 @@ type Versioner interface {
 	// from database.
 	UpdateObject(obj runtime.Object, resourceVersion uint64) error
 	// UpdateList sets the resource version into an API list object. Returns an error if the object
-	// cannot be updated correctly. May return nil if the requested object does not need metadata
-	// from database. continueValue is optional and indicates that more results are available if
-	// the client passes that value to the server in a subsequent call.
-	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error
+	// cannot be updated correctly. May return nil if the requested object does not need metadata from
+	// database. continueValue is optional and indicates that more results are available if the client
+	// passes that value to the server in a subsequent call. remainingItemCount indicates the number
+	// of remaining objects if the list is partial. The remainingItemCount field is omitted during
+	// serialization if it is set to 0.
+	UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, remainingItemCount int64) error
 	// PrepareObjectForStorage should set SelfLink and ResourceVersion to the empty value. Should
 	// return an error if the specified object cannot be updated.
 	PrepareObjectForStorage(obj runtime.Object) error
@@ -92,6 +94,16 @@ var Everything = SelectionPredicate{
 // that is guaranteed to succeed.
 // See the comment for GuaranteedUpdate for more details.
 type UpdateFunc func(input runtime.Object, res ResponseMeta) (output runtime.Object, ttl *uint64, err error)
+
+// ValidateObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. The function may NOT transform the provided
+// object.
+type ValidateObjectFunc func(obj runtime.Object) error
+
+// ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
+func ValidateAllObjectFunc(obj runtime.Object) error {
+	return nil
+}
 
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
@@ -151,7 +163,7 @@ type Interface interface {
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.
-	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
+	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions, validateDeletion ValidateObjectFunc) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items selected by 'p' are sent down to returned watch.Interface.
@@ -219,8 +231,8 @@ type Interface interface {
 	//       // Return the modified object - return an error to stop iterating. Return
 	//       // a uint64 to alter the TTL on the object, or nil to keep it the same value.
 	//       return cur, nil, nil
-	//    }
-	// })
+	//    },
+	// )
 	GuaranteedUpdate(
 		ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool,
 		precondtions *Preconditions, tryUpdate UpdateFunc, suggestion ...runtime.Object) error

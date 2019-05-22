@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"net/http"
 	"net/url"
 	"sync"
 
@@ -100,9 +101,10 @@ func newAttributesRecord(object metav1.Object, oldObject metav1.Object, kind sch
 		Name: "webhook-test",
 		UID:  "webhook-test",
 	}
+	options := &metav1.UpdateOptions{}
 
 	return &FakeAttributes{
-		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, dryRun, &userInfo),
+		Attributes: admission.NewAttributesRecord(object.(runtime.Object), oldObject.(runtime.Object), kind, namespace, name, gvr, subResource, admission.Update, options, dryRun, &userInfo),
 	}
 }
 
@@ -191,6 +193,7 @@ type Test struct {
 	ExpectAllow       bool
 	ErrorContains     string
 	ExpectAnnotations map[string]string
+	ExpectStatusCode  int32
 }
 
 // NewNonMutatingTestCases returns test cases with a given base url.
@@ -237,7 +240,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				NamespaceSelector:       &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ErrorContains: "without explanation",
+			ExpectStatusCode: http.StatusForbidden,
+			ErrorContains:    "without explanation",
 		},
 		{
 			Name: "match & disallow ii",
@@ -248,8 +252,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				NamespaceSelector:       &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-
-			ErrorContains: "you shall not pass",
+			ExpectStatusCode: http.StatusForbidden,
+			ErrorContains:    "you shall not pass",
 		},
 		{
 			Name: "match & disallow & but allowed because namespaceSelector exempt the ns",
@@ -334,7 +338,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				Rules:                   matchEverythingRules,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectAllow: false,
+			ExpectStatusCode: http.StatusInternalServerError,
+			ExpectAllow:      false,
 		},
 		{
 			Name: "match & fail (but fail because fail closed)",
@@ -360,7 +365,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				FailurePolicy:           &policyFail,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectAllow: false,
+			ExpectStatusCode: http.StatusInternalServerError,
+			ExpectAllow:      false,
 		},
 		{
 			Name: "match & allow (url)",
@@ -383,7 +389,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				NamespaceSelector:       &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ErrorContains: "without explanation",
+			ExpectStatusCode: http.StatusForbidden,
+			ErrorContains:    "without explanation",
 		}, {
 			Name: "absent response and fail open",
 			Webhooks: []registrationv1beta1.Webhook{{
@@ -406,7 +413,8 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				NamespaceSelector:       &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ErrorContains: "Webhook response was absent",
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "Webhook response was absent",
 		},
 		{
 			Name: "no match dry run",
@@ -433,8 +441,9 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				SideEffects:             &sideEffectsUnknown,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			IsDryRun:      true,
-			ErrorContains: "does not support dry run",
+			IsDryRun:         true,
+			ExpectStatusCode: http.StatusBadRequest,
+			ErrorContains:    "does not support dry run",
 		},
 		{
 			Name: "match dry run side effects None",
@@ -460,8 +469,9 @@ func NewNonMutatingTestCases(url *url.URL) []Test {
 				SideEffects:             &sideEffectsSome,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			IsDryRun:      true,
-			ErrorContains: "does not support dry run",
+			IsDryRun:         true,
+			ExpectStatusCode: http.StatusBadRequest,
+			ErrorContains:    "does not support dry run",
 		},
 		{
 			Name: "match dry run side effects NoneOnDryRun",
@@ -561,7 +571,8 @@ func NewMutatingTestCases(url *url.URL) []Test {
 				NamespaceSelector:       &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ErrorContains: "invalid character",
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "invalid character",
 		},
 		{
 			Name: "match & remove label dry run unsupported",
@@ -573,8 +584,9 @@ func NewMutatingTestCases(url *url.URL) []Test {
 				SideEffects:             &sideEffectsUnknown,
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			IsDryRun:      true,
-			ErrorContains: "does not support dry run",
+			IsDryRun:         true,
+			ExpectStatusCode: http.StatusBadRequest,
+			ErrorContains:    "does not support dry run",
 		},
 		// No need to test everything with the url case, since only the
 		// connection is different.

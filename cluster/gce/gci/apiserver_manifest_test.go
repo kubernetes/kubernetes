@@ -49,6 +49,7 @@ readonly APISERVER_SERVER_KEY_PATH=/foo/bar
 readonly APISERVER_CLIENT_CERT_PATH=/foo/bar
 readonly CLOUD_CONFIG_MOUNT="{\"name\": \"cloudconfigmount\",\"mountPath\": \"/etc/gce.conf\", \"readOnly\": true},"
 readonly CLOUD_CONFIG_VOLUME="{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"/etc/gce.conf\", \"type\": \"FileOrCreate\"}},"
+readonly INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
 readonly DOCKER_REGISTRY="k8s.gcr.io"
 readonly ENABLE_LEGACY_ABAC=false
 readonly ETC_MANIFESTS=${KUBE_HOME}/etc/kubernetes/manifests

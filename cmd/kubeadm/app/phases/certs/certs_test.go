@@ -17,7 +17,8 @@ limitations under the License.
 package certs
 
 import (
-	"crypto/rsa"
+	"bytes"
+	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
 	"io/ioutil"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/client-go/util/keyutil"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
@@ -38,7 +40,7 @@ import (
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
-func createTestCSR(t *testing.T) (*x509.CertificateRequest, *rsa.PrivateKey) {
+func createTestCSR(t *testing.T) (*x509.CertificateRequest, crypto.Signer) {
 	csr, key, err := pkiutil.NewCSRAndKey(
 		&certutil.Config{
 			CommonName: "testCert",
@@ -299,91 +301,72 @@ func TestWriteCSRFilesIfNotExist(t *testing.T) {
 
 }
 
-func TestWriteKeyFilesIfNotExist(t *testing.T) {
+func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
+	setupKey, err := keyutil.MakeEllipticPrivateKeyPEM()
+	if err != nil {
+		t.Fatalf("Can't setup test: %v", err)
+	}
 
-	setupKey, _ := NewServiceAccountSigningKey()
-	key, _ := NewServiceAccountSigningKey()
-
-	var tests = []struct {
-		setupFunc     func(pkiDir string) error
-		expectedError bool
-		expectedKey   *rsa.PrivateKey
+	tcases := []struct {
+		name        string
+		setupFunc   func(pkiDir string) error
+		expectedErr bool
+		expectedKey []byte
 	}{
 		{ // key does not exists > key written
-			expectedKey: key,
+			name: "generate successfully",
 		},
 		{ // key exists > existing key used
+			name: "use existing key",
 			setupFunc: func(pkiDir string) error {
-				return writeKeyFilesIfNotExist(pkiDir, "dummy", setupKey)
+				err := keyutil.WriteKey(filepath.Join(pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName), setupKey)
+				return err
 			},
 			expectedKey: setupKey,
 		},
 		{ // some file exists, but it is not a valid key > err
+			name: "empty key",
 			setupFunc: func(pkiDir string) error {
-				testutil.SetupEmptyFiles(t, pkiDir, "dummy.key")
+				testutil.SetupEmptyFiles(t, pkiDir, kubeadmconstants.ServiceAccountPrivateKeyName)
 				return nil
 			},
-			expectedError: true,
+			expectedErr: true,
 		},
 	}
+	for _, tt := range tcases {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(dir)
 
-	for _, test := range tests {
-		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
-
-		// executes setup func (if necessary)
-		if test.setupFunc != nil {
-			if err := test.setupFunc(tmpdir); err != nil {
-				t.Errorf("error executing setupFunc: %v", err)
-				continue
+			if tt.setupFunc != nil {
+				if err := tt.setupFunc(dir); err != nil {
+					t.Fatalf("error executing setupFunc: %v", err)
+				}
 			}
-		}
 
-		// executes create func
-		err := writeKeyFilesIfNotExist(tmpdir, "dummy", key)
+			err := CreateServiceAccountKeyAndPublicKeyFiles(dir)
+			if (err != nil) != tt.expectedErr {
+				t.Fatalf("expected error: %v, got: %v, error: %v", tt.expectedErr, err != nil, err)
+			} else if tt.expectedErr {
+				return
+			}
 
-		if !test.expectedError && err != nil {
-			t.Errorf("error writeKeyFilesIfNotExist failed when not expected to fail: %v", err)
-			continue
-		} else if test.expectedError && err == nil {
-			t.Error("error writeKeyFilesIfNotExist didn't failed when expected")
-			continue
-		} else if test.expectedError {
-			continue
-		}
-
-		// asserts expected files are there
-		testutil.AssertFileExists(t, tmpdir, "dummy.key", "dummy.pub")
-
-		// check created key
-		resultingKey, err := pkiutil.TryLoadKeyFromDisk(tmpdir, "dummy")
-		if err != nil {
-			t.Errorf("failure reading created key: %v", err)
-			continue
-		}
-
-		//TODO: check if there is a better method to compare keys
-		if resultingKey.D == key.D {
-			t.Error("created key does not match expected key")
-		}
+			resultingKeyPEM, wasGenerated, err := keyutil.LoadOrGenerateKeyFile(filepath.Join(dir, kubeadmconstants.ServiceAccountPrivateKeyName))
+			if err != nil {
+				t.Errorf("Can't load created key: %v", err)
+			} else if wasGenerated {
+				t.Error("The key was not created")
+			} else if tt.expectedKey != nil && !bytes.Equal(resultingKeyPEM, tt.expectedKey) {
+				t.Error("Non-existing key is used")
+			}
+		})
 	}
-}
-
-func TestNewCACertAndKey(t *testing.T) {
-	certCfg := &certutil.Config{CommonName: "kubernetes"}
-	caCert, _, err := NewCACertAndKey(certCfg)
-	if err != nil {
-		t.Fatalf("failed call NewCACertAndKey: %v", err)
-	}
-
-	certstestutil.AssertCertificateIsCa(t, caCert)
 }
 
 func TestSharedCertificateExists(t *testing.T) {
 	caCert, caKey := certstestutil.CreateCACert(t)
 	_, key, _ := certstestutil.CreateTestCert(t, caCert, caKey, certutil.AltNames{})
-	publicKey := &key.PublicKey
+	publicKey := key.Public()
 
 	var tests = []struct {
 		name          string
@@ -514,47 +497,108 @@ func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 
 func TestUsingExternalCA(t *testing.T) {
 	tests := []struct {
-		setupFuncs []func(cfg *kubeadmapi.InitConfiguration) error
-		expected   bool
+		name           string
+		setupFuncs     []func(cfg *kubeadmapi.InitConfiguration) error
+		externalCAFunc func(*kubeadmapi.ClusterConfiguration) (bool, error)
+		expected       bool
+		expectedErr    bool
 	}{
 		{
+			name: "Test External CA, when complete PKI exists",
 			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
 				CreatePKIAssets,
 			},
-			expected: false,
+			externalCAFunc: UsingExternalCA,
+			expected:       false,
 		},
 		{
+			name: "Test External CA, when ca.key missing",
 			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
 				CreatePKIAssets,
-				deleteCAKey,
-				deleteFrontProxyCAKey,
+				deleteCertOrKey(kubeadmconstants.CAKeyName),
 			},
-			expected: true,
+			externalCAFunc: UsingExternalCA,
+			expected:       true,
+		},
+		{
+			name: "Test External CA, when ca.key missing and signed certs are missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.CAKeyName),
+				deleteCertOrKey(kubeadmconstants.APIServerCertName),
+			},
+			externalCAFunc: UsingExternalCA,
+			expected:       true,
+			expectedErr:    true,
+		},
+		{
+			name: "Test External CA, when ca.key missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.CAKeyName),
+			},
+			externalCAFunc: UsingExternalCA,
+			expected:       true,
+		},
+		{
+			name: "Test External Front Proxy CA, when complete PKI exists",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+			},
+			externalCAFunc: UsingExternalFrontProxyCA,
+			expected:       false,
+		},
+		{
+			name: "Test External Front Proxy CA, when front-proxy-ca.key missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.FrontProxyCAKeyName),
+			},
+			externalCAFunc: UsingExternalFrontProxyCA,
+			expected:       true,
+		},
+		{
+			name: "Test External Front Proxy CA, when front-proxy-.key missing and signed certs are missing",
+			setupFuncs: []func(cfg *kubeadmapi.InitConfiguration) error{
+				CreatePKIAssets,
+				deleteCertOrKey(kubeadmconstants.FrontProxyCAKeyName),
+				deleteCertOrKey(kubeadmconstants.FrontProxyClientCertName),
+			},
+			externalCAFunc: UsingExternalFrontProxyCA,
+			expected:       true,
+			expectedErr:    true,
 		},
 	}
 
 	for _, test := range tests {
-		dir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(dir)
+		t.Run(test.name, func(t *testing.T) {
+			dir := testutil.SetupTempDir(t)
+			defer os.RemoveAll(dir)
 
-		cfg := &kubeadmapi.InitConfiguration{
-			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
-				Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
-				CertificatesDir: dir,
-			},
-			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
-		}
-
-		for _, f := range test.setupFuncs {
-			if err := f(cfg); err != nil {
-				t.Errorf("error executing setup function: %v", err)
+			cfg := &kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking:      kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
+					CertificatesDir: dir,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-hostname"},
 			}
-		}
 
-		if val, _ := UsingExternalCA(&cfg.ClusterConfiguration); val != test.expected {
-			t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
-		}
+			for _, f := range test.setupFuncs {
+				if err := f(cfg); err != nil {
+					t.Errorf("error executing setup function: %v", err)
+				}
+			}
+
+			val, err := test.externalCAFunc(&cfg.ClusterConfiguration)
+			if val != test.expected {
+				t.Errorf("UsingExternalCA did not match expected: %v", test.expected)
+			}
+
+			if (err != nil) != test.expectedErr {
+				t.Errorf("UsingExternalCA returned un expected err: %v", err)
+			}
+		})
 	}
 }
 
@@ -613,7 +657,7 @@ func TestValidateMethods(t *testing.T) {
 		{
 			name: "validatePrivatePublicKey",
 			files: certstestutil.PKIFiles{
-				"sa.pub": &key.PublicKey,
+				"sa.pub": key.Public(),
 				"sa.key": key,
 			},
 			validateFunc:    validatePrivatePublicKey,
@@ -673,7 +717,6 @@ func TestNewCSR(t *testing.T) {
 func TestCreateCertificateFilesMethods(t *testing.T) {
 
 	var tests = []struct {
-		setupFunc     func(cfg *kubeadmapi.InitConfiguration) error
 		createFunc    func(cfg *kubeadmapi.InitConfiguration) error
 		expectedFiles []string
 		externalEtcd  bool
@@ -742,18 +785,13 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 	}
 }
 
-func deleteCAKey(cfg *kubeadmapi.InitConfiguration) error {
-	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)); err != nil {
-		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.CAKeyName)
+func deleteCertOrKey(name string) func(*kubeadmapi.InitConfiguration) error {
+	return func(cfg *kubeadmapi.InitConfiguration) error {
+		if err := os.Remove(filepath.Join(cfg.CertificatesDir, name)); err != nil {
+			return errors.Wrapf(err, "failed removing %s", name)
+		}
+		return nil
 	}
-	return nil
-}
-
-func deleteFrontProxyCAKey(cfg *kubeadmapi.InitConfiguration) error {
-	if err := os.Remove(filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyCAKeyName)); err != nil {
-		return errors.Wrapf(err, "failed removing %s", kubeadmconstants.FrontProxyCAKeyName)
-	}
-	return nil
 }
 
 func assertCertsExist(t *testing.T, dir string) {

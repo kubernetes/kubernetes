@@ -29,13 +29,12 @@ type FileType string
 
 const (
 	// Default mount command if mounter path is not specified
-	defaultMountCommand           = "mount"
-	MountsInGlobalPDPath          = "mounts"
-	FileTypeDirectory    FileType = "Directory"
-	FileTypeFile         FileType = "File"
-	FileTypeSocket       FileType = "Socket"
-	FileTypeCharDev      FileType = "CharDevice"
-	FileTypeBlockDev     FileType = "BlockDevice"
+	defaultMountCommand          = "mount"
+	FileTypeDirectory   FileType = "Directory"
+	FileTypeFile        FileType = "File"
+	FileTypeSocket      FileType = "Socket"
+	FileTypeCharDev     FileType = "CharDevice"
+	FileTypeBlockDev    FileType = "BlockDevice"
 )
 
 type Interface interface {
@@ -50,19 +49,11 @@ type Interface interface {
 	List() ([]MountPoint, error)
 	// IsMountPointMatch determines if the mountpoint matches the dir
 	IsMountPointMatch(mp MountPoint, dir string) bool
-	// IsNotMountPoint determines if a directory is a mountpoint.
-	// It should return ErrNotExist when the directory does not exist.
-	// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
-	// IsNotMountPoint detects bind mounts in linux.
-	// IsNotMountPoint enumerates all the mountpoints using List() and
-	// the list of mountpoints may be large, then it uses
-	// IsMountPointMatch to evaluate whether the directory is a mountpoint
-	IsNotMountPoint(file string) (bool, error)
 	// IsLikelyNotMountPoint uses heuristics to determine if a directory
 	// is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsLikelyNotMountPoint does NOT properly detect all mountpoint types
-	// most notably linux bind mounts.
+	// most notably linux bind mounts and symbolic link.
 	IsLikelyNotMountPoint(file string) (bool, error)
 	// DeviceOpened determines if the device is in use elsewhere
 	// on the system, i.e. still mounted.
@@ -70,8 +61,8 @@ type Interface interface {
 	// PathIsDevice determines if a path is a device.
 	PathIsDevice(pathname string) (bool, error)
 	// GetDeviceNameFromMount finds the device name by checking the mount path
-	// to get the global mount path which matches its plugin directory
-	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
+	// to get the global mount path within its plugin directory
+	GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error)
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error
@@ -222,9 +213,14 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	return device, refCount, nil
 }
 
-// isNotMountPoint implements Mounter.IsNotMountPoint and is shared by mounter
-// implementations.
-func isNotMountPoint(mounter Interface, file string) (bool, error) {
+// IsNotMountPoint determines if a directory is a mountpoint.
+// It should return ErrNotExist when the directory does not exist.
+// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
+// IsNotMountPoint detects bind mounts in linux.
+// IsNotMountPoint enumerates all the mountpoints using List() and
+// the list of mountpoints may be large, then it uses
+// IsMountPointMatch to evaluate whether the directory is a mountpoint
+func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
 	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
@@ -263,11 +259,11 @@ func isNotMountPoint(mounter Interface, file string) (bool, error) {
 	return notMnt, nil
 }
 
-// isBind detects whether a bind mount is being requested and makes the remount options to
+// IsBind detects whether a bind mount is being requested and makes the remount options to
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
-func isBind(options []string) (bool, []string, []string) {
+func IsBind(options []string) (bool, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.

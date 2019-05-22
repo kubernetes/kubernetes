@@ -132,6 +132,9 @@ func checkErr(err error, handleErr func(string, int)) {
 	case kerrors.IsInvalid(err):
 		details := err.(*kerrors.StatusError).Status().Details
 		s := fmt.Sprintf("The %s %q is invalid", details.Kind, details.Name)
+		if len(details.Kind) == 0 && len(details.Name) == 0 {
+			s = "The request is invalid"
+		}
 		if len(details.Causes) > 0 {
 			errs := statusCausesToAggrError(details.Causes)
 			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)

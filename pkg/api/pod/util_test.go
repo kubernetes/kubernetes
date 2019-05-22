@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -381,7 +381,7 @@ func TestDropAlphaVolumeDevices(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -475,7 +475,7 @@ func TestDropSubPath(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -564,7 +564,7 @@ func TestDropRuntimeClass(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -658,7 +658,7 @@ func TestDropProcMount(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProcMountType, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -774,7 +774,7 @@ func TestDropPodPriority(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -884,7 +884,7 @@ func TestDropEmptyDirSizeLimit(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -984,7 +984,7 @@ func TestDropPodShareProcessNamespace(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodShareProcessNamespace, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -1070,7 +1070,7 @@ func TestDropAppArmor(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AppArmor, enabled)()
 
 					DropDisabledPodFields(newPod, oldPod)
 
@@ -1185,7 +1185,7 @@ func TestDropTokenRequestProjection(t *testing.T) {
 					continue
 				}
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequestProjection, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TokenRequestProjection, enabled)()
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
 						oldPodSpec = &oldPod.Spec
@@ -1317,7 +1317,7 @@ func TestDropRunAsGroup(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RunAsGroup, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RunAsGroup, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -1351,6 +1351,208 @@ func TestDropRunAsGroup(t *testing.T) {
 						// new pod should not need to be changed
 						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
 							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestDropGMSAFields(t *testing.T) {
+	defaultContainerSecurityContextFactory := func() *api.SecurityContext {
+		defaultProcMount := api.DefaultProcMount
+		return &api.SecurityContext{ProcMount: &defaultProcMount}
+	}
+	podWithoutWindowsOptionsFactory := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
+			},
+		}
+	}
+
+	type podFactoryInfo struct {
+		description  string
+		hasGMSAField bool
+		// this factory should generate the input pod whose spec will be fed to dropDisabledFields
+		podFactory func() *api.Pod
+		// this factory should generate the expected pod after the GMSA fields have been dropped
+		// we can't just use podWithoutWindowsOptionsFactory as is for this, since in some cases
+		// we'll be left with a WindowsSecurityContextOptions struct with no GMSA field set, as opposed
+		// to a nil pointer in the pod generated by podWithoutWindowsOptionsFactory
+		// if this field is not set, it will default to the podFactory
+		strippedPodFactory func() *api.Pod
+	}
+	podFactoryInfos := []podFactoryInfo{
+		{
+			description:  "does not have any GMSA field set",
+			hasGMSAField: false,
+			podFactory:   podWithoutWindowsOptionsFactory,
+		},
+		{
+			description:  "has a pod-level WindowsSecurityContextOptions struct with no GMSA field set",
+			hasGMSAField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:  "has a WindowsSecurityContextOptions struct with no GMSA field set on a container",
+			hasGMSAField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:  "has a WindowsSecurityContextOptions struct with no GMSA field set on an init container",
+			hasGMSAField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:  "is nil",
+			hasGMSAField: false,
+			podFactory:   func() *api.Pod { return nil },
+		},
+	}
+
+	toPtr := func(s string) *string {
+		return &s
+	}
+	addGMSACredentialSpecName := func(windowsOptions *api.WindowsSecurityContextOptions) {
+		windowsOptions.GMSACredentialSpecName = toPtr("dummy-gmsa-cred-spec-name")
+	}
+	addGMSACredentialSpec := func(windowsOptions *api.WindowsSecurityContextOptions) {
+		windowsOptions.GMSACredentialSpec = toPtr("dummy-gmsa-cred-spec-contents")
+	}
+	addBothGMSAFields := func(windowsOptions *api.WindowsSecurityContextOptions) {
+		addGMSACredentialSpecName(windowsOptions)
+		addGMSACredentialSpec(windowsOptions)
+	}
+
+	for fieldName, windowsOptionsTransformingFunc := range map[string]func(*api.WindowsSecurityContextOptions){
+		"GMSACredentialSpecName field": addGMSACredentialSpecName,
+		"GMSACredentialSpec field":     addGMSACredentialSpec,
+		"both GMSA fields":             addBothGMSAFields,
+	} {
+		// yes, these variables are indeed needed for the closure to work
+		// properly, please do NOT remove them
+		name := fieldName
+		transformingFunc := windowsOptionsTransformingFunc
+
+		windowsOptionsWithGMSAFieldFactory := func() *api.WindowsSecurityContextOptions {
+			windowsOptions := &api.WindowsSecurityContextOptions{}
+			transformingFunc(windowsOptions)
+			return windowsOptions
+		}
+
+		podFactoryInfos = append(podFactoryInfos,
+			podFactoryInfo{
+				description:  fmt.Sprintf("has %s in Pod", name),
+				hasGMSAField: true,
+				podFactory: func() *api.Pod {
+					pod := podWithoutWindowsOptionsFactory()
+					pod.Spec.SecurityContext.WindowsOptions = windowsOptionsWithGMSAFieldFactory()
+					return pod
+				},
+				strippedPodFactory: func() *api.Pod {
+					pod := podWithoutWindowsOptionsFactory()
+					pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+					return pod
+				},
+			},
+			podFactoryInfo{
+				description:  fmt.Sprintf("has %s in Container", name),
+				hasGMSAField: true,
+				podFactory: func() *api.Pod {
+					pod := podWithoutWindowsOptionsFactory()
+					pod.Spec.Containers[0].SecurityContext.WindowsOptions = windowsOptionsWithGMSAFieldFactory()
+					return pod
+				},
+				strippedPodFactory: func() *api.Pod {
+					pod := podWithoutWindowsOptionsFactory()
+					pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+					return pod
+				},
+			},
+			podFactoryInfo{
+				description:  fmt.Sprintf("has %s in InitContainer", name),
+				hasGMSAField: true,
+				podFactory: func() *api.Pod {
+					pod := podWithoutWindowsOptionsFactory()
+					pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = windowsOptionsWithGMSAFieldFactory()
+					return pod
+				},
+				strippedPodFactory: func() *api.Pod {
+					pod := podWithoutWindowsOptionsFactory()
+					pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+					return pod
+				},
+			})
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodFactoryInfo := range podFactoryInfos {
+			for _, newPodFactoryInfo := range podFactoryInfos {
+				newPodHasGMSAField, newPod := newPodFactoryInfo.hasGMSAField, newPodFactoryInfo.podFactory()
+				if newPod == nil {
+					continue
+				}
+				oldPodHasGMSAField, oldPod := oldPodFactoryInfo.hasGMSAField, oldPodFactoryInfo.podFactory()
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %s, new pod %s", enabled, oldPodFactoryInfo.description, newPodFactoryInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsGMSA, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodFactoryInfo.podFactory()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodFactoryInfo.podFactory()))
+					}
+
+					switch {
+					case enabled || oldPodHasGMSAField:
+						// new pod should not be changed if the feature is enabled, or if the old pod had any GMSA field set
+						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
+						}
+					case newPodHasGMSAField:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("%v", oldPod)
+							t.Errorf("%v", newPod)
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have any GMSA field set
+						var expectedStrippedPod *api.Pod
+						if newPodFactoryInfo.strippedPodFactory == nil {
+							expectedStrippedPod = newPodFactoryInfo.podFactory()
+						} else {
+							expectedStrippedPod = newPodFactoryInfo.strippedPodFactory()
+						}
+
+						if !reflect.DeepEqual(newPod, expectedStrippedPod) {
+							t.Errorf("new pod had some GMSA field set: %v", diff.ObjectReflectDiff(newPod, expectedStrippedPod))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
 						}
 					}
 				})
@@ -1419,7 +1621,7 @@ func TestDropPodSysctls(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Sysctls, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Sysctls, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {
@@ -1513,7 +1715,7 @@ func TestDropSubPathExpr(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, enabled)()
 
 					var oldPodSpec *api.PodSpec
 					if oldPod != nil {

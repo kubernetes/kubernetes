@@ -7,6 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller:go_default_library",
+        "//pkg/controller/volume/protectionutil:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/volume/util:go_default_library",

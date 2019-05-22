@@ -26,8 +26,12 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/features"
@@ -39,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	execmnt "k8s.io/kubernetes/pkg/volume/util/exec"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
@@ -56,6 +61,24 @@ func NewInitializedVolumePluginMgr(
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
 
+	// Initialize csiDriverLister before calling InitPlugins
+	var informerFactory informers.SharedInformerFactory
+	var csiDriverLister storagelisters.CSIDriverLister
+	var csiDriversSynced cache.InformerSynced
+	const resyncPeriod = 0
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		// Don't initialize if kubeClient is nil
+		if kubelet.kubeClient != nil {
+			informerFactory = informers.NewSharedInformerFactory(kubelet.kubeClient, resyncPeriod)
+			csiDriverInformer := informerFactory.Storage().V1beta1().CSIDrivers()
+			csiDriverLister = csiDriverInformer.Lister()
+			csiDriversSynced = csiDriverInformer.Informer().HasSynced
+
+		} else {
+			klog.Warning("kubeClient is nil. Skip initialization of CSIDriverLister")
+		}
+	}
+
 	mountPodManager, err := mountpod.NewManager(kubelet.getRootDir(), kubelet.podManager)
 	if err != nil {
 		return nil, err
@@ -67,6 +90,9 @@ func NewInitializedVolumePluginMgr(
 		configMapManager: configMapManager,
 		tokenManager:     tokenManager,
 		mountPodManager:  mountPodManager,
+		informerFactory:  informerFactory,
+		csiDriverLister:  csiDriverLister,
+		csiDriversSynced: csiDriversSynced,
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -93,6 +119,9 @@ type kubeletVolumeHost struct {
 	tokenManager     *token.Manager
 	configMapManager configmap.Manager
 	mountPodManager  mountpod.Manager
+	informerFactory  informers.SharedInformerFactory
+	csiDriverLister  storagelisters.CSIDriverLister
+	csiDriversSynced cache.InformerSynced
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -129,6 +158,34 @@ func (kvh *kubeletVolumeHost) GetKubeClient() clientset.Interface {
 
 func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
+}
+
+func (kvh *kubeletVolumeHost) GetInformerFactory() informers.SharedInformerFactory {
+	return kvh.informerFactory
+}
+
+func (kvh *kubeletVolumeHost) CSIDriverLister() storagelisters.CSIDriverLister {
+	return kvh.csiDriverLister
+}
+
+func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
+	return kvh.csiDriversSynced
+}
+
+// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
+func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
+	if kvh.csiDriversSynced == nil {
+		klog.Error("csiDriversSynced not found on KubeletVolumeHost")
+		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
+	}
+
+	synced := []cache.InformerSynced{kvh.csiDriversSynced}
+	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
+		klog.Warning("failed to wait for cache sync for CSIDriverLister")
+		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
+	}
+
+	return nil
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperMounter(
@@ -174,7 +231,7 @@ func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 	if exec == nil {
 		return kvh.kubelet.mounter
 	}
-	return mount.NewExecMounter(exec, kvh.kubelet.mounter)
+	return execmnt.NewExecMounter(exec, kvh.kubelet.mounter)
 }
 
 func (kvh *kubeletVolumeHost) GetHostName() string {

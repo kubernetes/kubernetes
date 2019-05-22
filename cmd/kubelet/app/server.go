@@ -30,6 +30,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-systemd/daemon"
@@ -40,10 +41,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -94,6 +97,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	nsutil "k8s.io/kubernetes/pkg/volume/util/nsenter"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/exec"
 	"k8s.io/utils/nsenter"
@@ -105,7 +109,7 @@ const (
 )
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
-func NewKubeletCommand(stopCh <-chan struct{}) *cobra.Command {
+func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
@@ -251,6 +255,9 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			// add the kubelet config controller to kubeletDeps
 			kubeletDeps.KubeletConfigController = kubeletConfigController
 
+			// set up stopCh here in order to be reused by kubelet and docker shim
+			stopCh := genericapiserver.SetupSignalHandler()
+
 			// start the experimental docker shim, if enabled
 			if kubeletServer.KubeletFlags.ExperimentalDockershim {
 				if err := RunDockershim(&kubeletServer.KubeletFlags, kubeletConfig, stopCh); err != nil {
@@ -371,7 +378,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		if err != nil {
 			return nil, err
 		}
-		mounter = mount.NewNsenterMounter(s.RootDirectory, ne)
+		mounter = nsutil.NewMounter(s.RootDirectory, ne)
 		// NSenter only valid on Linux
 		subpather = subpath.NewNSEnter(mounter, ne, s.RootDirectory)
 		// an exec interface which can use nsenter for flex plugin calls
@@ -708,7 +715,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		go wait.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), nil)
 			if err != nil {
-				klog.Errorf("Starting health server failed: %v", err)
+				klog.Errorf("Starting healthz server failed: %v", err)
 			}
 		}, 5*time.Second, wait.NeverStop)
 	}
@@ -757,6 +764,11 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 			return nil, nil, err
 		}
 
+		// use the correct content type for cert rotation, but don't set QPS
+		setContentTypeForClient(certConfig, s.ContentType)
+
+		kubeClientConfigOverrides(s, clientConfig)
+
 		clientCertificateManager, err := buildClientCertificateManager(certConfig, clientConfig, s.CertDirectory, nodeName)
 		if err != nil {
 			return nil, nil, err
@@ -764,7 +776,6 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 
 		// the rotating transport will use the cert from the cert manager instead of these files
 		transportConfig := restclient.AnonymousClientConfig(clientConfig)
-		kubeClientConfigOverrides(s, transportConfig)
 
 		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
 		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
@@ -836,7 +847,7 @@ func buildClientCertificateManager(certConfig, clientConfig *restclient.Config, 
 }
 
 func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclient.Config) {
-	clientConfig.ContentType = s.ContentType
+	setContentTypeForClient(clientConfig, s.ContentType)
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = float32(s.KubeAPIQPS)
 	clientConfig.Burst = int(s.KubeAPIBurst)
@@ -930,6 +941,21 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 	return tlsOptions, nil
 }
 
+// setContentTypeForClient sets the appropritae content type into the rest config
+// and handles defaulting AcceptContentTypes based on that input.
+func setContentTypeForClient(cfg *restclient.Config, contentType string) {
+	if len(contentType) == 0 {
+		return
+	}
+	cfg.ContentType = contentType
+	switch contentType {
+	case runtime.ContentTypeProtobuf:
+		cfg.AcceptContentTypes = strings.Join([]string{runtime.ContentTypeProtobuf, runtime.ContentTypeJSON}, ",")
+	default:
+		// otherwise let the rest client perform defaulting
+	}
+}
+
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
 //   1 Integration tests
 //   2 Kubelet binary
@@ -948,32 +974,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,
-	//                so that I could remove the associated fields from KubeletConfiginternal. I would
-	//                prefer this to be done as part of an independent validation step on the
-	//                KubeletConfiguration. But as far as I can tell, we don't have an explicit
-	//                place for validation of the KubeletConfiguration yet.
-	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeServer.HostNetworkSources)
-	if err != nil {
-		return err
-	}
-
-	hostPIDSources, err := kubetypes.GetValidatedSources(kubeServer.HostPIDSources)
-	if err != nil {
-		return err
-	}
-
-	hostIPCSources, err := kubetypes.GetValidatedSources(kubeServer.HostIPCSources)
-	if err != nil {
-		return err
-	}
-
-	privilegedSources := capabilities.PrivilegedSources{
-		HostNetworkSources: hostNetworkSources,
-		HostPIDSources:     hostPIDSources,
-		HostIPCSources:     hostIPCSources,
-	}
-	capabilities.Setup(kubeServer.AllowPrivileged, privilegedSources, 0)
+	capabilities.Initialize(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
 
 	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
 	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)

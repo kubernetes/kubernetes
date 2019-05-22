@@ -91,8 +91,9 @@ func RunKubelet() {
 
 const (
 	// Ports of different e2e services.
-	kubeletPort          = "10250"
-	kubeletReadOnlyPort  = "10255"
+	kubeletPort         = "10250"
+	kubeletReadOnlyPort = "10255"
+	// KubeletRootDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRootDirectory = "/var/lib/kubelet"
 	// Health check url of kubelet
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
@@ -108,7 +109,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	klog.Info("Starting kubelet")
 
 	// set feature gates so we can check which features are enabled and pass the appropriate flags
-	utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates)
+	if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(framework.TestContext.FeatureGates); err != nil {
+		return nil, err
+	}
 
 	// Build kubeconfig
 	kubeconfigPath, err := createKubeconfigCWD()
@@ -256,8 +259,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	cmdArgs = append(cmdArgs,
 		"--kubeconfig", kubeconfigPath,
 		"--root-dir", KubeletRootDirectory,
-		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-		"--allow-privileged=true",
+		"--v", LogVerbosityLevel, "--logtostderr",
 	)
 
 	// Apply test framework feature gates by default. This could also be overridden
@@ -410,9 +412,8 @@ func createRootDirectory(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
 			return os.MkdirAll(path, os.FileMode(0755))
-		} else {
-			return err
 		}
+		return err
 	}
 	return nil
 }

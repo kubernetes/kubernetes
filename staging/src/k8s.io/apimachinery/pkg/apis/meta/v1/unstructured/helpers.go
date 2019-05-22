@@ -275,6 +275,14 @@ func getNestedString(obj map[string]interface{}, fields ...string) string {
 	return val
 }
 
+func getNestedInt64(obj map[string]interface{}, fields ...string) int64 {
+	val, found, err := NestedInt64(obj, fields...)
+	if !found || err != nil {
+		return 0
+	}
+	return val
+}
+
 func jsonPath(fields []string) string {
 	return "." + strings.Join(fields, ".")
 }

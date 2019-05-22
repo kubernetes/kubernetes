@@ -153,14 +153,12 @@ func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, 
 }
 
 type metricSet struct {
-	latencies                  *prometheus.HistogramVec
-	deprecatedLatencies        *prometheus.HistogramVec
-	latenciesSummary           *prometheus.SummaryVec
-	deprecatedLatenciesSummary *prometheus.SummaryVec
+	latencies        *prometheus.HistogramVec
+	latenciesSummary *prometheus.SummaryVec
 }
 
 func newMetricSet(name string, labels []string, helpTemplate string, hasSummary bool) *metricSet {
-	var summary, deprecatedSummary *prometheus.SummaryVec
+	var summary *prometheus.SummaryVec
 	if hasSummary {
 		summary = prometheus.NewSummaryVec(
 			prometheus.SummaryOpts{
@@ -168,16 +166,6 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 				Subsystem: subsystem,
 				Name:      fmt.Sprintf("%s_admission_duration_seconds_summary", name),
 				Help:      fmt.Sprintf(helpTemplate, "latency summary in seconds"),
-				MaxAge:    latencySummaryMaxAge,
-			},
-			labels,
-		)
-		deprecatedSummary = prometheus.NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_milliseconds_summary", name),
-				Help:      fmt.Sprintf("(Deprecated) "+helpTemplate, "latency summary in milliseconds"),
 				MaxAge:    latencySummaryMaxAge,
 			},
 			labels,
@@ -195,56 +183,32 @@ func newMetricSet(name string, labels []string, helpTemplate string, hasSummary 
 			},
 			labels,
 		),
-		deprecatedLatencies: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Namespace: namespace,
-				Subsystem: subsystem,
-				Name:      fmt.Sprintf("%s_admission_latencies_milliseconds", name),
-				Help:      fmt.Sprintf("(Deprecated) "+helpTemplate, "latency histogram in milliseconds"),
-				Buckets:   latencyBuckets,
-			},
-			labels,
-		),
 
-		latenciesSummary:           summary,
-		deprecatedLatenciesSummary: deprecatedSummary,
+		latenciesSummary: summary,
 	}
 }
 
 // MustRegister registers all the prometheus metrics in the metricSet.
 func (m *metricSet) mustRegister() {
 	prometheus.MustRegister(m.latencies)
-	prometheus.MustRegister(m.deprecatedLatencies)
 	if m.latenciesSummary != nil {
 		prometheus.MustRegister(m.latenciesSummary)
-	}
-	if m.deprecatedLatenciesSummary != nil {
-		prometheus.MustRegister(m.deprecatedLatenciesSummary)
 	}
 }
 
 // Reset resets all the prometheus metrics in the metricSet.
 func (m *metricSet) reset() {
 	m.latencies.Reset()
-	m.deprecatedLatencies.Reset()
 	if m.latenciesSummary != nil {
 		m.latenciesSummary.Reset()
-	}
-	if m.deprecatedLatenciesSummary != nil {
-		m.deprecatedLatenciesSummary.Reset()
 	}
 }
 
 // Observe records an observed admission event to all metrics in the metricSet.
 func (m *metricSet) observe(elapsed time.Duration, labels ...string) {
 	elapsedSeconds := elapsed.Seconds()
-	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	m.latencies.WithLabelValues(labels...).Observe(elapsedSeconds)
-	m.deprecatedLatencies.WithLabelValues(labels...).Observe(elapsedMicroseconds)
 	if m.latenciesSummary != nil {
 		m.latenciesSummary.WithLabelValues(labels...).Observe(elapsedSeconds)
-	}
-	if m.deprecatedLatenciesSummary != nil {
-		m.deprecatedLatenciesSummary.WithLabelValues(labels...).Observe(elapsedMicroseconds)
 	}
 }

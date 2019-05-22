@@ -20,8 +20,9 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils/crd"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")
@@ -30,23 +31,23 @@ var _ = SIGDescribe("Discovery", func() {
 
 	var namespaceName string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		namespaceName = f.Namespace.Name
 
 		framework.SkipUnlessServerVersionGTE(storageVersionServerVersion, f.ClientSet.Discovery())
 
-		By("Setting up server cert")
+		ginkgo.By("Setting up server cert")
 		setupServerCert(namespaceName, serviceName)
 	})
 
-	It("[Feature:StorageVersionHash] Custom resource should have storage version hash", func() {
-		testcrd, err := framework.CreateTestCRD(f)
+	ginkgo.It("[Feature:StorageVersionHash] Custom resource should have storage version hash", func() {
+		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
 		}
 		defer testcrd.CleanUp()
 		spec := testcrd.Crd.Spec
-		resources, err := testcrd.ApiExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
+		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {
 			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
 		}

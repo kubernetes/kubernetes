@@ -22,14 +22,14 @@ import (
 
 	"github.com/go-openapi/spec"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestNewBuilder(t *testing.T) {
-	type args struct {
-	}
 	tests := []struct {
 		name string
 
@@ -37,41 +37,302 @@ func TestNewBuilder(t *testing.T) {
 
 		wantedSchema      string
 		wantedItemsSchema string
+
+		v2 bool // produce OpenAPIv2
 	}{
 		{
 			"nil",
 			"",
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`, `{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			true,
 		},
-		{"empty",
-			"{}",
-			`{"properties":{"apiVersion":{},"kind":{},"metadata":{}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+		{"with properties",
+			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			true,
 		},
-		{"empty properties",
-			`{"properties":{"spec":{},"status":{}}}`,
-			`{"properties":{"apiVersion":{},"kind":{},"metadata":{},"spec":{},"status":{}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-		},
-		{"filled properties",
-			`{"properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
-			`{"properties":{"apiVersion":{},"kind":{},"metadata":{},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
-			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
-		},
-		{"type",
+		{"type only",
 			`{"type":"object"}`,
-			`{"properties":{"apiVersion":{},"kind":{},"metadata":{}},"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			true,
+		},
+		{"with extensions",
+			`
+{
+  "type":"object", 
+  "properties": {
+    "int-or-string-1": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ]
+    },
+    "int-or-string-2": {
+      "x-kubernetes-int-or-string": true,
+      "allOf": [{
+        "anyOf": [
+          {"type":"integer"},
+          {"type":"string"}
+        ]
+      }, {
+        "anyOf": [
+          {"minimum": 42.0}
+        ]
+      }]
+    },
+    "int-or-string-3": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ],
+      "allOf": [{
+        "anyOf": [
+          {"minimum": 42.0}
+        ]
+      }]
+    },
+    "int-or-string-4": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"minimum": 42.0}
+      ]
+    },
+    "int-or-string-5": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"minimum": 42.0}
+      ],
+      "allOf": [
+        {"minimum": 42.0}
+      ]
+    },
+    "int-or-string-6": {
+      "x-kubernetes-int-or-string": true
+    },
+    "preserve-unknown-fields": {
+      "x-kubernetes-preserve-unknown-fields": true
+    },
+    "embedded-object": {
+      "x-kubernetes-embedded-resource": true,
+      "x-kubernetes-preserve-unknown-fields": true,
+      "type": "object"
+    }
+  }
+}`,
+			`
+{
+  "type":"object",
+  "properties": {
+    "apiVersion": {"type":"string"},
+    "kind": {"type":"string"},
+    "metadata": {"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},
+    "int-or-string-1": {
+      "x-kubernetes-int-or-string": true
+    },
+    "int-or-string-2": {
+      "x-kubernetes-int-or-string": true
+    },
+    "int-or-string-3": {
+      "x-kubernetes-int-or-string": true
+    },
+    "int-or-string-4": {
+      "x-kubernetes-int-or-string": true
+    },
+    "int-or-string-5": {
+      "x-kubernetes-int-or-string": true
+    },
+    "int-or-string-6": {
+      "x-kubernetes-int-or-string": true
+    },
+    "preserve-unknown-fields": {
+      "x-kubernetes-preserve-unknown-fields": true
+    },
+    "embedded-object": {
+      "x-kubernetes-embedded-resource": true,
+      "x-kubernetes-preserve-unknown-fields": true,
+      "type": "object"
+    }
+  },
+  "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
+}`,
+			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			true,
+		},
+		{"with extensions as v3 schema",
+			`
+{
+  "type":"object", 
+  "properties": {
+    "int-or-string-1": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ]
+    },
+    "int-or-string-2": {
+      "x-kubernetes-int-or-string": true,
+      "allOf": [{
+        "anyOf": [
+          {"type":"integer"},
+          {"type":"string"}
+        ]
+      }, {
+        "anyOf": [
+          {"minimum": 42.0}
+        ]
+      }]
+    },
+    "int-or-string-3": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ],
+      "allOf": [{
+        "anyOf": [
+          {"minimum": 42.0}
+        ]
+      }]
+    },
+    "int-or-string-4": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"minimum": 42.0}
+      ]
+    },
+    "int-or-string-5": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"minimum": 42.0}
+      ],
+      "allOf": [
+        {"minimum": 42.0}
+      ]
+    },
+    "int-or-string-6": {
+      "x-kubernetes-int-or-string": true
+    },
+    "preserve-unknown-fields": {
+      "x-kubernetes-preserve-unknown-fields": true
+    },
+    "embedded-object": {
+      "x-kubernetes-embedded-resource": true,
+      "x-kubernetes-preserve-unknown-fields": true,
+      "type": "object"
+    }
+  }
+}`,
+			`
+{
+  "type":"object",
+  "properties": {
+    "apiVersion": {"type":"string"},
+    "kind": {"type":"string"},
+    "metadata": {"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},
+    "int-or-string-1": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ]
+    },
+    "int-or-string-2": {
+      "x-kubernetes-int-or-string": true,
+      "allOf": [{
+        "anyOf": [
+          {"type":"integer"},
+          {"type":"string"}
+        ]
+      }, {
+        "anyOf": [
+          {"minimum": 42.0}
+        ]
+      }]
+    },
+    "int-or-string-3": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ],
+      "allOf": [{
+        "anyOf": [
+          {"minimum": 42.0}
+        ]
+      }]
+    },
+    "int-or-string-4": {
+      "x-kubernetes-int-or-string": true,
+      "allOf": [{
+        "anyOf": [
+          {"type":"integer"},
+          {"type":"string"}
+        ]
+      }],
+      "anyOf": [
+        {"minimum": 42.0}
+      ]
+    },
+    "int-or-string-5": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"minimum": 42.0}
+      ],
+      "allOf": [{
+        "anyOf": [
+          {"type":"integer"},
+          {"type":"string"}
+        ]
+      }, {
+        "minimum": 42.0
+      }]
+    },
+    "int-or-string-6": {
+      "x-kubernetes-int-or-string": true,
+      "anyOf": [
+        {"type":"integer"},
+        {"type":"string"}
+      ]
+    },
+    "preserve-unknown-fields": {
+      "x-kubernetes-preserve-unknown-fields": true
+    },
+    "embedded-object": {
+      "x-kubernetes-embedded-resource": true,
+      "x-kubernetes-preserve-unknown-fields": true,
+      "type": "object"
+    }
+  },
+  "x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]
+}`,
+			`{"$ref":"#/definitions/io.k8s.bar.v1.Foo"}`,
+			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var schema *spec.Schema
+			var schema *structuralschema.Structural
 			if len(tt.schema) > 0 {
-				schema = &spec.Schema{}
-				if err := json.Unmarshal([]byte(tt.schema), schema); err != nil {
+				v1beta1Schema := &v1beta1.JSONSchemaProps{}
+				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
 					t.Fatal(err)
 				}
+				internalSchema := &apiextensions.JSONSchemaProps{}
+				v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+				var err error
+				schema, err = structuralschema.NewStructural(internalSchema)
+				if err != nil {
+					t.Fatalf("structural schema error: %v", err)
+				}
+				if errs := structuralschema.ValidateStructural(schema, nil); len(errs) > 0 {
+					t.Fatalf("structural schema validation error: %v", errs.ToAggregate())
+				}
+				schema = schema.Unfold()
 			}
 
 			got := newBuilder(&apiextensions.CustomResourceDefinition{
@@ -86,7 +347,7 @@ func TestNewBuilder(t *testing.T) {
 					},
 					Scope: apiextensions.NamespaceScoped,
 				},
-			}, "v1", schema)
+			}, "v1", schema, tt.v2)
 
 			var wantedSchema, wantedItemsSchema spec.Schema
 			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
@@ -103,14 +364,12 @@ func TestNewBuilder(t *testing.T) {
 			}
 
 			// wipe out TypeMeta/ObjectMeta content, with those many lines of descriptions. We trust that they match here.
-			if _, found := got.schema.Properties["kind"]; found {
-				got.schema.Properties["kind"] = spec.Schema{}
-			}
-			if _, found := got.schema.Properties["apiVersion"]; found {
-				got.schema.Properties["apiVersion"] = spec.Schema{}
-			}
-			if _, found := got.schema.Properties["metadata"]; found {
-				got.schema.Properties["metadata"] = spec.Schema{}
+			for _, metaField := range []string{"kind", "apiVersion", "metadata"} {
+				if _, found := got.schema.Properties["kind"]; found {
+					prop := got.schema.Properties[metaField]
+					prop.Description = ""
+					got.schema.Properties[metaField] = prop
+				}
 			}
 
 			if !reflect.DeepEqual(&wantedSchema, got.schema) {

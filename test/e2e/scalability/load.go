@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,17 +40,17 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -134,7 +134,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
-	options := framework.FrameworkOptions{
+	options := framework.Options{
 		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
 		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
@@ -237,27 +237,27 @@ var _ = SIGDescribe("Load capacity", func() {
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
-				framework.Logf("Creating services")
+				e2elog.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
 				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
-				framework.Logf("%v Services created.", len(services))
+				e2elog.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
 					defer serviceCleanupPhase.End()
-					framework.Logf("Starting to delete services...")
+					e2elog.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
 					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
-					framework.Logf("Services deleted")
+					e2elog.Logf("Services deleted")
 				}(services)
 			} else {
-				framework.Logf("Skipping service creation")
+				e2elog.Logf("Skipping service creation")
 			}
 			serviceCreationPhase.End()
 			// Create all secrets.
@@ -285,7 +285,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					Client:    f.ClientSet,
 					Name:      daemonName,
 					Namespace: f.Namespace.Name,
-					LogFunc:   framework.Logf,
+					LogFunc:   e2elog.Logf,
 				}
 				daemonConfig.Run()
 				defer func(config *testutils.DaemonConfig) {
@@ -314,7 +314,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// to make it possible to create/schedule them in the meantime.
 			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
-			framework.Logf("Starting to create %v objects...", itArg.kind)
+			e2elog.Logf("Starting to create %v objects...", itArg.kind)
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
 
 			createAllResources(configs, creatingTime, testPhaseDurations.StartPhase(200, "load pods creation"))
@@ -327,7 +327,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// The expected number of created/deleted pods is totalPods/4 when scaling,
 			// as each RC changes its size from X to a uniform random value in [X/2, 3X/2].
 			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
-			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
+			e2elog.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
 			By("============================================================================")
 
@@ -335,20 +335,19 @@ var _ = SIGDescribe("Load capacity", func() {
 			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
-			framework.Logf("Starting to delete %v objects...", itArg.kind)
+			e2elog.Logf("Starting to delete %v objects...", itArg.kind)
 			deleteAllResources(configs, deletingTime, testPhaseDurations.StartPhase(500, "load pods deletion"))
 		})
 	}
 })
 
-func createClients(numberOfClients int) ([]clientset.Interface, []internalclientset.Interface, []scaleclient.ScalesGetter, error) {
+func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.ScalesGetter, error) {
 	clients := make([]clientset.Interface, numberOfClients)
-	internalClients := make([]internalclientset.Interface, numberOfClients)
 	scalesClients := make([]scaleclient.ScalesGetter, numberOfClients)
 
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		config.QPS = 100
 		config.Burst = 200
 		if framework.TestContext.KubeAPIContentType != "" {
@@ -361,11 +360,11 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		// each client here.
 		transportConfig, err := config.TransportConfig()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		tlsConfig, err := transport.TLSConfigFor(transportConfig)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		config.Transport = utilnet.SetTransportDefaults(&http.Transport{
 			Proxy:               http.ProxyFromEnvironment,
@@ -387,14 +386,9 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 
 		c, err := clientset.NewForConfig(config)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		clients[i] = c
-		internalClient, err := internalclientset.NewForConfig(config)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		internalClients[i] = internalClient
 
 		// create scale client, if GroupVersion or NegotiatedSerializer are not set
 		// assign default values - these fields are mandatory (required by RESTClientFor).
@@ -402,15 +396,15 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 			config.GroupVersion = &schema.GroupVersion{}
 		}
 		if config.NegotiatedSerializer == nil {
-			config.NegotiatedSerializer = legacyscheme.Codecs
+			config.NegotiatedSerializer = scheme.Codecs
 		}
 		restClient, err := restclient.RESTClientFor(config)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		discoClient, err := discovery.NewDiscoveryClientForConfig(config)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, err
 		}
 		cachedDiscoClient := cacheddiscovery.NewMemCacheClient(discoClient)
 		restMapper := restmapper.NewDeferredDiscoveryRESTMapper(cachedDiscoClient)
@@ -418,7 +412,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []internalclient
 		resolver := scaleclient.NewDiscoveryScaleKindResolver(cachedDiscoClient)
 		scalesClients[i] = scaleclient.New(restClient, restMapper, dynamic.LegacyAPIPathResolverFunc, resolver)
 	}
-	return clients, internalClients, scalesClients, nil
+	return clients, scalesClients, nil
 }
 
 func computePodCounts(total int) (int, int, int) {
@@ -478,12 +472,11 @@ func generateConfigs(
 	// Create a number of clients to better simulate real usecase
 	// where not everyone is using exactly the same client.
 	rcsPerClient := 20
-	clients, internalClients, scalesClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
+	clients, scalesClients, err := createClients((len(configs) + rcsPerClient - 1) / rcsPerClient)
 	framework.ExpectNoError(err)
 
 	for i := 0; i < len(configs); i++ {
 		configs[i].SetClient(clients[i%len(clients)])
-		configs[i].SetInternalClient(internalClients[i%len(internalClients)])
 		configs[i].SetScalesClient(scalesClients[i%len(clients)])
 	}
 	for i := 0; i < len(secretConfigs); i++ {
@@ -523,7 +516,7 @@ func GenerateConfigsForGroup(
 				Client:    nil, // this will be overwritten later
 				Name:      secretName,
 				Namespace: namespace,
-				LogFunc:   framework.Logf,
+				LogFunc:   e2elog.Logf,
 			})
 			secretNames = append(secretNames, secretName)
 		}
@@ -535,14 +528,13 @@ func GenerateConfigsForGroup(
 				Client:    nil, // this will be overwritten later
 				Name:      configMapName,
 				Namespace: namespace,
-				LogFunc:   framework.Logf,
+				LogFunc:   e2elog.Logf,
 			})
 			configMapNames = append(configMapNames, configMapName)
 		}
 
 		baseConfig := &testutils.RCConfig{
 			Client:         nil, // this will be overwritten later
-			InternalClient: nil, // this will be overwritten later
 			Name:           groupName + "-" + strconv.Itoa(i),
 			Namespace:      namespace,
 			Timeout:        UnreadyNodeToleration,
@@ -698,7 +690,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		if err == nil {
 			return true, nil
 		}
-		framework.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
+		e2elog.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
 		if testutils.IsRetryableAPIError(err) {
 			return false, nil
 		}

@@ -17,10 +17,12 @@ limitations under the License.
 package quota
 
 import (
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -186,7 +188,12 @@ func ResourceNames(resources corev1.ResourceList) []corev1.ResourceName {
 
 // Contains returns true if the specified item is in the list of items
 func Contains(items []corev1.ResourceName, item corev1.ResourceName) bool {
-	return ToSet(items).Has(string(item))
+	for _, i := range items {
+		if i == item {
+			return true
+		}
+	}
+	return false
 }
 
 // ContainsPrefix returns true if the specified item has a prefix that contained in given prefix Set
@@ -199,15 +206,32 @@ func ContainsPrefix(prefixSet []string, item corev1.ResourceName) bool {
 	return false
 }
 
-// Intersection returns the intersection of both list of resources
+// Intersection returns the intersection of both list of resources, deduped and sorted
 func Intersection(a []corev1.ResourceName, b []corev1.ResourceName) []corev1.ResourceName {
-	setA := ToSet(a)
-	setB := ToSet(b)
-	setC := setA.Intersection(setB)
-	result := []corev1.ResourceName{}
-	for _, resourceName := range setC.List() {
-		result = append(result, corev1.ResourceName(resourceName))
+	result := make([]corev1.ResourceName, 0, len(a))
+	for _, item := range a {
+		if Contains(result, item) {
+			continue
+		}
+		if !Contains(b, item) {
+			continue
+		}
+		result = append(result, item)
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	return result
+}
+
+// Difference returns the list of resources resulting from a-b, deduped and sorted
+func Difference(a []corev1.ResourceName, b []corev1.ResourceName) []corev1.ResourceName {
+	result := make([]corev1.ResourceName, 0, len(a))
+	for _, item := range a {
+		if Contains(b, item) || Contains(result, item) {
+			continue
+		}
+		result = append(result, item)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
 	return result
 }
 
@@ -243,7 +267,8 @@ func ToSet(resourceNames []corev1.ResourceName) sets.String {
 	return result
 }
 
-// CalculateUsage calculates and returns the requested ResourceList usage
+// CalculateUsage calculates and returns the requested ResourceList usage.
+// If an error is returned, usage only contains the resources which encountered no calculation errors.
 func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, hardLimits corev1.ResourceList, registry Registry, scopeSelector *corev1.ScopeSelector) (corev1.ResourceList, error) {
 	// find the intersection between the hard resources on the quota
 	// and the resources this controller can track to know what we can
@@ -257,6 +282,8 @@ func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, ha
 	// NOTE: the intersection just removes duplicates since the evaluator match intersects with hard
 	matchedResources := Intersection(hardResources, potentialResources)
 
+	errors := []error{}
+
 	// sum the observed usage from each evaluator
 	newUsage := corev1.ResourceList{}
 	for _, evaluator := range evaluators {
@@ -269,7 +296,11 @@ func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, ha
 		usageStatsOptions := UsageStatsOptions{Namespace: namespaceName, Scopes: scopes, Resources: intersection, ScopeSelector: scopeSelector}
 		stats, err := evaluator.UsageStats(usageStatsOptions)
 		if err != nil {
-			return nil, err
+			// remember the error
+			errors = append(errors, err)
+			// exclude resources which encountered calculation errors
+			matchedResources = Difference(matchedResources, intersection)
+			continue
 		}
 		newUsage = Add(newUsage, stats.Used)
 	}
@@ -278,5 +309,5 @@ func CalculateUsage(namespaceName string, scopes []corev1.ResourceQuotaScope, ha
 	// merge our observed usage with the quota usage status
 	// if the new usage is different than the last usage, we will need to do an update
 	newUsage = Mask(newUsage, matchedResources)
-	return newUsage, nil
+	return newUsage, utilerrors.NewAggregate(errors)
 }

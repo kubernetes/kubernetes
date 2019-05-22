@@ -39,11 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
-func init() {
-	// Register prometheus metrics
-	Register()
-}
-
 const (
 	// ipamResyncInterval is the amount of time between when the cloud and node
 	// CIDR range assignments are synchronized.

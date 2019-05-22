@@ -77,6 +77,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/controller/volume/attachdetach/cache:all-srcs",
+        "//pkg/controller/volume/attachdetach/config:all-srcs",
         "//pkg/controller/volume/attachdetach/metrics:all-srcs",
         "//pkg/controller/volume/attachdetach/populator:all-srcs",
         "//pkg/controller/volume/attachdetach/reconciler:all-srcs",

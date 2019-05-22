@@ -19,6 +19,7 @@
 function get-windows-node-instance-metadata-from-file {
   local metadata=""
   metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
+  metadata+="cluster-location=${KUBE_TEMP}/cluster-location.txt,"
   metadata+="kube-env=${KUBE_TEMP}/windows-node-kube-env.yaml,"
   metadata+="kubelet-config=${KUBE_TEMP}/windows-node-kubelet-config.yaml,"
   # To get startup script output run "gcloud compute instances
@@ -36,6 +37,10 @@ function get-windows-node-instance-metadata-from-file {
 function get-windows-node-instance-metadata {
   local metadata=""
   metadata+="k8s-version=${KUBE_VERSION:-v1.13.2},"
+  # Prevent the GCE Windows agent from managing IP addresses, since kube-proxy
+  # and these cluster setup scripts should take care of everything. See
+  # https://github.com/kubernetes/kubernetes/issues/75561.
+  metadata+="disable-address-manager=true,"
   metadata+="serial-port-enable=1,"
   # This enables logging the serial port output.
   # https://cloud.google.com/compute/docs/instances/viewing-serial-port-output

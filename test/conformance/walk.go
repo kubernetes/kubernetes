@@ -72,6 +72,8 @@ type conformanceData struct {
 	TestName string
 	// Extracted from the "Description:" comment before the test
 	Description string
+	// Version when this test is added or modified ex: v1.12, v1.13
+	Release string
 }
 
 func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
@@ -85,13 +87,16 @@ func (v *visitor) convertToConformanceData(at *ast.BasicLit) {
 	cd.Description = ""
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Testname:") {
-			line = strings.TrimSpace(line[9:])
-			cd.TestName = line
+		if sline := regexp.MustCompile("^Testname\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			cd.TestName = sline[1]
 			continue
 		}
-		if strings.HasPrefix(line, "Description:") {
-			line = strings.TrimSpace(line[12:])
+		if sline := regexp.MustCompile("^Release\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			cd.Release = sline[1]
+			continue
+		}
+		if sline := regexp.MustCompile("^Description\\s*:\\s*").Split(line, -1); len(sline) == 2 {
+			line = sline[1]
 		}
 		cd.Description += line + "\n"
 	}
@@ -161,8 +166,26 @@ func (v *visitor) failf(expr ast.Expr, format string, a ...interface{}) {
 func (v *visitor) comment(x *ast.BasicLit) string {
 	for _, comm := range v.cMap.Comments() {
 		testOffset := int(x.Pos()-comm.End()) - len("framework.ConformanceIt(\"")
-		if 0 < testOffset && testOffset < 3 {
-			return comm.Text()
+		//Cannot assume the offset is within three or four tabs from the test block itself.
+		//It is better to trim the newlines, tabs, etc and then we if the comment is followed
+		//by the test block itself so that we can associate the comment with it properly.
+		if 0 <= testOffset && testOffset <= 10 {
+			b1 := make([]byte, x.Pos()-comm.End())
+			//if we fail to open the file to compare the content we just assume the
+			//proximity of the comment and apply it.
+			myf, err := os.Open(v.FileSet.File(x.Pos()).Name())
+			if err == nil {
+				if _, err := myf.Seek(int64(comm.End()), 0); err == nil {
+					if _, err := myf.Read(b1); err == nil {
+						if strings.Compare(strings.Trim(string(b1), "\t \r\n"), "framework.ConformanceIt(\"") == 0 {
+							return comm.Text()
+						}
+					}
+				}
+			} else {
+				//comment section's end is noticed within 10 characters from framework.ConformanceIt block
+				return comm.Text()
+			}
 		}
 	}
 	return ""
@@ -300,18 +323,6 @@ func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 	return v
 }
 
-func scandir(dir string) {
-	v := newVisitor()
-	pkg, err := parser.ParseDir(v.FileSet, dir, nil, parser.ParseComments)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, p := range pkg {
-		ast.Walk(v, p)
-	}
-}
-
 func scanfile(path string, src interface{}) []conformanceData {
 	v := newVisitor()
 	file, err := parser.ParseFile(v.FileSet, path, src, parser.ParseComments)
@@ -353,6 +364,7 @@ func main() {
 				tests := scanfile(path, nil)
 				for _, cd := range tests {
 					fmt.Printf("## [%s](%s)\n\n", cd.TestName, cd.URL)
+					fmt.Printf("### Release %s\n", cd.Release)
 					fmt.Printf("%s\n\n", cd.Description)
 					if len(cd.Description) < 10 {
 						missingComments++

@@ -55,23 +55,6 @@ func (w httpResponseWriterWithInit) Write(b []byte) (n int, err error) {
 	return w.innerW.Write(b)
 }
 
-// WriteObject renders a returned runtime.Object to the response as a stream or an encoded object. If the object
-// returned by the response implements rest.ResourceStreamer that interface will be used to render the
-// response. The Accept header and current API version will be passed in, and the output will be copied
-// directly to the response body. If content type is returned it is used, otherwise the content type will
-// be "application/octet-stream". All other objects are sent to standard JSON serialization.
-func WriteObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSerializer, object runtime.Object, w http.ResponseWriter, req *http.Request) {
-	stream, ok := object.(rest.ResourceStreamer)
-	if ok {
-		requestInfo, _ := request.RequestInfoFrom(req.Context())
-		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-			StreamObject(statusCode, gv, s, stream, w, req)
-		})
-		return
-	}
-	WriteObjectNegotiated(s, gv, w, req, statusCode, object)
-}
-
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
 // If the client requests a websocket upgrade, negotiate for a websocket reader protocol (because many
 // browser clients cannot easily handle binary streaming protocols).
@@ -123,9 +106,17 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, innerW http.Resp
 }
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
-// The context is optional and can be nil.
-func WriteObjectNegotiated(s runtime.NegotiatedSerializer, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
-	serializer, err := negotiation.NegotiateOutputSerializer(req, s)
+func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	stream, ok := object.(rest.ResourceStreamer)
+	if ok {
+		requestInfo, _ := request.RequestInfoFrom(req.Context())
+		metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
+			StreamObject(statusCode, gv, s, stream, w, req)
+		})
+		return
+	}
+
+	_, serializer, err := negotiation.NegotiateOutputMediaType(req, s, restrictions)
 	if err != nil {
 		// if original statusCode was not successful we need to return the original error
 		// we cannot hide it behind negotiation problems
@@ -162,7 +153,7 @@ func ErrorNegotiated(err error, s runtime.NegotiatedSerializer, gv schema.GroupV
 		return code
 	}
 
-	WriteObjectNegotiated(s, gv, w, req, code, status)
+	WriteObjectNegotiated(s, negotiation.DefaultEndpointRestrictions, gv, w, req, code, status)
 	return code
 }
 

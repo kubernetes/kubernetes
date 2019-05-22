@@ -70,13 +70,13 @@ if [[ -n "${remote_git_repo}" ]]; then
 fi
 
 if [[ ${JOB_NAME} =~ -pull- ]]; then
-  : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/pull/${GCS_SUBDIR}${ghprbPullId:-unknown}"}
-  : ${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/pr-logs/directory"}
-  : ${JENKINS_GCS_LOGS_INDIRECT:="gs://kubernetes-jenkins/pr-logs/directory/${JOB_NAME}"}
+  : "${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/pull/${GCS_SUBDIR}${ghprbPullId:-unknown}"}"
+  : "${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/pr-logs/directory"}"
+  : "${JENKINS_GCS_LOGS_INDIRECT:="gs://kubernetes-jenkins/pr-logs/directory/${JOB_NAME}"}"
 else
-  : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}
-  : ${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/logs"}
-  : ${JENKINS_GCS_LOGS_INDIRECT:=""}
+  : "${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}"
+  : "${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/logs"}"
+  : "${JENKINS_GCS_LOGS_INDIRECT:=""}"
 fi
 
 readonly artifacts_path="${WORKSPACE}/_artifacts"
@@ -121,7 +121,7 @@ function find_version() {
     echo "${KUBE_GIT_VERSION-}"
   else
     # Last resort from the started.json
-    gsutil cat ${gcs_build_path}/started.json 2>/dev/null |\
+    gsutil cat "${gcs_build_path}/started.json" 2>/dev/null |\
      sed -n 's/ *"version": *"\([^"]*\)",*/\1/p'
   fi
   )
@@ -129,7 +129,8 @@ function find_version() {
 
 # Output started.json. Use test function below!
 function print_started() {
-  local metadata_keys=$(compgen -e | grep ^BUILD_METADATA_)
+  local metadata_keys
+  metadata_keys=$(compgen -e | grep ^BUILD_METADATA_)
   echo "{"
   echo "    \"version\": \"${version}\","  # TODO(fejta): retire
   echo "    \"job-version\": \"${version}\","
@@ -153,7 +154,7 @@ function print_started() {
 # Use this to test changes to print_started.
 if [[ -n "${TEST_STARTED_JSON:-}" ]]; then
   version=$(find_version)
-  cat <(print_started) | jq .
+  jq . <(print_started)
   exit
 fi
 
@@ -202,34 +203,34 @@ function update_job_result_cache() {
     echo "Could not find Kubernetes version"
   fi
 
-  mkdir -p ${tmp_results%/*}
+  mkdir -p "${tmp_results%/*}"
 
   # Construct a valid json file
-  echo "[" > ${tmp_results}
+  echo "[" > "${tmp_results}"
 
   for upload_attempt in $(seq 3); do
     echo "Copying ${job_results} to ${tmp_results} (attempt ${upload_attempt})"
     # The sed construct below is stripping out only the "version" lines
     # and then ensuring there's a single comma at the end of the line.
-    gsutil -q cat ${job_results} 2>&- |\
+    gsutil -q cat "${job_results}" 2>&- |\
      sed -n 's/^\({"version".*}\),*/\1,/p' |\
-     tail -${cache_size} >> ${tmp_results} || continue
+     tail -${cache_size} >> "${tmp_results}" || continue
     break
   done
 
   echo "{\"version\": \"${version}\", \"buildnumber\": \"${BUILD_NUMBER}\"," \
-       "\"result\": \"${build_result}\"}" >> ${tmp_results}
+       "\"result\": \"${build_result}\"}" >> "${tmp_results}"
 
-  echo "]" >> ${tmp_results}
+  echo "]" >> "${tmp_results}"
 
   for upload_attempt in $(seq 3); do
     echo "Copying ${tmp_results} to ${job_results} (attempt ${upload_attempt})"
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" \
-           ${tmp_results} ${job_results} || continue
+           "${tmp_results}" "${job_results}" || continue
     break
   done
 
-  rm -f ${tmp_results}
+  rm -f "${tmp_results}"
 }
 
 function upload_artifacts_and_build_result() {
@@ -285,8 +286,8 @@ if [[ -z "${BOOTSTRAP_MIGRATION:-}" ]]; then
   if [[ -n "${JENKINS_BUILD_STARTED:-}" ]]; then
     upload_version
   elif [[ -n "${JENKINS_BUILD_FINISHED:-}" ]]; then
-    upload_artifacts_and_build_result ${JENKINS_BUILD_FINISHED}
-    update_job_result_cache ${JENKINS_BUILD_FINISHED}
+    upload_artifacts_and_build_result "${JENKINS_BUILD_FINISHED}"
+    update_job_result_cache "${JENKINS_BUILD_FINISHED}"
   else
     echo "ERROR: Called without JENKINS_BUILD_STARTED or JENKINS_BUILD_FINISHED set."
     echo "ERROR: this should not happen"

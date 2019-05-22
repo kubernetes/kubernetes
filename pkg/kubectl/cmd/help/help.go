@@ -29,6 +29,7 @@ var helpLong = templates.LongDesc(i18n.T(`
 	Help provides help for any command in the application.
 	Simply type kubectl help [path to command] for full details.`))
 
+// NewCmdHelp returns the help Cobra command
 func NewCmdHelp() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "help [command] | STRING_TO_SEARCH",
@@ -42,6 +43,7 @@ func NewCmdHelp() *cobra.Command {
 	return cmd
 }
 
+// RunHelp checks given arguments and executes command
 func RunHelp(cmd *cobra.Command, args []string) {
 	foundCmd, _, err := cmd.Root().Find(args)
 
@@ -56,7 +58,7 @@ func RunHelp(cmd *cobra.Command, args []string) {
 		cmd.Println(err)
 
 		argsString := strings.Join(args, " ")
-		var matchedMsgIsPrinted bool = false
+		var matchedMsgIsPrinted = false
 		for _, foundCmd := range foundCmd.Commands() {
 			if strings.Contains(foundCmd.Short, argsString) {
 				if !matchedMsgIsPrinted {

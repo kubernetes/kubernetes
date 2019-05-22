@@ -99,7 +99,8 @@ func getBazelGinkgo() (string, error) {
 
 func execCommand(binary string, args ...string) error {
 	fmt.Printf("Running command: %v %v\n", binary, strings.Join(args, " "))
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command("sh", "-c", strings.Join(append([]string{binary}, args...), " "))
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

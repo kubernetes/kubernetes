@@ -56,38 +56,56 @@ import (
 //
 // Dlarfb is an internal routine. It is exported for testing purposes.
 func (Implementation) Dlarfb(side blas.Side, trans blas.Transpose, direct lapack.Direct, store lapack.StoreV, m, n, k int, v []float64, ldv int, t []float64, ldt int, c []float64, ldc int, work []float64, ldwork int) {
-	if side != blas.Left && side != blas.Right {
-		panic(badSide)
-	}
-	if trans != blas.Trans && trans != blas.NoTrans {
-		panic(badTrans)
-	}
-	if direct != lapack.Forward && direct != lapack.Backward {
-		panic(badDirect)
-	}
-	if store != lapack.ColumnWise && store != lapack.RowWise {
-		panic(badStore)
-	}
-	checkMatrix(m, n, c, ldc)
-	if k < 0 {
-		panic(kLT0)
-	}
-	checkMatrix(k, k, t, ldt)
 	nv := m
-	nw := n
 	if side == blas.Right {
 		nv = n
-		nw = m
 	}
-	if store == lapack.ColumnWise {
-		checkMatrix(nv, k, v, ldv)
-	} else {
-		checkMatrix(k, nv, v, ldv)
+	switch {
+	case side != blas.Left && side != blas.Right:
+		panic(badSide)
+	case trans != blas.Trans && trans != blas.NoTrans:
+		panic(badTrans)
+	case direct != lapack.Forward && direct != lapack.Backward:
+		panic(badDirect)
+	case store != lapack.ColumnWise && store != lapack.RowWise:
+		panic(badStoreV)
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case k < 0:
+		panic(kLT0)
+	case store == lapack.ColumnWise && ldv < max(1, k):
+		panic(badLdV)
+	case store == lapack.RowWise && ldv < max(1, nv):
+		panic(badLdV)
+	case ldt < max(1, k):
+		panic(badLdT)
+	case ldc < max(1, n):
+		panic(badLdC)
+	case ldwork < max(1, k):
+		panic(badLdWork)
 	}
-	checkMatrix(nw, k, work, ldwork)
 
 	if m == 0 || n == 0 {
 		return
+	}
+
+	nw := n
+	if side == blas.Right {
+		nw = m
+	}
+	switch {
+	case store == lapack.ColumnWise && len(v) < (nv-1)*ldv+k:
+		panic(shortV)
+	case store == lapack.RowWise && len(v) < (k-1)*ldv+nv:
+		panic(shortV)
+	case len(t) < (k-1)*ldt+k:
+		panic(shortT)
+	case len(c) < (m-1)*ldc+n:
+		panic(shortC)
+	case len(work) < (nw-1)*ldwork+k:
+		panic(shortWork)
 	}
 
 	bi := blas64.Implementation()

@@ -173,11 +173,6 @@ func Ordering() []string {
 	return predicatesOrdering
 }
 
-// SetPredicatesOrdering sets the ordering of predicates.
-func SetPredicatesOrdering(names []string) {
-	predicatesOrdering = names
-}
-
 // GetPersistentVolumeInfo returns a persistent volume object by PV ID.
 func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
 	return c.Get(pvID)
@@ -687,7 +682,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 						}
 					}
 				}
-				return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
+				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
 			}
 
 			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
@@ -696,7 +691,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 			}
 
 			if pv == nil {
-				return false, nil, fmt.Errorf("PersistentVolume not found: %q", pvName)
+				return false, nil, fmt.Errorf("PersistentVolume was not found: %q", pvName)
 			}
 
 			for k, v := range pv.ObjectMeta.Labels {
@@ -978,16 +973,18 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 		return
 	}
 	pm.serviceAffinityInUse = true
-	var errSvc, errList error
+	var err error
 	// Store services which match the pod.
-	pm.serviceAffinityMatchingPodServices, errSvc = s.serviceLister.GetPodServices(pm.pod)
-	selector := CreateSelectorFromLabels(pm.pod.Labels)
-	allMatches, errList := s.podLister.List(selector)
-
-	// In the future maybe we will return them as part of the function.
-	if errSvc != nil || errList != nil {
-		klog.Errorf("Some Error were found while precomputing svc affinity: \nservices:%v , \npods:%v", errSvc, errList)
+	pm.serviceAffinityMatchingPodServices, err = s.serviceLister.GetPodServices(pm.pod)
+	if err != nil {
+		klog.Errorf("Error precomputing service affinity: could not list services: %v", err)
 	}
+	selector := CreateSelectorFromLabels(pm.pod.Labels)
+	allMatches, err := s.podLister.List(selector)
+	if err != nil {
+		klog.Errorf("Error precomputing service affinity: could not list pods: %v", err)
+	}
+
 	// consider only the pods that belong to the same namespace
 	pm.serviceAffinityMatchingPodList = FilterPodsByNamespace(allMatches, pm.pod.Namespace)
 }
@@ -1093,6 +1090,9 @@ func PodFitsHostPorts(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulerno
 
 // search two arrays and return true if they have at least one common element; return false otherwise
 func haveOverlap(a1, a2 []string) bool {
+	if len(a1) > len(a2) {
+		a1, a2 = a2, a1
+	}
 	m := map[string]bool{}
 
 	for _, val := range a1 {
@@ -1293,11 +1293,11 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 
 	topologyMaps := newTopologyPairsMaps()
 	for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
 		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
+		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
 		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
 			if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 				pair := topologyPair{key: term.TopologyKey, value: topologyValue}
@@ -1315,7 +1315,8 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 		existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+				klog.Errorf("Pod %s has NodeName %q but node is not found",
+					podName(existingPod), existingPod.Spec.NodeName)
 				continue
 			}
 			return nil, err
@@ -1344,12 +1345,12 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 		// present in nodeInfo. Pods on other nodes pass the filter.
 		filteredPods, err := c.podLister.FilteredList(nodeInfo.Filter, labels.Everything())
 		if err != nil {
-			errMessage := fmt.Sprintf("Failed to get all pods, %+v", err)
+			errMessage := fmt.Sprintf("Failed to get all pods: %v", err)
 			klog.Error(errMessage)
 			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
 		}
 		if topologyMaps, err = c.getMatchingAntiAffinityTopologyPairsOfPods(pod, filteredPods); err != nil {
-			errMessage := fmt.Sprintf("Failed to get all terms that pod %+v matches, err: %+v", podName(pod), err)
+			errMessage := fmt.Sprintf("Failed to get all terms that match pod %s: %v", podName(pod), err)
 			klog.Error(errMessage)
 			return ErrExistingPodsAntiAffinityRulesNotMatch, errors.New(errMessage)
 		}
@@ -1454,7 +1455,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 			if !matchFound && len(affinityTerms) > 0 {
 				affTermsMatch, termsSelectorMatch, err := c.podMatchesPodAffinityTerms(pod, targetPod, nodeInfo, affinityTerms)
 				if err != nil {
-					errMessage := fmt.Sprintf("Cannot schedule pod %+v onto node %v, because of PodAffinity, err: %v", podName(pod), node.Name, err)
+					errMessage := fmt.Sprintf("Cannot schedule pod %s onto node %s, because of PodAffinity: %v", podName(pod), node.Name, err)
 					klog.Error(errMessage)
 					return ErrPodAffinityRulesNotMatch, errors.New(errMessage)
 				}

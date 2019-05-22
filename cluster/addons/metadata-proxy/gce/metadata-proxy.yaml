@@ -48,7 +48,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: metadata-proxy
-        image: k8s.gcr.io/metadata-proxy:v0.1.11
+        image: k8s.gcr.io/metadata-proxy:v0.1.12
         securityContext:
           privileged: true
         # Request and limit resources to get guaranteed QoS.
@@ -61,7 +61,7 @@ spec:
             cpu: "30m"
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: k8s.gcr.io/prometheus-to-sd:v0.3.1
+        image: k8s.gcr.io/prometheus-to-sd:v0.5.0
         # Request and limit resources to get guaranteed QoS.
         resources:
           requests:

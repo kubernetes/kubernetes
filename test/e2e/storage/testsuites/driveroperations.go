@@ -22,6 +22,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -71,8 +72,8 @@ func GetStorageClass(
 			Kind: "StorageClass",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			// Name must be unique, so let's base it on namespace name
-			Name: ns + "-" + suffix,
+			// Name must be unique, so let's base it on namespace name and use GenerateName
+			Name: names.SimpleNameGenerator.GenerateName(ns + "-" + suffix),
 		},
 		Provisioner:       provisioner,
 		Parameters:        parameters,

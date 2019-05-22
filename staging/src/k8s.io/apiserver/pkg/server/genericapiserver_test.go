@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/spec"
 	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
@@ -362,7 +361,7 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 
 	// verify we are able to update the served spec using the exposed service
 	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
-	swagger := new(spec.Swagger)
+	swagger := new(openapi.Swagger)
 	err = json.Unmarshal(newSpec, swagger)
 	assert.NoError(err)
 

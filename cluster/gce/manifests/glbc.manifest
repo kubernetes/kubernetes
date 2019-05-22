@@ -34,6 +34,9 @@ spec:
     - mountPath: /var/log/glbc.log
       name: logfile
       readOnly: false
+    - name: srvkube
+      mountPath: /etc/srv/kubernetes/l7-lb-controller
+      readOnly: true
     resources:
       # Request is set to accommodate this pod alongside the other
       # master components on a single core master.
@@ -45,7 +48,7 @@ spec:
     # TODO: split this out into args when we no longer need to pipe stdout to a file #6428
     - sh
     - -c
-    - 'exec /glbc --gce-ratelimit=ga.Operations.Get,qps,10,100 --gce-ratelimit=alpha.Operations.Get,qps,10,100 --gce-ratelimit=ga.BackendServices.Get,qps,1.8,1 --gce-ratelimit=ga.HealthChecks.Get,qps,1.8,1 --gce-ratelimit=alpha.HealthChecks.Get,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.Get,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.AttachNetworkEndpoints,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.DetachNetworkEndpoints,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.ListNetworkEndpoints,qps,1.8,1 --verbose --apiserver-host=http://localhost:8080 --default-backend-service=kube-system/default-http-backend --sync-period=600s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
+    - 'exec /glbc --gce-ratelimit=ga.Operations.Get,qps,10,100 --gce-ratelimit=alpha.Operations.Get,qps,10,100 --gce-ratelimit=ga.BackendServices.Get,qps,1.8,1 --gce-ratelimit=ga.HealthChecks.Get,qps,1.8,1 --gce-ratelimit=alpha.HealthChecks.Get,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.Get,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.AttachNetworkEndpoints,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.DetachNetworkEndpoints,qps,1.8,1 --gce-ratelimit=beta.NetworkEndpointGroups.ListNetworkEndpoints,qps,1.8,1 --verbose --kubeconfig=/etc/srv/kubernetes/l7-lb-controller/kubeconfig --default-backend-service=kube-system/default-http-backend --sync-period=600s --running-in-cluster=false --use-real-cloud=true --config-file-path=/etc/gce.conf --healthz-port=8086 1>>/var/log/glbc.log 2>&1'
   volumes:
   - hostPath:
       path: /etc/gce.conf
@@ -55,3 +58,6 @@ spec:
       path: /var/log/glbc.log
       type: FileOrCreate
     name: logfile
+  - name: srvkube
+    hostPath:
+      path: /etc/srv/kubernetes/l7-lb-controller

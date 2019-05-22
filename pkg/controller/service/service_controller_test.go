@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,28 +32,36 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
 const region = "us-central"
 
 func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
-	return &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default", UID: uid, SelfLink: testapi.Default.SelfLink("services", name)}, Spec: v1.ServiceSpec{Type: serviceType}}
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "default",
+			UID:       uid,
+			SelfLink:  testapi.Default.SelfLink("services", name),
+		},
+		Spec: v1.ServiceSpec{
+			Type: serviceType,
+		},
+	}
 }
 
 //Wrap newService so that you don't have to call default arguments again and again.
 func defaultExternalService() *v1.Service {
-
 	return newService("external-balancer", types.UID("123"), v1.ServiceTypeLoadBalancer)
-
 }
 
 func alwaysReady() bool { return true }
 
-func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset) {
-	cloud := &fakecloud.FakeCloud{}
+func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
+	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
 	client := fake.NewSimpleClientset()
@@ -151,7 +159,13 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 
 	for _, item := range table {
 		controller, cloud, client := newController()
-		err := controller.createLoadBalancerIfNeeded("foo/bar", item.service)
+		key := fmt.Sprintf("%s/%s", item.service.Namespace, item.service.Name)
+		if _, err := client.CoreV1().Services(item.service.Namespace).Create(item.service); err != nil {
+			t.Errorf("Failed to prepare service %s for testing: %v", key, err)
+			continue
+		}
+		client.ClearActions()
+		err := controller.syncLoadBalancerIfNeeded(key, item.service)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {
@@ -166,7 +180,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 				t.Errorf("unexpected client actions: %v", actions)
 			}
 		} else {
-			var balancer *fakecloud.FakeBalancer
+			var balancer *fakecloud.Balancer
 			for k := range cloud.Balancers {
 				if balancer == nil {
 					b := cloud.Balancers[k]
@@ -185,12 +199,12 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 			}
 			actionFound := false
 			for _, action := range actions {
-				if action.GetVerb() == "update" && action.GetResource().Resource == "services" {
+				if action.GetVerb() == "patch" && action.GetResource().Resource == "services" {
 					actionFound = true
 				}
 			}
 			if !actionFound {
-				t.Errorf("expected updated service to be sent to client, got these actions instead: %v", actions)
+				t.Errorf("expected patch service to be sent to client, got these actions instead: %v", actions)
 			}
 		}
 	}
@@ -205,7 +219,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	}
 	table := []struct {
 		services            []*v1.Service
-		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
+		expectedUpdateCalls []fakecloud.UpdateBalancerCall
 	}{
 		{
 			// No services present: no calls should be made.
@@ -225,7 +239,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 			services: []*v1.Service{
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "333", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
@@ -236,7 +250,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s1", "555", v1.ServiceTypeLoadBalancer),
 				newService("s2", "666", v1.ServiceTypeLoadBalancer),
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "444", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s1", "555", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s2", "666", v1.ServiceTypeLoadBalancer), Hosts: nodes},
@@ -250,7 +264,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s3", "999", v1.ServiceTypeLoadBalancer),
 				newService("s4", "123", v1.ServiceTypeClusterIP),
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s1", "888", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 				{Service: newService("s3", "999", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
@@ -261,7 +275,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "234", v1.ServiceTypeLoadBalancer),
 				nil,
 			},
-			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
+			expectedUpdateCalls: []fakecloud.UpdateBalancerCall{
 				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
@@ -326,7 +340,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 }
 
 func TestProcessServiceUpdate(t *testing.T) {
-	var controller *ServiceController
+	controller, _, client := newController()
 
 	//A pair of old and new loadbalancer IP address
 	oldLBIP := "192.168.1.1"
@@ -345,7 +359,6 @@ func TestProcessServiceUpdate(t *testing.T) {
 			svc:      defaultExternalService(),
 			updateFn: func(svc *v1.Service) *v1.Service {
 
-				controller, _, _ = newController()
 				controller.cache.getOrCreate("validKey")
 				return svc
 
@@ -404,6 +417,9 @@ func TestProcessServiceUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		newSvc := tc.updateFn(tc.svc)
+		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
+			t.Fatalf("Failed to prepare service %s for testing: %v", tc.key, err)
+		}
 		svcCache := controller.cache.getOrCreate(tc.key)
 		obtErr := controller.processServiceUpdate(svcCache, newSvc, tc.key)
 		if err := tc.expectedFn(newSvc, obtErr); err != nil {
@@ -527,7 +543,7 @@ func TestSyncService(t *testing.T) {
 func TestProcessServiceDeletion(t *testing.T) {
 
 	var controller *ServiceController
-	var cloud *fakecloud.FakeCloud
+	var cloud *fakecloud.Cloud
 	// Add a global svcKey name
 	svcKey := "external-balancer"
 

@@ -20,26 +20,26 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/network/scale"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Loadbalancing: L7 Scalability", func() {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	var (
 		ns string
 	)
 	f := framework.NewDefaultFramework("ingress-scale")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name
 	})
 
-	Describe("GCE [Slow] [Serial] [Feature:IngressScale]", func() {
+	ginkgo.Describe("GCE [Slow] [Serial] [Feature:IngressScale]", func() {
 		var (
 			scaleFramework *scale.IngressScaleFramework
 		)
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
 
 			scaleFramework = scale.NewIngressScaleFramework(f.ClientSet, ns, framework.TestContext.CloudConfig)
@@ -48,13 +48,13 @@ var _ = SIGDescribe("Loadbalancing: L7 Scalability", func() {
 			}
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			if errs := scaleFramework.CleanupScaleTest(); len(errs) != 0 {
 				framework.Failf("Unexpected error while cleaning up ingress scale test: %v", errs)
 			}
 		})
 
-		It("Creating and updating ingresses should happen promptly with small/medium/large amount of ingresses", func() {
+		ginkgo.It("Creating and updating ingresses should happen promptly with small/medium/large amount of ingresses", func() {
 			if errs := scaleFramework.RunScaleTest(); len(errs) != 0 {
 				framework.Failf("Unexpected error while running ingress scale test: %v", errs)
 			}

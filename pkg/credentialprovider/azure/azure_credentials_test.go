@@ -74,7 +74,7 @@ func Test(t *testing.T) {
 	}
 	provider.loadConfig(bytes.NewBufferString(configStr))
 
-	creds := provider.Provide()
+	creds := provider.Provide("")
 
 	if len(creds) != len(result)+1 {
 		t.Errorf("Unexpected list: %v, expected length %d", creds, len(result)+1)
@@ -91,6 +91,43 @@ func Test(t *testing.T) {
 		registryName := getLoginServer(val)
 		if _, found := creds[registryName]; !found {
 			t.Errorf("Missing expected registry: %s", registryName)
+		}
+	}
+}
+
+func TestParseACRLoginServerFromImage(t *testing.T) {
+	tests := []struct {
+		image    string
+		expected string
+	}{
+		{
+			image:    "invalidImage",
+			expected: "",
+		},
+		{
+			image:    "docker.io/library/busybox:latest",
+			expected: "",
+		},
+		{
+			image:    "foo.azurecr.io/bar/image:version",
+			expected: "foo.azurecr.io",
+		},
+		{
+			image:    "foo.azurecr.cn/bar/image:version",
+			expected: "foo.azurecr.cn",
+		},
+		{
+			image:    "foo.azurecr.de/bar/image:version",
+			expected: "foo.azurecr.de",
+		},
+		{
+			image:    "foo.azurecr.us/bar/image:version",
+			expected: "foo.azurecr.us",
+		},
+	}
+	for _, test := range tests {
+		if loginServer := parseACRLoginServerFromImage(test.image); loginServer != test.expected {
+			t.Errorf("function parseACRLoginServerFromImage returns \"%s\" for image %s, expected \"%s\"", loginServer, test.image, test.expected)
 		}
 	}
 }

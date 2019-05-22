@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	apiv1 "k8s.io/api/core/v1"
@@ -35,6 +35,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -42,10 +44,10 @@ import (
 var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 	f := framework.NewDefaultFramework("audit")
 
-	It("should dynamically audit API calls", func() {
+	ginkgo.It("should dynamically audit API calls", func() {
 		namespace := f.Namespace.Name
 
-		By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
+		ginkgo.By("Creating a kubernetes client that impersonates an unauthorized anonymous user")
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "failed to fetch config")
 
@@ -112,14 +114,14 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			p, err := f.ClientSet.CoreV1().Pods(namespace).Get("audit-proxy", metav1.GetOptions{})
 			if errors.IsNotFound(err) {
-				framework.Logf("waiting for audit-proxy pod to be present")
+				e2elog.Logf("waiting for audit-proxy pod to be present")
 				return false, nil
 			} else if err != nil {
 				return false, err
 			}
 			podIP = p.Status.PodIP
 			if podIP == "" {
-				framework.Logf("waiting for audit-proxy pod IP to be ready")
+				e2elog.Logf("waiting for audit-proxy pod IP to be ready")
 				return false, nil
 			}
 			return true, nil
@@ -152,17 +154,17 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 
 		_, err = f.ClientSet.AuditregistrationV1alpha1().AuditSinks().Create(&sink)
 		framework.ExpectNoError(err, "failed to create audit sink")
-		framework.Logf("created audit sink")
+		e2elog.Logf("created audit sink")
 
 		// check that we are receiving logs in the proxy
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
 			logs, err := framework.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
 			if err != nil {
-				framework.Logf("waiting for audit-proxy pod logs to be available")
+				e2elog.Logf("waiting for audit-proxy pod logs to be available")
 				return false, nil
 			}
 			if logs == "" {
-				framework.Logf("waiting for audit-proxy pod logs to be non-empty")
+				e2elog.Logf("waiting for audit-proxy pod logs to be non-empty")
 				return false, nil
 			}
 			return true, nil
@@ -346,7 +348,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		if framework.IsRBACEnabled(f) {
+		if auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
 			testCases = append(testCases, annotationTestCases...)
 		}
 		expectedEvents := []utils.AuditEvent{}
@@ -368,9 +370,9 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			reader := strings.NewReader(logs)
 			missingReport, err := utils.CheckAuditLines(reader, expectedEvents, auditv1.SchemeGroupVersion)
 			if err != nil {
-				framework.Logf("Failed to observe audit events: %v", err)
+				e2elog.Logf("Failed to observe audit events: %v", err)
 			} else if len(missingReport.MissingEvents) > 0 {
-				framework.Logf(missingReport.String())
+				e2elog.Logf(missingReport.String())
 			}
 			return len(missingReport.MissingEvents) == 0, nil
 		})

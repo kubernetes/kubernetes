@@ -531,7 +531,7 @@ func TestWaitForWithEarlyClosingWaitFunc(t *testing.T) {
 	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 
 	// The WaitFor should return immediately, so the duration is close to 0s.
 	if duration >= ForeverTestTimeout/2 {
@@ -555,7 +555,7 @@ func TestWaitForWithClosedChannel(t *testing.T) {
 	}, func() (bool, error) {
 		return false, nil
 	}, stopCh)
-	duration := time.Now().Sub(start)
+	duration := time.Since(start)
 	// The WaitFor should return immediately, so the duration is close to 0s.
 	if duration >= ForeverTestTimeout/2 {
 		t.Errorf("expected short timeout duration")
@@ -662,5 +662,35 @@ func TestBackoff_Step(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestContextForChannel(t *testing.T) {
+	var wg sync.WaitGroup
+	parentCh := make(chan struct{})
+	done := make(chan struct{})
+
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := contextForChannel(parentCh)
+			defer cancel()
+			<-ctx.Done()
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	// Closing parent channel should cancel all children contexts
+	close(parentCh)
+
+	select {
+	case <-done:
+	case <-time.After(ForeverTestTimeout):
+		t.Errorf("unexepcted timeout waiting for parent to cancel child contexts")
 	}
 }
