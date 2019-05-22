@@ -481,11 +481,14 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
-	// 1. Run a pod to get an available node, then delete the pod
-	// 2. Taint the node with a random taint
-	// 3. Try to relaunch the pod with tolerations tolerate the taints on node,
-	// and the pod's nodeName specified to the name of node found in step 1
-	ginkgo.It("validates that taints-tolerations is respected if matching", func() {
+	/*
+		Release : v1.16
+		Testname : Scheduler, taints-tolerations matching
+		Description : After removing the pod from the available node, verify that the
+		pod(with toleration against node taint) is scheduled when the node is tainted with a
+		random taint. The pod MUST be scheduled onto the node.
+	*/
+	framework.ConformanceIt("validates that taints-tolerations is respected if matching", func() {
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 
 		ginkgo.By("Trying to apply a random taint on the found node.")
@@ -528,6 +531,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// 2. Taint the node with a random taint
 	// 3. Try to relaunch the pod still no tolerations,
 	// and the pod's nodeName specified to the name of node found in step 1
+
+	//Promotion to conformance: NO
+	//Reason: This test cannot be promoted because it uses WaitForSchedulerAfterAction which
+	//uses scheduleFailureEvent which checks Event.Type and Event.Reason fields
 	ginkgo.It("validates that taints-tolerations is respected if not matching", func() {
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 
