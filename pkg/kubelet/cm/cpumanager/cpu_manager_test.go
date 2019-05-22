@@ -122,8 +122,24 @@ func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool
 func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 	return &v1.Pod{
 		Spec: v1.PodSpec{
+			InitContainers: []v1.Container{
+				{
+					Name: "init-container",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpuRequest),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpuLimit),
+							v1.ResourceName(v1.ResourceMemory): resource.MustParse("1G"),
+						},
+					},
+				},
+			},
 			Containers: []v1.Container{
 				{
+					Name: "app-container",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpuRequest),
@@ -200,8 +216,8 @@ func TestCPUManagerAdd(t *testing.T) {
 		}
 
 		pod := makePod("3", "3")
-		container := &pod.Spec.Containers[0]
-		err := mgr.AddContainer(pod, container, "fakeID")
+		_ = mgr.AddContainer(pod, &pod.Spec.InitContainers[0], "init-fakeID")
+		err := mgr.AddContainer(pod, &pod.Spec.Containers[0], "app-fakeID")
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
