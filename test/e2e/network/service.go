@@ -37,6 +37,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -138,7 +139,8 @@ var _ = SIGDescribe("Services", func() {
 
 		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
 
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		names := map[string]bool{}
 		defer func() {
@@ -153,19 +155,23 @@ var _ = SIGDescribe("Services", func() {
 
 		framework.CreatePodOrFail(cs, ns, name1, labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{name1: {80}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		framework.CreatePodOrFail(cs, ns, name2, labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{name1: {80}, name2: {80}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}, name2: {80}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		framework.DeletePodOrFail(cs, ns, name1)
 		delete(names, name1)
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{name2: {80}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name2: {80}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		framework.DeletePodOrFail(cs, ns, name2)
 		delete(names, name2)
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 	})
 
 	/*
@@ -206,7 +212,8 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create service with ServicePorts in namespace: %s", ns)
 		port1 := 100
 		port2 := 101
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		names := map[string]bool{}
 		defer func() {
@@ -234,19 +241,23 @@ var _ = SIGDescribe("Services", func() {
 
 		framework.CreatePodOrFail(cs, ns, podname1, labels, containerPorts1)
 		names[podname1] = true
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{podname1: {port1}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		framework.CreatePodOrFail(cs, ns, podname2, labels, containerPorts2)
 		names[podname2] = true
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{podname1: {port1}, podname2: {port2}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}, podname2: {port2}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		framework.DeletePodOrFail(cs, ns, podname1)
 		delete(names, podname1)
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{podname2: {port2}})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname2: {port2}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		framework.DeletePodOrFail(cs, ns, podname2)
 		delete(names, podname2)
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 	})
 
 	ginkgo.It("should preserve source pod IP for traffic thru service cluster IP", func() {
@@ -297,7 +308,8 @@ var _ = SIGDescribe("Services", func() {
 		}()
 
 		// Waiting for service to expose endpoint.
-		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{serverPodName: {servicePort}})
+		err := e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By("Retrieve sourceip from a pod on the same node")
 		sourceIP1, execPodIP1 := execSourceipTest(f, cs, ns, node1.Name, serviceIP, servicePort)
