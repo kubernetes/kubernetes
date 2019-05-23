@@ -57,8 +57,9 @@ type APIServiceSpec struct {
 	// InsecureSkipTLSVerify disables TLS certificate verification when communicating with this server.
 	// This is strongly discouraged.  You should use the CABundle instead.
 	InsecureSkipTLSVerify bool
-	// CABundle is a PEM(Base64) encoded CA bundle which will be used to validate an API server's serving certificate.
+	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	// If unspecified, system trust roots on the apiserver are used.
+	// The value should be base64 encoded when specified in JSON or YAML.
 	// +optional
 	CABundle []byte
 
