@@ -31,6 +31,8 @@ spec:
       containers:
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v0.4.1
+          securityContext:
+            privileged: true
           args:
             - --v=5
             - --csi-address=$(ADDRESS)

@@ -37,6 +37,8 @@ spec:
           env:
             - name: ADDRESS
               value: /csi/csi.sock
+          securityContext:
+            privileged: true
           imagePullPolicy: Always
           volumeMounts:
           - mountPath: /csi

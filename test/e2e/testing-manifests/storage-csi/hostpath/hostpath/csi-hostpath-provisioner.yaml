@@ -31,6 +31,8 @@ spec:
       containers:
         - name: csi-provisioner
           image: quay.io/k8scsi/csi-provisioner:v1.1.0
+          securityContext:
+            privileged: true
           args:
             - "--provisioner=csi-hostpath"
             - "--csi-address=$(ADDRESS)"

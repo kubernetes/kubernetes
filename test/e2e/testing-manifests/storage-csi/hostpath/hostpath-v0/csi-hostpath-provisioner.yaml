@@ -30,6 +30,8 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
+          securityContext:
+            privileged: true
           image: quay.io/k8scsi/csi-provisioner:v0.4.1
           args:
             - "--provisioner=csi-hostpath-v0"
