@@ -220,9 +220,6 @@ func New(client clientset.Interface,
 	// Setup volume binder
 	volumeBinder := volumebinder.NewVolumeBinder(client, nodeInformer, pvcInformer, pvInformer, storageClassInformer, time.Duration(options.bindTimeoutSeconds)*time.Second)
 	scheduledPodsHasSynced := podInformer.Informer().HasSynced
-	// ScheduledPodLister is something we provide to plug-in functions that
-	// they may need to call.
-	// scheduledPodLister := assignedPodLister{podInformer.Lister()}
 
 	// Setup cache debugger
 	debugger := cachedebugger.New(
@@ -238,22 +235,6 @@ func New(client clientset.Interface,
 		podQueue.Close()
 	}()
 
-	// initiate pluginFactoryArgs
-	pluginArgs := &factory.PluginFactoryArgs{
-		PodLister:                      schedulerCache,
-		ServiceLister:                  serviceInformer.Lister(),
-		ControllerLister:               replicationControllerInformer.Lister(),
-		ReplicaSetLister:               replicaSetInformer.Lister(),
-		StatefulSetLister:              statefulSetInformer.Lister(),
-		NodeLister:                     &nodeLister{nodeInformer.Lister()},
-		PDBLister:                      pdbInformer.Lister(),
-		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: nodeInformer.Lister()},
-		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: pvInformer.Lister()},
-		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: pvcInformer.Lister()},
-		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: storageClassLister},
-		VolumeBinder:                   volumeBinder,
-		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
-	}
 	source := schedulerAlgorithmSource
 	predicateKeys := sets.NewString()
 	priorityKeys := sets.NewString()
@@ -352,6 +333,22 @@ func New(client clientset.Interface,
 		return nil, fmt.Errorf("invalid hardPodAffinitySymmetricWeight: %d, must be in the range 1-100", options.hardPodAffinitySymmetricWeight)
 	}
 
+	// initiate pluginFactoryArgs
+	pluginArgs := &factory.PluginFactoryArgs{
+		PodLister:                      schedulerCache,
+		ServiceLister:                  serviceInformer.Lister(),
+		ControllerLister:               replicationControllerInformer.Lister(),
+		ReplicaSetLister:               replicaSetInformer.Lister(),
+		StatefulSetLister:              statefulSetInformer.Lister(),
+		NodeLister:                     &nodeLister{nodeInformer.Lister()},
+		PDBLister:                      pdbInformer.Lister(),
+		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: nodeInformer.Lister()},
+		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: pvInformer.Lister()},
+		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: pvcInformer.Lister()},
+		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: storageClassLister},
+		VolumeBinder:                   volumeBinder,
+		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
+	}
 	predicateFuncs, err := factory.GetFitPredicateFunctions(predicateKeys, *pluginArgs)
 	if err != nil {
 		return nil, err

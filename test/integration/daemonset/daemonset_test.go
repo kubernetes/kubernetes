@@ -101,8 +101,6 @@ func setupScheduler(
 	eventBroadcaster := record.NewBroadcaster()
 	defaultBindTimeout := int64(30)
 	defaultSource := "DefaultProvider"
-	// TODO: Replace NewFromConfig and AddAllEventHandlers with scheduler.New() in
-	// all test/integration tests.
 	sched, err := scheduler.New(cs,
 		informerFactory.Core().V1().Nodes(),
 		informerFactory.Core().V1().Pods(),
