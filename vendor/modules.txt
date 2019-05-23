@@ -342,6 +342,9 @@ github.com/ghodss/yaml
 # github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 => github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
 github.com/globalsign/mgo/bson
 github.com/globalsign/mgo/internal/json
+# github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
+github.com/go-bindata/go-bindata
+github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-openapi/analysis v0.17.2 => github.com/go-openapi/analysis v0.17.2
 github.com/go-openapi/analysis
 github.com/go-openapi/analysis/internal
@@ -558,9 +561,6 @@ github.com/json-iterator/go
 github.com/jstemmer/go-junit-report
 github.com/jstemmer/go-junit-report/formatter
 github.com/jstemmer/go-junit-report/parser
-# github.com/jteeuwen/go-bindata v0.0.0-20151023091102-a0ff2567cfb7 => github.com/jteeuwen/go-bindata v0.0.0-20151023091102-a0ff2567cfb7
-github.com/jteeuwen/go-bindata
-github.com/jteeuwen/go-bindata/go-bindata
 # github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22 => github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 github.com/kardianos/osext
 # github.com/karrick/godirwalk v1.7.5 => github.com/karrick/godirwalk v1.7.5

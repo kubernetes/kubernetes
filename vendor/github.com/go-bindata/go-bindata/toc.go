@@ -52,6 +52,40 @@ func (root *assetTree) funcOrNil() string {
 	}
 }
 
+func getFillerSize(tokenIndex int, lengths []int, nident int) int {
+	var (
+		curlen    int = lengths[tokenIndex]
+		maxlen    int = 0
+		substart  int = 0
+		subend    int = 0
+		spacediff int = 0
+	)
+
+	if curlen > 0 {
+		substart = tokenIndex
+		for (substart-1) >= 0 && lengths[substart-1] > 0 {
+			substart -= 1
+		}
+
+		subend = tokenIndex
+		for (subend+1) < len(lengths) && lengths[subend+1] > 0 {
+			subend += 1
+		}
+
+		var candidate int
+		for j := substart; j <= subend; j += 1 {
+			candidate = lengths[j]
+			if candidate > maxlen {
+				maxlen = candidate
+			}
+		}
+
+		spacediff = maxlen - curlen
+	}
+
+	return spacediff
+}
+
 func (root *assetTree) writeGoMap(w io.Writer, nident int) {
 	fmt.Fprintf(w, "&bintree{%s, map[string]*bintree{", root.funcOrNil())
 
@@ -60,16 +94,28 @@ func (root *assetTree) writeGoMap(w io.Writer, nident int) {
 
 		// Sort to make output stable between invocations
 		filenames := make([]string, len(root.Children))
+		hasChildren := make(map[string]bool)
 		i := 0
-		for filename, _ := range root.Children {
+		for filename, node := range root.Children {
 			filenames[i] = filename
+			hasChildren[filename] = len(node.Children) > 0
 			i++
 		}
 		sort.Strings(filenames)
 
-		for _, p := range filenames {
+		lengths := make([]int, len(root.Children))
+		for i, filename := range filenames {
+			if hasChildren[filename] {
+				lengths[i] = 0
+			} else {
+				lengths[i] = len(filename)
+			}
+		}
+
+		for i, p := range filenames {
 			ident(w, nident+1)
-			fmt.Fprintf(w, `"%s": `, p)
+			filler := strings.Repeat(" ", getFillerSize(i, lengths, nident))
+			fmt.Fprintf(w, `"%s": %s`, p, filler)
 			root.Children[p].writeGoMap(w, nident+1)
 		}
 		ident(w, nident)
@@ -87,6 +133,7 @@ func (root *assetTree) WriteAsGoMap(w io.Writer) error {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = `)
 	root.writeGoMap(w, 0)
 	return err
@@ -147,8 +194,16 @@ func writeTOC(w io.Writer, toc []Asset) error {
 		return err
 	}
 
+	var maxlen = 0
 	for i := range toc {
-		err = writeTOCAsset(w, &toc[i])
+		l := len(toc[i].Name)
+		if l > maxlen {
+			maxlen = l
+		}
+	}
+
+	for i := range toc {
+		err = writeTOCAsset(w, &toc[i], maxlen)
 		if err != nil {
 			return err
 		}
@@ -216,8 +271,11 @@ var _bindata = map[string]func() (*asset, error){
 }
 
 // writeTOCAsset write a TOC entry for the given asset.
-func writeTOCAsset(w io.Writer, asset *Asset) error {
-	_, err := fmt.Fprintf(w, "\t%q: %s,\n", asset.Name, asset.Func)
+func writeTOCAsset(w io.Writer, asset *Asset, maxlen int) error {
+	spacediff := maxlen - len(asset.Name)
+	filler := strings.Repeat(" ", spacediff)
+
+	_, err := fmt.Fprintf(w, "\t%q: %s%s,\n", asset.Name, filler, asset.Func)
 	return err
 }
 

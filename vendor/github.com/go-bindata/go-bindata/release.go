@@ -21,6 +21,11 @@ func writeRelease(w io.Writer, c *Config, toc []Asset) error {
 		return err
 	}
 
+	err = writeAssetFS(w, c)
+	if err != nil {
+		return err
+	}
+
 	for i := range toc {
 		err = writeReleaseAsset(w, c, &toc[i])
 		if err != nil {
@@ -37,15 +42,15 @@ func writeReleaseHeader(w io.Writer, c *Config) error {
 	var err error
 	if c.NoCompress {
 		if c.NoMemCopy {
-			err = header_uncompressed_nomemcopy(w)
+			err = header_uncompressed_nomemcopy(w, c)
 		} else {
-			err = header_uncompressed_memcopy(w)
+			err = header_uncompressed_memcopy(w, c)
 		}
 	} else {
 		if c.NoMemCopy {
-			err = header_compressed_nomemcopy(w)
+			err = header_compressed_nomemcopy(w, c)
 		} else {
-			err = header_compressed_memcopy(w)
+			err = header_compressed_memcopy(w, c)
 		}
 	}
 	if err != nil {
@@ -97,8 +102,23 @@ func sanitize(b []byte) []byte {
 	return bytes.Replace(b, []byte("\xEF\xBB\xBF"), []byte("`+\"\\xEF\\xBB\\xBF\"+`"), -1)
 }
 
-func header_compressed_nomemcopy(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
+func header_compressed_nomemcopy(w io.Writer, c *Config) error {
+	var header string
+
+	if c.HttpFileSystem {
+		header = `import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"net/http"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"`
+	} else {
+		header = `import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
@@ -107,7 +127,10 @@ func header_compressed_nomemcopy(w io.Writer) error {
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	"time"`
+	}
+
+	_, err := fmt.Fprintf(w, `%s
 )
 
 func bindataRead(data, name string) ([]byte, error) {
@@ -130,12 +153,27 @@ func bindataRead(data, name string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-`)
+`, header)
 	return err
 }
 
-func header_compressed_memcopy(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
+func header_compressed_memcopy(w io.Writer, c *Config) error {
+	var header string
+
+	if c.HttpFileSystem {
+		header = `import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"net/http"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"`
+	} else {
+		header = `import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
@@ -144,7 +182,10 @@ func header_compressed_memcopy(w io.Writer) error {
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	"time"`
+	}
+
+	_, err := fmt.Fprintf(w, `%s
 )
 
 func bindataRead(data []byte, name string) ([]byte, error) {
@@ -167,12 +208,27 @@ func bindataRead(data []byte, name string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-`)
+`, header)
 	return err
 }
 
-func header_uncompressed_nomemcopy(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
+func header_uncompressed_nomemcopy(w io.Writer, c *Config) error {
+	var header string
+
+	if c.HttpFileSystem {
+		header = `import (
+	"bytes"
+	"fmt"
+	"net/http"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"time"
+	"unsafe"`
+	} else {
+		header = `import (
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -180,7 +236,10 @@ func header_uncompressed_nomemcopy(w io.Writer) error {
 	"reflect"
 	"strings"
 	"time"
-	"unsafe"
+	"unsafe"`
+	}
+
+	_, err := fmt.Fprintf(w, `%s
 )
 
 func bindataRead(data, name string) ([]byte, error) {
@@ -194,20 +253,36 @@ func bindataRead(data, name string) ([]byte, error) {
 	return b, nil
 }
 
-`)
+`, header)
 	return err
 }
 
-func header_uncompressed_memcopy(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
+func header_uncompressed_memcopy(w io.Writer, c *Config) error {
+	var header string
+
+	if c.HttpFileSystem {
+		header = `import (
+	"bytes"
+	"fmt"
+	"net/http"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"`
+	} else {
+		header = `import (
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	"time"`
+	}
+
+	_, err := fmt.Fprintf(w, `%s
 )
-`)
+`, header)
 	return err
 }
 
@@ -224,21 +299,32 @@ type bindataFileInfo struct {
 	modTime time.Time
 }
 
+// Name return file name
 func (fi bindataFileInfo) Name() string {
 	return fi.name
 }
+
+// Size return file size
 func (fi bindataFileInfo) Size() int64 {
 	return fi.size
 }
+
+// Mode return file mode
 func (fi bindataFileInfo) Mode() os.FileMode {
 	return fi.mode
 }
+
+// Mode return file modify time
 func (fi bindataFileInfo) ModTime() time.Time {
 	return fi.modTime
 }
+
+// IsDir return file whether a directory
 func (fi bindataFileInfo) IsDir() bool {
-	return false
+	return fi.mode&os.ModeDir != 0
 }
+
+// Sys return file is sys mode
 func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }

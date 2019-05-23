@@ -9,13 +9,14 @@ go_library(
         "convert.go",
         "debug.go",
         "doc.go",
+        "file.go",
         "release.go",
         "restore.go",
         "stringwriter.go",
         "toc.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata",
-    importpath = "github.com/jteeuwen/go-bindata",
+    importmap = "k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata",
+    importpath = "github.com/go-bindata/go-bindata",
     visibility = ["//visibility:public"],
 )
 
@@ -30,7 +31,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//vendor/github.com/jteeuwen/go-bindata/go-bindata:all-srcs",
+        "//vendor/github.com/go-bindata/go-bindata/go-bindata:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
