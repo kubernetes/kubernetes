@@ -99,6 +99,14 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
 		Duration: constants.DefaultControlPlaneTimeout,
 	}
+
+	// Pin values for fields that are not present in v1beta1
+	obj.APIServer.RunAsUser = nil
+	obj.APIServer.RunAsGroup = nil
+	obj.ControllerManager.RunAsUser = nil
+	obj.ControllerManager.RunAsGroup = nil
+	obj.Scheduler.RunAsUser = nil
+	obj.Scheduler.RunAsGroup = nil
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {

@@ -51,38 +51,62 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 	// Get the required hostpath mounts
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
 
+	apiServerContainer := v1.Container{
+		Name:            kubeadmconstants.KubeAPIServer,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeAPIServer, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getAPIServerCommand(cfg, endpoint),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
+		LivenessProbe:   livenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), int(endpoint.BindPort), v1.URISchemeHTTPS),
+		Resources:       staticpodutil.ComponentResources("250m"),
+		Env:             getProxyEnvVars(),
+	}
+	if cfg.APIServer.ControlPlaneComponent.RunAsUser != nil || cfg.APIServer.ControlPlaneComponent.RunAsGroup != nil {
+		apiServerContainer.SecurityContext = &v1.SecurityContext{
+			RunAsUser:  cfg.APIServer.ControlPlaneComponent.RunAsUser,
+			RunAsGroup: cfg.APIServer.ControlPlaneComponent.RunAsGroup,
+		}
+	}
+
+	controllerManagerContainer := v1.Container{
+		Name:            kubeadmconstants.KubeControllerManager,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getControllerManagerCommand(cfg, k8sVersion),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
+		LivenessProbe:   livenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), ports.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
+		Resources:       staticpodutil.ComponentResources("200m"),
+		Env:             getProxyEnvVars(),
+	}
+	if cfg.ControllerManager.RunAsUser != nil || cfg.ControllerManager.RunAsGroup != nil {
+		controllerManagerContainer.SecurityContext = &v1.SecurityContext{
+			RunAsUser:  cfg.ControllerManager.RunAsUser,
+			RunAsGroup: cfg.ControllerManager.RunAsGroup,
+		}
+	}
+
+	schedulerContainer := v1.Container{
+		Name:            kubeadmconstants.KubeScheduler,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getSchedulerCommand(cfg),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
+		LivenessProbe:   livenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), ports.InsecureSchedulerPort, v1.URISchemeHTTP),
+		Resources:       staticpodutil.ComponentResources("100m"),
+		Env:             getProxyEnvVars(),
+	}
+	if cfg.Scheduler.RunAsUser != nil || cfg.Scheduler.RunAsGroup != nil {
+		schedulerContainer.SecurityContext = &v1.SecurityContext{
+			RunAsUser:  cfg.Scheduler.RunAsUser,
+			RunAsGroup: cfg.Scheduler.RunAsGroup,
+		}
+	}
+
 	// Prepare static pod specs
 	staticPodSpecs := map[string]v1.Pod{
-		kubeadmconstants.KubeAPIServer: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeAPIServer,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeAPIServer, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getAPIServerCommand(cfg, endpoint),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
-			LivenessProbe:   livenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), int(endpoint.BindPort), v1.URISchemeHTTPS),
-			Resources:       staticpodutil.ComponentResources("250m"),
-			Env:             getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
-		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeControllerManager,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getControllerManagerCommand(cfg, k8sVersion),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
-			LivenessProbe:   livenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), ports.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
-			Resources:       staticpodutil.ComponentResources("200m"),
-			Env:             getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
-		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeScheduler,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getSchedulerCommand(cfg),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
-			LivenessProbe:   livenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), ports.InsecureSchedulerPort, v1.URISchemeHTTP),
-			Resources:       staticpodutil.ComponentResources("100m"),
-			Env:             getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
+		kubeadmconstants.KubeAPIServer:         staticpodutil.ComponentPod(apiServerContainer, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
+		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(controllerManagerContainer, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
+		kubeadmconstants.KubeScheduler:         staticpodutil.ComponentPod(schedulerContainer, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
 	return staticPodSpecs
 }

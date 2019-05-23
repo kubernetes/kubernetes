@@ -119,6 +119,12 @@ type ClusterConfiguration struct {
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
 type ControlPlaneComponent struct {
+	// RunAsUser is the UID that the component container should run as.
+	RunAsUser *int64 `json:"runAsUser,omitempty"`
+
+	// RunAsGroup is the GID that the component container should run as.
+	RunAsGroup *int64 `json:"runAsGroup,omitempty"`
+
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
 	// TODO: This is temporary and ideally we would like to switch all components to
 	// use ComponentConfig + ConfigMaps.

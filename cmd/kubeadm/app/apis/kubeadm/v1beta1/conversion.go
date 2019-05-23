@@ -34,6 +34,20 @@ func Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kubeadm.
 	return nil
 }
 
+func Convert_kubeadm_ControlPlaneComponent_To_v1beta1_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_ControlPlaneComponent_To_v1beta1_ControlPlaneComponent(in, out, s); err != nil {
+		return err
+	}
+
+	if in.RunAsUser != nil {
+		return errors.New("runAsUser field is not supported by v1beta1 config format")
+	} else if in.RunAsGroup != nil {
+		return errors.New("runAsGroup field is not supported by v1beta1 config format")
+	}
+
+	return nil
+}
+
 func Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in *kubeadm.JoinControlPlane, out *JoinControlPlane, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in, out, s); err != nil {
 		return err

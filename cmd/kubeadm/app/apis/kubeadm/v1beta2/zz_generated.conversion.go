@@ -469,6 +469,8 @@ func Convert_kubeadm_ClusterStatus_To_v1beta2_ClusterStatus(in *kubeadm.ClusterS
 }
 
 func autoConvert_v1beta2_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *ControlPlaneComponent, out *kubeadm.ControlPlaneComponent, s conversion.Scope) error {
+	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
+	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
 	out.ExtraVolumes = *(*[]kubeadm.HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
 	return nil
@@ -480,6 +482,8 @@ func Convert_v1beta2_ControlPlaneComponent_To_kubeadm_ControlPlaneComponent(in *
 }
 
 func autoConvert_kubeadm_ControlPlaneComponent_To_v1beta2_ControlPlaneComponent(in *kubeadm.ControlPlaneComponent, out *ControlPlaneComponent, s conversion.Scope) error {
+	out.RunAsUser = (*int64)(unsafe.Pointer(in.RunAsUser))
+	out.RunAsGroup = (*int64)(unsafe.Pointer(in.RunAsGroup))
 	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
 	out.ExtraVolumes = *(*[]HostPathMount)(unsafe.Pointer(&in.ExtraVolumes))
 	return nil

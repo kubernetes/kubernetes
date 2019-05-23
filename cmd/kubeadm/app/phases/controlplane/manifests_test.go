@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -42,23 +43,12 @@ const (
 var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()
 
 func TestGetStaticPodSpecs(t *testing.T) {
-
-	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
 		KubernetesVersion: "v1.9.0",
 	}
 
-	// Executes GetStaticPodSpecs
-
-	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
-	k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
-
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, k8sVersion)
-
-	var tests = []struct {
-		name          string
-		staticPodName string
-	}{
+	// securityContext is nil for all of these test cases because they test the backwards compatible default of running as root.
+	var tests = []testGetStaticPodSpecExpectations{
 		{
 			name:          "KubeAPIServer",
 			staticPodName: kubeadmconstants.KubeAPIServer,
@@ -73,6 +63,78 @@ func TestGetStaticPodSpecs(t *testing.T) {
 		},
 	}
 
+	testGetStaticPodSpecs(t, cfg, tests)
+}
+
+func TestGetStaticPodSpecsSecurely(t *testing.T) {
+	var (
+		intAPIServerUser, intAPIServerGroup                 int64 = 1, 2
+		intControllerManagerUser, intControllerManagerGroup int64 = 4, 8
+		intSchedulerUser, intSchedulerGroup                 int64 = 16, 32
+	)
+
+	cfg := &kubeadmapi.ClusterConfiguration{
+		KubernetesVersion: "v1.9.0",
+		APIServer: kubeadmapi.APIServer{
+			ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
+				RunAsUser:  &intAPIServerUser,
+				RunAsGroup: &intAPIServerGroup,
+			},
+		},
+		ControllerManager: kubeadmapi.ControlPlaneComponent{
+			RunAsUser:  &intControllerManagerUser,
+			RunAsGroup: &intControllerManagerGroup,
+		},
+		Scheduler: kubeadmapi.ControlPlaneComponent{
+			RunAsUser:  &intSchedulerUser,
+			RunAsGroup: &intSchedulerGroup,
+		},
+	}
+
+	var tests = []testGetStaticPodSpecExpectations{
+		{
+			name:          "KubeAPIServer",
+			staticPodName: kubeadmconstants.KubeAPIServer,
+			securityContext: &v1.SecurityContext{
+				RunAsUser:  &intAPIServerUser,
+				RunAsGroup: &intAPIServerGroup,
+			},
+		},
+		{
+			name:          "KubeControllerManager",
+			staticPodName: kubeadmconstants.KubeControllerManager,
+			securityContext: &v1.SecurityContext{
+				RunAsUser:  &intControllerManagerUser,
+				RunAsGroup: &intControllerManagerGroup,
+			},
+		},
+		{
+			name:          "KubeScheduler",
+			staticPodName: kubeadmconstants.KubeScheduler,
+			securityContext: &v1.SecurityContext{
+				RunAsUser:  &intSchedulerUser,
+				RunAsGroup: &intSchedulerGroup,
+			},
+		},
+	}
+
+	testGetStaticPodSpecs(t, cfg, tests)
+}
+
+// testGetStaticPodSpecExpectations represents expectations for a pod spec.
+type testGetStaticPodSpecExpectations struct {
+	name            string              // description for test output
+	staticPodName   string              // name of the pod and container
+	securityContext *v1.SecurityContext // expected securityContext of the container (optional)
+}
+
+// testGetStaticPodSpecs takes a ClusterConfiguration to run GetStaticPodSpecs and validate the results against the
+// passed expectations (matching the expectations to the output by staticPodName).
+func testGetStaticPodSpecs(t *testing.T, cfg *kubeadmapi.ClusterConfiguration, tests []testGetStaticPodSpecExpectations) {
+	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
+	k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
+
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, k8sVersion)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			// assert the spec for the staticPodName exists
@@ -81,6 +143,15 @@ func TestGetStaticPodSpecs(t *testing.T) {
 				// Assert each specs refers to the right pod
 				if spec.Spec.Containers[0].Name != tc.staticPodName {
 					t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", tc.staticPodName, spec.Spec.Containers[0].Name, tc.staticPodName)
+				}
+
+				// Assert each container spec has the correct security context iff one is expected
+				if tc.securityContext != nil {
+					if !reflect.DeepEqual(spec.Spec.Containers[0].SecurityContext, tc.securityContext) {
+						t.Errorf("getKubeConfigSpecs spec for %s contains security context %s, expected %v", tc.staticPodName, spec.Spec.Containers[0].SecurityContext, tc.securityContext)
+					}
+				} else if spec.Spec.Containers[0].SecurityContext != nil {
+					t.Errorf("getKubeConfigSpecs spec for %s contains security context %s, expected nil", tc.staticPodName, spec.Spec.Containers[0].SecurityContext)
 				}
 
 			} else {
