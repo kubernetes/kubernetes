@@ -20,18 +20,19 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-TMP_ROOT="$(dirname "${BASH_SOURCE[@]}")/../.."
-KUBE_ROOT=$(readlink -e "${TMP_ROOT}" 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' "${TMP_ROOT}")
+# @RobertKielty : temporarily commenting this out to see if the local way of getting kube root works here.
+# TMP_ROOT="$(dirname "${BASH_SOURCE[@]}")/../.."
+# KUBE_ROOT=$(readlink -e "${TMP_ROOT}" 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' "${TMP_ROOT}")
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 
-source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
-source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
-source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
-source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+# shellcheck source=../../test/kubemark/bootstrap-kubemark.sh
+source "${KUBE_ROOT}/test/kubemark/bootstrap-kubemark.sh"
 
 if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh" ]] ; then
+# shellcheck disable=SC1090
   source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/startup.sh"
 fi
-
+# shellcheck source=../../cluster/kubemark/util.sh
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 # hack/lib/init.sh will ovewrite ETCD_VERSION if this is unset
@@ -41,6 +42,7 @@ source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 if [ -z "${ETCD_VERSION:-}" ]; then
   ETCD_VERSION="avoid-overwrite"
 fi
+# shellcheck source=../../hack/lib/init.sh
 source "${KUBE_ROOT}/hack/lib/init.sh"
 if [ "${ETCD_VERSION:-}" == "avoid-overwrite" ]; then
   ETCD_VERSION=""
@@ -450,7 +452,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     # Fail it if it already took more than 30 minutes.
     if [ $((now - start)) -gt 1800 ]; then
       echo ""
-      # shellcheck disable=SC2154 # Color defined in sourced script
+      # shellcheck disable=SC2154 
       echo -e "${color_red} Timeout waiting for all hollow-nodes to become Running. ${color_norm}"
       # Try listing nodes again - if it fails it means that API server is not responding
       if "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node &> /dev/null; then
@@ -469,7 +471,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
     nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node 2> /dev/null) || true
     ready=$(($(echo "${nodes}" | grep -vc "NotReady") - 1))
   done
-  # shellcheck disable=SC2154 # Color defined in sourced script
+  # shellcheck disable=SC2154 
   echo -e "${color_green} Done!${color_norm}"
 }
 
@@ -484,7 +486,7 @@ write-local-kubeconfig
 
 # Setup for master.
 function start-master {
-  # shellcheck disable=SC2154 # Color defined in sourced script
+  # shellcheck disable=SC2154
   echo -e "${color_yellow}STARTING SETUP FOR MASTER${color_norm}"
   create-master-environment-file
   create-master-instance-with-resources

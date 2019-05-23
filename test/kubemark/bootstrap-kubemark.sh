@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2017 The Kubernetes Authors.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-REPORT_DIR="${1:-_artifacts}"
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+# Script that creates a Kubemark cluster for any given cloud provider.
 
-# shellcheck source=../../test/kubemark/cloud-provider-config.sh
+set -o errexit
+set -o nounset
+set -o pipefail
+
+# shellcheck disable=SC2039
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+# shellcheck source=./skeleton/util.sh
+source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
+
+# shellcheck source=./cloud-provider-config.sh
 source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
+
+# shellcheck source=./gce/util.sh
+source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 
 # shellcheck source=../../cluster/kubemark/gce/config-default.sh
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
-
-export KUBEMARK_MASTER_NAME="${MASTER_NAME}"
-
-echo "Dumping logs for kubemark master: ${KUBEMARK_MASTER_NAME}"
-DUMP_ONLY_MASTER_LOGS=true "${KUBE_ROOT}/cluster/log-dump/log-dump.sh" "${REPORT_DIR}"

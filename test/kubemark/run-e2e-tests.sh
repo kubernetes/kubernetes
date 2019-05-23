@@ -22,6 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # We need an absolute path to KUBE_ROOT
 ABSOLUTE_ROOT=$(readlink -f "${KUBE_ROOT}")
 
+# shellcheck source=../../cluster/kubemark/util.sh
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 echo "Kubemark master name: ${MASTER_NAME}"
@@ -44,7 +45,7 @@ fi
 
 if [[ -f /.dockerenv ]]; then
 	# Running inside a dockerized runner.
-	go run ./hack/e2e.go -- --check-version-skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS[*]}"
+    go run ./hack/e2e.go -- --check-version-skew=false --test --test_args="--e2e-verify-service-account=false --dump-logs-on-failure=false ${ARGS[*]}"
 else
 	# Running locally.
 	for ((i=0; i < ${ARGS[@]}; i++)); do

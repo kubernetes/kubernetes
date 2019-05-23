@@ -17,16 +17,14 @@
 # Script that destroys Kubemark cluster and deletes all master resources.
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-
-source "${KUBE_ROOT}/test/kubemark/skeleton/util.sh"
-source "${KUBE_ROOT}/test/kubemark/cloud-provider-config.sh"
-source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
-source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+# shellcheck source=./bootstrap-kubemark.sh
+source "${KUBE_ROOT}/test/kubemark/bootstrap-kubemark.sh"
 
 if [[ -f "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/shutdown.sh" ]] ; then
-  source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/shutdown.sh"
+# shellcheck disable=SC1090
+  source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/shutdown.sh" 
 fi
-
+# shellcheck source=../../cluster/kubemark/util.sh
 source "${KUBE_ROOT}/cluster/kubemark/util.sh"
 
 KUBECTL="${KUBE_ROOT}/cluster/kubectl.sh"
