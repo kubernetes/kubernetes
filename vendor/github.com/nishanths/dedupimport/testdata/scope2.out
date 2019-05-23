@@ -1,0 +1,13 @@
+package pkg
+
+import (
+	"fmt"
+)
+
+func s() {
+	type fmt struct{}
+}
+
+type stringer struct {
+	fmt.Stringer
+}

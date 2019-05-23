@@ -1,0 +1,17 @@
+package pkg
+
+import "ast"
+import tree "tree"
+
+// unnamed encoding-json
+import "encoding/json"
+import "math"
+
+// fmt's doc comment
+import "fmt" // fmt should move above
+
+import "go/format"
+
+import "math/bits"
+
+import "go/token"

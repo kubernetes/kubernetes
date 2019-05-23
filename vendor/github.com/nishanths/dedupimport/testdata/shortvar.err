@@ -1,0 +1,1 @@
+testdata/shortvar.go:10:2: cannot rewrite f -> fmt: identifier fmt in scope might not be referring to the import

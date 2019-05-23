@@ -1,0 +1,8 @@
+language: go
+go:
+  - 1.9
+  - master
+matrix:
+  fast_finish: true
+  allow_failures:
+    - go: master

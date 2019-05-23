@@ -1,0 +1,21 @@
+package pkg
+
+import (
+	"github.com/foo/shellutil"
+	"github.com/nishanths/go-hgconfig"
+	"github.com/nishanths/lyft-go"
+	"google.io/meta/v1"
+	"gopkg.in/go-git.v3"
+)
+
+func foo() {
+	_ = shellutil.x
+	_ = git.x
+	{
+		_ = v1.x
+	}
+	_ = hgconfig.x
+	{
+		_ = lyft.x
+	}
+}

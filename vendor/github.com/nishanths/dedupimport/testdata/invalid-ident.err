@@ -1,0 +1,2 @@
+testdata/invalid-ident.go:9:9: cannot rewrite n -> 9io: identifier 9io is not a valid identifier; specify a mapping for the import using '-m'
+testdata/invalid-ident.go:10:9: cannot rewrite g -> go: identifier go is a go keyword; specify a mapping for the import using '-m'

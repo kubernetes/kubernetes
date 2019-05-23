@@ -1,0 +1,9 @@
+//dedupimport -keep comment
+
+package pkg
+
+import (
+	"code.org/frontend" // line comment
+)
+
+var x = frontend.Client

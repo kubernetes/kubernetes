@@ -1,0 +1,1 @@
+testdata/cannot.go:11:9: cannot rewrite u -> url: identifier url in scope might not be referring to the import

@@ -1,0 +1,15 @@
+package pkg
+
+import (
+	"fmt"
+	. "fmt"
+)
+
+import (
+	"math"
+)
+
+import t "encoding/json"
+
+import tt "crypto/sha1"
+import tt "crypto/sha256"

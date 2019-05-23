@@ -1,0 +1,26 @@
+package p
+
+import (
+	"fmt"
+)
+
+import math "math" // to do math things
+
+func foo(unrelated int) {
+	_ = f
+	_ = fmt.Println
+	_ = Printf
+	_ = fmt.Println
+	_ = math.Sin
+	_ = fmt.Print
+	_ = math.Cos
+	_, _, _, _ = w.Tan, x.Tan, math.Tan, math.Tan
+
+	lookup := make(map[interface{}]int)
+	lookup[math.Pi] = 3
+
+	{
+		_ = math.Sin
+		_ = t.Sin
+	}
+}

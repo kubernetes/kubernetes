@@ -1,0 +1,9 @@
+package pkg
+
+// Kept
+import (
+	// kept doc
+	//
+	// comment
+	"math" // kept line
+)

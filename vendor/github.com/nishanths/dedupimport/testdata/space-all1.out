@@ -1,0 +1,19 @@
+package pkg
+
+import (
+	"ast"
+	tree "tree"
+
+	// unnamed encoding-json
+	"encoding/json"
+	"math"
+
+	// fmt's doc comment
+	"fmt" // fmt should move above
+
+	"go/format"
+
+	"math/bits"
+
+	"go/token"
+)

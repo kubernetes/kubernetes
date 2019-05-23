@@ -1,0 +1,5 @@
+//dedupimport -keep named
+
+package pkg
+
+import m "math"
