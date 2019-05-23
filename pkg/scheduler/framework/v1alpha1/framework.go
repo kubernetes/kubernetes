@@ -86,122 +86,10 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 		f.plugins[name] = p
 	}
-
-	if plugins.PreFilter != nil {
-		for _, pf := range plugins.PreFilter.Enabled {
-			if pg, ok := f.plugins[pf.Name]; ok {
-				p, ok := pg.(PrefilterPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend prefilter plugin", pf.Name)
-				}
-				f.prefilterPlugins = append(f.prefilterPlugins, p)
-			} else {
-				return nil, fmt.Errorf("prefilter plugin %v does not exist", pf.Name)
-			}
-		}
+	err := f.appendPlugins(plugins)
+	if err != nil {
+		return nil, err
 	}
-
-	if plugins.Reserve != nil {
-		for _, r := range plugins.Reserve.Enabled {
-			if pg, ok := f.plugins[r.Name]; ok {
-				p, ok := pg.(ReservePlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend reserve plugin", r.Name)
-				}
-				f.reservePlugins = append(f.reservePlugins, p)
-			} else {
-				return nil, fmt.Errorf("reserve plugin %v does not exist", r.Name)
-			}
-		}
-	}
-
-	if plugins.PreBind != nil {
-		for _, pb := range plugins.PreBind.Enabled {
-			if pg, ok := f.plugins[pb.Name]; ok {
-				p, ok := pg.(PrebindPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend prebind plugin", pb.Name)
-				}
-				f.prebindPlugins = append(f.prebindPlugins, p)
-			} else {
-				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
-			}
-		}
-	}
-
-	if plugins.Bind != nil {
-		for _, pb := range plugins.Bind.Enabled {
-			if pg, ok := f.plugins[pb.Name]; ok {
-				p, ok := pg.(BindPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend bind plugin", pb.Name)
-				}
-				f.bindPlugins = append(f.bindPlugins, p)
-			} else {
-				return nil, fmt.Errorf("bind plugin %v does not exist", pb.Name)
-			}
-		}
-	}
-
-	if plugins.PostBind != nil {
-		for _, pb := range plugins.PostBind.Enabled {
-			if pg, ok := f.plugins[pb.Name]; ok {
-				p, ok := pg.(PostbindPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend postbind plugin", pb.Name)
-				}
-				f.postbindPlugins = append(f.postbindPlugins, p)
-			} else {
-				return nil, fmt.Errorf("postbind plugin %v does not exist", pb.Name)
-			}
-		}
-	}
-
-	if plugins.Unreserve != nil {
-		for _, ur := range plugins.Unreserve.Enabled {
-			if pg, ok := f.plugins[ur.Name]; ok {
-				p, ok := pg.(UnreservePlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend unreserve plugin", ur.Name)
-				}
-				f.unreservePlugins = append(f.unreservePlugins, p)
-			} else {
-				return nil, fmt.Errorf("unreserve plugin %v does not exist", ur.Name)
-			}
-		}
-	}
-
-	if plugins.Permit != nil {
-		for _, pr := range plugins.Permit.Enabled {
-			if pg, ok := f.plugins[pr.Name]; ok {
-				p, ok := pg.(PermitPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend permit plugin", pr.Name)
-				}
-				f.permitPlugins = append(f.permitPlugins, p)
-			} else {
-				return nil, fmt.Errorf("permit plugin %v does not exist", pr.Name)
-			}
-		}
-	}
-
-	if plugins.QueueSort != nil {
-		for _, qs := range plugins.QueueSort.Enabled {
-			if pg, ok := f.plugins[qs.Name]; ok {
-				p, ok := pg.(QueueSortPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend queue sort plugin", qs.Name)
-				}
-				f.queueSortPlugins = append(f.queueSortPlugins, p)
-				if len(f.queueSortPlugins) > 1 {
-					return nil, fmt.Errorf("only one queue sort plugin can be enabled")
-				}
-			} else {
-				return nil, fmt.Errorf("queue sort plugin %v does not exist", qs.Name)
-			}
-		}
-	}
-
 	return f, nil
 }
 
@@ -429,4 +317,100 @@ func pluginsNeeded(plugins *config.Plugins) map[string]struct{} {
 	find(plugins.Unreserve)
 
 	return pgMap
+}
+
+func (f *framework) appendPlugins(plugins *config.Plugins) error {
+	if plugins == nil {
+		return nil
+	}
+	appendPluginFn := func(ext string, name string) error {
+		extendErr := fmt.Errorf("plugin %v does not extend %s plugin", name, ext)
+
+		if pg, ok := f.plugins[name]; ok {
+			switch ext {
+			case "reserve":
+				p, ok := pg.(ReservePlugin)
+				if !ok {
+					return extendErr
+				}
+				f.reservePlugins = append(f.reservePlugins, p)
+			case "prebind":
+				p, ok := pg.(PrebindPlugin)
+				if !ok {
+					return extendErr
+				}
+				f.prebindPlugins = append(f.prebindPlugins, p)
+			case "unreserve":
+				p, ok := pg.(UnreservePlugin)
+				if !ok {
+					return extendErr
+				}
+				f.unreservePlugins = append(f.unreservePlugins, p)
+			case "permit":
+				p, ok := pg.(PermitPlugin)
+				if !ok {
+					return extendErr
+				}
+				f.permitPlugins = append(f.permitPlugins, p)
+			case "queueSort":
+				p, ok := pg.(QueueSortPlugin)
+				if !ok {
+					return extendErr
+				}
+				f.queueSortPlugins = append(f.queueSortPlugins, p)
+			case "bind":
+				p, ok := pg.(BindPlugin)
+				if !ok {
+					return extendErr
+				}
+				f.bindPlugins = append(f.bindPlugins, p)
+			}
+		} else {
+			return fmt.Errorf("%q plugin %q does not exist", ext, name)
+		}
+		return nil
+	}
+	var extensionPoints = []struct {
+		name    string
+		plugins *config.PluginSet
+	}{
+		{
+			name:    "reserve",
+			plugins: plugins.Reserve,
+		},
+		{
+			name:    "prebind",
+			plugins: plugins.PreBind,
+		},
+		{
+			name:    "unreserve",
+			plugins: plugins.Unreserve,
+		},
+		{
+			name:    "permit",
+			plugins: plugins.Permit,
+		},
+		{
+			name:    "queueSort",
+			plugins: plugins.QueueSort,
+		},
+		{
+			name:    "bind",
+			plugins: plugins.Bind,
+		},
+	}
+
+	for _, ep := range extensionPoints {
+		if ep.plugins == nil {
+			continue
+		}
+		for _, p := range ep.plugins.Enabled {
+			err := appendPluginFn(ep.name, p.Name)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
