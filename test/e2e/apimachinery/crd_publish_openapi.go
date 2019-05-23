@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -309,6 +310,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 
 		ginkgo.By("mark a version not serverd")
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("%v", err)
+		}
 		crd.Crd.Spec.Versions[1].Served = false
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
@@ -336,12 +341,16 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 		return nil, fmt.Errorf("require at least one version for CRD")
 	}
 
-	if schema == nil {
-		schema = []byte(`type: object`)
-	}
+	expect := schema
 	props := &v1beta1.JSONSchemaProps{}
-	if err := yaml.Unmarshal(schema, props); err != nil {
-		return nil, err
+	if schema == nil {
+		// to be backwards compatible, we expect CRD controller to treat
+		// CRD with nil schema specially and publish an empty schema
+		expect = []byte(`type: object`)
+	} else {
+		if err := yaml.Unmarshal(schema, props); err != nil {
+			return nil, err
+		}
 	}
 
 	crd, err := crd.CreateMultiVersionTestCRD(f, group, func(crd *v1beta1.CustomResourceDefinition) {
@@ -355,8 +364,11 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 		}
 		crd.Spec.Versions = apiVersions
 
-		crd.Spec.Validation = &v1beta1.CustomResourceValidation{
-			OpenAPIV3Schema: props,
+		// set up validation when input schema isn't nil
+		if schema != nil {
+			crd.Spec.Validation = &v1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: props,
+			}
 		}
 	})
 	if err != nil {
@@ -364,7 +376,7 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 	}
 
 	for _, v := range crd.Crd.Spec.Versions {
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), schema); err != nil {
+		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), expect); err != nil {
 			return nil, fmt.Errorf("%v", err)
 		}
 	}
@@ -579,9 +591,11 @@ properties:
     properties:
       dummy:
         description: Dummy property.
+        type: object
   status:
     description: Status of Waldo
     type: object
     properties:
       bars:
-        description: List of Bars and their statuses.`)
+        description: List of Bars and their statuses.
+        type: array`)
