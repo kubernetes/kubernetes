@@ -161,30 +161,16 @@ func DisableStrict(options *CodecFactoryOptions) {
 //
 // Mutators can be passed to change the CodecFactoryOptions before construction of the factory.
 // It is recommended to explicitly pass mutators instead of relying on defaults.
-// Legacy Behavior: when no mutators are passed, `WithPretty` is enabled and `WithStrict` is disabled.
+// By default, Pretty is enabled -- this is conformant with previously supported behavior.
 //
 // TODO: allow other codecs to be compiled in?
 // TODO: accept a scheme interface
 func NewCodecFactory(scheme *runtime.Scheme, mutators ...CodecFactoryOptionsMutator) CodecFactory {
-	options := CodecFactoryOptions{}
-	if len(mutators) == 0 {
-		// Legacy behavior
-		EnablePretty(&options)
-		DisableStrict(&options)
-	}
+	options := CodecFactoryOptions{Pretty: true}
 	for _, fn := range mutators {
 		fn(&options)
 	}
-	return NewCodecFactoryWithOptions(scheme, options)
-}
 
-// NewCodecFactoryWithOptions provides methods for retrieving serializers for the supported wire formats
-// and conversion wrappers to define preferred internal and external versions. In the future,
-// as the internal version is used less, callers may instead use a defaulting serializer and
-// only convert objects which are shared internally (Status, common API machinery).
-// TODO: allow other codecs to be compiled in?
-// TODO: accept a scheme interface
-func NewCodecFactoryWithOptions(scheme *runtime.Scheme, options CodecFactoryOptions) CodecFactory {
 	serializers := newSerializersForScheme(scheme, json.DefaultMetaFactory, options)
 	return newCodecFactory(scheme, serializers)
 }
