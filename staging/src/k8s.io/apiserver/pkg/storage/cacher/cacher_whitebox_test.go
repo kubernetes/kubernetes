@@ -438,3 +438,39 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 		}
 	}
 }
+
+func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	w, err := cacher.Watch(context.Background(), "pods/ns", "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	watchClosed := make(chan struct{})
+	go func() {
+		defer close(watchClosed)
+		for event := range w.ResultChan() {
+			switch event.Type {
+			case watch.Added, watch.Modified, watch.Deleted:
+				// ok
+			default:
+				t.Errorf("unexpected event %#v", event)
+			}
+		}
+	}()
+
+	cacher.Stop()
+
+	select {
+	case <-watchClosed:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for watch to close")
+	}
+
+}
