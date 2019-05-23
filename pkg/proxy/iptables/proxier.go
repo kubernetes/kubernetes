@@ -1236,6 +1236,15 @@ func (proxier *Proxier) syncProxyRules() {
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {
+			// Send local traffic to LoadBalancer
+			args = append(args[:0],
+				"-A", string(svcXlbChain),
+				"-m", "addrtype", "--src-type", "LOCAL",
+				"-m", "comment", "--comment",
+				fmt.Sprintf(`"Send LOCAL traffic for %s to LB IP"`, svcNameString),
+				"-j", "ACCEPT",
+			)
+			writeLine(proxier.natRules, args...)
 			// Blackhole all traffic since there are no local endpoints
 			args = append(args[:0],
 				"-A", string(svcXlbChain),
