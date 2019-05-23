@@ -189,8 +189,9 @@ var (
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
 func (dc *DisruptionController) getPodReplicaSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
-	if controllerRef.Kind != controllerKindRS.Kind {
-		return nil, nil
+	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
+	if !ok || err != nil {
+		return nil, err
 	}
 	rs, err := dc.rsLister.ReplicaSets(namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -210,8 +211,9 @@ func (dc *DisruptionController) getPodReplicaSet(controllerRef *metav1.OwnerRefe
 
 // getPodStatefulSet returns the statefulset referenced by the provided controllerRef.
 func (dc *DisruptionController) getPodStatefulSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
-	if controllerRef.Kind != controllerKindSS.Kind {
-		return nil, nil
+	ok, err := verifyGroupKind(controllerRef, controllerKindSS.Kind, []string{"apps"})
+	if !ok || err != nil {
+		return nil, err
 	}
 	ss, err := dc.ssLister.StatefulSets(namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -227,8 +229,9 @@ func (dc *DisruptionController) getPodStatefulSet(controllerRef *metav1.OwnerRef
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
-	if controllerRef.Kind != controllerKindRS.Kind {
-		return nil, nil
+	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
+	if !ok || err != nil {
+		return nil, err
 	}
 	rs, err := dc.rsLister.ReplicaSets(namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -257,8 +260,9 @@ func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerRefe
 }
 
 func (dc *DisruptionController) getPodReplicationController(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
-	if controllerRef.Kind != controllerKindRC.Kind {
-		return nil, nil
+	ok, err := verifyGroupKind(controllerRef, controllerKindRC.Kind, []string{""})
+	if !ok || err != nil {
+		return nil, err
 	}
 	rc, err := dc.rcLister.ReplicationControllers(namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -299,6 +303,29 @@ func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerRe
 		return nil, nil
 	}
 	return &controllerAndScale{scale.UID, scale.Spec.Replicas}, nil
+}
+
+func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, expectedGroups []string) (bool, error) {
+	gv, err := schema.ParseGroupVersion(controllerRef.APIVersion)
+	if err != nil {
+		return false, err
+	}
+
+	groupMatch := false
+	for _, group := range expectedGroups {
+		if group == gv.Group {
+			groupMatch = true
+			break
+		}
+	}
+	if !groupMatch {
+		return false, nil
+	}
+
+	if controllerRef.Kind == expectedKind {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
