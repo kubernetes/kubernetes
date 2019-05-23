@@ -64,41 +64,37 @@ func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory, option
 		StreamSerializer: jsonSerializer,
 	}
 	if options.Pretty {
-		jsonPrettySerializer := json.NewSerializerWithOptions(
+		jsonSerializerType.PrettySerializer = json.NewSerializerWithOptions(
 			mf, scheme, scheme,
 			json.SerializerOptions{Yaml: false, Pretty: true, Strict: options.Strict},
 		)
-		jsonSerializerType.PrettySerializer = jsonPrettySerializer
 	}
 
 	yamlSerializer := json.NewSerializerWithOptions(
 		mf, scheme, scheme,
 		json.SerializerOptions{Yaml: true, Pretty: false, Strict: options.Strict},
 	)
-	yamlSerializerType := serializerType{
-		AcceptContentTypes: []string{runtime.ContentTypeYAML},
-		ContentType:        runtime.ContentTypeYAML,
-		FileExtensions:     []string{"yaml"},
-		EncodesAsText:      true,
-		Serializer:         yamlSerializer,
-	}
-
 	protoSerializer := protobuf.NewSerializer(scheme, scheme)
 	protoRawSerializer := protobuf.NewRawSerializer(scheme, scheme)
-	protoSerializerType := serializerType{
-		AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
-		ContentType:        runtime.ContentTypeProtobuf,
-		FileExtensions:     []string{"pb"},
-		Serializer:         protoSerializer,
-
-		Framer:           protobuf.LengthDelimitedFramer,
-		StreamSerializer: protoRawSerializer,
-	}
 
 	serializers := []serializerType{
 		jsonSerializerType,
-		yamlSerializerType,
-		protoSerializerType,
+		{
+			AcceptContentTypes: []string{runtime.ContentTypeYAML},
+			ContentType:        runtime.ContentTypeYAML,
+			FileExtensions:     []string{"yaml"},
+			EncodesAsText:      true,
+			Serializer:         yamlSerializer,
+		},
+		{
+			AcceptContentTypes: []string{runtime.ContentTypeProtobuf},
+			ContentType:        runtime.ContentTypeProtobuf,
+			FileExtensions:     []string{"pb"},
+			Serializer:         protoSerializer,
+
+			Framer:           protobuf.LengthDelimitedFramer,
+			StreamSerializer: protoRawSerializer,
+		},
 	}
 
 	for _, fn := range serializerExtensions {
