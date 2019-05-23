@@ -125,6 +125,7 @@ func TestAdmit(t *testing.T) {
 			attrs := admission.NewAttributesRecord(
 				obj,                  // new object
 				obj.DeepCopyObject(), // old object, copy to be sure it's not modified
+				nil,
 				schema.GroupVersionKind{},
 				test.namespace,
 				"foo",

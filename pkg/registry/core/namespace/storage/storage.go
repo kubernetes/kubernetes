@@ -178,7 +178,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 					// wrong type
 					return nil, fmt.Errorf("expected *api.Namespace, got %v", existing)
 				}
-				if err := deleteValidation(existingNamespace); err != nil {
+				if err := deleteValidation(ctx, existingNamespace); err != nil {
 					return nil, err
 				}
 				// Set the deletion timestamp if needed

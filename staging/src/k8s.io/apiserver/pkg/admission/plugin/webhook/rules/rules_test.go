@@ -37,7 +37,7 @@ type tests map[string]ruleTest
 
 func a(group, version, resource, subresource, name string, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
 	return admission.NewAttributesRecord(
-		nil, nil,
+		nil, nil, nil,
 		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
 		"ns", name,
 		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
@@ -50,7 +50,7 @@ func a(group, version, resource, subresource, name string, operation admission.O
 
 func namespacedAttributes(group, version, resource, subresource, name string, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
 	return admission.NewAttributesRecord(
-		nil, nil,
+		nil, nil, nil,
 		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
 		"ns", name,
 		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,
@@ -63,7 +63,7 @@ func namespacedAttributes(group, version, resource, subresource, name string, op
 
 func clusterScopedAttributes(group, version, resource, subresource, name string, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
 	return admission.NewAttributesRecord(
-		nil, nil,
+		nil, nil, nil,
 		schema.GroupVersionKind{Group: group, Version: version, Kind: "k" + resource},
 		"", name,
 		schema.GroupVersionResource{Group: group, Version: version, Resource: resource}, subresource,

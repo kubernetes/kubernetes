@@ -101,7 +101,7 @@ func Test_nodeTaints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attributes := admission.NewAttributesRecord(&tt.node, &tt.oldNode, nodeKind, myNodeObj.Namespace, myNodeObj.Name, resource, "", tt.operation, tt.options, false, mynode)
+			attributes := admission.NewAttributesRecord(&tt.node, &tt.oldNode, nil, nodeKind, myNodeObj.Namespace, myNodeObj.Name, resource, "", tt.operation, tt.options, false, mynode)
 			c := NewPlugin()
 			if tt.features != nil {
 				c.features = tt.features

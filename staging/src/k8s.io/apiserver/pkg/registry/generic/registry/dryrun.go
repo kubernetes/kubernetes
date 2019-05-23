@@ -52,7 +52,7 @@ func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime
 		if err := preconditions.Check(key, out); err != nil {
 			return err
 		}
-		return deleteValidation(out)
+		return deleteValidation(ctx, out)
 	}
 	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation)
 }

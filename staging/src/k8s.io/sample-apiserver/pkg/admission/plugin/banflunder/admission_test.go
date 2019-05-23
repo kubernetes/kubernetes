@@ -130,6 +130,7 @@ func TestBanflunderAdmissionPlugin(t *testing.T) {
 			err = target.Admit(admission.NewAttributesRecord(
 				&scenario.admissionInput,
 				nil,
+				nil,
 				scenario.admissionInputKind,
 				scenario.admissionInput.ObjectMeta.Namespace,
 				"",

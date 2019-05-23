@@ -476,7 +476,7 @@ func (storage *SimpleRESTStorage) Create(ctx context.Context, obj runtime.Object
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := createValidation(obj); err != nil {
+	if err := createValidation(ctx, obj); err != nil {
 		return nil, err
 	}
 	return obj, err
@@ -653,7 +653,7 @@ func (storage *NamedCreaterRESTStorage) Create(ctx context.Context, name string,
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := createValidation(obj); err != nil {
+	if err := createValidation(ctx, obj); err != nil {
 		return nil, err
 	}
 	return obj, err

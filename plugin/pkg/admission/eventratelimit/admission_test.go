@@ -41,6 +41,7 @@ func attributesForRequest(rq request) admission.Attributes {
 	return admission.NewAttributesRecord(
 		rq.event,
 		nil,
+		nil,
 		api.Kind(rq.kind).WithVersion("version"),
 		rq.namespace,
 		"name",

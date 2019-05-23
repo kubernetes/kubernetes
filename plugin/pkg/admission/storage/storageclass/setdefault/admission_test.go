@@ -202,6 +202,7 @@ func TestAdmission(t *testing.T) {
 		attrs := admission.NewAttributesRecord(
 			claim, // new object
 			nil,   // old object
+			nil,
 			api.Kind("PersistentVolumeClaim").WithVersion("version"),
 			claim.Namespace,
 			claim.Name,

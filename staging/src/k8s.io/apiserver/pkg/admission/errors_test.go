@@ -30,6 +30,7 @@ func TestNewForbidden(t *testing.T) {
 	attributes := NewAttributesRecord(
 		&fakeObj{},
 		nil,
+		nil,
 		schema.GroupVersionKind{Group: "foo", Version: "bar", Kind: "Baz"},
 		"",
 		"",

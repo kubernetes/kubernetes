@@ -813,6 +813,7 @@ func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 	attrs := kadmission.NewAttributesRecord(
 		pod,
 		nil,
+		nil,
 		api.Kind("Pod").WithVersion("version"),
 		"namespace",
 		"",
