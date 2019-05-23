@@ -56,8 +56,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
-// Options defines flags and other configuration parameters for the `apply` command
-type Options struct {
+// ApplyOptions defines flags and other configuration parameters for the `apply` command
+type ApplyOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 	Recorder    genericclioptions.Recorder
 
@@ -133,9 +133,9 @@ var (
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
-// NewApplyOptions creates new Options for the `apply` command
-func NewApplyOptions(ioStreams genericclioptions.IOStreams) *Options {
-	return &Options{
+// NewApplyOptions creates new ApplyOptions for the `apply` command
+func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
+	return &ApplyOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
 		DeleteFlags: delete.NewDeleteFlags("that contains the configuration to apply"),
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
@@ -196,8 +196,8 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	return cmd
 }
 
-// Complete verifies if Options are valid and without conflicts.
-func (o *Options) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+// Complete verifies if ApplyOptions are valid and without conflicts.
+func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
 	o.FieldManager = cmdutil.GetFieldManagerFlag(cmd)
@@ -329,7 +329,7 @@ func isIncompatibleServerError(err error) bool {
 }
 
 // Run executes the `apply` command.
-func (o *Options) Run() error {
+func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
 		openapiSchema = o.OpenAPISchema
