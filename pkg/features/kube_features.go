@@ -453,6 +453,12 @@ const (
 	// Enables the regional PD feature on GCE.
 	deprecatedGCERegionalPersistentDisk featuregate.Feature = "GCERegionalPersistentDisk"
 
+	// owner: @MrHohn
+	// alpha: v1.15
+	//
+	// Enables Finalizer Protection for Service LoadBalancers.
+	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
+
 	// owner: @RobertKrawitz
 	// alpha: v1.15
 	//
@@ -535,6 +541,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                         {Default: false, PreRelease: featuregate.Alpha},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerFinalizer:                {Default: false, PreRelease: featuregate.Alpha},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
