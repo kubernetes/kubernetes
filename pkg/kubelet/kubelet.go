@@ -1845,7 +1845,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // 1.  configCh:       a channel to read config events from
 // 2.  handler:        the SyncHandler to dispatch pods to
 // 3.  syncCh:         a channel to read periodic sync events from
-// 4.  houseKeepingCh: a channel to read housekeeping events from
+// 4.  housekeepingCh: a channel to read housekeeping events from
 // 5.  plegCh:         a channel to read PLEG updates from
 //
 // Events are also read from the kubelet liveness manager's update channel.
@@ -1867,7 +1867,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 //             handler callback for the event type
 // * plegCh: update the runtime cache; sync pod
 // * syncCh: sync all pods waiting for sync
-// * houseKeepingCh: trigger cleanup of pods
+// * housekeepingCh: trigger cleanup of pods
 // * liveness manager: sync pods that have failed or in which one or more
 //                     containers have failed liveness checks
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,
