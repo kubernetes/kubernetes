@@ -112,6 +112,7 @@ type DeleteOptions struct {
 	Timeout     time.Duration
 
 	Output string
+	Quiet bool
 
 	DynamicClient dynamic.Interface
 	Mapper        meta.RESTMapper
@@ -283,7 +284,9 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		return err
 	}
 	if found == 0 {
-		fmt.Fprintf(o.Out, "No resources found\n")
+		if !o.Quiet {
+			fmt.Fprintf(o.Out, "No resources found\n")
+		}
 		return nil
 	}
 	if !o.WaitForDeletion {
@@ -335,6 +338,10 @@ func (o *DeleteOptions) deleteResource(info *resource.Info, deleteOptions *metav
 // PrintObj for deleted objects is special because we do not have an object to print.
 // This mirrors name printer behavior
 func (o *DeleteOptions) PrintObj(info *resource.Info) {
+	if o.Quiet {
+		return
+	}
+
 	operation := "deleted"
 	groupKind := info.Mapping.GroupVersionKind
 	kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
