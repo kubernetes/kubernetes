@@ -22,6 +22,7 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
@@ -177,26 +178,26 @@ func TestClusterRoleValidate(t *testing.T) {
 	defer tf.Cleanup()
 
 	tests := map[string]struct {
-		clusterRoleOptions *CreateClusterRoleOptions
+		clusterRoleOptions *ClusterRoleOptions
 		expectErr          bool
 	}{
 		"test-missing-name": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{},
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{},
 			},
 			expectErr: true,
 		},
 		"test-missing-verb": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name: "my-clusterrole",
 				},
 			},
 			expectErr: true,
 		},
 		"test-missing-resource": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 				},
@@ -204,8 +205,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-missing-resource-existing-apigroup": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 					Resources: []ResourceOptions{
@@ -218,8 +219,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-missing-resource-existing-subresource": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 					Resources: []ResourceOptions{
@@ -232,8 +233,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-verb": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"invalid-verb"},
 					Resources: []ResourceOptions{
@@ -246,8 +247,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-nonresource-verb": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"post"},
 					Resources: []ResourceOptions{
@@ -260,8 +261,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-special-verb": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"use"},
 					Resources: []ResourceOptions{
@@ -274,8 +275,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-mix-verbs": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"impersonate", "use"},
 					Resources: []ResourceOptions{
@@ -289,8 +290,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-special-verb-with-wrong-apigroup": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"impersonate"},
 					Resources: []ResourceOptions{
@@ -305,8 +306,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-resource": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 					Resources: []ResourceOptions{
@@ -319,8 +320,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-resource-name-with-multiple-resources": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 					Resources: []ResourceOptions{
@@ -337,8 +338,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-valid-case": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "role-binder",
 					Verbs: []string{"get", "list", "bind"},
 					Resources: []ResourceOptions{
@@ -352,8 +353,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-valid-case-with-subresource": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get", "list"},
 					Resources: []ResourceOptions{
@@ -367,8 +368,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-valid-case-with-additional-resource": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"impersonate"},
 					Resources: []ResourceOptions{
@@ -383,8 +384,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-invalid-empty-non-resource-url": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"create"},
 				},
@@ -393,8 +394,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-non-resource-url": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"create"},
 				},
@@ -403,8 +404,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-non-resource-url-with-*": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"create"},
 				},
@@ -413,8 +414,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-non-resource-url-with-multiple-*": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"create"},
 				},
@@ -423,8 +424,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-invalid-verb-for-non-resource-url": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"create"},
 				},
@@ -433,8 +434,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-resource-and-non-resource-url-specified-together": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 					Resources: []ResourceOptions{
@@ -449,8 +450,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: false,
 		},
 		"test-aggregation-rule-with-verb": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name:  "my-clusterrole",
 					Verbs: []string{"get"},
 				},
@@ -459,8 +460,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-aggregation-rule-with-resource": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name: "my-clusterrole",
 					Resources: []ResourceOptions{
 						{
@@ -474,8 +475,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-aggregation-rule-with-no-resource-url": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name: "my-clusterrole",
 				},
 				NonResourceURLs: []string{"/logs/"},
@@ -484,8 +485,8 @@ func TestClusterRoleValidate(t *testing.T) {
 			expectErr: true,
 		},
 		"test-aggregation-rule": {
-			clusterRoleOptions: &CreateClusterRoleOptions{
-				CreateRoleOptions: &CreateRoleOptions{
+			clusterRoleOptions: &ClusterRoleOptions{
+				RoleOptions: &RoleOptions{
 					Name: "my-clusterrole",
 				},
 				AggregationRule: map[string]string{"foo-key": "foo-vlue"},
@@ -511,3 +512,4 @@ func TestClusterRoleValidate(t *testing.T) {
 		})
 	}
 }
+

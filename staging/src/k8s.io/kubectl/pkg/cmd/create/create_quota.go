@@ -41,7 +41,7 @@ var (
 
 // QuotaOpts holds the command-line options for 'create quota' sub command
 type QuotaOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateQuota is a macro command to create a new quota

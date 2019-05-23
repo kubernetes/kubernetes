@@ -59,7 +59,7 @@ var (
 
 // ConfigMapOpts holds properties for create configmap sub-command
 type ConfigMapOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateConfigMap initializes and returns ConfigMapOpts

@@ -38,7 +38,7 @@ var (
 
 // ClusterRoleBindingOpts is returned by NewCmdCreateClusterRoleBinding
 type ClusterRoleBindingOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateClusterRoleBinding returns an initialized command instance of ClusterRoleBinding

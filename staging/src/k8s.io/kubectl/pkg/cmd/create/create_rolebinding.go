@@ -38,7 +38,7 @@ var (
 
 // RoleBindingOpts holds the options for 'create rolebinding' sub command
 type RoleBindingOpts struct {
-	CreateSubcommandOptions *CreateSubcommandOptions
+	CreateSubcommandOptions *SubcommandOptions
 }
 
 // NewCmdCreateRoleBinding returns an initialized Command instance for 'create rolebinding' sub command

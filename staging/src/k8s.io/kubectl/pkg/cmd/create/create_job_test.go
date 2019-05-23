@@ -52,7 +52,7 @@ func TestCreateJobValidation(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			o := &CreateJobOptions{
+			o := &JobOptions{
 				Image:   tc.image,
 				From:    tc.from,
 				Command: tc.command,
@@ -123,7 +123,7 @@ func TestCreateJob(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			o := &CreateJobOptions{
+			o := &JobOptions{
 				Name:    jobName,
 				Image:   tc.image,
 				Command: tc.command,
@@ -183,7 +183,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			o := &CreateJobOptions{
+			o := &JobOptions{
 				Name: jobName,
 			}
 			job := o.createJobFromCronJob(tc.from)
