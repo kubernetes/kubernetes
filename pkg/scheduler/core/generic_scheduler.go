@@ -677,6 +677,9 @@ func PrioritizeNodes(
 	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
+	trace := utiltrace.New(fmt.Sprintf("Ranking nodes for %s/%s", pod.Namespace, pod.Name))
+	defer trace.LogIfLong(100 * time.Millisecond)
+
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
 	if len(priorityConfigs) == 0 && len(extenders) == 0 {
@@ -701,6 +704,7 @@ func PrioritizeNodes(
 		defer mu.Unlock()
 		errs = append(errs, err)
 	}
+	trace.Step("calling priorityConfigs func")
 
 	results := make([]schedulerapi.HostPriorityList, len(priorityConfigs), len(priorityConfigs))
 
@@ -722,6 +726,7 @@ func PrioritizeNodes(
 		}
 	}
 
+	trace.Step("calling Map")
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
 		nodeInfo := nodeNameToInfo[nodes[index].Name]
 		for i := range priorityConfigs {
@@ -738,6 +743,7 @@ func PrioritizeNodes(
 		}
 	})
 
+	trace.Step("calling Reduce")
 	for i := range priorityConfigs {
 		if priorityConfigs[i].Reduce == nil {
 			continue
@@ -757,6 +763,7 @@ func PrioritizeNodes(
 	}
 	// Wait for all computations to be finished.
 	wg.Wait()
+	trace.Step("Reduce func complete")
 	if len(errs) != 0 {
 		return schedulerapi.HostPriorityList{}, errors.NewAggregate(errs)
 	}
@@ -772,6 +779,7 @@ func PrioritizeNodes(
 	}
 
 	if len(extenders) != 0 && nodes != nil {
+		trace.Step("calling extenders")
 		combinedScores := make(map[string]int, len(nodeNameToInfo))
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
@@ -798,6 +806,7 @@ func PrioritizeNodes(
 		}
 		// wait for all go routines to finish
 		wg.Wait()
+		trace.Step("extenders completed")
 		for i := range result {
 			result[i].Score += combinedScores[result[i].Host]
 		}
