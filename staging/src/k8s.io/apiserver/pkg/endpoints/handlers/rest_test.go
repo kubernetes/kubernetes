@@ -260,11 +260,11 @@ func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.Upda
 		}
 
 		if currentPod == nil {
-			if err := createValidation(currentPod); err != nil {
+			if err := createValidation(ctx, currentPod); err != nil {
 				return nil, false, err
 			}
 		} else {
-			if err := updateValidation(currentPod, inPod); err != nil {
+			if err := updateValidation(ctx, currentPod, inPod); err != nil {
 				return nil, false, err
 			}
 		}
@@ -351,19 +351,20 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 	admissionMutation := tc.admissionMutation
 	if admissionMutation == nil {
-		admissionMutation = func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionMutation = func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 			return nil
 		}
 	}
 	admissionValidation := tc.admissionValidation
 	if admissionValidation == nil {
-		admissionValidation = func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionValidation = func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 			return nil
 		}
 	}
 
 	ctx := request.NewDefaultContext()
 	ctx = request.WithNamespace(ctx, namespace)
+	ctx = request.WithLabelsHolder(ctx)
 
 	namer := &testNamer{namespace, name}
 	creater := runtime.ObjectCreater(scheme)
@@ -718,7 +719,7 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 	for _, test := range []Test{
 		{
 			name: "TestPatchWithMutatingAdmissionRejection",
-			admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionMutation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("mutating admission failure")
 			},
 			admissionValidation: rest.ValidateAllObjectUpdateFunc,
@@ -727,17 +728,17 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 		{
 			name:              "TestPatchWithValidatingAdmissionRejection",
 			admissionMutation: rest.ValidateAllObjectUpdateFunc,
-			admissionValidation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionValidation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("validating admission failure")
 			},
 			expectedError: "validating admission failure",
 		},
 		{
 			name: "TestPatchWithBothAdmissionRejections",
-			admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionMutation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("mutating admission failure")
 			},
-			admissionValidation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionValidation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("validating admission failure")
 			},
 			expectedError: "mutating admission failure",
@@ -777,7 +778,7 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	tc := &patchTestCase{
 		name: "TestPatchWithVersionConflictThenAdmissionFailure",
 
-		admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionMutation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 			if seen {
 				return errors.New("admission failure")
 			}
@@ -952,7 +953,7 @@ func (f mutateObjectUpdateFunc) Handles(operation admission.Operation) bool {
 }
 
 func (f mutateObjectUpdateFunc) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	return f(a.GetObject(), a.GetOldObject())
+	return f(context.TODO(), a.GetObject(), a.GetOldObject())
 }
 
 func TestTransformDecodeErrorEnsuresBadRequestError(t *testing.T) {

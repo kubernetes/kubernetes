@@ -447,7 +447,7 @@ func (storage *SimpleRESTStorage) Delete(ctx context.Context, id string, deleteV
 	if err := storage.errors["delete"]; err != nil {
 		return nil, false, err
 	}
-	if err := deleteValidation(&storage.item); err != nil {
+	if err := deleteValidation(ctx, &storage.item); err != nil {
 		return nil, false, err
 	}
 	var obj runtime.Object = &metav1.Status{Status: metav1.StatusSuccess}
@@ -495,7 +495,7 @@ func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objIn
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
-	if err := updateValidation(&storage.item, obj); err != nil {
+	if err := updateValidation(ctx, &storage.item, obj); err != nil {
 		return nil, false, err
 	}
 	return obj, false, err

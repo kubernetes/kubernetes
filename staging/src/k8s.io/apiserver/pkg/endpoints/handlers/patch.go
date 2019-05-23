@@ -245,7 +245,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 	}
 }
 
-type mutateObjectUpdateFunc func(obj, old runtime.Object) error
+type mutateObjectUpdateFunc func(ctx context.Context, obj, old runtime.Object) error
 
 // patcher breaks the process of patch application and retries into smaller
 // pieces of functionality.
