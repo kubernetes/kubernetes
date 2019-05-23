@@ -234,7 +234,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
-	priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
+	priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.alwaysCheckAllPredicates)
 	if err != nil {
 		return result, err
 	}
@@ -676,6 +676,7 @@ func PrioritizeNodes(
 	priorityConfigs []priorities.PriorityConfig,
 	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
+	alwaysCheckAllPredicates bool,
 ) (schedulerapi.HostPriorityList, error) {
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
@@ -697,6 +698,9 @@ func PrioritizeNodes(
 		errs []error
 	)
 	appendError := func(err error) {
+		if !alwaysCheckAllPredicates && len(errs) > 0 {
+			return
+		}
 		mu.Lock()
 		defer mu.Unlock()
 		errs = append(errs, err)
@@ -1008,6 +1012,7 @@ func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruption
 		pdbForPodIsViolated := false
 		// A pod with no labels will not match any PDB. So, no need to check.
 		if len(pod.Labels) != 0 {
+			podLabels := labels.Set(pod.Labels)
 			for _, pdb := range pdbs {
 				if pdb.Namespace != pod.Namespace {
 					continue
@@ -1017,7 +1022,7 @@ func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruption
 					continue
 				}
 				// A PDB with a nil or empty selector matches nothing.
-				if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+				if selector.Empty() || !selector.Matches(podLabels) {
 					continue
 				}
 				// We have found a matching PDB.

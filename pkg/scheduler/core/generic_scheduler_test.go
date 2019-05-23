@@ -433,7 +433,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:        []string{"2", "1"},
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			name:         "test error with priority map",
-			wErr:         errors.NewAggregate([]error{errPrioritize, errPrioritize}),
+			wErr:         errors.NewAggregate([]error{errPrioritize}),
 		},
 	}
 	for _, test := range tests {
@@ -720,7 +720,7 @@ func TestZeroRequest(t *testing.T) {
 
 			list, err := PrioritizeNodes(
 				test.pod, nodeNameToInfo, metaData, priorityConfigs,
-				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
+				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{}, true)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
