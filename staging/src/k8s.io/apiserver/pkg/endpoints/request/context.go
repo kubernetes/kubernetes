@@ -39,6 +39,11 @@ const (
 
 	// audiencesKey is the context key for request audiences.
 	audiencesKey
+
+	// labelsHolderKey is the context key for a labels holder.
+	// The labels holder holds the labels on an object after patch is
+	// applied, but before any mutating webhooks run.
+	labelsHolderKey
 )
 
 // NewContext instantiates a base context object for request flows.
@@ -93,4 +98,28 @@ func WithAuditEvent(parent context.Context, ev *audit.Event) context.Context {
 func AuditEventFrom(ctx context.Context) *audit.Event {
 	ev, _ := ctx.Value(auditKey).(*audit.Event)
 	return ev
+}
+
+// WithLabelsHolder returns a copy of parent with labelsHolder set.
+func WithLabelsHolder(parent context.Context) context.Context {
+	l := &labelsHolder{}
+	return WithValue(parent, labelsHolderKey, l)
+}
+
+// LabelsHolderFrom returns the labelsHolderKey value on the ctx.
+func LabelsHolderFrom(ctx context.Context) (*labelsHolder, bool) {
+	l, ok := ctx.Value(labelsHolderKey).(*labelsHolder)
+	return l, ok
+}
+
+type labelsHolder struct {
+	labels map[string]string
+}
+
+func (l *labelsHolder) SetLabels(labels map[string]string) {
+	l.labels = labels
+}
+
+func (l *labelsHolder) GetLabels() map[string]string {
+	return l.labels
 }

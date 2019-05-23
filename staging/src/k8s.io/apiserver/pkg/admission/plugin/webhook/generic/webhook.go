@@ -28,6 +28,7 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
@@ -43,6 +44,7 @@ type Webhook struct {
 	hookSource       Source
 	clientManager    *webhook.ClientManager
 	namespaceMatcher *namespace.Matcher
+	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
 }
 
@@ -78,6 +80,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
 		namespaceMatcher: &namespace.Matcher{},
+		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
 	}, nil
 }
@@ -139,7 +142,11 @@ func (a *Webhook) ShouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) 
 		return false, nil
 	}
 
-	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	match, err := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	if !match || err != nil {
+		return match, err
+	}
+	return a.objectMatcher.MatchObjectSelector(h, attr)
 }
 
 // Dispatch is called by the downstream Validate or Admit methods.

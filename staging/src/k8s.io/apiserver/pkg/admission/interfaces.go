@@ -57,6 +57,9 @@ type Attributes interface {
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
 
+	// GetLabels get the labels that are used to decide if admission webhooks should run.
+	GetLabels() map[string]string
+
 	// AddAnnotation sets annotation according to key-value pair. The key should be qualified, e.g., podsecuritypolicy.admission.k8s.io/admit-policy, where
 	// "podsecuritypolicy" is the name of the plugin, "admission.k8s.io" is the name of the organization, "admit-policy" is the key name.
 	// An error is returned if the format of key is invalid. When trying to overwrite annotation with a new value, an error is returned.

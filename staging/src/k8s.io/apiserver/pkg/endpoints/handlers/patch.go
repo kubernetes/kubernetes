@@ -93,6 +93,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 
 		ctx := req.Context()
+		ctx = request.WithLabelsHolder(ctx)
 		ctx = request.WithNamespace(ctx, namespace)
 
 		outputMediaType, _, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, scope)
@@ -146,6 +147,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		staticCreateAttributes := admission.NewAttributesRecord(
 			nil,
 			nil,
+			nil,
 			scope.Kind,
 			namespace,
 			name,
@@ -156,6 +158,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			dryrun.IsDryRun(options.DryRun),
 			userInfo)
 		staticUpdateAttributes := admission.NewAttributesRecord(
+			nil,
 			nil,
 			nil,
 			scope.Kind,
@@ -492,9 +495,9 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 	return objToUpdate, nil
 }
 
-func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
+func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, labels map[string]string, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo)
+	return admission.NewAttributesRecord(updatedObject, currentObject, labels, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo)
 }
 
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,
@@ -502,6 +505,16 @@ func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime
 // TODO: rename this function because the name implies it is related to applyPatcher
 func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
 	p.trace.Step("About to check admission control")
+	accessor, err := meta.Accessor(patchedObject)
+	if err != nil {
+		return nil, errors.NewInternalError(err)
+	}
+	labels := accessor.GetLabels()
+	labelsHolder, ok := request.LabelsHolderFrom(ctx)
+	if !ok {
+		return nil, errors.NewInternalError(fmt.Errorf("expect labelsHolder set in context"))
+	}
+	labelsHolder.SetLabels(labels)
 	var operation admission.Operation
 	var options runtime.Object
 	if hasUID, err := hasUID(currentObject); err != nil {
@@ -515,7 +528,7 @@ func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Obje
 		options = patchToUpdateOptions(p.options)
 	}
 	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
-		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation, options)
+		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, labels, operation, options)
 		return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
 	}
 	return patchedObject, nil

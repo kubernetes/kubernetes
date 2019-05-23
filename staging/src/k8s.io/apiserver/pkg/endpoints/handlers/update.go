@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -121,6 +122,12 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			return
 		}
 
+		var labels map[string]string
+		accessor, err := meta.Accessor(obj)
+		if err == nil {
+			labels = accessor.GetLabels()
+		}
+
 		userInfo, _ := request.UserFrom(ctx)
 		transformers := []rest.TransformFunc{}
 		if scope.FieldManager != nil {
@@ -139,11 +146,11 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 					return nil, fmt.Errorf("unexpected error when extracting UID from oldObj: %v", err.Error())
 				} else if !isNotZeroObject {
 					if mutatingAdmission.Handles(admission.Create) {
-						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope)
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, nil, labels, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope)
 					}
 				} else {
 					if mutatingAdmission.Handles(admission.Update) {
-						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope)
+						return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, labels, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope)
 					}
 				}
 				return newObj, nil
@@ -171,13 +178,13 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				withAuthorization(rest.AdmissionToValidateObjectFunc(
+				withAuthorization(rest.AdmissionToValidateObjectFuncWithStaticLabels(
 					admit,
-					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope),
+					admission.NewAttributesRecord(nil, nil, labels, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, updateToCreateOptions(options), dryrun.IsDryRun(options.DryRun), userInfo), scope),
 					scope.Authorizer, createAuthorizerAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(
+				rest.AdmissionToValidateObjectUpdateFuncWithStaticLabels(
 					admit,
-					admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope),
+					admission.NewAttributesRecord(nil, nil, labels, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, options, dryrun.IsDryRun(options.DryRun), userInfo), scope),
 				false,
 				options,
 			)
@@ -204,7 +211,7 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 	var authorizerDecision authorizer.Decision
 	var authorizerReason string
 	var authorizerErr error
-	return func(obj runtime.Object) error {
+	return func(ctx context.Context, obj runtime.Object) error {
 		if a == nil {
 			return errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize a create on update"))
 		}
@@ -214,7 +221,7 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorizerDecision == authorizer.DecisionAllow {
 			// Continue to validating admission
-			return validate(obj)
+			return validate(ctx, obj)
 		}
 		if authorizerErr != nil {
 			return errors.NewInternalError(authorizerErr)

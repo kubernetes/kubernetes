@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -150,14 +151,19 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 	mutating := isMutatingAdmission && mutatingAdmission.Handles(staticAttributes.GetOperation())
 	validating := isValidatingAdmission && validatingAdmission.Handles(staticAttributes.GetOperation())
 
-	return func(old runtime.Object) error {
+	return func(_ context.Context, old runtime.Object) error {
 		if !mutating && !validating {
 			return nil
+		}
+		accessor, err := meta.Accessor(old)
+		if err != nil {
+			return errors.NewInternalError(err)
 		}
 		finalAttributes := admission.NewAttributesRecord(
 			nil,
 			// Deep copy the object to avoid accidentally changing the object.
 			old.DeepCopyObject(),
+			accessor.GetLabels(),
 			staticAttributes.GetKind(),
 			staticAttributes.GetNamespace(),
 			staticAttributes.GetName(),

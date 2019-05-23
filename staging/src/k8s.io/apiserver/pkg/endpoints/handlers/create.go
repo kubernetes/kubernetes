@@ -27,6 +27,7 @@ import (
 	"unicode/utf8"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -129,7 +130,13 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
-		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
+
+		var labels map[string]string
+		accessor, err := meta.Accessor(obj)
+		if err == nil {
+			labels = accessor.GetLabels()
+		}
+		admissionAttributes := admission.NewAttributesRecord(obj, nil, labels, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, options, dryrun.IsDryRun(options.DryRun), userInfo)
 		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 			err = mutatingAdmission.Admit(admissionAttributes, scope)
 			if err != nil {
@@ -158,7 +165,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 				ctx,
 				name,
 				obj,
-				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes, scope),
+				rest.AdmissionToValidateObjectFuncWithStaticLabels(admit, admissionAttributes, scope),
 				options,
 			)
 		})

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
@@ -259,12 +260,45 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj run
 func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
-		return func(obj, old runtime.Object) error { return nil }
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
 	}
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		l, ok := request.LabelsHolderFrom(ctx)
+		if !ok {
+			return errors.NewInternalError(fmt.Errorf("expect labelsHolder set in context"))
+		}
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			old,
+			l.GetLabels(),
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
+			staticAttributes.IsDryRun(),
+			staticAttributes.GetUserInfo(),
+		)
+		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return validatingAdmission.Validate(finalAttributes, o)
+	}
+}
+
+// AdmissionToValidateObjectUpdateFuncWithStaticLabels converts validating admission to a rest validate object update func that takes labels from the static attributes.
+func AdmissionToValidateObjectUpdateFuncWithStaticLabels(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
+	validatingAdmission, ok := admit.(admission.ValidationInterface)
+	if !ok {
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
+	}
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		finalAttributes := admission.NewAttributesRecord(
+			obj,
+			old,
+			staticAttributes.GetLabels(),
 			staticAttributes.GetKind(),
 			staticAttributes.GetNamespace(),
 			staticAttributes.GetName(),

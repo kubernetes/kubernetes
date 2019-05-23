@@ -38,6 +38,7 @@ type attributesRecord struct {
 	dryRun      bool
 	object      runtime.Object
 	oldObject   runtime.Object
+	labels      map[string]string
 	userInfo    user.Info
 
 	// other elements are always accessed in single goroutine.
@@ -46,7 +47,7 @@ type attributesRecord struct {
 	annotationsLock sync.RWMutex
 }
 
-func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, labels map[string]string, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
 	return &attributesRecord{
 		kind:        kind,
 		namespace:   namespace,
@@ -58,6 +59,7 @@ func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind s
 		dryRun:      dryRun,
 		object:      object,
 		oldObject:   oldObject,
+		labels:      labels,
 		userInfo:    userInfo,
 	}
 }
@@ -100,6 +102,10 @@ func (record *attributesRecord) GetObject() runtime.Object {
 
 func (record *attributesRecord) GetOldObject() runtime.Object {
 	return record.oldObject
+}
+
+func (record *attributesRecord) GetLabels() map[string]string {
+	return record.labels
 }
 
 func (record *attributesRecord) GetUserInfo() user.Info {
