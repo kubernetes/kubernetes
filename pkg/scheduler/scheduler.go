@@ -554,28 +554,6 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 	return nil
 }
 
-// NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *factory.Config) *Scheduler {
-	metrics.Register()
-	return &Scheduler{
-		SchedulerCache:      config.SchedulerCache,
-		NodeLister:          config.NodeLister,
-		Algorithm:           config.Algorithm,
-		GetBinder:           config.GetBinder,
-		PodConditionUpdater: config.PodConditionUpdater,
-		PodPreemptor:        config.PodPreemptor,
-		Framework:           config.Framework,
-		NextPod:             config.NextPod,
-		WaitForCacheSync:    config.WaitForCacheSync,
-		Error:               config.Error,
-		Recorder:            config.Recorder,
-		StopEverything:      config.StopEverything,
-		VolumeBinder:        config.VolumeBinder,
-		DisablePreemption:   config.DisablePreemption,
-		SchedulingQueue:     config.SchedulingQueue,
-	}
-}
-
 // Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
 	if !sched.WaitForCacheSync() {
