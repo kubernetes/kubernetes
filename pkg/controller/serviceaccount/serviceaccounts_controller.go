@@ -199,8 +199,7 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 	}
 
 	createFailures := []error{}
-	for i := range c.serviceAccountsToEnsure {
-		sa := c.serviceAccountsToEnsure[i]
+	for _, sa := range c.serviceAccountsToEnsure {
 		switch _, err := c.saLister.ServiceAccounts(ns.Name).Get(sa.Name); {
 		case err == nil:
 			continue
