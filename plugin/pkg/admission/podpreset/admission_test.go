@@ -17,13 +17,16 @@ limitations under the License.
 package podpreset
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
+	fuzz "github.com/google/gofuzz"
 	corev1 "k8s.io/api/core/v1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
@@ -830,4 +833,56 @@ func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 	}
 
 	return nil
+}
+
+func TestEnvFromMergeKey(t *testing.T) {
+	f := fuzz.New()
+	for i := 0; i < 100; i++ {
+		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
+			orig := api.EnvFromSource{}
+			f.Fuzz(&orig)
+			clone := api.EnvFromSource{}
+			f.Fuzz(&clone)
+
+			key := newEnvFromMergeKey(orig)
+
+			// copy all key fields into the clone so it only differs by fields not from the key
+			clone.Prefix = key.prefix
+			if orig.ConfigMapRef == nil {
+				clone.ConfigMapRef = nil
+			} else {
+				if clone.ConfigMapRef == nil {
+					clone.ConfigMapRef = &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{},
+					}
+				}
+				clone.ConfigMapRef.Name = key.configMapRefName
+			}
+			if orig.SecretRef == nil {
+				clone.SecretRef = nil
+			} else {
+				if clone.SecretRef == nil {
+					clone.SecretRef = &api.SecretEnvSource{
+						LocalObjectReference: api.LocalObjectReference{},
+					}
+				}
+				clone.SecretRef.Name = key.secretRefName
+			}
+
+			// zero out known non-identifying fields
+			for _, e := range []api.EnvFromSource{orig, clone} {
+				if e.ConfigMapRef != nil {
+					e.ConfigMapRef.Optional = nil
+				}
+				if e.SecretRef != nil {
+					e.SecretRef.Optional = nil
+				}
+			}
+
+			if !reflect.DeepEqual(orig, clone) {
+				t.Errorf("expected all but known non-identifying fields for envFrom to be in envFromMergeKey but found unaccounted for differences, diff:\n%s", diff.ObjectReflectDiff(orig, clone))
+			}
+
+		})
+	}
 }

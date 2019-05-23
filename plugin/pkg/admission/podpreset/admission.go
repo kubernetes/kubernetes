@@ -252,19 +252,54 @@ func mergeEnv(envVars []api.EnvVar, podPresets []*settingsv1alpha1.PodPreset) ([
 	return mergedEnv, err
 }
 
+type envFromMergeKey struct {
+	prefix           string
+	configMapRefName string
+	secretRefName    string
+}
+
+func newEnvFromMergeKey(e api.EnvFromSource) envFromMergeKey {
+	k := envFromMergeKey{prefix: e.Prefix}
+	if e.ConfigMapRef != nil {
+		k.configMapRefName = e.ConfigMapRef.Name
+	}
+	if e.SecretRef != nil {
+		k.secretRefName = e.SecretRef.Name
+	}
+	return k
+}
+
 func mergeEnvFrom(envSources []api.EnvFromSource, podPresets []*settingsv1alpha1.PodPreset) ([]api.EnvFromSource, error) {
 	var mergedEnvFrom []api.EnvFromSource
 
+	// merge envFrom using a identify key to ensure Admit reinvocations are idempotent
+	origEnvSources := map[envFromMergeKey]api.EnvFromSource{}
+	for _, envSource := range envSources {
+		origEnvSources[newEnvFromMergeKey(envSource)] = envSource
+	}
 	mergedEnvFrom = append(mergedEnvFrom, envSources...)
+	var errs []error
 	for _, pp := range podPresets {
 		for _, envFromSource := range pp.Spec.EnvFrom {
 			internalEnvFrom := api.EnvFromSource{}
 			if err := apiscorev1.Convert_v1_EnvFromSource_To_core_EnvFromSource(&envFromSource, &internalEnvFrom, nil); err != nil {
 				return nil, err
 			}
-			mergedEnvFrom = append(mergedEnvFrom, internalEnvFrom)
+			found, ok := origEnvSources[newEnvFromMergeKey(internalEnvFrom)]
+			if !ok {
+				mergedEnvFrom = append(mergedEnvFrom, internalEnvFrom)
+				continue
+			}
+			if !reflect.DeepEqual(found, internalEnvFrom) {
+				errs = append(errs, fmt.Errorf("merging envFrom for %s has a conflict: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), internalEnvFrom, found))
+			}
 		}
 
+	}
+
+	err := utilerrors.NewAggregate(errs)
+	if err != nil {
+		return nil, err
 	}
 
 	return mergedEnvFrom, nil
