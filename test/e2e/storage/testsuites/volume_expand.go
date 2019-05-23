@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -56,6 +57,9 @@ func InitVolumeExpandTestSuite() TestSuite {
 				testpatterns.BlockVolModeDynamicPV,
 				testpatterns.DefaultFsDynamicPVAllowExpansion,
 				testpatterns.BlockVolModeDynamicPVAllowExpansion,
+			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
 			},
 		},
 	}
@@ -104,7 +108,8 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := v.getTestSuiteInfo().supportedSizeRange
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {

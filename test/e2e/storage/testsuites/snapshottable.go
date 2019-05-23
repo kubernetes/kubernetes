@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -57,6 +58,9 @@ func InitSnapshottableTestSuite() TestSuite {
 			name: "snapshottable",
 			testPatterns: []testpatterns.TestPattern{
 				testpatterns.DynamicSnapshot,
+			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
 			},
 		},
 	}
@@ -109,16 +113,19 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		if class == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
-
+		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
+		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 		pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-			ClaimSize:        dDriver.GetClaimSize(),
+			ClaimSize:        claimSize,
 			StorageClassName: &(class.Name),
 		}, config.Framework.Namespace.Name)
 
 		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)
-		class, err := cs.StorageV1().StorageClasses().Create(class)
+		class, err = cs.StorageV1().StorageClasses().Create(class)
 		framework.ExpectNoError(err)
 		defer func() {
 			framework.Logf("deleting storage class %s", class.Name)

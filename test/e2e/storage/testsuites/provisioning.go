@@ -74,6 +74,9 @@ func InitProvisioningTestSuite() TestSuite {
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.NtfsDynamicPV,
 			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
+			},
 		},
 	}
 }
@@ -130,7 +133,11 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 		l.cs = l.config.Framework.ClientSet
-		claimSize := dDriver.GetClaimSize()
+		testVolumeSizeRange := p.getTestSuiteInfo().supportedSizeRange
+		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+
 		l.sc = dDriver.GetDynamicProvisionStorageClass(l.config, pattern.FsType)
 		if l.sc == nil {
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)

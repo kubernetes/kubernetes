@@ -92,6 +92,9 @@ func InitNFSDriver() testsuites.TestDriver {
 			Name:             "nfs",
 			InTreePluginName: "kubernetes.io/nfs",
 			MaxFileSize:      testpatterns.FileSizeLarge,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -145,10 +148,6 @@ func (n *nfsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	suffix := fmt.Sprintf("%s-sc", n.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
-}
-
-func (n *nfsDriver) GetClaimSize() string {
-	return "5Gi"
 }
 
 func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -235,6 +234,9 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 			Name:             "gluster",
 			InTreePluginName: "kubernetes.io/glusterfs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -469,6 +471,9 @@ func InitRbdDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/rbd",
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -598,6 +603,9 @@ func InitCephFSDriver() testsuites.TestDriver {
 			InTreePluginName: "kubernetes.io/cephfs",
 			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -983,6 +991,9 @@ func InitCinderDriver() testsuites.TestDriver {
 			Name:             "cinder",
 			InTreePluginName: "kubernetes.io/cinder",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
@@ -1050,10 +1061,6 @@ func (c *cinderDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTes
 	suffix := fmt.Sprintf("%s-sc", c.driverInfo.Name)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
-}
-
-func (c *cinderDriver) GetClaimSize() string {
-	return "5Gi"
 }
 
 func (c *cinderDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
@@ -1153,9 +1160,12 @@ func InitGcePdDriver() testsuites.TestDriver {
 	)
 	return &gcePdDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:                 "gcepd",
-			InTreePluginName:     "kubernetes.io/gce-pd",
-			MaxFileSize:          testpatterns.FileSizeMedium,
+			Name:             "gcepd",
+			InTreePluginName: "kubernetes.io/gce-pd",
+			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			TopologyKeys:         []string{v1.LabelZoneFailureDomain},
@@ -1230,10 +1240,6 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
-func (g *gcePdDriver) GetClaimSize() string {
-	return "5Gi"
-}
-
 func (g *gcePdDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	config := &testsuites.PerTestConfig{
 		Driver:    g,
@@ -1292,6 +1298,9 @@ func InitVSphereDriver() testsuites.TestDriver {
 			Name:             "vsphere",
 			InTreePluginName: "kubernetes.io/vsphere-volume",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1365,10 +1374,6 @@ func (v *vSphereDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTe
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (v *vSphereDriver) GetClaimSize() string {
-	return "5Gi"
-}
-
 func (v *vSphereDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	return &testsuites.PerTestConfig{
 		Driver:    v,
@@ -1415,6 +1420,9 @@ func InitAzureDriver() testsuites.TestDriver {
 			Name:             "azure",
 			InTreePluginName: "kubernetes.io/azure-file",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
@@ -1495,10 +1503,6 @@ func (a *azureDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 }
 
-func (a *azureDriver) GetClaimSize() string {
-	return "5Gi"
-}
-
 func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
 	return &testsuites.PerTestConfig{
 		Driver:    a,
@@ -1550,6 +1554,9 @@ func InitAwsDriver() testsuites.TestDriver {
 			Name:             "aws",
 			InTreePluginName: "kubernetes.io/aws-ebs",
 			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Min: "5Gi",
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -1624,10 +1631,6 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
-}
-
-func (a *awsDriver) GetClaimSize() string {
-	return "5Gi"
 }
 
 func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {

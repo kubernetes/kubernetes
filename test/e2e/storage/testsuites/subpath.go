@@ -65,6 +65,9 @@ func InitSubPathTestSuite() TestSuite {
 				testpatterns.DefaultFsDynamicPV,
 				testpatterns.NtfsDynamicPV,
 			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
+			},
 		},
 	}
 }
@@ -111,7 +114,8 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType

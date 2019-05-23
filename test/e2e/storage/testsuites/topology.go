@@ -139,7 +139,10 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		framework.ExpectNotEqual(l.resource.sc, nil, "driver failed to provide a StorageClass")
 		l.resource.sc.VolumeBindingMode = &pattern.BindingMode
 
-		claimSize := dDriver.GetClaimSize()
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 		l.resource.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
 			StorageClassName: &(l.resource.sc.Name),
