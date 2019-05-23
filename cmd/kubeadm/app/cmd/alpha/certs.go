@@ -31,7 +31,6 @@ import (
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
@@ -128,7 +127,7 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 	flags := &renewFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
-			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
 		},
 	}
 	// Default values for the cobra help text
@@ -234,7 +233,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 	flags := &expirationFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
-			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
 		},
 	}
 	// Default values for the cobra help text

@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
@@ -158,7 +157,7 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 		return nil, errors.Wrapf(err, "couldn't create a temporary directory for the upgrade")
 	}
 
-	realManifestDir := filepath.Join(kubernetesDir, constants.ManifestsSubDirName)
+	realManifestDir := filepath.Join(kubernetesDir, kubeadmconstants.ManifestsSubDirName)
 	if err := os.Mkdir(realManifestDir, 0700); err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a realManifestDir for the upgrade")
 	}
@@ -197,21 +196,21 @@ func (spm *fakeStaticPodPathManager) KubernetesDir() string {
 }
 
 func (spm *fakeStaticPodPathManager) RealManifestPath(component string) string {
-	return constants.GetStaticPodFilepath(component, spm.realManifestDir)
+	return kubeadmconstants.GetStaticPodFilepath(component, spm.realManifestDir)
 }
 func (spm *fakeStaticPodPathManager) RealManifestDir() string {
 	return spm.realManifestDir
 }
 
 func (spm *fakeStaticPodPathManager) TempManifestPath(component string) string {
-	return constants.GetStaticPodFilepath(component, spm.tempManifestDir)
+	return kubeadmconstants.GetStaticPodFilepath(component, spm.tempManifestDir)
 }
 func (spm *fakeStaticPodPathManager) TempManifestDir() string {
 	return spm.tempManifestDir
 }
 
 func (spm *fakeStaticPodPathManager) BackupManifestPath(component string) string {
-	return constants.GetStaticPodFilepath(component, spm.backupManifestDir)
+	return kubeadmconstants.GetStaticPodFilepath(component, spm.backupManifestDir)
 }
 func (spm *fakeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
@@ -281,9 +280,9 @@ func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInt
 func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
-		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
-		KeyFile:       filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientCertName),
-		TrustedCAFile: filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientKeyName),
+		CertFile:      filepath.Join(c.CertificatesDir, kubeadmconstants.EtcdCACertName),
+		KeyFile:       filepath.Join(c.CertificatesDir, kubeadmconstants.EtcdHealthcheckClientCertName),
+		TrustedCAFile: filepath.Join(c.CertificatesDir, kubeadmconstants.EtcdHealthcheckClientKeyName),
 	}
 	_, err := tlsInfo.ClientConfig()
 	if err != nil {
@@ -482,7 +481,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpEtcdDataDir)
 
-			oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			oldcfg, err := getConfig(kubeadmconstants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}
@@ -526,7 +525,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				t.Fatalf("couldn't read temp file: %v", err)
 			}
 
-			newcfg, err := getConfig(constants.CurrentKubernetesVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			newcfg, err := getConfig(kubeadmconstants.CurrentKubernetesVersion.String(), tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}
@@ -591,7 +590,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 }
 
 func getAPIServerHash(dir string) (string, error) {
-	manifestPath := constants.GetStaticPodFilepath(constants.KubeAPIServer, dir)
+	manifestPath := kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, dir)
 
 	fileBytes, err := ioutil.ReadFile(manifestPath)
 	if err != nil {
@@ -702,7 +701,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 	}{
 		{
 			name:      "all CA exist, all certs should be rotated for etcd",
-			component: constants.Etcd,
+			component: kubeadmconstants.Etcd,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdServer,
 				&certsphase.KubeadmCertEtcdPeer,
@@ -711,7 +710,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		},
 		{
 			name:      "all CA exist, all certs should be rotated for apiserver",
-			component: constants.KubeAPIServer,
+			component: kubeadmconstants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdAPIClient,
 				&certsphase.KubeadmCertAPIServer,
@@ -721,7 +720,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		},
 		{
 			name:      "external CA, renew only certificates not signed by CA for apiserver",
-			component: constants.KubeAPIServer,
+			component: kubeadmconstants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdAPIClient,
 				&certsphase.KubeadmCertFrontProxyClient,
@@ -736,7 +735,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		},
 		{
 			name:      "external front-proxy-CA, renew only certificates not signed by front-proxy-CA for apiserver",
-			component: constants.KubeAPIServer,
+			component: kubeadmconstants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdAPIClient,
 				&certsphase.KubeadmCertFrontProxyClient,
@@ -752,21 +751,21 @@ func TestRenewCertsByComponent(t *testing.T) {
 		},
 		{
 			name:      "all CA exist, should be rotated for scheduler",
-			component: constants.KubeScheduler,
+			component: kubeadmconstants.KubeScheduler,
 			kubeConfigShouldExist: []string{
 				kubeadmconstants.SchedulerKubeConfigFileName,
 			},
 		},
 		{
 			name:      "all CA exist, should be rotated for controller manager",
-			component: constants.KubeControllerManager,
+			component: kubeadmconstants.KubeControllerManager,
 			kubeConfigShouldExist: []string{
 				kubeadmconstants.ControllerManagerKubeConfigFileName,
 			},
 		},
 		{
 			name:               "missing a cert to renew",
-			component:          constants.Etcd,
+			component:          kubeadmconstants.Etcd,
 			shouldErrorOnRenew: true,
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdServer,
@@ -775,7 +774,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		},
 		{
 			name:               "no CA, cannot continue",
-			component:          constants.Etcd,
+			component:          kubeadmconstants.Etcd,
 			skipCreateEtcdCA:   true,
 			shouldErrorOnRenew: true,
 		},
@@ -790,20 +789,20 @@ func TestRenewCertsByComponent(t *testing.T) {
 			cfg := testutil.GetDefaultInternalConfig(t)
 			cfg.CertificatesDir = tmpDir
 
-			if err := pkiutil.WriteCertAndKey(tmpDir, constants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+			if err := pkiutil.WriteCertAndKey(tmpDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
 				t.Fatalf("couldn't write out CA: %v", err)
 			}
 			if test.externalCA {
-				os.Remove(filepath.Join(tmpDir, constants.CAKeyName))
+				os.Remove(filepath.Join(tmpDir, kubeadmconstants.CAKeyName))
 			}
-			if err := pkiutil.WriteCertAndKey(tmpDir, constants.FrontProxyCACertAndKeyBaseName, caCert, caKey); err != nil {
+			if err := pkiutil.WriteCertAndKey(tmpDir, kubeadmconstants.FrontProxyCACertAndKeyBaseName, caCert, caKey); err != nil {
 				t.Fatalf("couldn't write out front-proxy-CA: %v", err)
 			}
 			if test.externalFrontProxyCA {
-				os.Remove(filepath.Join(tmpDir, constants.FrontProxyCAKeyName))
+				os.Remove(filepath.Join(tmpDir, kubeadmconstants.FrontProxyCAKeyName))
 			}
 			if !test.skipCreateEtcdCA {
-				if err := pkiutil.WriteCertAndKey(tmpDir, constants.EtcdCACertAndKeyBaseName, caCert, caKey); err != nil {
+				if err := pkiutil.WriteCertAndKey(tmpDir, kubeadmconstants.EtcdCACertAndKeyBaseName, caCert, caKey); err != nil {
 					t.Fatalf("couldn't write out etcd-CA: %v", err)
 				}
 			}

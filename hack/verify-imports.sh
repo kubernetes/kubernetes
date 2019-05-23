@@ -39,3 +39,32 @@ if [[ ! -x "$importverifier" ]]; then
 fi
 
 "${importverifier}" "k8s.io/" "${KUBE_ROOT}/staging/publishing/import-restrictions.yaml"
+echo "Checking all go file about import restrictions successfully!"
+
+# Ensure that we find the binaries we build before anything else.
+export GOBIN="${KUBE_OUTPUT_BINPATH}"
+PATH="${GOBIN}:${PATH}"
+
+# Install tools we need, but only from vendor/...
+go install k8s.io/kubernetes/vendor/github.com/nishanths/dedupimport
+
+# find_files contains all go file we want to check.
+find_files() {
+  find . -not \( \
+      \( \
+        -wholename './_output' \
+        -o -wholename './build' \
+        -o -wholename './cluster' \
+        -o -wholename './docs' \
+        -o -wholename './Godeps' \
+        -o -wholename './hack' \
+        -o -wholename './logo' \
+        -o -wholename './third_party' \
+        -o -wholename './translations' \
+        -o -wholename '*/vendor/*' \
+      \) -prune \
+    \) -name '*.go'
+}
+
+find_files | xargs dedupimport -d -i
+echo "Checking all go file import deduplicate file successfully!"
