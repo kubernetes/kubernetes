@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/informers"
@@ -825,4 +826,203 @@ func TestUpdateDisruptedPods(t *testing.T) {
 	dc.sync(pdbName)
 
 	ps.VerifyPdbStatus(t, pdbName, 0, 1, 1, 3, map[string]metav1.Time{"p3": {Time: currentTime}})
+}
+
+func TestBasicFinderFunctions(t *testing.T) {
+	dc, _ := newFakeDisruptionController()
+
+	rs, _ := newReplicaSet(t, 10)
+	add(t, dc.rsStore, rs)
+	rc, _ := newReplicationController(t, 12)
+	add(t, dc.rcStore, rc)
+	ss, _ := newStatefulSet(t, 14)
+	add(t, dc.ssStore, ss)
+
+	testCases := map[string]struct {
+		finderFunc    podControllerFinder
+		apiVersion    string
+		kind          string
+		name          string
+		uid           types.UID
+		findsScale    bool
+		expectedScale int32
+	}{
+		"replicaset controller with apps group": {
+			finderFunc:    dc.getPodReplicaSet,
+			apiVersion:    "apps/v1",
+			kind:          controllerKindRS.Kind,
+			name:          rs.Name,
+			uid:           rs.UID,
+			findsScale:    true,
+			expectedScale: 10,
+		},
+		"replicaset controller with invalid group": {
+			finderFunc: dc.getPodReplicaSet,
+			apiVersion: "invalid/v1",
+			kind:       controllerKindRS.Kind,
+			name:       rs.Name,
+			uid:        rs.UID,
+			findsScale: false,
+		},
+		"replicationcontroller with empty group": {
+			finderFunc:    dc.getPodReplicationController,
+			apiVersion:    "/v1",
+			kind:          controllerKindRC.Kind,
+			name:          rc.Name,
+			uid:           rc.UID,
+			findsScale:    true,
+			expectedScale: 12,
+		},
+		"replicationcontroller with invalid group": {
+			finderFunc: dc.getPodReplicationController,
+			apiVersion: "apps/v1",
+			kind:       controllerKindRC.Kind,
+			name:       rc.Name,
+			uid:        rc.UID,
+			findsScale: false,
+		},
+		"statefulset controller with extensions group": {
+			finderFunc:    dc.getPodStatefulSet,
+			apiVersion:    "apps/v1",
+			kind:          controllerKindSS.Kind,
+			name:          ss.Name,
+			uid:           ss.UID,
+			findsScale:    true,
+			expectedScale: 14,
+		},
+		"statefulset controller with invalid kind": {
+			finderFunc: dc.getPodStatefulSet,
+			apiVersion: "apps/v1",
+			kind:       controllerKindRS.Kind,
+			name:       ss.Name,
+			uid:        ss.UID,
+			findsScale: false,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			controllerRef := &metav1.OwnerReference{
+				APIVersion: tc.apiVersion,
+				Kind:       tc.kind,
+				Name:       tc.name,
+				UID:        tc.uid,
+			}
+
+			controllerAndScale, _ := tc.finderFunc(controllerRef, metav1.NamespaceDefault)
+
+			if controllerAndScale == nil {
+				if tc.findsScale {
+					t.Error("Expected scale, but got nil")
+				}
+				return
+			}
+
+			if got, want := controllerAndScale.scale, tc.expectedScale; got != want {
+				t.Errorf("Expected scale %d, but got %d", want, got)
+			}
+
+			if got, want := controllerAndScale.UID, tc.uid; got != want {
+				t.Errorf("Expected uid %s, but got %s", want, got)
+			}
+		})
+	}
+}
+
+func TestDeploymentFinderFunction(t *testing.T) {
+	labels := map[string]string{
+		"foo": "bar",
+	}
+
+	testCases := map[string]struct {
+		rsApiVersion  string
+		rsKind        string
+		depApiVersion string
+		depKind       string
+		findsScale    bool
+		expectedScale int32
+	}{
+		"happy path": {
+			rsApiVersion:  "apps/v1",
+			rsKind:        controllerKindRS.Kind,
+			depApiVersion: "extensions/v1",
+			depKind:       controllerKindDep.Kind,
+			findsScale:    true,
+			expectedScale: 10,
+		},
+		"invalid rs apiVersion": {
+			rsApiVersion:  "invalid/v1",
+			rsKind:        controllerKindRS.Kind,
+			depApiVersion: "apps/v1",
+			depKind:       controllerKindDep.Kind,
+			findsScale:    false,
+		},
+		"invalid rs kind": {
+			rsApiVersion:  "apps/v1",
+			rsKind:        "InvalidKind",
+			depApiVersion: "apps/v1",
+			depKind:       controllerKindDep.Kind,
+			findsScale:    false,
+		},
+		"invalid deployment apiVersion": {
+			rsApiVersion:  "extensions/v1",
+			rsKind:        controllerKindRS.Kind,
+			depApiVersion: "deployment/v1",
+			depKind:       controllerKindDep.Kind,
+			findsScale:    false,
+		},
+		"invalid deployment kind": {
+			rsApiVersion:  "apps/v1",
+			rsKind:        controllerKindRS.Kind,
+			depApiVersion: "extensions/v1",
+			depKind:       "InvalidKind",
+			findsScale:    false,
+		},
+	}
+
+	for tn, tc := range testCases {
+		t.Run(tn, func(t *testing.T) {
+			dc, _ := newFakeDisruptionController()
+
+			dep, _ := newDeployment(t, 10)
+			dep.Spec.Selector = newSel(labels)
+			add(t, dc.dStore, dep)
+
+			rs, _ := newReplicaSet(t, 5)
+			rs.Labels = labels
+			trueVal := true
+			rs.OwnerReferences = append(rs.OwnerReferences, metav1.OwnerReference{
+				APIVersion: tc.depApiVersion,
+				Kind:       tc.depKind,
+				Name:       dep.Name,
+				UID:        dep.UID,
+				Controller: &trueVal,
+			})
+			add(t, dc.rsStore, rs)
+
+			controllerRef := &metav1.OwnerReference{
+				APIVersion: tc.rsApiVersion,
+				Kind:       tc.rsKind,
+				Name:       rs.Name,
+				UID:        rs.UID,
+			}
+
+			controllerAndScale, _ := dc.getPodDeployment(controllerRef, metav1.NamespaceDefault)
+
+			if controllerAndScale == nil {
+				if tc.findsScale {
+					t.Error("Expected scale, but got nil")
+				}
+				return
+			}
+
+			if got, want := controllerAndScale.scale, tc.expectedScale; got != want {
+				t.Errorf("Expected scale %d, but got %d", want, got)
+			}
+
+			if got, want := controllerAndScale.UID, dep.UID; got != want {
+				t.Errorf("Expected uid %s, but got %s", want, got)
+			}
+		})
+	}
 }

@@ -245,8 +245,10 @@ func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerRefe
 	if controllerRef == nil {
 		return nil, nil
 	}
-	if controllerRef.Kind != controllerKindDep.Kind {
-		return nil, nil
+
+	ok, err = verifyGroupKind(controllerRef, controllerKindDep.Kind, []string{"apps", "extensions"})
+	if !ok || err != nil {
+		return nil, err
 	}
 	deployment, err := dc.dLister.Deployments(rs.Namespace).Get(controllerRef.Name)
 	if err != nil {
@@ -311,20 +313,16 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 		return false, err
 	}
 
-	groupMatch := false
-	for _, group := range expectedGroups {
-		if group == gv.Group {
-			groupMatch = true
-			break
-		}
-	}
-	if !groupMatch {
+	if controllerRef.Kind != expectedKind {
 		return false, nil
 	}
 
-	if controllerRef.Kind == expectedKind {
-		return true, nil
+	for _, group := range expectedGroups {
+		if group == gv.Group {
+			return true, nil
+		}
 	}
+
 	return false, nil
 }
 
