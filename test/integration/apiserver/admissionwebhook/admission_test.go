@@ -39,6 +39,7 @@ import (
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,8 +60,15 @@ const (
 	testNamespace      = "webhook-integration"
 	testClientUsername = "webhook-integration-client"
 
-	mutation   = "mutation"
-	validation = "validation"
+	mutation           = "mutation"
+	validation         = "validation"
+	withObjectSelector = "-with-label-selector"
+	skipped            = "-skipped"
+	called             = "-called"
+)
+
+var (
+	labelsAddedByWebhook = map[string]string{"byMutation": "true"}
 )
 
 type testContext struct {
@@ -158,13 +166,17 @@ type holder struct {
 	recordNamespace string
 	recordName      string
 
-	expectGVK        schema.GroupVersionKind
-	expectObject     bool
-	expectOldObject  bool
-	expectOptionsGVK schema.GroupVersionKind
-	expectOptions    bool
+	expectGVK                             schema.GroupVersionKind
+	expectObject                          bool
+	expectOldObject                       bool
+	expectOptionsGVK                      schema.GroupVersionKind
+	expectOptions                         bool
+	expectObjectSelectorValidationWebhook bool
+	expectObjectSelectorMutationWebhook   bool
 
-	recorded map[string]*v1beta1.AdmissionRequest
+	recorded                                map[string]*v1beta1.AdmissionRequest
+	recordedObjectSelectorValidationWebhook bool
+	recordedObjectSelectorMutationWebhook   bool
 }
 
 func (h *holder) reset(t *testing.T) {
@@ -180,11 +192,23 @@ func (h *holder) reset(t *testing.T) {
 	h.expectOldObject = false
 	h.expectOptionsGVK = schema.GroupVersionKind{}
 	h.expectOptions = false
+	h.expectObjectSelectorValidationWebhook = false
+	h.expectObjectSelectorMutationWebhook = false
 	h.recorded = map[string]*v1beta1.AdmissionRequest{
 		mutation:   nil,
 		validation: nil,
 	}
+	h.recordedObjectSelectorValidationWebhook = false
+	h.recordedObjectSelectorMutationWebhook = false
 }
+
+func (h *holder) expectObjectSelectorWebhooks() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	h.expectObjectSelectorValidationWebhook = true
+	h.expectObjectSelectorMutationWebhook = true
+}
+
 func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
 	// Special-case namespaces, since the object name shows up in request attributes for update/delete requests
 	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" && operation != v1beta1.Create {
@@ -207,6 +231,7 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.
 		validation: nil,
 	}
 }
+
 func (h *holder) record(phase string, request *v1beta1.AdmissionRequest) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -255,6 +280,18 @@ func (h *holder) record(phase string, request *v1beta1.AdmissionRequest) {
 	h.recorded[phase] = request
 }
 
+func (h *holder) recordObjectSelectorWebhook(phase string) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	if phase == mutation {
+		h.recordedObjectSelectorMutationWebhook = true
+	}
+	if phase == validation {
+		h.recordedObjectSelectorValidationWebhook = true
+	}
+}
+
 func (h *holder) verify(t *testing.T) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -264,6 +301,21 @@ func (h *holder) verify(t *testing.T) {
 	}
 	if err := h.verifyRequest(h.recorded[validation]); err != nil {
 		t.Errorf("validation error: %v", err)
+	}
+	// Check if current resource should be exempted from Admission processing
+	if admissionExemptResources[gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)] {
+		return
+	}
+
+	// The tests don't set labels on objects in the stub data overrides, so we shouldn't expect objectSelector scoped webhooks being called.
+	if stubDataOverrides[gvr(h.recordGVR.Group, h.recordGVR.Version, h.recordGVR.Resource)] != "" {
+		return
+	}
+	if h.expectObjectSelectorMutationWebhook != h.recordedObjectSelectorMutationWebhook {
+		t.Errorf("expected the mutation webhook to be triggered by the object selector")
+	}
+	if h.expectObjectSelectorMutationWebhook != h.recordedObjectSelectorMutationWebhook {
+		t.Errorf("expected the validation webhook to be triggered by the object selector")
 	}
 }
 
@@ -345,6 +397,10 @@ func TestWebhookV1beta1(t *testing.T) {
 	webhookMux := http.NewServeMux()
 	webhookMux.Handle("/"+mutation, newWebhookHandler(t, holder, mutation))
 	webhookMux.Handle("/"+validation, newWebhookHandler(t, holder, validation))
+	webhookMux.Handle("/"+mutation+withObjectSelector+skipped, objectSelectorWebhookHandler(t, false, holder, mutation))
+	webhookMux.Handle("/"+validation+withObjectSelector+skipped, objectSelectorWebhookHandler(t, false, holder, validation))
+	webhookMux.Handle("/"+mutation+withObjectSelector+called, objectSelectorWebhookHandler(t, true, holder, mutation))
+	webhookMux.Handle("/"+validation+withObjectSelector+called, objectSelectorWebhookHandler(t, true, holder, validation))
 	webhookServer := httptest.NewUnstartedServer(webhookMux)
 	webhookServer.TLS = &tls.Config{
 		RootCAs:      roots,
@@ -482,50 +538,67 @@ func testResourceCreate(c *testContext) {
 		c.t.Error(err)
 		return
 	}
+	addLabels(c.gvr, stubObj, "CREATE")
+
 	ns := ""
 	if c.resource.Namespaced {
 		ns = testNamespace
 	}
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, stubObj.GetName(), ns, true, false, true)
-	_, err = c.client.Resource(c.gvr).Namespace(ns).Create(stubObj, metav1.CreateOptions{})
+	c.admissionHolder.expectObjectSelectorWebhooks()
+	obj, err := c.client.Resource(c.gvr).Namespace(ns).Create(stubObj, metav1.CreateOptions{})
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
+	verifyLabelsAddedByMutationWebhook(c, obj)
 }
 
 func testResourceUpdate(c *testContext) {
+	var updatedObj *unstructured.Unstructured
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		obj, err := createOrGetResource(c.client, c.gvr, c.resource)
 		if err != nil {
 			return err
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
+		addLabels(c.gvr, obj, "UPDATE")
 		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1beta1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
-		_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Update(obj, metav1.UpdateOptions{})
+		c.admissionHolder.expectObjectSelectorWebhooks()
+		updatedObj, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Update(obj, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
 		c.t.Error(err)
 		return
 	}
+	verifyLabelsAddedByMutationWebhook(c, updatedObj)
 }
 
 func testResourcePatch(c *testContext) {
+	var patchedObj *unstructured.Unstructured
 	obj, err := createOrGetResource(c.client, c.gvr, c.resource)
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1beta1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
-	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
+	c.admissionHolder.expectObjectSelectorWebhooks()
+	patch := `{"metadata":{"annotations":{"patch":"true"}}}`
+	// resources in stubDataOverrides have specific requirements on metadata, so we skip adding labels for those resources.
+	if stubDataOverrides[c.gvr] == "" {
+		patch = `{"metadata":{"annotations":{"patch":"true"}, "labels":{"addLabelsOnVerb": "UPDATE", "byOperation": "true"}}}`
+	}
+
+	patchedObj, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
 		obj.GetName(),
 		types.MergePatchType,
-		[]byte(`{"metadata":{"annotations":{"patch":"true"}}}`),
+		[]byte(patch),
 		metav1.PatchOptions{})
 	if err != nil {
 		c.t.Error(err)
 		return
 	}
+	verifyLabelsAddedByMutationWebhook(c, patchedObj)
 }
 
 func testResourceDelete(c *testContext) {
@@ -535,9 +608,11 @@ func testResourceDelete(c *testContext) {
 		c.t.Error(err)
 		return
 	}
+	addByOperationLabels(c, obj)
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expectObjectSelectorWebhooks()
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -568,6 +643,7 @@ func testResourceDelete(c *testContext) {
 		c.t.Error(err)
 		return
 	}
+	addByOperationLabels(c, obj)
 	// Adding finalizer to the object, then deleting it.
 	// We don't add finalizers by setting DeleteOptions.PropagationPolicy
 	// because some resource (e.g., events) do not support garbage
@@ -582,6 +658,7 @@ func testResourceDelete(c *testContext) {
 		return
 	}
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expectObjectSelectorWebhooks()
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(obj.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -640,6 +717,7 @@ func testResourceDeletecollection(c *testContext) {
 		c.t.Error(err)
 		return
 	}
+	addByOperationLabels(c, obj)
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
 
@@ -656,6 +734,7 @@ func testResourceDeletecollection(c *testContext) {
 
 	// set expectations
 	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1beta1.Delete, "", obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expectObjectSelectorWebhooks()
 
 	// delete
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).DeleteCollection(&metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}, metav1.ListOptions{LabelSelector: "webhooktest=true"})
@@ -1043,6 +1122,100 @@ func testNoPruningCustomFancy(c *testContext) {
 // utility methods
 //
 
+// Add labels that will cause the mutation webhook to add {"byMutation": "true"} labels on `verb`.
+// Also add the {"byOperation": "true"} labels.
+func addLabels(gvr schema.GroupVersionResource, obj *unstructured.Unstructured, verb string) {
+	if stubDataOverrides[gvr] == "" {
+		obj.SetLabels(map[string]string{"addLabelsOnVerb": verb, "byOperation": "true"})
+	}
+}
+
+func verifyLabelsAddedByMutationWebhook(c *testContext, obj *unstructured.Unstructured) {
+	labels := obj.GetLabels()
+	if labels["byMutation"] != "true" && !admissionExemptResources[c.gvr] && stubDataOverrides[c.gvr] == "" {
+		c.t.Errorf("Expect labels to contain %v, got labels %v", labelsAddedByWebhook, labels)
+	}
+}
+
+func addByOperationLabels(c *testContext, obj *unstructured.Unstructured) {
+	patch := `{"metadata":{ "labels":{"byOperation": "true"}}}`
+	_, err := c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
+		obj.GetName(),
+		types.MergePatchType,
+		[]byte(patch),
+		metav1.PatchOptions{})
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+}
+
+// objectSeelctorWebhookHandler reports error if it is invoked while `shouldCall` is false.
+// If `shouldCall` is true, the handler records the fact that it is invoked.
+func objectSelectorWebhookHandler(t *testing.T, shouldCall bool, holder *holder, phase string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		data, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
+			t.Errorf("contentType=%s, expect application/json", contentType)
+			return
+		}
+		review := v1beta1.AdmissionReview{}
+		if err := json.Unmarshal(data, &review); err != nil {
+			t.Errorf("Fail to deserialize object: %s with error: %v", string(data), err)
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		if !shouldCall && review.Request.UserInfo.Username == testClientUsername {
+			// We can't simply call t.Error() here. For PATCH
+			// operation, the apiserver might opportunistically get
+			// the stale object with stale labels from the watch
+			// cache, apply the patch, and then forward to this
+			// webhook based on the stale labels. This is OK in
+			// production because the storage layer of the
+			// apiserver will not commit the writes, instead it
+			// will retry the patch with the fresh object, no
+			// matter if the admission chain approve or disapprove
+			// the request.
+			// If there is a real bug in the object selector code
+			// path, because this webhook disapproves the request,
+			// the test client will receive error and fail the
+			// test.
+			message := fmt.Sprintf("objects shouldn't be dispatched to this webhook based on the labels added by the mutation webhook. resource=%v, subresource=%v, operation=%v, review.Request.Object.Raw=%s", review.Request.Resource, review.Request.SubResource, review.Request.Operation, string(review.Request.Object.Raw))
+			review.Response = &v1beta1.AdmissionResponse{
+				Allowed: false,
+				UID:     review.Request.UID,
+				Result:  &metav1.Status{Message: message},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(review); err != nil {
+				t.Errorf("Marshal of response failed with error: %v", err)
+			}
+			return
+		}
+		if shouldCall && review.Request.UserInfo.Username == testClientUsername {
+			holder.recordObjectSelectorWebhook(phase)
+		}
+		review.Response = &v1beta1.AdmissionResponse{
+			Allowed: true,
+			UID:     review.Request.UID,
+			Result:  &metav1.Status{Message: "admitted"},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(review); err != nil {
+			t.Errorf("Marshal of response failed with error: %v", err)
+		}
+	})
+}
+
+// If the phase is "mutation", the webhook sets {"byMutation": "true"} labels
+// on the object if labels["addLabelsOnVerb"] equals the
+// admissionReview.Request.Operation.
 func newWebhookHandler(t *testing.T, holder *holder, phase string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
@@ -1111,7 +1284,22 @@ func newWebhookHandler(t *testing.T, holder *holder, phase string) http.Handler 
 		}
 		// If we're mutating, and have an object, return a patch to exercise conversion
 		if phase == mutation && len(review.Request.Object.Raw) > 0 {
-			review.Response.Patch = []byte(`[{"op":"add","path":"/foo","value":"test"}]`)
+			accessor, err := meta.Accessor(review.Request.Object.Object)
+			if err != nil {
+				t.Errorf("Cannot get accessor for %v: %v", review.Request.Object.Object, err)
+			}
+			labels := accessor.GetLabels()
+			if labels["addLabelsOnVerb"] == string(review.Request.Operation) {
+				// add the label that matches the objectSelector of the
+				// "{validation|mutation}WithObjectSelector" webhooks.
+				// Those webhooks still shouldn't be called, because
+				// the labels are extracted before admission.
+				review.Response.Patch = []byte(`[{"op":"add","path":"/foo","value":"test"}, {"op": "add", "path": "/metadata/labels/byMutation", "value": "true"}]`)
+			} else {
+				// otherwise add a no-op patch to exercise conversion.
+				review.Response.Patch = []byte(`[{"op":"add","path":"/foo","value":"test"}]`)
+
+			}
 			jsonPatch := v1beta1.PatchTypeJSONPatch
 			review.Response.PatchType = &jsonPatch
 		}
@@ -1161,6 +1349,26 @@ func getStubObj(gvr schema.GroupVersionResource, resource metav1.APIResource) (*
 	return stubObj, nil
 }
 
+// cleanLabels clears the labels on existing objects. This operation is not
+// subject to the object selector focused webhooks, as the updated object
+// doesn't have any labels.
+func cleanLabels(client dynamic.Interface, gvr schema.GroupVersionResource, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	var updatedObj *unstructured.Unstructured
+	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		var err error
+		obj, err = client.Resource(gvr).Namespace(obj.GetNamespace()).Get(obj.GetName(), metav1.GetOptions{})
+		obj.SetLabels(nil)
+		if err != nil {
+			return err
+		}
+		updatedObj, err = client.Resource(gvr).Namespace(obj.GetNamespace()).Update(obj, metav1.UpdateOptions{})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return updatedObj, nil
+}
+
 func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResource, resource metav1.APIResource) (*unstructured.Unstructured, error) {
 	stubObj, err := getStubObj(gvr, resource)
 	if err != nil {
@@ -1172,7 +1380,7 @@ func createOrGetResource(client dynamic.Interface, gvr schema.GroupVersionResour
 	}
 	obj, err := client.Resource(gvr).Namespace(ns).Get(stubObj.GetName(), metav1.GetOptions{})
 	if err == nil {
-		return obj, nil
+		return cleanLabels(client, gvr, obj)
 	}
 	if !errors.IsNotFound(err) {
 		return nil, err
@@ -1213,11 +1421,13 @@ func shouldTestResourceVerb(gvr schema.GroupVersionResource, resource metav1.API
 
 func createV1beta1ValidationWebhook(client clientset.Interface, endpoint string) error {
 	fail := admissionv1beta1.Fail
+	calledObjectSelctorEndpoint := endpoint + withObjectSelector + called
+	skippedObjectSelctorEndpoint := endpoint + withObjectSelector + skipped
 	// Attaching Admission webhook to API server
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&admissionv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
 		Webhooks: []admissionv1beta1.Webhook{{
-			Name: "admission.integration.test",
+			Name: "validation.integration.test",
 			ClientConfig: admissionv1beta1.WebhookClientConfig{
 				URL:      &endpoint,
 				CABundle: localhostCert,
@@ -1228,6 +1438,52 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint string)
 			}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
+		}, {
+			Name: "validation-skipped-by-object-selector.integration.test",
+			ClientConfig: admissionv1beta1.WebhookClientConfig{
+				URL:      &skippedObjectSelctorEndpoint,
+				CABundle: localhostCert,
+			},
+			Rules: []admissionv1beta1.RuleWithOperations{{
+				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
+				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+			}},
+			FailurePolicy:           &fail,
+			AdmissionReviewVersions: []string{"v1beta1"},
+			ObjectSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "byMutation",
+						Operator: metav1.LabelSelectorOpIn,
+						Values: []string{
+							"true",
+						},
+					},
+				},
+			},
+		}, {
+			Name: "validation-called-by-object-selector.integration.test",
+			ClientConfig: admissionv1beta1.WebhookClientConfig{
+				URL:      &calledObjectSelctorEndpoint,
+				CABundle: localhostCert,
+			},
+			Rules: []admissionv1beta1.RuleWithOperations{{
+				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
+				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+			}},
+			FailurePolicy:           &fail,
+			AdmissionReviewVersions: []string{"v1beta1"},
+			ObjectSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "byOperation",
+						Operator: metav1.LabelSelectorOpIn,
+						Values: []string{
+							"true",
+						},
+					},
+				},
+			},
 		}},
 	})
 	return err
@@ -1235,6 +1491,8 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint string)
 
 func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) error {
 	fail := admissionv1beta1.Fail
+	calledObjectSelctorEndpoint := endpoint + withObjectSelector + called
+	skippedObjectSelctorEndpoint := endpoint + withObjectSelector + skipped
 	// Attaching Mutation webhook to API server
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutation.integration.test"},
@@ -1250,6 +1508,52 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) e
 			}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
+		}, {
+			Name: "mutation-skipped-by-object-selector.integration.test",
+			ClientConfig: admissionv1beta1.WebhookClientConfig{
+				URL:      &skippedObjectSelctorEndpoint,
+				CABundle: localhostCert,
+			},
+			Rules: []admissionv1beta1.RuleWithOperations{{
+				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
+				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+			}},
+			FailurePolicy:           &fail,
+			AdmissionReviewVersions: []string{"v1beta1"},
+			ObjectSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "byMutation",
+						Operator: metav1.LabelSelectorOpIn,
+						Values: []string{
+							"true",
+						},
+					},
+				},
+			},
+		}, {
+			Name: "mutation-called-by-object-selector.integration.test",
+			ClientConfig: admissionv1beta1.WebhookClientConfig{
+				URL:      &calledObjectSelctorEndpoint,
+				CABundle: localhostCert,
+			},
+			Rules: []admissionv1beta1.RuleWithOperations{{
+				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
+				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+			}},
+			FailurePolicy:           &fail,
+			AdmissionReviewVersions: []string{"v1beta1"},
+			ObjectSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "byOperation",
+						Operator: metav1.LabelSelectorOpIn,
+						Values: []string{
+							"true",
+						},
+					},
+				},
+			},
 		}},
 	})
 	return err
