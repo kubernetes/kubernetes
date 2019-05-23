@@ -665,14 +665,20 @@ func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
 			continue
 		}
 		// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
-		podKey, _ := GetPodKey(p)
+		podKey, err := GetPodKey(p)
+		if err != nil {
+			klog.Errorf("Unable to get pod key: %v", err)
+			continue
+		}
 		for _, np := range n.Pods() {
-			npodkey, _ := GetPodKey(np)
-			if npodkey == podKey {
-				filtered = append(filtered, p)
-				break
+			if npodkey, err := GetPodKey(np); err == nil {
+				if npodkey == podKey {
+					filtered = append(filtered, p)
+					break
+				}
 			}
 		}
+
 	}
 	return filtered
 }
