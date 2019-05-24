@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 )
 
 func TestIsKnownSystemPriorityClass(t *testing.T) {
@@ -59,13 +59,13 @@ func TestGetPodPriority(t *testing.T) {
 	p := int32(20)
 	tests := []struct {
 		name             string
-		pod              *corev1.Pod
+		pod              *v1.Pod
 		expectedPriority int32
 	}{
 		{
 			name: "no priority pod resolves to static default priority",
-			pod: &corev1.Pod{
-				Spec: corev1.PodSpec{Containers: []corev1.Container{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{
 					{Name: "container", Image: "image"}},
 				},
 			},
@@ -73,8 +73,8 @@ func TestGetPodPriority(t *testing.T) {
 		},
 		{
 			name: "pod with priority resolves correctly",
-			pod: &corev1.Pod{
-				Spec: corev1.PodSpec{Containers: []corev1.Container{
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{Containers: []v1.Container{
 					{Name: "container", Image: "image"}},
 					Priority: &p,
 				},
