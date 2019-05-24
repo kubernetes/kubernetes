@@ -383,7 +383,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		pod = podClient.Create(pod)
 
 		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
+		framework.ExpectError(err, "while waiting for pod to be running")
 
 		By("updating the pod")
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -651,7 +651,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 	}()
 
 	err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
+	framework.ExpectError(err, "while waiting for pod to be running")
 }
 
 // Tests that the existing subpath mount is detected when a container restarts

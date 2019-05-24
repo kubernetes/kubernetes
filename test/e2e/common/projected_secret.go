@@ -410,7 +410,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 		volumeMountPath := "/etc/projected-secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		err := createNonOptionalSecretPod(f, volumeMountPath, podName)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 
 	//Secret object defined for the pod, If a key is specified which is not present in the secret,
@@ -420,7 +420,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected secret", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		err := createNonOptionalSecretPodWithSecret(f, volumeMountPath, podName)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 })
 
