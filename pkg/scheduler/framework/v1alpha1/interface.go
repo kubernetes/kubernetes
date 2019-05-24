@@ -34,14 +34,14 @@ type Code int
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
 	// NOTE: A nil status is also considered as "Success".
-	Success Code = 0
+	Success Code = iota
 	// Error is used for internal plugin errors, unexpected input, etc.
-	Error Code = 1
+	Error
 	// Unschedulable is used when a plugin finds a pod unschedulable.
 	// The accompanying status message should explain why the pod is unschedulable.
-	Unschedulable Code = 2
+	Unschedulable
 	// Wait is used when a permit plugin finds a pod scheduling should wait.
-	Wait Code = 3
+	Wait
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
