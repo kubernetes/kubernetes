@@ -248,7 +248,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		unmanagedNodes:     sets.NewString(),
 		routeCIDRs:         map[string]string{},
 	}
-	err = az.initializeCloudFromConfig(config, false)
+	err = az.InitializeCloudFromConfig(config, false)
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +256,8 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	return az, nil
 }
 
-// initializeCloudFromConfig initializes the Cloud from config.
-func (az *Cloud) initializeCloudFromConfig(config *Config, fromSecret bool) error {
+// InitializeCloudFromConfig initializes the Cloud from config.
+func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) error {
 	// cloud-config not set, return nil so that it would be initialized from secret.
 	if config == nil {
 		klog.Warning("cloud-config is not provided, Azure cloud provider would be initialized from secret")
@@ -545,7 +545,7 @@ func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder,
 	az.eventBroadcaster = record.NewBroadcaster()
 	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.kubeClient.CoreV1().Events("")})
 	az.eventRecorder = az.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "azure-cloud-provider"})
-	az.initializeCloudFromSecret()
+	az.InitializeCloudFromSecret()
 }
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.

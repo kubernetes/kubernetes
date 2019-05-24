@@ -58,7 +58,8 @@ const (
 	secretOverrideTypeCan  secretOverrideType = "can"
 )
 
-func (az *Cloud) initializeCloudFromSecret() {
+// InitializeCloudFromSecret initializes Azure cloud provider from Kubernetes secret.
+func (az *Cloud) InitializeCloudFromSecret() {
 	config, err := az.getConfigFromSecret()
 	if err != nil {
 		klog.Warningf("Failed to get cloud-config from secret: %v, skip initializing from secret", err)
@@ -70,7 +71,7 @@ func (az *Cloud) initializeCloudFromSecret() {
 		return
 	}
 
-	if err := az.initializeCloudFromConfig(config, true); err != nil {
+	if err := az.InitializeCloudFromConfig(config, true); err != nil {
 		klog.Errorf("Failed to initialize Azure cloud provider: %v", err)
 	}
 }
