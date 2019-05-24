@@ -772,7 +772,10 @@ func PrioritizeNodes(
 	}
 
 	if len(extenders) != 0 && nodes != nil {
-		combinedScores := make(map[string]int, len(nodeNameToInfo))
+		scores := make([]map[string]int, len(extenders))
+		for i := range extenders {
+			scores[i] = make(map[string]int)
+		}
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
 				continue
@@ -785,21 +788,22 @@ func PrioritizeNodes(
 					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
 					return
 				}
-				mu.Lock()
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
 					if klog.V(10) {
 						klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, extenders[extIndex].Name(), score)
 					}
-					combinedScores[host] += score * weight
+					scores[extIndex][host] = score * weight
 				}
-				mu.Unlock()
 			}(i)
 		}
 		// wait for all go routines to finish
 		wg.Wait()
 		for i := range result {
-			result[i].Score += combinedScores[result[i].Host]
+			host := result[i].Host
+			for j := range scores {
+				result[i].Score += scores[j][host]
+			}
 		}
 	}
 
