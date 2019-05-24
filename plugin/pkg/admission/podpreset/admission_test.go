@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -447,7 +448,7 @@ func TestAdmitConflictWithDifferentNamespaceShouldDoNothing(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -493,7 +494,7 @@ func TestAdmitConflictWithNonMatchingLabelsShouldNotError(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,7 +541,7 @@ func TestAdmitConflictShouldNotModifyPod(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -603,7 +604,7 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -663,7 +664,7 @@ func TestAdmitMirrorPod(t *testing.T) {
 		},
 	}
 
-	if err := admitPod(mirrorPod, pip); err != nil {
+	if err := admitPod(t, mirrorPod, pip); err != nil {
 		t.Fatal(err)
 	}
 
@@ -733,7 +734,7 @@ func TestExclusionNoAdmit(t *testing.T) {
 		},
 	}
 	originalPod := pod.DeepCopy()
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -797,7 +798,7 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 		},
 	}
 	originalPod := pod.DeepCopy()
-	err := admitPod(pod, pip)
+	err := admitPod(t, pod, pip)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -808,11 +809,11 @@ func TestAdmitEmptyPodNamespace(t *testing.T) {
 	}
 }
 
-func admitPod(pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
+func admitPod(t *testing.T, pod *api.Pod, pip *settingsv1alpha1.PodPreset) error {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Settings().V1alpha1().PodPresets().Informer().GetStore()
 	store.Add(pip)
-	plugin := NewTestAdmission(informerFactory.Settings().V1alpha1().PodPresets().Lister())
+	plugin := admissiontesting.WithReinvocationTesting(t, NewTestAdmission(informerFactory.Settings().V1alpha1().PodPresets().Lister()))
 	attrs := kadmission.NewAttributesRecord(
 		pod,
 		nil,
