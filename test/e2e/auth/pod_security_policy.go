@@ -122,7 +122,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 })
 
 func expectForbidden(err error) {
-	gomega.Expect(err).To(gomega.HaveOccurred(), "should be forbidden")
+	framework.ExpectError(err, "should be forbidden")
 	gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
 }
 

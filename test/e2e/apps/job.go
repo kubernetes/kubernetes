@@ -128,7 +128,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
+		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	})
 
