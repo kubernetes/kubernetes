@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -116,7 +117,7 @@ func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc
 			errs = append(errs, fmt.Errorf("failed to delete PVC %q: %v", pvc.Name, err))
 		}
 	} else {
-		Logf("pvc is nil")
+		e2elog.Logf("pvc is nil")
 	}
 	if pv != nil {
 		err := DeletePersistentVolume(c, pv.Name)
@@ -124,7 +125,7 @@ func PVPVCCleanup(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc
 			errs = append(errs, fmt.Errorf("failed to delete PV %q: %v", pv.Name, err))
 		}
 	} else {
-		Logf("pv is nil")
+		e2elog.Logf("pv is nil")
 	}
 	return errs
 }
@@ -158,7 +159,7 @@ func PVPVCMapCleanup(c clientset.Interface, ns string, pvols PVMap, claims PVCMa
 // DeletePersistentVolume deletes the PV.
 func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 	if c != nil && len(pvName) > 0 {
-		Logf("Deleting PersistentVolume %q", pvName)
+		e2elog.Logf("Deleting PersistentVolume %q", pvName)
 		err := c.CoreV1().PersistentVolumes().Delete(pvName, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			return fmt.Errorf("PV Delete API error: %v", err)
@@ -170,7 +171,7 @@ func DeletePersistentVolume(c clientset.Interface, pvName string) error {
 // DeletePersistentVolumeClaim deletes the Claim.
 func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns string) error {
 	if c != nil && len(pvcName) > 0 {
-		Logf("Deleting PersistentVolumeClaim %q", pvcName)
+		e2elog.Logf("Deleting PersistentVolumeClaim %q", pvcName)
 		err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvcName, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
 			return fmt.Errorf("PVC Delete API error: %v", err)
@@ -184,14 +185,14 @@ func DeletePersistentVolumeClaim(c clientset.Interface, pvcName string, ns strin
 // phase value to expect for the pv bound to the to-be-deleted claim.
 func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, expectPVPhase v1.PersistentVolumePhase) error {
 	pvname := pvc.Spec.VolumeName
-	Logf("Deleting PVC %v to trigger reclamation of PV %v", pvc.Name, pvname)
+	e2elog.Logf("Deleting PVC %v to trigger reclamation of PV %v", pvc.Name, pvname)
 	err := DeletePersistentVolumeClaim(c, pvc.Name, ns)
 	if err != nil {
 		return err
 	}
 
 	// Wait for the PV's phase to return to be `expectPVPhase`
-	Logf("Waiting for reclaim process to complete.")
+	e2elog.Logf("Waiting for reclaim process to complete.")
 	err = WaitForPersistentVolumePhase(expectPVPhase, c, pv.Name, Poll, PVReclaimingTimeout)
 	if err != nil {
 		return fmt.Errorf("pv %q phase did not become %v: %v", pv.Name, expectPVPhase, err)
@@ -216,7 +217,7 @@ func DeletePVCandValidatePV(c clientset.Interface, ns string, pvc *v1.Persistent
 		}
 	}
 
-	Logf("PV %v now in %q phase", pv.Name, expectPVPhase)
+	e2elog.Logf("PV %v now in %q phase", pv.Name, expectPVPhase)
 	return nil
 }
 
@@ -333,7 +334,7 @@ func CreatePVPVC(c clientset.Interface, pvConfig PersistentVolumeConfig, pvcConf
 	if preBind {
 		preBindMsg = " pre-bound"
 	}
-	Logf("Creating a PV followed by a%s PVC", preBindMsg)
+	e2elog.Logf("Creating a PV followed by a%s PVC", preBindMsg)
 
 	// make the pv and pvc definitions
 	pv := MakePersistentVolume(pvConfig)
@@ -406,7 +407,7 @@ func CreatePVsPVCs(numpvs, numpvcs int, c clientset.Interface, ns string, pvConf
 // WaitOnPVandPVC waits for the pv and pvc to bind to each other.
 func WaitOnPVandPVC(c clientset.Interface, ns string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) error {
 	// Wait for newly created PVC to bind to the PV
-	Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
+	e2elog.Logf("Waiting for PV %v to bind to PVC %v", pv.Name, pvc.Name)
 	err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, Poll, ClaimBindingTimeout)
 	if err != nil {
 		return fmt.Errorf("PVC %q did not become Bound: %v", pvc.Name, err)
@@ -462,8 +463,8 @@ func WaitAndVerifyBinds(c clientset.Interface, ns string, pvols PVMap, claims PV
 	for pvName := range pvols {
 		err := WaitForPersistentVolumePhase(v1.VolumeBound, c, pvName, Poll, PVBindingTimeout)
 		if err != nil && len(pvols) > len(claims) {
-			Logf("WARN: pv %v is not bound after max wait", pvName)
-			Logf("      This may be ok since there are more pvs than pvcs")
+			e2elog.Logf("WARN: pv %v is not bound after max wait", pvName)
+			e2elog.Logf("      This may be ok since there are more pvs than pvcs")
 			continue
 		}
 		if err != nil {
@@ -503,7 +504,7 @@ func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
 	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
 		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
 	}
-	Logf("Pod %v succeeded ", pod.Name)
+	e2elog.Logf("Pod %v succeeded ", pod.Name)
 	return nil
 }
 
@@ -519,7 +520,7 @@ func DeletePodWithWait(f *Framework, c clientset.Interface, pod *v1.Pod) error {
 // DeletePodWithWaitByName deletes the named and namespaced pod and waits for the pod to be terminated. Resilient to the pod
 // not existing.
 func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNamespace string) error {
-	Logf("Deleting pod %q in namespace %q", podName, podNamespace)
+	e2elog.Logf("Deleting pod %q in namespace %q", podName, podNamespace)
 	err := c.CoreV1().Pods(podNamespace).Delete(podName, nil)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
@@ -527,7 +528,7 @@ func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNa
 		}
 		return fmt.Errorf("pod Delete API error: %v", err)
 	}
-	Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
+	e2elog.Logf("Wait up to %v for pod %q to be fully deleted", PodDeleteTimeout, podName)
 	err = f.WaitForPodNotFound(podName, PodDeleteTimeout)
 	if err != nil {
 		return fmt.Errorf("pod %q was not deleted: %v", podName, err)
@@ -539,7 +540,7 @@ func DeletePodWithWaitByName(f *Framework, c clientset.Interface, podName, podNa
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
 func CreateWaitAndDeletePod(f *Framework, c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim) (err error) {
-	Logf("Creating nfs test pod")
+	e2elog.Logf("Creating nfs test pod")
 	pod := MakeWritePod(ns, pvc)
 	runPod, err := c.CoreV1().Pods(ns).Create(pod)
 	if err != nil {
@@ -575,7 +576,7 @@ func MakePersistentVolume(pvConfig PersistentVolumeConfig) *v1.PersistentVolume 
 	var claimRef *v1.ObjectReference
 	// If the reclaimPolicy is not provided, assume Retain
 	if pvConfig.ReclaimPolicy == "" {
-		Logf("PV ReclaimPolicy unspecified, default: Retain")
+		e2elog.Logf("PV ReclaimPolicy unspecified, default: Retain")
 		pvConfig.ReclaimPolicy = v1.PersistentVolumeReclaimRetain
 	}
 	if pvConfig.Prebind != nil {
@@ -619,7 +620,7 @@ func MakePersistentVolumeClaim(cfg PersistentVolumeClaimConfig, ns string) *v1.P
 	// Specs are expected to match this test's PersistentVolume
 
 	if len(cfg.AccessModes) == 0 {
-		Logf("AccessModes unspecified, default: all modes (RWO, RWX, ROX).")
+		e2elog.Logf("AccessModes unspecified, default: all modes (RWO, RWX, ROX).")
 		cfg.AccessModes = append(cfg.AccessModes, v1.ReadWriteOnce, v1.ReadOnlyMany, v1.ReadOnlyMany)
 	}
 
@@ -648,10 +649,10 @@ func createPDWithRetry(zone string) (string, error) {
 	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
 		newDiskName, err := createPD(zone)
 		if err != nil {
-			Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
+			e2elog.Logf("Couldn't create a new PD, sleeping 5 seconds: %v", err)
 			continue
 		}
-		Logf("Successfully created a new PD: %q.", newDiskName)
+		e2elog.Logf("Successfully created a new PD: %q.", newDiskName)
 		return newDiskName, nil
 	}
 	return "", err
@@ -673,10 +674,10 @@ func DeletePDWithRetry(diskName string) error {
 	for start := time.Now(); time.Since(start) < pdRetryTimeout; time.Sleep(pdRetryPollTime) {
 		err = deletePD(diskName)
 		if err != nil {
-			Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, pdRetryPollTime, err)
+			e2elog.Logf("Couldn't delete PD %q, sleeping %v: %v", diskName, pdRetryPollTime, err)
 			continue
 		}
-		Logf("Successfully deleted PD %q.", diskName)
+		e2elog.Logf("Successfully deleted PD %q.", diskName)
 		return nil
 	}
 	return fmt.Errorf("unable to delete PD %q: %v", diskName, err)
@@ -1041,7 +1042,7 @@ func GetDefaultStorageClassName(c clientset.Interface) (string, error) {
 	if len(scName) == 0 {
 		return "", fmt.Errorf("No default storage class found")
 	}
-	Logf("Default storage class: %q", scName)
+	e2elog.Logf("Default storage class: %q", scName)
 	return scName, nil
 }
 

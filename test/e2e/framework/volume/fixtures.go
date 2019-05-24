@@ -52,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -259,7 +260,7 @@ func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
 	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
-	framework.Logf("%s server pod IP address: %s", config.Prefix, ip)
+	e2elog.Logf("%s server pod IP address: %s", config.Prefix, ip)
 	return pod, ip
 }
 
@@ -353,7 +354,7 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrs.IsAlreadyExists(err) {
-			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
+			e2elog.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
 			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
@@ -391,17 +392,17 @@ func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 	ns := f.Namespace
 
 	if secret != nil {
-		framework.Logf("Deleting server secret %q...", secret.Name)
+		e2elog.Logf("Deleting server secret %q...", secret.Name)
 		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
 		if err != nil {
-			framework.Logf("Delete secret failed: %v", err)
+			e2elog.Logf("Delete secret failed: %v", err)
 		}
 	}
 
-	framework.Logf("Deleting server pod %q...", serverPod.Name)
+	e2elog.Logf("Deleting server pod %q...", serverPod.Name)
 	err := framework.DeletePodWithWait(f, cs, serverPod)
 	if err != nil {
-		framework.Logf("Server pod delete failed: %v", err)
+		e2elog.Logf("Server pod delete failed: %v", err)
 	}
 }
 
@@ -630,7 +631,7 @@ func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []
 		fullPath := filepath.Join(filePath, scriptName)
 
 		cmd := "echo \"" + content + "\" > " + fullPath + "; .\\" + fullPath
-		framework.Logf("generated pod command %s", cmd)
+		e2elog.Logf("generated pod command %s", cmd)
 		return []string{"powershell", "/c", cmd}
 	}
 	scriptName := fmt.Sprintf("%s.sh", fileName)

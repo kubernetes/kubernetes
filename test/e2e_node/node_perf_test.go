@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
 	. "github.com/onsi/ginkgo"
@@ -96,7 +97,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
 		framework.ExpectNoError(err)
 		perf, err := wl.ExtractPerformanceFromLogs(podLogs)
 		framework.ExpectNoError(err)
-		framework.Logf("Time to complete workload %s: %v", wl.Name(), perf)
+		e2elog.Logf("Time to complete workload %s: %v", wl.Name(), perf)
 	}
 
 	Context("Run node performance testing with pre-defined workloads", func() {

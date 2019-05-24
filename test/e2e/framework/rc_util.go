@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -98,7 +99,7 @@ func UpdateReplicationControllerWithRetries(c clientset.Interface, namespace, na
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
 		if rc, err = c.CoreV1().ReplicationControllers(namespace).Update(rc); err == nil {
-			Logf("Updating replication controller %q", name)
+			e2elog.Logf("Updating replication controller %q", name)
 			return true, nil
 		}
 		updateErr = err
@@ -144,10 +145,10 @@ func WaitForReplicationController(c clientset.Interface, namespace, name string,
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		_, err := c.CoreV1().ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
+			e2elog.Logf("Get ReplicationController %s in namespace %s failed (%v).", name, namespace, err)
 			return !exist, nil
 		}
-		Logf("ReplicationController %s in namespace %s found.", name, namespace)
+		e2elog.Logf("ReplicationController %s in namespace %s found.", name, namespace)
 		return exist, nil
 	})
 	if err != nil {
@@ -164,13 +165,13 @@ func WaitForReplicationControllerwithSelector(c clientset.Interface, namespace s
 		rcs, err := c.CoreV1().ReplicationControllers(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 		switch {
 		case len(rcs.Items) != 0:
-			Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
+			e2elog.Logf("ReplicationController with %s in namespace %s found.", selector.String(), namespace)
 			return exist, nil
 		case len(rcs.Items) == 0:
-			Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
+			e2elog.Logf("ReplicationController with %s in namespace %s disappeared.", selector.String(), namespace)
 			return !exist, nil
 		default:
-			Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
+			e2elog.Logf("List ReplicationController with %s in namespace %s failed: %v", selector.String(), namespace, err)
 			return false, nil
 		}
 	})
@@ -227,25 +228,25 @@ waitLoop:
 		for _, podID := range pods {
 			running := RunKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
-				Logf("%s is created but not running", podID)
+				e2elog.Logf("%s is created but not running", podID)
 				continue waitLoop
 			}
 
 			currentImage := RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
 			currentImage = trimDockerRegistry(currentImage)
 			if currentImage != containerImage {
-				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
+				e2elog.Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue waitLoop
 			}
 
 			// Call the generic validator function here.
 			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
 			if err := validator(c, podID); err != nil {
-				Logf("%s is running right image but validator function failed: %v", podID, err)
+				e2elog.Logf("%s is running right image but validator function failed: %v", podID, err)
 				continue waitLoop
 			}
 
-			Logf("%s is verified up and running", podID)
+			e2elog.Logf("%s is verified up and running", podID)
 			runningPods = append(runningPods, podID)
 		}
 		// If we reach here, then all our checks passed.

@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -165,7 +166,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 
 			pids := strings.TrimSpace(logs)
-			framework.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
+			e2elog.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
 			if pids == "" {
 				framework.Failf("nginx's pid should be seen by hostpid containers")
 			}
@@ -185,7 +186,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 
 			pids := strings.TrimSpace(logs)
-			framework.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
+			e2elog.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
 			pidSets := sets.NewString(strings.Split(pids, " ")...)
 			if pidSets.Has(nginxPid) {
 				framework.Failf("nginx's pid should not be seen by non-hostpid containers")
@@ -229,7 +230,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.Failf("Failed to create the shared memory on the host: %v", err)
 			}
 			hostSharedMemoryID = strings.TrimSpace(string(output))
-			framework.Logf("Got host shared memory ID %q", hostSharedMemoryID)
+			e2elog.Logf("Got host shared memory ID %q", hostSharedMemoryID)
 		})
 
 		It("should show the shared memory ID in the host IPC containers [NodeFeature:HostAccess]", func() {
@@ -241,7 +242,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 
 			podSharedMemoryIDs := strings.TrimSpace(logs)
-			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
+			e2elog.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
 			if !strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
 				framework.Failf("hostIPC container should show shared memory IDs on host")
 			}
@@ -256,7 +257,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 
 			podSharedMemoryIDs := strings.TrimSpace(logs)
-			framework.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
+			e2elog.Logf("Got shared memory IDs %q from pod %q", podSharedMemoryIDs, ipcutilsPodName)
 			if strings.Contains(podSharedMemoryIDs, hostSharedMemoryID) {
 				framework.Failf("non-hostIPC container should not show shared memory IDs on host")
 			}
@@ -312,7 +313,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 			addr := strings.Split(l.Addr().String(), ":")
 			listeningPort = addr[len(addr)-1]
-			framework.Logf("Opened a new tcp port %q", listeningPort)
+			e2elog.Logf("Opened a new tcp port %q", listeningPort)
 		})
 
 		It("should listen on same port in the host network containers [NodeFeature:HostAccess]", func() {
@@ -323,7 +324,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
+			e2elog.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
 			if !strings.Contains(logs, listeningPort) {
 				framework.Failf("host-networked container should listening on same port as host")
 			}
@@ -337,7 +338,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
+			e2elog.Logf("Got logs for pod %q: %q", busyboxPodName, logs)
 			if strings.Contains(logs, listeningPort) {
 				framework.Failf("non-hostnetworked container shouldn't show the same port as host")
 			}
@@ -389,7 +390,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			e2elog.Logf("Got logs for pod %q: %q", podName, logs)
 			if strings.Contains(logs, "Operation not permitted") {
 				framework.Failf("privileged container should be able to create dummy device")
 			}

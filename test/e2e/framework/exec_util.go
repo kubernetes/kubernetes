@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/gomega"
 )
@@ -48,7 +49,7 @@ type ExecOptions struct {
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
 func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
-	Logf("ExecWithOptions %+v", options)
+	e2elog.Logf("ExecWithOptions %+v", options)
 
 	config, err := LoadConfig()
 	ExpectNoError(err, "failed to load restclient config")
@@ -97,7 +98,7 @@ func (f *Framework) ExecCommandInContainerWithFullOutput(podName, containerName 
 // ExecCommandInContainer executes a command in the specified container.
 func (f *Framework) ExecCommandInContainer(podName, containerName string, cmd ...string) string {
 	stdout, stderr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-	Logf("Exec stderr: %q", stderr)
+	e2elog.Logf("Exec stderr: %q", stderr)
 	ExpectNoError(err,
 		"failed to execute command in pod %v, container %v: %v",
 		podName, containerName, err)
