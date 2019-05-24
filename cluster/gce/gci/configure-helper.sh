@@ -611,6 +611,15 @@ function create-master-auth {
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
   fi
+  if [[ -n "${EXTRA_STATIC_AUTH_COMPONENTS:-}" ]]; then
+    # Create a static Bearer token and kubeconfig for extra, comma-separated components.
+    IFS="," read -r -a extra_components <<< "${EXTRA_STATIC_AUTH_COMPONENTS:-}"
+    for extra_component in "${extra_components[@]}"; do
+      local token="$(secure_random 32)"
+      append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}"
+      create-kubeconfig "${extra_component}" "${token}"
+    done
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
