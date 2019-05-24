@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -703,26 +704,81 @@ func TestValidateFeatureGates(t *testing.T) {
 
 func TestValidateIgnorePreflightErrors(t *testing.T) {
 	var tests = []struct {
-		ignorePreflightErrors []string
-		expectedLen           int
-		expectedError         bool
+		ignorePreflightErrorsFromCLI        []string
+		ignorePreflightErrorsFromConfigFile []string
+		expectedSet                         sets.String
+		expectedError                       bool
 	}{
-		{[]string{}, 0, false},                             // empty list
-		{[]string{"check1", "check2"}, 2, false},           // non-duplicate
-		{[]string{"check1", "check2", "check1"}, 2, false}, // duplicates
-		{[]string{"check1", "check2", "all"}, 3, true},     // non-duplicate, but 'all' present together wth individual checks
-		{[]string{"all"}, 1, false},                        // skip all checks by using new flag
-		{[]string{"all"}, 1, false},                        // skip all checks by using both old and new flags at the same time
+		{ // empty lists in CLI and config file
+			[]string{},
+			[]string{},
+			sets.NewString(),
+			false,
+		},
+		{ // empty list in CLI only
+			[]string{},
+			[]string{"a"},
+			sets.NewString("a"),
+			false,
+		},
+		{ // empty list in config file only
+			[]string{"a"},
+			[]string{},
+			sets.NewString("a"),
+			false,
+		},
+		{ // no duplicates, no overlap
+			[]string{"a", "b"},
+			[]string{"c", "d"},
+			sets.NewString("a", "b", "c", "d"),
+			false,
+		},
+		{ // some duplicates, with some overlapping duplicates
+			[]string{"a", "b", "a"},
+			[]string{"c", "b"},
+			sets.NewString("a", "b", "c"),
+			false,
+		},
+		{ // non-duplicate, but 'all' present together with individual checks in CLI
+			[]string{"a", "b", "all"},
+			[]string{},
+			sets.NewString(),
+			true,
+		},
+		{ // empty list in CLI, but 'all' present in config file, which is forbidden
+			[]string{},
+			[]string{"all"},
+			sets.NewString(),
+			true,
+		},
+		{ // non-duplicate, but 'all' present in config file, which is forbidden
+			[]string{"a", "b"},
+			[]string{"all"},
+			sets.NewString(),
+			true,
+		},
+		{ // non-duplicate, but 'all' present in CLI, while values are in config file, which is forbidden
+			[]string{"all"},
+			[]string{"a", "b"},
+			sets.NewString(),
+			true,
+		},
+		{ // skip all checks
+			[]string{"all"},
+			[]string{},
+			sets.NewString("all"),
+			false,
+		},
 	}
 	for _, rt := range tests {
-		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrors)
+		result, err := ValidateIgnorePreflightErrors(rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile)
 		switch {
 		case err != nil && !rt.expectedError:
-			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s), error: %v", rt.ignorePreflightErrors, err)
+			t.Errorf("ValidateIgnorePreflightErrors: unexpected error for input (%s, %s), error: %v", rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, err)
 		case err == nil && rt.expectedError:
-			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s) but got: %v", rt.ignorePreflightErrors, result)
-		case result.Len() != rt.expectedLen:
-			t.Errorf("ValidateIgnorePreflightErrors: expected Len = %d for input (%s) but got: %v, %v", rt.expectedLen, rt.ignorePreflightErrors, result.Len(), result)
+			t.Errorf("ValidateIgnorePreflightErrors: expected error for input (%s, %s) but got: %v", rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, result)
+		case err == nil && !result.Equal(rt.expectedSet):
+			t.Errorf("ValidateIgnorePreflightErrors: expected (%v) for input (%s, %s) but got: %v", rt.expectedSet, rt.ignorePreflightErrorsFromCLI, rt.ignorePreflightErrorsFromConfigFile, result)
 		}
 	}
 }
