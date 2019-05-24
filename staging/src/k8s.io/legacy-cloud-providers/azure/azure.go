@@ -273,6 +273,32 @@ func (az *Cloud) initializeCloudFromConfig(config *Config, fromSecret bool) erro
 		config.VMType = vmTypeStandard
 	}
 
+	if config.OverrideType == "" {
+		// The default override type is secretOverrideTypeCan.
+		config.OverrideType = secretOverrideTypeCan
+	} else {
+		supportedOverrideTypes := sets.NewString(
+			string(secretOverrideTypeCan),
+			string(secretOverrideTypeMust),
+			string(secretOverrideTypeNo))
+		if !supportedOverrideTypes.Has(string(config.OverrideType)) {
+			return fmt.Errorf("overrideType %v is not supported, supported values are %v", config.OverrideType, supportedOverrideTypes.List())
+		}
+	}
+
+	if config.ConfigType == "" {
+		// The default config type is secretConfigureAll.
+		config.ConfigType = secretConfigureAll
+	} else {
+		supportedConfigTypes := sets.NewString(
+			string(secretConfigureAll),
+			string(secretConfigureNode),
+			string(secretConfigureControlPlane))
+		if !supportedConfigTypes.Has(string(config.ConfigType)) {
+			return fmt.Errorf("configType %v is not supported, supported values are %v", config.ConfigType, supportedConfigTypes.List())
+		}
+	}
+
 	env, err := auth.ParseAzureEnvironment(config.Cloud)
 	if err != nil {
 		return err
