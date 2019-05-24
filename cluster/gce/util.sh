@@ -902,7 +902,6 @@ function construct-windows-kubeproxy-flags {
   # double-quotes, because they still break sc.exe after expansion in the
   # binPath parameter, and single-quotes get parsed as characters instead
   # of string delimiters.
-  flags+=" --resource-container="
 
   KUBEPROXY_ARGS="${flags}"
 }

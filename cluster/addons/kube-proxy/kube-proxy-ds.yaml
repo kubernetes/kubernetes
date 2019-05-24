@@ -43,7 +43,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - kube-proxy {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+        - kube-proxy {{cluster_cidr}} --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
         env:
         - name: KUBERNETES_SERVICE_HOST
           value: {{kubernetes_service_host_env_value}}
