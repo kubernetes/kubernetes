@@ -45,6 +45,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/pointer"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -58,6 +59,14 @@ func checks(checkers ...Checker) []Checker {
 }
 
 func TestWebhookConverter(t *testing.T) {
+	testWebhookConverter(t, false)
+}
+
+func TestWebhookConverterWithPruning(t *testing.T) {
+	testWebhookConverter(t, true)
+}
+
+func testWebhookConverter(t *testing.T, pruning bool) {
 	tests := []struct {
 		group   string
 		handler http.Handler
@@ -111,6 +120,7 @@ func TestWebhookConverter(t *testing.T) {
 	defer tearDown()
 
 	crd := multiVersionFixture.DeepCopy()
+	crd.Spec.PreserveUnknownFields = pointer.BoolPtr(!pruning)
 
 	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
@@ -616,18 +626,78 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 				Name:    "v1beta1",
 				Served:  true,
 				Storage: true,
+				Schema: &apiextensionsv1beta1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+							"content": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"key": {Type: "string"},
+								},
+							},
+							"num": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"num1": {Type: "integer"},
+									"num2": {Type: "integer"},
+								},
+							},
+						},
+					},
+				},
 			},
 			{
 				// same schema as v1beta1
 				Name:    "v1alpha1",
 				Served:  true,
 				Storage: false,
+				Schema: &apiextensionsv1beta1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+							"content": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"key": {Type: "string"},
+								},
+							},
+							"num": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"num1": {Type: "integer"},
+									"num2": {Type: "integer"},
+								},
+							},
+						},
+					},
+				},
 			},
 			{
 				// different schema than v1beta1 and v1alpha1
 				Name:    "v1beta2",
 				Served:  true,
 				Storage: false,
+				Schema: &apiextensionsv1beta1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+							"contentv2": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"key": {Type: "string"},
+								},
+							},
+							"numv2": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"num1": {Type: "integer"},
+									"num2": {Type: "integer"},
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
