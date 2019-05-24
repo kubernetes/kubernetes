@@ -80,7 +80,7 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 		{
 			group:   "nontrivial-converter",
 			handler: NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList),
+			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning),
 		},
 		{
 			group:   "empty-response",
@@ -275,9 +275,23 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
 			name := "converted-" + createVersion.Name
 			client := ctc.versionedClient(ns, createVersion.Name)
-			if _, err := client.Create(newConversionMultiVersionFixture(ns, name, createVersion.Name), metav1.CreateOptions{}); err != nil {
+
+			fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
+			if !*ctc.crd.Spec.PreserveUnknownFields {
+				if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := client.Create(fixture, metav1.CreateOptions{}); err != nil {
 				t.Fatal(err)
 			}
+
+			// verify that the right, pruned version is in storage
+			obj, err := ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyMultiVersionObject(t, "v1beta1", obj)
 
 			for _, getVersion := range ctc.crd.Spec.Versions {
 				client := ctc.versionedClient(ns, getVersion.Name)
@@ -298,7 +312,14 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 	for _, createVersion := range ctc.crd.Spec.Versions {
 		name := "converted-" + createVersion.Name
 		client := ctc.versionedClient(ns, createVersion.Name)
-		if _, err := client.Create(newConversionMultiVersionFixture(ns, name, createVersion.Name), metav1.CreateOptions{}); err != nil {
+		fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
+		if !*ctc.crd.Spec.PreserveUnknownFields {
+			if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		_, err := client.Create(fixture, metav1.CreateOptions{})
+		if err != nil {
 			t.Fatal(err)
 		}
 		names.Insert(name)
@@ -321,6 +342,67 @@ func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
 			}
 			if !foundNames.Equal(names) {
 				t.Errorf("unexpected set of returned items: %s", foundNames.Difference(names))
+			}
+		})
+	}
+}
+
+func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
+	if *ctc.crd.Spec.PreserveUnknownFields {
+		return
+	}
+
+	ns := ctc.namespace
+
+	for _, createVersion := range ctc.crd.Spec.Versions {
+		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
+			name := "storagepruning-" + createVersion.Name
+			client := ctc.versionedClient(ns, createVersion.Name)
+
+			fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
+			if err := unstructured.SetNestedField(fixture.Object, "foo", "garbage"); err != nil {
+				t.Fatal(err)
+			}
+			_, err := client.Create(fixture, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// verify that the right, pruned version is in storage
+			obj, err := ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyMultiVersionObject(t, "v1beta1", obj)
+
+			// add garbage and set a label
+			if err := unstructured.SetNestedField(obj.Object, "foo", "garbage"); err != nil {
+				t.Fatal(err)
+			}
+			labels := obj.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			labels["mutated"] = "true"
+			obj.SetLabels(labels)
+			if err := ctc.etcdObjectReader.SetStoredCustomResource(ns, name, obj); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, getVersion := range ctc.crd.Spec.Versions {
+				client := ctc.versionedClient(ns, getVersion.Name)
+				obj, err := client.Get(name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// check that the direct mutation in etcd worked
+				labels := obj.GetLabels()
+				if labels["mutated"] != "true" {
+					t.Errorf("expected object %s in version %s to have label 'mutated=true'", name, getVersion.Name)
+				}
+
+				verifyMultiVersionObject(t, getVersion.Name, obj)
 			}
 		})
 	}
@@ -763,11 +845,11 @@ func verifyMultiVersionObject(t *testing.T, v string, obj *unstructured.Unstruct
 	}
 
 	delete(j, "metadata")
-	delete(j, "apiVersion")
-	delete(j, "kind")
 
 	var expected = map[string]map[string]interface{}{
 		"v1alpha1": {
+			"apiVersion": "stable.example.com/v1alpha1",
+			"kind":       "MultiVersion",
 			"content": map[string]interface{}{
 				"key": "value",
 			},
@@ -777,6 +859,8 @@ func verifyMultiVersionObject(t *testing.T, v string, obj *unstructured.Unstruct
 			},
 		},
 		"v1beta1": {
+			"apiVersion": "stable.example.com/v1beta1",
+			"kind":       "MultiVersion",
 			"content": map[string]interface{}{
 				"key": "value",
 			},
@@ -786,6 +870,8 @@ func verifyMultiVersionObject(t *testing.T, v string, obj *unstructured.Unstruct
 			},
 		},
 		"v1beta2": {
+			"apiVersion": "stable.example.com/v1beta2",
+			"kind":       "MultiVersion",
 			"contentv2": map[string]interface{}{
 				"key": "value",
 			},
