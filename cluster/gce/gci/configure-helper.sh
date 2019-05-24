@@ -2899,6 +2899,7 @@ EOF
   cat > "${config_path}" <<EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
+oom_score = -999
 
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
