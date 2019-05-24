@@ -31,7 +31,7 @@ import (
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 const (
@@ -510,8 +510,8 @@ func priority(p1, p2 *v1.Pod) int {
 		// If priority is not enabled, all pods are equal.
 		return 0
 	}
-	priority1 := schedulerutils.GetPodPriority(p1)
-	priority2 := schedulerutils.GetPodPriority(p2)
+	priority1 := scheduling.GetPodPriority(p1)
+	priority2 := scheduling.GetPodPriority(p2)
 	if priority1 == priority2 {
 		return 0
 	}

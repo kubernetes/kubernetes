@@ -19,6 +19,7 @@ package scheduling
 import (
 	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/api/core/v1"
 )
 
 // SystemPriorityClasses define system priority classes that are auto-created at cluster bootstrapping.
@@ -62,4 +63,15 @@ func IsKnownSystemPriorityClass(pc *PriorityClass) (bool, error) {
 		}
 	}
 	return false, fmt.Errorf("%v is not a known system priority class", pc.Name)
+}
+
+// GetPodPriority returns priority of the given pod.
+func GetPodPriority(pod *v1.Pod) int32 {
+	if pod.Spec.Priority != nil {
+		return *pod.Spec.Priority
+	}
+	// When priority of a running pod is nil, it means it was created at a time
+	// that there was no global default priority class and the priority class
+	// name of the pod was empty. So, we resolve to the static default priority.
+	return DefaultPriorityWhenNoDefaultClassExists
 }

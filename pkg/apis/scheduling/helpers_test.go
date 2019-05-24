@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestIsKnownSystemPriorityClass(t *testing.T) {
@@ -50,5 +51,41 @@ func TestIsKnownSystemPriorityClass(t *testing.T) {
 		if is, err := IsKnownSystemPriorityClass(test.pc); test.expected != is {
 			t.Errorf("Test [%v]: Expected %v, but got %v. Error: %v", test.name, test.expected, is, err)
 		}
+	}
+}
+
+// TestGetPodPriority tests GetPodPriority function.
+func TestGetPodPriority(t *testing.T) {
+	p := int32(20)
+	tests := []struct {
+		name             string
+		pod              *corev1.Pod
+		expectedPriority int32
+	}{
+		{
+			name: "no priority pod resolves to static default priority",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{
+					{Name: "container", Image: "image"}},
+				},
+			},
+			expectedPriority: DefaultPriorityWhenNoDefaultClassExists,
+		},
+		{
+			name: "pod with priority resolves correctly",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{Containers: []corev1.Container{
+					{Name: "container", Image: "image"}},
+					Priority: &p,
+				},
+			},
+			expectedPriority: p,
+		},
+	}
+	for _, test := range tests {
+		if GetPodPriority(test.pod) != test.expectedPriority {
+			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
+		}
+
 	}
 }
