@@ -24,6 +24,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 
@@ -37,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -77,7 +79,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
 
-		framework.WaitForAllNodesHealthy(cs, time.Minute)
+		e2enode.WaitForTotalHealthy(cs, time.Minute)
 		_, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)

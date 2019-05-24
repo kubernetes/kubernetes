@@ -27,6 +27,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
@@ -42,9 +43,9 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		gomega.Expect(len(nodeList.Items)).NotTo(gomega.BeZero())
 
 		pickedNode := nodeList.Items[0]
-		nodeIPs = framework.GetNodeAddresses(&pickedNode, v1.NodeExternalIP)
+		nodeIPs = e2enode.GetAddresses(&pickedNode, v1.NodeExternalIP)
 		// The pods running in the cluster can see the internal addresses.
-		nodeIPs = append(nodeIPs, framework.GetNodeAddresses(&pickedNode, v1.NodeInternalIP)...)
+		nodeIPs = append(nodeIPs, e2enode.GetAddresses(&pickedNode, v1.NodeInternalIP)...)
 
 		// make sure ServiceAccount admission controller is enabled, so secret generation on SA creation works
 		saName := "default"

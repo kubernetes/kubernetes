@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -55,12 +56,12 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
 		framework.ExpectNoError(err)
-		numNodes, err = framework.NumberOfRegisteredNodes(f.ClientSet)
+		numNodes, err = e2enode.TotalRegistered(f.ClientSet)
 		framework.ExpectNoError(err)
 		systemNamespace = metav1.NamespaceSystem
 
 		ginkgo.By("ensuring all nodes are ready")
-		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
+		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		framework.ExpectNoError(err)
 		e2elog.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
@@ -90,7 +91,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("ensuring all nodes are ready after the restart")
-		nodesAfter, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
+		nodesAfter, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
 		framework.ExpectNoError(err)
 		e2elog.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 

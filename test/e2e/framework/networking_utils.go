@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -580,7 +581,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	ginkgo.By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
-	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
+	config.ExternalAddrs = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
@@ -603,7 +604,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	if len(config.ExternalAddrs) != 0 {
 		config.NodeIP = config.ExternalAddrs[0]
 	} else {
-		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		internalAddrs := e2enode.FirstAddress(nodeList, v1.NodeInternalIP)
 		config.NodeIP = internalAddrs[0]
 	}
 }
@@ -1048,7 +1049,7 @@ func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 // This function executes commands on a node so it will work only for some
 // environments.
 func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1.Node, testFunc func()) {
-	host, err := GetNodeExternalIP(node)
+	host, err := e2enode.GetExternalIP(node)
 	if err != nil {
 		Failf("Error getting node external ip : %v", err)
 	}
@@ -1066,7 +1067,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	}()
 
 	e2elog.Logf("Waiting %v to ensure node %s is ready before beginning test...", resizeNodeReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
+	if !e2enode.WaitConditionToBe(c, node.Name, v1.NodeReady, true, resizeNodeReadyTimeout) {
 		Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 	}
 	for _, masterAddress := range masterAddresses {
@@ -1074,7 +1075,7 @@ func TestUnderTemporaryNetworkFailure(c clientset.Interface, ns string, node *v1
 	}
 
 	e2elog.Logf("Waiting %v for node %s to be not ready after simulated network failure", resizeNodeNotReadyTimeout, node.Name)
-	if !WaitForNodeToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
+	if !e2enode.WaitConditionToBe(c, node.Name, v1.NodeReady, false, resizeNodeNotReadyTimeout) {
 		Failf("Node %s did not become not-ready within %v", node.Name, resizeNodeNotReadyTimeout)
 	}
 

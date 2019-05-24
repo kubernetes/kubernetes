@@ -31,6 +31,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -237,7 +238,7 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	}
 
 	// Node sanity check: ensure it is "ready".
-	if !framework.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
+	if !e2enode.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
 		return false
 	}
 
@@ -273,12 +274,12 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !framework.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
+	if !e2enode.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
 		return false
 	}
 
 	// Wait for some kind of "ready" status.
-	if !framework.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
+	if !e2enode.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
 		return false
 	}
 

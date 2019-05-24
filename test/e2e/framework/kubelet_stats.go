@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/prometheus/common/model"
 )
@@ -499,7 +500,7 @@ type usageDataPerContainer struct {
 
 // GetKubeletHeapStats returns stats of kubelet heap.
 func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error) {
-	client, err := NodeProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
+	client, err := e2enode.ProxyRequest(c, nodeName, "debug/pprof/heap", ports.KubeletPort)
 	if err != nil {
 		return "", err
 	}

@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
@@ -87,7 +88,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
-			if err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+			if err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
@@ -99,7 +100,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 
 		ginkgo.It("node lease should be deleted when corresponding node is deleted", func() {
 			leaseClient := c.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
-			err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
+			err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute)
 			gomega.Expect(err).To(gomega.BeNil())
 
 			ginkgo.By("verify node lease exists for every nodes")
@@ -126,7 +127,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			gomega.Expect(err).To(gomega.BeNil())
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			gomega.Expect(err).To(gomega.BeNil())
-			err = framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
+			err = e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
 			gomega.Expect(err).To(gomega.BeNil())
 			targetNodes := framework.GetReadySchedulableNodesOrDie(c)
 			gomega.Expect(len(targetNodes.Items)).To(gomega.Equal(int(targetNumNodes)))

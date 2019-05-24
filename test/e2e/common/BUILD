@@ -78,6 +78,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/log:go_default_library",
+        "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/framework/volume:go_default_library",

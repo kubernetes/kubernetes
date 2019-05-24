@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -49,9 +50,9 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		var err error
-		numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+		numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 		framework.ExpectNoError(err)
-		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
+		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		framework.ExpectNoError(err)
 
 		e2elog.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
@@ -104,7 +105,7 @@ func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace
 		framework.Failf("Test failed; failed to recreate at least one node in %v.", framework.RecreateNodeReadyAgainTimeout)
 	}
 
-	nodesAfter, err := framework.CheckNodesReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)
+	nodesAfter, err := e2enode.CheckReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)
 	framework.ExpectNoError(err)
 	e2elog.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
 

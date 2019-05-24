@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -73,7 +74,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				if len(nodeGroupName) > 0 {
 					// Scale down back to only 'nodesNum' nodes, as expected at the start of the test.
 					framework.ExpectNoError(framework.ResizeGroup(nodeGroupName, nodesNum))
-					framework.ExpectNoError(framework.WaitForReadyNodes(f.ClientSet, nodesNum, 15*time.Minute))
+					framework.ExpectNoError(e2enode.WaitForReadyNodes(f.ClientSet, nodesNum, 15*time.Minute))
 				}
 			})
 

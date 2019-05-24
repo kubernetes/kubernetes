@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -209,9 +210,9 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
 	framework.ExpectNoError(err)
 
-	numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 	framework.ExpectNoError(err)
-	nodes, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
+	nodes, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Recreating nodes")

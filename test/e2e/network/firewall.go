@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
@@ -188,7 +189,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		}
 
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
-		nodeAddrs := framework.NodeAddresses(nodes, v1.NodeExternalIP)
+		nodeAddrs := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
 		if len(nodeAddrs) == 0 {
 			framework.Failf("did not find any node addresses")
 		}
