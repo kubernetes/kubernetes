@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -38,6 +39,9 @@ bootstrapTokens:
 nodeRegistration:
   criSocket: /run/containerd/containerd.sock
   name: someName
+  ignorePreflightErrors:
+    - c
+    - d
 ---
 apiVersion: kubeadm.k8s.io/v1beta2
 kind: ClusterConfiguration
@@ -129,6 +133,30 @@ func TestNewInitData(t *testing.T) {
 			},
 			expectError: true,
 		},
+
+		// Pre-flight errors:
+		{
+			name: "pre-flights errors from CLI args only",
+			flags: map[string]string{
+				options.IgnorePreflightErrors: "a,b",
+			},
+			validate: expectedInitIgnorePreflightErrors("a", "b"),
+		},
+		{
+			name: "pre-flights errors from InitConfiguration only",
+			flags: map[string]string{
+				options.CfgPath: configFilePath,
+			},
+			validate: expectedInitIgnorePreflightErrors("c", "d"),
+		},
+		{
+			name: "pre-flights errors from both CLI args and InitConfiguration",
+			flags: map[string]string{
+				options.CfgPath:               configFilePath,
+				options.IgnorePreflightErrors: "a,b",
+			},
+			validate: expectedInitIgnorePreflightErrors("a", "b", "c", "d"),
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -155,5 +183,17 @@ func TestNewInitData(t *testing.T) {
 				tc.validate(t, data)
 			}
 		})
+	}
+}
+
+func expectedInitIgnorePreflightErrors(expectedItems ...string) func(t *testing.T, data *initData) {
+	expected := sets.NewString(expectedItems...)
+	return func(t *testing.T, data *initData) {
+		if !expected.Equal(data.ignorePreflightErrors) {
+			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", expected.List(), data.ignorePreflightErrors.List())
+		}
+		if !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
+			t.Errorf("Invalid ignore preflight errors in InitConfiguration. Expected: %v. Actual: %v", expected.List(), data.cfg.NodeRegistration.IgnorePreflightErrors)
+		}
 	}
 }

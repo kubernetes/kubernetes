@@ -84,10 +84,6 @@ func newResetOptions() *resetOptions {
 // newResetData returns a new resetData struct to be used for the execution of the kubeadm reset workflow.
 func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out io.Writer) (*resetData, error) {
 	var cfg *kubeadmapi.InitConfiguration
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
 
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
@@ -98,6 +94,16 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		}
 	} else {
 		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrors(cfg))
+	if err != nil {
+		return nil, err
+	}
+	kubeadmutil.CheckErr(err)
+	if cfg != nil {
+		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 	}
 
 	var criSocketPath string
@@ -119,6 +125,13 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		outputWriter:          out,
 		cfg:                   cfg,
 	}, nil
+}
+
+func ignorePreflightErrors(cfg *kubeadmapi.InitConfiguration) []string {
+	if cfg == nil {
+		return []string{}
+	}
+	return cfg.NodeRegistration.IgnorePreflightErrors
 }
 
 // AddResetFlags adds reset flags

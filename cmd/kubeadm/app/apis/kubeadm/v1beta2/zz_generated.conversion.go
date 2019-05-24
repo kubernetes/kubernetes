@@ -821,6 +821,7 @@ func autoConvert_v1beta2_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOpti
 	out.CRISocket = in.CRISocket
 	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
+	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	return nil
 }
 
@@ -834,6 +835,7 @@ func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOpti
 	out.CRISocket = in.CRISocket
 	out.Taints = *(*[]corev1.Taint)(unsafe.Pointer(&in.Taints))
 	out.KubeletExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.KubeletExtraArgs))
+	out.IgnorePreflightErrors = *(*[]string)(unsafe.Pointer(&in.IgnorePreflightErrors))
 	return nil
 }
 
