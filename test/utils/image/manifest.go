@@ -108,8 +108,6 @@ const (
 	AuditProxy
 	// BusyBox image
 	BusyBox
-	// BusyBox image with default user 1234
-	BusyBoxUser
 	// CheckMetadataConcealment image
 	CheckMetadataConcealment
 	// CudaVectorAdd image
@@ -164,6 +162,8 @@ const (
 	NginxNew
 	// Nonewprivs image
 	Nonewprivs
+	// NonRoot runs with a default user of 1234
+	NonRoot
 	// NoSnatTest image
 	NoSnatTest
 	// NoSnatTestProxy image
@@ -204,7 +204,6 @@ func initImageConfigs() map[int]Config {
 	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
 	configs[AuditProxy] = Config{e2eRegistry, "audit-proxy", "1.0"}
 	configs[BusyBox] = Config{dockerLibraryRegistry, "busybox", "1.29"}
-	configs[BusyBoxUser] = Config{e2eRegistry, "busybox-user", "1.0"}
 	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
@@ -232,6 +231,7 @@ func initImageConfigs() map[int]Config {
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
+	configs[NonRoot] = Config{e2eRegistry, "nonroot", "1.0"}
 	configs[NoSnatTest] = Config{e2eRegistry, "no-snat-test", "1.0"}
 	configs[NoSnatTestProxy] = Config{e2eRegistry, "no-snat-test-proxy", "1.0"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go

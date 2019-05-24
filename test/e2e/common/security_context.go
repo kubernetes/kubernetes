@@ -97,7 +97,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 	Context("When creating a container with runAsNonRoot", func() {
 		rootImage := imageutils.GetE2EImage(imageutils.BusyBox)
-		nonRootImage := imageutils.GetE2EImage(imageutils.BusyBoxUser)
+		nonRootImage := imageutils.GetE2EImage(imageutils.NonRoot)
 		makeNonRootPod := func(podName, image string, userid *int64) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
