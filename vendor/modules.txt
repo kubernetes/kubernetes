@@ -634,6 +634,8 @@ github.com/munnerz/goautoneg
 github.com/mvdan/xurls
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 github.com/mxk/go-flowrate/flowrate
+# github.com/nishanths/dedupimport v0.0.0-20171111014527-eaca8f7e0b9b => github.com/nishanths/dedupimport v0.0.0-20171111014527-eaca8f7e0b9b
+github.com/nishanths/dedupimport
 # github.com/onsi/ginkgo v1.8.0 => github.com/onsi/ginkgo v1.8.0
 github.com/onsi/ginkgo
 github.com/onsi/ginkgo/config

@@ -306,6 +306,7 @@ filegroup(
         "//vendor/github.com/munnerz/goautoneg:all-srcs",
         "//vendor/github.com/mvdan/xurls:all-srcs",
         "//vendor/github.com/mxk/go-flowrate/flowrate:all-srcs",
+        "//vendor/github.com/nishanths/dedupimport:all-srcs",
         "//vendor/github.com/onsi/ginkgo:all-srcs",
         "//vendor/github.com/onsi/gomega:all-srcs",
         "//vendor/github.com/opencontainers/go-digest:all-srcs",
