@@ -253,8 +253,11 @@ func (f *framework) RunPermitPlugins(
 	if statusCode == Wait {
 		w := newWaitingPod(pod)
 		f.waitingPods.add(w)
-		defer f.waitingPods.remove(pod.UID)
 		timer := time.NewTimer(timeout)
+		defer func() {
+			f.waitingPods.remove(pod.UID)
+			timer.Stop()
+		}()
 		klog.V(4).Infof("waiting for %v for pod %v at permit", timeout, pod.Name)
 		select {
 		case <-timer.C:
