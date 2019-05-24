@@ -82,7 +82,7 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
 				}},
-			expected: errors.New("Only one extender can implement bind, found 2"),
+			expected: nil,
 		},
 		{
 			name: "invalid duplicate extender resource name",

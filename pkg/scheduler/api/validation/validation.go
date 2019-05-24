@@ -59,9 +59,6 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 			extenderManagedResources.Insert(string(resource.Name))
 		}
 	}
-	if binders > 1 {
-		validationErrors = append(validationErrors, fmt.Errorf("Only one extender can implement bind, found %v", binders))
-	}
 	return utilerrors.NewAggregate(validationErrors)
 }
 
