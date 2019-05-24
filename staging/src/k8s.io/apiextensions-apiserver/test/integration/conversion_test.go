@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
@@ -64,12 +66,12 @@ func TestWebhookConverter(t *testing.T) {
 		{
 			group:   "noop-converter",
 			handler: convert.NewObjectConverterWebhookHandler(t, noopConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions),
+			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
 		},
 		{
 			group:   "nontrivial-converter",
 			handler: convert.NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions),
+			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2")),
 		},
 		{
 			group:   "empty-response",
@@ -126,7 +128,7 @@ func TestWebhookConverter(t *testing.T) {
 	defer ctcTearDown()
 
 	// read only object to read at a different version than stored when we need to force conversion
-	marker, err := ctc.versionedClient("marker", "v1beta2").Create(newConversionMultiVersionFixture("marker", "marker", "v1beta2"), metav1.CreateOptions{})
+	marker, err := ctc.versionedClient("marker", "v1beta1").Create(newConversionMultiVersionFixture("marker", "marker", "v1beta1"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +147,7 @@ func TestWebhookConverter(t *testing.T) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
-				ctc.versionedClient(marker.GetNamespace(), "v1beta1").Get(marker.GetName(), metav1.GetOptions{})
+				ctc.versionedClient(marker.GetNamespace(), "v1alpha1").Get(marker.GetName(), metav1.GetOptions{})
 				select {
 				case <-upCh:
 					return true, nil
@@ -159,7 +161,7 @@ func TestWebhookConverter(t *testing.T) {
 			for i, checkFn := range test.checks {
 				name := fmt.Sprintf("check-%d", i)
 				t.Run(name, func(t *testing.T) {
-					defer ctc.setAndWaitStorageVersion(t, "v1beta2")
+					defer ctc.setAndWaitStorageVersion(t, "v1beta1")
 					ctc.namespace = fmt.Sprintf("webhook-conversion-%s-%s", test.group, name)
 					checkFn(t, ctc)
 				})
@@ -171,11 +173,11 @@ func TestWebhookConverter(t *testing.T) {
 func validateStorageVersion(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
-	for _, version := range []string{"v1beta1", "v1beta2"} {
-		t.Run(version, func(t *testing.T) {
-			name := "storageversion-" + version
-			client := ctc.versionedClient(ns, version)
-			obj, err := client.Create(newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
+	for _, version := range ctc.crd.Spec.Versions {
+		t.Run(version.Name, func(t *testing.T) {
+			name := "storageversion-" + version.Name
+			client := ctc.versionedClient(ns, version.Name)
+			obj, err := client.Create(newConversionMultiVersionFixture(ns, name, version.Name), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -193,66 +195,64 @@ func validateStorageVersion(t *testing.T, ctc *conversionTestContext) {
 
 // validateMixedStorageVersions ensures that identical custom resources written at different storage versions
 // are readable and remain the same.
-func validateMixedStorageVersions(t *testing.T, ctc *conversionTestContext) {
-	ns := ctc.namespace
+func validateMixedStorageVersions(versions ...string) func(t *testing.T, ctc *conversionTestContext) {
+	return func(t *testing.T, ctc *conversionTestContext) {
+		ns := ctc.namespace
+		clients := ctc.versionedClients(ns)
 
-	v1client := ctc.versionedClient(ns, "v1beta1")
-	v2client := ctc.versionedClient(ns, "v1beta2")
-	clients := map[string]dynamic.ResourceInterface{"v1beta1": v1client, "v1beta2": v2client}
-	versions := []string{"v1beta1", "v1beta2"}
+		// Create CRs at all storage versions
+		objNames := []string{}
+		for _, version := range versions {
+			ctc.setAndWaitStorageVersion(t, version)
 
-	// Create CRs at all storage versions
-	objNames := []string{}
-	for _, version := range versions {
-		ctc.setAndWaitStorageVersion(t, version)
-
-		name := "stored-at-" + version
-		obj, err := clients[version].Create(newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-		objNames = append(objNames, obj.GetName())
-	}
-
-	// Ensure copies of an object have the same fields and values at each custom resource definition version regardless of storage version
-	for clientVersion, client := range clients {
-		t.Run(clientVersion, func(t *testing.T) {
-			o1, err := client.Get(objNames[0], metav1.GetOptions{})
+			name := "mixedstorage-stored-as-" + version
+			obj, err := clients[version].Create(newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, objName := range objNames[1:] {
-				o2, err := client.Get(objName, metav1.GetOptions{})
+			objNames = append(objNames, obj.GetName())
+		}
+
+		// Ensure copies of an object have the same fields and values at each custom resource definition version regardless of storage version
+		for clientVersion, client := range clients {
+			t.Run(clientVersion, func(t *testing.T) {
+				o1, err := client.Get(objNames[0], metav1.GetOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
+				for _, objName := range objNames[1:] {
+					o2, err := client.Get(objName, metav1.GetOptions{})
+					if err != nil {
+						t.Fatal(err)
+					}
 
-				// ignore metadata for comparison purposes
-				delete(o1.Object, "metadata")
-				delete(o2.Object, "metadata")
-				if !reflect.DeepEqual(o1.Object, o2.Object) {
-					t.Errorf("Expected custom resource to be same regardless of which storage version is used but got %+v != %+v", o1, o2)
+					// ignore metadata for comparison purposes
+					delete(o1.Object, "metadata")
+					delete(o2.Object, "metadata")
+					if !reflect.DeepEqual(o1.Object, o2.Object) {
+						t.Errorf("Expected custom resource to be same regardless of which storage version is used to create, but got: %s", cmp.Diff(o1, o2))
+					}
 				}
-			}
-		})
+			})
+		}
 	}
 }
 
 func validateServed(t *testing.T, ctc *conversionTestContext) {
 	ns := ctc.namespace
 
-	for _, version := range []string{"v1beta1", "v1beta2"} {
-		t.Run(version, func(t *testing.T) {
-			name := "served-" + version
-			client := ctc.versionedClient(ns, version)
-			obj, err := client.Create(newConversionMultiVersionFixture(ns, name, version), metav1.CreateOptions{})
+	for _, version := range ctc.crd.Spec.Versions {
+		t.Run(version.Name, func(t *testing.T) {
+			name := "served-" + version.Name
+			client := ctc.versionedClient(ns, version.Name)
+			obj, err := client.Create(newConversionMultiVersionFixture(ns, name, version.Name), metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
-			ctc.setServed(t, version, false)
-			ctc.waitForServed(t, version, false, client, obj)
-			ctc.setServed(t, version, true)
-			ctc.waitForServed(t, version, true, client, obj)
+			ctc.setServed(t, version.Name, false)
+			ctc.waitForServed(t, version.Name, false, client, obj)
+			ctc.setServed(t, version.Name, true)
+			ctc.waitForServed(t, version.Name, true, client, obj)
 		})
 	}
 }
@@ -260,11 +260,10 @@ func validateServed(t *testing.T, ctc *conversionTestContext) {
 func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *conversionTestContext) {
 	return func(t *testing.T, ctc *conversionTestContext) {
 		ns := ctc.namespace
-		v1client := ctc.versionedClient(ns, "v1beta1")
-		v2client := ctc.versionedClient(ns, "v1beta2")
+		clients := ctc.versionedClients(ns)
 		var err error
-		// storage version is v1beta2, so this skips conversion
-		obj, err := v2client.Create(newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
+		// storage version is v1beta1, so this skips conversion
+		obj, err := clients["v1beta1"].Create(newConversionMultiVersionFixture(ns, id, "v1beta1"), metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -272,19 +271,19 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 			t.Run(verb, func(t *testing.T) {
 				switch verb {
 				case "get":
-					_, err = v1client.Get(obj.GetName(), metav1.GetOptions{})
+					_, err = clients["v1beta2"].Get(obj.GetName(), metav1.GetOptions{})
 				case "list":
-					_, err = v1client.List(metav1.ListOptions{})
+					_, err = clients["v1beta2"].List(metav1.ListOptions{})
 				case "create":
-					_, err = v1client.Create(newConversionMultiVersionFixture(ns, id, "v1beta1"), metav1.CreateOptions{})
+					_, err = clients["v1beta2"].Create(newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
 				case "update":
-					_, err = v1client.Update(obj, metav1.UpdateOptions{})
+					_, err = clients["v1beta2"].Update(obj, metav1.UpdateOptions{})
 				case "patch":
-					_, err = v1client.Patch(obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{})
+					_, err = clients["v1beta2"].Patch(obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{})
 				case "delete":
-					err = v1client.Delete(obj.GetName(), &metav1.DeleteOptions{})
+					err = clients["v1beta2"].Delete(obj.GetName(), &metav1.DeleteOptions{})
 				case "deletecollection":
-					err = v1client.DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
+					err = clients["v1beta2"].DeleteCollection(&metav1.DeleteOptions{}, metav1.ListOptions{})
 				}
 
 				if err == nil {
@@ -299,11 +298,11 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 				t.Run(fmt.Sprintf("%s-%s", subresource, verb), func(t *testing.T) {
 					switch verb {
 					case "create":
-						_, err = v1client.Create(newConversionMultiVersionFixture(ns, id, "v1beta1"), metav1.CreateOptions{}, subresource)
+						_, err = clients["v1beta2"].Create(newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{}, subresource)
 					case "update":
-						_, err = v1client.Update(obj, metav1.UpdateOptions{}, subresource)
+						_, err = clients["v1beta2"].Update(obj, metav1.UpdateOptions{}, subresource)
 					case "patch":
-						_, err = v1client.Patch(obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{}, subresource)
+						_, err = clients["v1beta2"].Patch(obj.GetName(), types.MergePatchType, []byte(`{"metadata":{"annotations":{"patch":"true"}}}`), metav1.PatchOptions{}, subresource)
 					}
 
 					if err == nil {
@@ -320,12 +319,12 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 func noopConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
 	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := json.Unmarshal(obj.Raw, u); err != nil {
-		return runtime.RawExtension{}, fmt.Errorf("Fail to deserialize object: %s with error: %v", string(obj.Raw), err)
+		return runtime.RawExtension{}, fmt.Errorf("failed to deserialize object: %s with error: %v", string(obj.Raw), err)
 	}
 	u.Object["apiVersion"] = desiredAPIVersion
 	raw, err := json.Marshal(u)
 	if err != nil {
-		return runtime.RawExtension{}, fmt.Errorf("Fail to serialize object: %v with error: %v", u, err)
+		return runtime.RawExtension{}, fmt.Errorf("failed to serialize object: %v with error: %v", u, err)
 	}
 	return runtime.RawExtension{Raw: raw}, nil
 }
@@ -353,26 +352,32 @@ func failureResponseConverter(message string) func(review apiextensionsv1beta1.C
 func nontrivialConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
 	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := json.Unmarshal(obj.Raw, u); err != nil {
-		return runtime.RawExtension{}, fmt.Errorf("Fail to deserialize object: %s with error: %v", string(obj.Raw), err)
+		return runtime.RawExtension{}, fmt.Errorf("failed to deserialize object: %s with error: %v", string(obj.Raw), err)
 	}
 
-	currentAPIVersion := u.Object["apiVersion"]
-	if currentAPIVersion == "v1beta2" && desiredAPIVersion == "v1beta1" {
+	currentAPIVersion := u.GetAPIVersion()
+
+	if currentAPIVersion == "stable.example.com/v1beta2" && (desiredAPIVersion == "stable.example.com/v1alpha1" || desiredAPIVersion == "stable.example.com/v1beta1") {
 		u.Object["num"] = u.Object["numv2"]
 		u.Object["content"] = u.Object["contentv2"]
 		delete(u.Object, "numv2")
 		delete(u.Object, "contentv2")
-	}
-	if currentAPIVersion == "v1beta1" && desiredAPIVersion == "v1beta2" {
+	} else if (currentAPIVersion == "stable.example.com/v1alpha1" || currentAPIVersion == "stable.example.com/v1beta1") && desiredAPIVersion == "stable.example.com/v1beta2" {
 		u.Object["numv2"] = u.Object["num"]
 		u.Object["contentv2"] = u.Object["content"]
 		delete(u.Object, "num")
 		delete(u.Object, "content")
+	} else if currentAPIVersion == "stable.example.com/v1alpha1" && desiredAPIVersion == "stable.example.com/v1beta1" {
+		// same schema
+	} else if currentAPIVersion == "stable.example.com/v1beta1" && desiredAPIVersion == "stable.example.com/v1alpha1" {
+		// same schema
+	} else if currentAPIVersion != desiredAPIVersion {
+		return runtime.RawExtension{}, fmt.Errorf("cannot convert from %s to %s", currentAPIVersion, desiredAPIVersion)
 	}
 	u.Object["apiVersion"] = desiredAPIVersion
 	raw, err := json.Marshal(u)
 	if err != nil {
-		return runtime.RawExtension{}, fmt.Errorf("Fail to serialize object: %v with error: %v", u, err)
+		return runtime.RawExtension{}, fmt.Errorf("failed to serialize object: %v with error: %v", u, err)
 	}
 	return runtime.RawExtension{Raw: raw}, nil
 }
@@ -403,6 +408,14 @@ type conversionTestContext struct {
 
 func (c *conversionTestContext) versionedClient(ns string, version string) dynamic.ResourceInterface {
 	return newNamespacedCustomResourceVersionedClient(ns, c.dynamicClient, c.crd, version)
+}
+
+func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.ResourceInterface {
+	ret := map[string]dynamic.ResourceInterface{}
+	for _, v := range c.crd.Spec.Versions {
+		ret[v.Name] = newNamespacedCustomResourceVersionedClient(ns, c.dynamicClient, c.crd, v.Name)
+	}
+	return ret
 }
 
 func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig) {
@@ -439,15 +452,18 @@ func (c *conversionTestContext) removeConversionWebhook(t *testing.T) {
 }
 
 func (c *conversionTestContext) setAndWaitStorageVersion(t *testing.T, version string) {
-	c.setStorageVersion(t, "v1beta2")
+	c.setStorageVersion(t, version)
 
-	client := c.versionedClient("probe", "v1beta2")
+	// create probe object. Version should be the default one to avoid webhook calls during test setup.
+	client := c.versionedClient("probe", "v1beta1")
 	name := fmt.Sprintf("probe-%v", uuid.NewUUID())
-	storageProbe, err := client.Create(newConversionMultiVersionFixture("probe", name, "v1beta2"), metav1.CreateOptions{})
+	storageProbe, err := client.Create(newConversionMultiVersionFixture("probe", name, "v1beta1"), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.waitForStorageVersion(t, "v1beta2", c.versionedClient(storageProbe.GetNamespace(), "v1beta2"), storageProbe)
+
+	// update object continuously and wait for etcd to have the target storage version.
+	c.waitForStorageVersion(t, version, c.versionedClient(storageProbe.GetNamespace(), "v1beta1"), storageProbe)
 
 	err = client.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
@@ -461,7 +477,7 @@ func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) 
 		t.Fatal(err)
 	}
 	for i, v := range crd.Spec.Versions {
-		crd.Spec.Versions[i].Storage = (v.Name == version)
+		crd.Spec.Versions[i].Storage = v.Name == version
 	}
 	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
 	if err != nil {
@@ -471,13 +487,16 @@ func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) 
 }
 
 func (c *conversionTestContext) waitForStorageVersion(t *testing.T, version string, versionedClient dynamic.ResourceInterface, obj *unstructured.Unstructured) *unstructured.Unstructured {
-	c.etcdObjectReader.WaitForStorageVersion(version, obj.GetNamespace(), obj.GetName(), 30*time.Second, func() {
-		var err error
-		obj, err = versionedClient.Update(obj, metav1.UpdateOptions{})
-		if err != nil {
+	if err := c.etcdObjectReader.WaitForStorageVersion(version, obj.GetNamespace(), obj.GetName(), 30*time.Second, func() {
+		if _, err := versionedClient.Patch(obj.GetName(), types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}); err != nil {
 			t.Fatalf("failed to update object: %v", err)
 		}
-	})
+	}); err != nil {
+		t.Fatalf("failed waiting for storage version %s: %v", version, err)
+	}
+
+	t.Logf("Effective storage version: %s", version)
+
 	return obj
 }
 
@@ -530,14 +549,22 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 		Scope: apiextensionsv1beta1.NamespaceScoped,
 		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 			{
+				// storage version, same schema as v1alpha1
 				Name:    "v1beta1",
+				Served:  true,
+				Storage: true,
+			},
+			{
+				// same schema as v1beta1
+				Name:    "v1alpha1",
 				Served:  true,
 				Storage: false,
 			},
 			{
+				// different schema than v1beta1 and v1alpha1
 				Name:    "v1beta2",
 				Served:  true,
-				Storage: true,
+				Storage: false,
 			},
 		},
 		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
@@ -551,7 +578,7 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 }
 
 func newConversionMultiVersionFixture(namespace, name, version string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
+	u := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "stable.example.com/" + version,
 			"kind":       "MultiVersion",
@@ -559,15 +586,39 @@ func newConversionMultiVersionFixture(namespace, name, version string) *unstruct
 				"namespace": namespace,
 				"name":      name,
 			},
-			"content": map[string]interface{}{
-				"key": "value",
-			},
-			"num": map[string]interface{}{
-				"num1": 1,
-				"num2": 1000000,
-			},
 		},
 	}
+
+	switch version {
+	case "v1alpha1":
+		u.Object["content"] = map[string]interface{}{
+			"key": "value",
+		}
+		u.Object["num"] = map[string]interface{}{
+			"num1": int64(1),
+			"num2": int64(1000000),
+		}
+	case "v1beta1":
+		u.Object["content"] = map[string]interface{}{
+			"key": "value",
+		}
+		u.Object["num"] = map[string]interface{}{
+			"num1": int64(1),
+			"num2": int64(1000000),
+		}
+	case "v1beta2":
+		u.Object["contentv2"] = map[string]interface{}{
+			"key": "value",
+		}
+		u.Object["numv2"] = map[string]interface{}{
+			"num1": int64(1),
+			"num2": int64(1000000),
+		}
+	default:
+		panic(fmt.Sprintf("unknown version %s", version))
+	}
+
+	return u
 }
 
 func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
