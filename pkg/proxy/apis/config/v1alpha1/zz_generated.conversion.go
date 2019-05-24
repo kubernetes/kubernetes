@@ -111,7 +111,6 @@ func autoConvert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguratio
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
 	out.Mode = config.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
-	out.ResourceContainer = in.ResourceContainer
 	out.UDPIdleTimeout = in.UDPIdleTimeout
 	if err := Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
 		return err
@@ -149,7 +148,6 @@ func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguratio
 	out.OOMScoreAdj = (*int32)(unsafe.Pointer(in.OOMScoreAdj))
 	out.Mode = v1alpha1.ProxyMode(in.Mode)
 	out.PortRange = in.PortRange
-	out.ResourceContainer = in.ResourceContainer
 	out.UDPIdleTimeout = in.UDPIdleTimeout
 	if err := Convert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(&in.Conntrack, &out.Conntrack, s); err != nil {
 		return err

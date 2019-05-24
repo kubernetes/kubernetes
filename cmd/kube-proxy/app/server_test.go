@@ -188,7 +188,6 @@ metricsBindAddress: "%s"
 mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
-resourceContainer: /foo
 udpIdleTimeout: 123ms
 nodePortAddresses:
   - "10.20.30.40/16"
@@ -303,7 +302,6 @@ nodePortAddresses:
 			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
 			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
-			ResourceContainer:  "/foo",
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 			NodePortAddresses:  []string{"10.20.30.40/16", "fd00:1::0/64"},
 		}
@@ -437,7 +435,6 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
-resourceContainer: /kube-proxy
 udpIdleTimeout: 250ms`)
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)

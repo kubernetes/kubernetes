@@ -69,7 +69,6 @@ import (
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
-	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/utils/exec"
@@ -191,10 +190,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-
-	// All flags below here are deprecated and will eventually be removed.
-	fs.StringVar(&o.config.ResourceContainer, "resource-container", o.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
-	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 }
 
 // NewOptions returns initialized Options
@@ -484,7 +479,6 @@ type ProxyServer struct {
 	MetricsBindAddress     string
 	EnableProfiling        bool
 	OOMScoreAdj            *int32
-	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
 	HealthzServer          *healthcheck.HealthzServer
 }
@@ -539,15 +533,6 @@ func (s *ProxyServer) Run() error {
 		oomAdjuster = oom.NewOOMAdjuster()
 		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
 			klog.V(2).Info(err)
-		}
-	}
-
-	if len(s.ResourceContainer) != 0 {
-		// Run in its own container.
-		if err := resourcecontainer.RunInResourceContainer(s.ResourceContainer); err != nil {
-			klog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
-		} else {
-			klog.V(2).Infof("Running in resource-only container %q", s.ResourceContainer)
 		}
 	}
 

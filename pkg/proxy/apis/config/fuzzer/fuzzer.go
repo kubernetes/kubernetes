@@ -44,7 +44,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.IPTables.MasqueradeBit = utilpointer.Int32Ptr(c.Int31())
 			obj.MetricsBindAddress = fmt.Sprintf("%d.%d.%d.%d:%d", c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(256), c.Intn(65536))
 			obj.OOMScoreAdj = utilpointer.Int32Ptr(c.Int31())
-			obj.ResourceContainer = "foo"
 			obj.ClientConnection.ContentType = "bar"
 			obj.NodePortAddresses = []string{"1.2.3.0/24"}
 		},
