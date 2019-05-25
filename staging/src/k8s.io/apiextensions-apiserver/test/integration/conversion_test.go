@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
@@ -71,7 +72,7 @@ func TestWebhookConverter(t *testing.T) {
 		{
 			group:   "nontrivial-converter",
 			handler: convert.NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2")),
+			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList),
 		},
 		{
 			group:   "empty-response",
@@ -253,6 +254,64 @@ func validateServed(t *testing.T, ctc *conversionTestContext) {
 			ctc.waitForServed(t, version.Name, false, client, obj)
 			ctc.setServed(t, version.Name, true)
 			ctc.waitForServed(t, version.Name, true, client, obj)
+		})
+	}
+}
+
+func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
+	ns := ctc.namespace
+
+	for _, createVersion := range ctc.crd.Spec.Versions {
+		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
+			name := "converted-" + createVersion.Name
+			client := ctc.versionedClient(ns, createVersion.Name)
+			if _, err := client.Create(newConversionMultiVersionFixture(ns, name, createVersion.Name), metav1.CreateOptions{}); err != nil {
+				t.Fatal(err)
+			}
+
+			for _, getVersion := range ctc.crd.Spec.Versions {
+				client := ctc.versionedClient(ns, getVersion.Name)
+				obj, err := client.Get(name, metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				verifyMultiVersionObject(t, getVersion.Name, obj)
+			}
+		})
+	}
+}
+
+func validateNonTrivialConvertedList(t *testing.T, ctc *conversionTestContext) {
+	ns := ctc.namespace + "-list"
+
+	names := sets.String{}
+	for _, createVersion := range ctc.crd.Spec.Versions {
+		name := "converted-" + createVersion.Name
+		client := ctc.versionedClient(ns, createVersion.Name)
+		if _, err := client.Create(newConversionMultiVersionFixture(ns, name, createVersion.Name), metav1.CreateOptions{}); err != nil {
+			t.Fatal(err)
+		}
+		names.Insert(name)
+	}
+
+	for _, listVersion := range ctc.crd.Spec.Versions {
+		t.Run(fmt.Sprintf("listing objects as %s", listVersion.Name), func(t *testing.T) {
+			client := ctc.versionedClient(ns, listVersion.Name)
+			obj, err := client.List(metav1.ListOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(obj.Items) != len(ctc.crd.Spec.Versions) {
+				t.Fatal("unexpected number of items")
+			}
+			foundNames := sets.String{}
+			for _, u := range obj.Items {
+				foundNames.Insert(u.GetName())
+				verifyMultiVersionObject(t, listVersion.Name, &u)
+			}
+			if !foundNames.Equal(names) {
+				t.Errorf("unexpected set of returned items: %s", foundNames.Difference(names))
+			}
 		})
 	}
 }
@@ -619,6 +678,52 @@ func newConversionMultiVersionFixture(namespace, name, version string) *unstruct
 	}
 
 	return u
+}
+
+func verifyMultiVersionObject(t *testing.T, v string, obj *unstructured.Unstructured) {
+	j := runtime.DeepCopyJSON(obj.Object)
+
+	if expected := "stable.example.com/" + v; obj.GetAPIVersion() != expected {
+		t.Errorf("unexpected apiVersion %q, expected %q", obj.GetAPIVersion(), expected)
+		return
+	}
+
+	delete(j, "metadata")
+	delete(j, "apiVersion")
+	delete(j, "kind")
+
+	var expected = map[string]map[string]interface{}{
+		"v1alpha1": {
+			"content": map[string]interface{}{
+				"key": "value",
+			},
+			"num": map[string]interface{}{
+				"num1": int64(1),
+				"num2": int64(1000000),
+			},
+		},
+		"v1beta1": {
+			"content": map[string]interface{}{
+				"key": "value",
+			},
+			"num": map[string]interface{}{
+				"num1": int64(1),
+				"num2": int64(1000000),
+			},
+		},
+		"v1beta2": {
+			"contentv2": map[string]interface{}{
+				"key": "value",
+			},
+			"numv2": map[string]interface{}{
+				"num1": int64(1),
+				"num2": int64(1000000),
+			},
+		},
+	}
+	if !reflect.DeepEqual(expected[v], j) {
+		t.Errorf("unexpected %s object: %s", v, cmp.Diff(expected[v], j))
+	}
 }
 
 func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
