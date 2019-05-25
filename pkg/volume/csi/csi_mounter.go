@@ -77,7 +77,7 @@ var _ volume.Volume = &csiMountMgr{}
 
 func (c *csiMountMgr) GetPath() string {
 	dir := filepath.Join(getTargetPath(c.podUID, c.specVolumeID, c.plugin.host), "/mount")
-	klog.V(4).Info(log("mounter.GetPath generated [%s]", dir))
+	klog.V(4).Infof(log("mounter.GetPath generated [%s]", dir))
 	return dir
 }
 
@@ -102,18 +102,18 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	mounted, err := isDirMounted(c.plugin, dir)
 	if err != nil {
-		klog.Error(log("mounter.SetUpAt failed while checking mount status for dir [%s]", dir))
+		klog.Errorf(log("mounter.SetUpAt failed while checking mount status for dir [%s]", dir))
 		return err
 	}
 
 	if mounted {
-		klog.V(4).Info(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
+		klog.V(4).Infof(log("mounter.SetUpAt skipping mount, dir already mounted [%s]", dir))
 		return nil
 	}
 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		klog.Error(log("mounter.SetUpAt failed to get CSI client: %v", err))
+		klog.Errorf(log("mounter.SetUpAt failed to get CSI client: %v", err))
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
@@ -121,7 +121,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	volSrc, pvSrc, err := getSourceFromSpec(c.spec)
 	if err != nil {
-		klog.Error(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
+		klog.Errorf(log("mounter.SetupAt failed to get CSI persistent source: %v", err))
 		return err
 	}
 
@@ -182,14 +182,14 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		// Check for STAGE_UNSTAGE_VOLUME set and populate deviceMountPath if so
 		stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 		if err != nil {
-			klog.Error(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
+			klog.Errorf(log("mounter.SetUpAt failed to check for STAGE_UNSTAGE_VOLUME capabilty: %v", err))
 			return err
 		}
 
 		if stageUnstageSet {
 			deviceMountPath, err = makeDeviceMountPath(c.plugin, c.spec)
 			if err != nil {
-				klog.Error(log("mounter.SetUpAt failed to make device mount path: %v", err))
+				klog.Errorf(log("mounter.SetUpAt failed to make device mount path: %v", err))
 				return err
 			}
 		}
@@ -210,10 +210,10 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 
 	// create target_dir before call to NodePublish
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.Error(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
+		klog.Errorf(log("mouter.SetUpAt failed to create dir %#v:  %v", dir, err))
 		return err
 	}
-	klog.V(4).Info(log("created target path successfully [%s]", dir))
+	klog.V(4).Infof(log("created target path successfully [%s]", dir))
 
 	nodePublishSecrets = map[string]string{}
 	if secretRef != nil {
@@ -228,7 +228,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	// Inject pod information into volume_attributes
 	podAttrs, err := c.podAttributes()
 	if err != nil {
-		klog.Error(log("mouter.SetUpAt failed to assemble volume attributes: %v", err))
+		klog.Errorf(log("mouter.SetUpAt failed to assemble volume attributes: %v", err))
 		return err
 	}
 	if podAttrs != nil {
@@ -258,7 +258,7 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 	if err != nil {
 		klog.Errorf(log("mounter.SetupAt failed: %v", err))
 		if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
-			klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+			klog.Errorf(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 		}
 		return err
 	}
@@ -273,12 +273,12 @@ func (c *csiMountMgr) SetUpAt(dir string, fsGroup *int64) error {
 		// attempt to rollback mount.
 		fsGrpErr := fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
 		if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
-			klog.Error(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
+			klog.Errorf(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
 			return fsGrpErr
 		}
 
 		if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
-			klog.Error(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
+			klog.Errorf(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
 			return fsGrpErr
 		}
 		return fsGrpErr
@@ -332,7 +332,7 @@ func (c *csiMountMgr) GetAttributes() volume.Attributes {
 	path := c.GetPath()
 	supportSelinux, err := mounter.GetSELinuxSupport(path)
 	if err != nil {
-		klog.V(2).Info(log("error checking for SELinux support: %s", err))
+		klog.V(2).Infof(log("error checking for SELinux support: %s", err))
 		// Best guess
 		supportSelinux = false
 	}
@@ -355,7 +355,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		klog.Error(log("mounter.SetUpAt failed to get CSI client: %v", err))
+		klog.Errorf(log("mounter.SetUpAt failed to get CSI client: %v", err))
 		return err
 	}
 
@@ -369,7 +369,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 
 	// clean mount point dir
 	if err := removeMountDir(c.plugin, dir); err != nil {
-		klog.Error(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
+		klog.Errorf(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 		return err
 	}
 	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
@@ -408,7 +408,7 @@ func (c *csiMountMgr) applyFSGroup(fsType string, fsGroup *int64) error {
 			return err
 		}
 
-		klog.V(4).Info(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
+		klog.V(4).Infof(log("mounter.SetupAt fsGroup [%d] applied successfully to %s", *fsGroup, c.volumeID))
 	}
 
 	return nil
@@ -419,7 +419,7 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 	mounter := plug.host.GetMounter(plug.GetPluginName())
 	notMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Error(log("isDirMounted IsLikelyNotMountPoint test failed for dir [%v]", dir))
+		klog.Errorf(log("isDirMounted IsLikelyNotMountPoint test failed for dir [%v]", dir))
 		return false, err
 	}
 	return !notMnt, nil
@@ -427,30 +427,30 @@ func isDirMounted(plug *csiPlugin, dir string) (bool, error) {
 
 // removeMountDir cleans the mount dir when dir is not mounted and removed the volume data file in dir
 func removeMountDir(plug *csiPlugin, mountPath string) error {
-	klog.V(4).Info(log("removing mount path [%s]", mountPath))
+	klog.V(4).Infof(log("removing mount path [%s]", mountPath))
 
 	mnt, err := isDirMounted(plug, mountPath)
 	if err != nil {
 		return err
 	}
 	if !mnt {
-		klog.V(4).Info(log("dir not mounted, deleting it [%s]", mountPath))
+		klog.V(4).Infof(log("dir not mounted, deleting it [%s]", mountPath))
 		if err := os.Remove(mountPath); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to remove dir [%s]: %v", mountPath, err))
+			klog.Errorf(log("failed to remove dir [%s]: %v", mountPath, err))
 			return err
 		}
 		// remove volume data file as well
 		volPath := path.Dir(mountPath)
 		dataFile := filepath.Join(volPath, volDataFileName)
-		klog.V(4).Info(log("also deleting volume info data file [%s]", dataFile))
+		klog.V(4).Infof(log("also deleting volume info data file [%s]", dataFile))
 		if err := os.Remove(dataFile); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to delete volume data file [%s]: %v", dataFile, err))
+			klog.Errorf(log("failed to delete volume data file [%s]: %v", dataFile, err))
 			return err
 		}
 		// remove volume path
-		klog.V(4).Info(log("deleting volume path [%s]", volPath))
+		klog.V(4).Infof(log("deleting volume path [%s]", volPath))
 		if err := os.Remove(volPath); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to delete volume path [%s]: %v", volPath, err))
+			klog.Errorf(log("failed to delete volume path [%s]: %v", volPath, err))
 			return err
 		}
 	}

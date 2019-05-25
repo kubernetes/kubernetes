@@ -275,7 +275,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	fsType string,
 	mountOptions []string,
 ) error {
-	klog.V(4).Info(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
+	klog.V(4).Infof(log("calling NodePublishVolume rpc [volid=%s,target_path=%s]", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -458,7 +458,7 @@ func (c *csiDriverClient) nodePublishVolumeV0(
 }
 
 func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string, targetPath string) error {
-	klog.V(4).Info(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
+	klog.V(4).Infof(log("calling NodeUnpublishVolume rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -516,7 +516,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	secrets map[string]string,
 	volumeContext map[string]string,
 ) error {
-	klog.V(4).Info(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	klog.V(4).Infof(log("calling NodeStageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -624,7 +624,7 @@ func (c *csiDriverClient) nodeStageVolumeV0(
 }
 
 func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingTargetPath string) error {
-	klog.V(4).Info(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
+	klog.V(4).Infof(log("calling NodeUnstageVolume rpc [volid=%s,staging_target_path=%s]", volID, stagingTargetPath))
 	if volID == "" {
 		return errors.New("missing volume id")
 	}
@@ -881,7 +881,7 @@ func (c *csiDriverClient) nodeSupportsVolumeStatsV1(ctx context.Context) (bool, 
 }
 
 func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, targetPath string) (*volume.Metrics, error) {
-	klog.V(4).Info(log("calling NodeGetVolumeStats rpc: [volid=%s, target_path=%s", volID, targetPath))
+	klog.V(4).Infof(log("calling NodeGetVolumeStats rpc: [volid=%s, target_path=%s", volID, targetPath))
 	if volID == "" {
 		return nil, errors.New("missing volume id")
 	}
