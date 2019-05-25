@@ -249,7 +249,6 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 // HealthzUpdater allows 
 type HealthzUpdater interface {
 	UpdateTimestamp() //used for sync runs
-	UpdateAPITimestamp() // user for service/endpoint updates
 }
 
 // HealthzServer returns 200 "OK" by default. Once timestamp has been
