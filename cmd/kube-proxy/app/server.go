@@ -633,12 +633,12 @@ func (s *ProxyServer) Run() error {
 	// are registered yet.
 	serviceConfig := config.NewServiceConfig(informerFactory.Core().V1().Services(), s.ConfigSyncPeriod)
 	serviceConfig.RegisterEventHandler(s.Proxier)
-	serviceConfig.RegisterEventHandler(healthz)
+	serviceConfig.RegisterEventHandler(s.HealthzServer)
 	go serviceConfig.Run(wait.NeverStop)
 
 	endpointsConfig := config.NewEndpointsConfig(informerFactory.Core().V1().Endpoints(), s.ConfigSyncPeriod)
 	endpointsConfig.RegisterEventHandler(s.Proxier)
-	serviceConfig.RegisterEventHandler(healthz)
+	serviceConfig.RegisterEventHandler(s.HealthzServer)
 	go endpointsConfig.Run(wait.NeverStop)
 
 	// This has to start after the calls to NewServiceConfig and NewEndpointsConfig because those
