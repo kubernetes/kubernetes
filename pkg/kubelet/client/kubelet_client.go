@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -31,11 +31,16 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
+// KubeletClientConfig defines config parameters for the kubelet client
 type KubeletClientConfig struct {
-	// Default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
-	Port         uint
+	// Port specifies the default port - used if no information about Kubelet port can be found in Node.NodeStatus.DaemonEndpoints.
+	Port uint
+
+	// ReadOnlyPort specifies the Port for ReadOnly communications.
 	ReadOnlyPort uint
-	EnableHttps  bool
+
+	// EnableHTTPs specifies if traffic should be encrypted.
+	EnableHTTPS bool
 
 	// PreferredAddressTypes - used to select an address from Node.NodeStatus.Addresses
 	PreferredAddressTypes []string
@@ -66,6 +71,7 @@ type ConnectionInfoGetter interface {
 	GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error)
 }
 
+// MakeTransport creates a RoundTripper for HTTP Transport.
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 	tlsConfig, err := transport.TLSConfigFor(config.transportConfig())
 	if err != nil {
@@ -96,7 +102,7 @@ func (c *KubeletClientConfig) transportConfig() *transport.Config {
 		},
 		BearerToken: c.BearerToken,
 	}
-	if c.EnableHttps && !cfg.HasCA() {
+	if c.EnableHTTPS && !cfg.HasCA() {
 		cfg.TLS.Insecure = true
 	}
 	return cfg
@@ -110,6 +116,7 @@ type NodeGetter interface {
 // NodeGetterFunc allows implementing NodeGetter with a function
 type NodeGetterFunc func(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error)
 
+// Get fetches information via NodeGetterFunc.
 func (f NodeGetterFunc) Get(ctx context.Context, name string, options metav1.GetOptions) (*v1.Node, error) {
 	return f(ctx, name, options)
 }
@@ -128,9 +135,10 @@ type NodeConnectionInfoGetter struct {
 	preferredAddressTypes []v1.NodeAddressType
 }
 
+// NewNodeConnectionInfoGetter creates a new NodeConnectionInfoGetter.
 func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (ConnectionInfoGetter, error) {
 	scheme := "http"
-	if config.EnableHttps {
+	if config.EnableHTTPS {
 		scheme = "https"
 	}
 
@@ -154,6 +162,7 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	}, nil
 }
 
+// GetConnectionInfo retrieves connection info from the status of a Node API object.
 func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error) {
 	node, err := k.nodes.Get(ctx, string(nodeName), metav1.GetOptions{})
 	if err != nil {
