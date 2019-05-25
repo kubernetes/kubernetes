@@ -392,6 +392,6 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "apiLastUpdate": %q, "currentTime": %q}`, 
-								  lastUpdated, apiLastUpdated, currentTime))
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`, 
+								  lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
 }
