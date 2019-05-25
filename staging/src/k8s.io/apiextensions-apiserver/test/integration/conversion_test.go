@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
@@ -131,7 +133,8 @@ func TestWebhookConverter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.group, func(t *testing.T) {
-			tearDown, webhookClientConfig, webhookWaitReady, err := convert.StartConversionWebhookServerWithWaitReady(test.handler)
+			upCh, handler := closeOnCall(test.handler)
+			tearDown, webhookClientConfig, err := convert.StartConversionWebhookServer(handler)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -140,12 +143,16 @@ func TestWebhookConverter(t *testing.T) {
 			ctc.setConversionWebhook(t, webhookClientConfig)
 			defer ctc.removeConversionWebhook(t)
 
-			err = webhookWaitReady(30*time.Second, func() error {
-				// the marker's storage version is v1beta2, so a v1beta1 read always triggers conversion
-				_, err := ctc.versionedClient(marker.GetNamespace(), "v1beta1").Get(marker.GetName(), metav1.GetOptions{})
-				return err
-			})
-			if err != nil {
+			// wait until new webhook is called the first time
+			if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+				ctc.versionedClient(marker.GetNamespace(), "v1beta1").Get(marker.GetName(), metav1.GetOptions{})
+				select {
+				case <-upCh:
+					return true, nil
+				default:
+					return false, nil
+				}
+			}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -561,4 +568,15 @@ func newConversionMultiVersionFixture(namespace, name, version string) *unstruct
 			},
 		},
 	}
+}
+
+func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
+	ch := make(chan struct{})
+	once := sync.Once{}
+	return ch, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() {
+			close(ch)
+		})
+		h.ServeHTTP(w, r)
+	})
 }

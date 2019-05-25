@@ -25,91 +25,51 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/uuid"
 )
-
-// WaitReadyFunc calls triggerConversionFn periodically and waits until it detects that the webhook
-// conversion server has handled at least 1 conversion request or the timeout is exceeded, in which
-// case an error is returned.
-type WaitReadyFunc func(timeout time.Duration, triggerConversionFn func() error) error
-
-// StartConversionWebhookServerWithWaitReady starts an http server with the provided handler and returns the WebhookClientConfig
-// needed to configure a CRD to use this conversion webhook as its converter.
-// It also returns a WaitReadyFunc to be called after the CRD is configured to wait until the conversion webhook handler
-// accepts at least one conversion request. If the server fails to start, an error is returned.
-// WaitReady is useful when changing the conversion webhook config of an existing CRD because the update does not take effect immediately.
-func StartConversionWebhookServerWithWaitReady(handler http.Handler) (func(), *apiextensionsv1beta1.WebhookClientConfig, WaitReadyFunc, error) {
-	var once sync.Once
-	handlerReadyC := make(chan struct{})
-	readyNotifyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		once.Do(func() {
-			close(handlerReadyC)
-		})
-		handler.ServeHTTP(w, r)
-	})
-
-	tearDown, webhookConfig, err := StartConversionWebhookServer(readyNotifyHandler)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error starting webhook server: %v", err)
-	}
-
-	waitReady := func(timeout time.Duration, triggerConversionFn func() error) error {
-		var err error
-		for {
-			select {
-			case <-handlerReadyC:
-				return nil
-			case <-time.After(timeout):
-				return fmt.Errorf("Timed out waiting for CRD webhook converter update, last trigger conversion error: %v", err)
-			case <-time.After(100 * time.Millisecond):
-				err = triggerConversionFn()
-			}
-		}
-	}
-	return tearDown, webhookConfig, waitReady, err
-}
 
 // StartConversionWebhookServer starts an http server with the provided handler and returns the WebhookClientConfig
 // needed to configure a CRD to use this conversion webhook as its converter.
 func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv1beta1.WebhookClientConfig, error) {
-	// Use a unique path for each webhook server. This ensures that all conversion requests
-	// received by the handler are intended for it; if a WebhookClientConfig other than this one
-	// is applied in the api server, conversion requests will not reach the handler (if they
-	// reach the server they will be returned at 404). This helps prevent tests that require a
-	// specific conversion webhook from accidentally using a different one, which could otherwise
-	// cause a test to flake or pass when it should fail. Since updating the conversion client
-	// config of a custom resource definition does not take effect immediately, this is needed
-	// by the WaitReady returned StartConversionWebhookServerWithWaitReady to detect when a
-	// conversion client config change in the api server has taken effect.
-	path := fmt.Sprintf("/conversionwebhook-%s", uuid.NewUUID())
 	roots := x509.NewCertPool()
 	if !roots.AppendCertsFromPEM(localhostCert) {
-		return nil, nil, fmt.Errorf("Failed to append Cert from PEM")
+		return nil, nil, fmt.Errorf("failed to append Cert from PEM")
 	}
 	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to build cert with error: %+v", err)
+		return nil, nil, fmt.Errorf("failed to build cert with error: %+v", err)
 	}
+
 	webhookMux := http.NewServeMux()
-	webhookMux.Handle(path, handler)
+	webhookMux.Handle("/convert", handler)
 	webhookServer := httptest.NewUnstartedServer(webhookMux)
 	webhookServer.TLS = &tls.Config{
 		RootCAs:      roots,
 		Certificates: []tls.Certificate{cert},
 	}
 	webhookServer.StartTLS()
-	endpoint := webhookServer.URL + path
+	endpoint := webhookServer.URL + "/convert"
 	webhookConfig := &apiextensionsv1beta1.WebhookClientConfig{
 		CABundle: localhostCert,
 		URL:      &endpoint,
 	}
+
+	// StartTLS returns immediately, there is a small chance of a race to avoid.
+	if err := wait.PollImmediate(time.Millisecond*100, wait.ForeverTestTimeout, func() (bool, error) {
+		_, err := webhookServer.Client().Get(webhookServer.URL) // even a 404 is fine
+		return err == nil, nil
+	}); err != nil {
+		webhookServer.Close()
+		return nil, nil, err
+	}
+
 	return webhookServer.Close, webhookConfig, nil
 }
 
