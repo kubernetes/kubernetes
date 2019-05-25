@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -92,7 +92,7 @@ type manager struct {
 	prober *prober
 }
 
-// NewManager creates a new prober manager instance.
+// NewManager creates a Manager for pod probing.
 func NewManager(
 	statusManager status.Manager,
 	livenessManager results.Manager,
