@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package integration
+package conversion
 
 import (
 	"encoding/json"
@@ -47,7 +47,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/test/integration/convert"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -66,22 +65,22 @@ func TestWebhookConverter(t *testing.T) {
 	}{
 		{
 			group:   "noop-converter",
-			handler: convert.NewObjectConverterWebhookHandler(t, noopConverter),
+			handler: NewObjectConverterWebhookHandler(t, noopConverter),
 			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
 		},
 		{
 			group:   "nontrivial-converter",
-			handler: convert.NewObjectConverterWebhookHandler(t, nontrivialConverter),
+			handler: NewObjectConverterWebhookHandler(t, nontrivialConverter),
 			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList),
 		},
 		{
 			group:   "empty-response",
-			handler: convert.NewReviewWebhookHandler(t, emptyResponseConverter),
+			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
 			checks:  checks(expectConversionFailureMessage("empty-response", "expected 1 converted objects")),
 		},
 		{
 			group:   "failure-message",
-			handler: convert.NewReviewWebhookHandler(t, failureResponseConverter("custom webhook conversion error")),
+			handler: NewReviewWebhookHandler(t, failureResponseConverter("custom webhook conversion error")),
 			checks:  checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
 		},
 	}
@@ -137,7 +136,7 @@ func TestWebhookConverter(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.group, func(t *testing.T) {
 			upCh, handler := closeOnCall(test.handler)
-			tearDown, webhookClientConfig, err := convert.StartConversionWebhookServer(handler)
+			tearDown, webhookClientConfig, err := StartConversionWebhookServer(handler)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -467,13 +466,17 @@ type conversionTestContext struct {
 }
 
 func (c *conversionTestContext) versionedClient(ns string, version string) dynamic.ResourceInterface {
-	return newNamespacedCustomResourceVersionedClient(ns, c.dynamicClient, c.crd, version)
+	gvr := schema.GroupVersionResource{Group: c.crd.Spec.Group, Version: version, Resource: c.crd.Spec.Names.Plural}
+	if c.crd.Spec.Scope != apiextensionsv1beta1.ClusterScoped {
+		return c.dynamicClient.Resource(gvr).Namespace(ns)
+	}
+	return c.dynamicClient.Resource(gvr)
 }
 
 func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.ResourceInterface {
 	ret := map[string]dynamic.ResourceInterface{}
 	for _, v := range c.crd.Spec.Versions {
-		ret[v.Name] = newNamespacedCustomResourceVersionedClient(ns, c.dynamicClient, c.crd, v.Name)
+		ret[v.Name] = c.versionedClient(ns, v.Name)
 	}
 	return ret
 }
