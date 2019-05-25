@@ -58,8 +58,6 @@ const (
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"
 	SuccessfulAttachVolume               = "SuccessfulAttachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
-	InsufficientFreeCPU                  = "InsufficientFreeCPU"
-	InsufficientFreeMemory               = "InsufficientFreeMemory"
 	NodeRebooted                         = "Rebooted"
 	ContainerGCFailed                    = "ContainerGCFailed"
 	ImageGCFailed                        = "ImageGCFailed"
