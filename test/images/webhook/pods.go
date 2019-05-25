@@ -128,7 +128,7 @@ func denySpecificAttachment(ar v1beta1.AdmissionReview) *v1beta1.AdmissionRespon
 		klog.Error(err)
 		return toAdmissionResponse(err)
 	}
-	klog.V(2).Info(fmt.Sprintf("podAttachOptions=%#v\n", podAttachOptions))
+	klog.V(2).Infof(fmt.Sprintf("podAttachOptions=%#v\n", podAttachOptions))
 	if !podAttachOptions.Stdin || podAttachOptions.Container != "container1" {
 		return &v1beta1.AdmissionResponse{Allowed: true}
 	}

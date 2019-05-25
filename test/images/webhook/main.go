@@ -60,7 +60,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 		return
 	}
 
-	klog.V(2).Info(fmt.Sprintf("handling request: %s", body))
+	klog.V(2).Infof(fmt.Sprintf("handling request: %s", body))
 
 	// The AdmissionReview that was sent to the webhook
 	requestedAdmissionReview := v1beta1.AdmissionReview{}
@@ -80,7 +80,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	// Return the same UID
 	responseAdmissionReview.Response.UID = requestedAdmissionReview.Request.UID
 
-	klog.V(2).Info(fmt.Sprintf("sending response: %v", responseAdmissionReview.Response))
+	klog.V(2).Infof(fmt.Sprintf("sending response: %v", responseAdmissionReview.Response))
 
 	respBytes, err := json.Marshal(responseAdmissionReview)
 	if err != nil {

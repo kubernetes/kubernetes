@@ -114,7 +114,7 @@ func serve(w http.ResponseWriter, r *http.Request, convert convertFunc) {
 		convertReview.Response = doConversion(convertReview.Request, convert)
 		convertReview.Response.UID = convertReview.Request.UID
 	}
-	klog.V(2).Info(fmt.Sprintf("sending response: %v", convertReview.Response))
+	klog.V(2).Infof(fmt.Sprintf("sending response: %v", convertReview.Response))
 
 	// reset the request, it is not needed in a response.
 	convertReview.Request = &v1beta1.ConversionRequest{}
