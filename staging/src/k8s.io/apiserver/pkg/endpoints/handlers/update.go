@@ -124,9 +124,11 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		var labels map[string]string
 		accessor, err := meta.Accessor(obj)
-		if err == nil {
-			labels = accessor.GetLabels()
+		if err != nil {
+			scope.err(errors.NewInternalError(err), w, req)
+			return
 		}
+		labels = accessor.GetLabels()
 
 		userInfo, _ := request.UserFrom(ctx)
 		transformers := []rest.TransformFunc{}

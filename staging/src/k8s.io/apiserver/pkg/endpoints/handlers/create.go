@@ -133,6 +133,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		var labels map[string]string
 		accessor, err := meta.Accessor(obj)
+		// As of May 24, 2019, the only obj that does not implement the
+		// Object interface is extensions/v1beta1/deployement/rollback,
+		// which is deprecated:
+		// https://github.com/kubernetes/kubernetes/blob/01a5ec3d3d8f0b1aaa05845d34a8684f32a2b8b0/pkg/apis/apps/types.go#L332
 		if err == nil {
 			labels = accessor.GetLabels()
 		}
