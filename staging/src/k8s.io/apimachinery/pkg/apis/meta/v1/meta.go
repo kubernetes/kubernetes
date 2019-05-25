@@ -115,8 +115,20 @@ func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink 
 func (meta *ListMeta) SetSelfLink(selfLink string)       { meta.SelfLink = selfLink }
 func (meta *ListMeta) GetContinue() string               { return meta.Continue }
 func (meta *ListMeta) SetContinue(c string)              { meta.Continue = c }
-func (meta *ListMeta) GetRemainingItemCount() int64      { return meta.RemainingItemCount }
-func (meta *ListMeta) SetRemainingItemCount(c int64)     { meta.RemainingItemCount = c }
+
+func (meta *ListMeta) GetRemainingItemCount() int64 {
+	if meta.RemainingItemCount != nil {
+		return *meta.RemainingItemCount
+	}
+	return 0
+}
+
+func (meta *ListMeta) SetRemainingItemCount(c int64) {
+	if meta.RemainingItemCount == nil {
+		meta.RemainingItemCount = new(int64)
+	}
+	*meta.RemainingItemCount = c
+}
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 

@@ -1062,7 +1062,7 @@ func TestList(t *testing.T) {
 			t.Errorf("(%s): length of list want=%d, got=%d", tt.name, len(tt.expectedOut), len(out.Items))
 			continue
 		}
-		if e, a := tt.expectedRemainingItemCount, out.ListMeta.RemainingItemCount; e != a {
+		if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); e != a {
 			t.Errorf("(%s): remainingItemCount want=%d, got=%d", tt.name, e, a)
 		}
 		for j, wantPod := range tt.expectedOut {
