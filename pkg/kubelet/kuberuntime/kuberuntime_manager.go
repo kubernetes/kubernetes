@@ -500,10 +500,16 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		}
 		return changes
 	}
-
+	allContainerStatusRunning := true
+	for _, container := range pod.Spec.Containers {
+		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+			allContainerStatusRunning = false
+		}
+	}
 	// Check initialization progress.
 	initLastStatus, next, done := findNextInitContainerToRun(pod, podStatus)
-	if !done {
+	if !done && !allContainerStatusRunning {
 		if next != nil {
 			initFailed := initLastStatus != nil && isContainerFailed(initLastStatus)
 			if initFailed && !shouldRestartOnFailure(pod) {

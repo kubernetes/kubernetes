@@ -1047,6 +1047,39 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
 		},
+		"next init container to run status is nil and all container's status is running; do nothing": {
+			mutatePodFn: func(pod *v1.Pod) { pod.Spec.RestartPolicy = v1.RestartPolicyAlways },
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.ContainerStatuses = []*kubecontainer.ContainerStatus{
+					{
+						ID:   kubecontainer.ContainerID{ID: "initid1"},
+						Name: "init1", State: kubecontainer.ContainerStateExited,
+						Hash: kubecontainer.HashContainer(&basePod.Spec.InitContainers[0]),
+					},
+					{
+						ID:   kubecontainer.ContainerID{ID: "initid2"},
+						Name: "init2", State: kubecontainer.ContainerStateExited,
+						Hash: kubecontainer.HashContainer(&basePod.Spec.InitContainers[1]),
+					},
+					{
+						ID:   kubecontainer.ContainerID{ID: "id1"},
+						Name: "foo1", State: kubecontainer.ContainerStateRunning,
+						Hash: kubecontainer.HashContainer(&basePod.Spec.Containers[0]),
+					},
+					{
+						ID:   kubecontainer.ContainerID{ID: "id2"},
+						Name: "foo2", State: kubecontainer.ContainerStateRunning,
+						Hash: kubecontainer.HashContainer(&basePod.Spec.Containers[1]),
+					},
+					{
+						ID:   kubecontainer.ContainerID{ID: "id3"},
+						Name: "foo3", State: kubecontainer.ContainerStateRunning,
+						Hash: kubecontainer.HashContainer(&basePod.Spec.Containers[2]),
+					},
+				}
+			},
+			actions: noAction,
+		},
 	} {
 		pod, status := makeBasePodAndStatusWithInitContainers()
 		if test.mutatePodFn != nil {
