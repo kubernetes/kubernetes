@@ -267,7 +267,8 @@ type HealthzServer struct {
 	nodeRef       *v1.ObjectReference
 
 	lastUpdated atomic.Value
-	apiLastUpdated atomic.Value
+	endpointsLastUpdated atomic.Value
+	servicesLastUpdated atomic.Value
 }
 
 // NewDefaultHealthzServer returns a default healthz http server.
@@ -301,9 +302,36 @@ func (hs *HealthzServer) UpdateTimestamp() {
 	hs.lastUpdated.Store(hs.clock.Now())
 }
 
-// UpdateTimestamp updates the lastUpdated timestamp.
-func (hs *HealthzServer) UpdateAPITimestamp() {
-	hs.apiLastUpdated.Store(hs.clock.Now())
+func (hs *HealthzServer) OnEndpointsAdd(endpoints *v1.Endpoints) {
+	hs.endpointsLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
+	hs.endpointsLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnEndpointsDelete(endpoints *v1.Endpoints) {
+	hs.endpointsLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnEndpointsSynced() {
+	hs.endpointsLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnServiceUpdate(oldService, service *v1.Service)
+	hs.servicesLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnServiceDelete(service *v1.Service) {
+	hs.servicesLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnServiceDelete(service *v1.Service) {
+	hs.servicesLastUpdated.Store(hs.clock.Now())
+}
+
+func (hs *HealthzServer) OnServiceSynced() {
+	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
 // Run starts the healthz http server and returns.
@@ -349,13 +377,17 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	currentTime := h.hs.clock.Now()
 
 	resp.Header().Set("Content-Type", "application/json")
+	//do we want to flags or different timeouts for endpoint/service last updated?
+	//differnt headers could actually come from headers in query or config.
 	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else if !apiLastUpdated.IsZero() && currentTime.After(apiLastUpdated.Add(h.hs.healthTimeout)) {
-		//could hide this behidn a config flag users have to turn on. Also different timeout period?
+	} else if !endpointsLastUpdated.IsZero() && currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
+		resp.WriteHeader(http.StatusServiceUnavailable)
+	} else if !servicesLastUpdated.IsZero() && currentTime.After(servicesLastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "apiLastUpdate": %q, "currentTime": %q}`, lastUpdated, apiLastUpdated, currentTime))
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "apiLastUpdate": %q, "currentTime": %q}`, 
+								  lastUpdated, apiLastUpdated, currentTime))
 }
