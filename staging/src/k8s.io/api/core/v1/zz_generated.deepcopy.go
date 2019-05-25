@@ -485,7 +485,7 @@ func (in *ComponentStatus) DeepCopyObject() runtime.Object {
 func (in *ComponentStatusList) DeepCopyInto(out *ComponentStatusList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ComponentStatus, len(*in))
@@ -610,7 +610,7 @@ func (in *ConfigMapKeySelector) DeepCopy() *ConfigMapKeySelector {
 func (in *ConfigMapList) DeepCopyInto(out *ConfigMapList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ConfigMap, len(*in))
@@ -1166,7 +1166,7 @@ func (in *Endpoints) DeepCopyObject() runtime.Object {
 func (in *EndpointsList) DeepCopyInto(out *EndpointsList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Endpoints, len(*in))
@@ -1323,7 +1323,7 @@ func (in *Event) DeepCopyObject() runtime.Object {
 func (in *EventList) DeepCopyInto(out *EventList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Event, len(*in))
@@ -1880,7 +1880,7 @@ func (in *LimitRangeItem) DeepCopy() *LimitRangeItem {
 func (in *LimitRangeList) DeepCopyInto(out *LimitRangeList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]LimitRange, len(*in))
@@ -1936,7 +1936,7 @@ func (in *LimitRangeSpec) DeepCopy() *LimitRangeSpec {
 func (in *List) DeepCopyInto(out *List) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]runtime.RawExtension, len(*in))
@@ -2087,7 +2087,7 @@ func (in *Namespace) DeepCopyObject() runtime.Object {
 func (in *NamespaceList) DeepCopyInto(out *NamespaceList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Namespace, len(*in))
@@ -2316,7 +2316,7 @@ func (in *NodeDaemonEndpoints) DeepCopy() *NodeDaemonEndpoints {
 func (in *NodeList) DeepCopyInto(out *NodeList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Node, len(*in))
@@ -2695,7 +2695,7 @@ func (in *PersistentVolumeClaimCondition) DeepCopy() *PersistentVolumeClaimCondi
 func (in *PersistentVolumeClaimList) DeepCopyInto(out *PersistentVolumeClaimList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PersistentVolumeClaim, len(*in))
@@ -2821,7 +2821,7 @@ func (in *PersistentVolumeClaimVolumeSource) DeepCopy() *PersistentVolumeClaimVo
 func (in *PersistentVolumeList) DeepCopyInto(out *PersistentVolumeList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PersistentVolume, len(*in))
@@ -3302,7 +3302,7 @@ func (in *PodExecOptions) DeepCopyObject() runtime.Object {
 func (in *PodList) DeepCopyInto(out *PodList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Pod, len(*in))
@@ -3740,7 +3740,7 @@ func (in *PodTemplate) DeepCopyObject() runtime.Object {
 func (in *PodTemplateList) DeepCopyInto(out *PodTemplateList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PodTemplate, len(*in))
@@ -4052,7 +4052,7 @@ func (in *ReplicationControllerCondition) DeepCopy() *ReplicationControllerCondi
 func (in *ReplicationControllerList) DeepCopyInto(out *ReplicationControllerList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ReplicationController, len(*in))
@@ -4208,7 +4208,7 @@ func (in *ResourceQuota) DeepCopyObject() runtime.Object {
 func (in *ResourceQuotaList) DeepCopyInto(out *ResourceQuotaList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ResourceQuota, len(*in))
@@ -4528,7 +4528,7 @@ func (in *SecretKeySelector) DeepCopy() *SecretKeySelector {
 func (in *SecretList) DeepCopyInto(out *SecretList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Secret, len(*in))
@@ -4800,7 +4800,7 @@ func (in *ServiceAccount) DeepCopyObject() runtime.Object {
 func (in *ServiceAccountList) DeepCopyInto(out *ServiceAccountList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ServiceAccount, len(*in))
@@ -4854,7 +4854,7 @@ func (in *ServiceAccountTokenProjection) DeepCopy() *ServiceAccountTokenProjecti
 func (in *ServiceList) DeepCopyInto(out *ServiceList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Service, len(*in))
