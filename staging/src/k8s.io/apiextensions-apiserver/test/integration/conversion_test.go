@@ -160,7 +160,7 @@ func TestWebhookConverter(t *testing.T) {
 			for i, checkFn := range test.checks {
 				name := fmt.Sprintf("check-%d", i)
 				t.Run(name, func(t *testing.T) {
-					ctc.setAndWaitStorageVersion(t, "v1beta2")
+					defer ctc.setAndWaitStorageVersion(t, "v1beta2")
 					ctc.namespace = fmt.Sprintf("webhook-conversion-%s-%s", test.group, name)
 					checkFn(t, ctc)
 				})
