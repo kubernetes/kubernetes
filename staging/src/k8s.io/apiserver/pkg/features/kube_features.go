@@ -94,6 +94,7 @@ const (
 
 	// owner: @caesarxuchao
 	// alpha: v1.14
+	// beta: v1.15
 	//
 	// Allow apiservers to expose the storage version hash in the discovery
 	// document.
@@ -141,7 +142,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	DryRun:                  {Default: true, PreRelease: featuregate.Beta},
 	ServerSideApply:         {Default: false, PreRelease: featuregate.Alpha},
-	StorageVersionHash:      {Default: false, PreRelease: featuregate.Alpha},
+	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
 	WatchBookmark:           {Default: false, PreRelease: featuregate.Alpha},
