@@ -318,11 +318,11 @@ func (hs *HealthzServer) OnEndpointsSynced() {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
-func (hs *HealthzServer) OnServiceUpdate(oldService, service *v1.Service) {
+func (hs *HealthzServer) OnServiceAdd(service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
-func (hs *HealthzServer) OnServiceDelete(service *v1.Service) {
+func (hs *HealthzServer) OnServiceUpdate(oldService, service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
