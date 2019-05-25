@@ -163,21 +163,21 @@ func defaultString(val, defVal string) string {
 
 // loadConfig loads configuration data from a file on disk
 func loadConfig(configName string) (map[string]string, error) {
-	klog.V(4).Info(log("loading config file %s", configName))
+	klog.V(4).Infof(log("loading config file %s", configName))
 	file, err := os.Open(configName)
 	if err != nil {
-		klog.Error(log("failed to open config file %s: %v", configName, err))
+		klog.Errorf(log("failed to open config file %s: %v", configName, err))
 		return nil, err
 	}
 	defer file.Close()
 	data := map[string]string{}
 	if err := gob.NewDecoder(file).Decode(&data); err != nil {
-		klog.Error(log("failed to parse config data %s: %v", configName, err))
+		klog.Errorf(log("failed to parse config data %s: %v", configName, err))
 		return nil, err
 	}
 	applyConfigDefaults(data)
 	if err := validateConfigs(data); err != nil {
-		klog.Error(log("failed to load ConfigMap %s: %v", err))
+		klog.Errorf(log("failed to load ConfigMap %s: %v", err))
 		return nil, err
 	}
 
@@ -186,31 +186,31 @@ func loadConfig(configName string) (map[string]string, error) {
 
 // saveConfig saves the configuration data to local disk
 func saveConfig(configName string, data map[string]string) error {
-	klog.V(4).Info(log("saving config file %s", configName))
+	klog.V(4).Infof(log("saving config file %s", configName))
 
 	dir := path.Dir(configName)
 	if _, err := os.Stat(dir); err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		klog.V(4).Info(log("creating config dir for config data: %s", dir))
+		klog.V(4).Infof(log("creating config dir for config data: %s", dir))
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			klog.Error(log("failed to create config data dir %v", err))
+			klog.Errorf(log("failed to create config data dir %v", err))
 			return err
 		}
 	}
 
 	file, err := os.Create(configName)
 	if err != nil {
-		klog.V(4).Info(log("failed to save config data file %s: %v", configName, err))
+		klog.V(4).Infof(log("failed to save config data file %s: %v", configName, err))
 		return err
 	}
 	defer file.Close()
 	if err := gob.NewEncoder(file).Encode(data); err != nil {
-		klog.Error(log("failed to save config %s: %v", configName, err))
+		klog.Errorf(log("failed to save config %s: %v", configName, err))
 		return err
 	}
-	klog.V(4).Info(log("config data file saved successfully as %s", configName))
+	klog.V(4).Infof(log("config data file saved successfully as %s", configName))
 	return nil
 }
 
@@ -221,7 +221,7 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	kubeClient := plug.host.GetKubeClient()
 	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
 	if err != nil {
-		klog.Error(log("failed to get secret: %v", err))
+		klog.Errorf(log("failed to get secret: %v", err))
 		return secretNotFoundErr
 	}
 	// merge secret data
@@ -251,11 +251,11 @@ func getSdcGUIDLabel(plug *sioPlugin) (string, error) {
 	}
 	label, ok := nodeLabels[sdcGUIDLabelName]
 	if !ok {
-		klog.V(4).Info(log("node label %s not found", sdcGUIDLabelName))
+		klog.V(4).Infof(log("node label %s not found", sdcGUIDLabelName))
 		return "", nil
 	}
 
-	klog.V(4).Info(log("found node label %s=%s", sdcGUIDLabelName, label))
+	klog.V(4).Infof(log("found node label %s=%s", sdcGUIDLabelName, label))
 	return label, nil
 }
 

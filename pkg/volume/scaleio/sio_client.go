@@ -96,7 +96,7 @@ func newSioClient(gateway, username, password string, sslEnabled bool, exec moun
 	}
 	r, err := regexp.Compile(`^emc-vol-\w*-\w*$`)
 	if err != nil {
-		klog.Error(log("failed to compile regex: %v", err))
+		klog.Errorf(log("failed to compile regex: %v", err))
 		return nil, err
 	}
 	client.diskRegex = r
@@ -115,7 +115,7 @@ func (c *sioClient) init() error {
 	klog.V(4).Infoln(log("initializing scaleio client"))
 	client, err := sio.NewClientWithArgs(c.gateway, "", c.insecure, c.certsEnabled)
 	if err != nil {
-		klog.Error(log("failed to create client: %v", err))
+		klog.Errorf(log("failed to create client: %v", err))
 		return err
 	}
 	c.client = client
@@ -126,24 +126,24 @@ func (c *sioClient) init() error {
 			Username: c.username,
 			Password: c.password},
 	); err != nil {
-		klog.Error(log("client authentication failed: %v", err))
+		klog.Errorf(log("client authentication failed: %v", err))
 		return err
 	}
 
 	// retrieve system
 	if c.system, err = c.findSystem(c.sysName); err != nil {
-		klog.Error(log("unable to find system %s: %v", c.sysName, err))
+		klog.Errorf(log("unable to find system %s: %v", c.sysName, err))
 		return err
 	}
 
 	// retrieve protection domain
 	if c.protectionDomain, err = c.findProtectionDomain(c.pdName); err != nil {
-		klog.Error(log("unable to find protection domain %s: %v", c.protectionDomain, err))
+		klog.Errorf(log("unable to find protection domain %s: %v", c.protectionDomain, err))
 		return err
 	}
 	// retrieve storage pool
 	if c.storagePool, err = c.findStoragePool(c.spName); err != nil {
-		klog.Error(log("unable to find storage pool %s: %v", c.storagePool, err))
+		klog.Errorf(log("unable to find storage pool %s: %v", c.storagePool, err))
 		return err
 	}
 	c.inited = true
@@ -156,7 +156,7 @@ func (c *sioClient) Volumes() ([]*siotypes.Volume, error) {
 	}
 	vols, err := c.getVolumes()
 	if err != nil {
-		klog.Error(log("failed to retrieve volumes: %v", err))
+		klog.Errorf(log("failed to retrieve volumes: %v", err))
 		return nil, err
 	}
 	return vols, nil
@@ -169,12 +169,12 @@ func (c *sioClient) Volume(id sioVolumeID) (*siotypes.Volume, error) {
 
 	vols, err := c.getVolumesByID(id)
 	if err != nil {
-		klog.Error(log("failed to retrieve volume by id: %v", err))
+		klog.Errorf(log("failed to retrieve volume by id: %v", err))
 		return nil, err
 	}
 	vol := vols[0]
 	if vol == nil {
-		klog.V(4).Info(log("volume not found, id %s", id))
+		klog.V(4).Infof(log("volume not found, id %s", id))
 		return nil, errors.New("volume not found")
 	}
 	return vol, nil
@@ -185,20 +185,20 @@ func (c *sioClient) FindVolume(name string) (*siotypes.Volume, error) {
 		return nil, err
 	}
 
-	klog.V(4).Info(log("searching for volume %s", name))
+	klog.V(4).Infof(log("searching for volume %s", name))
 	volumes, err := c.getVolumesByName(name)
 	if err != nil {
-		klog.Error(log("failed to find volume by name %v", err))
+		klog.Errorf(log("failed to find volume by name %v", err))
 		return nil, err
 	}
 
 	for _, volume := range volumes {
 		if volume.Name == name {
-			klog.V(4).Info(log("found volume %s", name))
+			klog.V(4).Infof(log("found volume %s", name))
 			return volume, nil
 		}
 	}
-	klog.V(4).Info(log("volume not found, name %s", name))
+	klog.V(4).Infof(log("volume not found, name %s", name))
 	return nil, errors.New("volume not found")
 }
 
@@ -214,7 +214,7 @@ func (c *sioClient) CreateVolume(name string, sizeGB int64) (*siotypes.Volume, e
 	}
 	createResponse, err := c.client.CreateVolume(params, c.storagePool.Name)
 	if err != nil {
-		klog.Error(log("failed to create volume %s: %v", name, err))
+		klog.Errorf(log("failed to create volume %s: %v", name, err))
 		return nil, err
 	}
 	return c.Volume(sioVolumeID(createResponse.ID))
@@ -224,13 +224,13 @@ func (c *sioClient) CreateVolume(name string, sizeGB int64) (*siotypes.Volume, e
 // is true, ScaleIO will allow other SDC to map to that volume.
 func (c *sioClient) AttachVolume(id sioVolumeID, multipleMappings bool) error {
 	if err := c.init(); err != nil {
-		klog.Error(log("failed to init'd client in attach volume: %v", err))
+		klog.Errorf(log("failed to init'd client in attach volume: %v", err))
 		return err
 	}
 
 	iid, err := c.IID()
 	if err != nil {
-		klog.Error(log("failed to get instanceIID for attach volume: %v", err))
+		klog.Errorf(log("failed to get instanceIID for attach volume: %v", err))
 		return err
 	}
 
@@ -243,11 +243,11 @@ func (c *sioClient) AttachVolume(id sioVolumeID, multipleMappings bool) error {
 	volClient.Volume = &siotypes.Volume{ID: string(id)}
 
 	if err := volClient.MapVolumeSdc(params); err != nil {
-		klog.Error(log("failed to attach volume id %s: %v", id, err))
+		klog.Errorf(log("failed to attach volume id %s: %v", id, err))
 		return err
 	}
 
-	klog.V(4).Info(log("volume %s attached successfully", id))
+	klog.V(4).Infof(log("volume %s attached successfully", id))
 	return nil
 }
 
@@ -306,11 +306,11 @@ func (c *sioClient) IID() (string, error) {
 		}
 		sdc, err := c.sysClient.FindSdc("SdcGUID", guid)
 		if err != nil {
-			klog.Error(log("failed to retrieve sdc info %s", err))
+			klog.Errorf(log("failed to retrieve sdc info %s", err))
 			return "", err
 		}
 		c.instanceID = sdc.Sdc.ID
-		klog.V(4).Info(log("retrieved instanceID %s", c.instanceID))
+		klog.V(4).Infof(log("retrieved instanceID %s", c.instanceID))
 	}
 	return c.instanceID, nil
 }
@@ -323,7 +323,7 @@ func (c *sioClient) getGUID() (string, error) {
 		cmd := c.getSdcCmd()
 		output, err := c.exec.Run(cmd, "--query_guid")
 		if err != nil {
-			klog.Error(log("drv_cfg --query_guid failed: %v", err))
+			klog.Errorf(log("drv_cfg --query_guid failed: %v", err))
 			return "", err
 		}
 		c.sdcGUID = strings.TrimSpace(string(output))
@@ -342,7 +342,7 @@ func (c *sioClient) getSioDiskPaths() ([]os.FileInfo, error) {
 			// sioDiskIDPath may not exist yet which is fine
 			return []os.FileInfo{}, nil
 		}
-		klog.Error(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
+		klog.Errorf(log("failed to ReadDir %s: %v", sioDiskIDPath, err))
 		return nil, err
 
 	}
@@ -390,7 +390,7 @@ func (c *sioClient) Devs() (map[string]string, error) {
 		volumeID := parts[3]
 		devPath, err := filepath.EvalSymlinks(fmt.Sprintf("%s/%s", sioDiskIDPath, f.Name()))
 		if err != nil {
-			klog.Error(log("devicepath-to-volID mapping error: %v", err))
+			klog.Errorf(log("devicepath-to-volID mapping error: %v", err))
 			return nil, err
 		}
 		// map volumeID to devicePath
@@ -416,18 +416,18 @@ func (c *sioClient) WaitForAttachedDevice(token string) (string, error) {
 		case <-ticker.C:
 			devMap, err := c.Devs()
 			if err != nil {
-				klog.Error(log("failed while waiting for volume to attach: %v", err))
+				klog.Errorf(log("failed while waiting for volume to attach: %v", err))
 				return "", err
 			}
 			go func() {
-				klog.V(4).Info(log("waiting for volume %s to be mapped/attached", token))
+				klog.V(4).Infof(log("waiting for volume %s to be mapped/attached", token))
 			}()
 			if path, ok := devMap[token]; ok {
-				klog.V(4).Info(log("device %s mapped to vol %s", path, token))
+				klog.V(4).Infof(log("device %s mapped to vol %s", path, token))
 				return path, nil
 			}
 		case <-timer.C:
-			klog.Error(log("timed out while waiting for volume to be mapped to a device"))
+			klog.Errorf(log("timed out while waiting for volume to be mapped to a device"))
 			return "", fmt.Errorf("volume attach timeout")
 		}
 	}
@@ -450,18 +450,18 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 		case <-ticker.C:
 			devMap, err := c.Devs()
 			if err != nil {
-				klog.Error(log("failed while waiting for volume to unmap/detach: %v", err))
+				klog.Errorf(log("failed while waiting for volume to unmap/detach: %v", err))
 				return err
 			}
 			go func() {
-				klog.V(4).Info(log("waiting for volume %s to be unmapped/detached", token))
+				klog.V(4).Infof(log("waiting for volume %s to be unmapped/detached", token))
 			}()
 			// cant find vol id, then ok.
 			if _, ok := devMap[token]; !ok {
 				return nil
 			}
 		case <-timer.C:
-			klog.Error(log("timed out while waiting for volume %s to be unmapped/detached", token))
+			klog.Errorf(log("timed out while waiting for volume %s to be unmapped/detached", token))
 			return fmt.Errorf("volume detach timeout")
 		}
 	}
@@ -476,7 +476,7 @@ func (c *sioClient) findSystem(sysname string) (sys *siotypes.System, err error)
 	}
 	systems, err := c.client.GetInstance("")
 	if err != nil {
-		klog.Error(log("failed to retrieve instances: %v", err))
+		klog.Errorf(log("failed to retrieve instances: %v", err))
 		return nil, err
 	}
 	for _, sys = range systems {
@@ -484,7 +484,7 @@ func (c *sioClient) findSystem(sysname string) (sys *siotypes.System, err error)
 			return sys, nil
 		}
 	}
-	klog.Error(log("system %s not found", sysname))
+	klog.Errorf(log("system %s not found", sysname))
 	return nil, errors.New("system not found")
 }
 
@@ -493,13 +493,13 @@ func (c *sioClient) findProtectionDomain(pdname string) (*siotypes.ProtectionDom
 	if c.sysClient != nil {
 		protectionDomain, err := c.sysClient.FindProtectionDomain("", pdname, "")
 		if err != nil {
-			klog.Error(log("failed to retrieve protection domains: %v", err))
+			klog.Errorf(log("failed to retrieve protection domains: %v", err))
 			return nil, err
 		}
 		c.pdClient.ProtectionDomain = protectionDomain
 		return protectionDomain, nil
 	}
-	klog.Error(log("protection domain %s not set", pdname))
+	klog.Errorf(log("protection domain %s not set", pdname))
 	return nil, errors.New("protection domain not set")
 }
 
@@ -508,13 +508,13 @@ func (c *sioClient) findStoragePool(spname string) (*siotypes.StoragePool, error
 	if c.pdClient != nil {
 		sp, err := c.pdClient.FindStoragePool("", spname, "")
 		if err != nil {
-			klog.Error(log("failed to retrieve storage pool: %v", err))
+			klog.Errorf(log("failed to retrieve storage pool: %v", err))
 			return nil, err
 		}
 		c.spClient.StoragePool = sp
 		return sp, nil
 	}
-	klog.Error(log("storage pool %s not set", spname))
+	klog.Errorf(log("storage pool %s not set", spname))
 	return nil, errors.New("storage pool not set")
 }
 

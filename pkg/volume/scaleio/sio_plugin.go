@@ -112,7 +112,7 @@ func (p *sioPlugin) NewMounter(
 
 // NewUnmounter creates a representation of the volume to unmount
 func (p *sioPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
-	klog.V(4).Info(log("Unmounter for %s", specName))
+	klog.V(4).Infof(log("Unmounter for %s", specName))
 
 	return &sioVolume{
 		podUID:      podUID,
@@ -165,7 +165,7 @@ var _ volume.DeletableVolumePlugin = &sioPlugin{}
 func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	attribs, err := getVolumeSourceAttribs(spec)
 	if err != nil {
-		klog.Error(log("deleter failed to extract volume attributes from spec: %v", err))
+		klog.Errorf(log("deleter failed to extract volume attributes from spec: %v", err))
 		return nil, err
 	}
 

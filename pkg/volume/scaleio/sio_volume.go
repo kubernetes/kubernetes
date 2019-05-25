@@ -86,20 +86,20 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
-	klog.V(4).Info(log("setting up volume for PV.spec %s", v.volSpecName))
+	klog.V(4).Infof(log("setting up volume for PV.spec %s", v.volSpecName))
 	if err := v.setSioMgr(); err != nil {
-		klog.Error(log("setup failed to create scalio manager: %v", err))
+		klog.Errorf(log("setup failed to create scalio manager: %v", err))
 		return err
 	}
 
 	mounter := v.plugin.host.GetMounter(v.plugin.GetPluginName())
 	notDevMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Error(log("IsLikelyNotMountPoint test failed for dir %v", dir))
+		klog.Errorf(log("IsLikelyNotMountPoint test failed for dir %v", dir))
 		return err
 	}
 	if !notDevMnt {
-		klog.V(4).Info(log("skipping setup, dir %s already a mount point", v.volName))
+		klog.V(4).Infof(log("skipping setup, dir %s already a mount point", v.volName))
 		return nil
 	}
 
@@ -115,12 +115,12 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 			}
 		}
 	}
-	klog.V(4).Info(log("multiple mapping enabled = %v", enableMultiMaps))
+	klog.V(4).Infof(log("multiple mapping enabled = %v", enableMultiMaps))
 
 	volName := v.volName
 	devicePath, err := v.sioMgr.AttachVolume(volName, enableMultiMaps)
 	if err != nil {
-		klog.Error(log("setup of volume %v:  %v", v.volSpecName, err))
+		klog.Errorf(log("setup of volume %v:  %v", v.volSpecName, err))
 		return err
 	}
 	options := []string{}
@@ -135,31 +135,31 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 		options = append(options, "ro")
 	}
 
-	klog.V(4).Info(log("mounting device  %s -> %s", devicePath, dir))
+	klog.V(4).Infof(log("mounting device  %s -> %s", devicePath, dir))
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.Error(log("failed to create dir %#v:  %v", dir, err))
+		klog.Errorf(log("failed to create dir %#v:  %v", dir, err))
 		return err
 	}
-	klog.V(4).Info(log("setup created mount point directory %s", dir))
+	klog.V(4).Infof(log("setup created mount point directory %s", dir))
 
 	diskMounter := util.NewSafeFormatAndMountFromHost(v.plugin.GetPluginName(), v.plugin.host)
 	err = diskMounter.FormatAndMount(devicePath, dir, v.fsType, options)
 
 	if err != nil {
-		klog.Error(log("mount operation failed during setup: %v", err))
+		klog.Errorf(log("mount operation failed during setup: %v", err))
 		if err := os.Remove(dir); err != nil && !os.IsNotExist(err) {
-			klog.Error(log("failed to remove dir %s during a failed mount at setup: %v", dir, err))
+			klog.Errorf(log("failed to remove dir %s during a failed mount at setup: %v", dir, err))
 			return err
 		}
 		return err
 	}
 
 	if !v.readOnly && fsGroup != nil {
-		klog.V(4).Info(log("applying  value FSGroup ownership"))
+		klog.V(4).Info(log("applying value FSGroup ownership"))
 		volume.SetVolumeOwnership(v, fsGroup)
 	}
 
-	klog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
+	klog.V(4).Infof(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
 	return nil
 }
 
@@ -193,17 +193,17 @@ func (v *sioVolume) TearDownAt(dir string) error {
 		return err
 	}
 
-	klog.V(4).Info(log("attempting to unmount %s", dir))
+	klog.V(4).Infof(log("attempting to unmount %s", dir))
 	if err := mount.CleanupMountPoint(dir, mounter, false); err != nil {
-		klog.Error(log("teardown failed while unmounting dir %s: %v ", dir, err))
+		klog.Errorf(log("teardown failed while unmounting dir %s: %v ", dir, err))
 		return err
 	}
-	klog.V(4).Info(log("dir %s unmounted successfully", dir))
+	klog.V(4).Infof(log("dir %s unmounted successfully", dir))
 
 	// detach/unmap
 	deviceBusy, err := mounter.DeviceOpened(dev)
 	if err != nil {
-		klog.Error(log("teardown unable to get status for device %s: %v", dev, err))
+		klog.Errorf(log("teardown unable to get status for device %s: %v", dev, err))
 		return err
 	}
 
@@ -211,13 +211,13 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	// use "last attempt wins" strategy to detach volume from node
 	// only allow volume to detach when it is not busy (not being used by other pods)
 	if !deviceBusy {
-		klog.V(4).Info(log("teardown is attempting to detach/unmap volume for PV %s", v.volSpecName))
+		klog.V(4).Infof(log("teardown is attempting to detach/unmap volume for PV %s", v.volSpecName))
 		if err := v.resetSioMgr(); err != nil {
-			klog.Error(log("teardown failed, unable to reset scalio mgr: %v", err))
+			klog.Errorf(log("teardown failed, unable to reset scalio mgr: %v", err))
 		}
 		volName := v.volName
 		if err := v.sioMgr.DetachVolume(volName); err != nil {
-			klog.Warning(log("warning: detaching failed for volume %s:  %v", volName, err))
+			klog.Warningf(log("warning: detaching failed for volume %s:  %v", volName, err))
 			return nil
 		}
 		klog.V(4).Infof(log("teardown of volume %v detached successfully", volName))
@@ -231,20 +231,20 @@ func (v *sioVolume) TearDownAt(dir string) error {
 var _ volume.Deleter = &sioVolume{}
 
 func (v *sioVolume) Delete() error {
-	klog.V(4).Info(log("deleting pvc %s", v.volSpecName))
+	klog.V(4).Infof(log("deleting pvc %s", v.volSpecName))
 
 	if err := v.setSioMgrFromSpec(); err != nil {
-		klog.Error(log("delete failed while setting sio manager: %v", err))
+		klog.Errorf(log("delete failed while setting sio manager: %v", err))
 		return err
 	}
 
 	err := v.sioMgr.DeleteVolume(v.volName)
 	if err != nil {
-		klog.Error(log("failed to delete volume %s: %v", v.volName, err))
+		klog.Errorf(log("failed to delete volume %s: %v", v.volName, err))
 		return err
 	}
 
-	klog.V(4).Info(log("successfully deleted PV %s with volume %s", v.volSpecName, v.volName))
+	klog.V(4).Infof(log("successfully deleted PV %s with volume %s", v.volSpecName, v.volName))
 	return nil
 }
 
@@ -254,7 +254,7 @@ func (v *sioVolume) Delete() error {
 var _ volume.Provisioner = &sioVolume{}
 
 func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.TopologySelectorTerm) (*api.PersistentVolume, error) {
-	klog.V(4).Info(log("attempting to dynamically provision pvc %v", v.options.PVC.Name))
+	klog.V(4).Infof(log("attempting to dynamically provision pvc %v", v.options.PVC.Name))
 
 	if !util.AccessModesContainedInAll(v.plugin.GetAccessModes(), v.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", v.options.PVC.Spec.AccessModes, v.plugin.GetAccessModes())
@@ -280,13 +280,13 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 	if volSizeBytes < eightGig {
 		eightGiBCapacity := resource.NewQuantity(eightGig, resource.BinarySI)
 		volSizeGB = int64(volumehelpers.RoundUpToGiB(*eightGiBCapacity))
-		klog.V(4).Info(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGB))
+		klog.V(4).Infof(log("capacity less than 8Gi found, adjusted to %dGi", volSizeGB))
 
 	}
 
 	// create sio manager
 	if err := v.setSioMgrFromConfig(); err != nil {
-		klog.Error(log("provision failed while setting up sio mgr: %v", err))
+		klog.Errorf(log("provision failed while setting up sio mgr: %v", err))
 		return nil, err
 	}
 
@@ -294,7 +294,7 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 	volName := genName
 	vol, err := v.sioMgr.CreateVolume(volName, volSizeGB)
 	if err != nil {
-		klog.Error(log("provision failed while creating volume: %v", err))
+		klog.Errorf(log("provision failed while creating volume: %v", err))
 		return nil, err
 	}
 
@@ -350,21 +350,21 @@ func (v *sioVolume) Provision(selectedNode *api.Node, allowedTopologies []api.To
 		pv.Spec.AccessModes = v.plugin.GetAccessModes()
 	}
 
-	klog.V(4).Info(log("provisioner created pv %v and volume %s successfully", pvName, vol.Name))
+	klog.V(4).Infof(log("provisioner created pv %v and volume %s successfully", pvName, vol.Name))
 	return pv, nil
 }
 
 // setSioMgr creates scaleio mgr from cached config data if found
 // otherwise, setups new config data and create mgr
 func (v *sioVolume) setSioMgr() error {
-	klog.V(4).Info(log("setting up sio mgr for spec  %s", v.volSpecName))
+	klog.V(4).Infof(log("setting up sio mgr for spec %s", v.volSpecName))
 	podDir := v.plugin.host.GetPodPluginDir(v.podUID, sioPluginName)
 	configName := filepath.Join(podDir, sioConfigFileName)
 	if v.sioMgr == nil {
 		configData, err := loadConfig(configName) // try to load config if exist
 		if err != nil {
 			if !os.IsNotExist(err) {
-				klog.Error(log("failed to load config %s : %v", configName, err))
+				klog.Errorf(log("failed to load config %s : %v", configName, err))
 				return err
 			}
 			klog.V(4).Info(log("previous config file not found, creating new one"))
@@ -378,31 +378,31 @@ func (v *sioVolume) setSioMgr() error {
 			configData[confKey.volSpecName] = v.volSpecName
 
 			if err := validateConfigs(configData); err != nil {
-				klog.Error(log("config setup failed: %s", err))
+				klog.Errorf(log("config setup failed: %s", err))
 				return err
 			}
 
 			// persist config
 			if err := saveConfig(configName, configData); err != nil {
-				klog.Error(log("failed to save config data: %v", err))
+				klog.Errorf(log("failed to save config data: %v", err))
 				return err
 			}
 		}
 		// merge in secret
 		if err := attachSecret(v.plugin, v.secretNamespace, configData); err != nil {
-			klog.Error(log("failed to load secret: %v", err))
+			klog.Errorf(log("failed to load secret: %v", err))
 			return err
 		}
 
 		// merge in Sdc Guid label value
 		if err := attachSdcGUID(v.plugin, configData); err != nil {
-			klog.Error(log("failed to retrieve sdc guid: %v", err))
+			klog.Errorf(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
 		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
-			klog.Error(log("failed to reset sio manager: %v", err))
+			klog.Errorf(log("failed to reset sio manager: %v", err))
 			return err
 		}
 
@@ -419,7 +419,7 @@ func (v *sioVolume) resetSioMgr() error {
 		// load config data from disk
 		configData, err := loadConfig(configName)
 		if err != nil {
-			klog.Error(log("failed to load config data: %v", err))
+			klog.Errorf(log("failed to load config data: %v", err))
 			return err
 		}
 		v.secretName = configData[confKey.secretName]
@@ -429,20 +429,20 @@ func (v *sioVolume) resetSioMgr() error {
 
 		// attach secret
 		if err := attachSecret(v.plugin, v.secretNamespace, configData); err != nil {
-			klog.Error(log("failed to load secret: %v", err))
+			klog.Errorf(log("failed to load secret: %v", err))
 			return err
 		}
 
 		// merge in Sdc Guid label value
 		if err := attachSdcGUID(v.plugin, configData); err != nil {
-			klog.Error(log("failed to retrieve sdc guid: %v", err))
+			klog.Errorf(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
 
 		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
-			klog.Error(log("failed to reset scaleio mgr: %v", err))
+			klog.Errorf(log("failed to reset scaleio mgr: %v", err))
 			return err
 		}
 		v.sioMgr = mgr
@@ -460,7 +460,7 @@ func (v *sioVolume) setSioMgrFromConfig() error {
 		v.configData[confKey.volSpecName] = v.volSpecName
 
 		if err := validateConfigs(v.configData); err != nil {
-			klog.Error(log("config data setup failed: %s", err))
+			klog.Errorf(log("config data setup failed: %s", err))
 			return err
 		}
 
@@ -471,14 +471,14 @@ func (v *sioVolume) setSioMgrFromConfig() error {
 		}
 
 		if err := attachSecret(v.plugin, v.secretNamespace, data); err != nil {
-			klog.Error(log("failed to load secret: %v", err))
+			klog.Errorf(log("failed to load secret: %v", err))
 			return err
 		}
 
 		mgr, err := newSioMgr(data, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
-			klog.Error(log("failed while setting scaleio mgr from config: %v", err))
+			klog.Errorf(log("failed while setting scaleio mgr from config: %v", err))
 			return err
 		}
 		v.sioMgr = mgr
@@ -501,20 +501,20 @@ func (v *sioVolume) setSioMgrFromSpec() error {
 		configData[confKey.volSpecName] = v.volSpecName
 
 		if err := validateConfigs(configData); err != nil {
-			klog.Error(log("config setup failed: %s", err))
+			klog.Errorf(log("config setup failed: %s", err))
 			return err
 		}
 
 		// attach secret object to config data
 		if err := attachSecret(v.plugin, v.secretNamespace, configData); err != nil {
-			klog.Error(log("failed to load secret: %v", err))
+			klog.Errorf(log("failed to load secret: %v", err))
 			return err
 		}
 
 		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
-			klog.Error(log("failed to reset sio manager: %v", err))
+			klog.Errorf(log("failed to reset sio manager: %v", err))
 			return err
 		}
 		v.sioMgr = mgr
