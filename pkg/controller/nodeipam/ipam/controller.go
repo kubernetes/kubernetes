@@ -29,10 +29,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	"k8s.io/legacy-cloud-providers/gce"
 )
 
 // Config for the IPAM controller.

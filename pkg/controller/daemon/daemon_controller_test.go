@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -434,7 +434,7 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.Dae
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
 			if err != nil {
@@ -469,7 +469,7 @@ func markPodReady(pod *v1.Pod) {
 // DaemonSets without node selectors should launch pods on every node.
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -487,7 +487,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 // When ScheduleDaemonSetPods is enabled, DaemonSets without node selectors should
 // launch pods on every node by NodeAffinity.
 func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, true)()
 
 	nodeNum := 5
 	for _, strategy := range updateStrategies() {
@@ -564,7 +564,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 // of 10 pods, and verify that the ds doesn't make 100 create calls per sync pass
 func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -590,7 +590,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 
 func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		strategies := updateStrategies()
 		for _, strategy := range strategies {
 			ds := newDaemonSet("foo")
@@ -618,7 +618,7 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 
 func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -654,7 +654,7 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 // DaemonSets should do nothing if there aren't any nodes
 func TestNoNodesDoesNothing(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			manager, podControl, _, err := newTestController()
 			if err != nil {
@@ -672,7 +672,7 @@ func TestNoNodesDoesNothing(t *testing.T) {
 // single node cluster.
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -690,7 +690,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 // DaemonSets should place onto NotReady nodes
 func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -746,7 +746,7 @@ func allocatableResources(memory, cpu string) v1.ResourceList {
 
 // When ScheduleDaemonSetPods is disabled, DaemonSets should not place onto nodes with insufficient free resource
 func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 	for _, strategy := range updateStrategies() {
 		podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 		ds := newDaemonSet("foo")
@@ -777,7 +777,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 // DaemonSets should not unschedule a daemonset pod from a node with insufficient free resource
 func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 			podSpec.NodeName = "too-much-mem"
@@ -818,7 +818,7 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 // DaemonSets should only place onto nodes with sufficient free resource and matched node selector
 func TestInsufficientCapacityNodeSufficientCapacityWithNodeLabelDaemonLaunchPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		podSpec := resourcePodSpecWithoutNodeName("50M", "75m")
 		ds := newDaemonSet("foo")
 		ds.Spec.Template.Spec = podSpec
@@ -845,7 +845,7 @@ func TestInsufficientCapacityNodeSufficientCapacityWithNodeLabelDaemonLaunchPod(
 // When ScheduleDaemonSetPods is disabled, DaemonSetPods should launch onto node with terminated pods if there
 // are sufficient resources.
 func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 
 	validate := func(strategy *apps.DaemonSetUpdateStrategy, expectedEvents int) {
 		podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
@@ -888,7 +888,7 @@ func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 
 // When ScheduleDaemonSetPods is disabled, DaemonSets should place onto nodes with sufficient free resources.
 func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 
 	validate := func(strategy *apps.DaemonSetUpdateStrategy, expectedEvents int) {
 		podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
@@ -931,7 +931,7 @@ func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 // DaemonSet should launch a pod on a node with taint NetworkUnavailable condition.
 func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("simple")
 			ds.Spec.UpdateStrategy = *strategy
@@ -955,7 +955,7 @@ func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
 // DaemonSets not take any actions when being deleted
 func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			podSpec := resourcePodSpec("not-too-much-mem", "75M", "75m")
 			ds := newDaemonSet("foo")
@@ -981,7 +981,7 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 
 func TestDontDoAnythingIfBeingDeletedRace(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			// Bare client says it IS deleted.
 			ds := newDaemonSet("foo")
@@ -1010,7 +1010,7 @@ func TestDontDoAnythingIfBeingDeletedRace(t *testing.T) {
 
 // When ScheduleDaemonSetPods is disabled, DaemonSets should not place onto nodes that would cause port conflicts.
 func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 	for _, strategy := range updateStrategies() {
 		podSpec := v1.PodSpec{
 			NodeName: "port-conflict",
@@ -1044,7 +1044,7 @@ func TestPortConflictNodeDaemonDoesNotLaunchPod(t *testing.T) {
 // Issue: https://github.com/kubernetes/kubernetes/issues/22309
 func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			podSpec := v1.PodSpec{
 				NodeName: "port-conflict",
@@ -1074,7 +1074,7 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 // DaemonSets should place onto nodes that would not cause port conflicts
 func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			podSpec1 := v1.PodSpec{
 				NodeName: "no-port-conflict",
@@ -1124,7 +1124,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 	// should detect this misconfiguration and choose not to sync the DaemonSet. We should
 	// not observe a deletion of the pod on node1.
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1157,7 +1157,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 // Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
 func TestDealsWithExistingPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1179,7 +1179,7 @@ func TestDealsWithExistingPods(t *testing.T) {
 // Daemon with node selector should launch pods on nodes matching selector.
 func TestSelectorDaemonLaunchesPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			daemon := newDaemonSet("foo")
 			daemon.Spec.UpdateStrategy = *strategy
@@ -1199,7 +1199,7 @@ func TestSelectorDaemonLaunchesPods(t *testing.T) {
 // Daemon with node selector should delete pods from nodes that do not satisfy selector.
 func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1223,7 +1223,7 @@ func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 // DaemonSet with node selector should launch pods on nodes matching selector, but also deal with existing pods on nodes.
 func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1251,7 +1251,7 @@ func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 // DaemonSet with node selector which does not match any node labels should not launch pods.
 func TestBadSelectorDaemonDoesNothing(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			manager, podControl, _, err := newTestController()
 			if err != nil {
@@ -1271,7 +1271,7 @@ func TestBadSelectorDaemonDoesNothing(t *testing.T) {
 // DaemonSet with node name should launch pod on node with corresponding name.
 func TestNameDaemonSetLaunchesPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1290,7 +1290,7 @@ func TestNameDaemonSetLaunchesPods(t *testing.T) {
 // DaemonSet with node name that does not exist should not launch pods.
 func TestBadNameDaemonSetDoesNothing(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1309,7 +1309,7 @@ func TestBadNameDaemonSetDoesNothing(t *testing.T) {
 // DaemonSet with node selector, and node name, matching a node, should launch a pod on the node.
 func TestNameAndSelectorDaemonSetLaunchesPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1330,7 +1330,7 @@ func TestNameAndSelectorDaemonSetLaunchesPods(t *testing.T) {
 // DaemonSet with node selector that matches some nodes, and node name that matches a different node, should do nothing.
 func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1351,7 +1351,7 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 // DaemonSet with node selector, matching some nodes, should launch pods on all the nodes.
 func TestSelectorDaemonSetLaunchesPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		ds := newDaemonSet("foo")
 		ds.Spec.Template.Spec.NodeSelector = simpleNodeLabel
 		manager, podControl, _, err := newTestController(ds)
@@ -1368,7 +1368,7 @@ func TestSelectorDaemonSetLaunchesPods(t *testing.T) {
 // Daemon with node affinity should launch pods on nodes matching affinity.
 func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			daemon := newDaemonSet("foo")
 			daemon.Spec.UpdateStrategy = *strategy
@@ -1404,7 +1404,7 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 
 func TestNumberReadyStatus(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1449,7 +1449,7 @@ func TestNumberReadyStatus(t *testing.T) {
 
 func TestObservedGeneration(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1496,7 +1496,7 @@ func TestDaemonKillFailedPods(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.test, func(t *testing.T) {
 			for _, f := range []bool{true, false} {
-				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 				for _, strategy := range updateStrategies() {
 					ds := newDaemonSet("foo")
 					ds.Spec.UpdateStrategy = *strategy
@@ -1518,7 +1518,7 @@ func TestDaemonKillFailedPods(t *testing.T) {
 // DaemonSet controller needs to backoff when killing failed pods to avoid hot looping and fighting with kubelet.
 func TestDaemonKillFailedPodsBackoff(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			t.Run(string(strategy.Type), func(t *testing.T) {
 				ds := newDaemonSet("foo")
@@ -1588,7 +1588,7 @@ func TestDaemonKillFailedPodsBackoff(t *testing.T) {
 // tolerate the nodes NoSchedule taint
 func TestNoScheduleTaintedDoesntEvicitRunningIntolerantPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("intolerant")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1612,7 +1612,7 @@ func TestNoScheduleTaintedDoesntEvicitRunningIntolerantPod(t *testing.T) {
 // tolerate the nodes NoExecute taint
 func TestNoExecuteTaintedDoesEvicitRunningIntolerantPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("intolerant")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1635,7 +1635,7 @@ func TestNoExecuteTaintedDoesEvicitRunningIntolerantPod(t *testing.T) {
 // DaemonSet should not launch a pod on a tainted node when the pod doesn't tolerate that taint.
 func TestTaintedNodeDaemonDoesNotLaunchIntolerantPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("intolerant")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1657,7 +1657,7 @@ func TestTaintedNodeDaemonDoesNotLaunchIntolerantPod(t *testing.T) {
 // DaemonSet should launch a pod on a tainted node when the pod can tolerate that taint.
 func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("tolerate")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1680,7 +1680,7 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 // DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
 func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("simple")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1705,7 +1705,7 @@ func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 // DaemonSet should launch a pod on an unreachable node with taint unreachable:NoExecute.
 func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("simple")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1730,7 +1730,7 @@ func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 // DaemonSet should launch a pod on an untainted node when the pod has tolerations.
 func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("tolerate")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1750,7 +1750,7 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 // DaemonSet should launch a pod on a not ready node with taint notReady:NoExecute.
 func TestDaemonSetRespectsTermination(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1781,7 +1781,7 @@ func setDaemonSetToleration(ds *apps.DaemonSet, tolerations []v1.Toleration) {
 // DaemonSet should launch a pod even when the node with MemoryPressure/DiskPressure/PIDPressure taints.
 func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("critical")
 			ds.Spec.UpdateStrategy = *strategy
@@ -1805,7 +1805,7 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 			manager.nodeStore.Add(node)
 
 			// Enabling critical pod and taint nodes by condition feature gate should create critical pod
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 			manager.dsStore.Add(ds)
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		}
@@ -1814,7 +1814,7 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 
 // When ScheduleDaemonSetPods is disabled, DaemonSet should launch a critical pod even when the node has insufficient free resource.
 func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 	for _, strategy := range updateStrategies() {
 		podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
 		ds := newDaemonSet("critical")
@@ -1834,7 +1834,7 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		})
 
 		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, false)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, false)()
 		manager.dsStore.Add(ds)
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
@@ -1846,7 +1846,7 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		}
 
 		// Enabling critical pod annotation feature gate should create critical pod
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 2)
@@ -1860,7 +1860,7 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 
 // When ScheduleDaemonSetPods is disabled, DaemonSets should NOT launch a critical pod when there are port conflicts.
 func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
 	for _, strategy := range updateStrategies() {
 		podSpec := v1.PodSpec{
 			NodeName: "port-conflict",
@@ -1880,7 +1880,7 @@ func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
 			Spec: podSpec,
 		})
 
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec
@@ -1900,7 +1900,7 @@ func setDaemonSetCritical(ds *apps.DaemonSet) {
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		var shouldCreate, wantToRun, shouldContinueRunning bool
 		if utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
 			shouldCreate = true
@@ -2227,7 +2227,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 func TestUpdateNode(t *testing.T) {
 	var enqueued bool
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		cases := []struct {
 			test               string
 			newNode            *v1.Node
@@ -2536,7 +2536,7 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 
 func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -2579,7 +2579,7 @@ func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 
 func TestGetNodesToDaemonPods(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
 			ds.Spec.UpdateStrategy = *strategy
@@ -2645,7 +2645,7 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 
 func TestAddNode(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		manager, _, _, err := newTestController()
 		if err != nil {
 			t.Fatalf("error creating DaemonSets controller: %v", err)
@@ -2674,7 +2674,7 @@ func TestAddNode(t *testing.T) {
 
 func TestAddPod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
 			if err != nil {
@@ -2720,7 +2720,7 @@ func TestAddPod(t *testing.T) {
 
 func TestAddPodOrphan(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
 			if err != nil {
@@ -2752,7 +2752,7 @@ func TestAddPodOrphan(t *testing.T) {
 
 func TestUpdatePod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
 			if err != nil {
@@ -2802,7 +2802,7 @@ func TestUpdatePod(t *testing.T) {
 
 func TestUpdatePodOrphanSameLabels(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
@@ -2829,7 +2829,7 @@ func TestUpdatePodOrphanSameLabels(t *testing.T) {
 
 func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
@@ -2860,7 +2860,7 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 
 func TestUpdatePodChangeControllerRef(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 
 		for _, strategy := range updateStrategies() {
 			ds := newDaemonSet("foo")
@@ -2888,7 +2888,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 func TestUpdatePodControllerRefRemoved(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
@@ -2916,7 +2916,7 @@ func TestUpdatePodControllerRefRemoved(t *testing.T) {
 
 func TestDeletePod(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()
@@ -2963,7 +2963,7 @@ func TestDeletePod(t *testing.T) {
 
 func TestDeletePodOrphan(t *testing.T) {
 	for _, f := range []bool{true, false} {
-		defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, f)()
 
 		for _, strategy := range updateStrategies() {
 			manager, _, _, err := newTestController()

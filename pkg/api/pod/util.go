@@ -368,6 +368,8 @@ func dropDisabledFields(
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
+	dropDisabledGMSAFields(podSpec, oldPodSpec)
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
 		podSpec.RuntimeClassName = nil
@@ -395,6 +397,39 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 			if podSpec.InitContainers[i].SecurityContext != nil {
 				podSpec.InitContainers[i].SecurityContext.RunAsGroup = nil
 			}
+		}
+	}
+}
+
+// dropDisabledGMSAFields removes disabled fields related to Windows GMSA
+// from the given PodSpec.
+func dropDisabledGMSAFields(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsGMSA) ||
+		gMSAFieldsInUse(oldPodSpec) {
+		return
+	}
+
+	if podSpec.SecurityContext != nil {
+		dropDisabledGMSAFieldsFromWindowsSecurityOptions(podSpec.SecurityContext.WindowsOptions)
+	}
+	dropDisabledGMSAFieldsFromContainers(podSpec.Containers)
+	dropDisabledGMSAFieldsFromContainers(podSpec.InitContainers)
+}
+
+// dropDisabledGMSAFieldsFromWindowsSecurityOptions removes disabled fields
+// related to Windows GMSA from the given WindowsSecurityContextOptions.
+func dropDisabledGMSAFieldsFromWindowsSecurityOptions(windowsOptions *api.WindowsSecurityContextOptions) {
+	if windowsOptions != nil {
+		windowsOptions.GMSACredentialSpecName = nil
+		windowsOptions.GMSACredentialSpec = nil
+	}
+}
+
+// dropDisabledGMSAFieldsFromContainers removes disabled fields
+func dropDisabledGMSAFieldsFromContainers(containers []api.Container) {
+	for i := range containers {
+		if containers[i].SecurityContext != nil {
+			dropDisabledGMSAFieldsFromWindowsSecurityOptions(containers[i].SecurityContext.WindowsOptions)
 		}
 	}
 }
@@ -609,6 +644,44 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// gMSAFieldsInUse returns true if the pod spec is non-nil and has one of any
+// SecurityContext's GMSACredentialSpecName or GMSACredentialSpec fields set.
+func gMSAFieldsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	if podSpec.SecurityContext != nil && gMSAFieldsInUseInWindowsSecurityOptions(podSpec.SecurityContext.WindowsOptions) {
+		return true
+	}
+
+	return gMSAFieldsInUseInAnyContainer(podSpec.Containers) ||
+		gMSAFieldsInUseInAnyContainer(podSpec.InitContainers)
+}
+
+// gMSAFieldsInUseInWindowsSecurityOptions returns true if the given WindowsSecurityContextOptions is
+// non-nil and one of its GMSACredentialSpecName or GMSACredentialSpec fields is set.
+func gMSAFieldsInUseInWindowsSecurityOptions(windowsOptions *api.WindowsSecurityContextOptions) bool {
+	if windowsOptions == nil {
+		return false
+	}
+
+	return windowsOptions.GMSACredentialSpecName != nil ||
+		windowsOptions.GMSACredentialSpec != nil
+}
+
+// gMSAFieldsInUseInAnyContainer returns true if any of the given Containers has its
+// SecurityContext's GMSACredentialSpecName or GMSACredentialSpec fields set.
+func gMSAFieldsInUseInAnyContainer(containers []api.Container) bool {
+	for _, container := range containers {
+		if container.SecurityContext != nil && gMSAFieldsInUseInWindowsSecurityOptions(container.SecurityContext.WindowsOptions) {
+			return true
+		}
+	}
+
 	return false
 }
 

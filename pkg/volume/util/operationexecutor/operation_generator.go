@@ -34,7 +34,6 @@ import (
 	volerr "k8s.io/cloud-provider/volume/errors"
 	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
-	expandcache "k8s.io/kubernetes/pkg/controller/volume/expand/cache"
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -129,7 +128,7 @@ type OperationGenerator interface {
 		string,
 		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
-	GenerateExpandVolumeFunc(*expandcache.PVCWithResizeRequest, expandcache.VolumeResizeMap) (volumetypes.GeneratedOperations, error)
+	GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error)
 
 	// Generates the volume file system resize function, which can resize volume's file system to expected size without unmounting the volume.
 	GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
@@ -810,7 +809,7 @@ func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOp
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 			klog.Infof(detailedMsg)
 			// File system resize succeeded, now update the PVC's Capacity to match the PV's
-			err = util.MarkFSResizeFinished(pvc, pv.Spec.Capacity, og.kubeClient)
+			err = util.MarkFSResizeFinished(pvc, pvSpecCap, og.kubeClient)
 			if err != nil {
 				// On retry, resizeFileSystem will be called again but do nothing
 				return false, fmt.Errorf("MountVolume.resizeFileSystem update PVC status failed : %v", err)
@@ -1494,47 +1493,47 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 }
 
 func (og *operationGenerator) GenerateExpandVolumeFunc(
-	pvcWithResizeRequest *expandcache.PVCWithResizeRequest,
-	resizeMap expandcache.VolumeResizeMap) (volumetypes.GeneratedOperations, error) {
+	pvc *v1.PersistentVolumeClaim,
+	pv *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
 
-	volumeSpec := volume.NewSpecFromPersistentVolume(pvcWithResizeRequest.PersistentVolume, false)
+	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 
 	volumePlugin, err := og.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
-
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", pvcWithResizeRequest.QualifiedName(), err)
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
 	}
 
 	if volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", pvcWithResizeRequest.QualifiedName())
+		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", util.GetPersistentVolumeClaimQualifiedName(pvc))
 	}
 
 	expandVolumeFunc := func() (error, error) {
-		newSize := pvcWithResizeRequest.ExpectedSize
-		pvSize := pvcWithResizeRequest.PersistentVolume.Spec.Capacity[v1.ResourceStorage]
+		newSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+		statusSize := pvc.Status.Capacity[v1.ResourceStorage]
+		pvSize := pv.Spec.Capacity[v1.ResourceStorage]
 		if pvSize.Cmp(newSize) < 0 {
 			updatedSize, expandErr := volumePlugin.ExpandVolumeDevice(
 				volumeSpec,
-				pvcWithResizeRequest.ExpectedSize,
-				pvcWithResizeRequest.CurrentSize)
-
+				newSize,
+				statusSize)
 			if expandErr != nil {
-				detailedErr := fmt.Errorf("error expanding volume %q of plugin %q: %v", pvcWithResizeRequest.QualifiedName(), volumePlugin.GetPluginName(), expandErr)
+				detailedErr := fmt.Errorf("error expanding volume %q of plugin %q: %v", util.GetPersistentVolumeClaimQualifiedName(pvc), volumePlugin.GetPluginName(), expandErr)
 				return detailedErr, detailedErr
 			}
 
-			klog.Infof("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
+			klog.Infof("ExpandVolume succeeded for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
+
 			newSize = updatedSize
 			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
 			// successful, that is why all PVCs for which pvc.Spec.Size > pvc.Status.Size must be reprocessed
 			// until they reflect user requested size in pvc.Status.Size
-			updateErr := resizeMap.UpdatePVSize(pvcWithResizeRequest, newSize)
-
+			updateErr := util.UpdatePVSize(pv, newSize, og.kubeClient)
 			if updateErr != nil {
-				detailedErr := fmt.Errorf("Error updating PV spec capacity for volume %q with : %v", pvcWithResizeRequest.QualifiedName(), updateErr)
+				detailedErr := fmt.Errorf("Error updating PV spec capacity for volume %q with : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), updateErr)
 				return detailedErr, detailedErr
 			}
-			klog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
+
+			klog.Infof("ExpandVolume.UpdatePV succeeded for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
 		}
 
 		fsVolume, _ := util.CheckVolumeModeFilesystem(volumeSpec)
@@ -1542,19 +1541,18 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		// Rest of the volume expand controller code will assume PVC as *not* resized until pvc.Status.Size
 		// reflects user requested size.
 		if !volumePlugin.RequiresFSResize() || !fsVolume {
-			klog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
-			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
-
+			klog.V(4).Infof("Controller resizing done for PVC %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
+			err := util.MarkResizeFinished(pvc, newSize, og.kubeClient)
 			if err != nil {
-				detailedErr := fmt.Errorf("Error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
+				detailedErr := fmt.Errorf("Error marking pvc %s as resized : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
 				return detailedErr, detailedErr
 			}
-			successMsg := fmt.Sprintf("ExpandVolume succeeded for volume %s", pvcWithResizeRequest.QualifiedName())
-			og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeNormal, kevents.VolumeResizeSuccess, successMsg)
+			successMsg := fmt.Sprintf("ExpandVolume succeeded for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
+			og.recorder.Eventf(pvc, v1.EventTypeNormal, kevents.VolumeResizeSuccess, successMsg)
 		} else {
-			err := resizeMap.MarkForFSResize(pvcWithResizeRequest)
+			err := util.MarkForFSResize(pvc, og.kubeClient)
 			if err != nil {
-				detailedErr := fmt.Errorf("Error updating pvc %s condition for fs resize : %v", pvcWithResizeRequest.QualifiedName(), err)
+				detailedErr := fmt.Errorf("Error updating pvc %s condition for fs resize : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
 				klog.Warning(detailedErr)
 				return nil, nil
 			}
@@ -1564,7 +1562,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 
 	eventRecorderFunc := func(err *error) {
 		if *err != nil {
-			og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
+			og.recorder.Eventf(pvc, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
 		}
 	}
 

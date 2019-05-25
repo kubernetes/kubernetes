@@ -88,6 +88,9 @@ type PreprovisionedPVTestDriver interface {
 type DynamicPVTestDriver interface {
 	TestDriver
 	// GetDynamicProvisionStorageClass returns a StorageClass dynamic provision Persistent Volume.
+	// The StorageClass must be created in the current test's namespace and have
+	// a unique name inside that namespace because GetDynamicProvisionStorageClass might
+	// be called more than once per test.
 	// It will set fsType to the StorageClass, if TestDriver supports it.
 	// It will return nil, if the TestDriver doesn't support it.
 	GetDynamicProvisionStorageClass(config *PerTestConfig, fsType string) *storagev1.StorageClass

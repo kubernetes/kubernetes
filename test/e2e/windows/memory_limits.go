@@ -35,6 +35,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -84,7 +85,7 @@ type nodeMemory struct {
 func checkNodeAllocatableTest(f *framework.Framework) {
 
 	nodeMem := getNodeMemory(f)
-	framework.Logf("nodeMem says: %+v", nodeMem)
+	e2elog.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
 	calculatedNodeAlloc := nodeMem.capacity.Copy()
@@ -125,7 +126,7 @@ func overrideAllocatableMemoryTest(f *framework.Framework, allocatablePods int) 
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePods[0].ObjectMeta.Name {
-				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
+				e2elog.Logf("Found %+v event with message %+v", e.Reason, e.Message)
 				return true
 			}
 		}
@@ -293,11 +294,11 @@ func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName str
 	gomega.Eventually(func() bool {
 		resp, err = client.Do(req)
 		if err != nil {
-			framework.Logf("Failed to get /configz, retrying. Error: %v", err)
+			e2elog.Logf("Failed to get /configz, retrying. Error: %v", err)
 			return false
 		}
 		if resp.StatusCode != 200 {
-			framework.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
+			e2elog.Logf("/configz response status not 200, retrying. Response was: %+v", resp)
 			return false
 		}
 

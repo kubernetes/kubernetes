@@ -98,9 +98,17 @@ function config-ip-firewall {
     iptables -w -t nat -N IP-MASQ
     iptables -w -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -w -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
-    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: RFC 1918 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 240.0.0.0/4 -m comment --comment "ip-masq: RFC 5735 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.0.2.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 198.51.100.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 203.0.113.0/24 -m comment --comment "ip-masq: RFC 5737 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 100.64.0.0/10 -m comment --comment "ip-masq: RFC 6598 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 198.18.0.0/15 -m comment --comment "ip-masq: RFC 6815 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.0.0.0/24 -m comment --comment "ip-masq: RFC 6890 reserved range is not subject to MASQUERADE" -j RETURN
+    iptables -w -t nat -A IP-MASQ -d 192.88.99.0/24 -m comment --comment "ip-masq: RFC 7526 reserved range is not subject to MASQUERADE" -j RETURN
     iptables -w -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
   fi
 
@@ -579,6 +587,9 @@ function create-master-auth {
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "gcp:kube-bootstrap,uid:gcp:kube-bootstrap,system:masters"
+  fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
   fi
@@ -599,6 +610,15 @@ function create-master-auth {
   fi
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
+  fi
+  if [[ -n "${EXTRA_STATIC_AUTH_COMPONENTS:-}" ]]; then
+    # Create a static Bearer token and kubeconfig for extra, comma-separated components.
+    IFS="," read -r -a extra_components <<< "${EXTRA_STATIC_AUTH_COMPONENTS:-}"
+    for extra_component in "${extra_components[@]}"; do
+      local token="$(secure_random 32)"
+      append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}"
+      create-kubeconfig "${extra_component}" "${token}"
+    done
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -1394,6 +1414,7 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *host_ip *}}@$host_ip@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
+  sed -i -e "s@{{ *listen_client_ip *}}@${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}@g" "${temp_file}"
   # Get default storage backend from manifest file.
   local -r default_storage_backend=$(cat "${temp_file}" | \
     grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
@@ -1470,6 +1491,7 @@ function start-etcd-servers {
 #   DOCKER_REGISTRY
 #   FLEXVOLUME_HOSTPATH_MOUNT
 #   FLEXVOLUME_HOSTPATH_VOLUME
+#   INSECURE_PORT_MAPPING
 function compute-master-manifest-variables {
   CLOUD_CONFIG_OPT=""
   CLOUD_CONFIG_VOLUME=""
@@ -1489,6 +1511,11 @@ function compute-master-manifest-variables {
   if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
     FLEXVOLUME_HOSTPATH_MOUNT="{ \"name\": \"flexvolumedir\", \"mountPath\": \"${VOLUME_PLUGIN_DIR}\", \"readOnly\": true},"
     FLEXVOLUME_HOSTPATH_VOLUME="{ \"name\": \"flexvolumedir\", \"hostPath\": {\"path\": \"${VOLUME_PLUGIN_DIR}\"}},"
+  fi
+
+  INSECURE_PORT_MAPPING=""
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
+    INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
   fi
 }
 
@@ -1514,6 +1541,7 @@ function prepare-mounter-rootfs {
 #   CLOUD_CONFIG_VOLUME
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
+#   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
   prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
@@ -1537,7 +1565,7 @@ function start-kube-apiserver {
     params+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   fi
   params+=" --secure-port=443"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-true}" != "true" ]]; then
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
     # Default is :8080
     params+=" --insecure-port=0"
   fi
@@ -1826,6 +1854,7 @@ function start-kube-apiserver {
   sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
   sed -i -e "s@{{liveness_probe_initial_delay}}@${KUBE_APISERVER_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${src_file}"
   sed -i -e "s@{{secure_port}}@443@g" "${src_file}"
+  sed -i -e "s@{{insecure_port_mapping}}@${INSECURE_PORT_MAPPING}@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_mount}}@@g" "${src_file}"
   sed -i -e "s@{{additional_cloud_config_volume}}@@g" "${src_file}"
   sed -i -e "s@{{webhook_authn_config_mount}}@${webhook_authn_config_mount}@g" "${src_file}"
@@ -2358,6 +2387,7 @@ function setup-coredns-manifest {
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${SERVICE_CLUSTER_IP_RANGE}@g" "${coredns_file}"
+  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${coredns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2409,6 +2439,7 @@ EOF
   # Replace the salt configurations with variable values.
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
+  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${kubedns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2825,6 +2856,82 @@ function wait-till-apiserver-ready() {
   done
 }
 
+function ensure-master-bootstrap-kubectl-auth {
+  # By default, `kubectl` uses http://localhost:8080
+  # If the insecure port is disabled, kubectl will need to use an admin-authenticated kubeconfig.
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
+    create-kubeconfig "kube-bootstrap" "${KUBE_BOOTSTRAP_TOKEN}"
+    export KUBECONFIG=/etc/srv/kubernetes/kube-bootstrap/kubeconfig
+  fi
+}
+
+function setup-containerd {
+  echo "Generate containerd config"
+  local config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
+  mkdir -p "$(dirname "${config_path}")"
+  local cni_template_path="${KUBE_HOME}/cni.template"
+  cat > "${cni_template_path}" <<EOF
+{
+  "name": "k8s-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "ptp",
+      "mtu": 1460,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "{{.PodCIDR}}",
+        "routes": [
+          {
+            "dst": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+EOF
+  if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider is specified
+      # or netd is enabled.
+      cni_template_path=""
+    fi
+  fi
+  # Reuse docker group for containerd.
+  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  cat > "${config_path}" <<EOF
+# Kubernetes doesn't use containerd restart manager.
+disabled_plugins = ["restart"]
+
+[debug]
+  level = "${CONTAINERD_LOG_LEVEL:-"info"}"
+
+[grpc]
+  gid = ${containerd_gid}
+
+[plugins.cri]
+  stream_server_address = "127.0.0.1"
+  max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
+[plugins.cri.cni]
+  bin_dir = "${KUBE_HOME}/bin"
+  conf_dir = "/etc/cni/net.d"
+  conf_template = "${cni_template_path}"
+[plugins.cri.registry.mirrors."docker.io"]
+  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+EOF
+  chmod 644 "${config_path}"
+
+  echo "Restart containerd to load the config change"
+  systemctl restart containerd
+}
+
 ########### Main Function ###########
 function main() {
   echo "Start to configure instance for kubernetes"
@@ -2872,7 +2979,6 @@ function main() {
     fi
   fi
 
-  # generate the controller manager, scheduler and cluster autoscaler tokens here since they are only used on the master.
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
@@ -2880,6 +2986,9 @@ function main() {
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
   ADDON_MANAGER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
+  fi
 
   setup-os-params
   config-ip-firewall
@@ -2892,6 +3001,7 @@ function main() {
     create-node-pki
     create-master-pki
     create-master-auth
+    ensure-master-bootstrap-kubectl-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -2909,9 +3019,12 @@ function main() {
   fi
 
   override-kubectl
+  container_runtime="${CONTAINER_RUNTIME:-docker}"
   # Run the containerized mounter once to pre-cache the container image.
-  if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
+  if [[ "${container_runtime}" == "docker" ]]; then
     assemble-docker-flags
+  elif [[ "${container_runtime}" == "containerd" ]]; then
+    setup-containerd
   fi
   start-kubelet
 

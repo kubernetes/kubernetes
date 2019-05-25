@@ -47,6 +47,14 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job reaches completions")
 		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods for job exist")
+		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		gomega.Expect(len(pods.Items)).To(gomega.Equal(int(completions)), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
+		for _, pod := range pods.Items {
+			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
+		}
 	})
 
 	// Pods sometimes fail, but eventually succeed.

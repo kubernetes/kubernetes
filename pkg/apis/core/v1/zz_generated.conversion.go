@@ -2310,6 +2310,7 @@ func autoConvert_v1_CSIPersistentVolumeSource_To_core_CSIPersistentVolumeSource(
 	out.ControllerPublishSecretRef = (*core.SecretReference)(unsafe.Pointer(in.ControllerPublishSecretRef))
 	out.NodeStageSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
 	out.NodePublishSecretRef = (*core.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
+	out.ControllerExpandSecretRef = (*core.SecretReference)(unsafe.Pointer(in.ControllerExpandSecretRef))
 	return nil
 }
 
@@ -2327,6 +2328,7 @@ func autoConvert_core_CSIPersistentVolumeSource_To_v1_CSIPersistentVolumeSource(
 	out.ControllerPublishSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.ControllerPublishSecretRef))
 	out.NodeStageSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodeStageSecretRef))
 	out.NodePublishSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.NodePublishSecretRef))
+	out.ControllerExpandSecretRef = (*v1.SecretReference)(unsafe.Pointer(in.ControllerExpandSecretRef))
 	return nil
 }
 
@@ -7597,6 +7599,8 @@ func Convert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *core
 }
 
 func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in *v1.WindowsSecurityContextOptions, out *core.WindowsSecurityContextOptions, s conversion.Scope) error {
+	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
+	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
 	return nil
 }
 
@@ -7606,6 +7610,8 @@ func Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOpti
 }
 
 func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
+	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
+	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
 	return nil
 }
 

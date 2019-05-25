@@ -68,7 +68,7 @@ func (hns fakeHNS) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	var remoteSubnets []*remoteSubnetInfo
 	rs := &remoteSubnetInfo{
 		destinationPrefix: destinationPrefix,
-		isolationId:       4096,
+		isolationID:       4096,
 		providerAddress:   providerAddress,
 		drMacAddress:      macAddress,
 	}

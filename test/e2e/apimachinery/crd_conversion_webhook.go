@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
@@ -105,15 +106,21 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 	})
 
 	ginkgo.It("Should be able to convert from CR v1 to CR v2", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", apiVersions,
-			&v1beta1.WebhookClientConfig{
-				CABundle: context.signingCert,
-				Service: &v1beta1.ServiceReference{
-					Namespace: f.Namespace.Name,
-					Name:      serviceCRDName,
-					Path:      pointer.StringPtr("/crdconvert"),
-					Port:      pointer.Int32Ptr(serviceCRDPort),
-				}})
+		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+			crd.Spec.Versions = apiVersions
+			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
+				Strategy: v1beta1.WebhookConverter,
+				WebhookClientConfig: &v1beta1.WebhookClientConfig{
+					CABundle: context.signingCert,
+					Service: &v1beta1.ServiceReference{
+						Namespace: f.Namespace.Name,
+						Name:      serviceCRDName,
+						Path:      pointer.StringPtr("/crdconvert"),
+						Port:      pointer.Int32Ptr(serviceCRDPort),
+					},
+				},
+			}
+		})
 		if err != nil {
 			return
 		}
@@ -122,15 +129,21 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Feature:CustomResourceWebh
 	})
 
 	ginkgo.It("Should be able to convert a non homogeneous list of CRs", func() {
-		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", apiVersions,
-			&v1beta1.WebhookClientConfig{
-				CABundle: context.signingCert,
-				Service: &v1beta1.ServiceReference{
-					Namespace: f.Namespace.Name,
-					Name:      serviceCRDName,
-					Path:      pointer.StringPtr("/crdconvert"),
-					Port:      pointer.Int32Ptr(serviceCRDPort),
-				}})
+		testcrd, err := crd.CreateMultiVersionTestCRD(f, "stable.example.com", func(crd *v1beta1.CustomResourceDefinition) {
+			crd.Spec.Versions = apiVersions
+			crd.Spec.Conversion = &v1beta1.CustomResourceConversion{
+				Strategy: v1beta1.WebhookConverter,
+				WebhookClientConfig: &v1beta1.WebhookClientConfig{
+					CABundle: context.signingCert,
+					Service: &v1beta1.ServiceReference{
+						Namespace: f.Namespace.Name,
+						Name:      serviceCRDName,
+						Path:      pointer.StringPtr("/crdconvert"),
+						Port:      pointer.Int32Ptr(serviceCRDPort),
+					},
+				},
+			}
+		})
 		if err != nil {
 			return
 		}
@@ -169,7 +182,7 @@ func createAuthReaderRoleBindingForCRDConversion(f *framework.Framework, namespa
 		},
 	})
 	if err != nil && errors.IsAlreadyExists(err) {
-		framework.Logf("role binding %s already exists", roleBindingCRDName)
+		e2elog.Logf("role binding %s already exists", roleBindingCRDName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
 	}

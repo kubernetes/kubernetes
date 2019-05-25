@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -42,7 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var (
@@ -217,13 +217,14 @@ type testVersioner struct{}
 func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
 	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
 }
-func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string) error {
+func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count int64) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err
 	}
 	listAccessor.SetResourceVersion(strconv.FormatUint(resourceVersion, 10))
 	listAccessor.SetContinue(continueValue)
+	listAccessor.SetRemainingItemCount(count)
 	return nil
 }
 func (testVersioner) PrepareObjectForStorage(obj runtime.Object) error {
@@ -298,7 +299,7 @@ func (d *dummyStorage) Versioner() storage.Versioner { return nil }
 func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions) error {
+func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc) error {
 	return fmt.Errorf("unimplemented")
 }
 func (d *dummyStorage) Watch(_ context.Context, _ string, _ string, _ storage.SelectionPredicate) (watch.Interface, error) {
@@ -495,6 +496,42 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 	}
 }
 
+func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	w, err := cacher.Watch(context.Background(), "pods/ns", "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	watchClosed := make(chan struct{})
+	go func() {
+		defer close(watchClosed)
+		for event := range w.ResultChan() {
+			switch event.Type {
+			case watch.Added, watch.Modified, watch.Deleted:
+				// ok
+			default:
+				t.Errorf("unexpected event %#v", event)
+			}
+		}
+	}()
+
+	cacher.Stop()
+
+	select {
+	case <-watchClosed:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for watch to close")
+	}
+
+}
+
 func TestTimeBucketWatchersBasic(t *testing.T) {
 	filter := func(_ string, _ labels.Set, _ fields.Set) bool {
 		return true
@@ -538,7 +575,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 }
 
 func testCacherSendBookmarkEvents(t *testing.T, watchCacheEnabled, allowWatchBookmarks, expectedBookmarks bool) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, watchCacheEnabled)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, watchCacheEnabled)()
 	backingStorage := &dummyStorage{}
 	cacher, _ := newTestCacher(backingStorage, 1000)
 	defer cacher.Stop()
@@ -637,7 +674,7 @@ func TestCacherSendBookmarkEvents(t *testing.T) {
 }
 
 func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
 	backingStorage := &dummyStorage{}
 	cacher, _ := newTestCacher(backingStorage, 1000)
 	defer cacher.Stop()
@@ -677,12 +714,16 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 			t.Fatalf("failure to update version of object (%d) %#v", bookmark.ResourceVersion, bookmark.Object)
 		}
 
+		wg := sync.WaitGroup{}
+		wg.Add(2)
 		go func() {
 			cacher.dispatchEvent(bookmark)
+			wg.Done()
 		}()
 
 		go func() {
 			w.Stop()
+			wg.Done()
 		}()
 
 		done := make(chan struct{})
@@ -699,5 +740,6 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 			t.Fatal("receive result timeout")
 		}
 		w.Stop()
+		wg.Wait()
 	}
 }

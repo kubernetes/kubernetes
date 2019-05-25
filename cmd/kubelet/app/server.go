@@ -46,6 +46,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
@@ -56,6 +57,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
+	"k8s.io/client-go/util/connrotation"
 	"k8s.io/client-go/util/keyutil"
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -108,7 +110,7 @@ const (
 )
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
-func NewKubeletCommand(stopCh <-chan struct{}) *cobra.Command {
+func NewKubeletCommand() *cobra.Command {
 	cleanFlagSet := pflag.NewFlagSet(componentKubelet, pflag.ContinueOnError)
 	cleanFlagSet.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	kubeletFlags := options.NewKubeletFlags()
@@ -253,6 +255,9 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// add the kubelet config controller to kubeletDeps
 			kubeletDeps.KubeletConfigController = kubeletConfigController
+
+			// set up stopCh here in order to be reused by kubelet and docker shim
+			stopCh := genericapiserver.SetupSignalHandler()
 
 			// start the experimental docker shim, if enabled
 			if kubeletServer.KubeletFlags.ExperimentalDockershim {
@@ -563,6 +568,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		if err != nil {
 			return err
 		}
+		if closeAllConns == nil {
+			return errors.New("closeAllConns must be a valid function other than nil")
+		}
 		kubeDeps.OnHeartbeatFailure = closeAllConns
 
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
@@ -711,7 +719,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		go wait.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), nil)
 			if err != nil {
-				klog.Errorf("Starting health server failed: %v", err)
+				klog.Errorf("Starting healthz server failed: %v", err)
 			}
 		}, 5*time.Second, wait.NeverStop)
 	}
@@ -802,8 +810,21 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 	}
 
 	kubeClientConfigOverrides(s, clientConfig)
+	closeAllConns, err := updateDialer(clientConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	return clientConfig, closeAllConns, nil
+}
 
-	return clientConfig, nil, nil
+// updateDialer instruments a restconfig with a dial. the returned function allows forcefully closing all active connections.
+func updateDialer(clientConfig *restclient.Config) (func(), error) {
+	if clientConfig.Transport != nil || clientConfig.Dial != nil {
+		return nil, fmt.Errorf("there is already a transport or dialer configured")
+	}
+	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
+	clientConfig.Dial = d.DialContext
+	return d.CloseAll, nil
 }
 
 // buildClientCertificateManager creates a certificate manager that will use certConfig to request a client certificate
@@ -970,32 +991,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// Setup event recorder if required.
 	makeEventRecorder(kubeDeps, nodeName)
 
-	// TODO(mtaufen): I moved the validation of these fields here, from UnsecuredKubeletConfig,
-	//                so that I could remove the associated fields from KubeletConfiginternal. I would
-	//                prefer this to be done as part of an independent validation step on the
-	//                KubeletConfiguration. But as far as I can tell, we don't have an explicit
-	//                place for validation of the KubeletConfiguration yet.
-	hostNetworkSources, err := kubetypes.GetValidatedSources(kubeServer.HostNetworkSources)
-	if err != nil {
-		return err
-	}
-
-	hostPIDSources, err := kubetypes.GetValidatedSources(kubeServer.HostPIDSources)
-	if err != nil {
-		return err
-	}
-
-	hostIPCSources, err := kubetypes.GetValidatedSources(kubeServer.HostIPCSources)
-	if err != nil {
-		return err
-	}
-
-	privilegedSources := capabilities.PrivilegedSources{
-		HostNetworkSources: hostNetworkSources,
-		HostPIDSources:     hostPIDSources,
-		HostIPCSources:     hostIPCSources,
-	}
-	capabilities.Setup(kubeServer.AllowPrivileged, privilegedSources, 0)
+	capabilities.Initialize(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
 
 	credentialprovider.SetPreferredDockercfgPath(kubeServer.RootDirectory)
 	klog.V(2).Infof("Using root directory: %v", kubeServer.RootDirectory)

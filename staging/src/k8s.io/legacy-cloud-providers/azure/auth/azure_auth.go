@@ -28,6 +28,11 @@ import (
 	"k8s.io/klog"
 )
 
+var (
+	// ErrorNoAuth indicates that no credentials are provided.
+	ErrorNoAuth = fmt.Errorf("no credentials provided for Azure cloud provider")
+)
+
 // AzureAuthConfig holds auth related part of cloud config
 type AzureAuthConfig struct {
 	// The cloud environment identifier. Takes values from https://github.com/Azure/go-autorest/blob/ec5f4903f77ed9927ac95b19ab8e44ada64c1356/autorest/azure/environments.go#L13
@@ -104,7 +109,7 @@ func GetServicePrincipalToken(config *AzureAuthConfig, env *azure.Environment) (
 			env.ServiceManagementEndpoint)
 	}
 
-	return nil, fmt.Errorf("No credentials provided for AAD application %s", config.AADClientID)
+	return nil, ErrorNoAuth
 }
 
 // ParseAzureEnvironment returns azure environment by name

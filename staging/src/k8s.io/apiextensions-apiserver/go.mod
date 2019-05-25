@@ -16,6 +16,7 @@ require (
 	github.com/go-openapi/strfmt v0.17.0
 	github.com/go-openapi/validate v0.18.0
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
+	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
@@ -31,14 +32,13 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog v0.3.0
+	k8s.io/klog v0.3.1
 	k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
 	k8s.io/utils v0.0.0-20190221042446-c2654d5206da
 	sigs.k8s.io/yaml v1.1.0
 )
 
 replace (
-	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9

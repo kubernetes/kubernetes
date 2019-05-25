@@ -44,6 +44,9 @@ func HasCapabilitiesRequest(container *v1.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
+// DetermineEffectiveSecurityContext returns a synthesized SecurityContext for reading effective configurations
+// from the provided pod's and container's security context. Container's fields take precedence in cases where both
+// are set
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
@@ -61,6 +64,18 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	if containerSc.SELinuxOptions != nil {
 		effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
 		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.WindowsOptions != nil {
+		// only override fields that are set at the container level, not the whole thing
+		if effectiveSc.WindowsOptions == nil {
+			effectiveSc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		}
+		if containerSc.WindowsOptions.GMSACredentialSpecName != nil || containerSc.WindowsOptions.GMSACredentialSpec != nil {
+			// both GMSA fields go hand in hand
+			effectiveSc.WindowsOptions.GMSACredentialSpecName = containerSc.WindowsOptions.GMSACredentialSpecName
+			effectiveSc.WindowsOptions.GMSACredentialSpec = containerSc.WindowsOptions.GMSACredentialSpec
+		}
 	}
 
 	if containerSc.Capabilities != nil {
@@ -117,6 +132,12 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 		synthesized.SELinuxOptions = &v1.SELinuxOptions{}
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
+
+	if pod.Spec.SecurityContext.WindowsOptions != nil {
+		synthesized.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		*synthesized.WindowsOptions = *pod.Spec.SecurityContext.WindowsOptions
+	}
+
 	if pod.Spec.SecurityContext.RunAsUser != nil {
 		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser

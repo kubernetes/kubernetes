@@ -36,11 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -1097,230 +1097,12 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 	require.NotNil(t, stats)
 }
 
-func TestHostNetworkAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
-		},
-	})
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo"},
-		},
-		HostNetwork: true,
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
-
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.NoError(t, err, "expected pod infra creation to succeed")
-}
-
-func TestHostNetworkDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{},
-		},
-	})
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo"},
-		},
-		HostNetwork: true,
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
-
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.Error(t, err, "expected pod infra creation to fail")
-}
-
-func TestHostPIDAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostPIDSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
-		},
-	})
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo"},
-		},
-		HostPID: true,
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
-
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.NoError(t, err, "expected pod infra creation to succeed")
-}
-
-func TestHostPIDDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostPIDSources: []string{},
-		},
-	})
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo"},
-		},
-		HostPID: true,
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
-
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.Error(t, err, "expected pod infra creation to fail")
-}
-
-func TestHostIPCAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostIPCSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
-		},
-	})
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo"},
-		},
-		HostIPC: true,
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
-
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.NoError(t, err, "expected pod infra creation to succeed")
-}
-
-func TestHostIPCDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostIPCSources: []string{},
-		},
-	})
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo"},
-		},
-		HostIPC: true,
-	})
-	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
-
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.Error(t, err, "expected pod infra creation to fail")
-}
-
-func TestPrivilegeContainerAllowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		AllowPrivileged: true,
-	})
-	privileged := true
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo", SecurityContext: &v1.SecurityContext{Privileged: &privileged}},
-		},
-	})
-
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.NoError(t, err, "expected pod infra creation to succeed")
-}
-
-func TestPrivilegedContainerDisallowed(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-
-	capabilities.SetForTests(capabilities.Capabilities{
-		AllowPrivileged: false,
-	})
-	privileged := true
-	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
-		Containers: []v1.Container{
-			{Name: "foo", SecurityContext: &v1.SecurityContext{Privileged: &privileged}},
-		},
-	})
-
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
-	assert.Error(t, err, "expected pod infra creation to fail")
-}
-
 func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
 	kubelet.runtimeState.setNetworkState(fmt.Errorf("simulated network error"))
-	capabilities.SetForTests(capabilities.Capabilities{
-		PrivilegedSources: capabilities.PrivilegedSources{
-			HostNetworkSources: []string{kubetypes.ApiserverSource, kubetypes.FileSource},
-		},
-	})
 
 	pod := podWithUIDNameNsSpec("12345678", "hostnetwork", "new", v1.PodSpec{
 		HostNetwork: false,
@@ -2240,11 +2022,11 @@ func runVolumeManager(kubelet *Kubelet) chan struct{} {
 	return stopCh
 }
 
-func forEachFeatureGate(t *testing.T, fs []utilfeature.Feature, tf func(t *testing.T)) {
+func forEachFeatureGate(t *testing.T, fs []featuregate.Feature, tf func(t *testing.T)) {
 	for _, fg := range fs {
 		for _, f := range []bool{true, false} {
 			func() {
-				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v(%t)", fg, f), tf)
 			}()
 		}

@@ -130,6 +130,8 @@ const (
 	GBRedisSlave
 	// Hostexec image
 	Hostexec
+	// InClusterClient image
+	InClusterClient
 	// IpcUtils image
 	IpcUtils
 	// Iperf image
@@ -194,7 +196,7 @@ const (
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
 	configs[CRDConversionWebhook] = Config{e2eRegistry, "crd-conversion-webhook", "1.13rev2"}
-	configs[AdmissionWebhook] = Config{e2eRegistry, "webhook", "1.14v1"}
+	configs[AdmissionWebhook] = Config{e2eRegistry, "webhook", "1.15v1"}
 	configs[Agnhost] = Config{e2eRegistry, "agnhost", "1.0"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
 	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
@@ -211,6 +213,7 @@ func initImageConfigs() map[int]Config {
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
 	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}
 	configs[Hostexec] = Config{e2eRegistry, "hostexec", "1.1"}
+	configs[InClusterClient] = Config{e2eRegistry, "inclusterclient", "1.0"}
 	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
 	configs[Iperf] = Config{e2eRegistry, "iperf", "1.0"}
 	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}

@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
@@ -275,7 +276,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v
 		volume.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case annDynamicallyProvisioned:
+			case pvutil.AnnDynamicallyProvisioned:
 				volume.Annotations[a] = mockPluginName
 			default:
 				volume.Annotations[a] = "yes"
@@ -380,7 +381,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case annStorageProvisioner:
+			case pvutil.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
@@ -687,7 +688,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 			obj := reactor.PopChange()
 			if obj == nil {
 				// Nothing was changed, should we exit?
-				if firstSync || reactor.ChangedSinceLastSync() > 0 {
+				if firstSync || reactor.GetChangeCount() > 0 {
 					// There were some changes after the last "periodic sync".
 					// Simulate "periodic sync" of everything (until it produces
 					// no changes).
@@ -711,7 +712,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				ctrl.claims.Update(claim)
 				err = ctrl.syncClaim(claim)
 				if err != nil {
-					if err == pvtesting.VersionConflictError {
+					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
 						klog.V(4).Infof("test intentionaly ignores version error.")
 					} else {
@@ -728,7 +729,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				ctrl.volumes.store.Update(volume)
 				err = ctrl.syncVolume(volume)
 				if err != nil {
-					if err == pvtesting.VersionConflictError {
+					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
 						klog.V(4).Infof("test intentionaly ignores version error.")
 					} else {

@@ -283,6 +283,11 @@ func (in *CustomResourceDefinitionSpec) DeepCopyInto(out *CustomResourceDefiniti
 		*out = new(CustomResourceConversion)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PreserveUnknownFields != nil {
+		in, out := &in.PreserveUnknownFields, &out.PreserveUnknownFields
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

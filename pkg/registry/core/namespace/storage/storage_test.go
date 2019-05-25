@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -161,8 +162,196 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, _, err := storage.Delete(ctx, "foo", nil); err == nil {
+	if _, _, err := storage.Delete(ctx, "foo", rest.ValidateAllObjectFunc, nil); err == nil {
+		t.Errorf("unexpected no error")
+	}
+	// should still exist
+	_, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateDeletingNamespaceWithIncompleteMetadataFinalizers(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.store.DestroyFunc()
+	key := "namespaces/foo"
+	ctx := genericapirequest.NewContext()
+	now := metav1.Now()
+	namespace := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "foo",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"example.com/foo"},
+		},
+		Spec: api.NamespaceSpec{
+			Finalizers: []api.FinalizerName{},
+		},
+		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, _, err = storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(ns), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should still exist
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateDeletingNamespaceWithIncompleteSpecFinalizers(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.store.DestroyFunc()
+	key := "namespaces/foo"
+	ctx := genericapirequest.NewContext()
+	now := metav1.Now()
+	namespace := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "foo",
+			DeletionTimestamp: &now,
+		},
+		Spec: api.NamespaceSpec{
+			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		},
+		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, _, err = storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(ns), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should still exist
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestUpdateDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.store.DestroyFunc()
+	key := "namespaces/foo"
+	ctx := genericapirequest.NewContext()
+	now := metav1.Now()
+	namespace := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "foo",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"example.com/foo"},
+		},
+		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns.(*api.Namespace).Finalizers = nil
+	if _, _, err = storage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(ns), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should not exist
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		t.Errorf("expected NotFound, got %v", err)
+	}
+}
+
+func TestFinalizeDeletingNamespaceWithCompleteFinalizers(t *testing.T) {
+	// get finalize storage
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
+	storage, _, finalizeStorage := NewREST(restOptions)
+
+	defer server.Terminate(t)
+	defer storage.store.DestroyFunc()
+	defer finalizeStorage.store.DestroyFunc()
+	key := "namespaces/foo"
+	ctx := genericapirequest.NewContext()
+	now := metav1.Now()
+	namespace := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "foo",
+			DeletionTimestamp: &now,
+		},
+		Spec: api.NamespaceSpec{
+			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		},
+		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns.(*api.Namespace).Spec.Finalizers = nil
+	if _, _, err = finalizeStorage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(ns), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should not exist
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		t.Errorf("expected NotFound, got %v", err)
+	}
+}
+
+func TestFinalizeDeletingNamespaceWithIncompleteMetadataFinalizers(t *testing.T) {
+	// get finalize storage
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "namespaces"}
+	storage, _, finalizeStorage := NewREST(restOptions)
+
+	defer server.Terminate(t)
+	defer storage.store.DestroyFunc()
+	defer finalizeStorage.store.DestroyFunc()
+	key := "namespaces/foo"
+	ctx := genericapirequest.NewContext()
+	now := metav1.Now()
+	namespace := &api.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "foo",
+			DeletionTimestamp: &now,
+			Finalizers:        []string{"example.com/foo"},
+		},
+		Spec: api.NamespaceSpec{
+			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		},
+		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns.(*api.Namespace).Spec.Finalizers = nil
+	if _, _, err = finalizeStorage.Update(ctx, "foo", rest.DefaultUpdatedObjectInfo(ns), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// should still exist
+	_, err = storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -186,8 +375,13 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, _, err := storage.Delete(ctx, "foo", nil); err != nil {
+	if _, _, err := storage.Delete(ctx, "foo", rest.ValidateAllObjectFunc, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	// should not exist
+	_, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if !apierrors.IsNotFound(err) {
+		t.Errorf("expected NotFound, got %v", err)
 	}
 }
 
@@ -384,7 +578,7 @@ func TestDeleteWithGCFinalizers(t *testing.T) {
 		}
 		var obj runtime.Object
 		var err error
-		if obj, _, err = storage.Delete(ctx, test.name, test.deleteOptions); err != nil {
+		if obj, _, err = storage.Delete(ctx, test.name, rest.ValidateAllObjectFunc, test.deleteOptions); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		ns, ok := obj.(*api.Namespace)

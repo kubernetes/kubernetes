@@ -6,31 +6,20 @@ reviewers:
   - MrHohn
   - deads2k
   - enisoc
-  - enj # for test/integration/etcd/etcd_storage_path_test.go
-  - erictune
-  - foxish # for test/e2e/network-partition.go
-  - gmarek
   - janetkuo
-  - kow3ns # for test/e2e/statefulset.go
-  - krousey
   - liggitt
-  - madhusudancs
-  - marun
   - mikedanese
-  - msau42 # for test/e2e/commmon/{*volume,empty_dir}.go and test/e2e/framework/{pv|volume}_util.go
+  - msau42
   - ncdc
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - shyamjvs
   - smarterclayton
-  - soltysh
   - sig-testing-reviewers
   - sttts
   - timothysc
   - zmerlynn
   - vishh
-  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
-  - oomichi
   - xichengliudui
   - andrewsykim
   - neolit123
@@ -44,31 +33,34 @@ approvers:
   - MrHohn
   - deads2k
   - enisoc
-  - enj # for test/integration/etcd/etcd_storage_path_test.go
-  - eparis
-  - erictune
-  - foxish # for test/e2e/network-partition.go
-  - gmarek
   - janetkuo
-  - kow3ns # for test/e2e/statefulset.go
-  - krousey
   - liggitt
-  - madhusudancs
-  - marun
   - mikedanese
-  - msau42 # for test/e2e/commmon/{*volume,empty_dir}.go and test/e2e/framework/{pv|volume}_util.go
+  - msau42
   - ncdc
+  - oomichi
   - pwittrock # for test/e2e/kubectl.go
   - saad-ali
   - shyamjvs
   - sig-testing-approvers
   - smarterclayton
-  - soltysh
   - sttts
   - timothysc
-  - zmerlynn
   - vishh
-  - MaciekPytel # for test/e2e/common/autoscaling_utils.go
+emeritus_approvers:
+  - enj
+  - eparis
+  - erictune
+  - foxish
+  - gmarek
+  - krousey
+  - kow3ns
+  - madhusudancs
+  - marun
+  - soltysh
+  - zmerlynn
+  - MaciekPytel
+
 labels:
 - area/test
 - sig/testing

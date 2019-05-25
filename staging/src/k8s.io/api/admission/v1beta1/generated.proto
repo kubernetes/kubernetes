@@ -60,7 +60,8 @@ message AdmissionRequest {
   // +optional
   optional string namespace = 6;
 
-  // Operation is the operation being performed
+  // Operation is the operation being performed. This may be different than the operation
+  // requested. e.g. a patch can result in either a CREATE or UPDATE Operation.
   optional string operation = 7;
 
   // UserInfo is information about the requesting user
@@ -78,6 +79,14 @@ message AdmissionRequest {
   // Defaults to false.
   // +optional
   optional bool dryRun = 11;
+
+  // Options is the operation option structure of the operation being performed.
+  // e.g. `meta.k8s.io/v1.DeleteOptions` or `meta.k8s.io/v1.CreateOptions`. This may be
+  // different than the options the caller provided. e.g. for a patch request the performed
+  // Operation might be a CREATE, in which case the Options will a
+  // `meta.k8s.io/v1.CreateOptions` even though the caller provided `meta.k8s.io/v1.PatchOptions`.
+  // +optional
+  optional k8s.io.apimachinery.pkg.runtime.RawExtension options = 12;
 }
 
 // AdmissionResponse describes an admission response.

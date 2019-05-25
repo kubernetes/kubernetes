@@ -32,7 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
@@ -422,7 +422,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.FakeCloud{}
+	cloud := &fakecloud.Cloud{}
 	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,

@@ -23,7 +23,6 @@ import (
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -224,7 +223,7 @@ func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
-	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
+	allErrors = append(allErrors, utilvalidation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
 
 	for i, rule := range hook.Rules {
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)

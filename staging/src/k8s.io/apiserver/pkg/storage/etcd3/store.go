@@ -181,44 +181,16 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 }
 
 // Delete implements storage.Interface.Delete.
-func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions) error {
+func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
 	key = path.Join(s.pathPrefix, key)
-	if preconditions == nil {
-		return s.unconditionalDelete(ctx, key, out)
-	}
-	return s.conditionalDelete(ctx, key, out, v, preconditions)
+	return s.conditionalDelete(ctx, key, out, v, preconditions, validateDeletion)
 }
 
-func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime.Object) error {
-	// We need to do get and delete in single transaction in order to
-	// know the value and revision before deleting it.
-	startTime := time.Now()
-	txnResp, err := s.client.KV.Txn(ctx).If().Then(
-		clientv3.OpGet(key),
-		clientv3.OpDelete(key),
-	).Commit()
-	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
-	if err != nil {
-		return err
-	}
-	getResp := txnResp.Responses[0].GetResponseRange()
-	if len(getResp.Kvs) == 0 {
-		return storage.NewKeyNotFoundError(key, 0)
-	}
-
-	kv := getResp.Kvs[0]
-	data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
-	if err != nil {
-		return storage.NewInternalError(err.Error())
-	}
-	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
-}
-
-func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions) error {
+func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
@@ -230,7 +202,12 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err != nil {
 			return err
 		}
-		if err := preconditions.Check(key, origState.obj); err != nil {
+		if preconditions != nil {
+			if err := preconditions.Check(key, origState.obj); err != nil {
+				return err
+			}
+		}
+		if err := validateDeletion(origState.obj); err != nil {
 			return err
 		}
 		startTime := time.Now()
@@ -301,19 +278,20 @@ func (s *store) GuaranteedUpdate(
 
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
-			// It's possible we were working with stale data
-			if mustCheckData && apierrors.IsConflict(err) {
-				// Actually fetch
-				origState, err = getCurrentState()
-				if err != nil {
-					return err
-				}
-				mustCheckData = false
-				// Retry
-				continue
+			// If our data is already up to date, return the error
+			if !mustCheckData {
+				return err
 			}
 
-			return err
+			// It's possible we were working with stale data
+			// Actually fetch
+			origState, err = getCurrentState()
+			if err != nil {
+				return err
+			}
+			mustCheckData = false
+			// Retry
+			continue
 		}
 
 		data, err := runtime.Encode(s.codec, ret)
@@ -413,7 +391,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		}
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
+	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", 0)
 }
 
 func (s *store) Count(key string) (int64, error) {
@@ -576,9 +554,10 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	// loop until we have filled the requested limit from etcd or there are no more results
 	var lastKey []byte
 	var hasMore bool
+	var getResp *clientv3.GetResponse
 	for {
 		startTime := time.Now()
-		getResp, err := s.client.KV.Get(ctx, key, options...)
+		getResp, err = s.client.KV.Get(ctx, key, options...)
 		metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
@@ -639,11 +618,17 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		if err != nil {
 			return err
 		}
-		return s.versioner.UpdateList(listObj, uint64(returnedRV), next)
+		remainingItemCount := getResp.Count - pred.Limit
+		// getResp.Count counts in objects that do not match the pred.
+		// Instead of returning inaccurate count, return 0.
+		if !pred.Empty() {
+			remainingItemCount = 0
+		}
+		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
+	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", 0)
 }
 
 // growSlice takes a slice value and grows its capacity up

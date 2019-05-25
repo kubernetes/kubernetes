@@ -37,7 +37,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-var VersionConflictError = errors.New("VersionError")
+// ErrVersionConflict is the error returned when resource version of requested
+// object conflicts with the object in storage.
+var ErrVersionConflict = errors.New("VersionError")
 
 // VolumeReactor is a core.Reactor that simulates etcd and API server. It
 // stores:
@@ -157,7 +159,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			storedVer, _ := strconv.Atoi(storedVolume.ResourceVersion)
 			requestedVer, _ := strconv.Atoi(volume.ResourceVersion)
 			if storedVer != requestedVer {
-				return true, obj, VersionConflictError
+				return true, obj, ErrVersionConflict
 			}
 			if reflect.DeepEqual(storedVolume, volume) {
 				klog.V(4).Infof("nothing updated volume %s", volume.Name)
@@ -190,7 +192,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			storedVer, _ := strconv.Atoi(storedClaim.ResourceVersion)
 			requestedVer, _ := strconv.Atoi(claim.ResourceVersion)
 			if storedVer != requestedVer {
-				return true, obj, VersionConflictError
+				return true, obj, ErrVersionConflict
 			}
 			if reflect.DeepEqual(storedClaim, claim) {
 				klog.V(4).Infof("nothing updated claim %s", claim.Name)
@@ -219,10 +221,9 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		if found {
 			klog.V(4).Infof("GetVolume: found %s", volume.Name)
 			return true, volume.DeepCopy(), nil
-		} else {
-			klog.V(4).Infof("GetVolume: volume %s not found", name)
-			return true, nil, fmt.Errorf("Cannot find volume %s", name)
 		}
+		klog.V(4).Infof("GetVolume: volume %s not found", name)
+		return true, nil, fmt.Errorf("Cannot find volume %s", name)
 
 	case action.Matches("get", "persistentvolumeclaims"):
 		name := action.(core.GetAction).GetName()
@@ -230,10 +231,9 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		if found {
 			klog.V(4).Infof("GetClaim: found %s", claim.Name)
 			return true, claim.DeepCopy(), nil
-		} else {
-			klog.V(4).Infof("GetClaim: claim %s not found", name)
-			return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
 		}
+		klog.V(4).Infof("GetClaim: claim %s not found", name)
+		return true, nil, apierrs.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("delete", "persistentvolumes"):
 		name := action.(core.DeleteAction).GetName()
@@ -246,9 +246,8 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			}
 			r.changedSinceLastSync++
 			return true, nil, nil
-		} else {
-			return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
 		}
+		return true, nil, fmt.Errorf("Cannot delete volume %s: not found", name)
 
 	case action.Matches("delete", "persistentvolumeclaims"):
 		name := action.(core.DeleteAction).GetName()
@@ -261,9 +260,8 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 			}
 			r.changedSinceLastSync++
 			return true, nil, nil
-		} else {
-			return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
 		}
+		return true, nil, fmt.Errorf("Cannot delete claim %s: not found", name)
 	}
 
 	return false, nil, nil
@@ -297,12 +295,6 @@ func (r *VolumeReactor) getWatches(gvr schema.GroupVersionResource, ns string) [
 		}
 	}
 	return watches
-}
-
-func (r *VolumeReactor) ChangedSinceLastSync() int {
-	r.lock.RLock()
-	defer r.lock.RUnlock()
-	return r.changedSinceLastSync
 }
 
 // injectReactError returns an error when the test requested given action to
@@ -435,6 +427,7 @@ func (r *VolumeReactor) SyncAll() {
 	r.changedSinceLastSync = 0
 }
 
+// GetChangeCount returns changes since last sync.
 func (r *VolumeReactor) GetChangeCount() int {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -515,6 +508,7 @@ func (r *VolumeReactor) AddClaimEvent(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
+// AddClaims adds PVCs into VolumeReactor.
 func (r *VolumeReactor) AddClaims(claims []*v1.PersistentVolumeClaim) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -523,6 +517,7 @@ func (r *VolumeReactor) AddClaims(claims []*v1.PersistentVolumeClaim) {
 	}
 }
 
+// AddVolumes adds PVs into VolumeReactor.
 func (r *VolumeReactor) AddVolumes(volumes []*v1.PersistentVolume) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -531,24 +526,28 @@ func (r *VolumeReactor) AddVolumes(volumes []*v1.PersistentVolume) {
 	}
 }
 
+// AddClaim adds a PVC into VolumeReactor.
 func (r *VolumeReactor) AddClaim(claim *v1.PersistentVolumeClaim) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.claims[claim.Name] = claim
 }
 
+// AddVolume adds a PV into VolumeReactor.
 func (r *VolumeReactor) AddVolume(volume *v1.PersistentVolume) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.volumes[volume.Name] = volume
 }
 
+// DeleteVolume deletes a PV by name.
 func (r *VolumeReactor) DeleteVolume(name string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	delete(r.volumes, name)
 }
 
+// AddClaimBoundToVolume adds a PVC and binds it to corresponding PV.
 func (r *VolumeReactor) AddClaimBoundToVolume(claim *v1.PersistentVolumeClaim) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -558,6 +557,7 @@ func (r *VolumeReactor) AddClaimBoundToVolume(claim *v1.PersistentVolumeClaim) {
 	}
 }
 
+// MarkVolumeAvaiable marks a PV available by name.
 func (r *VolumeReactor) MarkVolumeAvaiable(name string) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -568,6 +568,7 @@ func (r *VolumeReactor) MarkVolumeAvaiable(name string) {
 	}
 }
 
+// NewVolumeReactor creates a volume reactor.
 func NewVolumeReactor(client *fake.Clientset, fakeVolumeWatch, fakeClaimWatch *watch.FakeWatcher, errors []ReactorError) *VolumeReactor {
 	reactor := &VolumeReactor{
 		volumes:         make(map[string]*v1.PersistentVolume),

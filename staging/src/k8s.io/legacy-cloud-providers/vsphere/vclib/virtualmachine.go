@@ -233,7 +233,7 @@ func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Da
 
 	var dsMoList []mo.Datastore
 	pc := property.DefaultCollector(vm.Client())
-	properties := []string{DatastoreInfoProperty}
+	properties := []string{DatastoreInfoProperty, NameProperty}
 	err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
 	if err != nil {
 		klog.Errorf("Failed to get Datastore managed objects from datastore objects."+
@@ -241,12 +241,19 @@ func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Da
 		return nil, err
 	}
 	klog.V(9).Infof("Result dsMoList: %+v", dsMoList)
+	finder := getFinder(vm.Datacenter)
 	var dsObjList []*DatastoreInfo
 	for _, dsMo := range dsMoList {
+		// use the finder so that InventoryPath is set correctly in ds
+		ds, err := finder.Datastore(ctx, dsMo.Name)
+		if err != nil {
+			klog.Errorf("Failed finding datastore: %s. err: %+v", dsMo.Name, err)
+			return nil, err
+		}
+		datastore := Datastore{ds, vm.Datacenter}
 		dsObjList = append(dsObjList,
 			&DatastoreInfo{
-				&Datastore{object.NewDatastore(vm.Client(), dsMo.Reference()),
-					vm.Datacenter},
+				&datastore,
 				dsMo.Info.GetDatastoreInfo()})
 	}
 	return dsObjList, nil

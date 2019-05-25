@@ -29,6 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -225,7 +227,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		var err error
 		sshClient, err = getMasterSSHClient()
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to get the master SSH client.")
+		framework.ExpectNoError(err, "Failed to get the master SSH client.")
 	})
 
 	ginkgo.AfterEach(func() {
@@ -273,7 +275,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		for _, p := range remoteFiles {
 			err := writeRemoteFile(sshClient, p.data, temporaryRemotePath, p.fileName, 0644)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
+			framework.ExpectNoError(err, "Failed to write file %q at remote path %q with ssh client %+v", p.fileName, temporaryRemotePath, sshClient)
 		}
 
 		// directory on kubernetes-master
@@ -282,7 +284,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		// cleanup from previous tests
 		_, _, _, err := sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix))
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
+		framework.ExpectNoError(err, "Failed to remove remote dir %q with ssh client %+v", destinationDirPrefix, sshClient)
 
 		defer sshExec(sshClient, fmt.Sprintf("sudo rm -rf %s", destinationDirPrefix)) // ignore result in cleanup
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo mkdir -p %s", destinationDir))
@@ -297,8 +299,9 @@ var _ = SIGDescribe("Addon update", func() {
 		sshExecAndVerify(sshClient, fmt.Sprintf("sudo cp %s/%s %s/%s", temporaryRemotePath, svcAddonEnsureExists, destinationDir, svcAddonEnsureExists))
 		// Delete the "ensure exist class" addon at the end.
 		defer func() {
-			framework.Logf("Cleaning up ensure exist class addon.")
-			gomega.Expect(f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)).NotTo(gomega.HaveOccurred())
+			e2elog.Logf("Cleaning up ensure exist class addon.")
+			err := f.ClientSet.CoreV1().Services(addonNsName).Delete("addon-ensure-exists-test", nil)
+			framework.ExpectNoError(err)
 		}()
 
 		waitForReplicationControllerInAddonTest(f.ClientSet, addonNsName, "addon-reconcile-test", true)
@@ -332,7 +335,7 @@ var _ = SIGDescribe("Addon update", func() {
 
 		ginkgo.By("verify invalid addons weren't created")
 		_, err = f.ClientSet.CoreV1().ReplicationControllers(addonNsName).Get("invalid-addon-test", metav1.GetOptions{})
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		// Invalid addon manifests and the "ensure exist class" addon will be deleted by the deferred function.
 	})
@@ -355,11 +358,11 @@ func waitForReplicationControllerwithSelectorInAddonTest(c clientset.Interface, 
 		addonTestPollTimeout))
 }
 
-// TODO use the framework.SSH code, either adding an SCP to it or copying files
+// TODO use the ssh.SSH code, either adding an SCP to it or copying files
 // differently.
 func getMasterSSHClient() (*ssh.Client, error) {
 	// Get a signer for the provider.
-	signer, err := framework.GetSigner(framework.TestContext.Provider)
+	signer, err := e2essh.GetSigner(framework.TestContext.Provider)
 	if err != nil {
 		return nil, fmt.Errorf("error getting signer for provider %s: '%v'", framework.TestContext.Provider, err)
 	}
@@ -384,12 +387,12 @@ func getMasterSSHClient() (*ssh.Client, error) {
 
 func sshExecAndVerify(client *ssh.Client, cmd string) {
 	_, _, rc, err := sshExec(client, cmd)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "Failed to execute %q with ssh client %+v", cmd, client)
+	framework.ExpectNoError(err, "Failed to execute %q with ssh client %+v", cmd, client)
 	gomega.Expect(rc).To(gomega.Equal(0), "error return code from executing command on the cluster: %s", cmd)
 }
 
 func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
-	framework.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
+	e2elog.Logf("Executing '%s' on %v", cmd, client.RemoteAddr())
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", client.RemoteAddr(), err)
@@ -421,7 +424,7 @@ func sshExec(client *ssh.Client, cmd string) (string, string, int, error) {
 }
 
 func writeRemoteFile(sshClient *ssh.Client, data, dir, fileName string, mode os.FileMode) error {
-	framework.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
+	e2elog.Logf(fmt.Sprintf("Writing remote file '%s/%s' on %v", dir, fileName, sshClient.RemoteAddr()))
 	session, err := sshClient.NewSession()
 	if err != nil {
 		return fmt.Errorf("error creating session to host %s: '%v'", sshClient.RemoteAddr(), err)

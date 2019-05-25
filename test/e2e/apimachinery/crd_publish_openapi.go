@@ -32,10 +32,10 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	k8sclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
@@ -49,7 +49,7 @@ var (
 	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
-var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublishOpenAPI]", func() {
+var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
 
 	ginkgo.BeforeEach(func() {
@@ -62,7 +62,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("%v", err)
 		}
 
-		meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-foo")
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
@@ -70,13 +70,13 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		if _, err := framework.RunKubectlInput(validCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-foo"); err != nil {
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(validCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply valid CR %s: %v", validCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-foo"); err != nil {
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
 			framework.Failf("failed to delete valid CR: %v", err)
 		}
 
@@ -99,23 +99,23 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 
 		ginkgo.By("kubectl explain works to explain CR properties")
-		if err := verifyKubectlExplain(crd.GetPluralName(), `(?s)DESCRIPTION:.*Foo CRD for Testing.*FIELDS:.*apiVersion.*<string>.*APIVersion defines.*spec.*<Object>.*Specification of Foo`); err != nil {
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*Foo CRD for Testing.*FIELDS:.*apiVersion.*<string>.*APIVersion defines.*spec.*<Object>.*Specification of Foo`); err != nil {
 			framework.Failf("%v", err)
 		}
 
 		ginkgo.By("kubectl explain works to explain CR properties recursively")
-		if err := verifyKubectlExplain(crd.GetPluralName()+".metadata", `(?s)DESCRIPTION:.*Standard object's metadata.*FIELDS:.*creationTimestamp.*<string>.*CreationTimestamp is a timestamp`); err != nil {
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".metadata", `(?s)DESCRIPTION:.*Standard object's metadata.*FIELDS:.*creationTimestamp.*<string>.*CreationTimestamp is a timestamp`); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(crd.GetPluralName()+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
 			framework.Failf("%v", err)
 		}
-		if err := verifyKubectlExplain(crd.GetPluralName()+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
 			framework.Failf("%v", err)
 		}
 
 		ginkgo.By("kubectl explain works to return error when explain is called on property that doesn't exist")
-		if _, err := framework.RunKubectl("explain", crd.GetPluralName()+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
+		if _, err := framework.RunKubectl("explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
 			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
@@ -130,7 +130,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 			framework.Failf("%v", err)
 		}
 
-		meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
@@ -138,18 +138,18 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
 			framework.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-cr"); err != nil {
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
 			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
-		if _, err := framework.RunKubectl(ns, "delete", crd.GetPluralName(), "test-cr"); err != nil {
+		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
 			framework.Failf("failed to delete random CR: %v", err)
 		}
 
 		ginkgo.By("kubectl explain works to explain CR without validation schema")
-		if err := verifyKubectlExplain(crd.GetPluralName(), `(?s)DESCRIPTION:.*<empty>`); err != nil {
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*<empty>`); err != nil {
 			framework.Failf("%v", err)
 		}
 
@@ -168,8 +168,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if crdFoo.APIGroup == crdWaldo.APIGroup {
-			framework.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.APIGroup, crdWaldo.APIGroup)
+		if crdFoo.Crd.Spec.Group == crdWaldo.Crd.Spec.Group {
+			framework.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v1beta1"), schemaWaldo); err != nil {
 			framework.Failf("%v", err)
@@ -210,8 +210,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if crdFoo.APIGroup != crdWaldo.APIGroup {
-			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.APIGroup, crdWaldo.APIGroup)
+		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
+			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v5"), schemaWaldo); err != nil {
 			framework.Failf("%v", err)
@@ -237,8 +237,8 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		if err != nil {
 			framework.Failf("%v", err)
 		}
-		if crdFoo.APIGroup != crdWaldo.APIGroup {
-			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.APIGroup, crdWaldo.APIGroup)
+		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
+			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v6"), schemaWaldo); err != nil {
 			framework.Failf("%v", err)
@@ -269,7 +269,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 
 		ginkgo.By("rename a version")
 		patch := []byte(`{"spec":{"versions":[{"name":"v2","served":true,"storage":true},{"name":"v4","served":true,"storage":false}]}}`)
-		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.GetMetaName(), types.MergePatchType, patch)
+		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.Crd.Name, types.MergePatchType, patch)
 		if err != nil {
 			framework.Failf("%v", err)
 		}
@@ -289,7 +289,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 
 		// TestCrd.Versions is different from TestCrd.Crd.Versions, we have to manually
 		// update the name there. Used by cleanupCRD
-		crdMultiVer.Versions[1].Name = "v4"
+		crdMultiVer.Crd.Spec.Versions[1].Name = "v4"
 		if err := cleanupCRD(f, crdMultiVer); err != nil {
 			framework.Failf("%v", err)
 		}
@@ -310,6 +310,10 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublish
 		}
 
 		ginkgo.By("mark a version not serverd")
+		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("%v", err)
+		}
 		crd.Crd.Spec.Versions[1].Served = false
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
@@ -336,34 +340,43 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("require at least one version for CRD")
 	}
-	apiVersions := []v1beta1.CustomResourceDefinitionVersion{}
-	for _, version := range versions {
-		v := v1beta1.CustomResourceDefinitionVersion{
-			Name:    version,
-			Served:  true,
-			Storage: false,
-		}
-		apiVersions = append(apiVersions, v)
-	}
-	apiVersions[0].Storage = true
 
-	crd, err := crd.CreateMultiVersionTestCRD(f, group, apiVersions, nil)
+	expect := schema
+	props := &v1beta1.JSONSchemaProps{}
+	if schema == nil {
+		// to be backwards compatible, we expect CRD controller to treat
+		// CRD with nil schema specially and publish an empty schema
+		expect = []byte(`type: object`)
+	} else {
+		if err := yaml.Unmarshal(schema, props); err != nil {
+			return nil, err
+		}
+	}
+
+	crd, err := crd.CreateMultiVersionTestCRD(f, group, func(crd *v1beta1.CustomResourceDefinition) {
+		var apiVersions []v1beta1.CustomResourceDefinitionVersion
+		for i, version := range versions {
+			apiVersions = append(apiVersions, v1beta1.CustomResourceDefinitionVersion{
+				Name:    version,
+				Served:  true,
+				Storage: i == 0,
+			})
+		}
+		crd.Spec.Versions = apiVersions
+
+		// set up validation when input schema isn't nil
+		if schema != nil {
+			crd.Spec.Validation = &v1beta1.CustomResourceValidation{
+				OpenAPIV3Schema: props,
+			}
+		}
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRD: %v", err)
 	}
 
-	if schema != nil {
-		// patch validation schema for all versions
-		if err := patchSchema(schema, crd); err != nil {
-			return nil, fmt.Errorf("failed to patch schema: %v", err)
-		}
-	} else {
-		// change expectation if CRD doesn't have schema
-		schema = []byte(`type: object`)
-	}
-
-	for _, v := range crd.Versions {
-		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), schema); err != nil {
+	for _, v := range crd.Crd.Spec.Versions {
+		if err := waitForDefinition(f.ClientSet, definitionName(crd, v.Name), expect); err != nil {
 			return nil, fmt.Errorf("%v", err)
 		}
 	}
@@ -372,24 +385,13 @@ func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, version
 
 func cleanupCRD(f *framework.Framework, crd *crd.TestCrd) error {
 	crd.CleanUp()
-	for _, v := range crd.Versions {
+	for _, v := range crd.Crd.Spec.Versions {
 		name := definitionName(crd, v.Name)
 		if err := waitForDefinitionCleanup(f.ClientSet, name); err != nil {
 			return fmt.Errorf("%v", err)
 		}
 	}
 	return nil
-}
-
-// patchSchema takes schema in YAML and patches it to given CRD in given version
-func patchSchema(schema []byte, crd *crd.TestCrd) error {
-	s, err := utilyaml.ToJSON(schema)
-	if err != nil {
-		return fmt.Errorf("failed to create json patch: %v", err)
-	}
-	patch := []byte(fmt.Sprintf(`{"spec":{"validation":{"openAPIV3Schema":%s}}}`, string(s)))
-	crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crd.GetMetaName(), types.MergePatchType, patch)
-	return err
 }
 
 const waitSuccessThreshold = 10
@@ -530,7 +532,7 @@ func verifyKubectlExplain(name, pattern string) error {
 
 // definitionName returns the openapi definition name for given CRD in given version
 func definitionName(crd *crd.TestCrd, version string) string {
-	return openapiutil.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", crd.APIGroup, version, crd.Kind))
+	return openapiutil.ToRESTFriendlyName(fmt.Sprintf("%s/%s/%s", crd.Crd.Spec.Group, version, crd.Crd.Spec.Names.Kind))
 }
 
 var schemaFoo = []byte(`description: Foo CRD for Testing
@@ -589,9 +591,11 @@ properties:
     properties:
       dummy:
         description: Dummy property.
+        type: object
   status:
     description: Status of Waldo
     type: object
     properties:
       bars:
-        description: List of Bars and their statuses.`)
+        description: List of Bars and their statuses.
+        type: array`)

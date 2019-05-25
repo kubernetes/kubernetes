@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -115,23 +116,23 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 				if currentHeartbeatTime == lastHeartbeatTime {
 					if currentObserved.Sub(lastObserved) > 2*leaseDuration {
 						// heartbeat hasn't changed while watching for at least 2*leaseDuration, success!
-						framework.Logf("node status heartbeat is unchanged for %s, was waiting for at least %s, success!", currentObserved.Sub(lastObserved), 2*leaseDuration)
+						e2elog.Logf("node status heartbeat is unchanged for %s, was waiting for at least %s, success!", currentObserved.Sub(lastObserved), 2*leaseDuration)
 						return true, nil
 					}
-					framework.Logf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
+					e2elog.Logf("node status heartbeat is unchanged for %s, waiting for %s", currentObserved.Sub(lastObserved), 2*leaseDuration)
 					return false, nil
 				}
 
 				if currentHeartbeatTime.Sub(lastHeartbeatTime) >= leaseDuration {
 					// heartbeat time changed, but the diff was greater than leaseDuration, success!
-					framework.Logf("node status heartbeat changed in %s, was waiting for at least %s, success!", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					e2elog.Logf("node status heartbeat changed in %s, was waiting for at least %s, success!", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
 					return true, nil
 				}
 
 				if !apiequality.Semantic.DeepEqual(lastStatus, currentStatus) {
 					// heartbeat time changed, but there were relevant changes in the status, keep waiting
-					framework.Logf("node status heartbeat changed in %s (with other status changes), waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
-					framework.Logf("%s", diff.ObjectReflectDiff(lastStatus, currentStatus))
+					e2elog.Logf("node status heartbeat changed in %s (with other status changes), waiting for %s", currentHeartbeatTime.Sub(lastHeartbeatTime), leaseDuration)
+					e2elog.Logf("%s", diff.ObjectReflectDiff(lastStatus, currentStatus))
 					lastHeartbeatTime = currentHeartbeatTime
 					lastObserved = currentObserved
 					lastStatus = currentStatus

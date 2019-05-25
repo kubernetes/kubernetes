@@ -25,9 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 // EtcdUpgrade upgrades etcd on GCE.
@@ -59,7 +60,7 @@ func etcdUpgradeGCE(targetStorage, targetVersion string) error {
 		os.Environ(),
 		"TEST_ETCD_VERSION="+targetVersion,
 		"STORAGE_BACKEND="+targetStorage,
-		"TEST_ETCD_IMAGE=3.3.10-0")
+		"TEST_ETCD_IMAGE=3.3.10-1")
 
 	_, _, err := RunCmdEnv(env, gceUpgradeScript(), "-l", "-M")
 	return err
@@ -79,7 +80,7 @@ func masterUpgradeGCE(rawV string, enableKubeProxyDaemonSet bool) error {
 		env = append(env,
 			"TEST_ETCD_VERSION="+TestContext.EtcdUpgradeVersion,
 			"STORAGE_BACKEND="+TestContext.EtcdUpgradeStorage,
-			"TEST_ETCD_IMAGE=3.3.10-0")
+			"TEST_ETCD_IMAGE=3.3.10-1")
 	} else {
 		// In e2e tests, we skip the confirmation prompt about
 		// implicit etcd upgrades to simulate the user entering "y".
@@ -351,7 +352,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 			defer wg.Done()
 
 			Logf("Stopping docker and kubelet on %q to simulate failure", node.Name)
-			err := IssueSSHCommand("sudo systemctl stop docker kubelet", k.provider, &node)
+			err := e2essh.IssueSSHCommand("sudo systemctl stop docker kubelet", k.provider, &node)
 			if err != nil {
 				Logf("ERROR while stopping node %q: %v", node.Name, err)
 				return
@@ -360,7 +361,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 			time.Sleep(k.config.SimulatedDowntime)
 
 			Logf("Rebooting %q to repair the node", node.Name)
-			err = IssueSSHCommand("sudo reboot", k.provider, &node)
+			err = e2essh.IssueSSHCommand("sudo reboot", k.provider, &node)
 			if err != nil {
 				Logf("ERROR while rebooting node %q: %v", node.Name, err)
 				return

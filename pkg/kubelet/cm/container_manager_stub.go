@@ -17,7 +17,7 @@ limitations under the License.
 package cm
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,7 +32,9 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-type containerManagerStub struct{}
+type containerManagerStub struct {
+	shouldResetExtendedResourceCapacity bool
+}
 
 var _ ContainerManager = &containerManagerStub{}
 
@@ -110,6 +112,14 @@ func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.Conta
 	return nil
 }
 
+func (cm *containerManagerStub) ShouldResetExtendedResourceCapacity() bool {
+	return cm.shouldResetExtendedResourceCapacity
+}
+
 func NewStubContainerManager() ContainerManager {
-	return &containerManagerStub{}
+	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
+}
+
+func NewStubContainerManagerWithExtendedResource(shouldResetExtendedResourceCapacity bool) ContainerManager {
+	return &containerManagerStub{shouldResetExtendedResourceCapacity: shouldResetExtendedResourceCapacity}
 }

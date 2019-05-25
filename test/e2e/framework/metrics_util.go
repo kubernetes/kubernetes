@@ -37,6 +37,7 @@ import (
 	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/prometheus/common/expfmt"
 	"github.com/prometheus/common/model"
@@ -329,7 +330,7 @@ func getEtcdMetrics() ([]*model.Sample, error) {
 	}
 
 	cmd := "curl http://localhost:2379/metrics"
-	sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil || sshResult.Code != 0 {
 		return nil, fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 	}
@@ -656,7 +657,7 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 		}
 
 		cmd := "curl -X " + opUpper + " http://localhost:10251/metrics"
-		sshResult, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		sshResult, err := e2essh.SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
 		if err != nil || sshResult.Code != 0 {
 			return "", fmt.Errorf("unexpected error (code: %d) in ssh connection to master: %#v", sshResult.Code, err)
 		}

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -238,6 +239,8 @@ type ConfigFactoryArgs struct {
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
+	Plugins                        *config.Plugins
+	PluginConfig                   []config.PluginConfig
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
@@ -248,8 +251,8 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		stopEverything = wait.NeverStop
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-	// TODO(bsalamat): config files should be passed to the framework.
-	framework, err := framework.NewFramework(args.Registry, nil)
+
+	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
@@ -262,7 +265,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything),
+		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
@@ -384,19 +387,26 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	var extenders []algorithm.SchedulerExtender
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
+		var ignorableExtenders []algorithm.SchedulerExtender
 		for ii := range policy.ExtenderConfigs {
 			klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
 			if err != nil {
 				return nil, err
 			}
-			extenders = append(extenders, extender)
+			if !extender.IsIgnorable() {
+				extenders = append(extenders, extender)
+			} else {
+				ignorableExtenders = append(ignorableExtenders, extender)
+			}
 			for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
 				if r.IgnoredByScheduler {
 					ignoredExtendedResources.Insert(string(r.Name))
 				}
 			}
 		}
+		// place ignorable extenders to the tail of extenders
+		extenders = append(extenders, ignorableExtenders...)
 		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
@@ -682,7 +692,9 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 				pod, err := client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
-						podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle)
+						if err := podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle); err != nil {
+							klog.Error(err)
+						}
 					}
 					break
 				}

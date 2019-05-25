@@ -27,6 +27,7 @@ import (
 
 	// Cloud providers
 	cloudprovider "k8s.io/cloud-provider"
+	// ensure the cloud providers are installed
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/volume"

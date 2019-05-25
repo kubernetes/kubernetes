@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -32,14 +32,20 @@ func TestDropDisabledFields(t *testing.T) {
 		return &api.PersistentVolumeSpec{VolumeMode: mode}
 	}
 
+	secretRef := &api.SecretReference{
+		Name:      "expansion-secret",
+		Namespace: "default",
+	}
+
 	modeBlock := api.PersistentVolumeBlock
 
 	tests := map[string]struct {
-		oldSpec       *api.PersistentVolumeSpec
-		newSpec       *api.PersistentVolumeSpec
-		expectOldSpec *api.PersistentVolumeSpec
-		expectNewSpec *api.PersistentVolumeSpec
-		blockEnabled  bool
+		oldSpec             *api.PersistentVolumeSpec
+		newSpec             *api.PersistentVolumeSpec
+		expectOldSpec       *api.PersistentVolumeSpec
+		expectNewSpec       *api.PersistentVolumeSpec
+		blockEnabled        bool
+		csiExpansionEnabled bool
 	}{
 		"disabled block clears new": {
 			blockEnabled:  false,
@@ -84,11 +90,47 @@ func TestDropDisabledFields(t *testing.T) {
 			oldSpec:       specWithMode(&modeBlock),
 			expectOldSpec: specWithMode(&modeBlock),
 		},
+		"disabled csi expansion clears secrets": {
+			csiExpansionEnabled: false,
+			newSpec:             specWithCSISecrets(secretRef),
+			expectNewSpec:       specWithCSISecrets(nil),
+			oldSpec:             nil,
+			expectOldSpec:       nil,
+		},
+		"enabled csi expansion preserve secrets": {
+			csiExpansionEnabled: true,
+			newSpec:             specWithCSISecrets(secretRef),
+			expectNewSpec:       specWithCSISecrets(secretRef),
+			oldSpec:             nil,
+			expectOldSpec:       nil,
+		},
+		"enabled csi expansion preserve secrets when both old and new have it": {
+			csiExpansionEnabled: true,
+			newSpec:             specWithCSISecrets(secretRef),
+			expectNewSpec:       specWithCSISecrets(secretRef),
+			oldSpec:             specWithCSISecrets(secretRef),
+			expectOldSpec:       specWithCSISecrets(secretRef),
+		},
+		"disabled csi expansion old pv had secrets": {
+			csiExpansionEnabled: false,
+			newSpec:             specWithCSISecrets(secretRef),
+			expectNewSpec:       specWithCSISecrets(secretRef),
+			oldSpec:             specWithCSISecrets(secretRef),
+			expectOldSpec:       specWithCSISecrets(secretRef),
+		},
+		"enabled csi expansion preserves secrets when old pv did not had secrets": {
+			csiExpansionEnabled: true,
+			newSpec:             specWithCSISecrets(secretRef),
+			expectNewSpec:       specWithCSISecrets(secretRef),
+			oldSpec:             specWithCSISecrets(nil),
+			expectOldSpec:       specWithCSISecrets(nil),
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, tc.blockEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, tc.blockEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandCSIVolumes, tc.csiExpansionEnabled)()
 
 			DropDisabledFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
@@ -99,4 +141,20 @@ func TestDropDisabledFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+func specWithCSISecrets(secret *api.SecretReference) *api.PersistentVolumeSpec {
+	pvSpec := &api.PersistentVolumeSpec{
+		PersistentVolumeSource: api.PersistentVolumeSource{
+			CSI: &api.CSIPersistentVolumeSource{
+				Driver:       "com.google.gcepd",
+				VolumeHandle: "foobar",
+			},
+		},
+	}
+
+	if secret != nil {
+		pvSpec.CSI.ControllerExpandSecretRef = secret
+	}
+	return pvSpec
 }

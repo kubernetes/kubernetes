@@ -415,6 +415,8 @@ func (p *csiPlugin) NewMounter(
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
 
+	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
+
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
 	volData := map[string]string{
@@ -550,17 +552,7 @@ var _ volume.AttachableVolumePlugin = &csiPlugin{}
 var _ volume.DeviceMountableVolumePlugin = &csiPlugin{}
 
 func (p *csiPlugin) NewAttacher() (volume.Attacher, error) {
-	k8s := p.host.GetKubeClient()
-	if k8s == nil {
-		klog.Error(log("unable to get kubernetes client from host"))
-		return nil, errors.New("unable to get Kubernetes client")
-	}
-
-	return &csiAttacher{
-		plugin:        p,
-		k8s:           k8s,
-		waitSleepTime: 1 * time.Second,
-	}, nil
+	return p.newAttacherDetacher()
 }
 
 func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
@@ -568,17 +560,7 @@ func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 }
 
 func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
-	k8s := p.host.GetKubeClient()
-	if k8s == nil {
-		klog.Error(log("unable to get kubernetes client from host"))
-		return nil, errors.New("unable to get Kubernetes client")
-	}
-
-	return &csiAttacher{
-		plugin:        p,
-		k8s:           k8s,
-		waitSleepTime: 1 * time.Second,
-	}, nil
+	return p.newAttacherDetacher()
 }
 
 func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
@@ -835,6 +817,20 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 		return nil, err
 	}
 	return attachment.Status.AttachmentMetadata, nil
+}
+
+func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
+	k8s := p.host.GetKubeClient()
+	if k8s == nil {
+		klog.Error(log("unable to get kubernetes client from host"))
+		return nil, errors.New("unable to get Kubernetes client")
+	}
+
+	return &csiAttacher{
+		plugin:        p,
+		k8s:           k8s,
+		waitSleepTime: 1 * time.Second,
+	}, nil
 }
 
 func unregisterDriver(driverName string) error {

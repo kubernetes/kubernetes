@@ -28,10 +28,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 func addMasterReplica(zone string) error {
-	framework.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
+	e2elog.Logf(fmt.Sprintf("Adding a new master replica, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "true", "false")
 	if err != nil {
 		return err
@@ -40,7 +41,7 @@ func addMasterReplica(zone string) error {
 }
 
 func removeMasterReplica(zone string) error {
-	framework.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
+	e2elog.Logf(fmt.Sprintf("Removing an existing master replica, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "false", "false")
 	if err != nil {
 		return err
@@ -49,7 +50,7 @@ func removeMasterReplica(zone string) error {
 }
 
 func addWorkerNodes(zone string) error {
-	framework.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
+	e2elog.Logf(fmt.Sprintf("Adding worker nodes, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-grow-cluster.sh"), zone, "true", "false", "true")
 	if err != nil {
 		return err
@@ -58,7 +59,7 @@ func addWorkerNodes(zone string) error {
 }
 
 func removeWorkerNodes(zone string) error {
-	framework.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
+	e2elog.Logf(fmt.Sprintf("Removing worker nodes, zone: %s", zone))
 	_, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/e2e-internal/e2e-shrink-cluster.sh"), zone, "true", "true", "true")
 	if err != nil {
 		return err

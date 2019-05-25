@@ -25,11 +25,12 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/apps"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
@@ -44,13 +45,14 @@ var _ = SIGDescribe("Etcd failure [Disruptive]", func() {
 		// providers that provide those capabilities.
 		framework.SkipUnlessProviderIs("gce")
 
-		gomega.Expect(framework.RunRC(testutils.RCConfig{
+		err := framework.RunRC(testutils.RCConfig{
 			Client:    f.ClientSet,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
 			Image:     imageutils.GetPauseImageName(),
 			Replicas:  1,
-		})).NotTo(gomega.HaveOccurred())
+		})
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should recover from network partition with master", func() {
@@ -95,10 +97,10 @@ func doEtcdFailure(failCommand, fixCommand string) {
 
 func masterExec(cmd string) {
 	host := framework.GetMasterHost() + ":22"
-	result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
+	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
-		framework.LogSSHResult(result)
+		e2essh.LogResult(result)
 		framework.Failf("master exec command returned non-zero")
 	}
 }
@@ -113,7 +115,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(options)
 		if err != nil {
-			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
+			e2elog.Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
 		}
 		if len(pods.Items) == 0 {
@@ -121,9 +123,9 @@ func checkExistingRCRecovers(f *framework.Framework) {
 		}
 		for _, pod := range pods.Items {
 			err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod.Name, f.Namespace.Name)
 		}
-		framework.Logf("apiserver has recovered")
+		e2elog.Logf("apiserver has recovered")
 		return true, nil
 	}))
 
@@ -131,7 +133,7 @@ func checkExistingRCRecovers(f *framework.Framework) {
 	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
 		options := metav1.ListOptions{LabelSelector: rcSelector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
+		framework.ExpectNoError(err, "failed to list pods in namespace: %s, that match label selector: %s", f.Namespace.Name, rcSelector.String())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && podutil.IsPodReady(&pod) {
 				return true, nil

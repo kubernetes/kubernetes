@@ -21,10 +21,11 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -113,7 +114,7 @@ while true; do sleep 1; done
 					Expect(terminateContainer.IsReady()).Should(Equal(testCase.Ready))
 
 					status, err := terminateContainer.GetStatus()
-					Expect(err).ShouldNot(HaveOccurred())
+					framework.ExpectNoError(err)
 
 					By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
 					Expect(GetContainerState(status.State)).To(Equal(testCase.State))
@@ -147,13 +148,13 @@ while true; do sleep 1; done
 
 				By("get the container status")
 				status, err := c.GetStatus()
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
 				By("the container should be terminated")
 				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
 
 				By("the termination message should be set")
-				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				e2elog.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
 				Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				By("delete the container")
@@ -285,7 +286,7 @@ while true; do sleep 1; done
 					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 					By("create image pull secret")
 					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
 					container.ImagePullSecrets = []string{secret.Name}
 				}
@@ -344,7 +345,7 @@ while true; do sleep 1; done
 						break
 					}
 					if i < flakeRetry {
-						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
 						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}

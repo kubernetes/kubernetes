@@ -11,8 +11,6 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/test/integration/fixtures:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//test/e2e/framework:go_default_library",
     ],

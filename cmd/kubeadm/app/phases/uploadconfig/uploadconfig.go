@@ -101,6 +101,10 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			kubeadmconstants.ClusterStatusConfigMapKey:        string(clusterStatusYaml),
 		},
 	}, func(cm *v1.ConfigMap) error {
+		// Upgrade will call to UploadConfiguration with a modified KubernetesVersion reflecting the new
+		// Kubernetes version. In that case, the mutation path will take place.
+		cm.Data[kubeadmconstants.ClusterConfigurationConfigMapKey] = string(clusterConfigurationYaml)
+		// Mutate the ClusterStatus now
 		return mutateClusterStatus(cm, func(cs *kubeadmapi.ClusterStatus) error {
 			// Handle a nil APIEndpoints map. Should only happen if someone manually
 			// interacted with the ConfigMap.

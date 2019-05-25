@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
@@ -157,10 +158,11 @@ func newControlPlanePrepareKubeconfigSubphase() workflow.Phase {
 
 func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	return workflow.Phase{
-		Name:         "control-plane",
-		Short:        "Generate the manifests for the new control plane components",
-		Run:          runControlPlanePrepareControlPlaneSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
-		InheritFlags: getControlPlanePreparePhaseFlags("control-plane"),
+		Name:          "control-plane",
+		Short:         "Generate the manifests for the new control plane components",
+		Run:           runControlPlanePrepareControlPlaneSubphase, //NB. eventually in future we would like to break down this in sub phases for each component
+		InheritFlags:  getControlPlanePreparePhaseFlags("control-plane"),
+		ArgsValidator: cobra.NoArgs,
 	}
 }
 

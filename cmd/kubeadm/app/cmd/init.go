@@ -296,11 +296,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
-
 	if err = validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return nil, err
 	}
@@ -315,6 +310,13 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	if err != nil {
 		return nil, err
 	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
+	if err != nil {
+		return nil, err
+	}
+	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
 	// override node name and CRI socket from the command line options
 	if options.externalcfg.NodeRegistration.Name != "" {
@@ -334,7 +336,7 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// if dry running creates a temporary folder for saving kubeadm generated files
 	dryRunDir := ""
 	if options.dryRun {
-		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("kubeadm-init-dryrun"); err != nil {
+		if dryRunDir, err = kubeadmconstants.CreateTempDirForKubeadm("", "kubeadm-init-dryrun"); err != nil {
 			return nil, errors.Wrap(err, "couldn't create a temporary directory")
 		}
 	}

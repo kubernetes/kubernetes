@@ -42,7 +42,14 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 	allocatableResources := nodeInfo.AllocatableResource()
 
 	// compute pod limits
-	podLimits := getResourceLimits(pod)
+	var podLimits *schedulernodeinfo.Resource
+	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+		// We were able to parse metadata, use podLimits from there.
+		podLimits = priorityMeta.podLimits
+	} else {
+		// We couldn't parse metadata - fallback to computing it.
+		podLimits = getResourceLimits(pod)
+	}
 
 	cpuScore := computeScore(podLimits.MilliCPU, allocatableResources.MilliCPU)
 	memScore := computeScore(podLimits.Memory, allocatableResources.Memory)
@@ -83,7 +90,6 @@ func computeScore(limit, allocatable int64) int64 {
 // The reason to create this new function is to be consistent with other
 // priority functions because most or perhaps all priority functions work
 // with schedulernodeinfo.Resource.
-// TODO: cache it as part of metadata passed to priority functions.
 func getResourceLimits(pod *v1.Pod) *schedulernodeinfo.Resource {
 	result := &schedulernodeinfo.Resource{}
 	for _, container := range pod.Spec.Containers {

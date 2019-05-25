@@ -123,7 +123,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 			},
 			args: args{
 				obj: &metav1beta1.PartialObjectMetadataList{
-					Items: []*metav1beta1.PartialObjectMetadata{
+					Items: []metav1beta1.PartialObjectMetadata{
 						{ObjectMeta: metav1.ObjectMeta{Name: "blah", CreationTimestamp: metav1.NewTime(time.Unix(1, 0))}},
 						{ObjectMeta: metav1.ObjectMeta{Name: "blah-2", CreationTimestamp: metav1.NewTime(time.Unix(2, 0))}},
 					},

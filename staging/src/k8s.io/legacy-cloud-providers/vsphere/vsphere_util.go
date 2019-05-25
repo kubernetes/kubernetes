@@ -20,20 +20,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
@@ -43,6 +45,7 @@ import (
 const (
 	DatastoreProperty     = "datastore"
 	DatastoreInfoProperty = "info"
+	DatastoreNameProperty = "name"
 	Folder                = "Folder"
 	VirtualMachine        = "VirtualMachine"
 	DummyDiskName         = "kube-dummyDisk.vmdk"
@@ -121,7 +124,7 @@ func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nod
 }
 
 // Get all datastores accessible for the virtual machine object.
-func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
+func getSharedDatastoresInK8SCluster(ctx context.Context, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
 	nodeVmDetails, err := nodeManager.GetNodeDetails()
 	if err != nil {
 		klog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
@@ -155,12 +158,6 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, dc *vclib.Datacenter, 
 		}
 	}
 	klog.V(9).Infof("sharedDatastores : %+v", sharedDatastores)
-	sharedDatastores, err = getDatastoresForEndpointVC(ctx, dc, sharedDatastores)
-	if err != nil {
-		klog.Errorf("Failed to get shared datastores from endpoint VC. err: %+v", err)
-		return nil, err
-	}
-	klog.V(9).Infof("sharedDatastores at endpoint VC: %+v", sharedDatastores)
 	return sharedDatastores, nil
 }
 
@@ -182,7 +179,7 @@ func intersect(list1 []*vclib.DatastoreInfo, list2 []*vclib.DatastoreInfo) []*vc
 }
 
 // getMostFreeDatastore gets the best fit compatible datastore by free space.
-func getMostFreeDatastoreName(ctx context.Context, client *vim25.Client, dsInfoList []*vclib.DatastoreInfo) (string, error) {
+func getMostFreeDatastore(ctx context.Context, client *vim25.Client, dsInfoList []*vclib.DatastoreInfo) (*vclib.DatastoreInfo, error) {
 	var curMax int64
 	curMax = -1
 	var index int
@@ -193,65 +190,46 @@ func getMostFreeDatastoreName(ctx context.Context, client *vim25.Client, dsInfoL
 			index = i
 		}
 	}
-	return dsInfoList[index].Info.GetDatastoreInfo().Name, nil
+	return dsInfoList[index], nil
 }
 
-// Returns the datastores in the given datacenter by performing lookup based on datastore URL.
-func getDatastoresForEndpointVC(ctx context.Context, dc *vclib.Datacenter, sharedDsInfos []*vclib.DatastoreInfo) ([]*vclib.DatastoreInfo, error) {
-	var datastores []*vclib.DatastoreInfo
-	allDsInfoMap, err := dc.GetAllDatastores(ctx)
+func getPbmCompatibleDatastore(ctx context.Context, vcClient *vim25.Client, storagePolicyName string, nodeManager *NodeManager) (*vclib.DatastoreInfo, error) {
+	pbmClient, err := vclib.NewPbmClient(ctx, vcClient)
 	if err != nil {
 		return nil, err
-	}
-	for _, sharedDsInfo := range sharedDsInfos {
-		dsInfo, ok := allDsInfoMap[sharedDsInfo.Info.Url]
-		if ok {
-			datastores = append(datastores, dsInfo)
-		} else {
-			klog.V(4).Infof("Warning: Shared datastore with URL %s does not exist in endpoint VC", sharedDsInfo.Info.Url)
-		}
-	}
-	klog.V(9).Infof("Datastore from endpoint VC: %+v", datastores)
-	return datastores, nil
-}
-
-func getPbmCompatibleDatastore(ctx context.Context, dc *vclib.Datacenter, storagePolicyName string, nodeManager *NodeManager) (string, error) {
-	pbmClient, err := vclib.NewPbmClient(ctx, dc.Client())
-	if err != nil {
-		return "", err
 	}
 	storagePolicyID, err := pbmClient.ProfileIDByName(ctx, storagePolicyName)
 	if err != nil {
 		klog.Errorf("Failed to get Profile ID by name: %s. err: %+v", storagePolicyName, err)
-		return "", err
+		return nil, err
 	}
-	sharedDs, err := getSharedDatastoresInK8SCluster(ctx, dc, nodeManager)
+	sharedDs, err := getSharedDatastoresInK8SCluster(ctx, nodeManager)
 	if err != nil {
 		klog.Errorf("Failed to get shared datastores. err: %+v", err)
-		return "", err
+		return nil, err
 	}
 	if len(sharedDs) == 0 {
 		msg := "No shared datastores found in the endpoint virtual center"
 		klog.Errorf(msg)
-		return "", errors.New(msg)
+		return nil, errors.New(msg)
 	}
-	compatibleDatastores, _, err := pbmClient.GetCompatibleDatastores(ctx, dc, storagePolicyID, sharedDs)
+	compatibleDatastores, _, err := pbmClient.GetCompatibleDatastores(ctx, storagePolicyID, sharedDs)
 	if err != nil {
 		klog.Errorf("Failed to get compatible datastores from datastores : %+v with storagePolicy: %s. err: %+v",
 			sharedDs, storagePolicyID, err)
-		return "", err
+		return nil, err
 	}
 	klog.V(9).Infof("compatibleDatastores : %+v", compatibleDatastores)
-	datastore, err := getMostFreeDatastoreName(ctx, dc.Client(), compatibleDatastores)
+	datastore, err := getMostFreeDatastore(ctx, vcClient, compatibleDatastores)
 	if err != nil {
 		klog.Errorf("Failed to get most free datastore from compatible datastores: %+v. err: %+v", compatibleDatastores, err)
-		return "", err
+		return nil, err
 	}
-	klog.V(4).Infof("Most free datastore : %+s", datastore)
+	klog.V(4).Infof("Most free datastore : %+s", datastore.Info.Name)
 	return datastore, err
 }
 
-func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager *NodeManager, selectedZones []string) ([]*vclib.DatastoreInfo, error) {
+func getDatastoresForZone(ctx context.Context, nodeManager *NodeManager, selectedZones []string) ([]*vclib.DatastoreInfo, error) {
 
 	var sharedDatastores []*vclib.DatastoreInfo
 
@@ -279,7 +257,7 @@ func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager
 
 			var dsMoList []mo.Datastore
 			pc := property.DefaultCollector(host.Client())
-			properties := []string{DatastoreInfoProperty}
+			properties := []string{DatastoreInfoProperty, DatastoreNameProperty}
 			err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
 			if err != nil {
 				klog.Errorf("Failed to get Datastore managed objects from datastore objects."+
@@ -288,12 +266,37 @@ func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager
 			}
 			klog.V(9).Infof("Datastore mo details: %+v", dsMoList)
 
+			// find the Datacenter parent for this host
+			mes, err := mo.Ancestors(ctx, host.Client(), pc.Reference(), host.Reference())
+			if err != nil {
+				return nil, err
+			}
+			var dcMoref *types.ManagedObjectReference
+			for i := len(mes) - 1; i > 0; i-- {
+				if mes[i].Self.Type == "Datacenter" {
+					dcMoref = &mes[i].Self
+					break
+				}
+			}
+			if dcMoref == nil {
+				return nil, fmt.Errorf("Failed to find the Datacenter of host %s", host)
+			}
+
+			dc := object.NewDatacenter(host.Client(), *dcMoref)
+			finder := find.NewFinder(host.Client(), false)
+			finder.SetDatacenter(dc)
 			var dsObjList []*vclib.DatastoreInfo
 			for _, dsMo := range dsMoList {
+				// use the finder so that InventoryPath is set correctly in dsObj
+				dsObj, err := finder.Datastore(ctx, dsMo.Name)
+				if err != nil {
+					klog.Errorf("Failed to find datastore named %s in datacenter %s", dsMo.Name, dc)
+					return nil, err
+				}
 				dsObjList = append(dsObjList,
 					&vclib.DatastoreInfo{
-						Datastore: &vclib.Datastore{Datastore: object.NewDatastore(host.Client(), dsMo.Reference()),
-							Datacenter: nil},
+						Datastore: &vclib.Datastore{Datastore: dsObj,
+							Datacenter: &vclib.Datacenter{Datacenter: dc}},
 						Info: dsMo.Info.GetDatastoreInfo()})
 			}
 
@@ -317,40 +320,48 @@ func getDatastoresForZone(ctx context.Context, dc *vclib.Datacenter, nodeManager
 	return sharedDatastores, nil
 }
 
-func getPbmCompatibleZonedDatastore(ctx context.Context, dc *vclib.Datacenter, storagePolicyName string, zonedDatastores []*vclib.DatastoreInfo) (string, error) {
-	pbmClient, err := vclib.NewPbmClient(ctx, dc.Client())
+func getPbmCompatibleZonedDatastore(ctx context.Context, vcClient *vim25.Client, storagePolicyName string, zonedDatastores []*vclib.DatastoreInfo) (*vclib.DatastoreInfo, error) {
+	pbmClient, err := vclib.NewPbmClient(ctx, vcClient)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	storagePolicyID, err := pbmClient.ProfileIDByName(ctx, storagePolicyName)
 	if err != nil {
 		klog.Errorf("Failed to get Profile ID by name: %s. err: %+v", storagePolicyName, err)
-		return "", err
+		return nil, err
 	}
-	compatibleDatastores, _, err := pbmClient.GetCompatibleDatastores(ctx, dc, storagePolicyID, zonedDatastores)
+	compatibleDatastores, _, err := pbmClient.GetCompatibleDatastores(ctx, storagePolicyID, zonedDatastores)
 	if err != nil {
 		klog.Errorf("Failed to get compatible datastores from datastores : %+v with storagePolicy: %s. err: %+v",
 			zonedDatastores, storagePolicyID, err)
-		return "", err
+		return nil, err
 	}
 	klog.V(9).Infof("compatibleDatastores : %+v", compatibleDatastores)
-	datastore, err := getMostFreeDatastoreName(ctx, dc.Client(), compatibleDatastores)
+	datastore, err := getMostFreeDatastore(ctx, vcClient, compatibleDatastores)
 	if err != nil {
 		klog.Errorf("Failed to get most free datastore from compatible datastores: %+v. err: %+v", compatibleDatastores, err)
-		return "", err
+		return nil, err
 	}
-	klog.V(4).Infof("Most free datastore : %+s", datastore)
+	klog.V(4).Infof("Most free datastore : %+s", datastore.Info.Name)
 	return datastore, err
 }
 
-func (vs *VSphere) setVMOptions(ctx context.Context, dc *vclib.Datacenter, resourcePoolPath string) (*vclib.VMOptions, error) {
+func (vs *VSphere) setVMOptions(ctx context.Context, connection *vclib.VSphereConnection, ds *vclib.Datastore) (*vclib.VMOptions, error) {
 	var vmOptions vclib.VMOptions
-	resourcePool, err := dc.GetResourcePool(ctx, resourcePoolPath)
+	dsHosts, err := ds.GetDatastoreHostMounts(ctx)
 	if err != nil {
+		klog.Errorf("Failed to get datastore host mounts for %v: %+v", ds, err)
 		return nil, err
 	}
-	klog.V(9).Infof("Resource pool path %s, resourcePool %+v", resourcePoolPath, resourcePool)
-	folder, err := dc.GetFolderByPath(ctx, vs.cfg.Workspace.Folder)
+	// pick a host at random to use for Volume creation
+	dsHostMoref := dsHosts[rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(dsHosts))]
+	dummyVMHost := object.NewHostSystem(connection.Client, dsHostMoref)
+	resourcePool, err := dummyVMHost.ResourcePool(ctx)
+	if err != nil {
+		klog.Errorf("Failed to get resource pool from host %v", dummyVMHost)
+		return nil, err
+	}
+	folder, err := ds.Datacenter.GetFolderByPath(ctx, vs.cfg.Workspace.Folder)
 	if err != nil {
 		return nil, err
 	}
@@ -366,32 +377,30 @@ func (vs *VSphere) cleanUpDummyVMs(dummyVMPrefix string) {
 	defer cancel()
 	for {
 		time.Sleep(CleanUpDummyVMRoutineInterval * time.Minute)
-		vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
+		datacenters, err := vs.GetWorkspaceDatacenters(ctx)
 		if err != nil {
-			klog.V(4).Infof("Failed to get VSphere instance with err: %+v. Retrying again...", err)
+			klog.V(4).Infof("Failed to get datacenters from VC. err: %+v", err)
 			continue
 		}
-		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
-		if err != nil {
-			klog.V(4).Infof("Failed to get the datacenter: %s from VC. err: %+v", vs.cfg.Workspace.Datacenter, err)
-			continue
-		}
-		// Get the folder reference for global working directory where the dummy VM needs to be created.
-		vmFolder, err := dc.GetFolderByPath(ctx, vs.cfg.Workspace.Folder)
-		if err != nil {
-			klog.V(4).Infof("Unable to get the kubernetes folder: %q reference. err: %+v", vs.cfg.Workspace.Folder, err)
-			continue
-		}
-		// A write lock is acquired to make sure the cleanUp routine doesn't delete any VM's created by ongoing PVC requests.
-		cleanUpDummyVMs := func() {
-			cleanUpDummyVMLock.Lock()
-			defer cleanUpDummyVMLock.Unlock()
-			err = diskmanagers.CleanUpDummyVMs(ctx, vmFolder, dc)
+		// Clean up dummy VMs in each datacenter
+		for _, dc := range datacenters {
+			// Get the folder reference for global working directory where the dummy VM needs to be created.
+			vmFolder, err := dc.GetFolderByPath(ctx, vs.cfg.Workspace.Folder)
 			if err != nil {
-				klog.V(4).Infof("Unable to clean up dummy VM's in the kubernetes cluster: %q. err: %+v", vs.cfg.Workspace.Folder, err)
+				klog.V(4).Infof("Unable to get the kubernetes folder: %q reference. err: %+v", vs.cfg.Workspace.Folder, err)
+				continue
 			}
+			// A write lock is acquired to make sure the cleanUp routine doesn't delete any VM's created by ongoing PVC requests.
+			cleanUpDummyVMs := func() {
+				cleanUpDummyVMLock.Lock()
+				defer cleanUpDummyVMLock.Unlock()
+				err = diskmanagers.CleanUpDummyVMs(ctx, vmFolder)
+				if err != nil {
+					klog.V(4).Infof("Unable to clean up dummy VM's in the kubernetes cluster: %q. err: %+v", vs.cfg.Workspace.Folder, err)
+				}
+			}
+			cleanUpDummyVMs()
 		}
-		cleanUpDummyVMs()
 	}
 }
 
@@ -586,43 +595,6 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 	return nodesToRetry, nil
 }
 
-func (vs *VSphere) IsDummyVMPresent(vmName string) (bool, error) {
-	isDummyVMPresent := false
-
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
-	if err != nil {
-		return isDummyVMPresent, err
-	}
-
-	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
-	if err != nil {
-		return isDummyVMPresent, err
-	}
-
-	vmFolder, err := dc.GetFolderByPath(ctx, vs.cfg.Workspace.Folder)
-	if err != nil {
-		return isDummyVMPresent, err
-	}
-
-	vms, err := vmFolder.GetVirtualMachines(ctx)
-	if err != nil {
-		return isDummyVMPresent, err
-	}
-
-	for _, vm := range vms {
-		if vm.Name() == vmName {
-			isDummyVMPresent = true
-			break
-		}
-	}
-
-	return isDummyVMPresent, nil
-}
-
 func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) {
 	var nodeName string
 	nodes, err := vs.nodeManager.GetNodeDetails()
@@ -697,4 +669,64 @@ func GetVMUUID() (string, error) {
 	// need to add dashes, e.g. "564d395e-d807-e18a-cb25-b79f65eb2b9f"
 	uuid = fmt.Sprintf("%s-%s-%s-%s-%s", uuid[0:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:32])
 	return uuid, nil
+}
+
+// GetWorkspaceDatacenters returns the Datacenter objects that VCP has access to.
+// User can configure the list of datacenters in vsphere.conf. Otherwise all the
+// Datacenters in the configured list of VCs are returned.
+func (vs *VSphere) GetWorkspaceDatacenters(ctx context.Context) ([]*vclib.Datacenter, error) {
+	var datacenterObjs []*vclib.Datacenter
+	for vc, vsi := range vs.vsphereInstanceMap {
+		// ensure connection to VC
+		err := vs.nodeManager.vcConnect(ctx, vsi)
+		if err != nil {
+			return nil, err
+		}
+		if vsi.cfg.Datacenters == "" {
+			vcDatacenterObjs, err := vclib.GetAllDatacenter(ctx, vsi.conn)
+			if err != nil {
+				klog.Errorf("Error fetching list of datacenters from VC %s: %+v", vc, err)
+				return nil, err
+			}
+			datacenterObjs = append(datacenterObjs, vcDatacenterObjs...)
+		} else {
+			datacenters := strings.Split(vsi.cfg.Datacenters, ",")
+			for _, dc := range datacenters {
+				dc = strings.TrimSpace(dc)
+				if dc == "" {
+					continue
+				}
+				datacenterObj, err := vclib.GetDatacenter(ctx, vsi.conn, dc)
+				if err != nil {
+					klog.Errorf("Error fetching datacenter %s from VC %s: %+v", dc, vc, err)
+					return nil, err
+				}
+				datacenterObjs = append(datacenterObjs, datacenterObj)
+			}
+		}
+	}
+	return datacenterObjs, nil
+}
+
+// FindDatastoreByName looks for the given datastore by name across all available datacenters.
+// If more than one Datacenter has a Datastore with the given name, then returns reference to all of them.
+func (vs *VSphere) FindDatastoreByName(ctx context.Context, datastoreName string) ([]*vclib.DatastoreInfo, error) {
+	datacenters, err := vs.GetWorkspaceDatacenters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var datastoreInfos []*vclib.DatastoreInfo
+	for _, dc := range datacenters {
+		datastoreInfo, err := dc.GetDatastoreInfoByName(ctx, datastoreName)
+		if err != nil {
+			klog.V(9).Infof("Did not find datastore %s in datacenter %s, still looking.", datastoreName, dc.Name())
+			continue
+		}
+		datastoreInfos = append(datastoreInfos, datastoreInfo)
+	}
+	if len(datastoreInfos) == 0 {
+		return nil, fmt.Errorf("Datastore '%s' not found", datastoreName)
+	}
+	klog.V(4).Infof("Found datastore infos %v for datastore %s", datastoreInfos, datastoreName)
+	return datastoreInfos, nil
 }

@@ -1,6 +1,5 @@
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
-cmd/kube-controller-manager/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
 pkg/apis/abac/latest
@@ -50,7 +49,6 @@ pkg/apis/rbac/validation
 pkg/apis/storage
 pkg/apis/storage/v1
 pkg/apis/storage/v1beta1
-pkg/cloudprovider/providers/fake
 pkg/cloudprovider/providers/photon
 pkg/controller
 pkg/controller/apis/config/v1alpha1
@@ -103,8 +101,6 @@ pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controller/volume/persistentvolume/options
-pkg/controller/volume/persistentvolume/testing
-pkg/controller/volume/scheduling
 pkg/credentialprovider
 pkg/credentialprovider/gcp
 pkg/features
@@ -174,7 +170,6 @@ pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
-pkg/kubelet/oom
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/prober
@@ -196,9 +191,7 @@ pkg/master/tunneler
 pkg/proxy
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
-pkg/proxy/iptables
 pkg/proxy/userspace
-pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
@@ -290,10 +283,8 @@ pkg/security/podsecuritypolicy/seccomp
 pkg/security/podsecuritypolicy/selinux
 pkg/security/podsecuritypolicy/user
 pkg/security/podsecuritypolicy/util
-pkg/securitycontext
 pkg/serviceaccount
 pkg/ssh
-pkg/util/bandwidth
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env
@@ -502,7 +493,6 @@ staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
 staging/src/k8s.io/apiserver/pkg/storage/value
-staging/src/k8s.io/apiserver/pkg/util/feature
 staging/src/k8s.io/apiserver/pkg/util/proxy
 staging/src/k8s.io/apiserver/pkg/util/webhook
 staging/src/k8s.io/apiserver/pkg/util/wsstream
@@ -547,7 +537,6 @@ staging/src/k8s.io/client-go/scale/scheme/autoscalingv1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/testing
-staging/src/k8s.io/client-go/tools/auth
 staging/src/k8s.io/client-go/tools/cache
 staging/src/k8s.io/client-go/tools/cache/testing
 staging/src/k8s.io/client-go/tools/clientcmd
@@ -556,7 +545,6 @@ staging/src/k8s.io/client-go/tools/clientcmd/api/latest
 staging/src/k8s.io/client-go/tools/clientcmd/api/v1
 staging/src/k8s.io/client-go/tools/leaderelection
 staging/src/k8s.io/client-go/tools/leaderelection/resourcelock
-staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
 staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
@@ -576,6 +564,7 @@ staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 staging/src/k8s.io/code-generator/cmd/lister-gen/generators
 staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
+staging/src/k8s.io/component-base/featuregate
 staging/src/k8s.io/cri-api/pkg/apis/testing
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
@@ -597,26 +586,12 @@ staging/src/k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 staging/src/k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
-staging/src/k8s.io/sample-apiserver/pkg/apiserver
-staging/src/k8s.io/sample-apiserver/pkg/cmd/server
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller
-staging/src/k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1
-test/e2e
-test/e2e/auth
-test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
-test/e2e/framework
-test/e2e/framework/providers/gce
 test/e2e/lifecycle/bootstrap
-test/e2e/network
-test/e2e/node
 test/e2e/scalability
-test/e2e/scheduling
-test/e2e/storage
-test/e2e/storage/drivers
 test/e2e/storage/testsuites
 test/e2e/storage/utils
 test/e2e/storage/vsphere
@@ -624,5 +599,4 @@ test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/remote
 test/e2e_node/runner/remote
-test/e2e_node/services
 test/utils

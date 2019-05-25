@@ -65,6 +65,7 @@ ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 LOCAL_DNS_IP=${KUBE_LOCAL_DNS_IP:-169.254.20.10}
+DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
@@ -250,7 +251,7 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
   # default cgroup driver to match what is reported by docker to simplify local development
   if [[ -z ${CGROUP_DRIVER} ]]; then
     # match driver with docker runtime reported value (they must match)
-    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
+    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
   if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
@@ -553,7 +554,7 @@ EOF
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-apiserver "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
       ${cloud_config_arg} \
       "${advertise_address}" \
       "${node_port_range}" \
@@ -631,7 +632,7 @@ function start_controller_manager {
     fi
 
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-controller-manager \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -685,11 +686,6 @@ function start_cloud_controller_manager {
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
-
-    priv_arg=""
-    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
-      priv_arg="--allow-privileged=${ALLOW_PRIVILEGED}"
-    fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
@@ -751,7 +747,6 @@ function start_kubelet {
 
     # shellcheck disable=SC2206
     all_kubelet_flags=(
-      ${priv_arg:+"$priv_arg"}
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
       "--chaos-chance=${CHAOS_CHANCE}"
@@ -825,7 +820,7 @@ EOF
     fi
 
     # shellcheck disable=SC2024
-    sudo "${GO_OUT}/hyperkube" proxy \
+    sudo "${GO_OUT}/hyperkube" kube-proxy \
       --v="${LOG_LEVEL}" \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
@@ -835,7 +830,7 @@ EOF
 function start_kubescheduler {
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-scheduler \
       --v="${LOG_LEVEL}" \
       --leader-elect=false \
       --kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
@@ -849,6 +844,7 @@ function start_kubedns {
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
         ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
         ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
+        ${SED} -i -e "s/{{ pillar\['dns_memory_limit'\] }}/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml

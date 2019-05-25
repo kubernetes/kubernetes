@@ -46,7 +46,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	// make sure kubelet readonly (10255) and cadvisor (4194) ports are disabled via API server proxy
 	ginkgo.It(fmt.Sprintf("should not be able to proxy to the readonly kubelet port %v using proxy subresource", ports.KubeletReadOnlyPort), func() {
 		result, err := framework.NodeProxyRequest(f.ClientSet, nodeName, "pods/", ports.KubeletReadOnlyPort)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)
@@ -54,7 +54,7 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	})
 	ginkgo.It("should not be able to proxy to cadvisor port 4194 using proxy subresource", func() {
 		result, err := framework.NodeProxyRequest(f.ClientSet, nodeName, "containers/", 4194)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 
 		var statusCode int
 		result.StatusCode(&statusCode)

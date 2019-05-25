@@ -22,20 +22,20 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
-// partially cloned from webserver.go
+// State partially cloned from webserver.go
 type State struct {
 	Received map[string]int
 }
@@ -56,17 +56,17 @@ func testPreStop(c clientset.Interface, ns string) {
 			},
 		},
 	}
-	By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
+	ginkgo.By(fmt.Sprintf("Creating server pod %s in namespace %s", podDescr.Name, ns))
 	podDescr, err := c.CoreV1().Pods(ns).Create(podDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", podDescr.Name))
 
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
-		By("Deleting the server pod")
+		ginkgo.By("Deleting the server pod")
 		c.CoreV1().Pods(ns).Delete(podDescr.Name, nil)
 	}()
 
-	By("Waiting for pods to come up.")
+	ginkgo.By("Waiting for pods to come up.")
 	err = framework.WaitForPodRunningInNamespace(c, podDescr)
 	framework.ExpectNoError(err, "waiting for server pod to start")
 
@@ -99,7 +99,7 @@ func testPreStop(c clientset.Interface, ns string) {
 		},
 	}
 
-	By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
+	ginkgo.By(fmt.Sprintf("Creating tester pod %s in namespace %s", preStopDescr.Name, ns))
 	preStopDescr, err = c.CoreV1().Pods(ns).Create(preStopDescr)
 	framework.ExpectNoError(err, fmt.Sprintf("creating pod %s", preStopDescr.Name))
 	deletePreStop := true
@@ -107,7 +107,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		if deletePreStop {
-			By("Deleting the tester pod")
+			ginkgo.By("Deleting the tester pod")
 			c.CoreV1().Pods(ns).Delete(preStopDescr.Name, nil)
 		}
 	}()
@@ -116,7 +116,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, "waiting for tester pod to start")
 
 	// Delete the pod with the preStop handler.
-	By("Deleting pre-stop pod")
+	ginkgo.By("Deleting pre-stop pod")
 	if err := c.CoreV1().Pods(ns).Delete(preStopDescr.Name, nil); err == nil {
 		deletePreStop = false
 	}
@@ -143,13 +143,13 @@ func testPreStop(c clientset.Interface, ns string) {
 				framework.Failf("Error validating prestop: %v", err)
 				return true, err
 			}
-			By(fmt.Sprintf("Error validating prestop: %v", err))
+			ginkgo.By(fmt.Sprintf("Error validating prestop: %v", err))
 		} else {
-			framework.Logf("Saw: %s", string(body))
+			e2elog.Logf("Saw: %s", string(body))
 			state := State{}
 			err := json.Unmarshal(body, &state)
 			if err != nil {
-				framework.Logf("Error parsing: %v", err)
+				e2elog.Logf("Error parsing: %v", err)
 				return false, nil
 			}
 			if state.Received["prestop"] != 0 {
@@ -164,7 +164,7 @@ func testPreStop(c clientset.Interface, ns string) {
 var _ = SIGDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 	var podClient *framework.PodClient
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
 
@@ -177,42 +177,42 @@ var _ = SIGDescribe("PreStop", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
 		gracefulTerminationPeriodSeconds := int64(30)
-		By("creating the pod")
+		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())
 		pod := getPodWithpreStopLifeCycle(name)
 
-		By("submitting the pod to kubernetes")
+		ginkgo.By("submitting the pod to kubernetes")
 		podClient.Create(pod)
 
-		By("waiting for pod running")
+		ginkgo.By("waiting for pod running")
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 
 		var err error
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
-		Expect(err).NotTo(HaveOccurred(), "failed to GET scheduled pod")
+		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
-		By("deleting the pod gracefully")
+		ginkgo.By("deleting the pod gracefully")
 		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(gracefulTerminationPeriodSeconds))
-		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 
 		//wait up to graceful termination period seconds
 		time.Sleep(30 * time.Second)
 
-		By("verifying the pod running state after graceful termination")
+		ginkgo.By("verifying the pod running state after graceful termination")
 		result := &v1.PodList{}
 		err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
 			client, err := framework.NodeProxyRequest(f.ClientSet, pod.Spec.NodeName, "pods", ports.KubeletPort)
-			Expect(err).NotTo(HaveOccurred(), "failed to get the pods of the node")
+			framework.ExpectNoError(err, "failed to get the pods of the node")
 			err = client.Into(result)
-			Expect(err).NotTo(HaveOccurred(), "failed to parse the pods of the node")
+			framework.ExpectNoError(err, "failed to parse the pods of the node")
 
 			for _, kubeletPod := range result.Items {
 				if pod.Name != kubeletPod.Name {
 					continue
 				} else if kubeletPod.Status.Phase == v1.PodRunning {
-					framework.Logf("pod is running")
+					e2elog.Logf("pod is running")
 					return true, err
 				}
 			}

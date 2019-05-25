@@ -29,8 +29,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/legacy-cloud-providers/gce"
 	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
 )
 

@@ -8,11 +8,6 @@ rules:
 - destination: code-generator
   branches:
   - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/code-generator
-    name: release-1.11
-    go: 1.10.2
-  - source:
       branch: release-1.12
       dir: staging/src/k8s.io/code-generator
     name: release-1.12
@@ -31,11 +26,6 @@ rules:
   library: true
   branches:
   - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/apimachinery
-    name: release-1.11
-    go: 1.10.2
-  - source:
       branch: release-1.12
       dir: staging/src/k8s.io/apimachinery
     name: release-1.12
@@ -53,14 +43,6 @@ rules:
 - destination: api
   library: true
   branches:
-  - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/api
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
   - source:
       branch: release-1.12
       dir: staging/src/k8s.io/api
@@ -88,16 +70,6 @@ rules:
 - destination: client-go
   library: true
   branches:
-  - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/client-go
-    name: release-8.0
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
   - source:
       branch: release-1.12
       dir: staging/src/k8s.io/client-go
@@ -147,18 +119,6 @@ rules:
   library: true
   branches:
   - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/apiserver
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
-    - repository: client-go
-      branch: release-8.0
-  - source:
       branch: release-1.12
       dir: staging/src/k8s.io/apiserver
     name: release-1.12
@@ -198,20 +158,6 @@ rules:
         branch: release-1.14
 - destination: kube-aggregator
   branches:
-  - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/kube-aggregator
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
-    - repository: client-go
-      branch: release-8.0
-    - repository: apiserver
-      branch: release-1.11
   - source:
       branch: release-1.12
       dir: staging/src/k8s.io/kube-aggregator
@@ -258,24 +204,6 @@ rules:
         branch: release-1.14
 - destination: sample-apiserver
   branches:
-  - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/sample-apiserver
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
-    - repository: client-go
-      branch: release-8.0
-    - repository: apiserver
-      branch: release-1.11
-    - repository: code-generator
-      branch: release-1.11
-    required-packages:
-    - k8s.io/code-generator
   - source:
       branch: release-1.12
       dir: staging/src/k8s.io/sample-apiserver
@@ -343,22 +271,6 @@ rules:
 - destination: sample-controller
   branches:
   - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/sample-controller
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
-    - repository: client-go
-      branch: release-8.0
-    - repository: code-generator
-      branch: release-1.11
-    required-packages:
-    - k8s.io/code-generator
-  - source:
       branch: release-1.12
       dir: staging/src/k8s.io/sample-controller
     name: release-1.12
@@ -420,24 +332,6 @@ rules:
 - destination: apiextensions-apiserver
   branches:
   - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/apiextensions-apiserver
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
-    - repository: client-go
-      branch: release-8.0
-    - repository: apiserver
-      branch: release-1.11
-    - repository: code-generator
-      branch: release-1.11
-    required-packages:
-    - k8s.io/code-generator
-  - source:
       branch: release-1.12
       dir: staging/src/k8s.io/apiextensions-apiserver
     name: release-1.12
@@ -496,18 +390,6 @@ rules:
 - destination: metrics
   library: true
   branches:
-  - source:
-      branch: release-1.11
-      dir: staging/src/k8s.io/metrics
-    name: release-1.11
-    go: 1.10.2
-    dependencies:
-    - repository: apimachinery
-      branch: release-1.11
-    - repository: api
-      branch: release-1.11
-    - repository: client-go
-      branch: release-8.0
   - source:
       branch: release-1.12
       dir: staging/src/k8s.io/metrics

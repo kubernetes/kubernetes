@@ -22,7 +22,6 @@ go_library(
         "//test/e2e/storage/utils:go_default_library",
         "//test/e2e/upgrades:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
     ],
 )
 

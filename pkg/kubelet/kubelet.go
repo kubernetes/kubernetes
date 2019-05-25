@@ -32,7 +32,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -110,6 +110,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -465,7 +466,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	containerRefManager := kubecontainer.NewRefManager()
 
-	oomWatcher := oomwatcher.NewOOMWatcher(kubeDeps.Recorder)
+	oomWatcher := oomwatcher.NewWatcher(kubeDeps.Recorder)
 
 	clusterDNS := make([]net.IP, 0, len(kubeCfg.ClusterDNS))
 	for _, ipEntry := range kubeCfg.ClusterDNS {
@@ -656,7 +657,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 	klet.runtimeService = runtimeService
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && kubeDeps.KubeClient != nil {
 		klet.runtimeClassManager = runtimeclass.NewManager(kubeDeps.KubeClient)
 	}
 
@@ -1047,7 +1048,7 @@ type Kubelet struct {
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
 
-	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
+	// nodeStatusReportFrequency is the frequency that kubelet posts node
 	// status to master. It is only used when node lease feature is enabled.
 	nodeStatusReportFrequency time.Duration
 
@@ -1079,7 +1080,7 @@ type Kubelet struct {
 	os kubecontainer.OSInterface
 
 	// Watcher of out of memory events.
-	oomWatcher oomwatcher.OOMWatcher
+	oomWatcher oomwatcher.Watcher
 
 	// Monitor resource usage
 	resourceAnalyzer serverstats.ResourceAnalyzer
@@ -1222,6 +1223,8 @@ type Kubelet struct {
 // 4.  the pod-resources directory
 func (kl *Kubelet) setupDataDirs() error {
 	kl.rootDirectory = path.Clean(kl.rootDirectory)
+	pluginRegistrationDir := kl.getPluginsRegistrationDir()
+	pluginsDir := kl.getPluginsDir()
 	if err := os.MkdirAll(kl.getRootDir(), 0750); err != nil {
 		return fmt.Errorf("error creating root directory: %v", err)
 	}
@@ -1239,6 +1242,16 @@ func (kl *Kubelet) setupDataDirs() error {
 	}
 	if err := os.MkdirAll(kl.getPodResourcesDir(), 0750); err != nil {
 		return fmt.Errorf("error creating podresources directory: %v", err)
+	}
+	if selinux.SELinuxEnabled() {
+		err := selinux.SetFileLabel(pluginRegistrationDir, config.KubeletPluginsDirSELinuxLabel)
+		if err != nil {
+			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", pluginRegistrationDir, err)
+		}
+		err = selinux.SetFileLabel(pluginsDir, config.KubeletPluginsDirSELinuxLabel)
+		if err != nil {
+			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", pluginsDir, err)
+		}
 	}
 	return nil
 }
@@ -1782,15 +1795,6 @@ func (kl *Kubelet) canRunPod(pod *v1.Pod) lifecycle.PodAdmitResult {
 		}
 	}
 
-	// TODO: Refactor as a soft admit handler.
-	if err := canRunPod(pod); err != nil {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  "Forbidden",
-			Message: err.Error(),
-		}
-	}
-
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 
@@ -1841,7 +1845,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 // 1.  configCh:       a channel to read config events from
 // 2.  handler:        the SyncHandler to dispatch pods to
 // 3.  syncCh:         a channel to read periodic sync events from
-// 4.  houseKeepingCh: a channel to read housekeeping events from
+// 4.  housekeepingCh: a channel to read housekeeping events from
 // 5.  plegCh:         a channel to read PLEG updates from
 //
 // Events are also read from the kubelet liveness manager's update channel.
@@ -1863,7 +1867,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 //             handler callback for the event type
 // * plegCh: update the runtime cache; sync pod
 // * syncCh: sync all pods waiting for sync
-// * houseKeepingCh: trigger cleanup of pods
+// * housekeepingCh: trigger cleanup of pods
 // * liveness manager: sync pods that have failed or in which one or more
 //                     containers have failed liveness checks
 func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handler SyncHandler,

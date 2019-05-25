@@ -21,23 +21,24 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
-	enableTaintNodesByCondition  = utilfeature.NewFeatureGate()
-	disableTaintNodesByCondition = utilfeature.NewFeatureGate()
+	enableTaintNodesByCondition  = featuregate.NewFeatureGate()
+	disableTaintNodesByCondition = featuregate.NewFeatureGate()
 )
 
 func init() {
-	if err := enableTaintNodesByCondition.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TaintNodesByCondition: {Default: true}}); err != nil {
+	if err := enableTaintNodesByCondition.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TaintNodesByCondition: {Default: true}}); err != nil {
 		panic(err)
 	}
-	if err := disableTaintNodesByCondition.Add(map[utilfeature.Feature]utilfeature.FeatureSpec{features.TaintNodesByCondition: {Default: false}}); err != nil {
+	if err := disableTaintNodesByCondition.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TaintNodesByCondition: {Default: false}}); err != nil {
 		panic(err)
 	}
 }
@@ -60,8 +61,9 @@ func Test_nodeTaints(t *testing.T) {
 		name           string
 		node           api.Node
 		oldNode        api.Node
-		features       utilfeature.FeatureGate
+		features       featuregate.FeatureGate
 		operation      admission.Operation
+		options        runtime.Object
 		expectedTaints []api.Taint
 	}{
 		{
@@ -69,6 +71,7 @@ func Test_nodeTaints(t *testing.T) {
 			node:           myNodeObj,
 			features:       enableTaintNodesByCondition,
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			expectedTaints: []api.Taint{notReadyTaint},
 		},
 		{
@@ -76,6 +79,7 @@ func Test_nodeTaints(t *testing.T) {
 			node:           myNodeObj,
 			features:       disableTaintNodesByCondition,
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			expectedTaints: nil,
 		},
 		{
@@ -83,6 +87,7 @@ func Test_nodeTaints(t *testing.T) {
 			node:           myTaintedNodeObj,
 			features:       enableTaintNodesByCondition,
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			expectedTaints: []api.Taint{notReadyTaint},
 		},
 		{
@@ -90,12 +95,13 @@ func Test_nodeTaints(t *testing.T) {
 			node:           myUnreadyNodeObj,
 			features:       enableTaintNodesByCondition,
 			operation:      admission.Create,
+			options:        &metav1.CreateOptions{},
 			expectedTaints: []api.Taint{notReadyTaint},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attributes := admission.NewAttributesRecord(&tt.node, &tt.oldNode, nodeKind, myNodeObj.Namespace, myNodeObj.Name, resource, "", tt.operation, false, mynode)
+			attributes := admission.NewAttributesRecord(&tt.node, &tt.oldNode, nodeKind, myNodeObj.Namespace, myNodeObj.Name, resource, "", tt.operation, tt.options, false, mynode)
 			c := NewPlugin()
 			if tt.features != nil {
 				c.features = tt.features

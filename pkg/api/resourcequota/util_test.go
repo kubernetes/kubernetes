@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -76,7 +76,7 @@ func TestDropDisabledFields(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old ResourceQuota %v, new ResourceQuota %v", enabled, oldRQInfo.description, newRQInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResourceQuotaScopeSelectors, enabled)()
 
 					var oldRQSpec *api.ResourceQuotaSpec
 					if oldrq != nil {

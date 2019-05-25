@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	coordapi "k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
@@ -53,7 +54,7 @@ type NodeAuthorizer struct {
 	nodeRules  []rbacv1.PolicyRule
 
 	// allows overriding for testing
-	features utilfeature.FeatureGate
+	features featuregate.FeatureGate
 }
 
 // NewAuthorizer returns a new node authorizer

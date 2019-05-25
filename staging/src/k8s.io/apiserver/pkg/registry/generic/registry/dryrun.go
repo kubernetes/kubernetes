@@ -44,14 +44,17 @@ func (s *DryRunnableStorage) Create(ctx context.Context, key string, obj, out ru
 	return s.Storage.Create(ctx, key, obj, out, ttl)
 }
 
-func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, dryRun bool) error {
+func (s *DryRunnableStorage) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, deleteValidation storage.ValidateObjectFunc, dryRun bool) error {
 	if dryRun {
 		if err := s.Storage.Get(ctx, key, "", out, false); err != nil {
 			return err
 		}
-		return preconditions.Check(key, out)
+		if err := preconditions.Check(key, out); err != nil {
+			return err
+		}
+		return deleteValidation(out)
 	}
-	return s.Storage.Delete(ctx, key, out, preconditions)
+	return s.Storage.Delete(ctx, key, out, preconditions, deleteValidation)
 }
 
 func (s *DryRunnableStorage) Watch(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate) (watch.Interface, error) {

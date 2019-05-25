@@ -226,6 +226,7 @@ aliases:
     - thockin
     - rramkumar1
     - cmluciano
+    - m1093782566
   sig-apps-approvers:
     - kow3ns
     - janetkuo
@@ -287,6 +288,12 @@ aliases:
 
   sig-network-api-approvers:
     - smarterclayton
+    - thockin
+
+  sig-network-api-reviewers:
+    - caseydavenport
+    - cmluciano
+    - danwinship
     - thockin
 
   sig-node-api-approvers:
@@ -371,15 +378,13 @@ aliases:
   
   # sig-cluster-lifecycle-api-reviewers:
   #   - 
-  #   - 
+  #   -
   
-  # sig-network-api-reviewers:
-  #   - 
-  #   - 
-  
-  # sig-node-api-reviewers:
-  #   - 
-  #   - 
+  sig-node-api-reviewers:
+    - dchen1107
+    - derekwaynecarr
+    - tallclair
+    - yujuhong
   
   sig-scheduling-api-reviewers:
       - bsalamat

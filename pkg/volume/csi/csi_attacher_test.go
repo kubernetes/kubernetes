@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -32,12 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	utiltesting "k8s.io/client-go/util/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -226,7 +227,7 @@ func TestAttacherAttach(t *testing.T) {
 }
 
 func TestAttacherAttachWithInline(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	testCases := []struct {
 		name                string
 		nodeName            string
@@ -302,7 +303,7 @@ func TestAttacherAttachWithInline(t *testing.T) {
 }
 
 func TestAttacherWithCSIDriver(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
 	tests := []struct {
 		name                   string
@@ -360,9 +361,12 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				t.Log("plugin is not attachable")
 				return
 			}
-
+			var wg sync.WaitGroup
+			wg.Add(1)
 			go func(volSpec *volume.Spec, expectAttach bool) {
 				attachID, err := csiAttacher.Attach(volSpec, types.NodeName("node"))
+				defer wg.Done()
+
 				if err != nil {
 					t.Errorf("Attach() failed: %s", err)
 				}
@@ -378,12 +382,13 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 				}
 				markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, expectedAttachID, status)
 			}
+			wg.Wait()
 		})
 	}
 }
 
 func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
 	// In order to detect if the volume plugin would skip WaitForAttach for non-attachable drivers,
 	// we do not instantiate any VolumeAttachment. So if the plugin does not skip attach,  WaitForVolumeAttachment
@@ -533,7 +538,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 }
 
 func TestAttacherWaitForAttachWithInline(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
 	tests := []struct {
 		name             string
@@ -806,7 +811,7 @@ func TestAttacherVolumesAreAttached(t *testing.T) {
 }
 
 func TestAttacherVolumesAreAttachedWithInline(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	type attachedSpec struct {
 		volName  string
 		spec     *volume.Spec
@@ -1141,7 +1146,7 @@ func TestAttacherMountDevice(t *testing.T) {
 }
 
 func TestAttacherMountDeviceWithInline(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 	pvName := "test-pv"
 	testCases := []struct {
 		testName        string
@@ -1445,7 +1450,7 @@ func newTestWatchPlugin(t *testing.T, fakeClient *fakeclient.Clientset) (*csiPlu
 	factory := informers.NewSharedInformerFactory(fakeClient, csiResyncPeriod)
 	csiDriverInformer := factory.Storage().V1beta1().CSIDrivers()
 	csiDriverLister := csiDriverInformer.Lister()
-	go factory.Start(wait.NeverStop)
+	factory.Start(wait.NeverStop)
 
 	host := volumetest.NewFakeVolumeHostWithCSINodeName(
 		tmpDir,

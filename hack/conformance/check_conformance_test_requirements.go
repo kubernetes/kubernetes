@@ -34,7 +34,7 @@ const (
 	//e.g. framework.ConformanceIt("should provide secure master service ", func() {
 	patternStartConformance = "framework.ConformanceIt\\(.*, func\\(\\) {$"
 	patternEndConformance   = "}\\)$"
-	patternSkipProviderIs   = "Skip.*ProviderIs\\("
+	patternSkip             = "framework.Skip.*\\("
 )
 
 // This function checks the requirement: it works for all providers (e.g., no SkipIfProviderIs/SkipUnlessProviderIs calls)
@@ -44,7 +44,7 @@ func checkAllProviders(e2eFile string) error {
 
 	regStartConformance := regexp.MustCompile(patternStartConformance)
 	regEndConformance := regexp.MustCompile(patternEndConformance)
-	regSkipProviderIs := regexp.MustCompile(patternSkipProviderIs)
+	regSkip := regexp.MustCompile(patternSkip)
 
 	fileInput, err := ioutil.ReadFile(e2eFile)
 	if err != nil {
@@ -62,9 +62,9 @@ func checkAllProviders(e2eFile string) error {
 			inConformanceCode = true
 		}
 		if inConformanceCode {
-			if regSkipProviderIs.MatchString(line) {
+			if regSkip.MatchString(line) {
 				// To list all invalid places in a single operation of this tool, here doesn't return error and continues checking.
-				fmt.Fprintf(os.Stderr, "%v: Conformance test should not call SkipIfProviderIs()/SkipUnlessProviderIs()\n", e2eFile)
+				fmt.Fprintf(os.Stderr, "%v: Conformance test should not call any framework.Skip*()\n", e2eFile)
 				checkFailed = true
 			}
 			if regEndConformance.MatchString(line) {

@@ -753,7 +753,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
 	serviceUpdateResult := proxy.UpdateServiceMap(proxier.serviceMap, proxier.serviceChanges)
-	endpointUpdateResult := proxy.UpdateEndpointsMap(proxier.endpointsMap, proxier.endpointsChanges)
+	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	staleServices := serviceUpdateResult.UDPStaleClusterIP
 	// merge stale services gathered from updateEndpointsMap
@@ -1230,7 +1230,7 @@ func (proxier *Proxier) syncProxyRules() {
 	klog.V(5).Infof("Restoring iptables rules: %s", proxier.iptablesData.Bytes())
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
-		klog.Errorf("Failed to execute iptables-restore: %v\nfailed payload:\n%s", err, proxier.iptablesData.String())
+		klog.Errorf("Failed to execute iptables-restore: %v\nRules:\n%s", err, proxier.iptablesData.Bytes())
 		// Revert new local ports.
 		utilproxy.RevertPorts(replacementPortsMap, proxier.portsMap)
 		return
@@ -1272,6 +1272,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if proxier.healthzServer != nil {
 		proxier.healthzServer.UpdateTimestamp()
 	}
+	metrics.SyncProxyRulesLastTimestamp.SetToCurrentTime()
 
 	// Update healthchecks.  The endpoints list might include services that are
 	// not "OnlyLocal", but the services list will not, and the healthChecker

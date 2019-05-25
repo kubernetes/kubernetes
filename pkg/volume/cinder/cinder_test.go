@@ -317,6 +317,7 @@ func getOpenstackConfig() openstack.Config {
 			CAFile          string `gcfg:"ca-file"`
 			SecretName      string `gcfg:"secret-name"`
 			SecretNamespace string `gcfg:"secret-namespace"`
+			KubeconfigPath  string `gcfg:"kubeconfig-path"`
 		}{
 			Username:   "user",
 			Password:   "pass",
