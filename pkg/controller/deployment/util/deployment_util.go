@@ -504,7 +504,7 @@ func getReplicaSetFraction(rs apps.ReplicaSet, d apps.Deployment) int32 {
 	// We should never proportionally scale up from zero which means rs.spec.replicas and annotatedReplicas
 	// will never be zero here.
 	newRSsize := (float64(*(rs.Spec.Replicas) * deploymentReplicas)) / float64(annotatedReplicas)
-	return integer.RoundToInt32(newRSsize) - *(rs.Spec.Replicas)
+	return int32(math.Round(newRSsize)) - *(rs.Spec.Replicas)
 }
 
 // GetAllReplicaSets returns the old and new replica sets targeted by the given Deployment. It gets PodList and ReplicaSetList from client interface.
