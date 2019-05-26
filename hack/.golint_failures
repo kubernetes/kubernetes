@@ -2,7 +2,6 @@ cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
-pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
