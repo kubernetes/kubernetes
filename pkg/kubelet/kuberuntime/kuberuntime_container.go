@@ -704,36 +704,45 @@ func findNextInitContainerToRun(pod *v1.Pod, podStatus *kubecontainer.PodStatus)
 	}
 
 	// If there are failed containers, return the status of the last failed one.
-	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
-		container := &pod.Spec.InitContainers[i]
-		status := podStatus.FindContainerStatusByName(container.Name)
-		if status != nil && isInitContainerFailed(status) {
-			return status, container, false
-		}
-	}
-
-	// There are no failed containers now.
+	lastRunning := -1
+	lastExited := -1
 	for i := len(pod.Spec.InitContainers) - 1; i >= 0; i-- {
 		container := &pod.Spec.InitContainers[i]
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
 			continue
 		}
+		if isInitContainerFailed(status) {
+			return status, container, false
+		}
 
 		// container is still running, return not done.
 		if status.State == kubecontainer.ContainerStateRunning {
-			return nil, nil, false
+			if lastRunning < 0 {
+				lastRunning = i
+			}
+			continue
 		}
 
 		if status.State == kubecontainer.ContainerStateExited {
-			// all init containers successful
-			if i == (len(pod.Spec.InitContainers) - 1) {
-				return nil, nil, true
+			if lastExited < 0 {
+				lastExited = i
 			}
-
-			// all containers up to i successful, go to i+1
-			return nil, &pod.Spec.InitContainers[i+1], false
+			continue
 		}
+	}
+	if lastRunning >= 0 {
+		return nil, nil, false
+	}
+	if lastExited >= 0 {
+		// all init containers successful
+		if lastExited == (len(pod.Spec.InitContainers) - 1) {
+			return nil, nil, true
+		}
+
+		// all containers up to i successful, go to i+1
+		return nil, &pod.Spec.InitContainers[lastExited+1], false
+
 	}
 
 	return nil, &pod.Spec.InitContainers[0], false
