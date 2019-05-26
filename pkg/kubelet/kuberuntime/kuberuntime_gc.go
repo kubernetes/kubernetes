@@ -136,7 +136,6 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 			message := "Container is in unknown state, try killing it before removal"
 			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, nil); err != nil {
 				klog.Errorf("Failed to stop container %q: %v", containers[i].id, err)
-				continue
 			}
 		}
 		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
