@@ -39,7 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -626,39 +625,38 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
 	// only the last execution of each init container should be preserved, and only preserve it if it is in the
 	// list of init containers to keep.
-	initContainerNames := sets.NewString()
+	initContainerNames := make(map[string]int, len(pod.Spec.InitContainers))
 	for _, container := range pod.Spec.InitContainers {
-		initContainerNames.Insert(container.Name)
+		initContainerNames[container.Name] = 0
 	}
-	for name := range initContainerNames {
-		count := 0
-		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) ||
-				(status.State != kubecontainer.ContainerStateExited &&
-					status.State != kubecontainer.ContainerStateUnknown) {
-				continue
-			}
-			// Remove init containers in unknown state. It should have
-			// been stopped before pruneInitContainersBeforeStart is
-			// called.
-			count++
-			// keep the first init container for this name
-			if count == 1 {
-				continue
-			}
-			// prune all other init containers that match this container name
-			klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
-			if err := m.removeContainer(status.ID.ID); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
-				continue
-			}
+	for _, status := range podStatus.ContainerStatuses {
+		if _, ok := initContainerNames[status.Name]; !ok {
+			continue
+		}
+		if status.State != kubecontainer.ContainerStateExited &&
+			status.State != kubecontainer.ContainerStateUnknown {
+			continue
+		}
+		// Remove init containers in unknown state. It should have
+		// been stopped before pruneInitContainersBeforeStart is
+		// called.
+		initContainerNames[status.Name]++
+		// keep the first init container for this name
+		if initContainerNames[status.Name] == 1 {
+			continue
+		}
+		// prune all other init containers that match this container name
+		klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, initContainerNames[status.Name])
+		if err := m.removeContainer(status.ID.ID); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+			continue
+		}
 
-			// remove any references to this container
-			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
-				m.containerRefManager.ClearRef(status.ID)
-			} else {
-				klog.Warningf("No ref for container %q", status.ID)
-			}
+		// remove any references to this container
+		if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+			m.containerRefManager.ClearRef(status.ID)
+		} else {
+			klog.Warningf("No ref for container %q", status.ID)
 		}
 	}
 }
@@ -667,29 +665,26 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 // of the container because it assumes all init containers have been stopped
 // before the call happens.
 func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *kubecontainer.PodStatus) {
-	initContainerNames := sets.NewString()
+	initContainerNames := make(map[string]int, len(pod.Spec.InitContainers))
 	for _, container := range pod.Spec.InitContainers {
-		initContainerNames.Insert(container.Name)
+		initContainerNames[container.Name] = 0
 	}
-	for name := range initContainerNames {
-		count := 0
-		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) {
-				continue
-			}
-			count++
-			// Purge all init containers that match this container name
-			klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, count)
-			if err := m.removeContainer(status.ID.ID); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
-				continue
-			}
-			// Remove any references to this container
-			if _, ok := m.containerRefManager.GetRef(status.ID); ok {
-				m.containerRefManager.ClearRef(status.ID)
-			} else {
-				klog.Warningf("No ref for container %q", status.ID)
-			}
+	for _, status := range podStatus.ContainerStatuses {
+		if _, ok := initContainerNames[status.Name]; !ok {
+			continue
+		}
+		initContainerNames[status.Name]++
+		// Purge all init containers that match this container name
+		klog.V(4).Infof("Removing init container %q instance %q %d", status.Name, status.ID.ID, initContainerNames[status.Name])
+		if err := m.removeContainer(status.ID.ID); err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+			continue
+		}
+		// Remove any references to this container
+		if _, ok := m.containerRefManager.GetRef(status.ID); ok {
+			m.containerRefManager.ClearRef(status.ID)
+		} else {
+			klog.Warningf("No ref for container %q", status.ID)
 		}
 	}
 }
