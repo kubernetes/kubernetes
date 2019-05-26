@@ -92,6 +92,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/rest/dialer:all-srcs",
         "//staging/src/k8s.io/client-go/rest/fake:all-srcs",
         "//staging/src/k8s.io/client-go/rest/watch:all-srcs",
     ],

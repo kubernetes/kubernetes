@@ -28,8 +28,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
+	restdialer "k8s.io/client-go/rest/dialer"
 	"k8s.io/client-go/util/certificate"
-	"k8s.io/client-go/util/connrotation"
 )
 
 // UpdateTransport instruments a restconfig with a transport that dynamically uses
@@ -63,7 +63,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
 
-	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
+	d := restdialer.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 
 	if clientCertificateManager != nil {
 		if err := addCertRotation(stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
@@ -76,7 +76,7 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	return d.CloseAll, nil
 }
 
-func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
+func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *restdialer.Dialer) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)

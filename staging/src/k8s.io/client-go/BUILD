@@ -81,7 +81,6 @@ filegroup(
         "//staging/src/k8s.io/client-go/transport:all-srcs",
         "//staging/src/k8s.io/client-go/util/cert:all-srcs",
         "//staging/src/k8s.io/client-go/util/certificate:all-srcs",
-        "//staging/src/k8s.io/client-go/util/connrotation:all-srcs",
         "//staging/src/k8s.io/client-go/util/exec:all-srcs",
         "//staging/src/k8s.io/client-go/util/flowcontrol:all-srcs",
         "//staging/src/k8s.io/client-go/util/homedir:all-srcs",

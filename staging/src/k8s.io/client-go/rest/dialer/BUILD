@@ -2,15 +2,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["connrotation.go"],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/util/connrotation",
-    importpath = "k8s.io/client-go/util/connrotation",
+    srcs = ["dialer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/rest/dialer",
+    importpath = "k8s.io/client-go/rest/dialer",
     visibility = ["//visibility:public"],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["connrotation_test.go"],
+    srcs = ["dialer_test.go"],
     embed = [":go_default_library"],
 )
 

@@ -41,9 +41,9 @@ import (
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
+	restdialer "k8s.io/client-go/rest/dialer"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
-	"k8s.io/client-go/util/connrotation"
 	"k8s.io/klog"
 )
 
@@ -190,7 +190,7 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	} else {
 		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 	}
-	d := connrotation.NewDialer(dial)
+	d := restdialer.NewDialer(dial)
 	a.onRotate = d.CloseAll
 	c.Dial = d.DialContext
 
