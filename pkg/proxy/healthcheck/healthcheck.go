@@ -265,9 +265,9 @@ type HealthzServer struct {
 	recorder      record.EventRecorder
 	nodeRef       *v1.ObjectReference
 
-	lastUpdated atomic.Value
+	lastUpdated          atomic.Value
 	endpointsLastUpdated atomic.Value
-	servicesLastUpdated atomic.Value
+	servicesLastUpdated  atomic.Value
 }
 
 // NewDefaultHealthzServer returns a default healthz http server.
@@ -301,34 +301,42 @@ func (hs *HealthzServer) UpdateTimestamp() {
 	hs.lastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnEndpointsSynced() {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnServiceAdd(service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnServiceUpdate(oldService, service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnServiceDelete(service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
+// record watch updates
 func (hs *HealthzServer) OnServiceSynced() {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
@@ -392,5 +400,5 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 	}
 	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`, 
-								  lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
+		lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
 }
