@@ -25,6 +25,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
@@ -168,10 +169,14 @@ func (ssc *defaultStatefulSetControl) truncateHistory(
 	}
 	// delete any non-live history to maintain the revision limit.
 	history = history[:(historyLen - historyLimit)]
+	errors := []error{}
 	for i := 0; i < len(history); i++ {
 		if err := ssc.controllerHistory.DeleteControllerRevision(history[i]); err != nil {
-			return err
+			errors = append(errors, err)
 		}
+	}
+	if len(errors) > 0 {
+		return utilerrors.NewAggregate(errors)
 	}
 	return nil
 }
