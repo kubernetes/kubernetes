@@ -38,6 +38,7 @@ func TestNewForbidden(t *testing.T) {
 		Create,
 		nil,
 		false,
+		nil,
 		nil)
 	err := errors.New("some error")
 	expectedErr := `baz.foo "Unknown/errorGettingName" is forbidden: some error`

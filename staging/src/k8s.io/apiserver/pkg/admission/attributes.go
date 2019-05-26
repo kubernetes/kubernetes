@@ -25,20 +25,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 )
 
 type attributesRecord struct {
-	kind        schema.GroupVersionKind
-	namespace   string
-	name        string
-	resource    schema.GroupVersionResource
-	subresource string
-	operation   Operation
-	options     runtime.Object
-	dryRun      bool
-	object      runtime.Object
-	oldObject   runtime.Object
-	userInfo    user.Info
+	kind         schema.GroupVersionKind
+	namespace    string
+	name         string
+	resource     schema.GroupVersionResource
+	subresource  string
+	operation    Operation
+	options      runtime.Object
+	dryRun       bool
+	object       runtime.Object
+	oldObject    runtime.Object
+	userInfo     user.Info
+	fieldManager *fieldmanager.FieldManager
 
 	// other elements are always accessed in single goroutine.
 	// But ValidatingAdmissionWebhook add annotations concurrently.
@@ -46,19 +48,20 @@ type attributesRecord struct {
 	annotationsLock sync.RWMutex
 }
 
-func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info, fieldManager *fieldmanager.FieldManager) Attributes {
 	return &attributesRecord{
-		kind:        kind,
-		namespace:   namespace,
-		name:        name,
-		resource:    resource,
-		subresource: subresource,
-		operation:   operation,
-		options:     operationOptions,
-		dryRun:      dryRun,
-		object:      object,
-		oldObject:   oldObject,
-		userInfo:    userInfo,
+		kind:         kind,
+		namespace:    namespace,
+		name:         name,
+		resource:     resource,
+		subresource:  subresource,
+		operation:    operation,
+		options:      operationOptions,
+		dryRun:       dryRun,
+		object:       object,
+		oldObject:    oldObject,
+		userInfo:     userInfo,
+		fieldManager: fieldManager,
 	}
 }
 
@@ -104,6 +107,10 @@ func (record *attributesRecord) GetOldObject() runtime.Object {
 
 func (record *attributesRecord) GetUserInfo() user.Info {
 	return record.userInfo
+}
+
+func (record *attributesRecord) GetFieldManager() *fieldmanager.FieldManager {
+	return record.fieldManager
 }
 
 // getAnnotations implements privateAnnotationsGetter.It's a private method used

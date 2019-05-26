@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 )
 
 // Attributes is an interface used by AdmissionController to get information about a request
@@ -56,6 +57,8 @@ type Attributes interface {
 	GetKind() schema.GroupVersionKind
 	// GetUserInfo is information about the requesting user
 	GetUserInfo() user.Info
+	// GetFieldManager provides access to the scopes fieldManager for updating the the object and its managedFields when mutating
+	GetFieldManager() *fieldmanager.FieldManager
 
 	// AddAnnotation sets annotation according to key-value pair. The key should be qualified, e.g., podsecuritypolicy.admission.k8s.io/admit-policy, where
 	// "podsecuritypolicy" is the name of the plugin, "admission.k8s.io" is the name of the organization, "admit-policy" is the key name.

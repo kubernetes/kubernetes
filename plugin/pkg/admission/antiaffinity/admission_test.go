@@ -199,7 +199,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 	}
 	for _, test := range tests {
 		pod.Spec.Affinity = test.affinity
-		err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil), nil)
+		err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil, nil), nil)
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for Anti Affinity %+v but did not get an error", test.affinity)
@@ -267,7 +267,7 @@ func TestOtherResources(t *testing.T) {
 	for _, tc := range tests {
 		handler := &Plugin{}
 
-		err := handler.Validate(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+		err := handler.Validate(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, &metav1.CreateOptions{}, false, nil, nil), nil)
 
 		if tc.expectError {
 			if err == nil {

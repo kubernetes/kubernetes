@@ -154,7 +154,9 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			admission.Create,
 			patchToCreateOptions(options),
 			dryrun.IsDryRun(options.DryRun),
-			userInfo)
+			userInfo,
+			scope.FieldManager,
+		)
 		staticUpdateAttributes := admission.NewAttributesRecord(
 			nil,
 			nil,
@@ -167,6 +169,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			patchToUpdateOptions(options),
 			dryrun.IsDryRun(options.DryRun),
 			userInfo,
+			scope.FieldManager,
 		)
 
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
@@ -492,33 +495,34 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 	return objToUpdate, nil
 }
 
-func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
+func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation, operationOptions runtime.Object, fieldManager *fieldmanager.FieldManager) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo)
+	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo, fieldManager)
 }
 
-// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
+// admissionApplier provides a transformer that is called every time GuaranteedUpdate asks for the updated object,
 // and is given the currently persisted object and the patched object as input.
-// TODO: rename this function because the name implies it is related to applyPatcher
-func (p *patcher) applyAdmission(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-	p.trace.Step("About to check admission control")
-	var operation admission.Operation
-	var options runtime.Object
-	if hasUID, err := hasUID(currentObject); err != nil {
-		return nil, err
-	} else if !hasUID {
-		operation = admission.Create
-		currentObject = nil
-		options = patchToCreateOptions(p.options)
-	} else {
-		operation = admission.Update
-		options = patchToUpdateOptions(p.options)
+func (p *patcher) admissionApplier(fieldManager *fieldmanager.FieldManager) func(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
+	return func(ctx context.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
+		p.trace.Step("About to check admission control")
+		var operation admission.Operation
+		var options runtime.Object
+		if hasUID, err := hasUID(currentObject); err != nil {
+			return nil, err
+		} else if !hasUID {
+			operation = admission.Create
+			currentObject = nil
+			options = patchToCreateOptions(p.options)
+		} else {
+			operation = admission.Update
+			options = patchToUpdateOptions(p.options)
+		}
+		if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
+			attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation, options, fieldManager)
+			return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
+		}
+		return patchedObject, nil
 	}
-	if p.admissionCheck != nil && p.admissionCheck.Handles(operation) {
-		attributes := p.admissionAttributes(ctx, patchedObject, currentObject, operation, options)
-		return patchedObject, p.admissionCheck.Admit(attributes, p.objectInterfaces)
-	}
-	return patchedObject, nil
 }
 
 // patchResource divides PatchResource for easier unit testing
@@ -555,7 +559,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.admissionApplier(scope.FieldManager))
 	result, err := finishRequest(p.timeout, func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)

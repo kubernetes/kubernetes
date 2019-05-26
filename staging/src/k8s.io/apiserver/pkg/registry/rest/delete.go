@@ -167,6 +167,7 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
+			staticAttributes.GetFieldManager(),
 		)
 		if mutating {
 			if err := mutatingAdmission.Admit(finalAttributes, objInterfaces); err != nil {

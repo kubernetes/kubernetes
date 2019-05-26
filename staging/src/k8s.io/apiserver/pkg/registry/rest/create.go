@@ -178,6 +178,7 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
+			staticAttributes.GetFieldManager(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil

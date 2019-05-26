@@ -49,7 +49,8 @@ func attributesForRequest(rq request) admission.Attributes {
 		admission.Create,
 		&metav1.CreateOptions{},
 		rq.dryRun,
-		&user.DefaultInfo{Name: rq.username})
+		&user.DefaultInfo{Name: rq.username},
+		nil)
 }
 
 type request struct {
