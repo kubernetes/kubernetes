@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -175,12 +175,6 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
 	fs.Int32Var(&o.config.ClientConnection.Burst, "kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
 	fs.DurationVar(&o.config.UDPIdleTimeout.Duration, "udp-timeout", o.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
-	if o.config.Conntrack.Max == nil {
-		o.config.Conntrack.Max = utilpointer.Int32Ptr(0)
-	}
-	fs.Int32Var(o.config.Conntrack.Max, "conntrack-max", *o.config.Conntrack.Max,
-		"Maximum number of NAT connections to track (0 to leave as-is). This overrides conntrack-max-per-core and conntrack-min.")
-	fs.MarkDeprecated("conntrack-max", "This feature will be removed in a later release.")
 	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
 	fs.Int32Var(o.config.Conntrack.Min, "conntrack-min", *o.config.Conntrack.Min,
@@ -656,13 +650,6 @@ func (s *ProxyServer) birthCry() {
 }
 
 func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (int, error) {
-	if config.Max != nil && *config.Max > 0 {
-		if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
-			return -1, fmt.Errorf("invalid config: Conntrack Max and Conntrack MaxPerCore are mutually exclusive")
-		}
-		klog.V(3).Infof("getConntrackMax: using absolute conntrack-max (deprecated)")
-		return int(*config.Max), nil
-	}
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
 		if config.Min != nil {
