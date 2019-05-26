@@ -246,7 +246,6 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 	return nil
 }
 
-// HealthzUpdater allows 
 type HealthzUpdater interface {
 	UpdateTimestamp() //used for sync runs
 }
@@ -399,6 +398,6 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`, 
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`,
 		lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
 }
