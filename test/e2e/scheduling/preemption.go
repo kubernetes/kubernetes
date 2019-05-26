@@ -91,8 +91,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// This test verifies that when a higher priority pod is created and no node with
 	// enough resources is found, scheduler preempts a lower priority pod to schedule
 	// the high priority pod.
-	ginkgo.It("validates basic preemption works", func() {
-		var podRes v1.ResourceList
+	/*
+		Release : v1.16
+		Testname: Scheduler, Basic Preemption
+		Description: When a higher priority pod is created and no node with enough resources is found,
+		scheduler MUST preempt a lower priority pod and schedule the high priority pod.
+	*/
+	framework.ConformanceIt("validates basic preemption works", func() {
+		var podRes corev1.ResourceList
 		// Create one pod per node that uses a lot of the node's resources.
 		ginkgo.By("Create pods that use 60% of node resources.")
 		pods := make([]*v1.Pod, len(nodeList.Items))
@@ -151,8 +157,14 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// This test verifies that when a critical pod is created and no node with
 	// enough resources is found, scheduler preempts a lower priority pod to schedule
 	// this critical pod.
-	ginkgo.It("validates lower priority pod preemption by critical pod", func() {
-		var podRes v1.ResourceList
+	/*
+		Release : v1.16
+		Testname: Scheduler, Preemption for critical pod
+		Description: When a critical pod is created and no node with enough resources is found,
+		the scheduler MUST preempt a lower priority pod to schedule the critical pod.
+	*/
+	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func() {
+		var podRes corev1.ResourceList
 		// Create one pod per node that uses a lot of the node's resources.
 		ginkgo.By("Create pods that use 60% of node resources.")
 		pods := make([]*v1.Pod, len(nodeList.Items))
@@ -219,8 +231,15 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	// pod is preempted to allow the higher priority pod schedule.
 	// It also verifies that existing low priority pods are not preempted as their
 	// preemption wouldn't help.
-	ginkgo.It("validates pod anti-affinity works in preemption", func() {
-		var podRes v1.ResourceList
+	/*
+		Release : v1.16
+		Testname: Scheduler, Preemption with pod anti-affinity
+		Description: When a high priority pod is pending and its scheduling violates a medium priority
+		pod anti-affinity, the medium priority pod MUST be preempted to allow the higher priority pod schedule.
+		Existing low priority pods MUST NOT be preempted as their preemption wouldn't help.
+	*/
+	framework.ConformanceIt("validates pod anti-affinity works in preemption", func() {
+		var podRes corev1.ResourceList
 		// Create a few pods that uses a small amount of resources.
 		ginkgo.By("Create pods that use 10% of node resources.")
 		numPods := 4
