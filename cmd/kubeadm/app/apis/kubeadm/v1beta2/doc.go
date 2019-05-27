@@ -20,30 +20,23 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
 // Package v1beta2 defines the v1beta2 version of the kubeadm configuration file format.
-// This version graduates the configuration format to BETA and is a big step towards GA.
+// This version improves on the v1beta1 format by fixing some minor issues and adding a few new fields.
 //
-//A list of changes since v1alpha3:
-//	- "apiServerEndpoint" in InitConfiguration was renamed to "localAPIEndpoint" for better clarity of what the field
-//	represents.
-//	- Common fields in ClusterConfiguration such as "*extraArgs" and "*extraVolumes" for control plane components are now moved
-//	under component structs - i.e. "apiServer", "controllerManager", "scheduler".
-//	- "auditPolicy" was removed from ClusterConfiguration. Please use "extraArgs" in "apiServer" to configure this feature instead.
-//	- "unifiedControlPlaneImage" in ClusterConfiguration was changed to a boolean field called "useHyperKubeImage".
-//	- ClusterConfiguration now has a "dns" field which can be used to select and configure the cluster DNS addon.
-//	- "featureGates" still exists under ClusterConfiguration, but there are no supported feature gates in 1.13.
-//	See the Kubernetes 1.13 changelog for further details.
-//	- Both "localEtcd" and "dns" configurations now support custom image repositories.
-//	- The "controlPlane*"-related fields in JoinConfiguration were refactored into a sub-structure.
-//	- "clusterName" was removed from JoinConfiguration and the name is now fetched from the existing cluster.
+// A list of changes since v1beta1:
+//	- "certificateKey" field is added to InitConfiguration and JoinConfiguration.
+//	- "ignorePreflightErrors" field is added to the NodeRegistrationOptions.
+//	- The JSON "omitempty" tag is used in a more places where appropriate.
+//	- The JSON "omitempty" tag of the "taints" field (inside NodeRegistrationOptions) is removed.
+//	See the Kubernetes 1.15 changelog for further details.
 //
 // Migration from old kubeadm config versions
 //
-// Please convert your v1alpha3 configuration files to v1beta2 using the "kubeadm config migrate" command of kubeadm v1.13.x
+// Please convert your v1beta1 configuration files to v1beta2 using the "kubeadm config migrate" command of kubeadm v1.15.x
 // (conversion from older releases of kubeadm config files requires older release of kubeadm as well e.g.
-//	kubeadm v1.11 should be used to migrate v1alpha1 to v1alpha2; kubeadm v1.12 should be used to translate v1alpha2 to v1alpha3)
+//	kubeadm v1.11 should be used to migrate v1alpha1 to v1alpha2; kubeadm v1.12 should be used to translate v1alpha2 to v1alpha3;
+//	kubeadm v1.13 or v1.14 should be used to translate v1alpha3 to v1beta1)
 //
-// Nevertheless, kubeadm v1.13.x will support reading from v1alpha3 version of the kubeadm config file format, but this support
-// will be dropped in the v1.14 release.
+// Nevertheless, kubeadm v1.15.x will support reading from v1beta1 version of the kubeadm config file format.
 //
 // Basics
 //
@@ -181,9 +174,12 @@ limitations under the License.
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    cgroupDriver: "cgroupfs"
+//	  ignorePreflightErrors:
+//	  - IsPrivilegedUser
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
+//	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
 // 	---
 // 	apiVersion: kubeadm.k8s.io/v1beta2
 // 	kind: ClusterConfiguration
