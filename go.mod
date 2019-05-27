@@ -140,7 +140,7 @@ require (
 	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	github.com/spf13/jwalterweatherman v0.0.0-20160311093646-33c24e77fb80 // indirect
 	github.com/spf13/pflag v1.0.1
-	github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
+	github.com/spf13/viper v1.0.0
 	github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 	github.com/stretchr/testify v1.2.2
 	github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4 // indirect
@@ -382,7 +382,7 @@ replace (
 	github.com/spf13/cobra => github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v0.0.0-20160311093646-33c24e77fb80
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
-	github.com/spf13/viper => github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
+	github.com/spf13/viper => github.com/spf13/viper v1.0.0
 	github.com/storageos/go-api => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 	github.com/stretchr/objx => github.com/stretchr/objx v0.1.1
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2

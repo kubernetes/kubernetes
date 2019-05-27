@@ -756,7 +756,7 @@ github.com/spf13/cobra/doc
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.1 => github.com/spf13/pflag v1.0.1
 github.com/spf13/pflag
-# github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8 => github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
+# github.com/spf13/viper v1.0.0 => github.com/spf13/viper v1.0.0
 github.com/spf13/viper
 # github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 github.com/storageos/go-api
