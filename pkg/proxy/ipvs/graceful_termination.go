@@ -157,7 +157,7 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 }
 
 func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, error) {
-	klog.Infof("Trying to delete rs: %s", rsToDelete.String())
+	klog.V(2).Infof("Trying to delete rs: %s", rsToDelete.String())
 	rss, err := m.ipvs.GetRealServers(rsToDelete.VirtualServer)
 	if err != nil {
 		return false, err
@@ -171,7 +171,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 				klog.Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
 				return false, nil
 			}
-			klog.Infof("Deleting rs: %s", rsToDelete.String())
+			klog.V(2).Infof("Deleting rs: %s", rsToDelete.String())
 			err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rs)
 			if err != nil {
 				return false, fmt.Errorf("Delete destination %q err: %v", rs.String(), err)
