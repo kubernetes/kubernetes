@@ -263,9 +263,9 @@ func (r *resetData) Run() error {
 	// Only clear etcd data when using local etcd.
 	klog.V(1).Infoln("[reset] Checking for etcd config")
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
-	etcdDataDir, err := getEtcdDataDir(etcdManifestPath, cfg)
+	etcdDirs, err := getEtcdDirs(etcdManifestPath, cfg)
 	if err == nil {
-		dirsToClean = append(dirsToClean, etcdDataDir)
+		dirsToClean = append(dirsToClean, etcdDirs...)
 		if cfg != nil {
 			if err := etcdphase.RemoveStackedEtcdMemberFromCluster(client, cfg); err != nil {
 				klog.Warningf("[reset] failed to remove etcd member: %v\n.Please manually remove this etcd member using etcdctl", err)
@@ -350,30 +350,35 @@ func (r *resetData) Run() error {
 	return nil
 }
 
-func getEtcdDataDir(manifestPath string, cfg *kubeadmapi.InitConfiguration) (string, error) {
+func getEtcdDirs(manifestPath string, cfg *kubeadmapi.InitConfiguration) ([]string, error) {
 	const etcdVolumeName = "etcd-data"
-	var dataDir string
+	const etcdWalVolumeName = "etcd-wal"
+	var dataDir, walDir string
 
 	if cfg != nil && cfg.Etcd.Local != nil {
-		return cfg.Etcd.Local.DataDir, nil
+		return []string{cfg.Etcd.Local.WalDir, cfg.Etcd.Local.DataDir}, nil
 	}
 	klog.Warningln("[reset] No kubeadm config, using etcd pod spec to get data directory")
 
 	etcdPod, err := utilstaticpod.ReadStaticPodFromDisk(manifestPath)
 	if err != nil {
-		return "", err
+		return []string{"", ""}, err
 	}
 
 	for _, volumeMount := range etcdPod.Spec.Volumes {
 		if volumeMount.Name == etcdVolumeName {
 			dataDir = volumeMount.HostPath.Path
-			break
+			continue
+		}
+		if volumeMount.Name == etcdWalVolumeName {
+			walDir = volumeMount.HostPath.Path
+			continue
 		}
 	}
-	if dataDir == "" {
-		return dataDir, errors.New("invalid etcd pod manifest")
+	if dataDir == "" || walDir == "" {
+		return []string{walDir, dataDir}, errors.New("invalid etcd pod manifest")
 	}
-	return dataDir, nil
+	return []string{walDir, dataDir}, nil
 }
 
 func removeContainers(execer utilsexec.Interface, criSocketPath string) error {

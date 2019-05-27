@@ -765,6 +765,7 @@ func autoConvert_v1beta2_LocalEtcd_To_kubeadm_LocalEtcd(in *LocalEtcd, out *kube
 		return err
 	}
 	out.DataDir = in.DataDir
+	out.WalDir = in.WalDir
 	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))
@@ -781,6 +782,7 @@ func autoConvert_kubeadm_LocalEtcd_To_v1beta2_LocalEtcd(in *kubeadm.LocalEtcd, o
 		return err
 	}
 	out.DataDir = in.DataDir
+	out.WalDir = in.WalDir
 	out.ExtraArgs = *(*map[string]string)(unsafe.Pointer(&in.ExtraArgs))
 	out.ServerCertSANs = *(*[]string)(unsafe.Pointer(&in.ServerCertSANs))
 	out.PeerCertSANs = *(*[]string)(unsafe.Pointer(&in.PeerCertSANs))

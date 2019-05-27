@@ -289,6 +289,10 @@ type LocalEtcd struct {
 	// Defaults to "/var/lib/etcd".
 	DataDir string
 
+	// WalDir is the directory etcd will store wal files
+	// Defaults to "/var/lib/etcd/member/wal/"
+	WalDir string
+
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
 	ExtraArgs map[string]string

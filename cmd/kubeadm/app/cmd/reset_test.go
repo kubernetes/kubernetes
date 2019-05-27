@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/lithammer/dedent"
@@ -42,6 +43,10 @@ spec:
       path: /path/to/etcd
       type: DirectoryOrCreate
     name: etcd-data
+  - hostPath:
+      path: /path/to/etcd/member/wal
+      type: DirectoryOrCreate
+    name: etcd-wal
   - hostPath:
       path: /etc/kubernetes/pki/etcd
       type: DirectoryOrCreate
@@ -251,9 +256,9 @@ func TestRemoveContainers(t *testing.T) {
 	removeContainers(&fexec, "unix:///var/run/crio/crio.sock")
 }
 
-func TestGetEtcdDataDir(t *testing.T) {
+func TestGetEtcdDirs(t *testing.T) {
 	tests := map[string]struct {
-		dataDir       string
+		etcdDirs      []string
 		podYaml       string
 		expectErr     bool
 		writeManifest bool
@@ -265,7 +270,7 @@ func TestGetEtcdDataDir(t *testing.T) {
 			validConfig:   true,
 		},
 		"return etcd data dir": {
-			dataDir:       "/path/to/etcd",
+			etcdDirs:      []string{"/path/to/etcd", "/path/to/etcd/member/wal"},
 			podYaml:       etcdPod,
 			expectErr:     false,
 			writeManifest: true,
@@ -284,7 +289,7 @@ func TestGetEtcdDataDir(t *testing.T) {
 			validConfig:   true,
 		},
 		"kubeconfig file doesn't exist": {
-			dataDir:       "/path/to/etcd",
+			etcdDirs:      []string{"/path/to/etcd", "/path/to/etcd/member/wal"},
 			podYaml:       etcdPod,
 			expectErr:     false,
 			writeManifest: true,
@@ -305,18 +310,18 @@ func TestGetEtcdDataDir(t *testing.T) {
 				}
 			}
 
-			var dataDir string
+			var etcdDirs []string
 			var err error
 			if test.validConfig {
 				cfg := &kubeadmapi.InitConfiguration{}
-				dataDir, err = getEtcdDataDir(manifestPath, cfg)
+				etcdDirs, err = getEtcdDirs(manifestPath, cfg)
 			} else {
-				dataDir, err = getEtcdDataDir(manifestPath, nil)
+				etcdDirs, err = getEtcdDirs(manifestPath, nil)
 			}
 
 			if (err != nil) != test.expectErr {
 				t.Fatalf(dedent.Dedent(
-					"getEtcdDataDir failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
+					"getEtcdDirs failed\n%s\nexpected error: %t\n\tgot: %t\nerror: %v"),
 					name,
 					test.expectErr,
 					(err != nil),
@@ -324,8 +329,13 @@ func TestGetEtcdDataDir(t *testing.T) {
 				)
 			}
 
-			if dataDir != test.dataDir {
-				t.Fatalf(dedent.Dedent("getEtcdDataDir failed\n%s\n\texpected: %s\ngot: %s"), name, test.dataDir, dataDir)
+			sort.Strings(etcdDirs)
+			sort.Strings(test.etcdDirs)
+
+			for i, v := range test.etcdDirs {
+				if v != etcdDirs[i] {
+					t.Fatalf(dedent.Dedent("getEtcdDirs failed\n%s\n\texpected: %s\ngot: %s"), name, test.etcdDirs, etcdDirs)
+				}
 			}
 		})
 	}

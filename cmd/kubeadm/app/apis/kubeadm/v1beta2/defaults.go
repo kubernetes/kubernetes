@@ -18,6 +18,7 @@ package v1beta2
 
 import (
 	"net/url"
+	"path/filepath"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -127,6 +128,9 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 	if obj.Etcd.Local != nil {
 		if obj.Etcd.Local.DataDir == "" {
 			obj.Etcd.Local.DataDir = DefaultEtcdDataDir
+		}
+		if obj.Etcd.Local.WalDir == "" {
+			obj.Etcd.Local.WalDir = filepath.Join(obj.Etcd.Local.DataDir, "member/wal")
 		}
 	}
 }

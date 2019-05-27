@@ -432,6 +432,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
+							WalDir:  "/some/path/member/wal",
 						},
 					},
 					ComponentConfigs: kubeadm.ComponentConfigs{
@@ -479,6 +480,7 @@ func TestValidateInitConfiguration(t *testing.T) {
 					Etcd: kubeadm.Etcd{
 						Local: &kubeadm.LocalEtcd{
 							DataDir: "/some/path",
+							WalDir:  "/some/path/member/wal",
 						},
 					},
 					ComponentConfigs: kubeadm.ComponentConfigs{

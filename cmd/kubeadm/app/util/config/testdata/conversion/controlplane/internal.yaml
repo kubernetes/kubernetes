@@ -180,6 +180,7 @@ Etcd:
   External: null
   Local:
     DataDir: /var/lib/etcd
+    WalDir: /var/lib/etcd/member/wal
     ExtraArgs: null
     ImageRepository: ""
     ImageTag: ""

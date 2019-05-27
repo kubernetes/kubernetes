@@ -17,6 +17,8 @@ limitations under the License.
 package fuzzer
 
 import (
+	"path/filepath"
+
 	fuzz "github.com/google/gofuzz"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -63,6 +65,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 		Etcd: kubeadm.Etcd{
 			Local: &kubeadm.LocalEtcd{
 				DataDir: v1beta2.DefaultEtcdDataDir,
+				WalDir:  filepath.Join(v1beta2.DefaultEtcdDataDir, "member/wal"),
 			},
 		},
 		ImageRepository:   v1beta2.DefaultImageRepository,
@@ -126,6 +129,7 @@ func fuzzLocalEtcd(obj *kubeadm.LocalEtcd, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.DataDir = "foo"
+	obj.WalDir = "bar"
 }
 
 func fuzzNetworking(obj *kubeadm.Networking, c fuzz.Continue) {

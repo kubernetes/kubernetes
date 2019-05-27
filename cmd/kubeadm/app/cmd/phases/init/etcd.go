@@ -87,10 +87,14 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 			// creates target folder if doesn't exist already
 			if !data.DryRun() {
 				if err := os.MkdirAll(cfg.Etcd.Local.DataDir, 0700); err != nil {
-					return errors.Wrapf(err, "failed to create etcd directory %q", cfg.Etcd.Local.DataDir)
+					return errors.Wrapf(err, "failed to create etcd data directory %q", cfg.Etcd.Local.DataDir)
+				}
+				if err := os.MkdirAll(cfg.Etcd.Local.WalDir, 0700); err != nil {
+					return errors.Wrapf(err, "failed to create etcd wal directory %q", cfg.Etcd.Local.WalDir)
 				}
 			} else {
 				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.DataDir)
+				fmt.Printf("[dryrun] Would ensure that %q directory is present\n", cfg.Etcd.Local.WalDir)
 			}
 			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
 			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {

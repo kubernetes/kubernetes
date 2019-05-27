@@ -942,6 +942,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
 			PortOpenCheck{port: kubeadmconstants.EtcdListenPeerPort},
 			DirAvailableCheck{Path: cfg.Etcd.Local.DataDir},
+			DirAvailableCheck{Path: cfg.Etcd.Local.WalDir},
 		)
 	}
 

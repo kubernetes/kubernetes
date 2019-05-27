@@ -37,6 +37,7 @@ import (
 
 const (
 	etcdVolumeName           = "etcd-data"
+	etcdWalVolumeName        = "etcd-wal"
 	certsVolumeName          = "etcd-certs"
 	etcdHealthyCheckInterval = 5 * time.Second
 	etcdHealthyCheckRetries  = 8
@@ -155,8 +156,9 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, nodeName string, initialCluster []etcdutil.Member) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
 	etcdMounts := map[string]v1.Volume{
-		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
-		certsVolumeName: staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType),
+		etcdVolumeName:    staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
+		etcdWalVolumeName: staticpodutil.NewVolume(etcdWalVolumeName, cfg.Etcd.Local.WalDir, &pathType),
+		certsVolumeName:   staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType),
 	}
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
@@ -166,6 +168,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts: []v1.VolumeMount{
 			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.Local.DataDir, false),
+			staticpodutil.NewVolumeMount(etcdWalVolumeName, cfg.Etcd.Local.WalDir, false),
 			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 		},
 		LivenessProbe: staticpodutil.EtcdProbe(
@@ -184,6 +187,7 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		"listen-peer-urls":            etcdutil.GetPeerURL(endpoint),
 		"initial-advertise-peer-urls": etcdutil.GetPeerURL(endpoint),
 		"data-dir":                    cfg.Etcd.Local.DataDir,
+		"wal-dir":                     cfg.Etcd.Local.WalDir,
 		"cert-file":                   filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerCertName),
 		"key-file":                    filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdServerKeyName),
 		"trusted-ca-file":             filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
