@@ -246,11 +246,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
-		// this does default to / when enabled, but this tests against regressions.
-		if nodeConfig.CgroupRoot == "" {
-			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
-		}
-
 		// we need to check that the cgroup root actually exists for each subsystem
 		// of note, we always use the cgroupfs driver when performing this check since
 		// the input is provided in that format.
