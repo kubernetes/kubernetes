@@ -91,7 +91,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int) Policy
 	reserved, _ := takeByTopology(topology, allCPUs, numReservedCPUs)
 
 	if reserved.Size() != numReservedCPUs {
-		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs))
+		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal to %d)", reserved, numReservedCPUs))
 	}
 
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
