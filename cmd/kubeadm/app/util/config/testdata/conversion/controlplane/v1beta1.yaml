@@ -61,7 +61,6 @@ clientConnection:
 clusterCIDR: ""
 configSyncPeriod: 15m0s
 conntrack:
-  max: null
   maxPerCore: 32768
   min: 131072
   tcpCloseWaitTimeout: 1h0m0s
