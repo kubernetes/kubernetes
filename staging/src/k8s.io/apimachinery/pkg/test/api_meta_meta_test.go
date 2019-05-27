@@ -209,26 +209,14 @@ type InternalTypeMeta struct {
 	OwnerReferences    []metav1.OwnerReference `json:"ownerReferences,omitempty"`
 }
 
-func (m *InternalTypeMeta) GetResourceVersion() string   { return m.ResourceVersion }
-func (m *InternalTypeMeta) SetResourceVersion(rv string) { m.ResourceVersion = rv }
-func (m *InternalTypeMeta) GetSelfLink() string          { return m.SelfLink }
-func (m *InternalTypeMeta) SetSelfLink(link string)      { m.SelfLink = link }
-func (m *InternalTypeMeta) GetContinue() string          { return m.Continue }
-func (m *InternalTypeMeta) SetContinue(c string)         { m.Continue = c }
-
-func (m *InternalTypeMeta) GetRemainingItemCount() int64 {
-	if m.RemainingItemCount != nil {
-		return *m.RemainingItemCount
-	}
-	return 0
-}
-
-func (m *InternalTypeMeta) SetRemainingItemCount(c int64) {
-	if m.RemainingItemCount == nil {
-		m.RemainingItemCount = new(int64)
-	}
-	*m.RemainingItemCount = c
-}
+func (m *InternalTypeMeta) GetResourceVersion() string     { return m.ResourceVersion }
+func (m *InternalTypeMeta) SetResourceVersion(rv string)   { m.ResourceVersion = rv }
+func (m *InternalTypeMeta) GetSelfLink() string            { return m.SelfLink }
+func (m *InternalTypeMeta) SetSelfLink(link string)        { m.SelfLink = link }
+func (m *InternalTypeMeta) GetContinue() string            { return m.Continue }
+func (m *InternalTypeMeta) SetContinue(c string)           { m.Continue = c }
+func (m *InternalTypeMeta) GetRemainingItemCount() *int64  { return m.RemainingItemCount }
+func (m *InternalTypeMeta) SetRemainingItemCount(c *int64) { m.RemainingItemCount = c }
 
 type MyAPIObject struct {
 	TypeMeta InternalTypeMeta `json:",inline"`
