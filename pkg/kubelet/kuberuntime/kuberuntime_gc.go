@@ -125,6 +125,9 @@ func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersBy
 func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int) []containerGCInfo {
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
+	if numToKeep > 0 {
+		sort.Sort(byCreated(containers))
+	}
 	for i := len(containers) - 1; i >= numToKeep; i-- {
 		if containers[i].unknown {
 			// Containers in known state could be running, we should try
@@ -151,8 +154,11 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 // removeOldestNSandboxes removes the oldest inactive toRemove sandboxes and
 // returns the resulting slice.
 func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
-	// Remove from oldest to newest (last to first).
 	numToKeep := len(sandboxes) - toRemove
+	if numToKeep > 0 {
+		sort.Sort(sandboxByCreated(sandboxes))
+	}
+	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
 		if !sandboxes[i].active {
 			cgc.removeSandbox(sandboxes[i].id)
@@ -208,11 +214,6 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 			name: containerInfo.name,
 		}
 		evictUnits[key] = append(evictUnits[key], containerInfo)
-	}
-
-	// Sort the containers by age.
-	for uid := range evictUnits {
-		sort.Sort(byCreated(evictUnits[uid]))
 	}
 
 	return evictUnits, nil
@@ -307,11 +308,6 @@ func (cgc *containerGC) evictSandboxes(evictTerminatedPods bool) error {
 		}
 
 		sandboxesByPod[podUID] = append(sandboxesByPod[podUID], sandboxInfo)
-	}
-
-	// Sort the sandboxes by age.
-	for uid := range sandboxesByPod {
-		sort.Sort(sandboxByCreated(sandboxesByPod[uid]))
 	}
 
 	for podUID, sandboxes := range sandboxesByPod {
