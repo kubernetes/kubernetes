@@ -5,7 +5,6 @@ go_library(
     srcs = ["socketmask.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
 filegroup(
