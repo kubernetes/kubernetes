@@ -59,7 +59,7 @@ type resetOptions struct {
 	kubeconfigPath        string
 }
 
-// resetData defines all the runtime information used when running the kubeadm reset worklow;
+// resetData defines all the runtime information used when running the kubeadm reset workflow;
 // this data is shared across all the phases that are included in the workflow.
 type resetData struct {
 	certificatesDir       string
