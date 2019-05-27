@@ -285,7 +285,7 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 	if c == nil {
 		c = clock.RealClock{}
 	}
-	return &HealthzServer{
+	hs =  &HealthzServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
@@ -294,6 +294,9 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 		recorder:      recorder,
 		nodeRef:       nodeRef,
 	}
+	hs.lastUpdated.Store(hs.clock.Now())
+	hs.endpointsLastUpdated.Store(hs.clock.Now())
+	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
 // UpdateTimestamp updates the lastUpdated timestamp.
@@ -373,23 +376,13 @@ type healthzHandler struct {
 }
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	lastUpdated := time.Time{}
-	if val := h.hs.lastUpdated.Load(); val != nil {
-		lastUpdated = val.(time.Time)
-	}
-	endpointsLastUpdated := time.Time{}
-	if val := h.hs.endpointsLastUpdated.Load(); val != nil {
-		endpointsLastUpdated = val.(time.Time)
-	}
-	servicesLastUpdated := time.Time{}
-	if val := h.hs.endpointsLastUpdated.Load(); val != nil {
-		servicesLastUpdated = val.(time.Time)
-	}
+	lastUpdated := h.hs.lastUpdated.Load().(time.Time)
+	endpointsLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
+	servicesLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
 	currentTime := h.hs.clock.Now()
 
 	resp.Header().Set("Content-Type", "application/json")
-	//do we want to flags or different timeouts for endpoint/service last updated?
-	//differnt headers could actually come from headers in query or config.
+	
 	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else if !endpointsLastUpdated.IsZero() && currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
