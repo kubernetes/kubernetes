@@ -112,7 +112,7 @@ require (
 	github.com/mrunalp/fileutils v0.0.0-20160930181131-4ee1cc9a8058 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
 	github.com/mvdan/xurls v0.0.0-20160110113200-1b768d7c393a
-	github.com/onsi/ginkgo v1.6.0
+	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
 	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634 // indirect
@@ -345,7 +345,7 @@ replace (
 	github.com/mvdan/xurls => github.com/mvdan/xurls v0.0.0-20160110113200-1b768d7c393a
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/natefinch/lumberjack => github.com/natefinch/lumberjack v2.0.0+incompatible
-	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.6.0
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634
