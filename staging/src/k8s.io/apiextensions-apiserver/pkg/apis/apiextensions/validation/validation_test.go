@@ -1162,6 +1162,83 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				required("spec", "versions[1]", "schema", "openAPIV3Schema"),
 			},
 		},
+		{
+			name: "labelSelectorPath outside of .spec and .status",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version0",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							// null labelSelectorPath
+							Name:    "version0",
+							Served:  true,
+							Storage: true,
+							Subresources: &apiextensions.CustomResourceSubresources{
+								Scale: &apiextensions.CustomResourceSubresourceScale{
+									SpecReplicasPath:   ".spec.replicas",
+									StatusReplicasPath: ".status.replicas",
+								},
+							},
+						},
+						{
+							// labelSelectorPath under .status
+							Name:    "version1",
+							Served:  true,
+							Storage: false,
+							Subresources: &apiextensions.CustomResourceSubresources{
+								Scale: &apiextensions.CustomResourceSubresourceScale{
+									SpecReplicasPath:   ".spec.replicas",
+									StatusReplicasPath: ".status.replicas",
+									LabelSelectorPath:  strPtr(".status.labelSelector"),
+								},
+							},
+						},
+						{
+							// labelSelectorPath under .spec
+							Name:    "version2",
+							Served:  true,
+							Storage: false,
+							Subresources: &apiextensions.CustomResourceSubresources{
+								Scale: &apiextensions.CustomResourceSubresourceScale{
+									SpecReplicasPath:   ".spec.replicas",
+									StatusReplicasPath: ".status.replicas",
+									LabelSelectorPath:  strPtr(".spec.labelSelector"),
+								},
+							},
+						},
+						{
+							// labelSelectorPath outside of .spec and .status
+							Name:    "version3",
+							Served:  true,
+							Storage: false,
+							Subresources: &apiextensions.CustomResourceSubresources{
+								Scale: &apiextensions.CustomResourceSubresourceScale{
+									SpecReplicasPath:   ".spec.replicas",
+									StatusReplicasPath: ".status.replicas",
+									LabelSelectorPath:  strPtr(".labelSelector"),
+								},
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version0"},
+				},
+			},
+			errors: []validationMatch{
+				invalid("spec", "versions[3]", "subresources", "scale", "labelSelectorPath"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
