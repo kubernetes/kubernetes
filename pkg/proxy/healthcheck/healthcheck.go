@@ -297,6 +297,7 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 	hs.lastUpdated.Store(hs.clock.Now())
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 	hs.servicesLastUpdated.Store(hs.clock.Now())
+	return hs
 }
 
 // UpdateTimestamp updates the lastUpdated timestamp.
@@ -383,11 +384,11 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	resp.Header().Set("Content-Type", "application/json")
 	
-	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
+	if currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else if !endpointsLastUpdated.IsZero() && currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
+	} else if currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else if !servicesLastUpdated.IsZero() && currentTime.After(servicesLastUpdated.Add(h.hs.healthTimeout)) {
+	} else if currentTime.After(servicesLastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		resp.WriteHeader(http.StatusOK)
