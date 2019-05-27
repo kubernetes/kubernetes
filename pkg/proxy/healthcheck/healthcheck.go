@@ -246,8 +246,9 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 	return nil
 }
 
+// HealthzUpdater allows callers to update healthz timestamp only.
 type HealthzUpdater interface {
-	UpdateTimestamp() //used for sync runs
+	UpdateTimestamp()
 }
 
 // HealthzServer returns 200 "OK" by default. Once timestamp has been
@@ -300,42 +301,42 @@ func (hs *HealthzServer) UpdateTimestamp() {
 	hs.lastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnEndpointsAdd records endpoint update time
 func (hs *HealthzServer) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnEndpointsUpdate records endpoint update time
 func (hs *HealthzServer) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnEndpointsDelete records endpoint update time
 func (hs *HealthzServer) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnEndpointsSynced records endpoint update time
 func (hs *HealthzServer) OnEndpointsSynced() {
 	hs.endpointsLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnServiceAdd records service update time
 func (hs *HealthzServer) OnServiceAdd(service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnServiceUpdate records service update time
 func (hs *HealthzServer) OnServiceUpdate(oldService, service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnServiceDelete records service update time
 func (hs *HealthzServer) OnServiceDelete(service *v1.Service) {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
 
-// record watch updates
+// OnServiceSynced records service update time
 func (hs *HealthzServer) OnServiceSynced() {
 	hs.servicesLastUpdated.Store(hs.clock.Now())
 }
