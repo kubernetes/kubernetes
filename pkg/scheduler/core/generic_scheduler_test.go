@@ -416,9 +416,9 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:               map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
 			prioritizers:             []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			alwaysCheckAllPredicates: true,
-			nodes: []string{"1"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			name:  "test alwaysCheckAllPredicates is true",
+			nodes:                    []string{"1"},
+			pod:                      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			name:                     "test alwaysCheckAllPredicates is true",
 			wErr: &FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 1,
@@ -453,7 +453,7 @@ func TestGenericScheduler(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				nil,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil, nil, nil),
 				test.predicates,
 				algorithmpredicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
@@ -489,7 +489,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 	s := NewGenericScheduler(
 		cache,
 		nil,
-		internalqueue.NewSchedulingQueue(nil, nil),
+		internalqueue.NewSchedulingQueue(nil, nil, nil),
 		predicates,
 		algorithmpredicates.EmptyPredicateMetadataProducer,
 		prioritizers,
@@ -1492,7 +1492,7 @@ func TestPreempt(t *testing.T) {
 			scheduler := NewGenericScheduler(
 				cache,
 				nil,
-				internalqueue.NewSchedulingQueue(nil, nil),
+				internalqueue.NewSchedulingQueue(nil, nil, nil),
 				map[string]algorithmpredicates.FitPredicate{"matches": algorithmpredicates.PodFitsResources},
 				algorithmpredicates.EmptyPredicateMetadataProducer,
 				[]priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
@@ -1562,7 +1562,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 10,
 		},
 		{
-			name: "set percentageOfNodesToScore and nodes number not more than 50",
+			name:                     "set percentageOfNodesToScore and nodes number not more than 50",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              10,
 			wantNumNodes:             10,
@@ -1573,7 +1573,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 420,
 		},
 		{
-			name: "set percentageOfNodesToScore and nodes number more than 50",
+			name:                     "set percentageOfNodesToScore and nodes number more than 50",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              1000,
 			wantNumNodes:             400,
@@ -1584,7 +1584,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 300,
 		},
 		{
-			name: "set percentageOfNodesToScore and nodes number more than 50*125",
+			name:                     "set percentageOfNodesToScore and nodes number more than 50*125",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              6000,
 			wantNumNodes:             2400,
