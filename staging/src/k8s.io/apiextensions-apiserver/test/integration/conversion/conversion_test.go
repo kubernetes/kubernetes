@@ -27,11 +27,12 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,12 +43,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -115,7 +117,6 @@ func testWebhookConverter(t *testing.T, pruning, defaulting bool) {
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
 
 	// enable necessary features
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	if defaulting {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceDefaulting, true)()
 	}
