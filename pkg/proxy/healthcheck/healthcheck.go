@@ -286,7 +286,7 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 	if c == nil {
 		c = clock.RealClock{}
 	}
-	hs :=  &HealthzServer{
+	hs := &HealthzServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
@@ -383,7 +383,7 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	servicesLastUpdated := h.hs.servicesLastUpdated.Load().(time.Time)
 	currentTime := h.hs.clock.Now()
 	resp.Header().Set("Content-Type", "application/json")
-	
+
 	if currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else if checkHeader(req, "endpointsUpdateTimeout", currentTime.Sub(endpointsLastUpdated)) {
@@ -399,12 +399,10 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 }
 
 func checkHeader(req *http.Request, header string, sinceLastUpdate time.Duration) bool {
-	if header, exists := req.Header[header]; exists {	
+	if header, exists := req.Header[header]; exists {
 		if timeout, err := time.ParseDuration(header[0]); err != nil {
 			return timeout < sinceLastUpdate
 		}
-	} 
+	}
 	return false
 }
-
-
