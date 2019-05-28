@@ -847,3 +847,62 @@ func TestCompareHealthChecks(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureInternalLoadBalancerNEG(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+
+	apiService := fakeLoadbalancerServiceWithNEGs(string(LBTypeInternal))
+	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
+	assert.NoError(t, err)
+	// No loadbalancer resources will be created due to the NEG annotation
+	assert.Empty(t, status.Ingress)
+	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
+	// Invoking delete should be a no-op
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, apiService)
+	assert.NoError(t, err)
+	// Now remove the annotation so that lb resources are created
+	delete(apiService.Annotations, NEGAnnotation)
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	assertInternalLbResources(t, gce, apiService, vals, nodeNames)
+}
+
+func TestEnsureInternalLoadBalancerDeletedNEGs(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+
+	apiService := fakeLoadbalancerService(string(LBTypeInternal))
+
+	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	// Annotation gets added to service
+	apiService.Annotations[NEGAnnotation] = "{\"ilb\": true}"
+	newLBStatus := v1.LoadBalancerStatus{Ingress: []v1.LoadBalancerIngress{{IP: "1.2.3.4"}}}
+	// mock scenario where a different controller modifies status.
+	apiService.Status.LoadBalancer = newLBStatus
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, apiService, nodes)
+	assert.NoError(t, err)
+	// ensure that the status info is intact
+	assert.Equal(t, status, &newLBStatus)
+	// Invoked when service is deleted.
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, apiService)
+	assert.NoError(t, err)
+	assertInternalLbResourcesDeleted(t, gce, apiService, vals, true)
+}
