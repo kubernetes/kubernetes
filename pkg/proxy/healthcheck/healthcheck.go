@@ -381,18 +381,29 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	endpointsLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
 	servicesLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
 	currentTime := h.hs.clock.Now()
-
 	resp.Header().Set("Content-Type", "application/json")
-	
-	if currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
-		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else if currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
-		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else if currentTime.After(servicesLastUpdated.Add(h.hs.healthTimeout)) {
-		resp.WriteHeader(http.StatusServiceUnavailable)
-	} else {
-		resp.WriteHeader(http.StatusOK)
-	}
 	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`,
 		lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
+
+	if currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
+		resp.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	if endpointTimeout, ok := req.Header["endpointUpdateTimeout"]; ok {	
+		if endpointTimeoutSecs, err := strconv.Atoi(endpointTimeout); !err {
+			if currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
+				resp.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
+	}
+	if servicesTimeout, ok := req.Header["servicesUpdateTimeout"]; ok {	
+		if servicesTimeoutSecs, err := strconv.Atoi(servicesTimeout); !err {
+			if currentTime.After(servicessLastUpdated.Add(h.hs.healthTimeout)) {
+				resp.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
+	}
+	resp.WriteHeader(http.StatusOK)
 }
