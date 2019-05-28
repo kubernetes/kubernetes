@@ -383,9 +383,7 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	servicesLastUpdated := h.hs.servicesLastUpdated.Load().(time.Time)
 	currentTime := h.hs.clock.Now()
 	resp.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`,
-		lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
-
+	
 	if currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else if checkHeader(req, "endpointsUpdateTimeout", currentTime.Sub(endpointsLastUpdated)) {
@@ -395,6 +393,9 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
+
+	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`,
+		lastUpdated, endpointsLastUpdated, servicesLastUpdated, currentTime))
 }
 
 func checkHeader(req *http.Request, header string, sinceLastUpdate time.Duration) bool {
