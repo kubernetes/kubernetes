@@ -162,8 +162,8 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, _, err := storage.Delete(ctx, "foo", nil); err == nil {
-		t.Errorf("unexpected error: %v", err)
+	if _, _, err := storage.Delete(ctx, "foo", rest.ValidateAllObjectFunc, nil); err == nil {
+		t.Errorf("unexpected no error")
 	}
 	// should still exist
 	_, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
@@ -375,7 +375,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	if err := storage.store.Storage.Create(ctx, key, namespace, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, _, err := storage.Delete(ctx, "foo", nil); err != nil {
+	if _, _, err := storage.Delete(ctx, "foo", rest.ValidateAllObjectFunc, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// should not exist
@@ -578,7 +578,7 @@ func TestDeleteWithGCFinalizers(t *testing.T) {
 		}
 		var obj runtime.Object
 		var err error
-		if obj, _, err = storage.Delete(ctx, test.name, test.deleteOptions); err != nil {
+		if obj, _, err = storage.Delete(ctx, test.name, rest.ValidateAllObjectFunc, test.deleteOptions); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		ns, ok := obj.(*api.Namespace)

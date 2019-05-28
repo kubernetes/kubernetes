@@ -382,14 +382,14 @@ var _ = Describe("[sig-storage] Projected secret", func() {
 
 		By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(deleteSecret.Name, &metav1.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred(), "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Updating secret %v", updateSecret.Name))
 		updateSecret.ResourceVersion = "" // to force update
 		delete(updateSecret.Data, "data-1")
 		updateSecret.Data["data-3"] = []byte("value-3")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(updateSecret)
-		Expect(err).NotTo(HaveOccurred(), "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Creating secret with name %s", createSecret.Name))
 		if createSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(createSecret); err != nil {

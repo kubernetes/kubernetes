@@ -299,7 +299,7 @@ func (d *dummyStorage) Versioner() storage.Versioner { return nil }
 func (d *dummyStorage) Create(_ context.Context, _ string, _, _ runtime.Object, _ uint64) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions) error {
+func (d *dummyStorage) Delete(_ context.Context, _ string, _ runtime.Object, _ *storage.Preconditions, _ storage.ValidateObjectFunc) error {
 	return fmt.Errorf("unimplemented")
 }
 func (d *dummyStorage) Watch(_ context.Context, _ string, _ string, _ storage.SelectionPredicate) (watch.Interface, error) {
@@ -494,6 +494,42 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		}
 		w.Stop()
 	}
+}
+
+func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _ := newTestCacher(backingStorage, 1000)
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	w, err := cacher.Watch(context.Background(), "pods/ns", "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+
+	watchClosed := make(chan struct{})
+	go func() {
+		defer close(watchClosed)
+		for event := range w.ResultChan() {
+			switch event.Type {
+			case watch.Added, watch.Modified, watch.Deleted:
+				// ok
+			default:
+				t.Errorf("unexpected event %#v", event)
+			}
+		}
+	}()
+
+	cacher.Stop()
+
+	select {
+	case <-watchClosed:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for watch to close")
+	}
+
 }
 
 func TestTimeBucketWatchersBasic(t *testing.T) {

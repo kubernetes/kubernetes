@@ -26,17 +26,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
@@ -91,7 +88,6 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
-	dynamicClient dynamic.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -104,7 +100,7 @@ type GraphBuilder struct {
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
-	sharedInformers  informers.SharedInformerFactory
+	sharedInformers  controller.InformerFactory
 	ignoredResources map[schema.GroupResource]struct{}
 }
 
@@ -125,19 +121,6 @@ func (m *monitor) Run() {
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
-
-func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
-	return &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
-			return client.Resource(resource).List(options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			// We want to list this resource in all namespaces if it's namespace scoped, so not passing namespace is ok.
-			return client.Resource(resource).Watch(options)
-		},
-	}
-}
 
 func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -175,24 +158,14 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 		},
 	}
 	shared, err := gb.sharedInformers.ForResource(resource)
-	if err == nil {
-		klog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
-		// need to clone because it's from a shared cache
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
-		return shared.Informer().GetController(), shared.Informer().GetStore(), nil
+	if err != nil {
+		klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
+		return nil, nil, err
 	}
-	klog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
-
-	// TODO: consider store in one storage.
-	klog.V(5).Infof("create storage for resource %s", resource)
-	store, monitor := cache.NewInformer(
-		listWatcher(gb.dynamicClient, resource),
-		nil,
-		ResourceResyncTime,
-		// don't need to clone because it's not from shared cache
-		handlers,
-	)
-	return monitor, store, nil
+	klog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
+	// need to clone because it's from a shared cache
+	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,

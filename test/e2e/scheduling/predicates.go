@@ -713,7 +713,7 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, n
 		predicate = scheduleSuccessEvent(ns, podName, "" /* any node */)
 	}
 	success, err := common.ObserveEventAfterAction(f, predicate, action)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(success).To(gomega.Equal(true))
 }
 

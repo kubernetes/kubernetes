@@ -2410,18 +2410,22 @@ type PodConditionType string
 
 // These are valid conditions of pod.
 const (
-	// PodScheduled represents status of the scheduling process for this pod.
-	PodScheduled PodConditionType = "PodScheduled"
+	// ContainersReady indicates whether all containers in the pod are ready.
+	ContainersReady PodConditionType = "ContainersReady"
+	// PodInitialized means that all init containers in the pod have started successfully.
+	PodInitialized PodConditionType = "Initialized"
 	// PodReady means the pod is able to service requests and should be added to the
 	// load balancing pools of all matching services.
 	PodReady PodConditionType = "Ready"
-	// PodInitialized means that all init containers in the pod have started successfully.
-	PodInitialized PodConditionType = "Initialized"
+	// PodScheduled represents status of the scheduling process for this pod.
+	PodScheduled PodConditionType = "PodScheduled"
+)
+
+// These are reasons for a pod's transition to a condition.
+const (
 	// PodReasonUnschedulable reason in PodScheduled PodCondition means that the scheduler
 	// can't schedule the pod right now, for example due to insufficient resources in the cluster.
 	PodReasonUnschedulable = "Unschedulable"
-	// ContainersReady indicates whether all containers in the pod are ready.
-	ContainersReady PodConditionType = "ContainersReady"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -5355,7 +5359,17 @@ type SELinuxOptions struct {
 
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 type WindowsSecurityContextOptions struct {
-	// intentionally left empty for now
+	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
+	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
+	// +optional
+	GMSACredentialSpecName *string `json:"gmsaCredentialSpecName,omitempty" protobuf:"bytes,1,opt,name=gmsaCredentialSpecName"`
+
+	// GMSACredentialSpec is where the GMSA admission webhook
+	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+	// GMSA credential spec named by the GMSACredentialSpecName field.
+	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
+	// +optional
+	GMSACredentialSpec *string `json:"gmsaCredentialSpec,omitempty" protobuf:"bytes,2,opt,name=gmsaCredentialSpec"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

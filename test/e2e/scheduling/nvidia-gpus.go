@@ -18,6 +18,7 @@ package scheduling
 
 import (
 	"os"
+	"regexp"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -27,7 +28,9 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -131,7 +134,7 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 	e2elog.Logf("Using %v", dsYamlURL)
 	// Creates the DaemonSet that installs Nvidia Drivers.
 	ds, err := framework.DsFromManifest(dsYamlURL)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	ds.Namespace = f.Namespace.Name
 	_, err = f.ClientSet.AppsV1().DaemonSets(f.Namespace.Name).Create(ds)
 	framework.ExpectNoError(err, "failed to create nvidia-driver-installer daemonset")
@@ -172,8 +175,8 @@ func testNvidiaGPUs(f *framework.Framework) {
 	}
 	e2elog.Logf("Wait for all test pods to succeed")
 	// Wait for all pods to succeed
-	for _, po := range podList {
-		f.PodClient().WaitForSuccess(po.Name, 5*time.Minute)
+	for _, pod := range podList {
+		f.PodClient().WaitForSuccess(pod.Name, 5*time.Minute)
 	}
 
 	e2elog.Logf("Stopping ResourceUsageGather")
@@ -188,5 +191,106 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
 	ginkgo.It("run Nvidia GPU Device Plugin tests", func() {
 		testNvidiaGPUs(f)
+	})
+})
+
+func testNvidiaGPUsJob(f *framework.Framework) {
+	_ = SetupNVIDIAGPUNode(f, false)
+	// Job set to have 5 completions with parallelism of 1 to ensure that it lasts long enough to experience the node recreation
+	completions := int32(5)
+	ginkgo.By("Starting GPU job")
+	StartJob(f, completions)
+
+	job, err := jobutil.GetJob(f.ClientSet, f.Namespace.Name, "cuda-add")
+	framework.ExpectNoError(err)
+
+	// make sure job is running by waiting for its first pod to start running
+	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
+	framework.ExpectNoError(err)
+
+	numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+	framework.ExpectNoError(err)
+	nodes, err := framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
+	framework.ExpectNoError(err)
+
+	ginkgo.By("Recreating nodes")
+	err = gce.RecreateNodes(f.ClientSet, nodes)
+	framework.ExpectNoError(err)
+	ginkgo.By("Done recreating nodes")
+
+	ginkgo.By("Waiting for gpu job to finish")
+	err = jobutil.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name)
+	framework.ExpectNoError(err)
+	ginkgo.By("Done with gpu job")
+
+	gomega.Expect(job.Status.Failed).To(gomega.BeZero(), "Job pods failed during node recreation: %v", job.Status.Failed)
+
+	VerifyJobNCompletions(f, completions)
+}
+
+// StartJob starts a simple CUDA job that requests gpu and the specified number of completions
+func StartJob(f *framework.Framework, completions int32) {
+	var activeSeconds int64 = 3600
+	testJob := jobutil.NewTestJob("succeed", "cuda-add", v1.RestartPolicyAlways, 1, completions, &activeSeconds, 6)
+	testJob.Spec.Template.Spec = v1.PodSpec{
+		RestartPolicy: v1.RestartPolicyOnFailure,
+		Containers: []v1.Container{
+			{
+				Name:    "vector-addition",
+				Image:   imageutils.GetE2EImage(imageutils.CudaVectorAdd),
+				Command: []string{"/bin/sh", "-c", "./vectorAdd && sleep 60"},
+				Resources: v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						gpuResourceName: *resource.NewQuantity(1, resource.DecimalSI),
+					},
+				},
+			},
+		},
+	}
+	ns := f.Namespace.Name
+	_, err := jobutil.CreateJob(f.ClientSet, ns, testJob)
+	framework.ExpectNoError(err)
+	framework.Logf("Created job %v", testJob)
+}
+
+// VerifyJobNCompletions verifies that the job has completions number of successful pods
+func VerifyJobNCompletions(f *framework.Framework, completions int32) {
+	ns := f.Namespace.Name
+	pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, "cuda-add")
+	framework.ExpectNoError(err)
+	createdPods := pods.Items
+	createdPodNames := podNames(createdPods)
+	framework.Logf("Got the following pods for job cuda-add: %v", createdPodNames)
+
+	successes := int32(0)
+	for _, podName := range createdPodNames {
+		f.PodClient().WaitForFinish(podName, 5*time.Minute)
+		logs, err := framework.GetPodLogs(f.ClientSet, ns, podName, "vector-addition")
+		framework.ExpectNoError(err, "Should be able to get logs for pod %v", podName)
+		regex := regexp.MustCompile("PASSED")
+		if regex.MatchString(logs) {
+			successes++
+		}
+	}
+	if successes != completions {
+		framework.Failf("Only got %v completions. Expected %v completions.", successes, completions)
+	}
+}
+
+func podNames(pods []v1.Pod) []string {
+	originalPodNames := make([]string, len(pods))
+	for i, p := range pods {
+		originalPodNames[i] = p.ObjectMeta.Name
+	}
+	return originalPodNames
+}
+
+var _ = SIGDescribe("GPUDevicePluginAcrossRecreate [Feature:Recreate]", func() {
+	ginkgo.BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke")
+	})
+	f := framework.NewDefaultFramework("device-plugin-gpus-recreate")
+	ginkgo.It("run Nvidia GPU Device Plugin tests with a recreation", func() {
+		testNvidiaGPUsJob(f)
 	})
 })

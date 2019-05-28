@@ -967,12 +967,7 @@ filename | sha512 hash
     * While this is a backwards-incompatible change, it would have been impossible to setup reliable monitoring around these metrics since the labels were not stable. 
 * Add a configuration field to shorten the timeout of validating/mutating admission webhook call. The timeout value must be between 1 and 30 seconds. Default to 30 seconds when unspecified.  ([#74562](https://github.com/kubernetes/kubernetes/pull/74562), [@roycaihw](https://github.com/roycaihw))
 * client-go: PortForwarder.GetPorts() now contain correct local port if no local port was initially specified when setting up the port forwarder ([#73676](https://github.com/kubernetes/kubernetes/pull/73676), [@martin-helmich](https://github.com/martin-helmich))
-* # Apply resources from a directory containing kustomization.yaml ([#74140](https://github.com/kubernetes/kubernetes/pull/74140), [@Liujingfang1](https://github.com/Liujingfang1))
-    *         kubectl apply -k dir
-    *         # Delete resources from a directory containing kustomization.yaml.
-    *         kubectl delete -k dir
-    *         # List resources from a directory containing kustomization.yaml
-    *         kubectl get -k dir
+* The examples in kubectl apply/get/delete are updated to support `-k` which uses a `kustomization.yaml` file. ([#74140](https://github.com/kubernetes/kubernetes/pull/74140), [@Liujingfang1](https://github.com/Liujingfang1))
 * kubeadm: Allow to download certificate secrets uploaded by `init` or `upload-certs` phase, allowing to transfer certificate secrets (certificates and keys) from the cluster to other master machines when creating HA deployments. ([#74168](https://github.com/kubernetes/kubernetes/pull/74168), [@ereslibre](https://github.com/ereslibre))
 * Fixes an issue with missing apiVersion/kind in object data sent to admission webhooks ([#74448](https://github.com/kubernetes/kubernetes/pull/74448), [@liggitt](https://github.com/liggitt))
 * client-go: the deprecated versionless API group accessors (like `clientset.Apps()` have been removed). Use an explicit version instead (like `clientset.AppsV1()`) ([#74422](https://github.com/kubernetes/kubernetes/pull/74422), [@liggitt](https://github.com/liggitt))

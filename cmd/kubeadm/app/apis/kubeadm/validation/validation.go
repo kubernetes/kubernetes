@@ -463,12 +463,25 @@ func ValidateAPIEndpoint(c *kubeadm.APIEndpoint, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
-// ValidateIgnorePreflightErrors validates duplicates in ignore-preflight-errors flag.
-func ValidateIgnorePreflightErrors(ignorePreflightErrors []string) (sets.String, error) {
+// ValidateIgnorePreflightErrors validates duplicates in:
+// - ignore-preflight-errors flag and
+// - ignorePreflightErrors field in {Init,Join}Configuration files.
+func ValidateIgnorePreflightErrors(ignorePreflightErrorsFromCLI, ignorePreflightErrorsFromConfigFile []string) (sets.String, error) {
 	ignoreErrors := sets.NewString()
 	allErrs := field.ErrorList{}
 
-	for _, item := range ignorePreflightErrors {
+	for _, item := range ignorePreflightErrorsFromConfigFile {
+		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
+	}
+
+	if ignoreErrors.Has("all") {
+		// "all" is forbidden in config files. Administrators should use an
+		// explicit list of errors they want to ignore, as it can be risky to
+		// mask all errors in such a way. Hence, we return an error:
+		allErrs = append(allErrs, field.Invalid(field.NewPath("ignorePreflightErrors"), "all", "'all' cannot be used in configuration file"))
+	}
+
+	for _, item := range ignorePreflightErrorsFromCLI {
 		ignoreErrors.Insert(strings.ToLower(item)) // parameters are case insensitive
 	}
 

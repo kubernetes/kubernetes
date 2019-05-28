@@ -124,7 +124,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// Evicting a terminal pod should result in direct deletion of pod as it already caused disruption by the time we are evicting.
 	// There is no need to check for pdb.
 	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-		_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
+		_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +173,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	// At this point there was either no PDB or we succeeded in decrementing
 
 	// Try the delete
-	_, _, err = r.store.Delete(ctx, eviction.Name, deletionOptions)
+	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deletionOptions)
 	if err != nil {
 		return nil, err
 	}

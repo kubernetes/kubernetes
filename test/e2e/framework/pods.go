@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -246,6 +246,23 @@ func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 			}
 		},
 	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
+}
+
+// WaitForFinish waits for pod to finish running, regardless of success or failure.
+func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
+	f := c.f
+	gomega.Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed:
+				return true, nil
+			case v1.PodSucceeded:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	)).To(gomega.Succeed(), "wait for pod %q to finish running", name)
 }
 
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.

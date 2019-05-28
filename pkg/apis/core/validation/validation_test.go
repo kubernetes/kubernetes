@@ -13205,3 +13205,77 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateWindowsSecurityContextOptions(t *testing.T) {
+	toPtr := func(s string) *string {
+		return &s
+	}
+
+	testCases := []struct {
+		testName string
+
+		windowsOptions         *core.WindowsSecurityContextOptions
+		expectedErrorSubstring string
+	}{
+		{
+			testName: "a nil pointer",
+		},
+		{
+			testName:       "an empty struct",
+			windowsOptions: &core.WindowsSecurityContextOptions{},
+		},
+		{
+			testName: "a valid input",
+			windowsOptions: &core.WindowsSecurityContextOptions{
+				GMSACredentialSpecName: toPtr("dummy-gmsa-crep-spec-name"),
+				GMSACredentialSpec:     toPtr("dummy-gmsa-crep-spec-contents"),
+			},
+		},
+		{
+			testName: "a GMSA cred spec name that is not a valid resource name",
+			windowsOptions: &core.WindowsSecurityContextOptions{
+				// invalid because of the underscore
+				GMSACredentialSpecName: toPtr("not_a-valid-gmsa-crep-spec-name"),
+			},
+			expectedErrorSubstring: dnsSubdomainLabelErrMsg,
+		},
+		{
+			testName: "empty GMSA cred spec contents",
+			windowsOptions: &core.WindowsSecurityContextOptions{
+				GMSACredentialSpec: toPtr(""),
+			},
+			expectedErrorSubstring: "gmsaCredentialSpec cannot be an empty string",
+		},
+		{
+			testName: "GMSA cred spec contents that are too long",
+			windowsOptions: &core.WindowsSecurityContextOptions{
+				GMSACredentialSpec: toPtr(strings.Repeat("a", maxGMSACredentialSpecLength+1)),
+			},
+			expectedErrorSubstring: "gmsaCredentialSpec size must be under",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run("validateWindowsSecurityContextOptions with"+testCase.testName, func(t *testing.T) {
+			errs := validateWindowsSecurityContextOptions(testCase.windowsOptions, field.NewPath("field"))
+
+			switch len(errs) {
+			case 0:
+				if testCase.expectedErrorSubstring != "" {
+					t.Errorf("expected a failure containing the substring: %q", testCase.expectedErrorSubstring)
+				}
+			case 1:
+				if testCase.expectedErrorSubstring == "" {
+					t.Errorf("didn't expect a failure, got: %q", errs[0].Error())
+				} else if !strings.Contains(errs[0].Error(), testCase.expectedErrorSubstring) {
+					t.Errorf("expected a failure with the substring %q, got %q instead", testCase.expectedErrorSubstring, errs[0].Error())
+				}
+			default:
+				t.Errorf("got %d failures", len(errs))
+				for i, err := range errs {
+					t.Errorf("error %d: %q", i, err.Error())
+				}
+			}
+		})
+	}
+}

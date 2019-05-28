@@ -40,8 +40,6 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
-	"sigs.k8s.io/yaml"
-
 	v1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -60,6 +58,7 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -67,6 +66,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	uexec "k8s.io/utils/exec"
+	"sigs.k8s.io/yaml"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -1075,7 +1075,7 @@ metadata:
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-					endpoints, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+					ep, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 					if err != nil {
 						// log the real error
 						e2elog.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
@@ -1089,7 +1089,7 @@ metadata:
 						return false, err
 					}
 
-					uidToPort := framework.GetContainerPortsByPodUID(endpoints)
+					uidToPort := e2eendpoints.GetContainerPortsByPodUID(ep)
 					if len(uidToPort) == 0 {
 						e2elog.Logf("No endpoint found, retrying")
 						return false, nil

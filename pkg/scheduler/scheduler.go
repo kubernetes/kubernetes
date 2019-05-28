@@ -133,6 +133,8 @@ func New(client clientset.Interface,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
 	registry framework.Registry,
+	plugins *kubeschedulerconfig.Plugins,
+	pluginConfig []kubeschedulerconfig.PluginConfig,
 	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
@@ -158,6 +160,8 @@ func New(client clientset.Interface,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
 		Registry:                       registry,
+		Plugins:                        plugins,
+		PluginConfig:                   pluginConfig,
 	})
 	var config *factory.Config
 	source := schedulerAlgorithmSource

@@ -1207,7 +1207,7 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
-func (h *gcePdDriver) GetClaimSize() string {
+func (g *gcePdDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
@@ -1652,6 +1652,7 @@ var _ testsuites.TestDriver = &localDriver{}
 var _ testsuites.PreprovisionedVolumeTestDriver = &localDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &localDriver{}
 
+// InitLocalDriverWithVolumeType initializes the local driver based on the volume type.
 func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() testsuites.TestDriver {
 	maxFileSize := defaultLocalVolumeMaxFileSize
 	if maxFileSizeByVolType, ok := localVolumeMaxFileSizes[volumeType]; ok {

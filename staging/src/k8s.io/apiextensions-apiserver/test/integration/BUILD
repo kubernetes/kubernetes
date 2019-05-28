@@ -71,7 +71,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/conversion:all-srcs",
         "//staging/src/k8s.io/apiextensions-apiserver/test/integration/fixtures:all-srcs",
+        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

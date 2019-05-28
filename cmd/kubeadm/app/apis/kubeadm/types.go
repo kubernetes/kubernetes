@@ -229,6 +229,9 @@ type NodeRegistrationOptions struct {
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
 	KubeletExtraArgs map[string]string
+
+	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
+	IgnorePreflightErrors []string
 }
 
 // Networking contains elements describing cluster's networking configuration.

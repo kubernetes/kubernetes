@@ -637,6 +637,9 @@ message WindowsContainerSecurityContext {
     // exist in the container image and be resolved there by the runtime;
     // otherwise, the runtime MUST return error.
     string run_as_username = 1;
+
+    // The contents of the GMSA credential spec to use to run this container.
+    string credential_spec = 2;
 }
 
 // WindowsContainerConfig contains platform-specific configuration for

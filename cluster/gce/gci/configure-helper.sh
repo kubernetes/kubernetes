@@ -588,7 +588,7 @@ function create-master-auth {
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "system:cluster-bootstrap,uid:system:cluster-bootstrap,system:masters"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "gcp:kube-bootstrap,uid:gcp:kube-bootstrap,system:masters"
   fi
   if [[ -n "${KUBE_CONTROLLER_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CONTROLLER_MANAGER_TOKEN}," "system:kube-controller-manager,uid:system:kube-controller-manager"
@@ -610,6 +610,15 @@ function create-master-auth {
   fi
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
+  fi
+  if [[ -n "${EXTRA_STATIC_AUTH_COMPONENTS:-}" ]]; then
+    # Create a static Bearer token and kubeconfig for extra, comma-separated components.
+    IFS="," read -r -a extra_components <<< "${EXTRA_STATIC_AUTH_COMPONENTS:-}"
+    for extra_component in "${extra_components[@]}"; do
+      local token="$(secure_random 32)"
+      append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}"
+      create-kubeconfig "${extra_component}" "${token}"
+    done
   fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
@@ -1405,6 +1414,7 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *host_ip *}}@$host_ip@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
+  sed -i -e "s@{{ *listen_client_ip *}}@${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}@g" "${temp_file}"
   # Get default storage backend from manifest file.
   local -r default_storage_backend=$(cat "${temp_file}" | \
     grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
@@ -1506,7 +1516,7 @@ function compute-master-manifest-variables {
   INSECURE_PORT_MAPPING=""
   if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" == "true" ]]; then
     INSECURE_PORT_MAPPING="{ \"name\": \"local\", \"containerPort\": 8080, \"hostPort\": 8080},"
-  fi 
+  fi
 }
 
 # A helper function that bind mounts kubelet dirs for running mount in a chroot
@@ -2377,7 +2387,7 @@ function setup-coredns-manifest {
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${coredns_file}"
   sed -i -e "s@{{ *pillar\['service_cluster_ip_range'\] *}}@${SERVICE_CLUSTER_IP_RANGE}@g" "${coredns_file}"
-  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT}@g" "${coredns_file}"
+  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${coredns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2429,7 +2439,7 @@ EOF
   # Replace the salt configurations with variable values.
   sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
   sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
-  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT}@g" "${kubedns_file}"
+  sed -i -e "s@{{ *pillar\['dns_memory_limit'\] *}}@${DNS_MEMORY_LIMIT:-170Mi}@g" "${kubedns_file}"
 
   if [[ "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns-horizontal-autoscaler" "gce"
@@ -2846,12 +2856,80 @@ function wait-till-apiserver-ready() {
   done
 }
 
-function ensure-bootstrap-kubectl-auth {
-  # Creating an authenticated kubeconfig is only necessary if the insecure port is disabled.
-  if [[ -n "${KUBE_BOOTSTRAP_TOKEN}" ]]; then
-    create-kubeconfig "cluster-bootstrap" ${KUBE_BOOTSTRAP_TOKEN}
-    export KUBECONFIG=/etc/srv/kubernetes/cluster-bootstrap/kubeconfig
+function ensure-master-bootstrap-kubectl-auth {
+  # By default, `kubectl` uses http://localhost:8080
+  # If the insecure port is disabled, kubectl will need to use an admin-authenticated kubeconfig.
+  if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
+    create-kubeconfig "kube-bootstrap" "${KUBE_BOOTSTRAP_TOKEN}"
+    export KUBECONFIG=/etc/srv/kubernetes/kube-bootstrap/kubeconfig
   fi
+}
+
+function setup-containerd {
+  echo "Generate containerd config"
+  local config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
+  mkdir -p "$(dirname "${config_path}")"
+  local cni_template_path="${KUBE_HOME}/cni.template"
+  cat > "${cni_template_path}" <<EOF
+{
+  "name": "k8s-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "ptp",
+      "mtu": 1460,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "{{.PodCIDR}}",
+        "routes": [
+          {
+            "dst": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+EOF
+  if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider is specified
+      # or netd is enabled.
+      cni_template_path=""
+    fi
+  fi
+  # Reuse docker group for containerd.
+  local containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  cat > "${config_path}" <<EOF
+# Kubernetes doesn't use containerd restart manager.
+disabled_plugins = ["restart"]
+
+[debug]
+  level = "${CONTAINERD_LOG_LEVEL:-"info"}"
+
+[grpc]
+  gid = ${containerd_gid}
+
+[plugins.cri]
+  stream_server_address = "127.0.0.1"
+  max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
+[plugins.cri.cni]
+  bin_dir = "${KUBE_HOME}/bin"
+  conf_dir = "/etc/cni/net.d"
+  conf_template = "${cni_template_path}"
+[plugins.cri.registry.mirrors."docker.io"]
+  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+EOF
+  chmod 644 "${config_path}"
+
+  echo "Restart containerd to load the config change"
+  systemctl restart containerd
 }
 
 ########### Main Function ###########
@@ -2904,13 +2982,13 @@ function main() {
   KUBE_CONTROLLER_MANAGER_TOKEN="$(secure_random 32)"
   KUBE_SCHEDULER_TOKEN="$(secure_random 32)"
   KUBE_CLUSTER_AUTOSCALER_TOKEN="$(secure_random 32)"
-  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
-    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
-  fi
   if [[ "${ENABLE_L7_LOADBALANCING:-}" == "glbc" ]]; then
     GCE_GLBC_TOKEN="$(secure_random 32)"
   fi
   ADDON_MANAGER_TOKEN="$(secure_random 32)"
+  if [[ "${ENABLE_APISERVER_INSECURE_PORT:-false}" != "true" ]]; then
+    KUBE_BOOTSTRAP_TOKEN="$(secure_random 32)"
+  fi
 
   setup-os-params
   config-ip-firewall
@@ -2923,7 +3001,7 @@ function main() {
     create-node-pki
     create-master-pki
     create-master-auth
-    ensure-bootstrap-kubectl-auth
+    ensure-master-bootstrap-kubectl-auth
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -2941,9 +3019,12 @@ function main() {
   fi
 
   override-kubectl
+  container_runtime="${CONTAINER_RUNTIME:-docker}"
   # Run the containerized mounter once to pre-cache the container image.
-  if [[ "${CONTAINER_RUNTIME:-docker}" == "docker" ]]; then
+  if [[ "${container_runtime}" == "docker" ]]; then
     assemble-docker-flags
+  elif [[ "${container_runtime}" == "containerd" ]]; then
+    setup-containerd
   fi
   start-kubelet
 

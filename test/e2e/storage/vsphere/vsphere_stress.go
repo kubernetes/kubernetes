@@ -144,7 +144,8 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Waiting for the Pod: %v to be in the running state", logPrefix, pod.Name))
-		gomega.Expect(f.WaitForPodRunningSlow(pod.Name)).NotTo(gomega.HaveOccurred())
+		err = f.WaitForPodRunningSlow(pod.Name)
+		framework.ExpectNoError(err)
 
 		// Get the copy of the Pod to know the assigned node name.
 		pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
@@ -153,7 +154,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is attached to the node VM: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))
 		isVolumeAttached, verifyDiskAttachedError := diskIsAttached(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
 		gomega.Expect(isVolumeAttached).To(gomega.BeTrue())
-		gomega.Expect(verifyDiskAttachedError).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(verifyDiskAttachedError)
 
 		ginkgo.By(fmt.Sprintf("%v Verifing the volume: %v is accessible in the pod: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Name))
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
@@ -167,6 +168,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Deleting the Claim: %v", logPrefix, pvclaim.Name))
-		gomega.Expect(framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)).NotTo(gomega.HaveOccurred())
+		err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		framework.ExpectNoError(err)
 	}
 }

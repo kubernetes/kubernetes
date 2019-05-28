@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 // These tests need privileged containers, which are disabled by default.  Run
@@ -130,7 +129,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 			defer func() {
 				volume.TestCleanup(f, config)
 				err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
-				Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
+				framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 			}()
 
 			tests := []volume.Test{

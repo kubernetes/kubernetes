@@ -181,44 +181,16 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 }
 
 // Delete implements storage.Interface.Delete.
-func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions) error {
+func (s *store) Delete(ctx context.Context, key string, out runtime.Object, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
 	v, err := conversion.EnforcePtr(out)
 	if err != nil {
 		panic("unable to convert output object to pointer")
 	}
 	key = path.Join(s.pathPrefix, key)
-	if preconditions == nil {
-		return s.unconditionalDelete(ctx, key, out)
-	}
-	return s.conditionalDelete(ctx, key, out, v, preconditions)
+	return s.conditionalDelete(ctx, key, out, v, preconditions, validateDeletion)
 }
 
-func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime.Object) error {
-	// We need to do get and delete in single transaction in order to
-	// know the value and revision before deleting it.
-	startTime := time.Now()
-	txnResp, err := s.client.KV.Txn(ctx).If().Then(
-		clientv3.OpGet(key),
-		clientv3.OpDelete(key),
-	).Commit()
-	metrics.RecordEtcdRequestLatency("delete", getTypeName(out), startTime)
-	if err != nil {
-		return err
-	}
-	getResp := txnResp.Responses[0].GetResponseRange()
-	if len(getResp.Kvs) == 0 {
-		return storage.NewKeyNotFoundError(key, 0)
-	}
-
-	kv := getResp.Kvs[0]
-	data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(key))
-	if err != nil {
-		return storage.NewInternalError(err.Error())
-	}
-	return decode(s.codec, s.versioner, data, out, kv.ModRevision)
-}
-
-func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions) error {
+func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, preconditions *storage.Preconditions, validateDeletion storage.ValidateObjectFunc) error {
 	startTime := time.Now()
 	getResp, err := s.client.KV.Get(ctx, key)
 	metrics.RecordEtcdRequestLatency("get", getTypeName(out), startTime)
@@ -230,7 +202,12 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 		if err != nil {
 			return err
 		}
-		if err := preconditions.Check(key, origState.obj); err != nil {
+		if preconditions != nil {
+			if err := preconditions.Check(key, origState.obj); err != nil {
+				return err
+			}
+		}
+		if err := validateDeletion(origState.obj); err != nil {
 			return err
 		}
 		startTime := time.Now()
