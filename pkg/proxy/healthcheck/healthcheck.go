@@ -392,8 +392,9 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else if checkHeader(req, "servicesUpdateTimeout", currentTime.Sub(servicesLastUpdated)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
+	} else {
+		resp.WriteHeader(http.StatusOK)
 	}
-	resp.WriteHeader(http.StatusOK)
 }
 
 func checkHeader(req *http.Request, header string, sinceLastUpdate time.Duration) bool {
