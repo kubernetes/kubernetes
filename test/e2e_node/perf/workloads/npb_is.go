@@ -30,7 +30,7 @@ import (
 // from NAS parallel benchmark (NPB) suite.
 type npbISWorkload struct{}
 
-// Ensure npbISWorkload implemets NodePerfWorkload interface.
+// Ensure npbISWorkload implements NodePerfWorkload interface.
 var _ NodePerfWorkload = &npbISWorkload{}
 
 func (w npbISWorkload) Name() string {
