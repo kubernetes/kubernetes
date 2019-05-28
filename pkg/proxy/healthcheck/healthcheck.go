@@ -391,13 +391,14 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if endpointHeader, ok := req.Header["endpointUpdateTimeout"]; ok {	
-		if endpointTimeout, err := time.ParseDuration((endpointHeader); !err {
-			if currentTime.After(endpointsLastUpdated.Add(endpointTimeout) {
+		if endpointTimeout, err := time.ParseDuration(endpointHeader); !err {
+			if currentTime.After(endpointsLastUpdated.Add(endpointTimeout)) {
 				resp.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
 		}
 	}
+	
 	if servicesHeader, ok := req.Header["servicesUpdateTimeout"]; ok {	
 		if servicesTimeout, err := time.ParseDuration(servicesHeader); !err {
 			if currentTime.After(servicessLastUpdated.Add(servicesTimeout)) {
