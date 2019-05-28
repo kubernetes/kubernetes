@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			})
 			// a timeout is acceptable, since it means we waited 5 minutes and didn't see any unwarranted node status updates
 			if err != nil && err != wait.ErrWaitTimeout {
-				Expect(err).NotTo(HaveOccurred(), "error waiting for infrequent nodestatus update")
+				framework.ExpectNoError(err, "error waiting for infrequent nodestatus update")
 			}
 
 			By("verify node is still in ready status even though node status report is infrequent")

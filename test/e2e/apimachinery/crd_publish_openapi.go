@@ -49,7 +49,7 @@ var (
 	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
-var _ = SIGDescribe("CustomResourcePublishOpenAPI [Feature:CustomResourcePublishOpenAPI]", func() {
+var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
 
 	ginkgo.BeforeEach(func() {
@@ -598,4 +598,6 @@ properties:
     properties:
       bars:
         description: List of Bars and their statuses.
-        type: array`)
+        type: array
+        items:
+          type: object`)

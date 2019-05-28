@@ -736,7 +736,7 @@ func TestPDBInPreemption(t *testing.T) {
 	defer cleanupTest(t, context)
 	cs := context.clientSet
 
-	initDisruptionController(context)
+	initDisruptionController(t, context)
 
 	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
 		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),

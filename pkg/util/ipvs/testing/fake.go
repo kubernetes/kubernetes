@@ -27,47 +27,49 @@ import (
 //FakeIPVS no-op implementation of ipvs Interface
 type FakeIPVS struct {
 	Scheduler    string
-	Services     map[serviceKey]*utilipvs.VirtualServer
-	Destinations map[serviceKey][]*utilipvs.RealServer
+	Services     map[ServiceKey]*utilipvs.VirtualServer
+	Destinations map[ServiceKey][]*utilipvs.RealServer
 }
 
-type serviceKey struct {
+// ServiceKey uniquely identifies a Service for an IPVS virtual server
+type ServiceKey struct {
 	IP       string
 	Port     uint16
 	Protocol string
 }
 
-func (s *serviceKey) String() string {
+func (s *ServiceKey) String() string {
 	return fmt.Sprintf("%s:%d/%s", s.IP, s.Port, s.Protocol)
 }
 
-type realServerKey struct {
+// RealServerKey uniquely identifies an Endpoint for an IPVS real server
+type RealServerKey struct {
 	Address net.IP
 	Port    uint16
 }
 
-func (r *realServerKey) String() string {
+func (r *RealServerKey) String() string {
 	return net.JoinHostPort(r.Address.String(), strconv.Itoa(int(r.Port)))
 }
 
 //NewFake creates a fake ipvs implementation - a cache store.
 func NewFake() *FakeIPVS {
 	return &FakeIPVS{
-		Services:     make(map[serviceKey]*utilipvs.VirtualServer),
-		Destinations: make(map[serviceKey][]*utilipvs.RealServer),
+		Services:     make(map[ServiceKey]*utilipvs.VirtualServer),
+		Destinations: make(map[ServiceKey][]*utilipvs.RealServer),
 	}
 }
 
-func toServiceKey(serv *utilipvs.VirtualServer) serviceKey {
-	return serviceKey{
+func toServiceKey(serv *utilipvs.VirtualServer) ServiceKey {
+	return ServiceKey{
 		IP:       serv.Address.String(),
 		Port:     serv.Port,
 		Protocol: serv.Protocol,
 	}
 }
 
-func toRealServerKey(rs *utilipvs.RealServer) *realServerKey {
-	return &realServerKey{
+func toRealServerKey(rs *utilipvs.RealServer) *RealServerKey {
+	return &RealServerKey{
 		Address: rs.Address,
 		Port:    rs.Port,
 	}

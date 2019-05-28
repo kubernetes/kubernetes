@@ -387,19 +387,26 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	var extenders []algorithm.SchedulerExtender
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
+		var ignorableExtenders []algorithm.SchedulerExtender
 		for ii := range policy.ExtenderConfigs {
 			klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
 			if err != nil {
 				return nil, err
 			}
-			extenders = append(extenders, extender)
+			if !extender.IsIgnorable() {
+				extenders = append(extenders, extender)
+			} else {
+				ignorableExtenders = append(ignorableExtenders, extender)
+			}
 			for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
 				if r.IgnoredByScheduler {
 					ignoredExtendedResources.Insert(string(r.Name))
 				}
 			}
 		}
+		// place ignorable extenders to the tail of extenders
+		extenders = append(extenders, ignorableExtenders...)
 		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.

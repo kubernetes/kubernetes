@@ -107,24 +107,6 @@ func (fake *fakeIPSetVersioner) GetVersion() (string, error) {
 	return fake.version, fake.err
 }
 
-// New returns a new FakeSysctl
-func NewFakeSysctl() *FakeSysctl {
-	return &FakeSysctl{}
-}
-
-type FakeSysctl struct {
-}
-
-// GetSysctl returns the value for the specified sysctl setting
-func (fakeSysctl *FakeSysctl) GetSysctl(sysctl string) (int, error) {
-	return 1, nil
-}
-
-// SetSysctl modifies the specified sysctl flag to the new value
-func (fakeSysctl *FakeSysctl) SetSysctl(sysctl string, newVal int) error {
-	return nil
-}
-
 func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset utilipset.Interface, nodeIPs []net.IP, excludeCIDRs []*net.IPNet) *Proxier {
 	fcmd := fakeexec.FakeCmd{
 		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
