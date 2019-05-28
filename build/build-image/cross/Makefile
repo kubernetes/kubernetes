@@ -15,13 +15,20 @@
 .PHONY:	build push
 
 IMAGE=kube-cross
-TAG=$(shell cat VERSION)
+CONTAINER_REGISTRY?=staging-k8s.gcr.io
+GO_BASE_CONTAINER?="golang"
+GO_VERSION?="1.12.5"
+GO_BASE="${GO_BASE_CONTAINER}:${GO_VERSION}"
+TAG?=$(shell cat VERSION)
+FQIN="${CONTAINER_REGISTRY}/${IMAGE}:${TAG}"
 
 
 all: push
 
 build:
-	docker build --pull -t staging-k8s.gcr.io/$(IMAGE):$(TAG) .
+	docker build --pull \
+	--build-arg GO_BASE=${GO_BASE} \
+	-t $(FQIN) .
 
 push: build
-	docker push staging-k8s.gcr.io/$(IMAGE):$(TAG)
+	docker push $(FQIN)
