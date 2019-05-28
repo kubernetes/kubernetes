@@ -17,15 +17,21 @@ limitations under the License.
 package expand
 
 import (
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"regexp"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	coretesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/controller"
@@ -34,24 +40,20 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 func TestSyncHandler(t *testing.T) {
-	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
-	pvInformer := informerFactory.Core().V1().PersistentVolumes()
-	storageClassInformer := informerFactory.Storage().V1().StorageClasses()
-
 	tests := []struct {
 		name                string
 		csiMigrationEnabled bool
-		expansionCalled     bool
 		storageClass        *storagev1.StorageClass
 		pvcKey              string
 		pv                  *v1.PersistentVolume
 		pvc                 *v1.PersistentVolumeClaim
+		expansionCalled     bool
 		hasError            bool
+		expectedAnnotation  map[string]string
 	}{
 		{
 			name:     "when pvc has no PV binding",
@@ -72,12 +74,13 @@ func TestSyncHandler(t *testing.T) {
 			pvcKey: "default/missing-sc-pvc",
 		},
 		{
-			name:            "when pvc and pv has everything for in-tree plugin",
-			pv:              getFakePersistentVolume("vol-3", csitranslationplugins.AWSEBSInTreePluginName, "good-pvc-vol-3"),
-			pvc:             getFakePersistentVolumeClaim("good-pvc", "vol-3", "resizable2", "good-pvc-vol-3"),
-			storageClass:    getFakeStorageClass("resizable2", csitranslationplugins.AWSEBSInTreePluginName),
-			pvcKey:          "default/good-pvc",
-			expansionCalled: true,
+			name:               "when pvc and pv has everything for in-tree plugin",
+			pv:                 getFakePersistentVolume("vol-3", csitranslationplugins.AWSEBSInTreePluginName, "good-pvc-vol-3"),
+			pvc:                getFakePersistentVolumeClaim("good-pvc", "vol-3", "resizable2", "good-pvc-vol-3"),
+			storageClass:       getFakeStorageClass("resizable2", csitranslationplugins.AWSEBSInTreePluginName),
+			pvcKey:             "default/good-pvc",
+			expansionCalled:    true,
+			expectedAnnotation: map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSInTreePluginName},
 		},
 		{
 			name:                "when csi migration is enabled for a in-tree plugin",
@@ -86,17 +89,34 @@ func TestSyncHandler(t *testing.T) {
 			pvc:                 getFakePersistentVolumeClaim("csi-pvc", "vol-4", "resizable3", "csi-pvc-vol-4"),
 			storageClass:        getFakeStorageClass("resizable3", csitranslationplugins.AWSEBSInTreePluginName),
 			pvcKey:              "default/csi-pvc",
+			expectedAnnotation:  map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSDriverName},
+		},
+		{
+			name:            "for csi plugin without migration path",
+			pv:              getFakePersistentVolume("vol-5", "com.csi.ceph", "ceph-csi-pvc-vol-5"),
+			pvc:             getFakePersistentVolumeClaim("ceph-csi-pvc", "vol-5", "resizable4", "ceph-csi-pvc-vol-5"),
+			storageClass:    getFakeStorageClass("resizable4", "com.csi.ceph"),
+			pvcKey:          "default/ceph-csi-pvc",
+			expansionCalled: false,
+			hasError:        false,
 		},
 	}
 
 	for _, tc := range tests {
 		test := tc
+		fakeKubeClient := controllervolumetesting.CreateTestClient()
+		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+		pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
+		pvInformer := informerFactory.Core().V1().PersistentVolumes()
+		storageClassInformer := informerFactory.Storage().V1().StorageClasses()
+
+		pvc := test.pvc
 		if tc.pv != nil {
 			informerFactory.Core().V1().PersistentVolumes().Informer().GetIndexer().Add(tc.pv)
 		}
 
 		if tc.pvc != nil {
-			informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetIndexer().Add(tc.pvc)
+			informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetIndexer().Add(pvc)
 		}
 		allPlugins := []volume.VolumePlugin{}
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
@@ -116,19 +136,55 @@ func TestSyncHandler(t *testing.T) {
 		var expController *expandController
 		expController, _ = expc.(*expandController)
 		var expansionCalled bool
-		expController.operationGenerator = operationexecutor.NewFakeOgCounter(func() (error, error) {
+		expController.operationGenerator = operationexecutor.NewFakeOGCounter(func() (error, error) {
 			expansionCalled = true
 			return nil, nil
+		})
+
+		fakeKubeClient.AddReactor("patch", "persistentvolumeclaims", func(action coretesting.Action) (bool, runtime.Object, error) {
+			if action.GetSubresource() == "status" {
+				patchActionaction, _ := action.(coretesting.PatchAction)
+				pvc, err = applyPVCPatch(pvc, patchActionaction.GetPatch())
+				if err != nil {
+					return false, nil, err
+				}
+				return true, pvc, nil
+			}
+			return true, pvc, nil
 		})
 
 		err = expController.syncHandler(test.pvcKey)
 		if err != nil && !test.hasError {
 			t.Fatalf("for: %s; unexpected error while running handler : %v", test.name, err)
 		}
+
+		if err == nil && test.hasError {
+			t.Fatalf("for: %s; unexpected success", test.name)
+		}
 		if expansionCalled != test.expansionCalled {
 			t.Fatalf("for: %s; expected expansionCalled to be %v but was %v", test.name, test.expansionCalled, expansionCalled)
 		}
+
+		if len(test.expectedAnnotation) != 0 && !reflect.DeepEqual(test.expectedAnnotation, pvc.Annotations) {
+			t.Fatalf("for: %s; expected %v annotations, got %v", test.name, test.expectedAnnotation, pvc.Annotations)
+		}
 	}
+}
+
+func applyPVCPatch(originalPVC *v1.PersistentVolumeClaim, patch []byte) (*v1.PersistentVolumeClaim, error) {
+	pvcData, err := json.Marshal(originalPVC)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal pvc with %v", err)
+	}
+	updated, err := strategicpatch.StrategicMergePatch(pvcData, patch, v1.PersistentVolumeClaim{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply patch on pvc %v", err)
+	}
+	updatedPVC := &v1.PersistentVolumeClaim{}
+	if err := json.Unmarshal(updated, updatedPVC); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal updated pvc : %v", err)
+	}
+	return updatedPVC, nil
 }
 
 func getFakePersistentVolume(volumeName, pluginName string, pvcUID types.UID) *v1.PersistentVolume {

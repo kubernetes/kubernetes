@@ -82,22 +82,6 @@ func UpdatePVSize(
 	return nil
 }
 
-// MarkResizeInProgress marks cloudprovider resizing as in progress
-func MarkResizeInProgress(
-	pvc *v1.PersistentVolumeClaim,
-	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
-	// Mark PVC as Resize Started
-	progressCondition := v1.PersistentVolumeClaimCondition{
-		Type:               v1.PersistentVolumeClaimResizing,
-		Status:             v1.ConditionTrue,
-		LastTransitionTime: metav1.Now(),
-	}
-	conditions := []v1.PersistentVolumeClaimCondition{progressCondition}
-	newPVC := pvc.DeepCopy()
-	newPVC = MergeResizeConditionOnPVC(newPVC, conditions)
-	return PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
-}
-
 // MarkResizeInProgressWithResizer marks cloudprovider resizing as in progress
 // and also annotates the PVC with the name of the resizer.
 func MarkResizeInProgressWithResizer(

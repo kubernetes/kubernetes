@@ -194,6 +194,8 @@ func (expc *expandController) processNextWorkItem() bool {
 	return true
 }
 
+// syncHandler performs actual expansion of volume. If an error is returned
+// from this function - PVC will be requeued for resizing.
 func (expc *expandController) syncHandler(key string) error {
 	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -228,7 +230,7 @@ func (expc *expandController) syncHandler(key string) error {
 
 	class, err := expc.classLister.Get(claimClass)
 	if err != nil {
-		klog.V(4).Infof("volume expansion is not supported for PVC: %s;can not find StorageClass %s", util.ClaimToClaimKey(pvc), claimClass)
+		klog.V(4).Infof("failed to expand PVC: %s with error: %v", util.ClaimToClaimKey(pvc), err)
 		return nil
 	}
 
@@ -245,7 +247,9 @@ func (expc *expandController) syncHandler(key string) error {
 		}
 		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
 		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
-		return err
+		// If we are expecting that an external plugin will handle resizing this volume then
+		// is no point in requeuing this PVC.
+		return nil
 	}
 
 	if volumePlugin.IsMigratedToCSI() {
@@ -263,7 +267,6 @@ func (expc *expandController) syncHandler(key string) error {
 			errorMsg := fmt.Sprintf("error setting resizer annotation to pvc %s, with error %v", util.ClaimToClaimKey(pvc), err)
 			expc.recorder.Event(pvc, v1.EventTypeWarning, events.ExternalExpanding, errorMsg)
 			return fmt.Errorf(errorMsg)
-
 		}
 		return nil
 	}
