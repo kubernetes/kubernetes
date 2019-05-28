@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -36,8 +36,8 @@ import (
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
-// TopNodeOptions contains all the options for running the top-node cli command.
-type TopNodeOptions struct {
+// NodeOptions defines the structure for top node command options.
+type NodeOptions struct {
 	ResourceName    string
 	Selector        string
 	SortBy          string
@@ -52,6 +52,7 @@ type TopNodeOptions struct {
 	genericclioptions.IOStreams
 }
 
+// HeapsterTopOptions defines the structure for heapster top options.
 type HeapsterTopOptions struct {
 	Namespace string
 	Service   string
@@ -59,6 +60,7 @@ type HeapsterTopOptions struct {
 	Port      string
 }
 
+// Bind function associates hepaster configuration.
 func (o *HeapsterTopOptions) Bind(flags *pflag.FlagSet) {
 	if len(o.Namespace) == 0 {
 		o.Namespace = metricsutil.DefaultHeapsterNamespace
@@ -93,9 +95,10 @@ var (
 		  kubectl top node NODE_NAME`))
 )
 
-func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
+// NewCmdTopNode creates the 'top node' command.
+func NewCmdTopNode(f cmdutil.Factory, o *NodeOptions, streams genericclioptions.IOStreams) *cobra.Command {
 	if o == nil {
-		o = &TopNodeOptions{
+		o = &NodeOptions{
 			IOStreams: streams,
 		}
 	}
@@ -121,7 +124,8 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	return cmd
 }
 
-func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+// Complete adapts from the command line args and factory to the data required.
+func (o *NodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(args) == 1 {
 		o.ResourceName = args[0]
 	} else if len(args) > 1 {
@@ -151,7 +155,8 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	return nil
 }
 
-func (o *TopNodeOptions) Validate() error {
+// Validate checks to see if there is sufficient information run the command.
+func (o *NodeOptions) Validate() error {
 	if len(o.SortBy) > 0 {
 		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
 			return errors.New("--sort-by accepts only cpu or memory")
@@ -163,7 +168,8 @@ func (o *TopNodeOptions) Validate() error {
 	return nil
 }
 
-func (o TopNodeOptions) RunTopNode() error {
+// RunTopNode does the work.
+func (o NodeOptions) RunTopNode() error {
 	var err error
 	selector := labels.Everything()
 	if len(o.Selector) > 0 {
@@ -223,6 +229,7 @@ func (o TopNodeOptions) RunTopNode() error {
 	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders, o.SortBy)
 }
 
+// getMetricsFromMetricsAPI gets metrics from MetricsAPI
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
 	var err error
 	versionedMetrics := &metricsV1beta1api.NodeMetricsList{}

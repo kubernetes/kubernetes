@@ -44,6 +44,7 @@ var (
 		This command requires Metrics Server to be correctly configured and working on the server. `))
 )
 
+// NewCmdTop creates the 'top' command
 func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "top",
@@ -59,6 +60,7 @@ func NewCmdTop(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 	return cmd
 }
 
+// SupportedMetricsAPIVersionAvailable returns true/false based on supported metrics API version being available.
 func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) bool {
 	for _, discoveredAPIGroup := range discoveredAPIGroups.Groups {
 		if discoveredAPIGroup.Name != metricsapi.GroupName {
