@@ -68,6 +68,10 @@ build:remote --strategy=Closure=remote
 build:remote --strategy=Genrule=remote
 build:remote --define=EXECUTOR=remote
 
+# tar locally due to https://github.com/bazelbuild/bazel/issues/8462
+build:remote --strategy=PackageTar=sandboxed
+
+
 # --config=ci-instance adds a remote instance name
 build:ci-instance --remote_instance_name=projects/k8s-prow-builds/instances/default_instance
 
