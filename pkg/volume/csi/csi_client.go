@@ -93,10 +93,12 @@ type csiDriverName string
 
 // csiClient encapsulates all csi-plugin methods
 type csiDriverClient struct {
-	driverName          csiDriverName
-	addr                csiAddr
-	nodeV1ClientCreator nodeV1ClientCreator
-	nodeV0ClientCreator nodeV0ClientCreator
+	driverName                csiDriverName
+	addr                      csiAddr
+	nodeV1ClientCreator       nodeV1ClientCreator
+	nodeV0ClientCreator       nodeV0ClientCreator
+	controllerV1ClientCreator controllerV1ClientCreator
+	controllerV0ClientCreator controllerV0ClientCreator
 }
 
 var _ csiClient = &csiDriverClient{}
@@ -109,6 +111,18 @@ type nodeV1ClientCreator func(addr csiAddr) (
 
 type nodeV0ClientCreator func(addr csiAddr) (
 	nodeClient csipbv0.NodeClient,
+	closer io.Closer,
+	err error,
+)
+
+type controllerV1ClientCreator func(addr csiAddr) (
+	controllerClient csipbv1.ControllerClient,
+	closer io.Closer,
+	err error,
+)
+
+type controllerV0ClientCreator func(addr csiAddr) (
+	controllerClient csipbv0.ControllerClient,
 	closer io.Closer,
 	err error,
 )
@@ -151,6 +165,38 @@ func newV0NodeClient(addr csiAddr) (nodeClient csipbv0.NodeClient, closer io.Clo
 	return nodeClient, conn, nil
 }
 
+// newV1ControllerClient creates a new ControllerClient with the internally used gRPC
+// connection set up. It also returns a closer which must to be called to close
+// the gRPC connection when the ControllerClient is not used anymore.
+// This is the default implementation for the controllerV1ClientCreator, used in
+// newCsiDriverClient.
+func newV1ControllerClient(addr csiAddr) (controllerClient csipbv1.ControllerClient, closer io.Closer, err error) {
+	var conn *grpc.ClientConn
+	conn, err = newGrpcConn(addr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	controllerClient = csipbv1.NewControllerClient(conn)
+	return controllerClient, conn, nil
+}
+
+// newV0ControllerClient creates a new ControllerClient with the internally used gRPC
+// connection set up. It also returns a closer which must to be called to close
+// the gRPC connection when the ControllerClient is not used anymore.
+// This is the default implementation for the controllerV1ClientCreator, used in
+// newCsiDriverClient.
+func newV0ControllerClient(addr csiAddr) (controllerClient csipbv0.ControllerClient, closer io.Closer, err error) {
+	var conn *grpc.ClientConn
+	conn, err = newGrpcConn(addr)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	controllerClient = csipbv0.NewControllerClient(conn)
+	return controllerClient, conn, nil
+}
+
 func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 	if driverName == "" {
 		return nil, fmt.Errorf("driver name is empty")
@@ -170,17 +216,23 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 
 	nodeV1ClientCreator := newV1NodeClient
 	nodeV0ClientCreator := newV0NodeClient
+	controllerV1ClientCreator := newV1ControllerClient
+	controllerV0ClientCreator := newV0ControllerClient
 	if requiresV0Client {
 		nodeV1ClientCreator = nil
+		controllerV1ClientCreator = nil
 	} else {
 		nodeV0ClientCreator = nil
+		controllerV0ClientCreator = nil
 	}
 
 	return &csiDriverClient{
-		driverName:          driverName,
-		addr:                csiAddr(addr),
-		nodeV1ClientCreator: nodeV1ClientCreator,
-		nodeV0ClientCreator: nodeV0ClientCreator,
+		driverName:                driverName,
+		addr:                      csiAddr(addr),
+		nodeV1ClientCreator:       nodeV1ClientCreator,
+		nodeV0ClientCreator:       nodeV0ClientCreator,
+		controllerV1ClientCreator: controllerV1ClientCreator,
+		controllerV0ClientCreator: controllerV0ClientCreator,
 	}, nil
 }
 
