@@ -18,6 +18,7 @@ package evictions
 
 import (
 	"fmt"
+
 	"net/http/httptest"
 	"reflect"
 	"sync"
@@ -32,9 +33,13 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -329,6 +334,17 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.D
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pdb-informers")), resyncPeriod)
 
+	client := clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "disruption-controller"))
+
+	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(client.Discovery())
+	scaleClient, err := scale.NewForConfig(&config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		t.Fatalf("Error in create scaleClient: %v", err)
+	}
+
 	rm := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
 		informers.Policy().V1beta1().PodDisruptionBudgets(),
@@ -336,7 +352,9 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.D
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
-		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "disruption-controller")),
+		client,
+		mapper,
+		scaleClient,
 	)
 	return s, closeFn, rm, informers, clientSet
 }

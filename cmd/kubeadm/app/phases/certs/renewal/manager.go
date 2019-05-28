@@ -161,21 +161,14 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 		return false, errors.Errorf("%s is not a valid certificate for this cluster", name)
 	}
 
-	// checks if the we are in the external CA case (CA certificate provided without the certificate key)
-	var externalCA bool
-	switch handler.CABaseName {
-	case kubeadmconstants.CACertAndKeyBaseName:
-		externalCA, _ = certsphase.UsingExternalCA(rm.cfg)
-	case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
-		externalCA, _ = certsphase.UsingExternalFrontProxyCA(rm.cfg)
-	case kubeadmconstants.EtcdCACertAndKeyBaseName:
-		externalCA = false
-	default:
-		return false, errors.Errorf("unknown certificate authority %s", handler.CABaseName)
+	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
+	externallyManaged, err := rm.IsExternallyManaged(handler)
+	if err != nil {
+		return false, err
 	}
 
 	// in case of external CA it is not possible to renew certificates, then return early
-	if externalCA {
+	if externallyManaged {
 		return false, nil
 	}
 
@@ -273,6 +266,54 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	}
 
 	return nil
+}
+
+// GetExpirationInfo returns certificate expiration info.
+// For PKI certificates, use the name defined in the certsphase package, while for certificates
+// embedded in the kubeConfig files, use the kubeConfig file name defined in the kubeadm constants package.
+// If you use the CertificateRenewHandler returned by Certificates func, handler.Name already contains the right value.
+func (rm *Manager) GetExpirationInfo(name string) (*ExpirationInfo, error) {
+	handler, ok := rm.certificates[name]
+	if !ok {
+		return nil, errors.Errorf("%s is not a known certificate", name)
+	}
+
+	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
+	externallyManaged, err := rm.IsExternallyManaged(handler)
+	if err != nil {
+		return nil, err
+	}
+
+	// reads the current certificate
+	cert, err := handler.readwriter.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	// returns the certificate expiration info
+	return newExpirationInfo(name, cert, externallyManaged), nil
+}
+
+// IsExternallyManaged checks if we are in the external CA case (CA certificate provided without the certificate key)
+func (rm *Manager) IsExternallyManaged(h *CertificateRenewHandler) (bool, error) {
+	switch h.CABaseName {
+	case kubeadmconstants.CACertAndKeyBaseName:
+		externallyManaged, err := certsphase.UsingExternalCA(rm.cfg)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", h.CABaseName)
+		}
+		return externallyManaged, nil
+	case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
+		externallyManaged, err := certsphase.UsingExternalFrontProxyCA(rm.cfg)
+		if err != nil {
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", h.CABaseName)
+		}
+		return externallyManaged, nil
+	case kubeadmconstants.EtcdCACertAndKeyBaseName:
+		return false, nil
+	default:
+		return false, errors.Errorf("unknown certificate authority %s", h.CABaseName)
+	}
 }
 
 func certToConfig(cert *x509.Certificate) *certutil.Config {

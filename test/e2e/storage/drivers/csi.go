@@ -51,7 +51,9 @@ import (
 )
 
 const (
+	// GCEPDCSIProvisionerName is the name of GCE Persistent Disk CSI provisioner
 	GCEPDCSIProvisionerName = "pd.csi.storage.gke.io"
+	// GCEPDCSIZoneTopologyKey is the key of GCE Persistent Disk CSI zone topology
 	GCEPDCSIZoneTopologyKey = "topology.gke.io/zone"
 )
 

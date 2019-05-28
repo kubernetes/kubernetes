@@ -493,6 +493,23 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	statusScopes := map[string]*handlers.RequestScope{}
 	scaleScopes := map[string]*handlers.RequestScope{}
 
+	structuralSchemas := map[string]*structuralschema.Structural{}
+	for _, v := range crd.Spec.Versions {
+		val, err := apiextensions.GetSchemaForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema")
+		}
+		if val == nil {
+			continue
+		}
+		structuralSchemas[v.Name], err = structuralschema.NewStructural(val.OpenAPIV3Schema)
+		if *crd.Spec.PreserveUnknownFields == false && err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
+		}
+	}
+
 	for _, v := range crd.Spec.Versions {
 		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
 		if err != nil {
@@ -527,14 +544,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		// Note: we always default this to non-nil. But we should guard these dereferences any way.
 		if crd.Spec.PreserveUnknownFields == nil {
 			return nil, fmt.Errorf("unexpected nil spec.preserveUnknownFields in the CustomResourceDefinition")
-		}
-
-		var structuralSchema *structuralschema.Structural
-		if validationSchema != nil {
-			structuralSchema, err = structuralschema.NewStructural(validationSchema.OpenAPIV3Schema)
-			if *crd.Spec.PreserveUnknownFields == false && err != nil {
-				return nil, err // validation should avoid this
-			}
 		}
 
 		var statusSpec *apiextensions.CustomResourceSubresourceStatus
@@ -591,7 +600,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				converter:             safeConverter,
 				decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
 				encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
-				structuralSchema:      structuralSchema,
+				structuralSchemas:     structuralSchemas,
 				structuralSchemaGK:    kind.GroupKind(),
 				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
 			},
@@ -619,7 +628,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				typer:                 typer,
 				creator:               creator,
 				converter:             safeConverter,
-				structuralSchema:      structuralSchema,
+				structuralSchemas:     structuralSchemas,
 				structuralSchemaGK:    kind.GroupKind(),
 				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
 			},
@@ -676,7 +685,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		statusScope.Serializer = unstructuredNegotiatedSerializer{
 			typer: typer, creator: creator,
 			converter:             safeConverter,
-			structuralSchema:      structuralSchema,
+			structuralSchemas:     structuralSchemas,
 			structuralSchemaGK:    kind.GroupKind(),
 			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
 		}
@@ -715,7 +724,7 @@ type unstructuredNegotiatedSerializer struct {
 	creator   runtime.ObjectCreater
 	converter runtime.ObjectConvertor
 
-	structuralSchema      *structuralschema.Structural
+	structuralSchemas     map[string]*structuralschema.Structural // by version
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
@@ -750,7 +759,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchema: s.structuralSchema, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
 	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
 }
 
@@ -842,7 +851,7 @@ type crdConversionRESTOptionsGetter struct {
 	converter             runtime.ObjectConvertor
 	encoderVersion        schema.GroupVersion
 	decoderVersion        schema.GroupVersion
-	structuralSchema      *structuralschema.Structural
+	structuralSchemas     map[string]*structuralschema.Structural // by version
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
@@ -853,12 +862,12 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
 			dropInvalidMetadata:   true,
-			structuralSchema:      t.structuralSchema,
+			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
 		}}
 		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{
-			structuralSchema:      t.structuralSchema,
+			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
 		}}
@@ -950,7 +959,7 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 type unstructuredSchemaCoercer struct {
 	dropInvalidMetadata bool
 
-	structuralSchema      *structuralschema.Structural
+	structuralSchemas     map[string]*structuralschema.Structural
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
@@ -976,7 +985,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 		return err
 	}
 	if !v.preserveUnknownFields && gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
-		structuralpruning.Prune(u.Object, v.structuralSchema)
+		structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version])
 	}
 
 	// restore meta fields, starting clean

@@ -71,7 +71,9 @@ type NodeClient struct {
 	nodeStagedVolumes    map[string]CSIVolume
 	stageUnstageSet      bool
 	expansionSet         bool
+	volumeStatsSet       bool
 	nodeGetInfoResp      *csipb.NodeGetInfoResponse
+	nodeVolumeStatsResp  *csipb.NodeGetVolumeStatsResponse
 	nextErr              error
 }
 
@@ -81,6 +83,7 @@ func NewNodeClient(stageUnstageSet bool) *NodeClient {
 		nodePublishedVolumes: make(map[string]CSIVolume),
 		nodeStagedVolumes:    make(map[string]CSIVolume),
 		stageUnstageSet:      stageUnstageSet,
+		volumeStatsSet:       true,
 	}
 }
 
@@ -93,6 +96,12 @@ func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeCl
 	}
 }
 
+func NewNodeClientWithVolumeStats(volumeStatsSet bool) *NodeClient {
+	return &NodeClient{
+		volumeStatsSet: volumeStatsSet,
+	}
+}
+
 // SetNextError injects next expected error
 func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
@@ -100,6 +109,10 @@ func (f *NodeClient) SetNextError(err error) {
 
 func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
 	f.nodeGetInfoResp = resp
+}
+
+func (f *NodeClient) SetNodeVolumeStatsResp(resp *csipb.NodeGetVolumeStatsResponse) {
+	f.nodeVolumeStatsResp = resp
 }
 
 // GetNodePublishedVolumes returns node published volumes
@@ -264,12 +277,41 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 			},
 		})
 	}
+
+	if f.volumeStatsSet {
+		resp.Capabilities = append(resp.Capabilities, &csipb.NodeServiceCapability{
+			Type: &csipb.NodeServiceCapability_Rpc{
+				Rpc: &csipb.NodeServiceCapability_RPC{
+					Type: csipb.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+				},
+			},
+		})
+	}
 	return resp, nil
 }
 
+/*
 // NodeGetVolumeStats implements csi method
 func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, in *csipb.NodeGetVolumeStatsRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeStatsResponse, error) {
 	return nil, nil
+}
+*/
+
+// NodeGetVolumeStats implements csi method
+func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, req *csipb.NodeGetVolumeStatsRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeStatsResponse, error) {
+	if f.nextErr != nil {
+		return nil, f.nextErr
+	}
+	if req.GetVolumeId() == "" {
+		return nil, errors.New("missing volume id")
+	}
+	if req.GetVolumePath() == "" {
+		return nil, errors.New("missing Volume path")
+	}
+	if f.nodeVolumeStatsResp != nil {
+		return f.nodeVolumeStatsResp, nil
+	}
+	return &csipb.NodeGetVolumeStatsResponse{}, nil
 }
 
 // ControllerClient represents a CSI Controller client

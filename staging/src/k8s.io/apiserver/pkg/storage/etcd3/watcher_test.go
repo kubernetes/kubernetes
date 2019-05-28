@@ -135,7 +135,7 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
-	if err := store.Delete(ctx, key, &example.Pod{}, nil); err != nil {
+	if err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 	testCheckEventType(t, watch.Deleted, w)
@@ -295,7 +295,7 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 	}
 	etcdW := cluster.RandClient().Watch(ctx, "/", clientv3.WithPrefix())
 
-	if err := store.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}); err != nil {
+	if err := store.Delete(ctx, key, &example.Pod{}, &storage.Preconditions{}, storage.ValidateAllObjectFunc); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 

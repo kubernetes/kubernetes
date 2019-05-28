@@ -26,6 +26,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
+	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -117,7 +118,7 @@ func TestDeleteSystemPriorityClass(t *testing.T) {
 	if err := storage.Store.Storage.Create(ctx, key, pc, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, _, err := storage.Delete(ctx, pc.Name, nil); err == nil {
+	if _, _, err := storage.Delete(ctx, pc.Name, rest.ValidateAllObjectFunc, nil); err == nil {
 		t.Error("expected to receive an error")
 	}
 }

@@ -163,8 +163,10 @@ kube::golang::dedup() {
 # to readonly.
 # The configured vars will only contain platforms allowed by the
 # KUBE_SUPPORTED* vars at the top of this file.
-declare -a -g KUBE_SERVER_PLATFORMS
-declare -a -g KUBE_CLIENT_PLATFORMS
+declare -a KUBE_SERVER_PLATFORMS
+declare -a KUBE_CLIENT_PLATFORMS
+declare -a KUBE_NODE_PLATFORMS
+declare -a KUBE_TEST_PLATFORMS
 kube::golang::setup_platforms() {
   if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
     # KUBE_BUILD_PLATFORMS needs to be read into an array before the next
@@ -206,19 +208,22 @@ kube::golang::setup_platforms() {
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
     KUBE_SERVER_PLATFORMS=(linux/amd64)
     readonly KUBE_SERVER_PLATFORMS
-    readonly KUBE_NODE_PLATFORMS=(linux/amd64)
+    KUBE_NODE_PLATFORMS=(linux/amd64)
+    readonly KUBE_NODE_PLATFORMS
     if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
-      readonly KUBE_TEST_PLATFORMS=(
+      KUBE_TEST_PLATFORMS=(
         darwin/amd64
         linux/amd64
       )
+      readonly KUBE_TEST_PLATFORMS
       KUBE_CLIENT_PLATFORMS=(
         darwin/amd64
         linux/amd64
-      ) 
+      )
       readonly KUBE_CLIENT_PLATFORMS
     else
-      readonly KUBE_TEST_PLATFORMS=(linux/amd64)
+      KUBE_TEST_PLATFORMS=(linux/amd64)
+      readonly KUBE_TEST_PLATFORMS
       KUBE_CLIENT_PLATFORMS=(linux/amd64)
       readonly KUBE_CLIENT_PLATFORMS
     fi
@@ -297,7 +302,7 @@ kube::golang::server_test_targets() {
 IFS=" " read -ra KUBE_TEST_SERVER_TARGETS <<< "$(kube::golang::server_test_targets)"
 readonly KUBE_TEST_SERVER_TARGETS
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
-readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
+readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]:+"${KUBE_SERVER_PLATFORMS[@]}"}")
 
 # Gigabytes necessary for parallel platform builds.
 # As of January 2018, RAM usage is exceeding 30G

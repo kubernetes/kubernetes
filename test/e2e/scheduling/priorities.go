@@ -82,7 +82,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
 		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
@@ -191,7 +191,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
 		}
 		success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		gomega.Expect(success).To(gomega.Equal(true))
 
 		defer framework.RemoveAvoidPodsOffNode(cs, nodeName)
@@ -202,7 +202,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		testPods, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{
 			LabelSelector: "name=scheduler-priority-avoid-pod",
 		})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		ginkgo.By(fmt.Sprintf("Verify the pods should not scheduled to the node: %s", nodeName))
 		for _, pod := range testPods.Items {
 			gomega.Expect(pod.Spec.NodeName).NotTo(gomega.Equal(nodeName))
@@ -235,7 +235,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		ginkgo.By("Pod should prefer scheduled to the node don't have the taint.")
 		tolePod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		gomega.Expect(tolePod.Spec.NodeName).To(gomega.Equal(nodeName))
 
 		ginkgo.By("Trying to apply 10 taint on the first node.")
@@ -255,7 +255,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		ginkgo.By("Pod should prefer scheduled to the node that pod can tolerate.")
 		tolePod, err = cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 		gomega.Expect(tolePod.Spec.NodeName).To(gomega.Equal(nodeName))
 	})
 })
@@ -400,7 +400,7 @@ func createRC(ns, rsName string, replicas int32, rcPodLabels map[string]string, 
 		},
 	}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(ns).Create(rc)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	return rc
 }
 

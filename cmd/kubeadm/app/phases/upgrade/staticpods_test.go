@@ -697,6 +697,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 		skipCreateEtcdCA      bool
 		shouldErrorOnRenew    bool
 		certsShouldExist      []*certsphase.KubeadmCert
+		certsShouldBeRenewed  []*certsphase.KubeadmCert // NB. If empty, it will assume certsShouldBeRenewed == certsShouldExist
 		kubeConfigShouldExist []string
 	}{
 		{
@@ -724,6 +725,12 @@ func TestRenewCertsByComponent(t *testing.T) {
 			certsShouldExist: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdAPIClient,
 				&certsphase.KubeadmCertFrontProxyClient,
+				&certsphase.KubeadmCertAPIServer,
+				&certsphase.KubeadmCertKubeletClient,
+			},
+			certsShouldBeRenewed: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdAPIClient,
+				&certsphase.KubeadmCertFrontProxyClient,
 			},
 			externalCA: true,
 		},
@@ -731,6 +738,12 @@ func TestRenewCertsByComponent(t *testing.T) {
 			name:      "external front-proxy-CA, renew only certificates not signed by front-proxy-CA for apiserver",
 			component: constants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
+				&certsphase.KubeadmCertEtcdAPIClient,
+				&certsphase.KubeadmCertFrontProxyClient,
+				&certsphase.KubeadmCertAPIServer,
+				&certsphase.KubeadmCertKubeletClient,
+			},
+			certsShouldBeRenewed: []*certsphase.KubeadmCert{
 				&certsphase.KubeadmCertEtcdAPIClient,
 				&certsphase.KubeadmCertAPIServer,
 				&certsphase.KubeadmCertKubeletClient,
@@ -849,8 +862,22 @@ func TestRenewCertsByComponent(t *testing.T) {
 					continue
 				}
 				oldSerial, _ := certMaps[kubeCert.Name]
-				if oldSerial.Cmp(newCert.SerialNumber) == 0 {
-					t.Errorf("certifitate %v was not reissued", kubeCert.Name)
+
+				shouldBeRenewed := true
+				if test.certsShouldBeRenewed != nil {
+					shouldBeRenewed = false
+					for _, x := range test.certsShouldBeRenewed {
+						if x.Name == kubeCert.Name {
+							shouldBeRenewed = true
+						}
+					}
+				}
+
+				if shouldBeRenewed && oldSerial.Cmp(newCert.SerialNumber) == 0 {
+					t.Errorf("certifitate %v was not reissued when expected", kubeCert.Name)
+				}
+				if !shouldBeRenewed && oldSerial.Cmp(newCert.SerialNumber) != 0 {
+					t.Errorf("certifitate %v was reissued when not expected", kubeCert.Name)
 				}
 			}
 

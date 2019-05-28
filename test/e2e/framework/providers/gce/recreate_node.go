@@ -92,12 +92,12 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 
 // Recreate all the nodes in the test instance group
 func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
-	err := recreateNodes(c, nodes)
+	err := RecreateNodes(c, nodes)
 	if err != nil {
 		framework.Failf("Test failed; failed to start the restart instance group command.")
 	}
 
-	err = waitForNodeBootIdsToChange(c, nodes, framework.RecreateNodeReadyAgainTimeout)
+	err = WaitForNodeBootIdsToChange(c, nodes, framework.RecreateNodeReadyAgainTimeout)
 	if err != nil {
 		framework.Failf("Test failed; failed to recreate at least one node in %v.", framework.RecreateNodeReadyAgainTimeout)
 	}

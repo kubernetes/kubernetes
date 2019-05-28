@@ -66,5 +66,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
 	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
 	CustomResourceWebhookConversion: {Default: false, PreRelease: featuregate.Alpha},
-	CustomResourcePublishOpenAPI:    {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
 }

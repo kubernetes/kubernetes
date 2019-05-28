@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -49,44 +50,113 @@ const (
 var _ = Framework(&framework{})
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, _ *runtime.Unknown) (Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
 	f := &framework{
 		registry:         r,
 		nodeInfoSnapshot: cache.NewNodeInfoSnapshot(),
 		plugins:          make(map[string]Plugin),
 		waitingPods:      newWaitingPodsMap(),
 	}
+	if plugins == nil {
+		return f, nil
+	}
 
-	// TODO: The framework needs to read the scheduler config and initialize only
-	// needed plugins. In this initial version of the code, we initialize all.
+	// get needed plugins from config
+	pg := pluginsNeeded(plugins)
+	if len(pg) == 0 {
+		return f, nil
+	}
+
+	pluginConfig := pluginNameToConfig(args)
 	for name, factory := range r {
-		// TODO: 'nil' should be replaced by plugin config.
-		p, err := factory(nil, f)
+		// initialize only needed plugins
+		if _, ok := pg[name]; !ok {
+			continue
+		}
+
+		// find the config args of a plugin
+		pc := pluginConfig[name]
+
+		p, err := factory(pc, f)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing plugin %v: %v", name, err)
 		}
 		f.plugins[name] = p
+	}
 
-		// TODO: For now, we assume any plugins that implements an extension
-		// point wants to be called at that extension point. We should change this
-		// later and add these plugins based on the configuration.
-		if qsp, ok := p.(QueueSortPlugin); ok {
-			f.queueSortPlugins = append(f.queueSortPlugins, qsp)
-		}
-
-		if rp, ok := p.(ReservePlugin); ok {
-			f.reservePlugins = append(f.reservePlugins, rp)
-		}
-		if pp, ok := p.(PrebindPlugin); ok {
-			f.prebindPlugins = append(f.prebindPlugins, pp)
-		}
-		if up, ok := p.(UnreservePlugin); ok {
-			f.unreservePlugins = append(f.unreservePlugins, up)
-		}
-		if pr, ok := p.(PermitPlugin); ok {
-			f.permitPlugins = append(f.permitPlugins, pr)
+	if plugins.Reserve != nil {
+		for _, r := range plugins.Reserve.Enabled {
+			if pg, ok := f.plugins[r.Name]; ok {
+				p, ok := pg.(ReservePlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend reserve plugin", r.Name)
+				}
+				f.reservePlugins = append(f.reservePlugins, p)
+			} else {
+				return nil, fmt.Errorf("reserve plugin %v does not exist", r.Name)
+			}
 		}
 	}
+
+	if plugins.PreBind != nil {
+		for _, pb := range plugins.PreBind.Enabled {
+			if pg, ok := f.plugins[pb.Name]; ok {
+				p, ok := pg.(PrebindPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend prebind plugin", pb.Name)
+				}
+				f.prebindPlugins = append(f.prebindPlugins, p)
+			} else {
+				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
+			}
+		}
+	}
+
+	if plugins.Unreserve != nil {
+		for _, ur := range plugins.Unreserve.Enabled {
+			if pg, ok := f.plugins[ur.Name]; ok {
+				p, ok := pg.(UnreservePlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend unreserve plugin", ur.Name)
+				}
+				f.unreservePlugins = append(f.unreservePlugins, p)
+			} else {
+				return nil, fmt.Errorf("unreserve plugin %v does not exist", ur.Name)
+			}
+		}
+	}
+
+	if plugins.Permit != nil {
+		for _, pr := range plugins.Permit.Enabled {
+			if pg, ok := f.plugins[pr.Name]; ok {
+				p, ok := pg.(PermitPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend permit plugin", pr.Name)
+				}
+				f.permitPlugins = append(f.permitPlugins, p)
+			} else {
+				return nil, fmt.Errorf("permit plugin %v does not exist", pr.Name)
+			}
+		}
+	}
+
+	if plugins.QueueSort != nil {
+		for _, qs := range plugins.QueueSort.Enabled {
+			if pg, ok := f.plugins[qs.Name]; ok {
+				p, ok := pg.(QueueSortPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend queue sort plugin", qs.Name)
+				}
+				f.queueSortPlugins = append(f.queueSortPlugins, p)
+				if len(f.queueSortPlugins) > 1 {
+					return nil, fmt.Errorf("only one queue sort plugin can be enabled")
+				}
+			} else {
+				return nil, fmt.Errorf("queue sort plugin %v does not exist", qs.Name)
+			}
+		}
+	}
+
 	return f, nil
 }
 
@@ -224,4 +294,43 @@ func (f *framework) IterateOverWaitingPods(callback func(WaitingPod)) {
 // GetWaitingPod returns a reference to a WaitingPod given its UID.
 func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 	return f.waitingPods.get(uid)
+}
+
+func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {
+	pc := make(map[string]*runtime.Unknown, 0)
+	for _, p := range args {
+		pc[p.Name] = &p.Args
+	}
+	return pc
+}
+
+func pluginsNeeded(plugins *config.Plugins) map[string]struct{} {
+	pgMap := make(map[string]struct{}, 0)
+
+	if plugins == nil {
+		return pgMap
+	}
+
+	find := func(pgs *config.PluginSet) {
+		if pgs == nil {
+			return
+		}
+		for _, pg := range pgs.Enabled {
+			pgMap[pg.Name] = struct{}{}
+		}
+	}
+	find(plugins.QueueSort)
+	find(plugins.PreFilter)
+	find(plugins.Filter)
+	find(plugins.PostFilter)
+	find(plugins.Score)
+	find(plugins.NormalizeScore)
+	find(plugins.Reserve)
+	find(plugins.Permit)
+	find(plugins.PreBind)
+	find(plugins.Bind)
+	find(plugins.PostBind)
+	find(plugins.Unreserve)
+
+	return pgMap
 }

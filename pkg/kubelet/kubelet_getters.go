@@ -159,6 +159,11 @@ func (kl *Kubelet) getPodResourcesDir() string {
 	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPodResourcesDirName)
 }
 
+// getPluginsDirSELinuxLabel returns the selinux label to be applied on plugin directories
+func (kl *Kubelet) getPluginsDirSELinuxLabel() string {
+	return config.KubeletPluginsDirSELinuxLabel
+}
+
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pods.
 func (kl *Kubelet) GetPods() []*v1.Pod {

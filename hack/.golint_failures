@@ -537,7 +537,6 @@ staging/src/k8s.io/client-go/scale/scheme/autoscalingv1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1
 staging/src/k8s.io/client-go/testing
-staging/src/k8s.io/client-go/tools/auth
 staging/src/k8s.io/client-go/tools/cache
 staging/src/k8s.io/client-go/tools/cache/testing
 staging/src/k8s.io/client-go/tools/clientcmd
@@ -546,7 +545,6 @@ staging/src/k8s.io/client-go/tools/clientcmd/api/latest
 staging/src/k8s.io/client-go/tools/clientcmd/api/v1
 staging/src/k8s.io/client-go/tools/leaderelection
 staging/src/k8s.io/client-go/tools/leaderelection/resourcelock
-staging/src/k8s.io/client-go/tools/portforward
 staging/src/k8s.io/client-go/tools/record
 staging/src/k8s.io/client-go/tools/reference
 staging/src/k8s.io/client-go/transport
@@ -590,12 +588,10 @@ staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-test/e2e/autoscaling
 test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/lifecycle/bootstrap
 test/e2e/scalability
-test/e2e/storage/drivers
 test/e2e/storage/testsuites
 test/e2e/storage/utils
 test/e2e/storage/vsphere

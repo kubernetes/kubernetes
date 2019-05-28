@@ -59,7 +59,7 @@ type resetOptions struct {
 	kubeconfigPath        string
 }
 
-// resetData defines all the runtime information used when running the kubeadm reset worklow;
+// resetData defines all the runtime information used when running the kubeadm reset workflow;
 // this data is shared across all the phases that are included in the workflow.
 type resetData struct {
 	certificatesDir       string
@@ -84,10 +84,6 @@ func newResetOptions() *resetOptions {
 // newResetData returns a new resetData struct to be used for the execution of the kubeadm reset workflow.
 func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out io.Writer) (*resetData, error) {
 	var cfg *kubeadmapi.InitConfiguration
-	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors)
-	if err != nil {
-		return nil, err
-	}
 
 	client, err := getClientset(options.kubeconfigPath, false)
 	if err == nil {
@@ -98,6 +94,16 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		}
 	} else {
 		klog.V(1).Infof("[reset] Could not obtain a client set from the kubeconfig file: %s", options.kubeconfigPath)
+	}
+
+	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, ignorePreflightErrors(cfg))
+	if err != nil {
+		return nil, err
+	}
+	kubeadmutil.CheckErr(err)
+	if cfg != nil {
+		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
+		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 	}
 
 	var criSocketPath string
@@ -119,6 +125,13 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 		outputWriter:          out,
 		cfg:                   cfg,
 	}, nil
+}
+
+func ignorePreflightErrors(cfg *kubeadmapi.InitConfiguration) []string {
+	if cfg == nil {
+		return []string{}
+	}
+	return cfg.NodeRegistration.IgnorePreflightErrors
 }
 
 // AddResetFlags adds reset flags
@@ -279,12 +292,23 @@ func (r *resetData) Run() error {
 
 	// Try to unmount mounted directories under kubeadmconstants.KubeletRunDirectory in order to be able to remove the kubeadmconstants.KubeletRunDirectory directory later
 	fmt.Printf("[reset] Unmounting mounted directories in %q\n", kubeadmconstants.KubeletRunDirectory)
-	umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", kubeadmconstants.KubeletRunDirectory)
 
-	klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
-	umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
+	// In case KubeletRunDirectory holds a symbolic link, evaluate it
+	var absoluteKubeletRunDirectory string
+	absoluteKubeletRunDirectory, err = filepath.EvalSymlinks(kubeadmconstants.KubeletRunDirectory)
 	if err != nil {
-		klog.Errorf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		klog.Errorf("[reset] Failed to evaluate the %q directory. Skipping its unmount and cleanup: %v", kubeadmconstants.KubeletRunDirectory, err)
+	} else {
+		// Only unmount mount points which start with "/var/lib/kubelet" or absolute path of symbolic link, and avoid using empty absoluteKubeletRunDirectory
+		umountDirsCmd := fmt.Sprintf("awk '$2 ~ path {print $2}' path=%s/ /proc/mounts | xargs -r umount", absoluteKubeletRunDirectory)
+		klog.V(1).Infof("[reset] Executing command %q", umountDirsCmd)
+		umountOutputBytes, err := exec.Command("sh", "-c", umountDirsCmd).Output()
+		if err != nil {
+			klog.Errorf("[reset] Failed to unmount mounted directories in %s: %s\n", kubeadmconstants.KubeletRunDirectory, string(umountOutputBytes))
+		} else {
+			// Only clean absoluteKubeletRunDirectory if umountDirsCmd passed without error
+			dirsToClean = append(dirsToClean, absoluteKubeletRunDirectory)
+		}
 	}
 
 	klog.V(1).Info("[reset] Removing Kubernetes-managed containers")
@@ -292,7 +316,7 @@ func (r *resetData) Run() error {
 		klog.Errorf("[reset] Failed to remove containers: %v", err)
 	}
 
-	dirsToClean = append(dirsToClean, []string{kubeadmconstants.KubeletRunDirectory, "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
+	dirsToClean = append(dirsToClean, []string{"/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}...)
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories
 	fmt.Printf("[reset] Deleting contents of stateful directories: %v\n", dirsToClean)
@@ -317,7 +341,7 @@ func (r *resetData) Run() error {
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
-		
+
 		The reset process does not clean your kubeconfig files and you must remove them manually.
 		Please, check the contents of the $HOME/.kube/config file.
 	`)

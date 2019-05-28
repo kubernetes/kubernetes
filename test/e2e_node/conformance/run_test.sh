@@ -176,7 +176,6 @@ if [ ! -z $pid ]; then
 fi
 
 volume_stats_agg_period=10s
-allow_privileged=true
 serialize_image_pulls=false
 config_dir=`mktemp -d`
 file_check_frequency=10s
@@ -184,7 +183,6 @@ pod_cidr=10.100.0.0/24
 log_level=4
 start_kubelet --kubeconfig ${KUBELET_KUBECONFIG} \
   --volume-stats-agg-period $volume_stats_agg_period \
-  --allow-privileged=$allow_privileged \
   --serialize-image-pulls=$serialize_image_pulls \
   --pod-manifest-path $config_dir \
   --file-check-frequency $file_check_frequency \
