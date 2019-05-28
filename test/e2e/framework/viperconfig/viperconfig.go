@@ -78,10 +78,16 @@ func ViperizeFlags(requiredConfig, optionalConfig string) error {
 			// "file not found". Unfortunately error
 			// messages are sometimes hard to understand,
 			// so try to help the user a bit.
-			switch err.Error() {
-			case viperFileNotFound:
+			switch err.(type) {
+			case viper.ConfigFileNotFoundError:
 				if required {
-					return wrapError(errors.New("not found or not using a supported file format"))
+					return wrapError(errors.New("not found"))
+				}
+				// Proceed without config.
+				return nil
+			case viper.UnsupportedConfigError:
+				if required {
+					return wrapError(errors.New("not using a supported file format"))
 				}
 				// Proceed without config.
 				return nil
