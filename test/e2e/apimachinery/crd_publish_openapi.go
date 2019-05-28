@@ -598,4 +598,6 @@ properties:
     properties:
       bars:
         description: List of Bars and their statuses.
-        type: array`)
+        type: array
+        items:
+          type: object`)
