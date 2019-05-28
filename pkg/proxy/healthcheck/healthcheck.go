@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
+
 	"sync"
 	"sync/atomic"
 	"time"
@@ -379,7 +381,7 @@ type healthzHandler struct {
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	lastUpdated := h.hs.lastUpdated.Load().(time.Time)
 	endpointsLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
-	servicesLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
+	servicesLastUpdated = h.hs.servicesLastUpdated.Load().(time.Time)
 	currentTime := h.hs.clock.Now()
 	resp.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`,
