@@ -943,7 +943,7 @@ COMMIT
 		},
 		RunScript: []fakeexec.FakeRunAction{
 			func() ([]byte, []byte, error) { return []byte(output), []byte(stderrOutput), nil },
-			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
+			func() ([]byte, []byte, error) { return nil, []byte(stderrOutput), &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := fakeexec.FakeExec{
@@ -983,6 +983,9 @@ COMMIT
 	err = runner.SaveInto(TableNAT, buffer)
 	if err == nil {
 		t.Errorf("%s: Expected failure", protoStr)
+	}
+	if string(buffer.Bytes()) != stderrOutput {
+		t.Errorf("%s: Expected output '%s', got '%v'", protoStr, stderrOutput, string(buffer.Bytes()))
 	}
 }
 
