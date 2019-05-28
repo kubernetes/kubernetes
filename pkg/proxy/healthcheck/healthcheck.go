@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"sync"
@@ -287,7 +286,7 @@ func newHealthzServer(listener Listener, httpServerFactory HTTPServerFactory, c 
 	if c == nil {
 		c = clock.RealClock{}
 	}
-	hs =  &HealthzServer{
+	hs :=  &HealthzServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
 		clock:         c,
@@ -380,8 +379,8 @@ type healthzHandler struct {
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	lastUpdated := h.hs.lastUpdated.Load().(time.Time)
-	endpointsLastUpdated = h.hs.endpointsLastUpdated.Load().(time.Time)
-	servicesLastUpdated = h.hs.servicesLastUpdated.Load().(time.Time)
+	endpointsLastUpdated := h.hs.endpointsLastUpdated.Load().(time.Time)
+	servicesLastUpdated := h.hs.servicesLastUpdated.Load().(time.Time)
 	currentTime := h.hs.clock.Now()
 	resp.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q, "endpointsUpdate": %q, "servicesUpdate": %q, "currentTime": %q}`,
@@ -391,17 +390,17 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 		return
 	}
-	if endpointTimeout, ok := req.Header["endpointUpdateTimeout"]; ok {	
-		if endpointTimeoutSecs, err := strconv.Atoi(endpointTimeout); !err {
-			if currentTime.After(endpointsLastUpdated.Add(h.hs.healthTimeout)) {
+	if endpointHeader, ok := req.Header["endpointUpdateTimeout"]; ok {	
+		if endpointTimeout, err := time.ParseDuration((endpointHeader); !err {
+			if currentTime.After(endpointsLastUpdated.Add(endpointTimeout) {
 				resp.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
 		}
 	}
-	if servicesTimeout, ok := req.Header["servicesUpdateTimeout"]; ok {	
-		if servicesTimeoutSecs, err := strconv.Atoi(servicesTimeout); !err {
-			if currentTime.After(servicessLastUpdated.Add(h.hs.healthTimeout)) {
+	if servicesHeader, ok := req.Header["servicesUpdateTimeout"]; ok {	
+		if servicesTimeout, err := time.ParseDuration(servicesHeader); !err {
+			if currentTime.After(servicessLastUpdated.Add(servicesTimeout)) {
 				resp.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
@@ -409,3 +408,4 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	}
 	resp.WriteHeader(http.StatusOK)
 }
+
