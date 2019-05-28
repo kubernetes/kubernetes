@@ -1197,7 +1197,7 @@ controllerManagerExtraVolumes:
 * Support for the `alpha.kubernetes.io/nvidia-gpu` resource, which was deprecated in 1.10, has been removed. Please use the resource exposed by DevicePlugins instead (`nvidia.com/gpu`). ([#61498](https://github.com/kubernetes/kubernetes/pull/61498), [@mindprince](https://github.com/mindprince))
 * The `kube-cloud-controller-manager` flag `--service-account-private-key-file` has been removed. Use `--use-service-account-credentials` instead. ([#60875](https://github.com/kubernetes/kubernetes/pull/60875), [@charrywanganthony](https://github.com/charrywanganthony))
 * The rknetes code, which was deprecated in 1.10, has been removed. Use rktlet and CRI instead. ([#61432](https://github.com/kubernetes/kubernetes/pull/61432), [@filbranden](https://github.com/filbranden))
-* DaemonSet scheduling associated with the alpha ScheduleDaemonSetPods feature flag has been emoved. See https://github.com/kubernetes/enhancements/issues/548 for feature status. ([#61411](https://github.com/kubernetes/kubernetes/pull/61411), [@liggitt](https://github.com/liggitt))
+* DaemonSet scheduling associated with the alpha ScheduleDaemonSetPods feature flag has been removed. See https://github.com/kubernetes/enhancements/issues/548 for feature status. ([#61411](https://github.com/kubernetes/kubernetes/pull/61411), [@liggitt](https://github.com/liggitt))
 * The `METADATA_AGENT_VERSION` configuration option has been removed to keep metadata agent version consistent across Kubernetes deployments. ([#63000](https://github.com/kubernetes/kubernetes/pull/63000), [@kawych](https://github.com/kawych))
 * The deprecated `--service-account-private-key-file` flag has been removed from the cloud-controller-manager. The flag is still present and supported in the kube-controller-manager. ([#65182](https://github.com/kubernetes/kubernetes/pull/65182), [@liggitt](https://github.com/liggitt))
 * Removed alpha functionality that allowed the controller manager to approve kubelet server certificates. This functionality should be replaced by automating validation and approval of node server certificate signing requests. ([#62471](https://github.com/kubernetes/kubernetes/pull/62471), [@mikedanese](https://github.com/mikedanese))
@@ -2407,7 +2407,6 @@ filename | sha256 hash
 
 ### Action Required
 
-* NONE ([#62643](https://github.com/kubernetes/kubernetes/pull/62643), [@xiangpengzhao](https://github.com/xiangpengzhao))
 * ACTION REQUIRED: Alpha annotation for PersistentVolume node affinity has been removed.  Update your PersistentVolumes to use the beta PersistentVolume.nodeAffinity field before upgrading to this release ([#61816](https://github.com/kubernetes/kubernetes/pull/61816), [@wackxu](https://github.com/wackxu))
 * ACTION REQUIRED: In-place node upgrades to this release from versions 1.7.14+, 1.8.9+, and 1.9.4+ are not supported if using subpath volumes with PVCs.  Such pods should be drained from the node first. ([#61373](https://github.com/kubernetes/kubernetes/pull/61373), [@msau42](https://github.com/msau42))
 
