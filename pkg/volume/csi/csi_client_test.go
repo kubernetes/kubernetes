@@ -31,8 +31,9 @@ import (
 )
 
 type fakeCsiDriverClient struct {
-	t          *testing.T
-	nodeClient *fake.NodeClient
+	t                *testing.T
+	nodeClient       *fake.NodeClient
+	controllerClient *fake.ControllerClient
 }
 
 func newFakeCsiDriverClient(t *testing.T, stagingCapable bool) *fakeCsiDriverClient {
@@ -266,6 +267,28 @@ func (c *fakeCsiDriverClient) NodeExpandVolume(ctx context.Context, volumeid, vo
 	}
 	updatedQuantity := resource.NewQuantity(resp.CapacityBytes, resource.BinarySI)
 	return *updatedQuantity, nil
+}
+
+func (c *fakeCsiDriverClient) ControllerSupportsPublishUnpublish(ctx context.Context) (bool, error) {
+	c.t.Log("calling fake.ControllerGetCapabilities for ControllerSupportsPublishUnpublish...")
+	req := &csipbv1.ControllerGetCapabilitiesRequest{}
+	resp, err := c.controllerClient.ControllerGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	publishUnpublishSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME {
+			publishUnpublishSet = true
+		}
+	}
+	return publishUnpublishSet, nil
 }
 
 func setupClient(t *testing.T, stageUnstageSet bool) csiClient {

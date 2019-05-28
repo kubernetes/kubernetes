@@ -83,6 +83,7 @@ type csiClient interface {
 	NodeSupportsStageUnstage(ctx context.Context) (bool, error)
 	NodeSupportsNodeExpand(ctx context.Context) (bool, error)
 	NodeSupportsVolumeStats(ctx context.Context) (bool, error)
+	ControllerSupportsPublishUnpublish(ctx context.Context) (bool, error)
 }
 
 // Strongly typed address
@@ -997,4 +998,70 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 
 	}
 	return metrics, nil
+}
+
+func (c *csiDriverClient) ControllerSupportsPublishUnpublish(ctx context.Context) (bool, error) {
+	klog.V(4).Info(log("calling ControllerGetCapabilities rpc to determine if ControllerSupportsPublishUnpublish"))
+
+	if c.controllerV1ClientCreator != nil {
+		return c.controllerSupportsPublishUnpublishV1(ctx)
+	} else if c.controllerV0ClientCreator != nil {
+		return c.controllerSupportsPublishUnpublishV0(ctx)
+	}
+
+	return false, fmt.Errorf("failed to call ControllerSupportsPublishUnpublish. Both nodeV1ClientCreator and nodeV0ClientCreator are nil")
+}
+
+func (c *csiDriverClient) controllerSupportsPublishUnpublishV1(ctx context.Context) (bool, error) {
+	controllerClient, closer, err := c.controllerV1ClientCreator(c.addr)
+	if err != nil {
+		return false, err
+	}
+	defer closer.Close()
+
+	req := &csipbv1.ControllerGetCapabilitiesRequest{}
+	resp, err := controllerClient.ControllerGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	publishUnpublishSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv1.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME {
+			publishUnpublishSet = true
+		}
+	}
+	return publishUnpublishSet, nil
+}
+
+func (c *csiDriverClient) controllerSupportsPublishUnpublishV0(ctx context.Context) (bool, error) {
+	controllerClient, closer, err := c.controllerV0ClientCreator(c.addr)
+	if err != nil {
+		return false, err
+	}
+	defer closer.Close()
+
+	req := &csipbv0.ControllerGetCapabilitiesRequest{}
+	resp, err := controllerClient.ControllerGetCapabilities(ctx, req)
+	if err != nil {
+		return false, err
+	}
+
+	capabilities := resp.GetCapabilities()
+
+	publishUnpublishSet := false
+	if capabilities == nil {
+		return false, nil
+	}
+	for _, capability := range capabilities {
+		if capability.GetRpc().GetType() == csipbv0.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME {
+			publishUnpublishSet = true
+		}
+	}
+	return publishUnpublishSet, nil
 }
