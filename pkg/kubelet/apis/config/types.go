@@ -291,12 +291,12 @@ type KubeletConfiguration struct {
 
 	/* the following fields are meant for Node Allocatable */
 
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pids=100) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
 	// that describe resources reserved for non-kubernetes components.
 	// Currently only cpu and memory are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
-	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pids=100) pairs
+	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G,pid=100) pairs
 	// that describe resources reserved for kubernetes system components.
 	// Currently cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.

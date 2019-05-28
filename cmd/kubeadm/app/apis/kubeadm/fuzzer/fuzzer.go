@@ -32,6 +32,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzClusterConfiguration,
 		fuzzComponentConfigs,
 		fuzzDNS,
+		fuzzNodeRegistration,
 		fuzzLocalEtcd,
 		fuzzNetworking,
 		fuzzJoinConfiguration,
@@ -85,6 +86,13 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 
 	// Pin values for fields that are not present in v1beta1
 	obj.CertificateKey = ""
+}
+
+func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
+	obj.IgnorePreflightErrors = nil
 }
 
 func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue) {

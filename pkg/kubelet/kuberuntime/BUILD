@@ -90,7 +90,6 @@ go_test(
         "instrumented_services_test.go",
         "kuberuntime_container_linux_test.go",
         "kuberuntime_container_test.go",
-        "kuberuntime_container_windows_test.go",
         "kuberuntime_gc_test.go",
         "kuberuntime_image_test.go",
         "kuberuntime_manager_test.go",

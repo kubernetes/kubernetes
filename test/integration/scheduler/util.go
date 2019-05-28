@@ -33,12 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -238,8 +242,18 @@ func initTestSchedulerWithOptions(
 
 // initDisruptionController initializes and runs a Disruption Controller to properly
 // update PodDisuptionBudget objects.
-func initDisruptionController(context *testContext) *disruption.DisruptionController {
+func initDisruptionController(t *testing.T, context *testContext) *disruption.DisruptionController {
 	informers := informers.NewSharedInformerFactory(context.clientSet, 12*time.Hour)
+
+	discoveryClient := cacheddiscovery.NewMemCacheClient(context.clientSet.Discovery())
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
+
+	config := restclient.Config{Host: context.httpServer.URL}
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(context.clientSet.Discovery())
+	scaleClient, err := scale.NewForConfig(&config, mapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		t.Fatalf("Error in create scaleClient: %v", err)
+	}
 
 	dc := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
@@ -248,7 +262,9 @@ func initDisruptionController(context *testContext) *disruption.DisruptionContro
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
-		context.clientSet)
+		context.clientSet,
+		mapper,
+		scaleClient)
 
 	informers.Start(context.schedulerConfig.StopEverything)
 	informers.WaitForCacheSync(context.schedulerConfig.StopEverything)

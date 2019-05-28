@@ -97,15 +97,8 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	//      - type: integer
 	//      - type: string
 	//    - ... zero or more
-	skipAnyOf := false
-	skipFirstAllOfAnyOf := false
-	if s.XIntOrString && s.ValueValidation != nil {
-		if len(s.ValueValidation.AnyOf) == 2 && reflect.DeepEqual(s.ValueValidation.AnyOf, intOrStringAnyOf) {
-			skipAnyOf = true
-		} else if len(s.ValueValidation.AllOf) >= 1 && len(s.ValueValidation.AllOf[0].AnyOf) == 2 && reflect.DeepEqual(s.ValueValidation.AllOf[0].AnyOf, intOrStringAnyOf) {
-			skipFirstAllOfAnyOf = true
-		}
-	}
+	skipAnyOf := isIntOrStringAnyOfPattern(s)
+	skipFirstAllOfAnyOf := isIntOrStringAllOfPattern(s)
 
 	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, lvl, fldPath)...)
 
@@ -155,6 +148,20 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	}
 
 	return allErrs
+}
+
+func isIntOrStringAnyOfPattern(s *Structural) bool {
+	if s == nil || s.ValueValidation == nil {
+		return false
+	}
+	return len(s.ValueValidation.AnyOf) == 2 && reflect.DeepEqual(s.ValueValidation.AnyOf, intOrStringAnyOf)
+}
+
+func isIntOrStringAllOfPattern(s *Structural) bool {
+	if s == nil || s.ValueValidation == nil {
+		return false
+	}
+	return len(s.ValueValidation.AllOf) >= 1 && len(s.ValueValidation.AllOf[0].AnyOf) == 2 && reflect.DeepEqual(s.ValueValidation.AllOf[0].AnyOf, intOrStringAnyOf)
 }
 
 // validateGeneric checks the generic fields of a structural schema.

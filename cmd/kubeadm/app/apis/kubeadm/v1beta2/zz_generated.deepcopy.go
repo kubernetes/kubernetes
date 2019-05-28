@@ -538,6 +538,11 @@ func (in *NodeRegistrationOptions) DeepCopyInto(out *NodeRegistrationOptions) {
 			(*out)[key] = val
 		}
 	}
+	if in.IgnorePreflightErrors != nil {
+		in, out := &in.IgnorePreflightErrors, &out.IgnorePreflightErrors
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

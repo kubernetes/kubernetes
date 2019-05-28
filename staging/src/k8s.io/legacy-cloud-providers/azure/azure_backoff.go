@@ -596,8 +596,9 @@ func shouldRetryHTTPRequest(resp *http.Response, err error) bool {
 	return false
 }
 
+// processHTTPRetryResponse : return true means stop retry, false means continue retry
 func (az *Cloud) processHTTPRetryResponse(service *v1.Service, reason string, resp *http.Response, err error) (bool, error) {
-	if resp != nil && isSuccessHTTPResponse(resp) {
+	if err == nil && resp != nil && isSuccessHTTPResponse(resp) {
 		// HTTP 2xx suggests a successful response
 		return true, nil
 	}
@@ -620,7 +621,7 @@ func (az *Cloud) processHTTPRetryResponse(service *v1.Service, reason string, re
 }
 
 func (az *Cloud) processHTTPResponse(service *v1.Service, reason string, resp *http.Response, err error) error {
-	if isSuccessHTTPResponse(resp) {
+	if err == nil && isSuccessHTTPResponse(resp) {
 		// HTTP 2xx suggests a successful response
 		return nil
 	}
