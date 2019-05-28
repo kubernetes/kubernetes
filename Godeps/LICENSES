@@ -2523,7 +2523,6 @@ THE SOFTWARE.
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
-
    APPENDIX: How to apply the Apache License to your work.
 
       To apply the Apache License to your work, attach the following
@@ -23461,4 +23460,3 @@ SOFTWARE.
 
 = vendor/vbom.ml/util/LICENSE 9f7e1d7e8f527330ebb5f4c32e0f3e40
 ================================================================================
-
