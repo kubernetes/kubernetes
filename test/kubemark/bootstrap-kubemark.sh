@@ -19,7 +19,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-
+set -x
 # shellcheck disable=SC2039
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 # shellcheck source=./skeleton/util.sh
@@ -33,3 +33,4 @@ source "${KUBE_ROOT}/test/kubemark/${CLOUD_PROVIDER}/util.sh"
 
 # shellcheck source=../../cluster/kubemark/gce/config-default.sh
 source "${KUBE_ROOT}/cluster/kubemark/${CLOUD_PROVIDER}/config-default.sh"
+set -x

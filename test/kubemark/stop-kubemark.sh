@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Script that destroys Kubemark cluster and deletes all master resources.
-
+set -x 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 # shellcheck source=./bootstrap-kubemark.sh
 source "${KUBE_ROOT}/test/kubemark/bootstrap-kubemark.sh"
@@ -43,3 +43,4 @@ rm -rf "${RESOURCE_DIRECTORY}/addons" \
 	"${RESOURCE_DIRECTORY}/kubemark-master-env.sh"  &> /dev/null || true
 
 delete-master-instance-and-resources
+set +x
