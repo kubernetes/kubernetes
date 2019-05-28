@@ -398,7 +398,7 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 func checkHeader(req *http.Request, header string, sinceLastUpdate time.Duration) bool {
 	if header, exists := req.Header[header]; exists {	
-		if timeout, err = time.ParseDuration(header[:0]); !err {
+		if timeout, err := time.ParseDuration(header[0]); err != nil {
 			return timeout < sinceLastUpdate
 		}
 	} 
