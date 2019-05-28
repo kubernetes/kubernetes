@@ -84,6 +84,20 @@ func (s *EtcdObjectReader) GetStoredCustomResource(ns, name string) (*unstructur
 	return u, nil
 }
 
+// SetStoredCustomResource writes the storage representation of a custom resource to etcd.
+func (s *EtcdObjectReader) SetStoredCustomResource(ns, name string, obj *unstructured.Unstructured) error {
+	bs, err := obj.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	key := path.Join("/", s.storagePrefix, s.crd.Spec.Group, s.crd.Spec.Names.Plural, ns, name)
+	if _, err := s.etcdClient.KV.Put(context.Background(), key, string(bs)); err != nil {
+		return fmt.Errorf("error setting storage object %s, %s from etcd at key %s: %v", ns, name, key, err)
+	}
+	return nil
+}
+
 // GetEtcdClients returns an initialized  clientv3.Client and clientv3.KV.
 func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, clientv3.KV, error) {
 	tlsInfo := transport.TLSInfo{
