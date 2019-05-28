@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"regexp"
 	"strings"
 	"sync"
@@ -332,7 +333,7 @@ func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
 	// creates a new buffer, redirects stdout and stderr to it and also
 	// calls Run()].
 	cmd.SetStdout(buffer)
-	cmd.SetStderr(buffer)
+	cmd.SetStderr(ioutil.Discard)
 	return cmd.Run()
 }
 
