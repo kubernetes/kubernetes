@@ -29,6 +29,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//cmd/kubeadm/app/apis/kubeadm:all-srcs",
+        "//cmd/kubeadm/app/apis/output:all-srcs",
         "//cmd/kubeadm/app/cmd:all-srcs",
         "//cmd/kubeadm/app/componentconfigs:all-srcs",
         "//cmd/kubeadm/app/constants:all-srcs",
