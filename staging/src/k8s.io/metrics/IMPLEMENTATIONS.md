@@ -17,7 +17,7 @@ They are listed here for convenience.***
 
 - [Prometheus
   Adapter](https://github.com/directxman12/k8s-prometheus-adapter).  An
-  implementation of the custom metrics API that attempts to support
+  implementation of the custom and external metrics API that attempts to support
   arbitrary metrics following a set label and naming scheme.
 
 - [Microsoft Azure Adapter](https://github.com/Azure/azure-k8s-metrics-adapter). An implementation of the custom metrics API that allows you to retrieve arbitrary metrics from Azure Monitor.
