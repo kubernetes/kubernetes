@@ -534,7 +534,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 			}
 			createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// update with .status.num = 15, expecting an error

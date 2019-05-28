@@ -40,6 +40,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -386,6 +387,8 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 	// After changing a CRD, the resources for versions will be re-created that can be result in
 	// cancelled connection (e.g. "grpc connection closed" or "context canceled").
 	// Just retrying fixes that.
+	//
+	// TODO: we have to wait for the storage version to become effective. Storage version changes are not instant.
 	for i := 0; i < 5; i++ {
 		_, err = customResourceClients["v1"].Create(crInstance, metav1.CreateOptions{})
 		if err == nil {
