@@ -388,18 +388,15 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 
 	if currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
-	}
-	else if checkHeader(req, "endpointsUpdateTimeout", currentTime.Sub(endpointsLastUpdated)) {
+	} else if checkHeader(req, "endpointsUpdateTimeout", currentTime.Sub(endpointsLastUpdated)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
-	}
-	else if checkHeader(req, "servicesUpdateTimeout", currentTime.Sub(servicesLastUpdated)) {
+	} else if checkHeader(req, "servicesUpdateTimeout", currentTime.Sub(servicesLastUpdated)) {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	}
 	resp.WriteHeader(http.StatusOK)
 }
 
-func checkHeader(req *http.Request, header string, sinceLastUpdate time.Duration) bool
-{
+func checkHeader(req *http.Request, header string, sinceLastUpdate time.Duration) bool {
 	if header, exists := req.Header[header]; exists {	
 		if timeout, err = time.ParseDuration(header[:0]); !err {
 			return timeout < sinceLastUpdate
