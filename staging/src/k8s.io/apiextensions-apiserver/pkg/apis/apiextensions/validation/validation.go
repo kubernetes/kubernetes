@@ -121,10 +121,10 @@ func ValidateCustomResourceDefinitionVersion(version *apiextensions.CustomResour
 // ValidateCustomResourceDefinitionSpec statically validates
 func ValidateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, fldPath *field.Path) field.ErrorList {
 	allowDefaults := utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting)
-	return validateCustomResourceDefinitionSpec(spec, true, allowDefaults, fldPath)
+	return validateCustomResourceDefinitionSpec(spec, true, allowDefaults, false, fldPath)
 }
 
-func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, requireRecognizedVersion, allowDefaults bool, fldPath *field.Path) field.ErrorList {
+func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefinitionSpec, requireRecognizedVersion, allowDefaults, allowConversionWithPreserveUnknownFields bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(spec.Group) == 0 {
@@ -237,9 +237,16 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 		}
 	}
 
+	if !allowConversionWithPreserveUnknownFields && conversionAndPreserveUnknownFields(spec) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("conversion").Child("strategy"), spec.Conversion.Strategy, "must be None if spec.preserveUnknownFields is true"))
+	}
 	allErrs = append(allErrs, validateCustomResourceConversion(spec.Conversion, requireRecognizedVersion, fldPath.Child("conversion"))...)
 
 	return allErrs
+}
+
+func conversionAndPreserveUnknownFields(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	return (spec.Conversion != nil && spec.Conversion.Strategy != apiextensions.NoneConverter) && (spec.PreserveUnknownFields == nil || *spec.PreserveUnknownFields)
 }
 
 func validateEnumStrings(fldPath *field.Path, value string, accepted []string, required bool) field.ErrorList {
@@ -359,7 +366,7 @@ func ValidateCustomResourceDefinitionSpecUpdate(spec, oldSpec *apiextensions.Cus
 	// find out whether any schema had default before. Then we keep allowing it.
 	allowDefaults := utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceDefaulting) || specHasDefaults(oldSpec)
 
-	allErrs := validateCustomResourceDefinitionSpec(spec, requireRecognizedVersion, allowDefaults, fldPath)
+	allErrs := validateCustomResourceDefinitionSpec(spec, requireRecognizedVersion, allowDefaults, conversionAndPreserveUnknownFields(oldSpec), fldPath)
 
 	if established {
 		// these effect the storage and cannot be changed therefore
