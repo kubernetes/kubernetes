@@ -139,7 +139,7 @@ func convertNullTypeToNullable(x interface{}) interface{} {
 	}
 }
 
-func TestNullable(t *testing.T) {
+func TestValidateCustomResource(t *testing.T) {
 	type args struct {
 		schema apiextensions.JSONSchemaProps
 		object interface{}
@@ -149,6 +149,7 @@ func TestNullable(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
+		// TODO: make more complete
 		{"!nullable against non-null", args{
 			apiextensions.JSONSchemaProps{
 				Properties: map[string]apiextensions.JSONSchemaProps{
@@ -235,6 +236,17 @@ func TestNullable(t *testing.T) {
 			},
 			map[string]interface{}{"field": nil},
 		}, false},
+		{"invalid regex", args{
+			apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"field": {
+						Type:    "string",
+						Pattern: "+",
+					},
+				},
+			},
+			map[string]interface{}{"field": "foo"},
+		}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
