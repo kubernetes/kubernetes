@@ -70,6 +70,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.APIServerBindPort,
 			options.CfgPath,
 			options.ControlPlane,
+			options.ExperimentalControlPlane,
 			options.NodeName,
 			options.FileDiscovery,
 			options.TokenDiscovery,
@@ -83,6 +84,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 		flags = []string{
 			options.CfgPath,
 			options.ControlPlane,
+			options.ExperimentalControlPlane,
 			options.FileDiscovery,
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
@@ -96,6 +98,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.APIServerAdvertiseAddress,
 			options.CfgPath,
 			options.ControlPlane,
+			options.ExperimentalControlPlane,
 			options.NodeName,
 			options.FileDiscovery,
 			options.TokenDiscovery,
@@ -108,6 +111,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 		flags = []string{
 			options.CfgPath,
 			options.ControlPlane,
+			options.ExperimentalControlPlane,
 			options.FileDiscovery,
 			options.TokenDiscovery,
 			options.TokenDiscoveryCAHash,
@@ -122,6 +126,7 @@ func getControlPlanePreparePhaseFlags(name string) []string {
 			options.APIServerBindPort,
 			options.CfgPath,
 			options.ControlPlane,
+			options.ExperimentalControlPlane,
 		}
 	default:
 		flags = []string{}
