@@ -357,6 +357,13 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // termination_grace_period is the time that a pod reaper should wait
+    // before terminating the containers in a pod.
+    // For e.g., on a Linux system, this can be used to configure the
+    // systemd TimeoutStopUSec property for the containers running in systemd
+    // scopes, so systemd gives the pod containers enough time to shutdown
+    // gracefully on system shutdown or reboot.
+    int64 termination_grace_period = 9;
 }
 
 message RunPodSandboxRequest {
