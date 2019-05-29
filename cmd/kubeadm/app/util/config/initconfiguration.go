@@ -128,14 +128,27 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 
 // SetClusterDynamicDefaults checks and sets values for the ClusterConfiguration object
 func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAddress string, bindPort int32) error {
+	kubeProxyUserBindAddress := ""
+	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.BindAddress != "" {
+		kubeProxyUserBindAddress = cfg.ComponentConfigs.KubeProxy.BindAddress
+	}
+
 	// Default all the embedded ComponentConfig structs
+	// This will set 'cfg.ComponentConfigs.KubeProxy.BindAddress' as '0.0.0.0' if it is unset
 	componentconfigs.Known.Default(cfg)
 
-	ip := net.ParseIP(advertiseAddress)
-	if ip.To4() != nil {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv4
+	if kubeProxyUserBindAddress != "" {
+		addressIP := net.ParseIP(kubeProxyUserBindAddress)
+		if addressIP == nil {
+			return errors.Errorf("could not use %q as bind address for kube-proxy, must be a valid IPv4 or IPv6 address", kubeProxyUserBindAddress)
+		}
 	} else {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv6
+		ip := net.ParseIP(advertiseAddress)
+		if ip.To4() != nil {
+			cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv4
+		} else {
+			cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv6
+		}
 	}
 
 	// Resolve possible version labels and validate version string
