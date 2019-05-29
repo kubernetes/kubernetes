@@ -135,7 +135,7 @@ func BenchmarkSchedulingNodeAffinity(b *testing.B) {
 func makeBasePodWithPodAntiAffinity(podLabels, affinityLabels map[string]string) *v1.Pod {
 	basePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "anit-affinity-pod-",
+			GenerateName: "anti-affinity-pod-",
 			Labels:       podLabels,
 		},
 		Spec: testutils.MakePodSpec(),
