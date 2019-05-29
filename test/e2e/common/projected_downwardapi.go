@@ -26,17 +26,17 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
-var _ = Describe("[sig-storage] Projected downwardAPI", func() {
+var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 2 * time.Minute
 	var podClient *framework.PodClient
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
 
@@ -86,7 +86,7 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup [NodeFeature:FSGroup]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
@@ -100,7 +100,7 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 	})
 
-	It("should provide podname as non-root with fsgroup and defaultMode [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should provide podname as non-root with fsgroup and defaultMode [NodeFeature:FSGroup]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
@@ -128,23 +128,23 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 		podName := "labelsupdate" + string(uuid.NewUUID())
 		pod := projectedDownwardAPIVolumePodForUpdateTest(podName, labels, map[string]string{}, "/etc/podinfo/labels")
 		containerName := "client-container"
-		By("Creating the pod")
+		ginkgo.By("Creating the pod")
 		podClient.CreateSync(pod)
 
-		Eventually(func() (string, error) {
+		gomega.Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
+			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
 
-		Eventually(func() (string, error) {
+		gomega.Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
+			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key3=\"value3\"\n"))
 	})
 
 	/*
@@ -159,26 +159,26 @@ var _ = Describe("[sig-storage] Projected downwardAPI", func() {
 		pod := projectedDownwardAPIVolumePodForUpdateTest(podName, map[string]string{}, annotations, "/etc/podinfo/annotations")
 
 		containerName := "client-container"
-		By("Creating the pod")
+		ginkgo.By("Creating the pod")
 		podClient.CreateSync(pod)
 
 		pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
-		Eventually(func() (string, error) {
+		gomega.Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
+			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
 		podClient.Update(podName, func(pod *v1.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
 
-		Eventually(func() (string, error) {
+		gomega.Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
-			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
+			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"foo\"\n"))
 	})
 
 	/*
