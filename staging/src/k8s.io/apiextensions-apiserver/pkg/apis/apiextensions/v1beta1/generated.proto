@@ -394,6 +394,9 @@ message JSONSchemaProps {
 
   optional string title = 7;
 
+  // default is a default value for undefined object fields.
+  // Defaulting is an alpha feature under the CustomResourceDefaulting feature gate.
+  // Defaulting requires spec.preserveUnknownFields to be false.
   optional JSON default = 8;
 
   optional double maximum = 9;
