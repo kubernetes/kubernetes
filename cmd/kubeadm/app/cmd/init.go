@@ -95,7 +95,8 @@ type initOptions struct {
 	featureGatesString      string
 	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
-	externalcfg             *kubeadmapiv1beta2.InitConfiguration
+	externalInitCfg         *kubeadmapiv1beta2.InitConfiguration
+	externalClusterCfg      *kubeadmapiv1beta2.ClusterConfiguration
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
 }
@@ -151,18 +152,19 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 	// adds flags to the init command
 	// init command local flags could be eventually inherited by the sub-commands automatically generated for phases
-	AddInitConfigFlags(cmd.Flags(), initOptions.externalcfg, &initOptions.featureGatesString)
+	AddInitConfigFlags(cmd.Flags(), initOptions.externalInitCfg)
+	AddClusterConfigFlags(cmd.Flags(), initOptions.externalClusterCfg, &initOptions.featureGatesString)
 	AddInitOtherFlags(cmd.Flags(), initOptions)
 	initOptions.bto.AddTokenFlag(cmd.Flags())
 	initOptions.bto.AddTTLFlag(cmd.Flags())
-	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalcfg.ImageRepository)
+	options.AddImageMetaFlags(cmd.Flags(), &initOptions.externalClusterCfg.ImageRepository)
 
 	// defines additional flag that are not used by the init command but that could be eventually used
 	// by the sub-commands automatically generated for phases
 	initRunner.SetAdditionalFlags(func(flags *flag.FlagSet) {
 		options.AddKubeConfigFlag(flags, &initOptions.kubeconfigPath)
 		options.AddKubeConfigDirFlag(flags, &initOptions.kubeconfigDir)
-		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalcfg.APIServer.ExtraArgs, &initOptions.externalcfg.ControllerManager.ExtraArgs, &initOptions.externalcfg.Scheduler.ExtraArgs)
+		options.AddControlPlanExtraArgsFlags(flags, &initOptions.externalClusterCfg.APIServer.ExtraArgs, &initOptions.externalClusterCfg.ControllerManager.ExtraArgs, &initOptions.externalClusterCfg.Scheduler.ExtraArgs)
 	})
 
 	// initialize the workflow runner with the list of phases
@@ -193,7 +195,7 @@ func NewCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration, featureGatesString *string) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
@@ -202,6 +204,19 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfig
 		&cfg.LocalAPIEndpoint.BindPort, options.APIServerBindPort, cfg.LocalAPIEndpoint.BindPort,
 		"Port for the API Server to bind to.",
 	)
+	flagSet.StringVar(
+		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
+		`Specify the node name.`,
+	)
+	flagSet.StringVar(
+		&cfg.CertificateKey, options.CertificateKey, "",
+		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
+	)
+	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
+}
+
+// AddClusterConfigFlags adds cluster flags bound to the config to the specified flagset
+func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
 		"Use alternative range of IP address for service VIPs.",
@@ -225,15 +240,6 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfig
 		&cfg.APIServer.CertSANs, options.APIServerCertSANs, cfg.APIServer.CertSANs,
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
-	flagSet.StringVar(
-		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
-		`Specify the node name.`,
-	)
-	flagSet.StringVar(
-		&cfg.CertificateKey, options.CertificateKey, "",
-		"Key used to encrypt the control-plane certificates in the kubeadm-certs Secret.",
-	)
-	cmdutil.AddCRISocketFlag(flagSet, &cfg.NodeRegistration.CRISocket)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
 
@@ -266,19 +272,23 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalcfg := &kubeadmapiv1beta2.InitConfiguration{}
-	kubeadmscheme.Scheme.Default(externalcfg)
+	externalInitCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	kubeadmscheme.Scheme.Default(externalInitCfg)
+
+	externalClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	kubeadmscheme.Scheme.Default(externalClusterCfg)
 
 	// Create the options object for the bootstrap token-related flags, and override the default value for .Description
 	bto := options.NewBootstrapTokenOptions()
 	bto.Description = "The default bootstrap token generated by 'kubeadm init'."
 
 	return &initOptions{
-		externalcfg:    externalcfg,
-		bto:            bto,
-		kubeconfigDir:  kubeadmconstants.KubernetesDir,
-		kubeconfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
-		uploadCerts:    false,
+		externalInitCfg:    externalInitCfg,
+		externalClusterCfg: externalClusterCfg,
+		bto:                bto,
+		kubeconfigDir:      kubeadmconstants.KubernetesDir,
+		kubeconfigPath:     kubeadmconstants.GetAdminKubeConfigPath(),
+		uploadCerts:        false,
 	}
 }
 
@@ -287,12 +297,13 @@ func newInitOptions() *initOptions {
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm init workflow
 func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io.Writer) (*initData, error) {
 	// Re-apply defaults to the public kubeadm API (this will set only values not exposed/not set as a flags)
-	kubeadmscheme.Scheme.Default(options.externalcfg)
+	kubeadmscheme.Scheme.Default(options.externalInitCfg)
+	kubeadmscheme.Scheme.Default(options.externalClusterCfg)
 
 	// Validate standalone flags values and/or combination of flags and then assigns
 	// validated values to the public kubeadm config API when applicable
 	var err error
-	if options.externalcfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString); err != nil {
+	if options.externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, options.featureGatesString); err != nil {
 		return nil, err
 	}
 
@@ -300,13 +311,13 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 		return nil, err
 	}
 
-	if err = options.bto.ApplyTo(options.externalcfg); err != nil {
+	if err = options.bto.ApplyTo(options.externalInitCfg); err != nil {
 		return nil, err
 	}
 
 	// Either use the config file if specified, or convert public kubeadm API to the internal InitConfiguration
 	// and validates InitConfiguration
-	cfg, err := configutil.LoadOrDefaultInitConfiguration(options.cfgPath, options.externalcfg)
+	cfg, err := configutil.LoadOrDefaultInitConfiguration(options.cfgPath, options.externalInitCfg, options.externalClusterCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -319,11 +330,11 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
 	// override node name and CRI socket from the command line options
-	if options.externalcfg.NodeRegistration.Name != "" {
-		cfg.NodeRegistration.Name = options.externalcfg.NodeRegistration.Name
+	if options.externalInitCfg.NodeRegistration.Name != "" {
+		cfg.NodeRegistration.Name = options.externalInitCfg.NodeRegistration.Name
 	}
-	if options.externalcfg.NodeRegistration.CRISocket != "" {
-		cfg.NodeRegistration.CRISocket = options.externalcfg.NodeRegistration.CRISocket
+	if options.externalInitCfg.NodeRegistration.CRISocket != "" {
+		cfg.NodeRegistration.CRISocket = options.externalInitCfg.NodeRegistration.CRISocket
 	}
 
 	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
