@@ -69,7 +69,7 @@ type KubeletFlags struct {
 	// run those in addition to the pods specified by static pod files, and exit.
 	RunOnce bool
 
-	// enableServer enables the Kubelet's server
+	// EnableServer enables the Kubelet's server
 	EnableServer bool
 
 	// HostnameOverride is the hostname used to identify the kubelet instead
@@ -86,20 +86,20 @@ type KubeletFlags struct {
 	// Container-runtime-specific options.
 	config.ContainerRuntimeOptions
 
-	// certDirectory is the directory where the TLS certs are located (by
+	// CertDirectory is the directory where the TLS certs are located (by
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string
 
-	// cloudProvider is the provider for cloud services.
+	// CloudProvider is the provider for cloud services.
 	// +optional
 	CloudProvider string
 
-	// cloudConfigFile is the path to the cloud provider configuration file.
+	// CloudConfigFile is the path to the cloud provider configuration file.
 	// +optional
 	CloudConfigFile string
 
-	// rootDirectory is the directory path to place kubelet files (volume
+	// RootDirectory is the directory path to place kubelet files (volume
 	// mounts,etc).
 	RootDirectory string
 
@@ -115,10 +115,10 @@ type KubeletFlags struct {
 	// Omit this flag to use the combination of built-in default configuration values and flags.
 	KubeletConfigFile string
 
-	// registerNode enables automatic registration with the apiserver.
+	// RegisterNode enables automatic registration with the apiserver.
 	RegisterNode bool
 
-	// registerWithTaints are an array of taints to add to a node object when
+	// RegisterWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
 	RegisterWithTaints []core.Taint
@@ -131,13 +131,13 @@ type KubeletFlags struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// +optional
 	AllowedUnsafeSysctls []string
-	// containerized should be set to true if kubelet is running in a container.
+	// Containerized should be set to true if kubelet is running in a container.
 	Containerized bool
-	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	// RemoteRuntimeEndpoint is the endpoint of remote runtime service
 	RemoteRuntimeEndpoint string
-	// remoteImageEndpoint is the endpoint of remote image service
+	// RemoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
+	// ExperimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
 	ExperimentalMounterPath string
 	// If enabled, the kubelet will integrate with the kernel memcg notification to determine if memory eviction thresholds are crossed rather than polling.
 	// +optional
@@ -151,10 +151,10 @@ type KubeletFlags struct {
 	ExperimentalNodeAllocatableIgnoreEvictionThreshold bool
 	// Node Labels are the node labels to add when registering the node in the cluster
 	NodeLabels map[string]string
-	// volumePluginDir is the full path of the directory in which to search
+	// VolumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string
-	// lockFilePath is the path that kubelet will use to as a lock file.
+	// LockFilePath is the path that kubelet will use to as a lock file.
 	// It uses this file as a lock to synchronize with other kubelet processes
 	// that may be running.
 	LockFilePath string
@@ -163,9 +163,9 @@ type KubeletFlags struct {
 	// This will cause the kubelet to listen to inotify events on the lock file,
 	// releasing it and exiting when another process tries to open that file.
 	ExitOnLockContention bool
-	// seccompProfileRoot is the directory path for seccomp profiles.
+	// SeccompProfileRoot is the directory path for seccomp profiles.
 	SeccompProfileRoot string
-	// bootstrapCheckpointPath is the path to the directory containing pod checkpoints to
+	// BootstrapCheckpointPath is the path to the directory containing pod checkpoints to
 	// run on restore
 	BootstrapCheckpointPath string
 	// NodeStatusMaxImages caps the number of images reported in Node.Status.Images.
@@ -173,23 +173,23 @@ type KubeletFlags struct {
 	NodeStatusMaxImages int32
 
 	// DEPRECATED FLAGS
-	// minimumGCAge is the minimum age for a finished container before it is
+	// MinimumGCAge is the minimum age for a finished container before it is
 	// garbage collected.
 	MinimumGCAge metav1.Duration
-	// maxPerPodContainerCount is the maximum number of old instances to
+	// MaxPerPodContainerCount is the maximum number of old instances to
 	// retain per container. Each container takes up some disk space.
 	MaxPerPodContainerCount int32
-	// maxContainerCount is the maximum number of old instances of containers
+	// MaxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32
-	// masterServiceNamespace is The namespace from which the kubernetes
+	// MasterServiceNamespace is The namespace from which the kubernetes
 	// master services should be injected into pods.
 	MasterServiceNamespace string
-	// registerSchedulable tells the kubelet to register the node as
+	// RegisterSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
 	// DEPRECATED: use registerWithTaints instead
 	RegisterSchedulable bool
-	// nonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
+	// NonMasqueradeCIDR configures masquerading: traffic to IPs outside this range will use IP masquerade.
 	NonMasqueradeCIDR string
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
