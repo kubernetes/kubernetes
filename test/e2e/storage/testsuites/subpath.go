@@ -36,7 +36,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var (
@@ -151,7 +150,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
 			err := framework.DeletePodWithWait(f, f.ClientSet, l.pod)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while deleting pod")
+			framework.ExpectNoError(err, "while deleting pod")
 			l.pod = nil
 		}
 
@@ -427,7 +426,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
 		removeUnusedContainers(l.pod)
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(l.pod)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating pod")
+		framework.ExpectNoError(err, "while creating pod")
 		defer func() {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
 			framework.DeletePodWithWait(f, f.ClientSet, pod)
@@ -435,12 +434,12 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 
 		// Wait for pod to be running
 		err = framework.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for pod to be running")
+		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
 		rmCmd := fmt.Sprintf("rm -r %s", l.subPathDir)
 		_, err = podContainerExec(l.pod, 1, rmCmd)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while removing subpath directory")
+		framework.ExpectNoError(err, "while removing subpath directory")
 
 		// Delete pod (from defer) and wait for it to be successfully deleted
 	})
@@ -713,7 +712,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating pod")
+	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
@@ -792,17 +791,17 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating pod")
+	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
 	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for pod to be running")
+	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
 	out, err := podContainerExec(pod, 1, fmt.Sprintf("rm %v", probeFilePath))
 	e2elog.Logf("Pod exec output: %v", out)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while failing liveness probe")
+	framework.ExpectNoError(err, "while failing liveness probe")
 
 	// Check that container has restarted
 	ginkgo.By("Waiting for container to restart")
@@ -824,7 +823,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 		}
 		return false, nil
 	})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for container to restart")
+	framework.ExpectNoError(err, "while waiting for container to restart")
 
 	// Fix liveness probe
 	ginkgo.By("Rewriting the file")
@@ -836,7 +835,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	}
 	out, err = podContainerExec(pod, 1, writeCmd)
 	e2elog.Logf("Pod exec output: %v", out)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while rewriting the probe file")
+	framework.ExpectNoError(err, "while rewriting the probe file")
 
 	// Wait for container restarts to stabilize
 	ginkgo.By("Waiting for container to stop restarting")
@@ -865,7 +864,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 		}
 		return false, nil
 	})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for container to stabilize")
+	framework.ExpectNoError(err, "while waiting for container to stabilize")
 }
 
 func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete bool) {
@@ -885,13 +884,13 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	ginkgo.By(fmt.Sprintf("Creating pod %s", pod.Name))
 	removeUnusedContainers(pod)
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating pod")
+	framework.ExpectNoError(err, "while creating pod")
 
 	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for pod to be running")
+	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while getting pod")
+	framework.ExpectNoError(err, "while getting pod")
 
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
 }
@@ -899,13 +898,13 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	ginkgo.By(fmt.Sprintf("Creating pod to format volume %s", pod.Name))
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating volume init pod")
+	framework.ExpectNoError(err, "while creating volume init pod")
 
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for volume init pod to succeed")
+	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while deleting volume init pod")
+	framework.ExpectNoError(err, "while deleting volume init pod")
 }
 
 func podContainerExec(pod *v1.Pod, containerIndex int, command string) (string, error) {
