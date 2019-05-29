@@ -59,6 +59,9 @@ const (
 	// KubernetesVersion flag sets the Kubernetes version for the control plane.
 	KubernetesVersion = "kubernetes-version"
 
+	// KubeletVersion flag sets the version for the kubelet config.
+	KubeletVersion = "kubelet-version"
+
 	// NetworkingDNSDomain flag sets the domain for services, e.g. "myorg.internal".
 	NetworkingDNSDomain = "service-dns-domain"
 
