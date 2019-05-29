@@ -46,6 +46,7 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 )
@@ -217,6 +218,10 @@ func main() {
 
 // Find all sibling pods in the service and post to their /write handler.
 func contactOthers(state *State) {
+	var (
+		versionInfo *version.Info
+		err         error
+	)
 	sleepTime := 5 * time.Second
 	// In large cluster getting all endpoints is pretty expensive.
 	// Thus, we will limit ourselves to send on average at most 10 such
@@ -241,11 +246,22 @@ func contactOthers(state *State) {
 	if err != nil {
 		log.Fatalf("Unable to create client; error: %v\n", err)
 	}
-	// Double check that worked by getting the server version.
-	if v, err := client.Discovery().ServerVersion(); err != nil {
-		log.Fatalf("Unable to get server version: %v\n", err)
-	} else {
-		log.Printf("Server version: %#v\n", v)
+
+	// Try to get the server version until <timeout>; we use a timeout because
+	// the pod might not have immediate network connectivity.
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
+		// Double check that worked by getting the server version.
+		if versionInfo, err = client.Discovery().ServerVersion(); err != nil {
+			log.Printf("Unable to get server version: %v; retrying.\n", err)
+		} else {
+			log.Printf("Server version: %#v\n", versionInfo)
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if err != nil {
+		log.Fatalf("Unable to contact Kubernetes: %v\n", err)
 	}
 
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
