@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -438,22 +439,22 @@ func (j *ServiceTestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName 
 	err := wait.PollImmediate(Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
-			Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
+			e2elog.Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
 			return false, nil
 		}
 		if len(endpoints.Subsets) == 0 {
-			Logf("Expect endpoints with subsets, got none.")
+			e2elog.Logf("Expect endpoints with subsets, got none.")
 			return false, nil
 		}
 		// TODO: Handle multiple endpoints
 		if len(endpoints.Subsets[0].Addresses) == 0 {
-			Logf("Expected Ready endpoints - found none")
+			e2elog.Logf("Expected Ready endpoints - found none")
 			return false, nil
 		}
 		epHostName := *endpoints.Subsets[0].Addresses[0].NodeName
-		Logf("Pod for service %s/%s is on node %s", namespace, serviceName, epHostName)
+		e2elog.Logf("Pod for service %s/%s is on node %s", namespace, serviceName, epHostName)
 		if epHostName != nodeName {
-			Logf("Found endpoint on wrong node, expected %v, got %v", nodeName, epHostName)
+			e2elog.Logf("Found endpoint on wrong node, expected %v, got %v", nodeName, epHostName)
 			return false, nil
 		}
 		return true, nil
@@ -546,7 +547,7 @@ func (j *ServiceTestJig) UpdateServiceOrFail(namespace, name string, update func
 
 // WaitForNewIngressIPOrFail waits for the given service to get a new ingress IP, or fails after the given timeout
 func (j *ServiceTestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *v1.Service {
-	Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
+	e2elog.Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) == 0 {
 			return false
@@ -572,7 +573,7 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 			s.Spec.Ports[0].NodePort = int32(newPort)
 		})
 		if err != nil && strings.Contains(err.Error(), portallocator.ErrAllocated.Error()) {
-			Logf("tried nodePort %d, but it is in use, will try another", newPort)
+			e2elog.Logf("tried nodePort %d, but it is in use, will try another", newPort)
 			continue
 		}
 		// Otherwise err was nil or err was a real error
@@ -586,7 +587,7 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 
 // WaitForLoadBalancerOrFail waits the given service to have a LoadBalancer, or fails after the given timeout
 func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *v1.Service {
-	Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
+	e2elog.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
@@ -598,11 +599,11 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
-			Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
+			e2elog.Logf("Failed to delete cloud resources for service: %s %d (%v)", ip, port, err)
 		}
 	}()
 
-	Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
+	e2elog.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) == 0
 	})
@@ -791,7 +792,7 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
+	e2elog.Logf("Waiting up to %v for %d pods to be created", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := j.Client.CoreV1().Pods(namespace).List(options)
@@ -807,10 +808,10 @@ func (j *ServiceTestJig) waitForPodsCreated(namespace string, replicas int) ([]s
 			found = append(found, pod.Name)
 		}
 		if len(found) == replicas {
-			Logf("Found all %d pods", replicas)
+			e2elog.Logf("Found all %d pods", replicas)
 			return found, nil
 		}
-		Logf("Found %d/%d pods - will retry", len(found), replicas)
+		e2elog.Logf("Found %d/%d pods - will retry", len(found), replicas)
 	}
 	return nil, fmt.Errorf("timeout waiting for %d pods to be created", replicas)
 }
@@ -859,7 +860,7 @@ func newNetexecPodSpec(podName string, httpPort, udpPort int32, hostNetwork bool
 
 // LaunchNetexecPodOnNode launches a netexec pod on the given node.
 func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName string, httpPort, udpPort int32, hostNetwork bool) {
-	Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
+	e2elog.Logf("Creating netexec pod %q on node %v in namespace %q", podName, nodeName, f.Namespace.Name)
 	pod := newNetexecPodSpec(podName, httpPort, udpPort, hostNetwork)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
@@ -867,7 +868,7 @@ func (j *ServiceTestJig) LaunchNetexecPodOnNode(f *Framework, nodeName, podName 
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
-	Logf("Netexec pod  %q in namespace %q running", pod.Name, f.Namespace.Name)
+	e2elog.Logf("Netexec pod  %q in namespace %q running", pod.Name, f.Namespace.Name)
 }
 
 // newEchoServerPodSpec returns the pod spec of echo server pod
@@ -895,7 +896,7 @@ func newEchoServerPodSpec(podName string) *v1.Pod {
 // as the target for source IP preservation test. The client's source ip would
 // be echoed back by the web server.
 func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podName string) {
-	Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
+	e2elog.Logf("Creating echo server pod %q in namespace %q", podName, f.Namespace.Name)
 	pod := newEchoServerPodSpec(podName)
 	pod.Spec.NodeName = nodeName
 	pod.ObjectMeta.Labels = j.Labels
@@ -903,7 +904,7 @@ func (j *ServiceTestJig) LaunchEchoserverPodOnNode(f *Framework, nodeName, podNa
 	_, err := podClient.Create(pod)
 	ExpectNoError(err)
 	ExpectNoError(f.WaitForPodRunning(podName))
-	Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
+	e2elog.Logf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name)
 }
 
 // TestReachableHTTP tests that the given host serves HTTP on the given port.
@@ -1033,15 +1034,15 @@ func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, err
 		Failf("Got empty IP for reachability check (%s)", url)
 		return false, fmt.Errorf("invalid input ip or port")
 	}
-	Logf("Testing HTTP health check on %v", url)
+	e2elog.Logf("Testing HTTP health check on %v", url)
 	resp, err := httpGetNoConnectionPoolTimeout(url, 5*time.Second)
 	if err != nil {
-		Logf("Got error testing for reachability of %s: %v", url, err)
+		e2elog.Logf("Got error testing for reachability of %s: %v", url, err)
 		return false, err
 	}
 	defer resp.Body.Close()
 	if err != nil {
-		Logf("Got error reading response from %s: %v", url, err)
+		e2elog.Logf("Got error reading response from %s: %v", url, err)
 		return false, err
 	}
 	// HealthCheck responder returns 503 for no local endpoints
@@ -1318,22 +1319,22 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		// verify service from node
 		func() string {
 			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
-			Logf("Executing cmd %q on host %v", cmd, host)
+			e2elog.Logf("Executing cmd %q on host %v", cmd, host)
 			result, err := e2essh.SSH(cmd, host, TestContext.Provider)
 			if err != nil || result.Code != 0 {
 				e2essh.LogResult(result)
-				Logf("error while SSH-ing to node: %v", err)
+				e2elog.Logf("error while SSH-ing to node: %v", err)
 			}
 			return result.Stdout
 		},
 		// verify service from pod
 		func() string {
 			cmd := buildCommand("wget -q -T 1 -O -")
-			Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
+			e2elog.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPodName)
 			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
 			output, err := RunHostCmd(ns, execPodName, cmd)
 			if err != nil {
-				Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPodName, err, output)
+				e2elog.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPodName, err, output)
 			}
 			return output
 		},
@@ -1359,12 +1360,12 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 			// and we need a better way to track how often it occurs.
 			if gotEndpoints.IsSuperset(expectedEndpoints) {
 				if !gotEndpoints.Equal(expectedEndpoints) {
-					Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
+					e2elog.Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
 				}
 				passed = true
 				break
 			}
-			Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
+			e2elog.Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
 		}
 		if !passed {
 			// Sort the lists so they're easier to visually diff.
@@ -1391,12 +1392,12 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 		result, err := e2essh.SSH(command, host, TestContext.Provider)
 		if err != nil {
 			e2essh.LogResult(result)
-			Logf("error while SSH-ing to node: %v", err)
+			e2elog.Logf("error while SSH-ing to node: %v", err)
 		}
 		if result.Code != 99 {
 			return nil
 		}
-		Logf("service still alive - still waiting")
+		e2elog.Logf("service still alive - still waiting")
 	}
 	return fmt.Errorf("waiting for service to be down timed out")
 }
@@ -1408,10 +1409,10 @@ func CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zo
 
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
-	Logf("\nOutput of kubectl describe svc:\n")
+	e2elog.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := RunKubectl(
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	Logf(desc)
+	e2elog.Logf(desc)
 }
 
 // CreateServiceSpec returns a Service object for testing.
@@ -1460,7 +1461,7 @@ type affinityTracker struct {
 // Record the response going to a given host.
 func (at *affinityTracker) recordHost(host string) {
 	at.hostTrace = append(at.hostTrace, host)
-	Logf("Received response from host: %s", host)
+	e2elog.Logf("Received response from host: %s", host)
 }
 
 // Check that we got a constant count requests going to the same host.
@@ -1483,7 +1484,7 @@ func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds b
 }
 
 func checkAffinityFailed(tracker affinityTracker, err string) {
-	Logf("%v", tracker.hostTrace)
+	e2elog.Logf("%v", tracker.hostTrace)
 	Failf(err)
 }
 
@@ -1504,7 +1505,7 @@ func CheckAffinity(jig *ServiceTestJig, execPod *v1.Pod, targetIP string, target
 		if execPod != nil {
 			stdout, err := RunHostCmd(execPod.Namespace, execPod.Name, cmd)
 			if err != nil {
-				Logf("Failed to get response from %s. Retry until timeout", targetIPPort)
+				e2elog.Logf("Failed to get response from %s. Retry until timeout", targetIPPort)
 				return false, nil
 			}
 			tracker.recordHost(stdout)

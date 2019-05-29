@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -82,13 +83,13 @@ func IsPodSecurityPolicyEnabled(f *Framework) bool {
 	isPSPEnabledOnce.Do(func() {
 		psps, err := f.ClientSet.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
 		if err != nil {
-			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
+			e2elog.Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
 		} else if psps == nil || len(psps.Items) == 0 {
-			Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
+			e2elog.Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
 			isPSPEnabled = false
 		} else {
-			Logf("Found PodSecurityPolicies; assuming PodSecurityPolicy is enabled.")
+			e2elog.Logf("Found PodSecurityPolicies; assuming PodSecurityPolicy is enabled.")
 			isPSPEnabled = true
 		}
 	})

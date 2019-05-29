@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
@@ -101,7 +102,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
+				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
 			}
 			By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()

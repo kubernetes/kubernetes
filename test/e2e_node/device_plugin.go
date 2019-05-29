@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
@@ -69,7 +70,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 
 			socketPath := pluginSockDir + "dp." + fmt.Sprintf("%d", time.Now().Unix())
-			framework.Logf("socketPath %v", socketPath)
+			e2elog.Logf("socketPath %v", socketPath)
 
 			dp1 := dm.NewDevicePluginStub(devs, socketPath, resourceName, false)
 			dp1.SetAllocFunc(stubAllocFunc)
@@ -257,7 +258,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 			return false
 		}
 		currentCount = p.Status.ContainerStatuses[0].RestartCount
-		framework.Logf("initial %v, current %v", initialCount, currentCount)
+		e2elog.Logf("initial %v, current %v", initialCount, currentCount)
 		return currentCount > initialCount
 	}, 5*time.Minute, framework.Poll).Should(BeTrue())
 }
@@ -269,7 +270,7 @@ func parseLog(f *framework.Framework, podName string, contName string, re string
 		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}
 
-	framework.Logf("got pod logs: %v", logs)
+	e2elog.Logf("got pod logs: %v", logs)
 	regex := regexp.MustCompile(re)
 	matches := regex.FindStringSubmatch(logs)
 	if len(matches) < 2 {

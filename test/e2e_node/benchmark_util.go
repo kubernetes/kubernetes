@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 
@@ -46,9 +47,9 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	testName := labels["test"]
 	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
-	framework.Logf("Dumping perf data for test %q to %q.", testName, fileName)
+	e2elog.Logf("Dumping perf data for test %q to %q.", testName, fileName)
 	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
-		framework.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
+		e2elog.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
 	}
 }
 
@@ -82,7 +83,7 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1
 	timeSeries.ResourceData = rc.GetResourceTimeSeries()
 
 	if framework.TestContext.ReportDir == "" {
-		framework.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
+		e2elog.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
 		return
 	}
 	dumpDataToFile(timeSeries, timeSeries.Labels, "time_series")

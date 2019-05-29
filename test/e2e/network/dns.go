@@ -376,9 +376,9 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testAgnhostPod)
 		framework.ExpectNoError(err, "failed to create pod: %s", testAgnhostPod.Name)
-		framework.Logf("Created pod %v", testAgnhostPod)
+		e2elog.Logf("Created pod %v", testAgnhostPod)
 		defer func() {
-			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
+			e2elog.Logf("Deleting pod %s...", testAgnhostPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testAgnhostPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
 			}

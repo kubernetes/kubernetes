@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -134,12 +135,12 @@ type E2ELogger struct{}
 
 // Infof outputs log.
 func (l *E2ELogger) Infof(format string, args ...interface{}) {
-	framework.Logf(format, args...)
+	e2elog.Logf(format, args...)
 }
 
 // Errorf outputs log.
 func (l *E2ELogger) Errorf(format string, args ...interface{}) {
-	framework.Logf(format, args...)
+	e2elog.Logf(format, args...)
 }
 
 // ConformanceTests contains a closure with an entry and exit log line.
@@ -334,7 +335,7 @@ func BuildInsecureClient(timeout time.Duration) *http.Client {
 // Ingress, it's updated.
 func createTLSSecret(kubeClient clientset.Interface, namespace, secretName string, hosts ...string) (host string, rootCA, privKey []byte, err error) {
 	host = strings.Join(hosts, ",")
-	framework.Logf("Generating RSA cert for host %v", host)
+	e2elog.Logf("Generating RSA cert for host %v", host)
 	cert, key, err := GenerateRSACerts(host, true)
 	if err != nil {
 		return
@@ -351,11 +352,11 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 	var s *v1.Secret
 	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
-		framework.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
+		e2elog.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
 		_, err = kubeClient.CoreV1().Secrets(namespace).Update(s)
 	} else {
-		framework.Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
+		e2elog.Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		_, err = kubeClient.CoreV1().Secrets(namespace).Create(secret)
 	}
 	return host, cert, key, err
@@ -732,7 +733,7 @@ func (j *TestJig) VerifyURL(route, host string, iterations int, interval time.Du
 	for i := 0; i < iterations; i++ {
 		b, err := framework.SimpleGET(httpClient, route, host)
 		if err != nil {
-			framework.Logf(b)
+			e2elog.Logf(b)
 			return err
 		}
 		j.Logger.Infof("Verified %v with host %v %d times, sleeping for %v", route, host, i, interval)
@@ -843,14 +844,14 @@ func (cont *NginxIngressController) Init() {
 	read := func(file string) string {
 		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), ginkgo.Fail))
 	}
-	framework.Logf("initializing nginx ingress controller")
+	e2elog.Logf("initializing nginx ingress controller")
 	framework.RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))
 
 	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	cont.rc = rc
 
-	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
+	e2elog.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
 	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
@@ -861,7 +862,7 @@ func (cont *NginxIngressController) Init() {
 	cont.pod = &pods.Items[0]
 	cont.externalIP, err = framework.GetHostExternalAddress(cont.Client, cont.pod)
 	framework.ExpectNoError(err)
-	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
+	e2elog.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
 
 func generateBacksideHTTPSIngressSpec(ns string) *networkingv1beta1.Ingress {
