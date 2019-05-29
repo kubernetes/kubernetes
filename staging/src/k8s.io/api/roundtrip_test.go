@@ -107,3 +107,11 @@ func TestRoundTripExternalTypes(t *testing.T) {
 
 	roundtrip.RoundTripExternalTypes(t, scheme, codecs, fuzzer, nil)
 }
+
+func TestCompatibility(t *testing.T) {
+	scheme := runtime.NewScheme()
+	for _, builder := range groups {
+		require.NoError(t, builder.AddToScheme(scheme))
+	}
+	roundtrip.NewCompatibilityTestOptions(scheme).Complete(t).Run(t)
+}
