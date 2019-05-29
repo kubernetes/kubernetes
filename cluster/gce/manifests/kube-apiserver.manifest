@@ -25,10 +25,12 @@
       }
     },
     "command": [
-                 "/bin/sh",
-                 "-c",
-                 "exec /usr/local/bin/kube-apiserver {{params}} --allow-privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
-               ],
+      "/usr/local/bin/kube-apiserver"
+    ],
+    "args": [
+      "--allow-privileged={{pillar['allow_privileged']}}",
+      {{params}}
+    ],
     {{container_env}}
     "livenessProbe": {
       "httpGet": {
