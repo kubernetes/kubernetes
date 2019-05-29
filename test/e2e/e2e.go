@@ -41,6 +41,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/manifest"
+	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
 	testutils "k8s.io/kubernetes/test/utils"
 	utilnet "k8s.io/utils/net"
 
@@ -100,8 +101,11 @@ func RunE2ETests(t *testing.T) {
 			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
 		}
 	}
-	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 
+	// Stream the progress to stdout and optionally a URL accepting progress updates.
+	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
+
+	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 
