@@ -104,11 +104,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
 			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
-			return PodAdmitResult{
-				Admit:   fit,
-				Reason:  "UnexpectedAdmissionError",
-				Message: message,
-			}
+			// In future syncPod loops, the kubelet will retry the pod deletion steps that it was stuck on.
+			fit = true
 		}
 	}
 	if !fit {
