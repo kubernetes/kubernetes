@@ -886,3 +886,80 @@ func TestClearManagedFields(t *testing.T) {
 		t.Fatalf("Failed to clear managedFields, got: %v", managedFields)
 	}
 }
+
+// TestAdmissionFieldManager verifies that mutating admission controllers take field ownership
+func TestAdmissionFieldManager(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.StorageV1().RESTClient().Patch(types.ApplyPatchType).
+		Resource("storageclasses").
+		Name("test-storageclass").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "storage.k8s.io/v1",
+			"kind": "StorageClass",
+			"metadata": {
+					"name": "test-storageclass",
+					"annotations": {
+						"storageclass.kubernetes.io/is-default-class": "true"
+					}
+			},
+			"provisioner": "kubernetes.io/no-provisioner",
+			"volumeBindingMode": "WaitForFirstConsumer"
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("persistentvolumeclaims").
+		Name("test-pvc").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "PersistentVolumeClaim",
+			"metadata": {
+				"name": "test-pvc",
+				"namespace": "default",
+			},
+			"spec": {
+				"accessModes": [
+					"ReadWriteOnce"
+				],
+				"resources": {
+					"requests": {
+						"storage": "1Gi"
+					}
+				}
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("persistentvolumeclaims").Name("test-pvc").Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	if len(accessor.GetManagedFields()) < 2 {
+		t.Fatalf("Expected two fieldManagers, got: %v", accessor.GetManagedFields())
+	}
+
+	if accessor.GetManagedFields()[1].Manager != "DefaultStorageClass" {
+		t.Fatalf("Expected second fieldManager to be 'DefaultStorageClass', got: %v", accessor.GetManagedFields()[1].Manager)
+	}
+}

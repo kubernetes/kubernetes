@@ -140,6 +140,7 @@ func (ps *Plugins) NewFromPlugins(pluginNames []string, configProvider ConfigPro
 			return nil, err
 		}
 		if plugin != nil {
+			plugin = NewFieldManagerAdmissionWrapper(plugin, pluginName)
 			if decorator != nil {
 				handlers = append(handlers, decorator.Decorate(plugin, pluginName))
 			} else {
