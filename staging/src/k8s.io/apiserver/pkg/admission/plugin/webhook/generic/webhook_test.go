@@ -28,10 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
 )
 
 func TestShouldCallHook(t *testing.T) {
-	a := &Webhook{namespaceMatcher: &namespace.Matcher{}}
+	a := &Webhook{namespaceMatcher: &namespace.Matcher{}, objectMatcher: &object.Matcher{}}
 
 	allScopes := v1beta1.AllScopes
 	exactMatch := v1beta1.Exact
@@ -82,6 +83,7 @@ func TestShouldCallHook(t *testing.T) {
 			name: "invalid kind lookup",
 			webhook: &v1beta1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				MatchPolicy:       &equivalentMatch,
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
@@ -95,6 +97,7 @@ func TestShouldCallHook(t *testing.T) {
 			name: "wildcard rule, match as requested",
 			webhook: &v1beta1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}, Scope: &allScopes},
@@ -109,6 +112,7 @@ func TestShouldCallHook(t *testing.T) {
 			name: "specific rules, prefer exact match",
 			webhook: &v1beta1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
@@ -129,6 +133,7 @@ func TestShouldCallHook(t *testing.T) {
 			name: "specific rules, match miss",
 			webhook: &v1beta1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
@@ -144,6 +149,7 @@ func TestShouldCallHook(t *testing.T) {
 			webhook: &v1beta1.ValidatingWebhook{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
@@ -159,6 +165,7 @@ func TestShouldCallHook(t *testing.T) {
 			webhook: &v1beta1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
@@ -177,6 +184,7 @@ func TestShouldCallHook(t *testing.T) {
 			webhook: &v1beta1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments"}, Scope: &allScopes},
@@ -195,6 +203,7 @@ func TestShouldCallHook(t *testing.T) {
 			name: "specific rules, subresource prefer exact match",
 			webhook: &v1beta1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
@@ -215,6 +224,7 @@ func TestShouldCallHook(t *testing.T) {
 			name: "specific rules, subresource match miss",
 			webhook: &v1beta1.ValidatingWebhook{
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
@@ -230,6 +240,7 @@ func TestShouldCallHook(t *testing.T) {
 			webhook: &v1beta1.ValidatingWebhook{
 				MatchPolicy:       &exactMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
@@ -245,6 +256,7 @@ func TestShouldCallHook(t *testing.T) {
 			webhook: &v1beta1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"extensions"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
@@ -263,6 +275,7 @@ func TestShouldCallHook(t *testing.T) {
 			webhook: &v1beta1.ValidatingWebhook{
 				MatchPolicy:       &equivalentMatch,
 				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector:    &metav1.LabelSelector{},
 				Rules: []v1beta1.RuleWithOperations{{
 					Operations: []v1beta1.OperationType{"*"},
 					Rule:       v1beta1.Rule{APIGroups: []string{"apps"}, APIVersions: []string{"v1beta1"}, Resources: []string{"deployments", "deployments/scale"}, Scope: &allScopes},
@@ -280,7 +293,7 @@ func TestShouldCallHook(t *testing.T) {
 
 	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			invocation, err := a.shouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), testcase.webhook), testcase.attrs, interfaces)
+			invocation, err := a.ShouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), testcase.webhook), testcase.attrs, interfaces)
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)

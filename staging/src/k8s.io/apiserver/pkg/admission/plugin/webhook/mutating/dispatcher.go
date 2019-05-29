@@ -36,6 +36,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
@@ -56,7 +57,7 @@ func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generi
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
-func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, relevantHooks []*generic.WebhookInvocation) error {
+func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
 	reinvokeCtx := attr.GetReinvocationContext()
 	var webhookReinvokeCtx *webhookReinvokeContext
 	if v := reinvokeCtx.Value(PluginName); v != nil {
@@ -75,14 +76,31 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		webhookReinvokeCtx.SetLastWebhookInvocationOutput(attr.GetObject())
 	}()
 	var versionedAttr *generic.VersionedAttributes
-	for _, invocation := range relevantHooks {
+	for _, hook := range hooks {
+		attrForCheck := attr
+		if versionedAttr != nil {
+			attrForCheck = versionedAttr
+		}
+		invocation, statusErr := a.plugin.ShouldCallHook(hook, attrForCheck, o)
+		if statusErr != nil {
+			return statusErr
+		}
+		if invocation == nil {
+			continue
+		}
 		hook, ok := invocation.Webhook.GetMutatingWebhook()
 		if !ok {
 			return fmt.Errorf("mutating webhook dispatch requires v1beta1.MutatingWebhook, but got %T", hook)
 		}
+		// This means that during reinvocation, a webhook will not be
+		// called for the first time. For example, if the webhook is
+		// skipped in the first round because of mismatching labels,
+		// even if the labels become matching, the webhook does not
+		// get called during reinvocation.
 		if reinvokeCtx.IsReinvoke() && !webhookReinvokeCtx.ShouldReinvokeWebhook(invocation.Webhook.GetUID()) {
 			continue
 		}
+
 		if versionedAttr == nil {
 			// First webhook, create versioned attributes
 			var err error

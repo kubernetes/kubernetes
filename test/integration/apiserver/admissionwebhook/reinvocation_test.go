@@ -52,8 +52,9 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 	reinvokeIfNeeded := registrationv1beta1.IfNeededReinvocationPolicy
 
 	type testWebhook struct {
-		path   string
-		policy *registrationv1beta1.ReinvocationPolicyType
+		path           string
+		policy         *registrationv1beta1.ReinvocationPolicyType
+		objectSelector *metav1.LabelSelector
 	}
 
 	testCases := []struct {
@@ -109,6 +110,16 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			},
 			expectLabels:      map[string]string{"x": "true", "fight": "false"},
 			expectInvocations: map[string]int{"/settrue": 2, "/setfalse": 2},
+		},
+		{ // in-tree (mutation), webhook A is SKIPPED due to objectSelector not matching, webhook B (mutation), reinvoke in-tree (no-mutation), webhook A is SKIPPED even though the labels match now, because it's not called in the first round. No reinvocation of webhook B required
+			name:                 "no reinvocation of webhook B when in-tree or prior webhook mutations",
+			initialPriorityClass: "low-priority", // trigger initial in-tree mutation
+			webhooks: []testWebhook{
+				{path: "/conditionaladdlabel", policy: &reinvokeIfNeeded, objectSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				{path: "/addlabel", policy: &reinvokeIfNeeded},
+			},
+			expectLabels:      map[string]string{"x": "true", "a": "true"},
+			expectInvocations: map[string]int{"/addlabel": 1, "/conditionaladdlabel": 0},
 		},
 		{
 			name: "invalid priority class set by webhook should result in error from in-tree priority plugin",
@@ -193,7 +204,7 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			}
 
 			for i, webhook := range tt.webhooks {
-				defer registerWebhook(t, client, fmt.Sprintf("admission.integration.test%d", i), webhookServer.URL+webhook.path, webhook.policy)()
+				defer registerWebhook(t, client, fmt.Sprintf("admission.integration.test%d", i), webhookServer.URL+webhook.path, webhook.policy, webhook.objectSelector)()
 			}
 
 			pod := &corev1.Pod{
@@ -248,7 +259,7 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 	}
 }
 
-func registerWebhook(t *testing.T, client clientset.Interface, name, endpoint string, reinvocationPolicy *registrationv1beta1.ReinvocationPolicyType) func() {
+func registerWebhook(t *testing.T, client clientset.Interface, name, endpoint string, reinvocationPolicy *registrationv1beta1.ReinvocationPolicyType, objectSelector *metav1.LabelSelector) func() {
 	fail := admissionv1beta1.Fail
 	hook, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
@@ -262,6 +273,7 @@ func registerWebhook(t *testing.T, client clientset.Interface, name, endpoint st
 				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
 				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 			}},
+			ObjectSelector:          objectSelector,
 			FailurePolicy:           &fail,
 			ReinvocationPolicy:      reinvocationPolicy,
 			AdmissionReviewVersions: []string{"v1beta1"},

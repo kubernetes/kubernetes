@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
@@ -45,6 +46,7 @@ type Webhook struct {
 	hookSource       Source
 	clientManager    *webhookutil.ClientManager
 	namespaceMatcher *namespace.Matcher
+	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
 }
 
@@ -80,6 +82,7 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
 		namespaceMatcher: &namespace.Matcher{},
+		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
 	}, nil
 }
@@ -127,9 +130,9 @@ func (a *Webhook) ValidateInitialization() error {
 	return nil
 }
 
-// shouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
+// ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
 // or an error if an error was encountered during evaluation.
-func (a *Webhook) shouldCallHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
+func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
 	var err *apierrors.StatusError
 	var invocation *WebhookInvocation
 	for _, r := range h.GetRules() {
@@ -184,6 +187,11 @@ func (a *Webhook) shouldCallHook(h webhook.WebhookAccessor, attr admission.Attri
 		return nil, err
 	}
 
+	matches, err = a.objectMatcher.MatchObjectSelector(h, attr)
+	if !matches || err != nil {
+		return nil, err
+	}
+
 	return invocation, nil
 }
 
@@ -206,21 +214,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 
-	var relevantHooks []*WebhookInvocation
-	for i := range hooks {
-		invocation, err := a.shouldCallHook(hooks[i], attr, o)
-		if err != nil {
-			return err
-		}
-		if invocation != nil {
-			relevantHooks = append(relevantHooks, invocation)
-		}
-	}
-
-	if len(relevantHooks) == 0 {
-		// no matching hooks
-		return nil
-	}
-
-	return a.dispatcher.Dispatch(ctx, attr, o, relevantHooks)
+	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

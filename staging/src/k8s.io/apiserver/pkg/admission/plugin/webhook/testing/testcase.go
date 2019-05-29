@@ -245,7 +245,7 @@ func ConvertToMutatingTestCases(tests []ValidatingTest) []MutatingTest {
 func ConvertToMutatingWebhooks(webhooks []registrationv1beta1.ValidatingWebhook) []registrationv1beta1.MutatingWebhook {
 	mutating := make([]registrationv1beta1.MutatingWebhook, len(webhooks))
 	for i, h := range webhooks {
-		mutating[i] = registrationv1beta1.MutatingWebhook{h.Name, h.ClientConfig, h.Rules, h.FailurePolicy, h.MatchPolicy, h.NamespaceSelector, h.SideEffects, h.TimeoutSeconds, h.AdmissionReviewVersions, nil}
+		mutating[i] = registrationv1beta1.MutatingWebhook{h.Name, h.ClientConfig, h.Rules, h.FailurePolicy, h.MatchPolicy, h.NamespaceSelector, h.ObjectSelector, h.SideEffects, h.TimeoutSeconds, h.AdmissionReviewVersions, nil}
 	}
 	return mutating
 }
@@ -552,6 +552,30 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 			}},
 			ExpectAllow: true,
 		},
+		{
+			Name: "skip webhook whose objectSelector does not match",
+			Webhooks: []registrationv1beta1.ValidatingWebhook{{
+				Name:                    "allow.example.com",
+				ClientConfig:            ccfgSVC("allow"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:              "shouldNotBeCalled",
+				ClientConfig:      ccfgSVC("shouldNotBeCalled"),
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"label": "nonexistent",
+					},
+				},
+				Rules:                   matchEverythingRules,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"allow.example.com/key1": "value1"},
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -642,6 +666,36 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			ExpectStatusCode: http.StatusBadRequest,
 			ErrorContains:    "does not support dry run",
 		},
+		{
+			Name: "first webhook remove labels, second webhook shouldn't be called",
+			Webhooks: []registrationv1beta1.MutatingWebhook{{
+				Name:              "removelabel.example.com",
+				ClientConfig:      ccfgSVC("removeLabel"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"remove": "me",
+					},
+				},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:              "shouldNotBeCalled",
+				ClientConfig:      ccfgSVC("shouldNotBeCalled"),
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"remove": "me",
+					},
+				},
+				Rules:                   matchEverythingRules,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectAllow:       true,
+			AdditionalLabels:  map[string]string{"remove": "me"},
+			ExpectLabels:      map[string]string{"pod.name": "my-pod"},
+			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 		{
@@ -651,6 +705,7 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ClientConfig:            ccfgSVC("addLabel"),
 				Rules:                   matchEverythingRules,
 				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 				ReinvocationPolicy:      &reinvokeIfNeeded,
 			}, {
@@ -658,6 +713,7 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ClientConfig:            ccfgSVC("removeLabel"),
 				Rules:                   matchEverythingRules,
 				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 				ReinvocationPolicy:      &reinvokeIfNeeded,
 			}},
@@ -672,6 +728,7 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ClientConfig:            ccfgSVC("addLabel"),
 				Rules:                   matchEverythingRules,
 				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 				ReinvocationPolicy:      &reinvokeNever,
 			}},
@@ -685,6 +742,7 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ClientConfig:            ccfgSVC("addLabel"),
 				Rules:                   matchEverythingRules,
 				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectAllow:            true,
@@ -697,6 +755,7 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 				ClientConfig:            ccfgSVC("noop"),
 				Rules:                   matchEverythingRules,
 				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 			ExpectAllow: true,

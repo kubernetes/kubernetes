@@ -29,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
@@ -38,28 +39,45 @@ import (
 )
 
 type validatingDispatcher struct {
-	cm *webhookutil.ClientManager
+	cm     *webhookutil.ClientManager
+	plugin *Plugin
 }
 
-func newValidatingDispatcher(cm *webhookutil.ClientManager) generic.Dispatcher {
-	return &validatingDispatcher{cm}
+func newValidatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generic.Dispatcher {
+	return func(cm *webhookutil.ClientManager) generic.Dispatcher {
+		return &validatingDispatcher{cm, p}
+	}
 }
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, relevantHooks []*generic.WebhookInvocation) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error {
+	var relevantHooks []*generic.WebhookInvocation
 	// Construct all the versions we need to call our webhooks
 	versionedAttrs := map[schema.GroupVersionKind]*generic.VersionedAttributes{}
-	for _, call := range relevantHooks {
-		// If we already have this version, continue
-		if _, ok := versionedAttrs[call.Kind]; ok {
+	for _, hook := range hooks {
+		invocation, statusError := d.plugin.ShouldCallHook(hook, attr, o)
+		if statusError != nil {
+			return statusError
+		}
+		if invocation == nil {
 			continue
 		}
-		versionedAttr, err := generic.NewVersionedAttributes(attr, call.Kind, o)
+		relevantHooks = append(relevantHooks, invocation)
+		// If we already have this version, continue
+		if _, ok := versionedAttrs[invocation.Kind]; ok {
+			continue
+		}
+		versionedAttr, err := generic.NewVersionedAttributes(attr, invocation.Kind, o)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
-		versionedAttrs[call.Kind] = versionedAttr
+		versionedAttrs[invocation.Kind] = versionedAttr
+	}
+
+	if len(relevantHooks) == 0 {
+		// no matching hooks
+		return nil
 	}
 
 	wg := sync.WaitGroup{}

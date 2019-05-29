@@ -82,6 +82,17 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		})
+	case "/shouldNotBeCalled":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: false,
+				Result: &metav1.Status{
+					Message: "doesn't expect labels to match object selector",
+					Code:    http.StatusForbidden,
+				},
+			},
+		})
 	case "/allow":
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{

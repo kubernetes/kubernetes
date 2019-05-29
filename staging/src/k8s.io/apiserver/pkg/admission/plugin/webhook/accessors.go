@@ -40,6 +40,8 @@ type WebhookAccessor interface {
 	GetMatchPolicy() *v1beta1.MatchPolicyType
 	// GetNamespaceSelector gets the webhook NamespaceSelector field.
 	GetNamespaceSelector() *metav1.LabelSelector
+	// GetObjectSelector gets the webhook ObjectSelector field.
+	GetObjectSelector() *metav1.LabelSelector
 	// GetSideEffects gets the webhook SideEffects field.
 	GetSideEffects() *v1beta1.SideEffectClass
 	// GetTimeoutSeconds gets the webhook TimeoutSeconds field.
@@ -83,6 +85,9 @@ func (m mutatingWebhookAccessor) GetMatchPolicy() *v1beta1.MatchPolicyType {
 }
 func (m mutatingWebhookAccessor) GetNamespaceSelector() *metav1.LabelSelector {
 	return m.NamespaceSelector
+}
+func (m mutatingWebhookAccessor) GetObjectSelector() *metav1.LabelSelector {
+	return m.ObjectSelector
 }
 func (m mutatingWebhookAccessor) GetSideEffects() *v1beta1.SideEffectClass {
 	return m.SideEffects
@@ -132,6 +137,9 @@ func (v validatingWebhookAccessor) GetMatchPolicy() *v1beta1.MatchPolicyType {
 }
 func (v validatingWebhookAccessor) GetNamespaceSelector() *metav1.LabelSelector {
 	return v.NamespaceSelector
+}
+func (v validatingWebhookAccessor) GetObjectSelector() *metav1.LabelSelector {
+	return v.ObjectSelector
 }
 func (v validatingWebhookAccessor) GetSideEffects() *v1beta1.SideEffectClass {
 	return v.SideEffects

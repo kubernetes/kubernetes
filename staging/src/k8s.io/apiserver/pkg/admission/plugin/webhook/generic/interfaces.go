@@ -35,7 +35,7 @@ type Source interface {
 // variants of the object and old object.
 type VersionedAttributes struct {
 	// Attributes holds the original admission attributes
-	Attributes admission.Attributes
+	admission.Attributes
 	// VersionedOldObject holds Attributes.OldObject (if non-nil), converted to VersionedKind.
 	// It must never be mutated.
 	VersionedOldObject runtime.Object
@@ -46,6 +46,14 @@ type VersionedAttributes struct {
 	VersionedKind schema.GroupVersionKind
 	// Dirty indicates VersionedObject has been modified since being converted from Attributes.Object
 	Dirty bool
+}
+
+// GetObject overrides the Attributes.GetObject()
+func (v *VersionedAttributes) GetObject() runtime.Object {
+	if v.VersionedObject != nil {
+		return v.VersionedObject
+	}
+	return v.Attributes.GetObject()
 }
 
 // WebhookInvocation describes how to call a webhook, including the resource and subresource the webhook registered for,
@@ -59,6 +67,9 @@ type WebhookInvocation struct {
 
 // Dispatcher dispatches webhook call to a list of webhooks with admission attributes as argument.
 type Dispatcher interface {
-	// Dispatch a request to the webhooks using the given webhooks. A non-nil error means the request is rejected.
-	Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []*WebhookInvocation) error
+	// Dispatch a request to the webhooks. Dispatcher may choose not to
+	// call a hook, either because the rules of the hook does not match, or
+	// the namespaceSelector or the objectSelector of the hook does not
+	// match. A non-nil error means the request is rejected.
+	Dispatch(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces, hooks []webhook.WebhookAccessor) error
 }
