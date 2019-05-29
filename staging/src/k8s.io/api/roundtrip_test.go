@@ -95,16 +95,15 @@ var groups = []runtime.SchemeBuilder{
 }
 
 func TestRoundTripExternalTypes(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
 	for _, builder := range groups {
-		scheme := runtime.NewScheme()
-		codecs := serializer.NewCodecFactory(scheme)
-
 		require.NoError(t, builder.AddToScheme(scheme))
-		seed := rand.Int63()
-		// I'm only using the generic fuzzer funcs, but at some point in time we might need to
-		// switch to specialized. For now we're happy with the current serialization test.
-		fuzzer := fuzzer.FuzzerFor(genericfuzzer.Funcs, rand.NewSource(seed), codecs)
-
-		roundtrip.RoundTripExternalTypes(t, scheme, codecs, fuzzer, nil)
 	}
+	seed := rand.Int63()
+	// I'm only using the generic fuzzer funcs, but at some point in time we might need to
+	// switch to specialized. For now we're happy with the current serialization test.
+	fuzzer := fuzzer.FuzzerFor(genericfuzzer.Funcs, rand.NewSource(seed), codecs)
+
+	roundtrip.RoundTripExternalTypes(t, scheme, codecs, fuzzer, nil)
 }
