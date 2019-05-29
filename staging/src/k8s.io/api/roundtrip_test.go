@@ -56,9 +56,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
@@ -109,43 +107,4 @@ func TestRoundTripExternalTypes(t *testing.T) {
 
 		roundtrip.RoundTripExternalTypes(t, scheme, codecs, fuzzer, nil)
 	}
-}
-
-func TestFailRoundTrip(t *testing.T) {
-	scheme := runtime.NewScheme()
-	codecs := serializer.NewCodecFactory(scheme)
-	groupVersion := schema.GroupVersion{Group: "broken", Version: "v1"}
-	builder := runtime.NewSchemeBuilder(func(scheme *runtime.Scheme) error {
-		scheme.AddKnownTypes(groupVersion, &BrokenType{})
-		metav1.AddToGroupVersion(scheme, groupVersion)
-		return nil
-	})
-	require.NoError(t, builder.AddToScheme(scheme))
-	seed := rand.Int63()
-	fuzzer := fuzzer.FuzzerFor(genericfuzzer.Funcs, rand.NewSource(seed), codecs)
-	tmpT := new(testing.T)
-	roundtrip.RoundTripExternalTypes(tmpT, scheme, codecs, fuzzer, nil)
-	// It's very hacky way of making sure the DeepCopy is actually invoked inside RoundTripExternalTypes
-	// used in the other test. If for some reason this tests starts passing we need to fail b/c we're not testing
-	// the DeepCopy in the other method which we care so much about.
-	if !tmpT.Failed() {
-		t.Log("RoundTrip should've failed on DeepCopy but it did not!")
-		t.FailNow()
-	}
-}
-
-type BrokenType struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Field1 string `json:"field1,omitempty"`
-	Field2 string `json:"field2,omitempty"`
-}
-
-func (in *BrokenType) DeepCopy() *BrokenType {
-	return new(BrokenType)
-}
-
-func (in *BrokenType) DeepCopyObject() runtime.Object {
-	return in.DeepCopy()
 }
