@@ -295,7 +295,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 		expectedTaintCnt int
 	}{
 		{
-			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
+			desc: "Uninitialized nodeRegistration field produces a single taint (the control plane one)",
 			cfg: kubeadmapiv1beta2.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "kubeadm.k8s.io/v1beta2",
@@ -305,7 +305,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 			expectedTaintCnt: 1,
 		},
 		{
-			desc: "Uninitialized taints field produces a single taint (the master one)",
+			desc: "Uninitialized taints field produces a single taint (the control plane one)",
 			cfg: kubeadmapiv1beta2.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "kubeadm.k8s.io/v1beta2",
