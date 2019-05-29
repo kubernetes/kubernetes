@@ -83,6 +83,16 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning),
 		},
 		{
+			group:   "metadata-mutating-converter",
+			handler: NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
+			checks:  checks(validateObjectMetaMutation),
+		},
+		{
+			group:   "metadata-uid-mutating-converter",
+			handler: NewObjectConverterWebhookHandler(t, uidMutatingConverter),
+			checks:  checks(validateUIDMutation),
+		},
+		{
 			group:   "empty-response",
 			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
 			checks:  checks(expectConversionFailureMessage("empty-response", "expected 1 converted objects")),
@@ -408,6 +418,108 @@ func validateStoragePruning(t *testing.T, ctc *conversionTestContext) {
 	}
 }
 
+func validateObjectMetaMutation(t *testing.T, ctc *conversionTestContext) {
+	ns := ctc.namespace
+
+	t.Logf("Creating object in storage version v1beta1")
+	storageVersion := "v1beta1"
+	ctc.setAndWaitStorageVersion(t, storageVersion)
+	name := "objectmeta-mutation-" + storageVersion
+	client := ctc.versionedClient(ns, storageVersion)
+	obj, err := client.Create(newConversionMultiVersionFixture(ns, name, storageVersion), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validateObjectMetaMutationObject(t, false, false, obj)
+
+	t.Logf("Getting object in other version v1beta2")
+	client = ctc.versionedClient(ns, "v1beta2")
+	obj, err = client.Get(name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validateObjectMetaMutationObject(t, true, true, obj)
+
+	t.Logf("Creating object in non-storage version")
+	name = "objectmeta-mutation-v1beta2"
+	client = ctc.versionedClient(ns, "v1beta2")
+	obj, err = client.Create(newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validateObjectMetaMutationObject(t, true, true, obj)
+
+	t.Logf("Listing objects in non-storage version")
+	client = ctc.versionedClient(ns, "v1beta2")
+	list, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, obj := range list.Items {
+		validateObjectMetaMutationObject(t, true, true, &obj)
+	}
+}
+
+func validateObjectMetaMutationObject(t *testing.T, expectAnnotations, expectLabels bool, obj *unstructured.Unstructured) {
+	if expectAnnotations {
+		if _, found := obj.GetAnnotations()["from"]; !found {
+			t.Errorf("expected 'from=stable.example.com/v1beta1' annotation")
+		}
+		if _, found := obj.GetAnnotations()["to"]; !found {
+			t.Errorf("expected 'to=stable.example.com/v1beta2' annotation")
+		}
+	} else {
+		if v, found := obj.GetAnnotations()["from"]; found {
+			t.Errorf("unexpected 'from' annotation: %s", v)
+		}
+		if v, found := obj.GetAnnotations()["to"]; found {
+			t.Errorf("unexpected 'to' annotation: %s", v)
+		}
+	}
+	if expectLabels {
+		if _, found := obj.GetLabels()["from"]; !found {
+			t.Errorf("expected 'from=stable.example.com.v1beta1' label")
+		}
+		if _, found := obj.GetLabels()["to"]; !found {
+			t.Errorf("expected 'to=stable.example.com.v1beta2' label")
+		}
+	} else {
+		if v, found := obj.GetLabels()["from"]; found {
+			t.Errorf("unexpected 'from' label: %s", v)
+		}
+		if v, found := obj.GetLabels()["to"]; found {
+			t.Errorf("unexpected 'to' label: %s", v)
+		}
+	}
+	if sets.NewString(obj.GetFinalizers()...).Has("foo") {
+		t.Errorf("unexpected 'foo' finalizer")
+	}
+	if obj.GetGeneration() == 42 {
+		t.Errorf("unexpected generation 42")
+	}
+	if v, found, err := unstructured.NestedString(obj.Object, "metadata", "garbage"); err != nil {
+		t.Errorf("unexpected error accessing 'metadata.garbage': %v", err)
+	} else if found {
+		t.Errorf("unexpected 'metadata.garbage': %s", v)
+	}
+}
+
+func validateUIDMutation(t *testing.T, ctc *conversionTestContext) {
+	ns := ctc.namespace
+
+	t.Logf("Creating object in non-storage version v1beta1")
+	storageVersion := "v1beta1"
+	ctc.setAndWaitStorageVersion(t, storageVersion)
+	name := "uid-mutation-" + storageVersion
+	client := ctc.versionedClient(ns, "v1beta2")
+	obj, err := client.Create(newConversionMultiVersionFixture(ns, name, "v1beta2"), metav1.CreateOptions{})
+	if err == nil {
+		t.Fatalf("expected creation error, but got: %v", obj)
+	} else if !strings.Contains(err.Error(), "must have the same UID") {
+		t.Errorf("expected 'must have the same UID' error message, but got: %v", err)
+	}
+}
+
 func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *conversionTestContext) {
 	return func(t *testing.T, ctc *conversionTestContext) {
 		ns := ctc.namespace
@@ -525,6 +637,87 @@ func nontrivialConverter(desiredAPIVersion string, obj runtime.RawExtension) (ru
 	} else if currentAPIVersion != desiredAPIVersion {
 		return runtime.RawExtension{}, fmt.Errorf("cannot convert from %s to %s", currentAPIVersion, desiredAPIVersion)
 	}
+	u.Object["apiVersion"] = desiredAPIVersion
+	raw, err := json.Marshal(u)
+	if err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to serialize object: %v with error: %v", u, err)
+	}
+	return runtime.RawExtension{Raw: raw}, nil
+}
+
+func metadataMutatingConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
+	obj, err := nontrivialConverter(desiredAPIVersion, obj)
+	if err != nil {
+		return runtime.RawExtension{}, err
+	}
+
+	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := json.Unmarshal(obj.Raw, u); err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to deserialize object: %s with error: %v", string(obj.Raw), err)
+	}
+
+	// do not mutate the marker or the probe objects
+	if !strings.Contains(u.GetName(), "mutation") {
+		return obj, nil
+	}
+
+	currentAPIVersion := u.GetAPIVersion()
+
+	// mutate annotations. This should be persisted.
+	annotations := u.GetAnnotations()
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations["from"] = currentAPIVersion
+	annotations["to"] = desiredAPIVersion
+	u.SetAnnotations(annotations)
+
+	// mutate labels. This should be persisted.
+	labels := u.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels["from"] = strings.Replace(currentAPIVersion, "/", ".", 1) // replace / with . because label values do not allow /
+	labels["to"] = strings.Replace(desiredAPIVersion, "/", ".", 1)
+	u.SetLabels(labels)
+
+	// mutate other fields. This should be ignored.
+	u.SetGeneration(42)
+	u.SetOwnerReferences([]metav1.OwnerReference{{
+		APIVersion:         "v1",
+		Kind:               "Namespace",
+		Name:               "default",
+		UID:                "1234",
+		Controller:         nil,
+		BlockOwnerDeletion: nil,
+	}})
+	u.SetResourceVersion("42")
+	u.SetFinalizers([]string{"foo"})
+	if err := unstructured.SetNestedField(u.Object, "foo", "metadata", "garbage"); err != nil {
+		return runtime.RawExtension{}, err
+	}
+
+	raw, err := json.Marshal(u)
+	if err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to serialize object: %v with error: %v", u, err)
+	}
+	return runtime.RawExtension{Raw: raw}, nil
+}
+
+func uidMutatingConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.RawExtension, error) {
+	u := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := json.Unmarshal(obj.Raw, u); err != nil {
+		return runtime.RawExtension{}, fmt.Errorf("failed to deserialize object: %s with error: %v", string(obj.Raw), err)
+	}
+
+	// do not mutate the marker or the probe objects
+	if strings.Contains(u.GetName(), "mutation") {
+		// mutate other fields. This should be ignored.
+		if err := unstructured.SetNestedField(u.Object, "42", "metadata", "uid"); err != nil {
+			return runtime.RawExtension{}, err
+		}
+	}
+
 	u.Object["apiVersion"] = desiredAPIVersion
 	raw, err := json.Marshal(u)
 	if err != nil {
