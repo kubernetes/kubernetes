@@ -168,8 +168,12 @@ const sysctlForward = "net/ipv4/ip_forward"
 const sysctlArpIgnore = "net/ipv4/conf/all/arp_ignore"
 const sysctlArpAnnounce = "net/ipv4/conf/all/arp_announce"
 
-const ipvsServiceSchedulerAnnotation = "proxy.ipvs.alpha.k8s.io/scheduler"
-const ipvsServiceLocalEndpointWeightAnnotation = "proxy.ipvs.alpha.k8s.io/local-endpoint-weight"
+// ipvsServiceSchedulerAnnotation allows specifying ipvs scheduler name per service.
+// The valid values are: rr, wrr, lc, wlc, lblc, lblcr, sh, dh, sed, nq.
+const ipvsServiceSchedulerAnnotation = "kube-proxy.kubernetes.io/ipvs-scheduler"
+// ipvsServiceLocalEndpointWeightAnnotation allows specifying a weight for ipvs real server
+// that located in on the current node.
+const ipvsServiceLocalEndpointWeightAnnotation = "kube-proxy.kubernetes.io/ipvs-local-endpoint-weight"
 
 // Proxier is an ipvs based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
