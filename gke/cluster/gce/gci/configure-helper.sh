@@ -3388,7 +3388,11 @@ function main() {
       # stop docker if it is present as we want to use just containerd
       log-wrap 'StopDocker' systemctl stop docker || echo "unable to stop docker"
     fi
-    log-wrap 'SetupContainerd' setup-containerd
+    if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+      log-wrap 'GKESetupContainerd' gke-setup-containerd
+    else
+      log-wrap 'SetupContainerd' setup-containerd
+    fi
   fi
 
   log-start 'SetupKubePodLogReadersGroupDir'
