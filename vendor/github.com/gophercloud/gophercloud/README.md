@@ -127,7 +127,7 @@ new resource in the `server` variable (a
 
 ## Advanced Usage
 
-Have a look at the [FAQ](./FAQ.md) for some tips on customizing the way Gophercloud works.
+Have a look at the [FAQ](./docs/FAQ.md) for some tips on customizing the way Gophercloud works.
 
 ## Backwards-Compatibility Guarantees
 
@@ -140,4 +140,20 @@ See the [contributing guide](./.github/CONTRIBUTING.md).
 ## Help and feedback
 
 If you're struggling with something or have spotted a potential bug, feel free
-to submit an issue to our [bug tracker](/issues).
+to submit an issue to our [bug tracker](https://github.com/gophercloud/gophercloud/issues).
+
+## Thank You
+
+We'd like to extend special thanks and appreciation to the following:
+
+### OpenLab
+
+<a href="http://openlabtesting.org/"><img src="./docs/assets/openlab.png" width="600px"></a>
+
+OpenLab is providing a full CI environment to test each PR and merge for a variety of OpenStack releases.
+
+### VEXXHOST
+
+<a href="https://vexxhost.com/"><img src="./docs/assets/vexxhost.png" width="600px"></a>
+
+VEXXHOST is providing their services to assist with the development and testing of Gophercloud.

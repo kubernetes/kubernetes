@@ -32,6 +32,9 @@ const (
 	FormatLegacy = "legacy"
 	// FormatJson saves event in structured json format.
 	FormatJson = "json"
+
+	// PluginName is the name of this plugin, to be used in help and logs.
+	PluginName = "log"
 )
 
 // AllowedFormats are the formats known by log backend.
@@ -56,13 +59,15 @@ func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) 
 	}
 }
 
-func (b *backend) ProcessEvents(events ...*auditinternal.Event) {
+func (b *backend) ProcessEvents(events ...*auditinternal.Event) bool {
+	success := true
 	for _, ev := range events {
-		b.logEvent(ev)
+		success = b.logEvent(ev) && success
 	}
+	return success
 }
 
-func (b *backend) logEvent(ev *auditinternal.Event) {
+func (b *backend) logEvent(ev *auditinternal.Event) bool {
 	line := ""
 	switch b.format {
 	case FormatLegacy:
@@ -70,18 +75,20 @@ func (b *backend) logEvent(ev *auditinternal.Event) {
 	case FormatJson:
 		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
 		if err != nil {
-			audit.HandlePluginError("log", err, ev)
-			return
+			audit.HandlePluginError(PluginName, err, ev)
+			return false
 		}
 		line = string(bs[:])
 	default:
-		audit.HandlePluginError("log", fmt.Errorf("log format %q is not in list of known formats (%s)",
+		audit.HandlePluginError(PluginName, fmt.Errorf("log format %q is not in list of known formats (%s)",
 			b.format, strings.Join(AllowedFormats, ",")), ev)
-		return
+		return false
 	}
 	if _, err := fmt.Fprint(b.out, line); err != nil {
-		audit.HandlePluginError("log", err, ev)
+		audit.HandlePluginError(PluginName, err, ev)
+		return false
 	}
+	return true
 }
 
 func (b *backend) Run(stopCh <-chan struct{}) error {
@@ -90,4 +97,8 @@ func (b *backend) Run(stopCh <-chan struct{}) error {
 
 func (b *backend) Shutdown() {
 	// Nothing to do here.
+}
+
+func (b *backend) String() string {
+	return PluginName
 }

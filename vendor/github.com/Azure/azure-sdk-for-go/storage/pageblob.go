@@ -87,10 +87,10 @@ func (b *Blob) modifyRange(blobRange BlobRange, bytes io.Reader, options *PutPag
 		return errors.New("the value for rangeEnd must be greater than or equal to rangeStart")
 	}
 	if blobRange.Start%512 != 0 {
-		return errors.New("the value for rangeStart must be a modulus of 512")
+		return errors.New("the value for rangeStart must be a multiple of 512")
 	}
 	if blobRange.End%512 != 511 {
-		return errors.New("the value for rangeEnd must be a modulus of 511")
+		return errors.New("the value for rangeEnd must be a multiple of 512 - 1")
 	}
 
 	params := url.Values{"comp": {"page"}}
@@ -121,9 +121,8 @@ func (b *Blob) modifyRange(blobRange BlobRange, bytes io.Reader, options *PutPag
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusCreated})
 }
 
 // GetPageRangesOptions includes the options for a get page ranges operation
@@ -147,7 +146,7 @@ func (b *Blob) GetPageRanges(options *GetPageRangesOptions) (GetPageRangesRespon
 		params = addTimeout(params, options.Timeout)
 		params = addSnapshot(params, options.Snapshot)
 		if options.PreviousSnapshot != nil {
-			params.Add("prevsnapshot", timeRfc1123Formatted(*options.PreviousSnapshot))
+			params.Add("prevsnapshot", timeRFC3339Formatted(*options.PreviousSnapshot))
 		}
 		if options.Range != nil {
 			headers["Range"] = options.Range.String()
@@ -161,12 +160,12 @@ func (b *Blob) GetPageRanges(options *GetPageRangesOptions) (GetPageRangesRespon
 	if err != nil {
 		return out, err
 	}
-	defer resp.body.Close()
+	defer drainRespBody(resp)
 
-	if err = checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err = checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return out, err
 	}
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	return out, err
 }
 

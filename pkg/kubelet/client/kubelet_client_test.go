@@ -19,13 +19,8 @@ package client
 import (
 	"testing"
 
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 )
-
-// Ensure a node client can be used as a NodeGetter.
-// This allows anyone with a node client to easily construct a NewNodeConnectionInfoGetter.
-var _ = NodeGetter(v1core.NodeInterface(nil))
 
 func TestMakeTransportInvalid(t *testing.T) {
 	config := &KubeletClientConfig{

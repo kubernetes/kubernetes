@@ -43,6 +43,7 @@ func (u URLParams) Encode() string {
 	return url.Values(u).Encode()
 }
 
+// SetOptions sets the URL params and any additional call options.
 func SetOptions(u URLParams, opts ...googleapi.CallOption) {
 	for _, o := range opts {
 		u.Set(o.Get())

@@ -27,9 +27,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
+// PluginName indicates name of admission plugin.
+const PluginName = "ExtendedResourceToleration"
+
 // Register is called by the apiserver to register the plugin factory.
 func Register(plugins *admission.Plugins) {
-	plugins.Register("ExtendedResourceToleration", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return newExtendedResourceToleration(), nil
 	})
 }
@@ -53,7 +56,7 @@ type plugin struct {
 // a toleration with key "example.com/device", operator "Exists" and effect "NoSchedule".
 // The rationale for this is described in:
 // https://github.com/kubernetes/kubernetes/issues/55080
-func (p *plugin) Admit(attributes admission.Attributes) error {
+func (p *plugin) Admit(attributes admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != core.Resource("pods") {
 		return nil

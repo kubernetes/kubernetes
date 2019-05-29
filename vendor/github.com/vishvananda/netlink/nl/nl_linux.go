@@ -621,6 +621,20 @@ func (s *NetlinkSocket) Receive() ([]syscall.NetlinkMessage, error) {
 	return syscall.ParseNetlinkMessage(rb)
 }
 
+// SetSendTimeout allows to set a send timeout on the socket
+func (s *NetlinkSocket) SetSendTimeout(timeout *syscall.Timeval) error {
+	// Set a send timeout of SOCKET_SEND_TIMEOUT, this will allow the Send to periodically unblock and avoid that a routine
+	// remains stuck on a send on a closed fd
+	return syscall.SetsockoptTimeval(int(s.fd), syscall.SOL_SOCKET, syscall.SO_SNDTIMEO, timeout)
+}
+
+// SetReceiveTimeout allows to set a receive timeout on the socket
+func (s *NetlinkSocket) SetReceiveTimeout(timeout *syscall.Timeval) error {
+	// Set a read timeout of SOCKET_READ_TIMEOUT, this will allow the Read to periodically unblock and avoid that a routine
+	// remains stuck on a recvmsg on a closed fd
+	return syscall.SetsockoptTimeval(int(s.fd), syscall.SOL_SOCKET, syscall.SO_RCVTIMEO, timeout)
+}
+
 func (s *NetlinkSocket) GetPid() (uint32, error) {
 	fd := int(atomic.LoadInt32(&s.fd))
 	lsa, err := syscall.Getsockname(fd)

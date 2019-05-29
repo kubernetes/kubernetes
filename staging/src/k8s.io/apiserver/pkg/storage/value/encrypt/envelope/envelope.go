@@ -21,23 +21,29 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/binary"
+	"encoding/base64"
 	"fmt"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
 
 	lru "github.com/hashicorp/golang-lru"
+	"golang.org/x/crypto/cryptobyte"
 )
 
 // defaultCacheSize is the number of decrypted DEKs which would be cached by the transformer.
 const defaultCacheSize = 1000
 
+func init() {
+	value.RegisterMetrics()
+}
+
 // Service allows encrypting and decrypting data using an external Key Management Service.
 type Service interface {
-	// Decrypt a given data string to obtain the original byte data.
-	Decrypt(data string) ([]byte, error)
-	// Encrypt bytes to a string ciphertext.
-	Encrypt(data []byte) (string, error)
+	// Decrypt a given bytearray to obtain the original data as bytes.
+	Decrypt(data []byte) ([]byte, error)
+	// Encrypt bytes to a ciphertext.
+	Encrypt(data []byte) ([]byte, error)
 }
 
 type envelopeTransformer struct {
@@ -74,19 +80,18 @@ func (t *envelopeTransformer) TransformFromStorage(data []byte, context value.Co
 	// Read the 16 bit length-of-DEK encoded at the start of the encrypted DEK. 16 bits can
 	// represent a maximum key length of 65536 bytes. We are using a 256 bit key, whose
 	// length cannot fit in 8 bits (1 byte). Thus, we use 16 bits (2 bytes) to store the length.
-	keyLen := int(binary.BigEndian.Uint16(data[:2]))
-	if keyLen+2 > len(data) {
-		return nil, false, fmt.Errorf("invalid data encountered by genvelope transformer, length longer than available bytes: %q", data)
+	var encKey cryptobyte.String
+	s := cryptobyte.String(data)
+	if ok := s.ReadUint16LengthPrefixed(&encKey); !ok {
+		return nil, false, fmt.Errorf("invalid data encountered by envelope transformer: failed to read uint16 length prefixed data")
 	}
-	encKey := string(data[2 : keyLen+2])
-	encData := data[2+keyLen:]
 
-	var transformer value.Transformer
+	encData := []byte(s)
+
 	// Look up the decrypted DEK from cache or Envelope.
-	_transformer, found := t.transformers.Get(encKey)
-	if found {
-		transformer = _transformer.(value.Transformer)
-	} else {
+	transformer := t.getTransformer(encKey)
+	if transformer == nil {
+		value.RecordCacheMiss()
 		key, err := t.envelopeService.Decrypt(encKey)
 		if err != nil {
 			return nil, false, fmt.Errorf("error while decrypting key: %q", err)
@@ -116,41 +121,51 @@ func (t *envelopeTransformer) TransformToStorage(data []byte, context value.Cont
 		return nil, err
 	}
 
-	// Append the length of the encrypted DEK as the first 2 bytes.
-	encKeyLen := make([]byte, 2)
-	encKeyBytes := []byte(encKey)
-	binary.BigEndian.PutUint16(encKeyLen, uint16(len(encKeyBytes)))
-
-	prefix := append(encKeyLen, encKeyBytes...)
-
-	prefixedData := make([]byte, len(prefix), len(data)+len(prefix))
-	copy(prefixedData, prefix)
 	result, err := transformer.TransformToStorage(data, context)
 	if err != nil {
 		return nil, err
 	}
-	prefixedData = append(prefixedData, result...)
-	return prefixedData, nil
+	// Append the length of the encrypted DEK as the first 2 bytes.
+	b := cryptobyte.NewBuilder(nil)
+	b.AddUint16LengthPrefixed(func(b *cryptobyte.Builder) {
+		b.AddBytes([]byte(encKey))
+	})
+	b.AddBytes(result)
+
+	return b.Bytes()
 }
 
 var _ value.Transformer = &envelopeTransformer{}
 
 // addTransformer inserts a new transformer to the Envelope cache of DEKs for future reads.
-func (t *envelopeTransformer) addTransformer(encKey string, key []byte) (value.Transformer, error) {
+func (t *envelopeTransformer) addTransformer(encKey []byte, key []byte) (value.Transformer, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 	transformer := t.baseTransformerFunc(block)
-	t.transformers.Add(encKey, transformer)
+	// Use base64 of encKey as the key into the cache because hashicorp/golang-lru
+	// cannot hash []uint8.
+	t.transformers.Add(base64.StdEncoding.EncodeToString(encKey), transformer)
 	return transformer, nil
 }
 
+// getTransformer fetches the transformer corresponding to encKey from cache, if it exists.
+func (t *envelopeTransformer) getTransformer(encKey []byte) value.Transformer {
+	_transformer, found := t.transformers.Get(base64.StdEncoding.EncodeToString(encKey))
+	if found {
+		return _transformer.(value.Transformer)
+	}
+	return nil
+}
+
 // generateKey generates a random key using system randomness.
-func generateKey(length int) ([]byte, error) {
-	key := make([]byte, length)
-	_, err := rand.Read(key)
-	if err != nil {
+func generateKey(length int) (key []byte, err error) {
+	defer func(start time.Time) {
+		value.RecordDataKeyGeneration(start, err)
+	}(time.Now())
+	key = make([]byte, length)
+	if _, err = rand.Read(key); err != nil {
 		return nil, err
 	}
 

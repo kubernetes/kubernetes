@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -85,7 +85,7 @@ func (g *genProtoIDL) Filter(c *generator.Context, t *types.Type) bool {
 			// Type specified "true".
 			return true
 		}
-		glog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
+		klog.Fatalf(`Comment tag "protobuf" must be true or false, found: %q`, tagVals[0])
 	}
 	if !g.generateAll {
 		// We're not generating everything.
@@ -128,7 +128,7 @@ func isProtoable(seen map[*types.Type]bool, t *types.Type) bool {
 	case types.Interface:
 		return false
 	default:
-		log.Printf("WARNING: type %q is not protable: %s", t.Kind, t.Name)
+		log.Printf("WARNING: type %q is not portable: %s", t.Kind, t.Name)
 		return false
 	}
 }
@@ -516,10 +516,13 @@ func memberTypeToProtobufField(locator ProtobufLocator, field *protoField, t *ty
 				log.Printf("failed to alias: %s %s: err %v", t.Name, t.Underlying.Name, err)
 				return err
 			}
-			if field.Extras == nil {
-				field.Extras = make(map[string]string)
+			// If this is not an alias to a slice, cast to the alias
+			if !field.Repeated {
+				if field.Extras == nil {
+					field.Extras = make(map[string]string)
+				}
+				field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
 			}
-			field.Extras["(gogoproto.casttype)"] = strconv.Quote(locator.CastTypeName(t.Name))
 		}
 	case types.Slice:
 		if t.Elem.Name.Name == "byte" && len(t.Elem.Name.Package) == 0 {
@@ -721,6 +724,10 @@ func genComment(out io.Writer, lines []string, indent string) {
 		lines = lines[:l-1]
 	}
 	for _, c := range lines {
+		if len(c) == 0 {
+			fmt.Fprintf(out, "%s//\n", indent) // avoid trailing whitespace
+			continue
+		}
 		fmt.Fprintf(out, "%s// %s\n", indent, c)
 	}
 }

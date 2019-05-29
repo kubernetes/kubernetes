@@ -1,0 +1,18 @@
+sudo: false
+
+language: go
+
+go:
+ - 1.7
+ - 1.8
+
+install:
+    - go get -u github.com/golang/lint/golint
+    - go get -u github.com/HewlettPackard/gas
+
+script:
+    - golint --set_exit_status
+    - go vet
+    - go test -v -cover -race
+    - go test -bench .
+    - gas ./...

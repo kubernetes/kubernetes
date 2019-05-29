@@ -20,13 +20,15 @@ package ipvs
 
 import (
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type emptyHandle struct {
 }
 
 // NewNetLinkHandle will create an EmptyHandle
-func NewNetLinkHandle() NetLinkHandle {
+func NewNetLinkHandle(ipv6 bool) NetLinkHandle {
 	return &emptyHandle{}
 }
 
@@ -48,4 +50,14 @@ func (h *emptyHandle) EnsureDummyDevice(devName string) (bool, error) {
 // DeleteDummyDevice is part of interface.
 func (h *emptyHandle) DeleteDummyDevice(devName string) error {
 	return fmt.Errorf("netlink is not supported in this platform")
+}
+
+// ListBindAddress is part of interface.
+func (h *emptyHandle) ListBindAddress(devName string) ([]string, error) {
+	return nil, fmt.Errorf("netlink is not supported in this platform")
+}
+
+// GetLocalAddresses is part of interface.
+func (h *emptyHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
+	return nil, fmt.Errorf("netlink is not supported in this platform")
 }

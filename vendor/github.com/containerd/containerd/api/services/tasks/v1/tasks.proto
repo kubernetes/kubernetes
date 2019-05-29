@@ -4,7 +4,7 @@ package containerd.services.tasks.v1;
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/any.proto";
-import "gogoproto/gogo.proto";
+import weak "gogoproto/gogo.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/metrics.proto";
 import "github.com/containerd/containerd/api/types/descriptor.proto";

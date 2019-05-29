@@ -1,9 +1,0 @@
-kind: Service
-apiVersion: v1
-metadata:
-  name: dns-backend
-spec:
-  ports:
-    - port: 8000
-  selector:
-    name: dns-backend

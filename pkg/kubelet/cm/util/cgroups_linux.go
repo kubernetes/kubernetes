@@ -23,6 +23,7 @@ import (
 	libcontainerutils "github.com/opencontainers/runc/libcontainer/utils"
 )
 
+// GetPids gets pids of the desired cgroup
 // Forked from opencontainers/runc/libcontainer/cgroup/fs.Manager.GetPids()
 func GetPids(cgroupPath string) ([]int, error) {
 	dir, err := getCgroupPath(cgroupPath)

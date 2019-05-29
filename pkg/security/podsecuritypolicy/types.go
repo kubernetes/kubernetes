@@ -17,9 +17,9 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
@@ -32,16 +32,12 @@ import (
 // Provider provides the implementation to generate a new security
 // context based on constraints or validate an existing security context against constraints.
 type Provider interface {
-	// Create a PodSecurityContext based on the given constraints. Also returns an updated set
-	// of Pod annotations for alpha feature support.
-	CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error)
-	// Create a container SecurityContext based on the given constraints. Also returns an updated set
-	// of Pod annotations for alpha feature support.
-	CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, map[string]string, error)
-	// Ensure a pod's SecurityContext is in compliance with the given constraints.
-	ValidatePodSecurityContext(pod *api.Pod, fldPath *field.Path) field.ErrorList
-	// Ensure a container's SecurityContext is in compliance with the given constraints
-	ValidateContainerSecurityContext(pod *api.Pod, container *api.Container, fldPath *field.Path) field.ErrorList
+	// MutatePod sets the default values of the required but not filled fields of the pod and all
+	// containers in the pod.
+	MutatePod(pod *api.Pod) error
+	// ValidatePod ensures a pod and all its containers are in compliance with the given constraints.
+	// ValidatePod MUST NOT mutate the pod.
+	ValidatePod(pod *api.Pod) field.ErrorList
 	// Get the name of the PSP that this provider was initialized with.
 	GetPSPName() string
 }
@@ -54,12 +50,13 @@ type Provider interface {
 type StrategyFactory interface {
 	// CreateStrategies creates the strategies that a provider will use.  The namespace argument
 	// should be the namespace of the object being checked (the pod's namespace).
-	CreateStrategies(psp *extensions.PodSecurityPolicy, namespace string) (*ProviderStrategies, error)
+	CreateStrategies(psp *policy.PodSecurityPolicy, namespace string) (*ProviderStrategies, error)
 }
 
 // ProviderStrategies is a holder for all strategies that the provider requires to be populated.
 type ProviderStrategies struct {
 	RunAsUserStrategy         user.RunAsUserStrategy
+	RunAsGroupStrategy        group.GroupStrategy
 	SELinuxStrategy           selinux.SELinuxStrategy
 	AppArmorStrategy          apparmor.Strategy
 	FSGroupStrategy           group.GroupStrategy

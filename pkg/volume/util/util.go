@@ -20,46 +20,68 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
+	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
 	readyFileName = "ready"
-	losetupPath   = "losetup"
 
-	ErrDeviceNotFound     = "device not found"
-	ErrDeviceNotSupported = "device not supported"
-	ErrNotAvailable       = "not available"
+	// ControllerManagedAttachAnnotation is the key of the annotation on Node
+	// objects that indicates attach/detach operations for the node should be
+	// managed by the attach/detach controller
+	ControllerManagedAttachAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
+
+	// KeepTerminatedPodVolumesAnnotation is the key of the annotation on Node
+	// that decides if pod volumes are unmounted when pod is terminated
+	KeepTerminatedPodVolumesAnnotation string = "volumes.kubernetes.io/keep-terminated-pod-volumes"
+
+	// MountsInGlobalPDPath is name of the directory appended to a volume plugin
+	// name to create the place for volume mounts in the global PD path.
+	MountsInGlobalPDPath = "mounts"
+
+	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
+	// object that specifies a supplemental GID.
+	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
+	// object created dynamically
+	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
 )
 
 // IsReady checks for the existence of a regular file
 // called 'ready' in the given directory and returns
 // true if that file exists.
 func IsReady(dir string) bool {
-	readyFile := path.Join(dir, readyFileName)
+	readyFile := filepath.Join(dir, readyFileName)
 	s, err := os.Stat(readyFile)
 	if err != nil {
 		return false
 	}
 
 	if !s.Mode().IsRegular() {
-		glog.Errorf("ready-file is not a file: %s", readyFile)
+		klog.Errorf("ready-file is not a file: %s", readyFile)
 		return false
 	}
 
@@ -71,82 +93,17 @@ func IsReady(dir string) bool {
 // created.
 func SetReady(dir string) {
 	if err := os.MkdirAll(dir, 0750); err != nil && !os.IsExist(err) {
-		glog.Errorf("Can't mkdir %s: %v", dir, err)
+		klog.Errorf("Can't mkdir %s: %v", dir, err)
 		return
 	}
 
-	readyFile := path.Join(dir, readyFileName)
+	readyFile := filepath.Join(dir, readyFileName)
 	file, err := os.Create(readyFile)
 	if err != nil {
-		glog.Errorf("Can't touch %s: %v", readyFile, err)
+		klog.Errorf("Can't touch %s: %v", readyFile, err)
 		return
 	}
 	file.Close()
-}
-
-// UnmountPath is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-func UnmountPath(mountPath string, mounter mount.Interface) error {
-	return UnmountMountPoint(mountPath, mounter, false /* extensiveMountPointCheck */)
-}
-
-// UnmountMountPoint is a common unmount routine that unmounts the given path and
-// deletes the remaining directory if successful.
-// if extensiveMountPointCheck is true
-// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
-// IsNotMountPoint is more expensive but properly handles bind mounts.
-func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
-		return nil
-	}
-
-	var notMnt bool
-	var err error
-
-	if extensiveMountPointCheck {
-		notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
-	} else {
-		notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
-	}
-
-	if err != nil {
-		return err
-	}
-
-	if notMnt {
-		glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-		return os.Remove(mountPath)
-	}
-
-	// Unmount the mount path
-	glog.V(4).Infof("%q is a mountpoint, unmounting", mountPath)
-	if err := mounter.Unmount(mountPath); err != nil {
-		return err
-	}
-	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
-	if mntErr != nil {
-		return err
-	}
-	if notMnt {
-		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
-		return os.Remove(mountPath)
-	}
-	return fmt.Errorf("Failed to unmount path %v", mountPath)
-}
-
-// PathExists returns true if the specified path exists.
-func PathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
-	}
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
@@ -184,6 +141,7 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 	return secret, nil
 }
 
+// GetClassForVolume locates storage class by persistent volume
 func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) (*storage.StorageClass, error) {
 	if kubeClient == nil {
 		return nil, fmt.Errorf("Cannot get kube client")
@@ -203,27 +161,22 @@ func GetClassForVolume(kubeClient clientset.Interface, pv *v1.PersistentVolume) 
 // CheckNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func CheckNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
-	affinity, err := v1helper.GetStorageNodeAffinityFromAnnotation(pv.Annotations)
-	if err != nil {
-		return fmt.Errorf("Error getting storage node affinity: %v", err)
-	}
-	if affinity == nil {
+	return checkVolumeNodeAffinity(pv, nodeLabels)
+}
+
+func checkVolumeNodeAffinity(pv *v1.PersistentVolume, nodeLabels map[string]string) error {
+	if pv.Spec.NodeAffinity == nil {
 		return nil
 	}
 
-	if affinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		terms := affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
-		glog.V(10).Infof("Match for RequiredDuringSchedulingIgnoredDuringExecution node selector terms %+v", terms)
-		for _, term := range terms {
-			selector, err := v1helper.NodeSelectorRequirementsAsSelector(term.MatchExpressions)
-			if err != nil {
-				return fmt.Errorf("Failed to parse MatchExpressions: %v", err)
-			}
-			if !selector.Matches(labels.Set(nodeLabels)) {
-				return fmt.Errorf("NodeSelectorTerm %+v does not match node labels", term.MatchExpressions)
-			}
+	if pv.Spec.NodeAffinity.Required != nil {
+		terms := pv.Spec.NodeAffinity.Required.NodeSelectorTerms
+		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
+		if !v1helper.MatchNodeSelectorTerms(terms, labels.Set(nodeLabels), nil) {
+			return fmt.Errorf("No matching NodeSelectorTerms")
 		}
 	}
+
 	return nil
 }
 
@@ -248,231 +201,342 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func ZonesSetToLabelValue(strSet sets.String) string {
-	return strings.Join(strSet.UnsortedList(), kubeletapis.LabelMultiZoneDelimiter)
+// CalculateTimeoutForVolume calculates time for a Recycler pod to complete a
+// recycle operation. The calculation and return value is either the
+// minimumTimeout or the timeoutIncrement per Gi of storage size, whichever is
+// greater.
+func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.PersistentVolume) int64 {
+	giQty := resource.MustParse("1Gi")
+	pvQty := pv.Spec.Capacity[v1.ResourceStorage]
+	giSize := giQty.Value()
+	pvSize := pvQty.Value()
+	timeout := (pvSize / giSize) * int64(timeoutIncrement)
+	if timeout < int64(minimumTimeout) {
+		return int64(minimumTimeout)
+	}
+	return timeout
 }
 
-// ZonesToSet converts a string containing a comma separated list of zones to set
-func ZonesToSet(zonesString string) (sets.String, error) {
-	return stringToSet(zonesString, ",")
+// GenerateVolumeName returns a PV name with clusterName prefix. The function
+// should be used to generate a name of GCE PD or Cinder volume. It basically
+// adds "<clusterName>-dynamic-" before the PV name, making sure the resulting
+// string fits given length and cuts "dynamic" if not.
+func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
+	prefix := clusterName + "-dynamic"
+	pvLen := len(pvName)
+
+	// cut the "<clusterName>-dynamic" to fit full pvName into maxLength
+	// +1 for the '-' dash
+	if pvLen+1+len(prefix) > maxLength {
+		prefix = prefix[:maxLength-pvLen-1]
+	}
+	return prefix + "-" + pvName
 }
 
-// LabelZonesToSet converts a PV label value from string containing a delimited list of zones to set
-func LabelZonesToSet(labelZonesValue string) (sets.String, error) {
-	return stringToSet(labelZonesValue, kubeletapis.LabelMultiZoneDelimiter)
+// GetPath checks if the path from the mounter is empty.
+func GetPath(mounter volume.Mounter) (string, error) {
+	path := mounter.GetPath()
+	if path == "" {
+		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
+	}
+	return path, nil
 }
 
-// StringToSet converts a string containing list separated by specified delimiter to to a set
-func stringToSet(str, delimiter string) (sets.String, error) {
-	zonesSlice := strings.Split(str, delimiter)
-	zonesSet := make(sets.String)
-	for _, zone := range zonesSlice {
-		trimmedZone := strings.TrimSpace(zone)
-		if trimmedZone == "" {
-			return make(sets.String), fmt.Errorf(
-				"%q separated list (%q) must not contain an empty string",
-				delimiter,
-				str)
+// UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
+// to empty_dir
+func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volSpec volume.Spec, podUID utypes.UID) error {
+	klog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
+
+	// Wrap EmptyDir, let it do the teardown.
+	wrapped, err := host.NewWrapperUnmounter(volName, volSpec, podUID)
+	if err != nil {
+		return err
+	}
+	return wrapped.TearDownAt(dir)
+}
+
+// MountOptionFromSpec extracts and joins mount options from volume spec with supplied options
+func MountOptionFromSpec(spec *volume.Spec, options ...string) []string {
+	pv := spec.PersistentVolume
+
+	if pv != nil {
+		// Use beta annotation first
+		if mo, ok := pv.Annotations[v1.MountOptionAnnotation]; ok {
+			moList := strings.Split(mo, ",")
+			return JoinMountOptions(moList, options)
 		}
-		zonesSet.Insert(trimmedZone)
+
+		if len(pv.Spec.MountOptions) > 0 {
+			return JoinMountOptions(pv.Spec.MountOptions, options)
+		}
 	}
-	return zonesSet, nil
+
+	return options
 }
 
-// BlockVolumePathHandler defines a set of operations for handling block volume-related operations
-type BlockVolumePathHandler interface {
-	// MapDevice creates a symbolic link to block device under specified map path
-	MapDevice(devicePath string, mapPath string, linkName string) error
-	// UnmapDevice removes a symbolic link to block device under specified map path
-	UnmapDevice(mapPath string, linkName string) error
-	// RemovePath removes a file or directory on specified map path
-	RemoveMapPath(mapPath string) error
-	// IsSymlinkExist retruns true if specified symbolic link exists
-	IsSymlinkExist(mapPath string) (bool, error)
-	// GetDeviceSymlinkRefs searches symbolic links under global map path
-	GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error)
-	// FindGlobalMapPathUUIDFromPod finds {pod uuid} symbolic link under globalMapPath
-	// corresponding to map path symlink, and then return global map path with pod uuid.
-	FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error)
-	// AttachFileDevice takes a path to a regular file and makes it available as an
-	// attached block device.
-	AttachFileDevice(path string) (string, error)
-	// GetLoopDevice returns the full path to the loop device associated with the given path.
-	GetLoopDevice(path string) (string, error)
-	// RemoveLoopDevice removes specified loopback device
-	RemoveLoopDevice(device string) error
+// JoinMountOptions joins mount options eliminating duplicates
+func JoinMountOptions(userOptions []string, systemOptions []string) []string {
+	allMountOptions := sets.NewString()
+
+	for _, mountOption := range userOptions {
+		if len(mountOption) > 0 {
+			allMountOptions.Insert(mountOption)
+		}
+	}
+
+	for _, mountOption := range systemOptions {
+		allMountOptions.Insert(mountOption)
+	}
+	return allMountOptions.List()
 }
 
-// NewBlockVolumePathHandler returns a new instance of BlockVolumeHandler.
-func NewBlockVolumePathHandler() BlockVolumePathHandler {
-	var volumePathHandler VolumePathHandler
-	return volumePathHandler
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }
 
-// VolumePathHandler is path related operation handlers for block volume
-type VolumePathHandler struct {
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
 }
 
-// MapDevice creates a symbolic link to block device under specified map path
-func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName string) error {
-	// Example of global map path:
-	//   globalMapPath/linkName: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{podUid}
-	//   linkName: {podUid}
-	//
-	// Example of pod device map path:
-	//   podDeviceMapPath/linkName: pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
-	//   linkName: {volumeName}
-	if len(devicePath) == 0 {
-		return fmt.Errorf("Failed to map device to map path. devicePath is empty")
+// GetWindowsPath get a windows path
+func GetWindowsPath(path string) string {
+	windowsPath := strings.Replace(path, "/", "\\", -1)
+	if strings.HasPrefix(windowsPath, "\\") {
+		windowsPath = "c:" + windowsPath
 	}
-	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to map device to map path. mapPath is empty")
-	}
-	if !filepath.IsAbs(mapPath) {
-		return fmt.Errorf("The map path should be absolute: map path: %s", mapPath)
-	}
-	glog.V(5).Infof("MapDevice: devicePath %s", devicePath)
-	glog.V(5).Infof("MapDevice: mapPath %s", mapPath)
-	glog.V(5).Infof("MapDevice: linkName %s", linkName)
-
-	// Check and create mapPath
-	_, err := os.Stat(mapPath)
-	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("cannot validate map path: %s", mapPath)
-		return err
-	}
-	if err = os.MkdirAll(mapPath, 0750); err != nil {
-		return fmt.Errorf("Failed to mkdir %s, error %v", mapPath, err)
-	}
-	// Remove old symbolic link(or file) then create new one.
-	// This should be done because current symbolic link is
-	// stale accross node reboot.
-	linkPath := path.Join(mapPath, string(linkName))
-	if err = os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	err = os.Symlink(devicePath, linkPath)
-	return err
+	return windowsPath
 }
 
-// UnmapDevice removes a symbolic link associated to block device under specified map path
-func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
-	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to unmap device from map path. mapPath is empty")
-	}
-	glog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
-	glog.V(5).Infof("UnmapDevice: linkName %s", linkName)
-
-	// Check symbolic link exists
-	linkPath := path.Join(mapPath, string(linkName))
-	if islinkExist, checkErr := v.IsSymlinkExist(linkPath); checkErr != nil {
-		return checkErr
-	} else if !islinkExist {
-		glog.Warningf("Warning: Unmap skipped because symlink does not exist on the path: %v", linkPath)
-		return nil
-	}
-	err := os.Remove(linkPath)
-	return err
+// GetUniquePodName returns a unique identifier to reference a pod by
+func GetUniquePodName(pod *v1.Pod) types.UniquePodName {
+	return types.UniquePodName(pod.UID)
 }
 
-// RemoveMapPath removes a file or directory on specified map path
-func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
-	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to remove map path. mapPath is empty")
+// GetUniqueVolumeName returns a unique name representing the volume/plugin.
+// Caller should ensure that volumeName is a name/ID uniquely identifying the
+// actual backing device, directory, path, etc. for a particular volume.
+// The returned name can be used to uniquely reference the volume, for example,
+// to prevent operations (attach/detach or mount/unmount) from being triggered
+// on the same volume.
+func GetUniqueVolumeName(pluginName, volumeName string) v1.UniqueVolumeName {
+	return v1.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
+}
+
+// GetUniqueVolumeNameFromSpecWithPod returns a unique volume name with pod
+// name included. This is useful to generate different names for different pods
+// on same volume.
+func GetUniqueVolumeNameFromSpecWithPod(
+	podName types.UniquePodName, volumePlugin volume.VolumePlugin, volumeSpec *volume.Spec) v1.UniqueVolumeName {
+	return v1.UniqueVolumeName(
+		fmt.Sprintf("%s/%v-%s", volumePlugin.GetPluginName(), podName, volumeSpec.Name()))
+}
+
+// GetUniqueVolumeNameFromSpec uses the given VolumePlugin to generate a unique
+// name representing the volume defined in the specified volume spec.
+// This returned name can be used to uniquely reference the actual backing
+// device, directory, path, etc. referenced by the given volumeSpec.
+// If the given plugin does not support the volume spec, this returns an error.
+func GetUniqueVolumeNameFromSpec(
+	volumePlugin volume.VolumePlugin,
+	volumeSpec *volume.Spec) (v1.UniqueVolumeName, error) {
+	if volumePlugin == nil {
+		return "", fmt.Errorf(
+			"volumePlugin should not be nil. volumeSpec.Name=%q",
+			volumeSpec.Name())
 	}
-	glog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
-	err := os.RemoveAll(mapPath)
-	if err != nil && !os.IsNotExist(err) {
-		return err
+
+	volumeName, err := volumePlugin.GetVolumeName(volumeSpec)
+	if err != nil || volumeName == "" {
+		return "", fmt.Errorf(
+			"failed to GetVolumeName from volumePlugin for volumeSpec %q err=%v",
+			volumeSpec.Name(),
+			err)
 	}
+
+	return GetUniqueVolumeName(
+			volumePlugin.GetPluginName(),
+			volumeName),
+		nil
+}
+
+// IsPodTerminated checks if pod is terminated
+func IsPodTerminated(pod *v1.Pod, podStatus v1.PodStatus) bool {
+	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
+}
+
+// notRunning returns true if every status is terminated or waiting, or the status list
+// is empty.
+func notRunning(statuses []v1.ContainerStatus) bool {
+	for _, status := range statuses {
+		if status.State.Terminated == nil && status.State.Waiting == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// SplitUniqueName splits the unique name to plugin name and volume name strings. It expects the uniqueName to follow
+// the format plugin_name/volume_name and the plugin name must be namespaced as described by the plugin interface,
+// i.e. namespace/plugin containing exactly one '/'. This means the unique name will always be in the form of
+// plugin_namespace/plugin/volume_name, see k8s.io/kubernetes/pkg/volume/plugins.go VolumePlugin interface
+// description and pkg/volume/util/volumehelper/volumehelper.go GetUniqueVolumeNameFromSpec that constructs
+// the unique volume names.
+func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
+	components := strings.SplitN(string(uniqueName), "/", 3)
+	if len(components) != 3 {
+		return "", "", fmt.Errorf("cannot split volume unique name %s to plugin/volume components", uniqueName)
+	}
+	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
+	return pluginName, components[2], nil
+}
+
+// NewSafeFormatAndMountFromHost creates a new SafeFormatAndMount with Mounter
+// and Exec taken from given VolumeHost.
+func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *mount.SafeFormatAndMount {
+	mounter := host.GetMounter(pluginName)
+	exec := host.GetExec(pluginName)
+	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
+}
+
+// GetVolumeMode retrieves VolumeMode from pv.
+// If the volume doesn't have PersistentVolume, it's an inline volume,
+// should return volumeMode as filesystem to keep existing behavior.
+func GetVolumeMode(volumeSpec *volume.Spec) (v1.PersistentVolumeMode, error) {
+	if volumeSpec == nil || volumeSpec.PersistentVolume == nil {
+		return v1.PersistentVolumeFilesystem, nil
+	}
+	if volumeSpec.PersistentVolume.Spec.VolumeMode != nil {
+		return *volumeSpec.PersistentVolume.Spec.VolumeMode, nil
+	}
+	return "", fmt.Errorf("cannot get volumeMode for volume: %v", volumeSpec.Name())
+}
+
+// GetPersistentVolumeClaimVolumeMode retrieves VolumeMode from pvc.
+func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.PersistentVolumeMode, error) {
+	if claim.Spec.VolumeMode != nil {
+		return *claim.Spec.VolumeMode, nil
+	}
+	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
+}
+
+// GetPersistentVolumeClaimQualifiedName returns a qualified name for pvc.
+func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) string {
+	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
+}
+
+// CheckVolumeModeFilesystem checks VolumeMode.
+// If the mode is Filesystem, return true otherwise return false.
+func CheckVolumeModeFilesystem(volumeSpec *volume.Spec) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
+		volumeMode, err := GetVolumeMode(volumeSpec)
+		if err != nil {
+			return true, err
+		}
+		if volumeMode == v1.PersistentVolumeBlock {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// CheckPersistentVolumeClaimModeBlock checks VolumeMode.
+// If the mode is Block, return true otherwise return false.
+func CheckPersistentVolumeClaimModeBlock(pvc *v1.PersistentVolumeClaim) bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && pvc.Spec.VolumeMode != nil && *pvc.Spec.VolumeMode == v1.PersistentVolumeBlock
+}
+
+// IsWindowsUNCPath checks if path is prefixed with \\
+// This can be used to skip any processing of paths
+// that point to SMB shares, local named pipes and local UNC path
+func IsWindowsUNCPath(goos, path string) bool {
+	if goos != "windows" {
+		return false
+	}
+	// Check for UNC prefix \\
+	if strings.HasPrefix(path, `\\`) {
+		return true
+	}
+	return false
+}
+
+// IsWindowsLocalPath checks if path is a local path
+// prefixed with "/" or "\" like "/foo/bar" or "\foo\bar"
+func IsWindowsLocalPath(goos, path string) bool {
+	if goos != "windows" {
+		return false
+	}
+	if IsWindowsUNCPath(goos, path) {
+		return false
+	}
+	if strings.Contains(path, ":") {
+		return false
+	}
+	if !(strings.HasPrefix(path, `/`) || strings.HasPrefix(path, `\`)) {
+		return false
+	}
+	return true
+}
+
+// MakeAbsolutePath convert path to absolute path according to GOOS
+func MakeAbsolutePath(goos, path string) string {
+	if goos != "windows" {
+		return filepath.Clean("/" + path)
+	}
+	// These are all for windows
+	// If there is a colon, give up.
+	if strings.Contains(path, ":") {
+		return path
+	}
+	// If there is a slash, but no drive, add 'c:'
+	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") {
+		return "c:" + path
+	}
+	// Otherwise, add 'c:\'
+	return "c:\\" + path
+}
+
+// MapBlockVolume is a utility function to provide a common way of mounting
+// block device path for a specified volume and pod.  This function should be
+// called by volume plugins that implements volume.BlockVolumeMapper.Map() method.
+func MapBlockVolume(
+	devicePath,
+	globalMapPath,
+	podVolumeMapPath,
+	volumeMapName string,
+	podUID utypes.UID,
+) error {
+	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
+
+	// map devicePath to global node path
+	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID))
+	if mapErr != nil {
+		return mapErr
+	}
+
+	// map devicePath to pod volume path
+	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName)
+	if mapErr != nil {
+		return mapErr
+	}
+
 	return nil
 }
 
-// IsSymlinkExist returns true if specified file exists and the type is symbolik link.
-// If file doesn't exist, or file exists but not symbolick link, return false with no error.
-// On other cases, return false with error from Lstat().
-func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
-	fi, err := os.Lstat(mapPath)
-	if err == nil {
-		// If file exits and it's symbolick link, return true and no error
-		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-			return true, nil
-		}
-		// If file exits but it's not symbolick link, return fale and no error
-		return false, nil
-	}
-	// If file doesn't exist, return false and no error
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	// Return error from Lstat()
-	return false, err
-}
-
-// GetDeviceSymlinkRefs searches symbolic links under global map path
-func (v VolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error) {
-	var refs []string
-	files, err := ioutil.ReadDir(mapPath)
-	if err != nil {
-		return nil, fmt.Errorf("Directory cannot read %v", err)
-	}
-	for _, file := range files {
-		if file.Mode()&os.ModeSymlink != os.ModeSymlink {
-			continue
-		}
-		filename := file.Name()
-		filepath, err := os.Readlink(path.Join(mapPath, filename))
-		if err != nil {
-			return nil, fmt.Errorf("Symbolic link cannot be retrieved %v", err)
-		}
-		glog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", filepath, devPath)
-		if filepath == devPath {
-			refs = append(refs, path.Join(mapPath, filename))
-		}
-	}
-	glog.V(5).Infof("GetDeviceSymlinkRefs: refs %v", refs)
-	return refs, nil
-}
-
-// FindGlobalMapPathUUIDFromPod finds {pod uuid} symbolic link under globalMapPath
-// corresponding to map path symlink, and then return global map path with pod uuid.
-// ex. mapPath symlink: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName} -> /dev/sdX
-//     globalMapPath/{pod uuid}: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid} -> /dev/sdX
-func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error) {
-	var globalMapPathUUID string
-	// Find symbolic link named pod uuid under plugin dir
-	err := filepath.Walk(pluginDir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if (fi.Mode()&os.ModeSymlink == os.ModeSymlink) && (fi.Name() == string(podUID)) {
-			glog.V(5).Infof("FindGlobalMapPathFromPod: path %s, mapPath %s", path, mapPath)
-			if res, err := compareSymlinks(path, mapPath); err == nil && res {
-				globalMapPathUUID = path
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	glog.V(5).Infof("FindGlobalMapPathFromPod: globalMapPathUUID %s", globalMapPathUUID)
-	// Return path contains global map path + {pod uuid}
-	return globalMapPathUUID, nil
-}
-
-func compareSymlinks(global, pod string) (bool, error) {
-	devGlobal, err := os.Readlink(global)
-	if err != nil {
-		return false, err
-	}
-	devPod, err := os.Readlink(pod)
-	if err != nil {
-		return false, err
-	}
-	glog.V(5).Infof("CompareSymlinks: devGloBal %s, devPod %s", devGlobal, devPod)
-	if devGlobal == devPod {
-		return true, nil
-	}
-	return false, nil
+// GetPluginMountDir returns the global mount directory name appended
+// to the given plugin name's plugin directory
+func GetPluginMountDir(host volume.VolumeHost, name string) string {
+	mntDir := filepath.Join(host.GetPluginDir(name), MountsInGlobalPDPath)
+	return mntDir
 }

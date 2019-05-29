@@ -1,15 +1,20 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"net/url"
 	"time"
 
 	timetypes "github.com/docker/docker/api/types/time"
-	"golang.org/x/net/context"
 )
 
-// ContainerStop stops a container without terminating the process.
-// The process is blocked until the container stops or the timeout expires.
+// ContainerStop stops a container. In case the container fails to stop
+// gracefully within a time frame specified by the timeout argument,
+// it is forcefully terminated (killed).
+//
+// If the timeout is nil, the container's StopTimeout value is used, if set,
+// otherwise the engine default. A negative timeout value can be specified,
+// meaning no timeout, i.e. no forceful termination is performed.
 func (cli *Client) ContainerStop(ctx context.Context, containerID string, timeout *time.Duration) error {
 	query := url.Values{}
 	if timeout != nil {

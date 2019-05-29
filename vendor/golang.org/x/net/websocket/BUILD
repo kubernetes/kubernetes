@@ -9,6 +9,7 @@ go_library(
         "server.go",
         "websocket.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/net/websocket",
     importpath = "golang.org/x/net/websocket",
     visibility = ["//visibility:public"],
 )

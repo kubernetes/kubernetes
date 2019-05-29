@@ -21,14 +21,17 @@ import (
 	"net"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
@@ -50,10 +53,11 @@ import (
 // TODO: perform repair?
 type Repair struct {
 	interval      time.Duration
-	serviceClient coreclient.ServicesGetter
+	serviceClient corev1client.ServicesGetter
 	network       *net.IPNet
 	alloc         rangeallocation.RangeRegistry
 	leaks         map[string]int // counter per leaked IP
+	recorder      record.EventRecorder
 }
 
 // How many times we need to detect a leak before we clean up.  This is to
@@ -62,13 +66,18 @@ const numRepairsBeforeLeakCleanup = 3
 
 // NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, serviceClient coreclient.ServicesGetter, network *net.IPNet, alloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient corev1client.EventsGetter, network *net.IPNet, alloc rangeallocation.RangeRegistry) *Repair {
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: eventClient.Events("")})
+	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "ipallocator-repair-controller"})
+
 	return &Repair{
 		interval:      interval,
 		serviceClient: serviceClient,
 		network:       network,
 		alloc:         alloc,
 		leaks:         map[string]int{},
+		recorder:      recorder,
 	}
 }
 
@@ -136,6 +145,7 @@ func (c *Repair) runOnce() error {
 		ip := net.ParseIP(svc.Spec.ClusterIP)
 		if ip == nil {
 			// cluster IP is corrupt
+			c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPNotValid", "Cluster IP %s is not a valid IP; please recreate service", svc.Spec.ClusterIP)
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
 			continue
 		}
@@ -147,22 +157,24 @@ func (c *Repair) runOnce() error {
 				stored.Release(ip)
 			} else {
 				// cluster IP doesn't seem to be allocated
-				runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not allocated; repairing", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
+				c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPNotAllocated", "Cluster IP %s is not allocated; repairing", ip)
+				runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not allocated; repairing", ip, svc.Name, svc.Namespace))
 			}
 			delete(c.leaks, ip.String()) // it is used, so it can't be leaked
 		case ipallocator.ErrAllocated:
-			// TODO: send event
 			// cluster IP is duplicate
+			c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPAlreadyAllocated", "Cluster IP %s was assigned to multiple services; please recreate service", ip)
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
 		case err.(*ipallocator.ErrNotInRange):
-			// TODO: send event
 			// cluster IP is out of range
+			c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPOutOfRange", "Cluster IP %s is not within the service CIDR %s; please recreate service", ip, c.network)
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
-			// TODO: send event
 			// somehow we are out of IPs
-			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", rebuilt)
+			c.recorder.Eventf(&svc, v1.EventTypeWarning, "ServiceCIDRFull", "Service CIDR %s is full; you must widen the CIDR in order to create new services", c.network)
+			return fmt.Errorf("the service CIDR %s is full; you must widen the CIDR in order to create new services", c.network)
 		default:
+			c.recorder.Eventf(&svc, v1.EventTypeWarning, "UnknownError", "Unable to allocate cluster IP %s due to an unknown error", ip)
 			return fmt.Errorf("unable to allocate cluster IP %s for service %s/%s due to an unknown error, exiting: %v", ip, svc.Name, svc.Namespace, err)
 		}
 	}

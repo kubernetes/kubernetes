@@ -17,14 +17,15 @@ limitations under the License.
 package apiservice
 
 import (
+	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 
@@ -37,7 +38,11 @@ type apiServerStrategy struct {
 	names.NameGenerator
 }
 
-func NewStrategy(typer runtime.ObjectTyper) apiServerStrategy {
+// apiServerStrategy must implement rest.RESTCreateUpdateStrategy
+var _ rest.RESTCreateUpdateStrategy = apiServerStrategy{}
+
+// NewStrategy creates a new apiServerStrategy.
+func NewStrategy(typer runtime.ObjectTyper) rest.RESTCreateUpdateStrategy {
 	return apiServerStrategy{typer, names.SimpleNameGenerator}
 }
 
@@ -45,7 +50,7 @@ func (apiServerStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (apiServerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	apiservice := obj.(*apiregistration.APIService)
 	apiservice.Status = apiregistration.APIServiceStatus{}
 
@@ -55,13 +60,13 @@ func (apiServerStrategy) PrepareForCreate(ctx genericapirequest.Context, obj run
 	}
 }
 
-func (apiServerStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (apiServerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Status = oldAPIService.Status
 }
 
-func (apiServerStrategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (apiServerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidateAPIService(obj.(*apiregistration.APIService))
 }
 
@@ -76,7 +81,7 @@ func (apiServerStrategy) AllowUnconditionalUpdate() bool {
 func (apiServerStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (apiServerStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (apiServerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
@@ -85,7 +90,8 @@ type apiServerStatusStrategy struct {
 	names.NameGenerator
 }
 
-func NewStatusStrategy(typer runtime.ObjectTyper) apiServerStatusStrategy {
+// NewStatusStrategy creates a new apiServerStatusStrategy.
+func NewStatusStrategy(typer runtime.ObjectTyper) rest.RESTUpdateStrategy {
 	return apiServerStatusStrategy{typer, names.SimpleNameGenerator}
 }
 
@@ -93,7 +99,7 @@ func (apiServerStatusStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (apiServerStatusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newAPIService := obj.(*apiregistration.APIService)
 	oldAPIService := old.(*apiregistration.APIService)
 	newAPIService.Spec = oldAPIService.Spec
@@ -111,19 +117,22 @@ func (apiServerStatusStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
+// Canonicalize normalizes the object after validation.
 func (apiServerStatusStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (apiServerStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+// ValidateUpdate validates an update of apiServerStatusStrategy.
+func (apiServerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateAPIServiceStatusUpdate(obj.(*apiregistration.APIService), old.(*apiregistration.APIService))
 }
 
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
+// GetAttrs returns the labels and fields of an API server for filtering purposes.
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	apiserver, ok := obj.(*apiregistration.APIService)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a APIService.")
+		return nil, nil, fmt.Errorf("given object is not a APIService")
 	}
-	return labels.Set(apiserver.ObjectMeta.Labels), APIServiceToSelectableFields(apiserver), apiserver.Initializers != nil, nil
+	return labels.Set(apiserver.ObjectMeta.Labels), ToSelectableFields(apiserver), nil
 }
 
 // MatchAPIService is the filter used by the generic etcd backend to watch events
@@ -136,7 +145,7 @@ func MatchAPIService(label labels.Selector, field fields.Selector) storage.Selec
 	}
 }
 
-// APIServiceToSelectableFields returns a field set that represents the object.
-func APIServiceToSelectableFields(obj *apiregistration.APIService) fields.Set {
+// ToSelectableFields returns a field set that represents the object.
+func ToSelectableFields(obj *apiregistration.APIService) fields.Set {
 	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, true)
 }

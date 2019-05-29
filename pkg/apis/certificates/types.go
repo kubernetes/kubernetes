@@ -18,8 +18,6 @@ package certificates
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Describes a certificate signing request
@@ -122,7 +120,7 @@ type KeyUsage string
 const (
 	UsageSigning            KeyUsage = "signing"
 	UsageDigitalSignature   KeyUsage = "digital signature"
-	UsageContentCommittment KeyUsage = "content committment"
+	UsageContentCommittment KeyUsage = "content commitment"
 	UsageKeyEncipherment    KeyUsage = "key encipherment"
 	UsageKeyAgreement       KeyUsage = "key agreement"
 	UsageDataEncipherment   KeyUsage = "data encipherment"

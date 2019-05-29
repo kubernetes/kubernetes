@@ -11,19 +11,18 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/pkg/api/v1/service",
     deps = [
-        "//pkg/util/net/sets:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["util_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/v1/service",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/util/net/sets:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

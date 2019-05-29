@@ -5,12 +5,9 @@ go_library(
     srcs = [
         "signal.go",
         "signal_posix.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "signal_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "signal_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-controller/pkg/signals",
     importpath = "k8s.io/sample-controller/pkg/signals",
     visibility = ["//visibility:public"],
 )

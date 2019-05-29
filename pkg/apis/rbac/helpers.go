@@ -21,39 +21,8 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
-
-func RoleRefGroupKind(roleRef RoleRef) schema.GroupKind {
-	return schema.GroupKind{Group: roleRef.APIGroup, Kind: roleRef.Kind}
-}
-
-func VerbMatches(rule *PolicyRule, requestedVerb string) bool {
-	for _, ruleVerb := range rule.Verbs {
-		if ruleVerb == VerbAll {
-			return true
-		}
-		if ruleVerb == requestedVerb {
-			return true
-		}
-	}
-
-	return false
-}
-
-func APIGroupMatches(rule *PolicyRule, requestedGroup string) bool {
-	for _, ruleGroup := range rule.APIGroups {
-		if ruleGroup == APIGroupAll {
-			return true
-		}
-		if ruleGroup == requestedGroup {
-			return true
-		}
-	}
-
-	return false
-}
 
 func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubresource string) bool {
 	for _, ruleResource := range rule.Resources {
@@ -77,36 +46,6 @@ func ResourceMatches(rule *PolicyRule, combinedRequestedResource, requestedSubre
 			strings.HasSuffix(ruleResource, requestedSubresource) {
 			return true
 
-		}
-	}
-
-	return false
-}
-
-func ResourceNameMatches(rule *PolicyRule, requestedName string) bool {
-	if len(rule.ResourceNames) == 0 {
-		return true
-	}
-
-	for _, ruleName := range rule.ResourceNames {
-		if ruleName == requestedName {
-			return true
-		}
-	}
-
-	return false
-}
-
-func NonResourceURLMatches(rule *PolicyRule, requestedURL string) bool {
-	for _, ruleURL := range rule.NonResourceURLs {
-		if ruleURL == NonResourceAll {
-			return true
-		}
-		if ruleURL == requestedURL {
-			return true
-		}
-		if strings.HasSuffix(ruleURL, "*") && strings.HasPrefix(requestedURL, strings.TrimRight(ruleURL, "*")) {
-			return true
 		}
 	}
 
@@ -147,6 +86,10 @@ func (r PolicyRule) String() string {
 func (r PolicyRule) CompactString() string {
 	formatStringParts := []string{}
 	formatArgs := []interface{}{}
+	if len(r.APIGroups) > 0 {
+		formatStringParts = append(formatStringParts, "APIGroups:%q")
+		formatArgs = append(formatArgs, r.APIGroups)
+	}
 	if len(r.Resources) > 0 {
 		formatStringParts = append(formatStringParts, "Resources:%q")
 		formatArgs = append(formatArgs, r.Resources)
@@ -158,10 +101,6 @@ func (r PolicyRule) CompactString() string {
 	if len(r.ResourceNames) > 0 {
 		formatStringParts = append(formatStringParts, "ResourceNames:%q")
 		formatArgs = append(formatArgs, r.ResourceNames)
-	}
-	if len(r.APIGroups) > 0 {
-		formatStringParts = append(formatStringParts, "APIGroups:%q")
-		formatArgs = append(formatArgs, r.APIGroups)
 	}
 	if len(r.Verbs) > 0 {
 		formatStringParts = append(formatStringParts, "Verbs:%q")

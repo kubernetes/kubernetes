@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
@@ -30,11 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/client-go/kubernetes/scheme"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/controller/job"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
+	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -50,223 +52,221 @@ var _ = SIGDescribe("CronJob", func() {
 	// Pod will complete instantly
 	successCommand := []string{"/bin/true"}
 
-	BeforeEach(func() {
-		framework.SkipIfMissingResource(f.ClientPool, CronJobGroupVersionResourceBeta, f.Namespace.Name)
+	ginkgo.BeforeEach(func() {
+		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
 	})
 
 	// multiple jobs running at once
-	It("should schedule multiple jobs concurrently", func() {
-		By("Creating a cronjob")
+	ginkgo.It("should schedule multiple jobs concurrently", func() {
+		ginkgo.By("Creating a cronjob")
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
-		By("Ensuring more than one job is running at a time")
+		ginkgo.By("Ensuring more than one job is running at a time")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 2)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to wait for active jobs in CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 
-		By("Ensuring at least two running jobs exists by listing jobs explicitly")
+		ginkgo.By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
-		Expect(len(activeJobs) >= 2).To(BeTrue())
+		gomega.Expect(len(activeJobs) >= 2).To(gomega.BeTrue())
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// suspended should not schedule jobs
-	It("should not schedule jobs when suspended [Slow]", func() {
-		By("Creating a suspended cronjob")
+	ginkgo.It("should not schedule jobs when suspended [Slow]", func() {
+		ginkgo.By("Creating a suspended cronjob")
 		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			sleepCommand, nil)
 		t := true
 		cronJob.Spec.Suspend = &t
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
-		By("Ensuring no jobs are scheduled")
+		ginkgo.By("Ensuring no jobs are scheduled")
 		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, false)
-		Expect(err).To(HaveOccurred())
+		framework.ExpectError(err)
 
-		By("Ensuring no job exists by listing jobs explicitly")
+		ginkgo.By("Ensuring no job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
-		Expect(jobs.Items).To(HaveLen(0))
+		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
+		gomega.Expect(jobs.Items).To(gomega.HaveLen(0))
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// only single active job is allowed for ForbidConcurrent
-	It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
-		By("Creating a ForbidConcurrent cronjob")
+	ginkgo.It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
+		ginkgo.By("Creating a ForbidConcurrent cronjob")
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1beta1.ForbidConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
-		By("Ensuring a job is scheduled")
+		ginkgo.By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to schedule CronJob %s", cronJob.Name)
 
-		By("Ensuring exactly one is scheduled")
+		ginkgo.By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(cronJob.Status.Active).Should(HaveLen(1))
+		framework.ExpectNoError(err, "Failed to get CronJob %s", cronJob.Name)
+		gomega.Expect(cronJob.Status.Active).Should(gomega.HaveLen(1))
 
-		By("Ensuring exactly one running job exists by listing jobs explicitly")
+		ginkgo.By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to list the CronJobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
-		Expect(activeJobs).To(HaveLen(1))
+		gomega.Expect(activeJobs).To(gomega.HaveLen(1))
 
-		By("Ensuring no more jobs are scheduled")
+		ginkgo.By("Ensuring no more jobs are scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 2)
-		Expect(err).To(HaveOccurred())
+		framework.ExpectError(err)
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// only single active job is allowed for ReplaceConcurrent
-	It("should replace jobs when ReplaceConcurrent", func() {
-		By("Creating a ReplaceConcurrent cronjob")
+	ginkgo.It("should replace jobs when ReplaceConcurrent", func() {
+		ginkgo.By("Creating a ReplaceConcurrent cronjob")
 		cronJob := newTestCronJob("replace", "*/1 * * * ?", batchv1beta1.ReplaceConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
-		By("Ensuring a job is scheduled")
+		ginkgo.By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to schedule CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 
-		By("Ensuring exactly one is scheduled")
+		ginkgo.By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(cronJob.Status.Active).Should(HaveLen(1))
+		framework.ExpectNoError(err, "Failed to get CronJob %s", cronJob.Name)
+		gomega.Expect(cronJob.Status.Active).Should(gomega.HaveLen(1))
 
-		By("Ensuring exactly one running job exists by listing jobs explicitly")
+		ginkgo.By("Ensuring exactly one running job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to list the jobs in namespace %s", f.Namespace.Name)
 		activeJobs, _ := filterActiveJobs(jobs)
-		Expect(activeJobs).To(HaveLen(1))
+		gomega.Expect(activeJobs).To(gomega.HaveLen(1))
 
-		By("Ensuring the job is replaced with a new one")
+		ginkgo.By("Ensuring the job is replaced with a new one")
 		err = waitForJobReplaced(f.ClientSet, f.Namespace.Name, jobs.Items[0].Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to replace CronJob %s in namespace %s", jobs.Items[0].Name, f.Namespace.Name)
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// shouldn't give us unexpected warnings
-	It("should not emit unexpected warnings", func() {
-		By("Creating a cronjob")
+	ginkgo.It("should not emit unexpected warnings", func() {
+		ginkgo.By("Creating a cronjob")
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
-		By("Ensuring at least two jobs and at least one finished job exists by listing jobs explicitly")
+		ginkgo.By("Ensuring at least two jobs and at least one finished job exists by listing jobs explicitly")
 		err = waitForJobsAtLeast(f.ClientSet, f.Namespace.Name, 2)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to ensure at least two job exists in namespace %s", f.Namespace.Name)
 		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to ensure at least on finished job exists in namespace %s", f.Namespace.Name)
 
-		By("Ensuring no unexpected event has happened")
-		err = checkNoEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
-		Expect(err).NotTo(HaveOccurred())
+		ginkgo.By("Ensuring no unexpected event has happened")
+		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob", "UnexpectedJob"})
+		framework.ExpectError(err)
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to delete CronJob %s in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// deleted jobs should be removed from the active list
-	It("should remove from active list jobs that have been deleted", func() {
-		By("Creating a ForbidConcurrent cronjob")
+	ginkgo.It("should remove from active list jobs that have been deleted", func() {
+		ginkgo.By("Creating a ForbidConcurrent cronjob")
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1beta1.ForbidConcurrent,
 			sleepCommand, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
-		By("Ensuring a job is scheduled")
+		ginkgo.By("Ensuring a job is scheduled")
 		err = waitForActiveJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, 1)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to ensure a %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
 
-		By("Ensuring exactly one is scheduled")
+		ginkgo.By("Ensuring exactly one is scheduled")
 		cronJob, err = getCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(cronJob.Status.Active).Should(HaveLen(1))
+		framework.ExpectNoError(err, "Failed to ensure exactly one %s cronjob is scheduled in namespace %s", cronJob.Name, f.Namespace.Name)
+		gomega.Expect(cronJob.Status.Active).Should(gomega.HaveLen(1))
 
-		By("Deleting the job")
+		ginkgo.By("Deleting the job")
 		job := cronJob.Status.Active[0]
-		reaper, err := kubectl.ReaperFor(batchinternal.Kind("Job"), f.InternalClientset)
-		Expect(err).NotTo(HaveOccurred())
-		timeout := 1 * time.Minute
-		err = reaper.Stop(f.Namespace.Name, job.Name, timeout, metav1.NewDeleteOptions(0))
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(framework.DeleteResourceAndWaitForGC(f.ClientSet, batchinternal.Kind("Job"), f.Namespace.Name, job.Name))
 
-		By("Ensuring job was deleted")
-		_, err = framework.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-		Expect(err).To(HaveOccurred())
-		Expect(errors.IsNotFound(err)).To(BeTrue())
+		ginkgo.By("Ensuring job was deleted")
+		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectError(err)
+		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 
-		By("Ensuring there are no active jobs in the cronjob")
-		err = waitForNoJobs(f.ClientSet, f.Namespace.Name, cronJob.Name, true)
-		Expect(err).NotTo(HaveOccurred())
+		ginkgo.By("Ensuring the job is not in the cronjob active list")
+		err = waitForJobNotActive(f.ClientSet, f.Namespace.Name, cronJob.Name, job.Name)
+		framework.ExpectNoError(err, "Failed to ensure the %s cronjob is not in active list in namespace %s", cronJob.Name, f.Namespace.Name)
 
-		By("Ensuring MissingJob event has occured")
-		err = checkNoEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
-		Expect(err).To(HaveOccurred())
+		ginkgo.By("Ensuring MissingJob event has occurred")
+		err = waitForEventWithReason(f.ClientSet, f.Namespace.Name, cronJob.Name, []string{"MissingJob"})
+		framework.ExpectNoError(err, "Failed to ensure missing job event has occurred for %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to remove %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
 	// cleanup of successful finished jobs, with limit of one successful job
-	It("should delete successful finished jobs with limit of one successful job", func() {
-		By("Creating a AllowConcurrent cronjob with custom history limits")
+	ginkgo.It("should delete successful finished jobs with limit of one successful job", func() {
+		ginkgo.By("Creating a AllowConcurrent cronjob with custom history limits")
 		successLimit := int32(1)
 		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
 			successCommand, &successLimit)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to create allowconcurrent cronjob with custom history limits in namespace %s", f.Namespace.Name)
 
 		// Job is going to complete instantly: do not check for an active job
 		// as we are most likely to miss it
 
-		By("Ensuring a finished job exists")
+		ginkgo.By("Ensuring a finished job exists")
 		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists in namespace %s", f.Namespace.Name)
 
-		By("Ensuring a finished job exists by listing jobs explicitly")
+		ginkgo.By("Ensuring a finished job exists by listing jobs explicitly")
 		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
 		_, finishedJobs := filterActiveJobs(jobs)
-		Expect(len(finishedJobs) == 1).To(BeTrue())
+		gomega.Expect(len(finishedJobs) == 1).To(gomega.BeTrue())
 
 		// Job should get deleted when the next job finishes the next minute
-		By("Ensuring this job does not exist anymore")
-		err = waitForJobNotExist(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		Expect(err).NotTo(HaveOccurred())
+		ginkgo.By("Ensuring this job and its pods does not exist anymore")
+		err = waitForJobToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
+		framework.ExpectNoError(err, "Failed to ensure that job does not exists anymore in namespace %s", f.Namespace.Name)
+		err = waitForJobsPodToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
+		framework.ExpectNoError(err, "Failed to ensure that pods for job does not exists anymore in namespace %s", f.Namespace.Name)
 
-		By("Ensuring there is 1 finished job by listing jobs explicitly")
+		ginkgo.By("Ensuring there is 1 finished job by listing jobs explicitly")
 		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to ensure there is one finished job by listing job explicitly in namespace %s", f.Namespace.Name)
 		_, finishedJobs = filterActiveJobs(jobs)
-		Expect(len(finishedJobs) == 1).To(BeTrue())
+		gomega.Expect(len(finishedJobs) == 1).To(gomega.BeTrue())
 
-		By("Removing cronjob")
+		ginkgo.By("Removing cronjob")
 		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err, "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 })
 
@@ -303,7 +303,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: "busybox",
+									Image: imageutils.GetE2EImage(imageutils.BusyBox),
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",
@@ -340,7 +340,7 @@ func deleteCronJob(c clientset.Interface, ns, name string) error {
 // Wait for at least given amount of active jobs.
 func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
+		curr, err := getCronJob(c, ns, cronJobName)
 		if err != nil {
 			return false, err
 		}
@@ -354,21 +354,37 @@ func waitForActiveJobs(c clientset.Interface, ns, cronJobName string, active int
 // empty after the timeout.
 func waitForNoJobs(c clientset.Interface, ns, jobName string, failIfNonEmpty bool) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
-		curr, err := c.BatchV1beta1().CronJobs(ns).Get(jobName, metav1.GetOptions{})
+		curr, err := getCronJob(c, ns, jobName)
 		if err != nil {
 			return false, err
 		}
 
 		if failIfNonEmpty {
 			return len(curr.Status.Active) == 0, nil
-		} else {
-			return len(curr.Status.Active) != 0, nil
 		}
+		return len(curr.Status.Active) != 0, nil
 	})
 }
 
-// Wait for a job to not exist by listing jobs explicitly.
-func waitForJobNotExist(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
+// Wait till a given job actually goes away from the Active list for a given cronjob
+func waitForJobNotActive(c clientset.Interface, ns, cronJobName, jobName string) error {
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		curr, err := getCronJob(c, ns, cronJobName)
+		if err != nil {
+			return false, err
+		}
+
+		for _, j := range curr.Status.Active {
+			if j.Name == jobName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
+// Wait for a job to disappear by listing them explicitly.
+func waitForJobToDisappear(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
 		jobs, err := c.BatchV1().Jobs(ns).List(metav1.ListOptions{})
 		if err != nil {
@@ -384,6 +400,18 @@ func waitForJobNotExist(c clientset.Interface, ns string, targetJob *batchv1.Job
 	})
 }
 
+// Wait for a pod to disappear by listing them explicitly.
+func waitForJobsPodToDisappear(c clientset.Interface, ns string, targetJob *batchv1.Job) error {
+	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
+		options := metav1.ListOptions{LabelSelector: fmt.Sprintf("controller-uid=%s", targetJob.UID)}
+		pods, err := c.CoreV1().Pods(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		return len(pods.Items) == 0, nil
+	})
+}
+
 // Wait for a job to be replaced with a new one.
 func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error {
 	return wait.Poll(framework.Poll, cronJobTimeout, func() (bool, error) {
@@ -396,7 +424,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
 		} else if len(aliveJobs) == 0 {
-			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
+			e2elog.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
 		return aliveJobs[0].Name != previousJobName, nil
@@ -430,24 +458,26 @@ func waitForAnyFinishedJob(c clientset.Interface, ns string) error {
 	})
 }
 
-// checkNoEventWithReason checks no events with a reason within a list has occured
-func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
-	sj, err := c.BatchV1beta1().CronJobs(ns).Get(cronJobName, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("Error in getting cronjob %s/%s: %v", ns, cronJobName, err)
-	}
-	events, err := c.CoreV1().Events(ns).Search(legacyscheme.Scheme, sj)
-	if err != nil {
-		return fmt.Errorf("Error in listing events: %s", err)
-	}
-	for _, e := range events.Items {
-		for _, reason := range reasons {
-			if e.Reason == reason {
-				return fmt.Errorf("Found event with reason %s: %#v", reason, e)
+// waitForEventWithReason waits for events with a reason within a list has occurred
+func waitForEventWithReason(c clientset.Interface, ns, cronJobName string, reasons []string) error {
+	return wait.Poll(framework.Poll, 30*time.Second, func() (bool, error) {
+		sj, err := getCronJob(c, ns, cronJobName)
+		if err != nil {
+			return false, err
+		}
+		events, err := c.CoreV1().Events(ns).Search(scheme.Scheme, sj)
+		if err != nil {
+			return false, err
+		}
+		for _, e := range events.Items {
+			for _, reason := range reasons {
+				if e.Reason == reason {
+					return true, nil
+				}
 			}
 		}
-	}
-	return nil
+		return false, nil
+	})
 }
 
 // filterNotDeletedJobs returns the job list without any jobs that are pending

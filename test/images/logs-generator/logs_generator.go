@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/klog"
 )
 
 var (
@@ -47,11 +47,11 @@ func main() {
 	flag.Parse()
 
 	if *linesTotal <= 0 {
-		glog.Fatalf("Invalid total number of lines: %d", *linesTotal)
+		klog.Fatalf("Invalid total number of lines: %d", *linesTotal)
 	}
 
 	if *duration <= 0 {
-		glog.Fatalf("Invalid duration: %v", *duration)
+		klog.Fatalf("Invalid duration: %v", *duration)
 	}
 
 	generateLogs(*linesTotal, *duration)
@@ -60,12 +60,12 @@ func main() {
 // Outputs linesTotal lines of logs to stdout uniformly for duration
 func generateLogs(linesTotal int, duration time.Duration) {
 	delay := duration / time.Duration(linesTotal)
-	rand.Seed(time.Now().UnixNano())
 
-	tick := time.Tick(delay)
+	ticker := time.NewTicker(delay)
+	defer ticker.Stop()
 	for id := 0; id < linesTotal; id++ {
-		glog.Info(generateLogLine(id))
-		<-tick
+		klog.Info(generateLogLine(id))
+		<-ticker.C
 	}
 }
 

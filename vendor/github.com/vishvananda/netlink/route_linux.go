@@ -86,6 +86,34 @@ func (d *MPLSDestination) String() string {
 	return strings.Join(s, "/")
 }
 
+func (d *MPLSDestination) Equal(x Destination) bool {
+	o, ok := x.(*MPLSDestination)
+	if !ok {
+		return false
+	}
+	if d == nil && o == nil {
+		return true
+	}
+	if d == nil || o == nil {
+		return false
+	}
+	if d.Labels == nil && o.Labels == nil {
+		return true
+	}
+	if d.Labels == nil || o.Labels == nil {
+		return false
+	}
+	if len(d.Labels) != len(o.Labels) {
+		return false
+	}
+	for i := range d.Labels {
+		if d.Labels[i] != o.Labels[i] {
+			return false
+		}
+	}
+	return true
+}
+
 type MPLSEncap struct {
 	Labels []int
 }
@@ -127,6 +155,34 @@ func (e *MPLSEncap) String() string {
 		s = append(s, fmt.Sprintf("%d", l))
 	}
 	return strings.Join(s, "/")
+}
+
+func (e *MPLSEncap) Equal(x Encap) bool {
+	o, ok := x.(*MPLSEncap)
+	if !ok {
+		return false
+	}
+	if e == nil && o == nil {
+		return true
+	}
+	if e == nil || o == nil {
+		return false
+	}
+	if e.Labels == nil && o.Labels == nil {
+		return true
+	}
+	if e.Labels == nil || o.Labels == nil {
+		return false
+	}
+	if len(e.Labels) != len(o.Labels) {
+		return false
+	}
+	for i := range e.Labels {
+		if e.Labels[i] != o.Labels[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // RouteAdd will add a route to the system.
@@ -421,19 +477,8 @@ func (h *Handle) RouteListFiltered(family int, filter *Route, filterMask uint64)
 				continue
 			case filterMask&RT_FILTER_DST != 0:
 				if filter.MPLSDst == nil || route.MPLSDst == nil || (*filter.MPLSDst) != (*route.MPLSDst) {
-					if filter.Dst == nil {
-						if route.Dst != nil {
-							continue
-						}
-					} else {
-						if route.Dst == nil {
-							continue
-						}
-						aMaskLen, aMaskBits := route.Dst.Mask.Size()
-						bMaskLen, bMaskBits := filter.Dst.Mask.Size()
-						if !(route.Dst.IP.Equal(filter.Dst.IP) && aMaskLen == bMaskLen && aMaskBits == bMaskBits) {
-							continue
-						}
+					if !ipNetEqual(route.Dst, filter.Dst) {
+						continue
 					}
 				}
 			}
@@ -633,16 +678,34 @@ func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
 // RouteSubscribe takes a chan down which notifications will be sent
 // when routes are added or deleted. Close the 'done' chan to stop subscription.
 func RouteSubscribe(ch chan<- RouteUpdate, done <-chan struct{}) error {
-	return routeSubscribeAt(netns.None(), netns.None(), ch, done)
+	return routeSubscribeAt(netns.None(), netns.None(), ch, done, nil)
 }
 
 // RouteSubscribeAt works like RouteSubscribe plus it allows the caller
 // to choose the network namespace in which to subscribe (ns).
 func RouteSubscribeAt(ns netns.NsHandle, ch chan<- RouteUpdate, done <-chan struct{}) error {
-	return routeSubscribeAt(ns, netns.None(), ch, done)
+	return routeSubscribeAt(ns, netns.None(), ch, done, nil)
 }
 
-func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <-chan struct{}) error {
+// RouteSubscribeOptions contains a set of options to use with
+// RouteSubscribeWithOptions.
+type RouteSubscribeOptions struct {
+	Namespace     *netns.NsHandle
+	ErrorCallback func(error)
+}
+
+// RouteSubscribeWithOptions work like RouteSubscribe but enable to
+// provide additional options to modify the behavior. Currently, the
+// namespace can be provided as well as an error callback.
+func RouteSubscribeWithOptions(ch chan<- RouteUpdate, done <-chan struct{}, options RouteSubscribeOptions) error {
+	if options.Namespace == nil {
+		none := netns.None()
+		options.Namespace = &none
+	}
+	return routeSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback)
+}
+
+func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <-chan struct{}, cberr func(error)) error {
 	s, err := nl.SubscribeAt(newNs, curNs, syscall.NETLINK_ROUTE, syscall.RTNLGRP_IPV4_ROUTE, syscall.RTNLGRP_IPV6_ROUTE)
 	if err != nil {
 		return err
@@ -658,11 +721,17 @@ func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <
 		for {
 			msgs, err := s.Receive()
 			if err != nil {
+				if cberr != nil {
+					cberr(err)
+				}
 				return
 			}
 			for _, m := range msgs {
 				route, err := deserializeRoute(m.Data)
 				if err != nil {
+					if cberr != nil {
+						cberr(err)
+					}
 					return
 				}
 				ch <- RouteUpdate{Type: m.Header.Type, Route: route}

@@ -44,10 +44,8 @@ func (op CompactOp) toRequest() *pb.CompactionRequest {
 	return &pb.CompactionRequest{Revision: op.revision, Physical: op.physical}
 }
 
-// WithCompactPhysical makes compact RPC call wait until
-// the compaction is physically applied to the local database
-// such that compacted entries are totally removed from the
-// backend database.
+// WithCompactPhysical makes Compact wait until all compacted entries are
+// removed from the etcd server's storage.
 func WithCompactPhysical() CompactOption {
 	return func(op *CompactOp) { op.physical = true }
 }

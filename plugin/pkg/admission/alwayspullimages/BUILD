@@ -12,22 +12,22 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
-    importpath = "k8s.io/kubernetes/plugin/pkg/admission/alwayspullimages",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission/testing:go_default_library",
     ],
 )
 

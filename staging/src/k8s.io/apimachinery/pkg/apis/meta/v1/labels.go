@@ -25,33 +25,13 @@ func CloneSelectorAndAddLabel(selector *LabelSelector, labelKey, labelValue stri
 	}
 
 	// Clone.
-	newSelector := new(LabelSelector)
+	newSelector := selector.DeepCopy()
 
-	// TODO(madhusudancs): Check if you can use deepCopy_extensions_LabelSelector here.
-	newSelector.MatchLabels = make(map[string]string)
-	if selector.MatchLabels != nil {
-		for key, val := range selector.MatchLabels {
-			newSelector.MatchLabels[key] = val
-		}
+	if newSelector.MatchLabels == nil {
+		newSelector.MatchLabels = make(map[string]string)
 	}
+
 	newSelector.MatchLabels[labelKey] = labelValue
-
-	if selector.MatchExpressions != nil {
-		newMExps := make([]LabelSelectorRequirement, len(selector.MatchExpressions))
-		for i, me := range selector.MatchExpressions {
-			newMExps[i].Key = me.Key
-			newMExps[i].Operator = me.Operator
-			if me.Values != nil {
-				newMExps[i].Values = make([]string, len(me.Values))
-				copy(newMExps[i].Values, me.Values)
-			} else {
-				newMExps[i].Values = nil
-			}
-		}
-		newSelector.MatchExpressions = newMExps
-	} else {
-		newSelector.MatchExpressions = nil
-	}
 
 	return newSelector
 }

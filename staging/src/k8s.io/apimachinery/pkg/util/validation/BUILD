@@ -9,16 +9,16 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
-    importpath = "k8s.io/apimachinery/pkg/util/validation",
-    library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
+    embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/validation",
     importpath = "k8s.io/apimachinery/pkg/util/validation",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
 )
 
 filegroup(

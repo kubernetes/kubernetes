@@ -19,28 +19,25 @@ package group
 import (
 	"fmt"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
 // mustRunAs implements the GroupStrategy interface
 type mustRunAs struct {
-	ranges []extensions.GroupIDRange
-	field  string
+	ranges []policy.IDRange
 }
 
 var _ GroupStrategy = &mustRunAs{}
 
 // NewMustRunAs provides a new MustRunAs strategy based on ranges.
-func NewMustRunAs(ranges []extensions.GroupIDRange, field string) (GroupStrategy, error) {
+func NewMustRunAs(ranges []policy.IDRange) (GroupStrategy, error) {
 	if len(ranges) == 0 {
 		return nil, fmt.Errorf("ranges must be supplied for MustRunAs")
 	}
 	return &mustRunAs{
 		ranges: ranges,
-		field:  field,
 	}, nil
 }
 
@@ -61,28 +58,14 @@ func (s *mustRunAs) GenerateSingle(_ *api.Pod) (*int64, error) {
 // Validate ensures that the specified values fall within the range of the strategy.
 // Groups are passed in here to allow this strategy to support multiple group fields (fsgroup and
 // supplemental groups).
-func (s *mustRunAs) Validate(_ *api.Pod, groups []int64) field.ErrorList {
+func (s *mustRunAs) Validate(fldPath *field.Path, _ *api.Pod, groups []int64) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(groups) == 0 && len(s.ranges) > 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath(s.field), groups, "unable to validate empty groups against required ranges"))
+		allErrs = append(allErrs, field.Invalid(fldPath, groups, "unable to validate empty groups against required ranges"))
 	}
 
-	for _, group := range groups {
-		if !s.isGroupValid(group) {
-			detail := fmt.Sprintf("%d is not an allowed group", group)
-			allErrs = append(allErrs, field.Invalid(field.NewPath(s.field), groups, detail))
-		}
-	}
+	allErrs = append(allErrs, ValidateGroupsInRanges(fldPath, s.ranges, groups)...)
 
 	return allErrs
-}
-
-func (s *mustRunAs) isGroupValid(group int64) bool {
-	for _, rng := range s.ranges {
-		if psputil.GroupFallsInRange(group, rng) {
-			return true
-		}
-	}
-	return false
 }

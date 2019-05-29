@@ -23,7 +23,8 @@ import (
 	"github.com/coreos/etcd/mvcc/mvccpb"
 )
 
-const (
+// non-const so modifiable by tests
+var (
 	// chanBufLen is the length of the buffered chan
 	// for sending out watched events.
 	// TODO: find a good buf value. 1024 is just a random one that
@@ -41,9 +42,11 @@ type watchable interface {
 }
 
 type watchableStore struct {
-	mu sync.Mutex
-
 	*store
+
+	// mu protects watcher groups and batches. It should never be locked
+	// before locking store.mu to avoid deadlock.
+	mu sync.RWMutex
 
 	// victims are watcher batches that were blocked on the watch channel
 	victims []watcherBatch
@@ -76,97 +79,16 @@ func newWatchableStore(b backend.Backend, le lease.Lessor, ig ConsistentIndexGet
 		synced:   newWatcherGroup(),
 		stopc:    make(chan struct{}),
 	}
+	s.store.ReadView = &readView{s}
+	s.store.WriteView = &writeView{s}
 	if s.le != nil {
 		// use this store as the deleter so revokes trigger watch events
-		s.le.SetRangeDeleter(s)
+		s.le.SetRangeDeleter(func() lease.TxnDelete { return s.Write() })
 	}
 	s.wg.Add(2)
 	go s.syncWatchersLoop()
 	go s.syncVictimsLoop()
 	return s
-}
-
-func (s *watchableStore) Put(key, value []byte, lease lease.LeaseID) (rev int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	rev = s.store.Put(key, value, lease)
-	changes := s.store.getChanges()
-	if len(changes) != 1 {
-		plog.Panicf("unexpected len(changes) != 1 after put")
-	}
-
-	ev := mvccpb.Event{
-		Type: mvccpb.PUT,
-		Kv:   &changes[0],
-	}
-	s.notify(rev, []mvccpb.Event{ev})
-	return rev
-}
-
-func (s *watchableStore) DeleteRange(key, end []byte) (n, rev int64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	n, rev = s.store.DeleteRange(key, end)
-	changes := s.store.getChanges()
-
-	if len(changes) != int(n) {
-		plog.Panicf("unexpected len(changes) != n after deleteRange")
-	}
-
-	if n == 0 {
-		return n, rev
-	}
-
-	evs := make([]mvccpb.Event, n)
-	for i := range changes {
-		evs[i] = mvccpb.Event{
-			Type: mvccpb.DELETE,
-			Kv:   &changes[i]}
-		evs[i].Kv.ModRevision = rev
-	}
-	s.notify(rev, evs)
-	return n, rev
-}
-
-func (s *watchableStore) TxnBegin() int64 {
-	s.mu.Lock()
-	return s.store.TxnBegin()
-}
-
-func (s *watchableStore) TxnEnd(txnID int64) error {
-	err := s.store.TxnEnd(txnID)
-	if err != nil {
-		return err
-	}
-
-	changes := s.getChanges()
-	if len(changes) == 0 {
-		s.mu.Unlock()
-		return nil
-	}
-
-	rev := s.store.Rev()
-	evs := make([]mvccpb.Event, len(changes))
-	for i, change := range changes {
-		switch change.CreateRevision {
-		case 0:
-			evs[i] = mvccpb.Event{
-				Type: mvccpb.DELETE,
-				Kv:   &changes[i]}
-			evs[i].Kv.ModRevision = rev
-		default:
-			evs[i] = mvccpb.Event{
-				Type: mvccpb.PUT,
-				Kv:   &changes[i]}
-		}
-	}
-
-	s.notify(rev, evs)
-	s.mu.Unlock()
-
-	return nil
 }
 
 func (s *watchableStore) Close() error {
@@ -186,9 +108,6 @@ func (s *watchableStore) NewWatchStream() WatchStream {
 }
 
 func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch chan<- WatchResponse, fcs ...FilterFunc) (*watcher, cancelFunc) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	wa := &watcher{
 		key:    key,
 		end:    end,
@@ -198,21 +117,24 @@ func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch c
 		fcs:    fcs,
 	}
 
-	s.store.mu.Lock()
-	synced := startRev > s.store.currentRev.main || startRev == 0
+	s.mu.Lock()
+	s.revMu.RLock()
+	synced := startRev > s.store.currentRev || startRev == 0
 	if synced {
-		wa.minRev = s.store.currentRev.main + 1
+		wa.minRev = s.store.currentRev + 1
 		if startRev > wa.minRev {
 			wa.minRev = startRev
 		}
 	}
-	s.store.mu.Unlock()
 	if synced {
 		s.synced.add(wa)
 	} else {
 		slowWatcherGauge.Inc()
 		s.unsynced.add(wa)
 	}
+	s.revMu.RUnlock()
+	s.mu.Unlock()
+
 	watcherGauge.Inc()
 
 	return wa, func() { s.cancelWatcher(wa) }
@@ -222,13 +144,15 @@ func (s *watchableStore) watch(key, end []byte, startRev int64, id WatchID, ch c
 func (s *watchableStore) cancelWatcher(wa *watcher) {
 	for {
 		s.mu.Lock()
-
 		if s.unsynced.delete(wa) {
 			slowWatcherGauge.Dec()
 			break
 		} else if s.synced.delete(wa) {
 			break
 		} else if wa.compacted {
+			break
+		} else if wa.ch == nil {
+			// already canceled (e.g., cancel/close race)
 			break
 		}
 
@@ -255,7 +179,24 @@ func (s *watchableStore) cancelWatcher(wa *watcher) {
 	}
 
 	watcherGauge.Dec()
+	wa.ch = nil
 	s.mu.Unlock()
+}
+
+func (s *watchableStore) Restore(b backend.Backend) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := s.store.Restore(b)
+	if err != nil {
+		return err
+	}
+
+	for wa := range s.synced.watchers {
+		wa.restore = true
+		s.unsynced.add(wa)
+	}
+	s.synced = newWatcherGroup()
+	return nil
 }
 
 // syncWatchersLoop syncs the watcher in the unsynced map every 100ms.
@@ -263,12 +204,15 @@ func (s *watchableStore) syncWatchersLoop() {
 	defer s.wg.Done()
 
 	for {
-		s.mu.Lock()
+		s.mu.RLock()
 		st := time.Now()
 		lastUnsyncedWatchers := s.unsynced.size()
-		s.syncWatchers()
-		unsyncedWatchers := s.unsynced.size()
-		s.mu.Unlock()
+		s.mu.RUnlock()
+
+		unsyncedWatchers := 0
+		if lastUnsyncedWatchers > 0 {
+			unsyncedWatchers = s.syncWatchers()
+		}
 		syncDuration := time.Since(st)
 
 		waitDuration := 100 * time.Millisecond
@@ -295,9 +239,9 @@ func (s *watchableStore) syncVictimsLoop() {
 		for s.moveVictims() != 0 {
 			// try to update all victim watchers
 		}
-		s.mu.Lock()
+		s.mu.RLock()
 		isEmpty := len(s.victims) == 0
-		s.mu.Unlock()
+		s.mu.RUnlock()
 
 		var tickc <-chan time.Time
 		if !isEmpty {
@@ -340,8 +284,8 @@ func (s *watchableStore) moveVictims() (moved int) {
 
 		// assign completed victim watchers to unsync/sync
 		s.mu.Lock()
-		s.store.mu.Lock()
-		curRev := s.store.currentRev.main
+		s.store.revMu.RLock()
+		curRev := s.store.currentRev
 		for w, eb := range wb {
 			if newVictim != nil && newVictim[w] != nil {
 				// couldn't send watch response; stays victim
@@ -358,7 +302,7 @@ func (s *watchableStore) moveVictims() (moved int) {
 				s.synced.add(w)
 			}
 		}
-		s.store.mu.Unlock()
+		s.store.revMu.RUnlock()
 		s.mu.Unlock()
 	}
 
@@ -376,19 +320,23 @@ func (s *watchableStore) moveVictims() (moved int) {
 //	2. iterate over the set to get the minimum revision and remove compacted watchers
 //	3. use minimum revision to get all key-value pairs and send those events to watchers
 //	4. remove synced watchers in set from unsynced group and move to synced group
-func (s *watchableStore) syncWatchers() {
+func (s *watchableStore) syncWatchers() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if s.unsynced.size() == 0 {
-		return
+		return 0
 	}
 
-	s.store.mu.Lock()
-	defer s.store.mu.Unlock()
+	s.store.revMu.RLock()
+	defer s.store.revMu.RUnlock()
 
 	// in order to find key-value pairs from unsynced watchers, we need to
 	// find min revision index, and these revisions can be used to
 	// query the backend store of key-value pairs
-	curRev := s.store.currentRev.main
+	curRev := s.store.currentRev
 	compactionRev := s.store.compactMainRev
+
 	wg, minRev := s.unsynced.choose(maxWatchersPerSync, curRev, compactionRev)
 	minBytes, maxBytes := newRevBytes(), newRevBytes()
 	revToBytes(revision{main: minRev}, minBytes)
@@ -396,7 +344,7 @@ func (s *watchableStore) syncWatchers() {
 
 	// UnsafeRange returns keys and values. And in boltdb, keys are revisions.
 	// values are actual key-value pairs in backend.
-	tx := s.store.b.BatchTx()
+	tx := s.store.b.ReadTx()
 	tx.Lock()
 	revs, vs := tx.UnsafeRange(keyBucketName, minBytes, maxBytes, 0)
 	evs := kvsToEvents(wg, revs, vs)
@@ -446,6 +394,8 @@ func (s *watchableStore) syncWatchers() {
 		vsz += len(v)
 	}
 	slowWatcherGauge.Set(float64(s.unsynced.size() + vsz))
+
+	return s.unsynced.size()
 }
 
 // kvsToEvents gets all events for the watchers from all key-value pairs
@@ -479,7 +429,6 @@ func (s *watchableStore) notify(rev int64, evs []mvccpb.Event) {
 		if eb.revs != 1 {
 			plog.Panicf("unexpected multiple revisions in notification")
 		}
-
 		if w.send(WatchResponse{WatchID: w.id, Events: eb.evs, Revision: rev}) {
 			pendingEventsGauge.Add(float64(len(eb.evs)))
 		} else {
@@ -511,8 +460,8 @@ func (s *watchableStore) addVictim(victim watcherBatch) {
 func (s *watchableStore) rev() int64 { return s.store.Rev() }
 
 func (s *watchableStore) progress(w *watcher) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	if _, ok := s.synced.watchers[w]; ok {
 		w.send(WatchResponse{WatchID: w.id, Revision: s.rev()})
@@ -533,6 +482,14 @@ type watcher struct {
 
 	// compacted is set when the watcher is removed because of compaction
 	compacted bool
+
+	// restore is true when the watcher is being restored from leader snapshot
+	// which means that this watcher has just been moved from "synced" to "unsynced"
+	// watcher group, possibly with a future revision when it was first added
+	// to the synced watcher
+	// "unsynced" watcher revision must always be <= current revision,
+	// except when the watcher were to be moved from "synced" watcher group
+	restore bool
 
 	// minRev is the minimum revision update the watcher will accept
 	minRev int64

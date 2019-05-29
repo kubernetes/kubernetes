@@ -161,12 +161,19 @@ var (
 	// Kubernetes, and have special scaling options on top of those available
 	// to normal per-pod metrics (the "pods" source).
 	ResourceMetricSourceType MetricSourceType = "Resource"
+	// ExternalMetricSourceType is a global metric that is not associated
+	// with any Kubernetes object. It allows autoscaling based on information
+	// coming from components running outside of cluster
+	// (for example length of queue in cloud messaging service, or
+	// QPS from loadbalancer running outside of cluster).
+	ExternalMetricSourceType MetricSourceType = "External"
 )
 
 // MetricSpec specifies how to scale based on a single metric
 // (only `type` and one other matching field should be set at once).
 type MetricSpec struct {
-	// type is the type of metric source.  It should match one of the fields below.
+	// type is the type of metric source.  It should be one of "Object",
+	// "Pods" or "Resource", each mapping to a matching field in the object.
 	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
 
 	// object refers to a metric describing a single kubernetes object
@@ -185,6 +192,13 @@ type MetricSpec struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricSource `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+	// external refers to a global metric that is not associated
+	// with any Kubernetes object. It allows autoscaling based on information
+	// coming from components running outside of cluster
+	// (for example length of queue in cloud messaging service, or
+	// QPS from loadbalancer running outside of cluster).
+	// +optional
+	External *ExternalMetricSource `json:"external,omitempty" protobuf:"bytes,5,opt,name=external"`
 }
 
 // ObjectMetricSource indicates how to scale on a metric describing a
@@ -197,6 +211,16 @@ type ObjectMetricSource struct {
 	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
 	// targetValue is the target value of the metric (as a quantity).
 	TargetValue resource.Quantity `json:"targetValue" protobuf:"bytes,3,name=targetValue"`
+
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric.
+	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping
+	// When unset, just the metricName will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,name=selector"`
+	// averageValue is the target value of the average of the
+	// metric across all relevant pods (as a quantity)
+	// +optional
+	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,5,name=averageValue"`
 }
 
 // PodsMetricSource indicates how to scale on a metric describing each pod in
@@ -209,6 +233,12 @@ type PodsMetricSource struct {
 	// targetAverageValue is the target value of the average of the
 	// metric across all relevant pods (as a quantity)
 	TargetAverageValue resource.Quantity `json:"targetAverageValue" protobuf:"bytes,2,name=targetAverageValue"`
+
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
+	// When set, it is passed as an additional parameter to the metrics server for more specific metrics scoping
+	// When unset, just the metricName will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,name=selector"`
 }
 
 // ResourceMetricSource indicates how to scale on a resource metric known to
@@ -233,9 +263,30 @@ type ResourceMetricSource struct {
 	TargetAverageValue *resource.Quantity `json:"targetAverageValue,omitempty" protobuf:"bytes,3,opt,name=targetAverageValue"`
 }
 
+// ExternalMetricSource indicates how to scale on a metric not associated with
+// any Kubernetes object (for example length of queue in cloud
+// messaging service, or QPS from loadbalancer running outside of cluster).
+type ExternalMetricSource struct {
+	// metricName is the name of the metric in question.
+	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
+	// metricSelector is used to identify a specific time series
+	// within a given metric.
+	// +optional
+	MetricSelector *metav1.LabelSelector `json:"metricSelector,omitempty" protobuf:"bytes,2,opt,name=metricSelector"`
+	// targetValue is the target value of the metric (as a quantity).
+	// Mutually exclusive with TargetAverageValue.
+	// +optional
+	TargetValue *resource.Quantity `json:"targetValue,omitempty" protobuf:"bytes,3,opt,name=targetValue"`
+	// targetAverageValue is the target per-pod value of global metric (as a quantity).
+	// Mutually exclusive with TargetValue.
+	// +optional
+	TargetAverageValue *resource.Quantity `json:"targetAverageValue,omitempty" protobuf:"bytes,4,opt,name=targetAverageValue"`
+}
+
 // MetricStatus describes the last-read state of a single metric.
 type MetricStatus struct {
-	// type is the type of metric source.  It will match one of the fields below.
+	// type is the type of metric source.  It will be one of "Object",
+	// "Pods" or "Resource", each corresponds to a matching field in the object.
 	Type MetricSourceType `json:"type" protobuf:"bytes,1,name=type"`
 
 	// object refers to a metric describing a single kubernetes object
@@ -254,6 +305,13 @@ type MetricStatus struct {
 	// to normal per-pod metrics using the "pods" source.
 	// +optional
 	Resource *ResourceMetricStatus `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
+	// external refers to a global metric that is not associated
+	// with any Kubernetes object. It allows autoscaling based on information
+	// coming from components running outside of cluster
+	// (for example length of queue in cloud messaging service, or
+	// QPS from loadbalancer running outside of cluster).
+	// +optional
+	External *ExternalMetricStatus `json:"external,omitempty" protobuf:"bytes,5,opt,name=external"`
 }
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
@@ -302,6 +360,16 @@ type ObjectMetricStatus struct {
 	MetricName string `json:"metricName" protobuf:"bytes,2,name=metricName"`
 	// currentValue is the current value of the metric (as a quantity).
 	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,3,name=currentValue"`
+
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
+	// When set in the ObjectMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
+	// When unset, just the metricName will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,4,name=selector"`
+	// averageValue is the current value of the average of the
+	// metric across all relevant pods (as a quantity)
+	// +optional
+	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,5,name=averageValue"`
 }
 
 // PodsMetricStatus indicates the current value of a metric describing each pod in
@@ -312,6 +380,12 @@ type PodsMetricStatus struct {
 	// currentAverageValue is the current value of the average of the
 	// metric across all relevant pods (as a quantity)
 	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,2,name=currentAverageValue"`
+
+	// selector is the string-encoded form of a standard kubernetes label selector for the given metric
+	// When set in the PodsMetricSource, it is passed as an additional parameter to the metrics server for more specific metrics scoping.
+	// When unset, just the metricName will be used to gather metrics.
+	// +optional
+	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,3,name=selector"`
 }
 
 // ResourceMetricStatus indicates the current value of a resource metric known to
@@ -334,4 +408,21 @@ type ResourceMetricStatus struct {
 	// a percentage of the request), similar to the "pods" metric source type.
 	// It will always be set, regardless of the corresponding metric specification.
 	CurrentAverageValue resource.Quantity `json:"currentAverageValue" protobuf:"bytes,3,name=currentAverageValue"`
+}
+
+// ExternalMetricStatus indicates the current value of a global metric
+// not associated with any Kubernetes object.
+type ExternalMetricStatus struct {
+	// metricName is the name of a metric used for autoscaling in
+	// metric system.
+	MetricName string `json:"metricName" protobuf:"bytes,1,name=metricName"`
+	// metricSelector is used to identify a specific time series
+	// within a given metric.
+	// +optional
+	MetricSelector *metav1.LabelSelector `json:"metricSelector,omitempty" protobuf:"bytes,2,opt,name=metricSelector"`
+	// currentValue is the current value of the metric (as a quantity)
+	CurrentValue resource.Quantity `json:"currentValue" protobuf:"bytes,3,name=currentValue"`
+	// currentAverageValue is the current value of metric averaged over autoscaled pods.
+	// +optional
+	CurrentAverageValue *resource.Quantity `json:"currentAverageValue,omitempty" protobuf:"bytes,4,opt,name=currentAverageValue"`
 }

@@ -11,3 +11,8 @@ $ make
 # Push
 $ make push
 ```
+
+## Version history:
+
+1.0: build cuda-vector-add from CUDA 8.0.
+2.0: build cuda-vector-add from CUDA 10.0

@@ -34,7 +34,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 		&FakeExpirationPolicy{
 			NeverExpire: sets.NewString(),
 			RetrieveKeyFunc: func(obj interface{}) (string, error) {
-				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
+				return obj.(*TimestampedEntry).Obj.(testStoreObject).id, nil
 			},
 		},
 		clock.RealClock{},
@@ -67,7 +67,7 @@ func TestReAddExpiredItem(t *testing.T) {
 	exp := &FakeExpirationPolicy{
 		NeverExpire: sets.NewString(),
 		RetrieveKeyFunc: func(obj interface{}) (string, error) {
-			return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
+			return obj.(*TimestampedEntry).Obj.(testStoreObject).id, nil
 		},
 	}
 	ttlStore := NewFakeExpirationStore(
@@ -130,7 +130,7 @@ func TestTTLList(t *testing.T) {
 		&FakeExpirationPolicy{
 			NeverExpire: sets.NewString(testObjs[1].id),
 			RetrieveKeyFunc: func(obj interface{}) (string, error) {
-				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
+				return obj.(*TimestampedEntry).Obj.(testStoreObject).id, nil
 			},
 		},
 		clock.RealClock{},
@@ -168,15 +168,15 @@ func TestTTLPolicy(t *testing.T) {
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
 	policy := TTLPolicy{ttl, clock.NewFakeClock(fakeTime)}
-	fakeTimestampedEntry := &timestampedEntry{obj: struct{}{}, timestamp: exactlyOnTTL}
+	fakeTimestampedEntry := &TimestampedEntry{Obj: struct{}{}, Timestamp: exactlyOnTTL}
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL cache should not expire entries exactly on ttl")
 	}
-	fakeTimestampedEntry.timestamp = fakeTime
+	fakeTimestampedEntry.Timestamp = fakeTime
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL Cache should not expire entries before ttl")
 	}
-	fakeTimestampedEntry.timestamp = expiredTime
+	fakeTimestampedEntry.Timestamp = expiredTime
 	if !policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL Cache should expire entries older than ttl")
 	}

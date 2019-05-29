@@ -59,7 +59,6 @@ const (
 	offsetFsTotalUsageBytes
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
-	offsetVolume
 )
 
 var (
@@ -71,6 +70,7 @@ func TestGetCgroupStats(t *testing.T) {
 	const (
 		cgroupName        = "test-cgroup-name"
 		containerInfoSeed = 1000
+		updateStats       = false
 	)
 	var (
 		mockCadvisor     = new(cadvisortest.Mock)
@@ -87,12 +87,45 @@ func TestGetCgroupStats(t *testing.T) {
 	mockCadvisor.On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
 
 	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
-	cs, ns, err := provider.GetCgroupStats(cgroupName)
+	cs, ns, err := provider.GetCgroupStats(cgroupName, updateStats)
 	assert.NoError(err)
 
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
 	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
 	checkNetworkStats(t, "", containerInfoSeed, ns)
+
+	assert.Equal(cgroupName, cs.Name)
+	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
+
+	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetCgroupCPUAndMemoryStats(t *testing.T) {
+	const (
+		cgroupName        = "test-cgroup-name"
+		containerInfoSeed = 1000
+		updateStats       = false
+	)
+	var (
+		mockCadvisor     = new(cadvisortest.Mock)
+		mockPodManager   = new(kubepodtest.MockManager)
+		mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+
+		assert  = assert.New(t)
+		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
+
+		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
+		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{cgroupName: containerInfo}
+	)
+
+	mockCadvisor.On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
+
+	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
+	cs, err := provider.GetCgroupCPUAndMemoryStats(cgroupName, updateStats)
+	assert.NoError(err)
+
+	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
+	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
 
 	assert.Equal(cgroupName, cs.Name)
 	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
@@ -362,6 +395,41 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
+func TestHasDedicatedImageFs(t *testing.T) {
+	for desc, test := range map[string]struct {
+		rootfsDevice  string
+		imagefsDevice string
+		dedicated     bool
+	}{
+		"dedicated device for image filesystem": {
+			rootfsDevice:  "root/device",
+			imagefsDevice: "image/device",
+			dedicated:     true,
+		},
+		"shared device for image filesystem": {
+			rootfsDevice:  "share/device",
+			imagefsDevice: "share/device",
+			dedicated:     false,
+		},
+	} {
+		t.Logf("TestCase %q", desc)
+		var (
+			mockCadvisor     = new(cadvisortest.Mock)
+			mockPodManager   = new(kubepodtest.MockManager)
+			mockRuntimeCache = new(kubecontainertest.MockRuntimeCache)
+		)
+		mockCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{Device: test.rootfsDevice}, nil)
+
+		provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{
+			device: test.imagefsDevice,
+		})
+		dedicated, err := provider.HasDedicatedImageFs()
+		assert.NoError(t, err)
+		assert.Equal(t, test.dedicated, dedicated)
+		mockCadvisor.AssertExpectations(t)
+	}
+}
+
 func getTerminatedContainerInfo(seed int, podName string, podNamespace string, containerName string) cadvisorapiv2.ContainerInfo {
 	cinfo := getTestContainerInfo(seed, podName, podNamespace, containerName)
 	cinfo.Stats[0].Memory.RSS = 0
@@ -539,13 +607,13 @@ func checkNetworkStats(t *testing.T, label string, seed int, stats *statsapi.Net
 
 	assert.EqualValues(t, 2, len(stats.Interfaces), "network interfaces should contain 2 elements")
 
-	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is ont eth0")
+	assert.EqualValues(t, "eth0", stats.Interfaces[0].Name, "default interface name is not eth0")
 	assert.EqualValues(t, seed+offsetNetRxBytes, *stats.Interfaces[0].RxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetRxErrors, *stats.Interfaces[0].RxErrors, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetTxBytes, *stats.Interfaces[0].TxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, seed+offsetNetTxErrors, *stats.Interfaces[0].TxErrors, label+".Net.TxErrors")
 
-	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is ont cbr0")
+	assert.EqualValues(t, "cbr0", stats.Interfaces[1].Name, "cbr0 interface name is not cbr0")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxBytes, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].RxErrors, label+".Net.TxErrors")
 	assert.EqualValues(t, 100, *stats.Interfaces[1].TxBytes, label+".Net.TxErrors")
@@ -599,18 +667,33 @@ type fakeResourceAnalyzer struct {
 	podVolumeStats serverstats.PodVolumeStats
 }
 
-func (o *fakeResourceAnalyzer) Start()                          {}
-func (o *fakeResourceAnalyzer) Get() (*statsapi.Summary, error) { return nil, nil }
+func (o *fakeResourceAnalyzer) Start()                                           {}
+func (o *fakeResourceAnalyzer) Get(bool) (*statsapi.Summary, error)              { return nil, nil }
+func (o *fakeResourceAnalyzer) GetCPUAndMemoryStats() (*statsapi.Summary, error) { return nil, nil }
 func (o *fakeResourceAnalyzer) GetPodVolumeStats(uid types.UID) (serverstats.PodVolumeStats, bool) {
 	return o.podVolumeStats, true
 }
 
 type fakeContainerStatsProvider struct {
+	device string
 }
 
 func (p fakeContainerStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+func (p fakeContainerStatsProvider) ListPodStatsAndUpdateCPUNanoCoreUsage() ([]statsapi.PodStats, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (p fakeContainerStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (p fakeContainerStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (p fakeContainerStatsProvider) ImageFsDevice() (string, error) {
+	return p.device, nil
 }

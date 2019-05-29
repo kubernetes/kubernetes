@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This driver implements a tmpfs with a pre-populated file index.html.
+# Attach is required, but it is a no-op that always returns success.
+
 FLEX_DUMMY_LOG=${FLEX_DUMMY_LOG:-"/tmp/flex-dummy.log"}
 
 VALID_MNTDEVICE=foo
@@ -78,11 +81,21 @@ domountdevice() {
 
 unmountdevice() {
 	debug "unmountdevice $@"
-	MNTDEVICE=$2
-	validateMountDeviceOrDie "$MNTDEVICE" "unmountdevice"
 	MNTPATH=$1
 	rm "${MNTPATH}/index.html" >/dev/null 2>&1
 	umount ${MNTPATH} >/dev/null 2>&1
+	log "{\"status\":\"Success\"}"
+	exit 0
+}
+
+expandvolume() {
+	debug "expandvolume $@"
+	log "{\"status\":\"Success\"}"
+	exit 0
+}
+
+expandfs() {
+	debug "expandfs $@"
 	log "{\"status\":\"Success\"}"
 	exit 0
 }
@@ -91,7 +104,7 @@ op=$1
 
 if [ "$op" = "init" ]; then
 	debug "init $@"
-	log "{\"status\":\"Success\",\"capabilities\":{\"attach\":true}}"
+	log "{\"status\":\"Success\",\"capabilities\":{\"attach\":true, \"requiresFSResize\":true}}"
 	exit 0
 fi
 
@@ -115,6 +128,12 @@ case "$op" in
 		;;
 	unmountdevice)
 		unmountdevice $*
+		;;
+	expandvolume)
+		expandvolume $*
+		;;
+	expandfs)
+		expandfs $*
 		;;
 	*)
 		log "{\"status\":\"Not supported\"}"

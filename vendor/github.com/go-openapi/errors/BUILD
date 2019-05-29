@@ -5,11 +5,13 @@ go_library(
     srcs = [
         "api.go",
         "auth.go",
+        "doc.go",
         "headers.go",
         "middleware.go",
         "parsing.go",
         "schema.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/go-openapi/errors",
     importpath = "github.com/go-openapi/errors",
     visibility = ["//visibility:public"],
 )

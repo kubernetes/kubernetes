@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"path"
 	"strings"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/internal/sdkuri"
 )
 
 // ProviderName provides a name of EC2Role provider
@@ -125,7 +125,7 @@ type ec2RoleCredRespBody struct {
 	Message string
 }
 
-const iamSecurityCredsPath = "/iam/security-credentials"
+const iamSecurityCredsPath = "iam/security-credentials/"
 
 // requestCredList requests a list of credentials from the EC2 service.
 // If there are no credentials, or there is an error making or receiving the request
@@ -153,7 +153,7 @@ func requestCredList(client *ec2metadata.EC2Metadata) ([]string, error) {
 // If the credentials cannot be found, or there is an error reading the response
 // and error will be returned.
 func requestCred(client *ec2metadata.EC2Metadata, credsName string) (ec2RoleCredRespBody, error) {
-	resp, err := client.GetMetadata(path.Join(iamSecurityCredsPath, credsName))
+	resp, err := client.GetMetadata(sdkuri.PathJoin(iamSecurityCredsPath, credsName))
 	if err != nil {
 		return ec2RoleCredRespBody{},
 			awserr.New("EC2RoleRequestError",

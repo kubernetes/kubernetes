@@ -1,6 +1,8 @@
 package loadbalancers
 
 import (
+	"fmt"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/pagination"
 )
@@ -20,6 +22,7 @@ type ListOpts struct {
 	Description        string `q:"description"`
 	AdminStateUp       *bool  `q:"admin_state_up"`
 	TenantID           string `q:"tenant_id"`
+	ProjectID          string `q:"project_id"`
 	ProvisioningStatus string `q:"provisioning_status"`
 	VipAddress         string `q:"vip_address"`
 	VipPortID          string `q:"vip_port_id"`
@@ -35,7 +38,7 @@ type ListOpts struct {
 	SortDir            string `q:"sort_dir"`
 }
 
-// ToLoadbalancerListQuery formats a ListOpts into a query string.
+// ToLoadBalancerListQuery formats a ListOpts into a query string.
 func (opts ListOpts) ToLoadBalancerListQuery() (string, error) {
 	q, err := gophercloud.BuildQueryString(opts)
 	return q.String(), err
@@ -81,9 +84,13 @@ type CreateOpts struct {
 	// that belong to them or networks that are shared).
 	VipSubnetID string `json:"vip_subnet_id" required:"true"`
 
-	// The UUID of the tenant who owns the Loadbalancer. Only administrative users
-	// can specify a tenant UUID other than their own.
+	// TenantID is the UUID of the project who owns the Loadbalancer.
+	// Only administrative users can specify a project UUID other than their own.
 	TenantID string `json:"tenant_id,omitempty"`
+
+	// ProjectID is the UUID of the project who owns the Loadbalancer.
+	// Only administrative users can specify a project UUID other than their own.
+	ProjectID string `json:"project_id,omitempty"`
 
 	// The IP address of the Loadbalancer.
 	VipAddress string `json:"vip_address,omitempty"`
@@ -134,10 +141,10 @@ type UpdateOptsBuilder interface {
 // operation.
 type UpdateOpts struct {
 	// Human-readable name for the Loadbalancer. Does not have to be unique.
-	Name string `json:"name,omitempty"`
+	Name *string `json:"name,omitempty"`
 
 	// Human-readable description for the Loadbalancer.
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// The administrative state of the Loadbalancer. A valid value is true (UP)
 	// or false (DOWN).
@@ -170,8 +177,28 @@ func Delete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	return
 }
 
+// CascadingDelete is like `Delete`, but will also delete any of the load balancer's
+// children (listener, monitor, etc).
+// NOTE: This function will only work with Octavia load balancers; Neutron does not
+// support this.
+func CascadingDelete(c *gophercloud.ServiceClient, id string) (r DeleteResult) {
+	if c.Type != "load-balancer" {
+		r.Err = fmt.Errorf("error prior to running cascade delete: only Octavia LBs supported")
+		return
+	}
+	u := fmt.Sprintf("%s?cascade=true", resourceURL(c, id))
+	_, r.Err = c.Delete(u, nil)
+	return
+}
+
 // GetStatuses will return the status of a particular LoadBalancer.
 func GetStatuses(c *gophercloud.ServiceClient, id string) (r GetStatusesResult) {
 	_, r.Err = c.Get(statusRootURL(c, id), &r.Body, nil)
+	return
+}
+
+// GetStats will return the shows the current statistics of a particular LoadBalancer.
+func GetStats(c *gophercloud.ServiceClient, id string) (r StatsResult) {
+	_, r.Err = c.Get(statisticsRootURL(c, id), &r.Body, nil)
 	return
 }

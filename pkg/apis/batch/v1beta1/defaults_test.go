@@ -27,6 +27,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	. "k8s.io/kubernetes/pkg/apis/batch/v1beta1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultCronJob(t *testing.T) {
@@ -40,8 +41,8 @@ func TestSetDefaultCronJob(t *testing.T) {
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.AllowConcurrent,
 					Suspend:                    newBool(false),
-					SuccessfulJobsHistoryLimit: newInt32(3),
-					FailedJobsHistoryLimit:     newInt32(1),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(3),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -50,16 +51,16 @@ func TestSetDefaultCronJob(t *testing.T) {
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 					Suspend:                    newBool(true),
-					SuccessfulJobsHistoryLimit: newInt32(5),
-					FailedJobsHistoryLimit:     newInt32(5),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
 				},
 			},
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
 					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
 					Suspend:                    newBool(true),
-					SuccessfulJobsHistoryLimit: newInt32(5),
-					FailedJobsHistoryLimit:     newInt32(5),
+					SuccessfulJobsHistoryLimit: utilpointer.Int32Ptr(5),
+					FailedJobsHistoryLimit:     utilpointer.Int32Ptr(5),
 				},
 			},
 		},
@@ -111,12 +112,6 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 
 func newBool(val bool) *bool {
 	p := new(bool)
-	*p = val
-	return p
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
 	*p = val
 	return p
 }

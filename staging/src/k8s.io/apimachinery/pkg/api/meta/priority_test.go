@@ -35,6 +35,30 @@ func TestPriorityRESTMapperResourceForErrorHandling(t *testing.T) {
 		err              string
 	}{
 		{
+			name:     "error",
+			delegate: fixedRESTMapper{err: errors.New("delegateError")},
+			err:      "delegateError",
+		},
+		{
+			name:     "single hit + error",
+			delegate: fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "single-hit"}}, err: errors.New("delegateError")},
+			result:   schema.GroupVersionResource{Resource: "single-hit"},
+			err:      "delegateError",
+		},
+		{
+			name: "group selection + error",
+			delegate: fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{
+				{Group: "one", Version: "a", Resource: "first"},
+				{Group: "two", Version: "b", Resource: "second"},
+			}, err: errors.New("delegateError")},
+			resourcePatterns: []schema.GroupVersionResource{
+				{Group: "one", Version: AnyVersion, Resource: AnyResource},
+			},
+			result: schema.GroupVersionResource{Group: "one", Version: "a", Resource: "first"},
+			err:    "delegateError",
+		},
+
+		{
 			name:     "single hit",
 			delegate: fixedRESTMapper{resourcesFor: []schema.GroupVersionResource{{Resource: "single-hit"}}},
 			result:   schema.GroupVersionResource{Resource: "single-hit"},
@@ -106,6 +130,10 @@ func TestPriorityRESTMapperResourceForErrorHandling(t *testing.T) {
 		if len(tc.err) == 0 && actualErr == nil {
 			continue
 		}
+		if len(tc.err) == 0 && actualErr != nil {
+			t.Errorf("%s: unexpected err: %v", tc.name, actualErr)
+			continue
+		}
 		if len(tc.err) > 0 && actualErr == nil {
 			t.Errorf("%s: missing expected err: %v", tc.name, tc.err)
 			continue
@@ -125,6 +153,30 @@ func TestPriorityRESTMapperKindForErrorHandling(t *testing.T) {
 		result       schema.GroupVersionKind
 		err          string
 	}{
+		{
+			name:     "error",
+			delegate: fixedRESTMapper{err: errors.New("delegateErr")},
+			err:      "delegateErr",
+		},
+		{
+			name:     "single hit + error",
+			delegate: fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "single-hit"}}, err: errors.New("delegateErr")},
+			result:   schema.GroupVersionKind{Kind: "single-hit"},
+			err:      "delegateErr",
+		},
+		{
+			name: "group selection + error",
+			delegate: fixedRESTMapper{kindsFor: []schema.GroupVersionKind{
+				{Group: "one", Version: "a", Kind: "first"},
+				{Group: "two", Version: "b", Kind: "second"},
+			}, err: errors.New("delegateErr")},
+			kindPatterns: []schema.GroupVersionKind{
+				{Group: "one", Version: AnyVersion, Kind: AnyKind},
+			},
+			result: schema.GroupVersionKind{Group: "one", Version: "a", Kind: "first"},
+			err:    "delegateErr",
+		},
+
 		{
 			name:     "single hit",
 			delegate: fixedRESTMapper{kindsFor: []schema.GroupVersionKind{{Kind: "single-hit"}}},
@@ -197,6 +249,10 @@ func TestPriorityRESTMapperKindForErrorHandling(t *testing.T) {
 		if len(tc.err) == 0 && actualErr == nil {
 			continue
 		}
+		if len(tc.err) == 0 && actualErr != nil {
+			t.Errorf("%s: unexpected err: %v", tc.name, actualErr)
+			continue
+		}
 		if len(tc.err) > 0 && actualErr == nil {
 			t.Errorf("%s: missing expected err: %v", tc.name, tc.err)
 			continue
@@ -234,18 +290,25 @@ func TestPriorityRESTMapperRESTMapping(t *testing.T) {
 			name:   "empty",
 			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{}},
 			input:  schema.GroupKind{Kind: "Foo"},
-			err:    &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "Foo"}},
+			err:    &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "Foo"}},
 		},
 		{
 			name:   "ignore not found",
-			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "IGNORE_THIS"}}}}},
+			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "IGNORE_THIS"}}}}},
 			input:  schema.GroupKind{Kind: "Foo"},
-			err:    &NoKindMatchError{PartialKind: schema.GroupVersionKind{Kind: "Foo"}},
+			err:    &NoKindMatchError{GroupKind: schema.GroupKind{Kind: "Foo"}},
 		},
 		{
 			name:   "accept first failure",
 			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{mappings: []*RESTMapping{mapping1}}}},
 			input:  schema.GroupKind{Kind: "Foo"},
+			err:    errors.New("fail on this"),
+		},
+		{
+			name:   "result + error",
+			mapper: PriorityRESTMapper{Delegate: fixedRESTMapper{mappings: []*RESTMapping{mapping1}, err: errors.New("fail on this")}},
+			input:  schema.GroupKind{Kind: "Foo"},
+			result: mapping1,
 			err:    errors.New("fail on this"),
 		},
 		{

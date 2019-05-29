@@ -7,12 +7,10 @@ go_library(
         "fake_stenographer.go",
         "stenographer.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/reporters/stenographer",
     importpath = "github.com/onsi/ginkgo/reporters/stenographer",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/types:go_default_library",
-    ],
+    deps = ["//vendor/github.com/onsi/ginkgo/types:go_default_library"],
 )
 
 filegroup(

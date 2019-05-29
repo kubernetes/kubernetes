@@ -28,7 +28,7 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 func TestListVolumesForPod(t *testing.T) {
@@ -64,7 +64,7 @@ func TestListVolumesForPod(t *testing.T) {
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
 	assert.NoError(t, err)
 
-	podName := volumehelper.GetUniquePodName(pod)
+	podName := util.GetUniquePodName(pod)
 
 	volumesToReturn, volumeExsit := kubelet.ListVolumesForPod(types.UID(podName))
 	assert.True(t, volumeExsit, "expected to find volumes for pod %q", podName)
@@ -180,7 +180,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		util.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -227,7 +227,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		util.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -252,7 +252,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		util.GetUniquePodName(pod))
 
 	assert.Len(t, podVolumes, 0,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
@@ -261,7 +261,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
 
 	// Verify volumes detached and no longer reported as in use
-	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
+	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyDetachCallCount(
 		1 /* expectedDetachCallCount */, testKubelet.volumePlugin))
@@ -279,11 +279,10 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
-							Name:       "fake/vol1",
+							Name:       "fake/fake-device",
 							DevicePath: "fake/path",
 						},
 					}},
-				Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 			}, nil
 		})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
@@ -310,14 +309,14 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
-		v1.UniqueVolumeName("fake/vol1"),
+		v1.UniqueVolumeName("fake/fake-device"),
 		stopCh,
 		kubelet.volumeManager)
 
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		util.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -346,11 +345,10 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 				Status: v1.NodeStatus{
 					VolumesAttached: []v1.AttachedVolume{
 						{
-							Name:       "fake/vol1",
+							Name:       "fake/fake-device",
 							DevicePath: "fake/path",
 						},
 					}},
-				Spec: v1.NodeSpec{ExternalID: testKubeletHostname},
 			}, nil
 		})
 	kubeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
@@ -378,7 +376,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Fake node status update
 	go simulateVolumeInUseUpdate(
-		v1.UniqueVolumeName("fake/vol1"),
+		v1.UniqueVolumeName("fake/fake-device"),
 		stopCh,
 		kubelet.volumeManager)
 
@@ -386,7 +384,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		util.GetUniquePodName(pod))
 
 	expectedPodVolumes := []string{"vol1"}
 	assert.Len(t, podVolumes, len(expectedPodVolumes), "Volumes for pod %+v", pod)
@@ -410,7 +408,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 
 	// Verify volumes unmounted
 	podVolumes = kubelet.volumeManager.GetMountedVolumesForPod(
-		volumehelper.GetUniquePodName(pod))
+		util.GetUniquePodName(pod))
 
 	assert.Len(t, podVolumes, 0,
 		"Expected volumes to be unmounted and detached. But some volumes are still mounted: %#v", podVolumes)
@@ -419,7 +417,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		1 /* expectedTearDownCallCount */, testKubelet.volumePlugin))
 
 	// Verify volumes detached and no longer reported as in use
-	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/vol1"), kubelet.volumeManager))
+	assert.NoError(t, waitForVolumeDetach(v1.UniqueVolumeName("fake/fake-device"), kubelet.volumeManager))
 	assert.True(t, testKubelet.volumePlugin.GetNewAttacherCallCount() >= 1, "Expected plugin NewAttacher to be called at least once")
 	assert.NoError(t, volumetest.VerifyZeroDetachCallCount(testKubelet.volumePlugin))
 }
@@ -465,6 +463,11 @@ func (f *stubBlockVolume) GetPodDeviceMapPath() (string, string) {
 func (f *stubBlockVolume) SetUpDevice() (string, error) {
 	return "", nil
 }
+
+func (f stubBlockVolume) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return nil
+}
+
 func (f *stubBlockVolume) TearDownDevice(mapPath string, devicePath string) error {
 	return nil
 }

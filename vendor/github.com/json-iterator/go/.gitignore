@@ -1,3 +1,4 @@
-.idea
+/vendor
+/bug_test.go
 /coverage.txt
-/profile.out
+/.idea

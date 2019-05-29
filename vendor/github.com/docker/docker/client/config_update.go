@@ -1,11 +1,11 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // ConfigUpdate attempts to update a Config

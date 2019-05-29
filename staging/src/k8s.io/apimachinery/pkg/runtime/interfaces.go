@@ -39,14 +39,14 @@ type GroupVersioner interface {
 	KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (target schema.GroupVersionKind, ok bool)
 }
 
-// Encoders write objects to a serialized form
+// Encoder writes objects to a serialized form
 type Encoder interface {
 	// Encode writes an object to a stream. Implementations may return errors if the versions are
 	// incompatible, or if no conversion is defined.
 	Encode(obj Object, w io.Writer) error
 }
 
-// Decoders attempt to load an object from data.
+// Decoder attempts to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
 	// default kind, group, and version provided. It returns a decoded object as well as the kind, group, and
@@ -91,6 +91,10 @@ type Framer interface {
 type SerializerInfo struct {
 	// MediaType is the value that represents this serializer over the wire.
 	MediaType string
+	// MediaTypeType is the first part of the MediaType ("application" in "application/json").
+	MediaTypeType string
+	// MediaTypeSubType is the second part of the MediaType ("json" in "application/json").
+	MediaTypeSubType string
 	// EncodesAsText indicates this serializer can be encoded to UTF-8 safely.
 	EncodesAsText bool
 	// Serializer is the individual object serializer for this media type.
@@ -174,15 +178,18 @@ type ObjectVersioner interface {
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
-	// Convert attempts to convert one object into another, or returns an error. This method does
-	// not guarantee the in object is not mutated. The context argument will be passed to
-	// all nested conversions.
+	// Convert attempts to convert one object into another, or returns an error. This
+	// method does not mutate the in object, but the in and out object might share data structures,
+	// i.e. the out object cannot be mutated without mutating the in object as well.
+	// The context argument will be passed to all nested conversions.
 	Convert(in, out, context interface{}) error
 	// ConvertToVersion takes the provided object and converts it the provided version. This
-	// method does not guarantee that the in object is not mutated. This method is similar to
-	// Convert() but handles specific details of choosing the correct output version.
+	// method does not mutate the in object, but the in and out object might share data structures,
+	// i.e. the out object cannot be mutated without mutating the in object as well.
+	// This method is similar to Convert() but handles specific details of choosing the correct
+	// output version.
 	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
-	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
+	ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error)
 }
 
 // ObjectTyper contains methods for extracting the APIVersion and Kind
@@ -203,6 +210,25 @@ type ObjectCreater interface {
 	New(kind schema.GroupVersionKind) (out Object, err error)
 }
 
+// EquivalentResourceMapper provides information about resources that address the same underlying data as a specified resource
+type EquivalentResourceMapper interface {
+	// EquivalentResourcesFor returns a list of resources that address the same underlying data as resource.
+	// If subresource is specified, only equivalent resources which also have the same subresource are included.
+	// The specified resource can be included in the returned list.
+	EquivalentResourcesFor(resource schema.GroupVersionResource, subresource string) []schema.GroupVersionResource
+	// KindFor returns the kind expected by the specified resource[/subresource].
+	// A zero value is returned if the kind is unknown.
+	KindFor(resource schema.GroupVersionResource, subresource string) schema.GroupVersionKind
+}
+
+// EquivalentResourceRegistry provides an EquivalentResourceMapper interface,
+// and allows registering known resource[/subresource] -> kind
+type EquivalentResourceRegistry interface {
+	EquivalentResourceMapper
+	// RegisterKindFor registers the existence of the specified resource[/subresource] along with its expected kind.
+	RegisterKindFor(resource schema.GroupVersionResource, subresource string, kind schema.GroupVersionKind)
+}
+
 // ResourceVersioner provides methods for setting and retrieving
 // the resource version from an API object.
 type ResourceVersioner interface {
@@ -221,7 +247,7 @@ type SelfLinker interface {
 	Namespace(obj Object) (string, error)
 }
 
-// All API types registered with Scheme must support the Object interface. Since objects in a scheme are
+// Object interface must be supported by all API types registered with Scheme. Since objects in a scheme are
 // expected to be serialized to the wire, the interface an Object must provide to the Scheme allows
 // serializers to set the kind, version, and group the object is represented as. An Object may choose
 // to return a no-op ObjectKindAccessor in cases where it is not expected to be serialized.
@@ -234,9 +260,9 @@ type Object interface {
 // to JSON allowed.
 type Unstructured interface {
 	Object
-	// UnstructuredContent returns a non-nil, mutable map of the contents of this object. Values may be
+	// UnstructuredContent returns a non-nil map with this object's contents. Values may be
 	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
-	// and from JSON.
+	// and from JSON. SetUnstructuredContent should be used to mutate the contents.
 	UnstructuredContent() map[string]interface{}
 	// SetUnstructuredContent updates the object content to match the provided map.
 	SetUnstructuredContent(map[string]interface{})

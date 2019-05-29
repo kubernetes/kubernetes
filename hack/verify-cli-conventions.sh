@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
@@ -30,7 +30,7 @@ make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
 clicheck=$(kube::util::find-binary "clicheck")
 
-if ! output=`$clicheck 2>&1`
+if ! output=$($clicheck 2>&1)
 then
 	echo "$output"
 	echo

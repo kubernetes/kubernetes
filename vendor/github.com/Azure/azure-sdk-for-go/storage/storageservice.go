@@ -77,14 +77,14 @@ func (c Client) getServiceProperties(service string, auth authentication) (*Serv
 	if err != nil {
 		return nil, err
 	}
-	defer resp.body.Close()
+	defer resp.Body.Close()
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusOK}); err != nil {
 		return nil, err
 	}
 
 	var out ServiceProperties
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	if err != nil {
 		return nil, err
 	}
@@ -126,6 +126,6 @@ func (c Client) setServiceProperties(props ServiceProperties, service string, au
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusAccepted})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusAccepted})
 }

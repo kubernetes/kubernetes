@@ -46,9 +46,9 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 // These tests need privileged containers, which are disabled by default.  Run
@@ -62,7 +62,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	var c clientset.Interface
 
 	BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
+		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu", "custom")
 
 		namespace = f.Namespace
 		c = f.ClientSet
@@ -73,10 +73,10 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	Describe("NFSv4", func() {
 		It("should be mountable for NFSv4", func() {
-			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
-			defer framework.VolumeTestCleanup(f, config)
+			config, _, serverIP := volume.NewNFSServer(c, namespace.Name, []string{})
+			defer volume.TestCleanup(f, config)
 
-			tests := []framework.VolumeTest{
+			tests := []volume.Test{
 				{
 					Volume: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
@@ -91,16 +91,16 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			framework.TestVolumeClient(c, config, nil, tests)
+			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
 		})
 	})
 
 	Describe("NFSv3", func() {
 		It("should be mountable for NFSv3", func() {
-			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
-			defer framework.VolumeTestCleanup(f, config)
+			config, _, serverIP := volume.NewNFSServer(c, namespace.Name, []string{})
+			defer volume.TestCleanup(f, config)
 
-			tests := []framework.VolumeTest{
+			tests := []volume.Test{
 				{
 					Volume: v1.VolumeSource{
 						NFS: &v1.NFSVolumeSource{
@@ -114,7 +114,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			framework.TestVolumeClient(c, config, nil, tests)
+			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -124,15 +124,15 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			// create gluster server and endpoints
-			config, _, _ := framework.NewGlusterfsServer(c, namespace.Name)
+			config, _, _ := volume.NewGlusterfsServer(c, namespace.Name)
 			name := config.Prefix + "-server"
 			defer func() {
-				framework.VolumeTestCleanup(f, config)
+				volume.TestCleanup(f, config)
 				err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
-				Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
+				framework.ExpectNoError(err, "defer: Gluster delete endpoints failed")
 			}()
 
-			tests := []framework.VolumeTest{
+			tests := []volume.Test{
 				{
 					Volume: v1.VolumeSource{
 						Glusterfs: &v1.GlusterfsVolumeSource{
@@ -147,7 +147,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 					ExpectedContent: "Hello from GlusterFS!",
 				},
 			}
-			framework.TestVolumeClient(c, config, nil, tests)
+			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
 		})
 	})
 })

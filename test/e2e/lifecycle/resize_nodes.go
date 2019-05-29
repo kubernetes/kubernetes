@@ -26,11 +26,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
-
-const resizeNodeReadyTimeout = 2 * time.Minute
 
 func resizeRC(c clientset.Interface, ns, name string, replicas int32) error {
 	rc, err := c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
@@ -47,14 +44,13 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	var systemPodsNo int32
 	var c clientset.Interface
 	var ns string
-	ignoreLabels := framework.ImagePullerLabels
 	var group string
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
-		Expect(err).NotTo(HaveOccurred())
+		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
+		framework.ExpectNoError(err)
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
@@ -64,22 +60,23 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	})
 
 	// Slow issue #13323 (8 min)
-	Describe("Resize [Slow]", func() {
+	ginkgo.Describe("Resize [Slow]", func() {
+		var originalNodeCount int32
 		var skipped bool
 
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			skipped = true
 			framework.SkipUnlessProviderIs("gce", "gke", "aws")
 			framework.SkipUnlessNodeCountIsAtLeast(2)
 			skipped = false
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			if skipped {
 				return
 			}
 
-			By("restoring the original node instance group size")
+			ginkgo.By("restoring the original node instance group size")
 			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
@@ -92,74 +89,79 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			//
 			// TODO(cjcullen) reduce this sleep (#19314)
 			if framework.ProviderIs("gke") {
-				By("waiting 5 minutes for all dead tunnels to be dropped")
+				ginkgo.By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
 			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
-			if err := framework.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
+
+			if err := framework.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
-			By("waiting for system pods to successfully restart")
-			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, ignoreLabels)
-			Expect(err).NotTo(HaveOccurred())
-			By("waiting for image prepulling pods to complete")
-			framework.WaitForPodsSuccess(c, metav1.NamespaceSystem, framework.ImagePullerLabels, framework.ImagePrePullingTimeout)
+			ginkgo.By("waiting for system pods to successfully restart")
+			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+			framework.ExpectNoError(err)
 		})
 
-		It("should be able to delete nodes", func() {
+		ginkgo.It("should be able to delete nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred())
+			numNodes, err := framework.NumberOfRegisteredNodes(c)
+			framework.ExpectNoError(err)
+			originalNodeCount = int32(numNodes)
+			common.NewRCByName(c, ns, name, originalNodeCount, nil)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
+			framework.ExpectNoError(err)
 
-			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
-			err = framework.ResizeGroup(group, replicas-1)
-			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForGroupSize(group, replicas-1)
-			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForReadyNodes(c, int(replicas-1), 10*time.Minute)
-			Expect(err).NotTo(HaveOccurred())
+			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
+			ginkgo.By(fmt.Sprintf("decreasing cluster size to %d", targetNumNodes))
+			err = framework.ResizeGroup(group, targetNumNodes)
+			framework.ExpectNoError(err)
+			err = framework.WaitForGroupSize(group, targetNumNodes)
+			framework.ExpectNoError(err)
+			err = framework.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
+			framework.ExpectNoError(err)
 
-			By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
+			ginkgo.By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
 				"the now non-existent node and the RC to recreate it")
 			time.Sleep(time.Minute)
 
-			By("verifying whether the pods from the removed node are recreated")
-			err = framework.VerifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By("verifying whether the pods from the removed node are recreated")
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
+			framework.ExpectNoError(err)
 		})
 
 		// TODO: Bug here - testName is not correct
-		It("should be able to add nodes", func() {
+		ginkgo.It("should be able to add nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
-			replicas := int32(framework.TestContext.CloudConfig.NumNodes)
-			common.NewRCByName(c, ns, name, replicas, nil)
-			err := framework.VerifyPods(c, ns, name, true, replicas)
-			Expect(err).NotTo(HaveOccurred())
+			numNodes, err := framework.NumberOfRegisteredNodes(c)
+			framework.ExpectNoError(err)
+			originalNodeCount = int32(numNodes)
+			common.NewRCByName(c, ns, name, originalNodeCount, nil)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
+			framework.ExpectNoError(err)
 
-			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
-			err = framework.ResizeGroup(group, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForGroupSize(group, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-			err = framework.WaitForReadyNodes(c, int(replicas+1), 10*time.Minute)
-			Expect(err).NotTo(HaveOccurred())
+			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
+			ginkgo.By(fmt.Sprintf("increasing cluster size to %d", targetNumNodes))
+			err = framework.ResizeGroup(group, targetNumNodes)
+			framework.ExpectNoError(err)
+			err = framework.WaitForGroupSize(group, targetNumNodes)
+			framework.ExpectNoError(err)
+			err = framework.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
+			framework.ExpectNoError(err)
 
-			By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", replicas+1))
-			err = resizeRC(c, ns, name, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
-			err = framework.VerifyPods(c, ns, name, true, replicas+1)
-			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
+			err = resizeRC(c, ns, name, originalNodeCount+1)
+			framework.ExpectNoError(err)
+			err = framework.VerifyPods(c, ns, name, true, originalNodeCount+1)
+			framework.ExpectNoError(err)
 		})
 	})
 })

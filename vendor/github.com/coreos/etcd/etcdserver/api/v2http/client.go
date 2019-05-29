@@ -15,9 +15,9 @@
 package v2http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"expvar"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -30,45 +30,42 @@ import (
 	etcdErr "github.com/coreos/etcd/error"
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api"
+	"github.com/coreos/etcd/etcdserver/api/etcdhttp"
 	"github.com/coreos/etcd/etcdserver/api/v2http/httptypes"
 	"github.com/coreos/etcd/etcdserver/auth"
 	"github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/etcdserver/membership"
 	"github.com/coreos/etcd/etcdserver/stats"
 	"github.com/coreos/etcd/pkg/types"
-	"github.com/coreos/etcd/raft"
 	"github.com/coreos/etcd/store"
-	"github.com/coreos/etcd/version"
-	"github.com/coreos/pkg/capnslog"
+
 	"github.com/jonboulle/clockwork"
-	"github.com/prometheus/client_golang/prometheus"
-	"golang.org/x/net/context"
 )
 
 const (
-	authPrefix               = "/v2/auth"
-	keysPrefix               = "/v2/keys"
-	deprecatedMachinesPrefix = "/v2/machines"
-	membersPrefix            = "/v2/members"
-	statsPrefix              = "/v2/stats"
-	varsPath                 = "/debug/vars"
-	metricsPath              = "/metrics"
-	healthPath               = "/health"
-	versionPath              = "/version"
-	configPath               = "/config"
+	authPrefix     = "/v2/auth"
+	keysPrefix     = "/v2/keys"
+	machinesPrefix = "/v2/machines"
+	membersPrefix  = "/v2/members"
+	statsPrefix    = "/v2/stats"
 )
 
 // NewClientHandler generates a muxed http.Handler with the given parameters to serve etcd client requests.
-func NewClientHandler(server *etcdserver.EtcdServer, timeout time.Duration) http.Handler {
-	sec := auth.NewStore(server, timeout)
+func NewClientHandler(server etcdserver.ServerPeer, timeout time.Duration) http.Handler {
+	mux := http.NewServeMux()
+	etcdhttp.HandleBasic(mux, server)
+	handleV2(mux, server, timeout)
+	return requestLogger(mux)
+}
 
+func handleV2(mux *http.ServeMux, server etcdserver.ServerV2, timeout time.Duration) {
+	sec := auth.NewStore(server, timeout)
 	kh := &keysHandler{
 		sec:                   sec,
 		server:                server,
 		cluster:               server.Cluster(),
-		timer:                 server,
 		timeout:               timeout,
-		clientCertAuthEnabled: server.Cfg.ClientCertAuthEnabled,
+		clientCertAuthEnabled: server.ClientCertAuthEnabled(),
 	}
 
 	sh := &statsHandler{
@@ -81,44 +78,32 @@ func NewClientHandler(server *etcdserver.EtcdServer, timeout time.Duration) http
 		cluster: server.Cluster(),
 		timeout: timeout,
 		clock:   clockwork.NewRealClock(),
-		clientCertAuthEnabled: server.Cfg.ClientCertAuthEnabled,
+		clientCertAuthEnabled: server.ClientCertAuthEnabled(),
 	}
 
-	dmh := &deprecatedMachinesHandler{
-		cluster: server.Cluster(),
-	}
+	mah := &machinesHandler{cluster: server.Cluster()}
 
 	sech := &authHandler{
 		sec:                   sec,
 		cluster:               server.Cluster(),
-		clientCertAuthEnabled: server.Cfg.ClientCertAuthEnabled,
+		clientCertAuthEnabled: server.ClientCertAuthEnabled(),
 	}
-
-	mux := http.NewServeMux()
 	mux.HandleFunc("/", http.NotFound)
-	mux.Handle(healthPath, healthHandler(server))
-	mux.HandleFunc(versionPath, versionHandler(server.Cluster(), serveVersion))
 	mux.Handle(keysPrefix, kh)
 	mux.Handle(keysPrefix+"/", kh)
 	mux.HandleFunc(statsPrefix+"/store", sh.serveStore)
 	mux.HandleFunc(statsPrefix+"/self", sh.serveSelf)
 	mux.HandleFunc(statsPrefix+"/leader", sh.serveLeader)
-	mux.HandleFunc(varsPath, serveVars)
-	mux.HandleFunc(configPath+"/local/log", logHandleFunc)
-	mux.Handle(metricsPath, prometheus.Handler())
 	mux.Handle(membersPrefix, mh)
 	mux.Handle(membersPrefix+"/", mh)
-	mux.Handle(deprecatedMachinesPrefix, dmh)
+	mux.Handle(machinesPrefix, mah)
 	handleAuth(mux, sech)
-
-	return requestLogger(mux)
 }
 
 type keysHandler struct {
 	sec                   auth.Store
-	server                etcdserver.Server
+	server                etcdserver.ServerV2
 	cluster               api.Cluster
-	timer                 etcdserver.RaftTimer
 	timeout               time.Duration
 	clientCertAuthEnabled bool
 }
@@ -156,7 +141,7 @@ func (h *keysHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case resp.Event != nil:
-		if err := writeKeyEvent(w, resp.Event, noValueOnSuccess, h.timer); err != nil {
+		if err := writeKeyEvent(w, resp, noValueOnSuccess); err != nil {
 			// Should never be reached
 			plog.Errorf("error writing event (%v)", err)
 		}
@@ -164,17 +149,17 @@ func (h *keysHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case resp.Watcher != nil:
 		ctx, cancel := context.WithTimeout(context.Background(), defaultWatchTimeout)
 		defer cancel()
-		handleKeyWatch(ctx, w, resp.Watcher, rr.Stream, h.timer)
+		handleKeyWatch(ctx, w, resp, rr.Stream)
 	default:
 		writeKeyError(w, errors.New("received response with no Event/Watcher!"))
 	}
 }
 
-type deprecatedMachinesHandler struct {
+type machinesHandler struct {
 	cluster api.Cluster
 }
 
-func (h *deprecatedMachinesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *machinesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !allowMethod(w, r.Method, "GET", "HEAD") {
 		return
 	}
@@ -184,7 +169,7 @@ func (h *deprecatedMachinesHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 
 type membersHandler struct {
 	sec                   auth.Store
-	server                etcdserver.Server
+	server                etcdserver.ServerV2
 	cluster               api.Cluster
 	timeout               time.Duration
 	clock                 clockwork.Clock
@@ -234,7 +219,7 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		now := h.clock.Now()
 		m := membership.NewMember("", req.PeerURLs, "", &now)
-		err := h.server.AddMember(ctx, *m)
+		_, err := h.server.AddMember(ctx, *m)
 		switch {
 		case err == membership.ErrIDExists || err == membership.ErrPeerURLexists:
 			writeError(w, r, httptypes.NewHTTPError(http.StatusConflict, err.Error()))
@@ -255,7 +240,7 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
-		err := h.server.RemoveMember(ctx, uint64(id))
+		_, err := h.server.RemoveMember(ctx, uint64(id))
 		switch {
 		case err == membership.ErrIDRemoved:
 			writeError(w, r, httptypes.NewHTTPError(http.StatusGone, fmt.Sprintf("Member permanently removed: %s", id)))
@@ -280,7 +265,7 @@ func (h *membersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			ID:             id,
 			RaftAttributes: membership.RaftAttributes{PeerURLs: req.PeerURLs.StringSlice()},
 		}
-		err := h.server.UpdateMember(ctx, m)
+		_, err := h.server.UpdateMember(ctx, m)
 		switch {
 		case err == membership.ErrPeerURLexists:
 			writeError(w, r, httptypes.NewHTTPError(http.StatusConflict, err.Error()))
@@ -321,108 +306,18 @@ func (h *statsHandler) serveLeader(w http.ResponseWriter, r *http.Request) {
 	}
 	stats := h.stats.LeaderStats()
 	if stats == nil {
-		writeError(w, r, httptypes.NewHTTPError(http.StatusForbidden, "not current leader"))
+		etcdhttp.WriteError(w, r, httptypes.NewHTTPError(http.StatusForbidden, "not current leader"))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(stats)
 }
 
-func serveVars(w http.ResponseWriter, r *http.Request) {
-	if !allowMethod(w, r.Method, "GET") {
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	fmt.Fprintf(w, "{\n")
-	first := true
-	expvar.Do(func(kv expvar.KeyValue) {
-		if !first {
-			fmt.Fprintf(w, ",\n")
-		}
-		first = false
-		fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
-	})
-	fmt.Fprintf(w, "\n}\n")
-}
-
-func healthHandler(server *etcdserver.EtcdServer) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !allowMethod(w, r.Method, "GET") {
-			return
-		}
-		if uint64(server.Leader()) == raft.None {
-			http.Error(w, `{"health": "false"}`, http.StatusServiceUnavailable)
-			return
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		if _, err := server.Do(ctx, etcdserverpb.Request{Method: "QGET"}); err != nil {
-			http.Error(w, `{"health": "false"}`, http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"health": "true"}`))
-	}
-}
-
-func versionHandler(c api.Cluster, fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		v := c.Version()
-		if v != nil {
-			fn(w, r, v.String())
-		} else {
-			fn(w, r, "not_decided")
-		}
-	}
-}
-
-func serveVersion(w http.ResponseWriter, r *http.Request, clusterV string) {
-	if !allowMethod(w, r.Method, "GET") {
-		return
-	}
-	vs := version.Versions{
-		Server:  version.Version,
-		Cluster: clusterV,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	b, err := json.Marshal(&vs)
-	if err != nil {
-		plog.Panicf("cannot marshal versions to json (%v)", err)
-	}
-	w.Write(b)
-}
-
-func logHandleFunc(w http.ResponseWriter, r *http.Request) {
-	if !allowMethod(w, r.Method, "PUT") {
-		return
-	}
-
-	in := struct{ Level string }{}
-
-	d := json.NewDecoder(r.Body)
-	if err := d.Decode(&in); err != nil {
-		writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid json body"))
-		return
-	}
-
-	logl, err := capnslog.ParseLevel(strings.ToUpper(in.Level))
-	if err != nil {
-		writeError(w, r, httptypes.NewHTTPError(http.StatusBadRequest, "Invalid log level "+in.Level))
-		return
-	}
-
-	plog.Noticef("globalLogLevel set to %q", logl.String())
-	capnslog.SetGlobalLogLevel(logl)
-	w.WriteHeader(http.StatusNoContent)
-}
-
 // parseKeyRequest converts a received http.Request on keysPrefix to
 // a server Request, performing validation of supplied fields as appropriate.
 // If any validation fails, an empty Request and non-nil error is returned.
 func parseKeyRequest(r *http.Request, clock clockwork.Clock) (etcdserverpb.Request, bool, error) {
-	noValueOnSuccess := false
+	var noValueOnSuccess bool
 	emptyReq := etcdserverpb.Request{}
 
 	err := r.ParseForm()
@@ -607,14 +502,15 @@ func parseKeyRequest(r *http.Request, clock clockwork.Clock) (etcdserverpb.Reque
 // writeKeyEvent trims the prefix of key path in a single Event under
 // StoreKeysPrefix, serializes it and writes the resulting JSON to the given
 // ResponseWriter, along with the appropriate headers.
-func writeKeyEvent(w http.ResponseWriter, ev *store.Event, noValueOnSuccess bool, rt etcdserver.RaftTimer) error {
+func writeKeyEvent(w http.ResponseWriter, resp etcdserver.Response, noValueOnSuccess bool) error {
+	ev := resp.Event
 	if ev == nil {
 		return errors.New("cannot write empty Event!")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Etcd-Index", fmt.Sprint(ev.EtcdIndex))
-	w.Header().Set("X-Raft-Index", fmt.Sprint(rt.Index()))
-	w.Header().Set("X-Raft-Term", fmt.Sprint(rt.Term()))
+	w.Header().Set("X-Raft-Index", fmt.Sprint(resp.Index))
+	w.Header().Set("X-Raft-Term", fmt.Sprint(resp.Term))
 
 	if ev.IsCreated() {
 		w.WriteHeader(http.StatusCreated)
@@ -656,7 +552,8 @@ func writeKeyError(w http.ResponseWriter, err error) {
 	}
 }
 
-func handleKeyWatch(ctx context.Context, w http.ResponseWriter, wa store.Watcher, stream bool, rt etcdserver.RaftTimer) {
+func handleKeyWatch(ctx context.Context, w http.ResponseWriter, resp etcdserver.Response, stream bool) {
+	wa := resp.Watcher
 	defer wa.Remove()
 	ech := wa.EventChan()
 	var nch <-chan bool
@@ -666,8 +563,8 @@ func handleKeyWatch(ctx context.Context, w http.ResponseWriter, wa store.Watcher
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Etcd-Index", fmt.Sprint(wa.StartIndex()))
-	w.Header().Set("X-Raft-Index", fmt.Sprint(rt.Index()))
-	w.Header().Set("X-Raft-Term", fmt.Sprint(rt.Term()))
+	w.Header().Set("X-Raft-Index", fmt.Sprint(resp.Index))
+	w.Header().Set("X-Raft-Term", fmt.Sprint(resp.Term))
 	w.WriteHeader(http.StatusOK)
 
 	// Ensure headers are flushed early, in case of long polling

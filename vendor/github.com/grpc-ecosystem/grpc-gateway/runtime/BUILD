@@ -15,8 +15,10 @@ go_library(
         "mux.go",
         "pattern.go",
         "proto2_convert.go",
+        "proto_errors.go",
         "query.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/grpc-ecosystem/grpc-gateway/runtime",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/runtime",
     visibility = ["//visibility:public"],
     deps = [
@@ -25,10 +27,10 @@ go_library(
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/runtime/internal:go_default_library",
         "//vendor/github.com/grpc-ecosystem/grpc-gateway/utilities:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/google.golang.org/grpc/metadata:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 

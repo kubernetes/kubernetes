@@ -17,6 +17,6 @@ limitations under the License.
 // Package extensionsint contains the necessary scaffolding of the
 // internal version of extensions as required by conversion logic.
 // It doesn't have any of its own types -- it's just necessary to
-// get the expected behavoir out of runtime.Scheme.ConvertToVersion
+// get the expected behavior out of runtime.Scheme.ConvertToVersion
 // and associated methods.
 package extensionsint

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -28,16 +28,18 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export GOPATH=${HOME}/_gopath
-export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:$PATH
+export PATH=${GOPATH}/bin:${HOME}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 # Install a few things needed by unit and /integration tests.
 command -v etcd &>/dev/null || ./hack/install-etcd.sh
-go get -u github.com/jstemmer/go-junit-report
+go install k8s.io/kubernetes/vendor/github.com/jstemmer/go-junit-report
 
 # Enable the Go race detector.
 export KUBE_RACE=-race
-# Produce a JUnit-style XML test report for Jenkins.
-export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/_artifacts
+# Set artifacts directory
+export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
+# Produce a JUnit-style XML test report
+export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 

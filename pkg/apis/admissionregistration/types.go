@@ -20,58 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// InitializerConfiguration describes the configuration of initializers.
-type InitializerConfiguration struct {
-	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
-	// +optional
-	metav1.ObjectMeta
-
-	// Initializers is a list of resources and their default initializers
-	// Order-sensitive.
-	// When merging multiple InitializerConfigurations, we sort the initializers
-	// from different InitializerConfigurations by the name of the
-	// InitializerConfigurations; the order of the initializers from the same
-	// InitializerConfiguration is preserved.
-	// +optional
-	Initializers []Initializer
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// InitializerConfigurationList is a list of InitializerConfiguration.
-type InitializerConfigurationList struct {
-	metav1.TypeMeta
-	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
-	// +optional
-	metav1.ListMeta
-
-	// List of InitializerConfiguration.
-	Items []InitializerConfiguration
-}
-
-// Initializer describes the name and the failure policy of an initializer, and
-// what resources it applies to.
-type Initializer struct {
-	// Name is the identifier of the initializer. It will be added to the
-	// object that needs to be initialized.
-	// Name should be fully qualified, e.g., alwayspullimages.kubernetes.io, where
-	// "alwayspullimages" is the name of the webhook, and kubernetes.io is the name
-	// of the organization.
-	// Required
-	Name string
-
-	// Rules describes what resources/subresources the initializer cares about.
-	// The initializer cares about an operation if it matches _any_ Rule.
-	// Rule.Resources must not include subresources.
-	Rules []Rule
-}
-
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
 // to make sure that all the tuple expansions are valid.
 type Rule struct {
@@ -101,21 +49,70 @@ type Rule struct {
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string
+
+	// scope specifies the scope of this rule.
+	// Valid values are "Cluster", "Namespaced", and "*"
+	// "Cluster" means that only cluster-scoped resources will match this rule.
+	// Namespace API objects are cluster-scoped.
+	// "Namespaced" means that only namespaced resources will match this rule.
+	// "*" means that there are no scope restrictions.
+	// Subresources match the scope of their parent resource.
+	// Default is "*".
+	//
+	// +optional
+	Scope *ScopeType
 }
 
+// ScopeType specifies the type of scope being used
+type ScopeType string
+
+const (
+	// ClusterScope means that scope is limited to cluster-scoped objects.
+	// Namespace objects are cluster-scoped.
+	ClusterScope ScopeType = "Cluster"
+	// NamespacedScope means that scope is limited to namespaced objects.
+	NamespacedScope ScopeType = "Namespaced"
+	// AllScopes means that all scopes are included.
+	AllScopes ScopeType = "*"
+)
+
+// FailurePolicyType specifies the type of failure policy
 type FailurePolicyType string
 
 const (
-	// Ignore means the initializer is removed from the initializers list of an
-	// object if the initializer is timed out.
+	// Ignore means that an error calling the webhook is ignored.
 	Ignore FailurePolicyType = "Ignore"
-	// For 1.7, only "Ignore" is allowed. "Fail" will be allowed when the
-	// extensible admission feature is beta.
+	// Fail means that an error calling the webhook causes the admission to fail.
 	Fail FailurePolicyType = "Fail"
 )
 
-// +genclient
-// +genclient:nonNamespaced
+// MatchPolicyType specifies the type of match policy
+type MatchPolicyType string
+
+const (
+	// Exact means requests should only be sent to the webhook if they exactly match a given rule
+	Exact MatchPolicyType = "Exact"
+	// Equivalent means requests should be sent to the webhook if they modify a resource listed in rules via another API group or version.
+	Equivalent MatchPolicyType = "Equivalent"
+)
+
+// SideEffectClass denotes the type of side effects resulting from calling the webhook
+type SideEffectClass string
+
+const (
+	// SideEffectClassUnknown means that no information is known about the side effects of calling the webhook.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassUnknown SideEffectClass = "Unknown"
+	// SideEffectClassNone means that calling the webhook will have no side effects.
+	SideEffectClassNone SideEffectClass = "None"
+	// SideEffectClassSome means that calling the webhook will possibly have side effects.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassSome SideEffectClass = "Some"
+	// SideEffectClassNoneOnDryRun means that calling the webhook will possibly have side effects, but if the
+	// request being reviewed has the dry-run attribute, the side effects will be suppressed.
+	SideEffectClassNoneOnDryRun SideEffectClass = "NoneOnDryRun"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ValidatingWebhookConfiguration describes the configuration of an admission webhook that accepts or rejects and object without changing it.
@@ -142,8 +139,6 @@ type ValidatingWebhookConfigurationList struct {
 	Items []ValidatingWebhookConfiguration
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
@@ -192,11 +187,27 @@ type Webhook struct {
 	// +optional
 	FailurePolicy *FailurePolicyType
 
+	// matchPolicy defines how the "rules" list is used to match incoming requests.
+	// Allowed values are "Exact" or "Equivalent".
+	//
+	// - Exact: match a request only if it exactly matches a specified rule.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// but "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would not be sent to the webhook.
+	//
+	// - Equivalent: match a request if modifies a resource listed in rules, even via another API group or version.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// and "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would be converted to apps/v1 and sent to the webhook.
+	//
+	// +optional
+	MatchPolicy *MatchPolicyType
+
 	// NamespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
-	// object.metadata.labels. If the object is other cluster scoped resource,
-	// it is not subjected to the webhook.
+	// object.metadata.labels. If the object is another cluster scoped resource,
+	// it never skips the webhook.
 	//
 	// For example, to run the webhook on any objects whose namespace is not
 	// associated with "runlevel" of "0" or "1";  you will set the selector as
@@ -237,6 +248,31 @@ type Webhook struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
+
+	// SideEffects states whether this webhookk has side effects.
+	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
+	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
+	// sideEffects == Unknown or Some. Defaults to Unknown.
+	// +optional
+	SideEffects *SideEffectClass
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// +optional
+	TimeoutSeconds *int32
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If the webhook configuration has already been persisted with a version apiserver
+	// does not understand, calls to the webhook will fail and be subject to the failure policy.
+	// +optional
+	AdmissionReviewVersions []string
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -252,6 +288,7 @@ type RuleWithOperations struct {
 	Rule
 }
 
+// OperationType specifies what type of operation the admission hook cares about.
 type OperationType string
 
 // The constants should be kept in sync with those defined in k8s.io/kubernetes/pkg/admission/interface.go.
@@ -267,7 +304,7 @@ const (
 // connection with the webhook
 type WebhookClientConfig struct {
 	// `url` gives the location of the webhook, in standard URL form
-	// (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
 	// The `host` should not refer to a service running in the cluster; use
@@ -300,16 +337,12 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// If there is only one port open for the service, that port will be
-	// used. If there are multiple ports open, port 443 will be used if it
-	// is open, otherwise it is an error.
-	//
 	// +optional
 	Service *ServiceReference
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate
-	// the webhook's server certificate.
-	// Required.
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
+	// +optional
 	CABundle []byte
 }
 
@@ -326,4 +359,9 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string
+
+	// If specified, the port on the service that hosting webhook.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port int32
 }

@@ -48,13 +48,6 @@ func (self *ResourceList) Pods() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
-func (self *ResourceList) NvidiaGPU() *resource.Quantity {
-	if val, ok := (*self)[ResourceNvidiaGPU]; ok {
-		return &val
-	}
-	return &resource.Quantity{}
-}
-
 func (self *ResourceList) StorageEphemeral() *resource.Quantity {
 	if val, ok := (*self)[ResourceEphemeralStorage]; ok {
 		return &val

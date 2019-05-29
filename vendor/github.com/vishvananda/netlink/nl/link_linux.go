@@ -444,6 +444,13 @@ func (msg *VfTrust) Serialize() []byte {
 }
 
 const (
+	XDP_FLAGS_UPDATE_IF_NOEXIST = 1 << iota
+	XDP_FLAGS_SKB_MODE
+	XDP_FLAGS_DRV_MODE
+	XDP_FLAGS_MASK = XDP_FLAGS_UPDATE_IF_NOEXIST | XDP_FLAGS_SKB_MODE | XDP_FLAGS_DRV_MODE
+)
+
+const (
 	IFLA_XDP_UNSPEC   = iota
 	IFLA_XDP_FD       /* fd of xdp program to attach, or -1 to remove */
 	IFLA_XDP_ATTACHED /* read-only bool indicating if prog is attached */

@@ -19,14 +19,20 @@ type ListOptsBuilder interface {
 type ListOpts struct {
 	Status       string `q:"status"`
 	Name         string `q:"name"`
+	Description  string `q:"description"`
 	AdminStateUp *bool  `q:"admin_state_up"`
 	TenantID     string `q:"tenant_id"`
+	ProjectID    string `q:"project_id"`
 	Shared       *bool  `q:"shared"`
 	ID           string `q:"id"`
 	Marker       string `q:"marker"`
 	Limit        int    `q:"limit"`
 	SortKey      string `q:"sort_key"`
 	SortDir      string `q:"sort_dir"`
+	Tags         string `q:"tags"`
+	TagsAny      string `q:"tags-any"`
+	NotTags      string `q:"not-tags"`
+	NotTagsAny   string `q:"not-tags-any"`
 }
 
 // ToNetworkListQuery formats a ListOpts into a query string.
@@ -66,10 +72,13 @@ type CreateOptsBuilder interface {
 
 // CreateOpts represents options used to create a network.
 type CreateOpts struct {
-	AdminStateUp *bool  `json:"admin_state_up,omitempty"`
-	Name         string `json:"name,omitempty"`
-	Shared       *bool  `json:"shared,omitempty"`
-	TenantID     string `json:"tenant_id,omitempty"`
+	AdminStateUp          *bool    `json:"admin_state_up,omitempty"`
+	Name                  string   `json:"name,omitempty"`
+	Description           string   `json:"description,omitempty"`
+	Shared                *bool    `json:"shared,omitempty"`
+	TenantID              string   `json:"tenant_id,omitempty"`
+	ProjectID             string   `json:"project_id,omitempty"`
+	AvailabilityZoneHints []string `json:"availability_zone_hints,omitempty"`
 }
 
 // ToNetworkCreateMap builds a request body from CreateOpts.
@@ -102,9 +111,10 @@ type UpdateOptsBuilder interface {
 
 // UpdateOpts represents options used to update a network.
 type UpdateOpts struct {
-	AdminStateUp *bool  `json:"admin_state_up,omitempty"`
-	Name         string `json:"name,omitempty"`
-	Shared       *bool  `json:"shared,omitempty"`
+	AdminStateUp *bool   `json:"admin_state_up,omitempty"`
+	Name         string  `json:"name,omitempty"`
+	Description  *string `json:"description,omitempty"`
+	Shared       *bool   `json:"shared,omitempty"`
 }
 
 // ToNetworkUpdateMap builds a request body from UpdateOpts.
@@ -137,7 +147,12 @@ func Delete(c *gophercloud.ServiceClient, networkID string) (r DeleteResult) {
 func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
-	pages, err := List(client, nil).AllPages()
+
+	listOpts := ListOpts{
+		Name: name,
+	}
+
+	pages, err := List(client, listOpts).AllPages()
 	if err != nil {
 		return "", err
 	}

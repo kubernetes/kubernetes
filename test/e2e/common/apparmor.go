@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/gomega"
 )
@@ -116,7 +117,7 @@ done`, testCmd)
 			Affinity: loaderAffinity,
 			Containers: []api.Container{{
 				Name:    "test",
-				Image:   busyboxImage,
+				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 				Command: []string{"sh", "-c", testCmd},
 			}},
 			RestartPolicy: api.RestartPolicyNever,
@@ -185,7 +186,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
 						Name:  "apparmor-loader",
-						Image: "gcr.io/google_containers/apparmor-loader:0.1",
+						Image: imageutils.GetE2EImage(imageutils.AppArmorLoader),
 						Args:  []string{"-poll", "10s", "/profiles"},
 						SecurityContext: &api.SecurityContext{
 							Privileged: &True,

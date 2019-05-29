@@ -23,3 +23,27 @@ func deleteURL(client *gophercloud.ServiceClient, id string) string {
 func accessURL(client *gophercloud.ServiceClient, id string) string {
 	return client.ServiceURL("flavors", id, "os-flavor-access")
 }
+
+func accessActionURL(client *gophercloud.ServiceClient, id string) string {
+	return client.ServiceURL("flavors", id, "action")
+}
+
+func extraSpecsListURL(client *gophercloud.ServiceClient, id string) string {
+	return client.ServiceURL("flavors", id, "os-extra_specs")
+}
+
+func extraSpecsGetURL(client *gophercloud.ServiceClient, id, key string) string {
+	return client.ServiceURL("flavors", id, "os-extra_specs", key)
+}
+
+func extraSpecsCreateURL(client *gophercloud.ServiceClient, id string) string {
+	return client.ServiceURL("flavors", id, "os-extra_specs")
+}
+
+func extraSpecUpdateURL(client *gophercloud.ServiceClient, id, key string) string {
+	return client.ServiceURL("flavors", id, "os-extra_specs", key)
+}
+
+func extraSpecDeleteURL(client *gophercloud.ServiceClient, id, key string) string {
+	return client.ServiceURL("flavors", id, "os-extra_specs", key)
+}

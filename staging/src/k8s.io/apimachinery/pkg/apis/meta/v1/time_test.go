@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 type TimeHolder struct {
@@ -35,8 +35,8 @@ func TestTimeMarshalYAML(t *testing.T) {
 		result string
 	}{
 		{Time{}, "t: null\n"},
-		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: 1998-05-05T05:05:05Z\n"},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
+		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: \"1998-05-05T05:05:05Z\"\n"},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: \"1998-05-05T05:05:05Z\"\n"},
 	}
 
 	for _, c := range cases {
@@ -191,6 +191,50 @@ func TestTimeEqual(t *testing.T) {
 			result := c.x.Equal(c.y)
 			if result != c.result {
 				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			}
+		})
+	}
+}
+
+func TestTimeBefore(t *testing.T) {
+	t1 := NewTime(time.Now())
+	cases := []struct {
+		name string
+		x    *Time
+		y    *Time
+	}{
+		{"nil <? nil", nil, nil},
+		{"!nil <? !nil", &t1, &t1},
+		{"nil <? !nil", nil, &t1},
+		{"!nil <? nil", &t1, nil},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.Before(c.y)
+			if result {
+				t.Errorf("Failed equality test for '%v', '%v': expected false, got %+v", c.x, c.y, result)
+			}
+		})
+	}
+}
+
+func TestTimeIsZero(t *testing.T) {
+	t1 := NewTime(time.Now())
+	cases := []struct {
+		name   string
+		x      *Time
+		result bool
+	}{
+		{"nil =? 0", nil, true},
+		{"!nil =? 0", &t1, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.IsZero()
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
 			}
 		})
 	}

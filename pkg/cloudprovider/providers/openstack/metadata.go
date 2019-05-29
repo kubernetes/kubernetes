@@ -27,25 +27,25 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/utils/exec"
 )
 
 const (
-	// metadataUrlTemplate allows building an OpenStack Metadata service URL.
+	// metadataURLTemplate allows building an OpenStack Metadata service URL.
 	// It's a hardcoded IPv4 link-local address as documented in "OpenStack Cloud
 	// Administrator Guide", chapter Compute - Networking with nova-network.
-	// https://docs.openstack.org/admin-guide/compute-networking-nova.html#metadata-service
+	//https://docs.openstack.org/nova/latest/admin/networking-nova.html#metadata-service
 	defaultMetadataVersion = "2012-08-10"
-	metadataUrlTemplate    = "http://169.254.169.254/openstack/%s/meta_data.json"
+	metadataURLTemplate    = "http://169.254.169.254/openstack/%s/meta_data.json"
 
 	// metadataID is used as an identifier on the metadata search order configuration.
 	metadataID = "metadataService"
 
 	// Config drive is defined as an iso9660 or vfat (deprecated) drive
 	// with the "config-2" label.
-	// http://docs.openstack.org/user-guide/cli-config-drive.html
+	//https://docs.openstack.org/nova/latest/user/config-drive.html
 	configDriveLabel        = "config-2"
 	configDrivePathTemplate = "openstack/%s/meta_data.json"
 
@@ -53,10 +53,10 @@ const (
 	configDriveID = "configDrive"
 )
 
+// ErrBadMetadata is used to indicate a problem parsing data from metadata server
 var ErrBadMetadata = errors.New("invalid OpenStack metadata, got empty uuid")
 
-// There are multiple device types. To keep it simple, we're using a single structure
-// for all device metadata types.
+// DeviceMetadata is a single/simplified data structure for all kinds of device metadata types.
 type DeviceMetadata struct {
 	Type    string `json:"type"`
 	Bus     string `json:"bus,omitempty"`
@@ -65,10 +65,11 @@ type DeviceMetadata struct {
 	// .. and other fields.
 }
 
-// Assumes the "2012-08-10" meta_data.json format.
+// Metadata has the information fetched from OpenStack metadata service or
+// config drives. Assumes the "2012-08-10" meta_data.json format.
 // See http://docs.openstack.org/user-guide/cli_config_drive.html
 type Metadata struct {
-	Uuid             string           `json:"uuid"`
+	UUID             string           `json:"uuid"`
 	Name             string           `json:"name"`
 	AvailabilityZone string           `json:"availability_zone"`
 	Devices          []DeviceMetadata `json:"devices,omitempty"`
@@ -84,15 +85,15 @@ func parseMetadata(r io.Reader) (*Metadata, error) {
 		return nil, err
 	}
 
-	if metadata.Uuid == "" {
+	if metadata.UUID == "" {
 		return nil, ErrBadMetadata
 	}
 
 	return &metadata, nil
 }
 
-func getMetadataUrl(metadataVersion string) string {
-	return fmt.Sprintf(metadataUrlTemplate, metadataVersion)
+func getMetadataURL(metadataVersion string) string {
+	return fmt.Sprintf(metadataURLTemplate, metadataVersion)
 }
 
 func getConfigDrivePath(metadataVersion string) string {
@@ -120,7 +121,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	}
 	defer os.Remove(mntdir)
 
-	glog.V(4).Infof("Attempting to mount configdrive %s on %s", dev, mntdir)
+	klog.V(4).Infof("Attempting to mount configdrive %s on %s", dev, mntdir)
 
 	mounter := mount.New("" /* default mount path */)
 	err = mounter.Mount(dev, mntdir, "iso9660", []string{"ro"})
@@ -132,7 +133,7 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 	}
 	defer mounter.Unmount(mntdir)
 
-	glog.V(4).Infof("Configdrive mounted on %s", mntdir)
+	klog.V(4).Infof("Configdrive mounted on %s", mntdir)
 
 	configDrivePath := getConfigDrivePath(metadataVersion)
 	f, err := os.Open(
@@ -147,16 +148,16 @@ func getMetadataFromConfigDrive(metadataVersion string) (*Metadata, error) {
 
 func getMetadataFromMetadataService(metadataVersion string) (*Metadata, error) {
 	// Try to get JSON from metadata server.
-	metadataUrl := getMetadataUrl(metadataVersion)
-	glog.V(4).Infof("Attempting to fetch metadata from %s", metadataUrl)
-	resp, err := http.Get(metadataUrl)
+	metadataURL := getMetadataURL(metadataVersion)
+	klog.V(4).Infof("Attempting to fetch metadata from %s", metadataURL)
+	resp, err := http.Get(metadataURL)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching %s: %v", metadataUrl, err)
+		return nil, fmt.Errorf("error fetching %s: %v", metadataURL, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
+		err = fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataURL, resp.Status)
 		return nil, err
 	}
 

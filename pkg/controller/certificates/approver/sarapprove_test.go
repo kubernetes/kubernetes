@@ -86,7 +86,6 @@ func TestHasKubeletUsages(t *testing.T) {
 
 func TestHandle(t *testing.T) {
 	cases := []struct {
-		message    string
 		allowed    bool
 		recognized bool
 		err        bool
@@ -183,77 +182,6 @@ func TestHandle(t *testing.T) {
 				t.Errorf("unexpected err: %v", err)
 			}
 			c.verify(t, client.Actions())
-		})
-	}
-}
-
-func TestSelfNodeServerCertRecognizer(t *testing.T) {
-	defaultCSR := csrBuilder{
-		cn:        "system:node:foo",
-		orgs:      []string{"system:nodes"},
-		requestor: "system:node:foo",
-		usages: []capi.KeyUsage{
-			capi.UsageKeyEncipherment,
-			capi.UsageDigitalSignature,
-			capi.UsageServerAuth,
-		},
-		dns: []string{"node"},
-		ips: []net.IP{net.ParseIP("192.168.0.1")},
-	}
-
-	testCases := []struct {
-		description     string
-		csrBuilder      csrBuilder
-		expectedOutcome bool
-	}{
-		{
-			description:     "Success - all requirements met",
-			csrBuilder:      defaultCSR,
-			expectedOutcome: true,
-		},
-		{
-			description: "No organization",
-			csrBuilder: func(b csrBuilder) csrBuilder {
-				b.orgs = []string{}
-				return b
-			}(defaultCSR),
-			expectedOutcome: false,
-		},
-		{
-			description: "Wrong organization",
-			csrBuilder: func(b csrBuilder) csrBuilder {
-				b.orgs = append(b.orgs, "new-org")
-				return b
-			}(defaultCSR),
-			expectedOutcome: false,
-		},
-		{
-			description: "Wrong usages",
-			csrBuilder: func(b csrBuilder) csrBuilder {
-				b.usages = []capi.KeyUsage{}
-				return b
-			}(defaultCSR),
-			expectedOutcome: false,
-		},
-		{
-			description: "Wrong common name",
-			csrBuilder: func(b csrBuilder) csrBuilder {
-				b.cn = "wrong-common-name"
-				return b
-			}(defaultCSR),
-			expectedOutcome: false,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			csr := makeFancyTestCsr(tc.csrBuilder)
-			x509cr, err := k8s_certificates_v1beta1.ParseCSR(csr)
-			if err != nil {
-				t.Errorf("unexpected err: %v", err)
-			}
-			if isSelfNodeServerCert(csr, x509cr) != tc.expectedOutcome {
-				t.Errorf("expected recognized to be %v", tc.expectedOutcome)
-			}
 		})
 	}
 }

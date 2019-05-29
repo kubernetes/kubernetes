@@ -19,7 +19,7 @@ limitations under the License.
 package upgrades
 
 import (
-	"k8s.io/kubernetes/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

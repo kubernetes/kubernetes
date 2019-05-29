@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/docker/api/types/swarm"
 
 import (
 	"github.com/docker/docker/api/types/network"
@@ -62,6 +62,8 @@ const (
 	PortConfigProtocolTCP PortConfigProtocol = "tcp"
 	// PortConfigProtocolUDP UDP
 	PortConfigProtocolUDP PortConfigProtocol = "udp"
+	// PortConfigProtocolSCTP SCTP
+	PortConfigProtocolSCTP PortConfigProtocol = "sctp"
 )
 
 // EndpointVirtualIP represents the virtual ip of a port.

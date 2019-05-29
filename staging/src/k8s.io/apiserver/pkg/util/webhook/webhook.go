@@ -22,11 +22,9 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
@@ -39,17 +37,17 @@ const defaultRequestTimeout = 30 * time.Second
 
 type GenericWebhook struct {
 	RestClient     *rest.RESTClient
-	initialBackoff time.Duration
+	InitialBackoff time.Duration
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
-func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
-	return newGenericWebhook(registry, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout)
+func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
+	return newGenericWebhook(scheme, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout)
 }
 
-func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
+func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
-		if !registry.IsEnabledVersion(groupVersion) {
+		if !scheme.IsVersionRegistered(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
 		}
 	}
@@ -71,7 +69,7 @@ func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 	clientConfig.Timeout = requestTimeout
 
 	codec := codecFactory.LegacyCodec(groupVersions...)
-	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
+	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
@@ -85,7 +83,7 @@ func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 // it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
 func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() rest.Result) rest.Result {
 	var result rest.Result
-	WithExponentialBackoff(g.initialBackoff, func() error {
+	WithExponentialBackoff(g.InitialBackoff, func() error {
 		result = webhookFn()
 		return result.Error()
 	})

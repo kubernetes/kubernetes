@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -24,13 +25,10 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/ghodss/yaml"
-	"github.com/golang/glog"
-
-	"bytes"
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/apis/apiserver"
@@ -89,13 +87,24 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 		}
 		return configProvider{
 			config: decodedConfig,
-			scheme: configScheme,
 		}, nil
 	}
 	// we got an error where the decode wasn't related to a missing type
 	if !(runtime.IsMissingVersion(err) || runtime.IsMissingKind(err) || runtime.IsNotRegisteredError(err)) {
 		return nil, err
 	}
+
+	// Only tolerate load errors if the file appears to be one of the two legacy plugin configs
+	unstructuredData := map[string]interface{}{}
+	if err2 := yaml.Unmarshal(data, &unstructuredData); err2 != nil {
+		return nil, err
+	}
+	_, isLegacyImagePolicy := unstructuredData["imagePolicy"]
+	_, isLegacyPodNodeSelector := unstructuredData["podNodeSelectorPluginConfig"]
+	if !isLegacyImagePolicy && !isLegacyPodNodeSelector {
+		return nil, err
+	}
+
 	// convert the legacy format to the new admission control format
 	// in order to preserve backwards compatibility, we set plugins that
 	// previously read input from a non-versioned file configuration to the
@@ -117,32 +126,24 @@ func ReadAdmissionConfiguration(pluginNames []string, configFilePath string, con
 	}
 	return configProvider{
 		config: internalConfig,
-		scheme: configScheme,
 	}, nil
 }
 
 type configProvider struct {
 	config *apiserver.AdmissionConfiguration
-	scheme *runtime.Scheme
 }
 
 // GetAdmissionPluginConfigurationFor returns a reader that holds the admission plugin configuration.
-func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration, scheme *runtime.Scheme) (io.Reader, error) {
-	// if there is nothing nested in the object, we return the named location
-	obj := pluginCfg.Configuration
-	if obj != nil {
-		// serialize the configuration and build a reader for it
-		content, err := writeYAML(obj, scheme)
-		if err != nil {
-			return nil, err
-		}
-		return bytes.NewBuffer(content), nil
+func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfiguration) (io.Reader, error) {
+	// if there is a nest object, return it directly
+	if pluginCfg.Configuration != nil {
+		return bytes.NewBuffer(pluginCfg.Configuration.Raw), nil
 	}
 	// there is nothing nested, so we delegate to path
 	if pluginCfg.Path != "" {
 		content, err := ioutil.ReadFile(pluginCfg.Path)
 		if err != nil {
-			glog.Fatalf("Couldn't open admission plugin configuration %s: %#v", pluginCfg.Path, err)
+			klog.Fatalf("Couldn't open admission plugin configuration %s: %#v", pluginCfg.Path, err)
 			return nil, err
 		}
 		return bytes.NewBuffer(content), nil
@@ -151,8 +152,8 @@ func GetAdmissionPluginConfigurationFor(pluginCfg apiserver.AdmissionPluginConfi
 	return nil, nil
 }
 
-// GetAdmissionPluginConfiguration takes the admission configuration and returns a reader
-// for the specified plugin.  If no specific configuration is present, we return a nil reader.
+// ConfigFor returns a reader for the specified plugin.
+// If no specific configuration is present, we return a nil reader.
 func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 	// there is no config, so there is no potential config
 	if p.config == nil {
@@ -163,7 +164,7 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 		if pluginName != pluginCfg.Name {
 			continue
 		}
-		pluginConfig, err := GetAdmissionPluginConfigurationFor(pluginCfg, p.scheme)
+		pluginConfig, err := GetAdmissionPluginConfigurationFor(pluginCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -171,27 +172,4 @@ func (p configProvider) ConfigFor(pluginName string) (io.Reader, error) {
 	}
 	// there is no registered config that matches on plugin name.
 	return nil, nil
-}
-
-// writeYAML writes the specified object to a byte array as yaml.
-func writeYAML(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {
-	gvks, _, err := scheme.ObjectKinds(obj)
-	if err != nil {
-		return nil, err
-	}
-	gvs := []schema.GroupVersion{}
-	for _, gvk := range gvks {
-		gvs = append(gvs, gvk.GroupVersion())
-	}
-	codecs := serializer.NewCodecFactory(scheme)
-	json, err := runtime.Encode(codecs.LegacyCodec(gvs...), obj)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := yaml.JSONToYAML(json)
-	if err != nil {
-		return nil, err
-	}
-	return content, err
 }

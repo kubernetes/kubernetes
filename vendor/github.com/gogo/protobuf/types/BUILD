@@ -17,6 +17,7 @@ go_library(
         "timestamp_gogo.go",
         "wrappers.pb.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/types",
     importpath = "github.com/gogo/protobuf/types",
     visibility = ["//visibility:public"],
     deps = [

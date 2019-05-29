@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2017 The Kubernetes Authors.
 #
@@ -19,6 +19,8 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+
+export GO111MODULE=auto
 
 staging_repos=($(ls "${KUBE_ROOT}/staging/src/k8s.io/"))
 staging_repos_pattern=$(IFS="|"; echo "${staging_repos[*]}")

@@ -4,34 +4,30 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
-        "client_unix.go",
-        "controller.go",
-        "event.go",
+        "health.go",
+        "logger.go",
+        "login.go",
         "namespace.go",
+        "network_diagnostics.go",
+        "node.go",
+        "policy.go",
         "pool.go",
         "rule.go",
         "server_version.go",
         "template.go",
+        "user.go",
         "util.go",
         "validation.go",
         "volume.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "client_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/storageos/go-api",
     importpath = "github.com/storageos/go-api",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/gorilla/websocket:go_default_library",
+        "//vendor/github.com/storageos/go-api/netutil:go_default_library",
+        "//vendor/github.com/storageos/go-api/serror:go_default_library",
         "//vendor/github.com/storageos/go-api/types:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "//vendor/github.com/Microsoft/go-winio:go_default_library",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )
 
 filegroup(
@@ -45,6 +41,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//vendor/github.com/storageos/go-api/netutil:all-srcs",
+        "//vendor/github.com/storageos/go-api/serror:all-srcs",
         "//vendor/github.com/storageos/go-api/types:all-srcs",
     ],
     tags = ["automanaged"],

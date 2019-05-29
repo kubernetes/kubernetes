@@ -20,9 +20,10 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -65,6 +66,12 @@ type worker struct {
 
 	// If set, skip probing.
 	onHold bool
+
+	// proberResultsMetricLabels holds the labels attached to this worker
+	// for the ProberResults metric by result.
+	proberResultsSuccessfulMetricLabels prometheus.Labels
+	proberResultsFailedMetricLabels     prometheus.Labels
+	proberResultsUnknownMetricLabels    prometheus.Labels
 }
 
 // Creates and starts a new probe worker.
@@ -93,6 +100,23 @@ func newWorker(
 		w.initialValue = results.Success
 	}
 
+	basicMetricLabels := prometheus.Labels{
+		"probe_type": w.probeType.String(),
+		"container":  w.container.Name,
+		"pod":        w.pod.Name,
+		"namespace":  w.pod.Namespace,
+		"pod_uid":    string(w.pod.UID),
+	}
+
+	w.proberResultsSuccessfulMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
+	w.proberResultsSuccessfulMetricLabels["result"] = probeResultSuccessful
+
+	w.proberResultsFailedMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
+	w.proberResultsFailedMetricLabels["result"] = probeResultFailed
+
+	w.proberResultsUnknownMetricLabels = deepCopyPrometheusLabels(basicMetricLabels)
+	w.proberResultsUnknownMetricLabels["result"] = probeResultUnknown
+
 	return w
 }
 
@@ -114,6 +138,9 @@ func (w *worker) run() {
 		}
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
+		ProberResults.Delete(w.proberResultsSuccessfulMetricLabels)
+		ProberResults.Delete(w.proberResultsFailedMetricLabels)
+		ProberResults.Delete(w.proberResultsUnknownMetricLabels)
 	}()
 
 probeLoop:
@@ -146,13 +173,13 @@ func (w *worker) doProbe() (keepGoing bool) {
 	status, ok := w.probeManager.statusManager.GetPodStatus(w.pod.UID)
 	if !ok {
 		// Either the pod has not been created yet, or it was already deleted.
-		glog.V(3).Infof("No status for pod: %v", format.Pod(w.pod))
+		klog.V(3).Infof("No status for pod: %v", format.Pod(w.pod))
 		return true
 	}
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		glog.V(3).Infof("Pod %v %v, exiting probe worker",
+		klog.V(3).Infof("Pod %v %v, exiting probe worker",
 			format.Pod(w.pod), status.Phase)
 		return false
 	}
@@ -160,7 +187,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)
 	if !ok || len(c.ContainerID) == 0 {
 		// Either the container has not been created yet, or it was deleted.
-		glog.V(3).Infof("Probe target container not found: %v - %v",
+		klog.V(3).Infof("Probe target container not found: %v - %v",
 			format.Pod(w.pod), w.container.Name)
 		return true // Wait for more information.
 	}
@@ -181,7 +208,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	if c.State.Running == nil {
-		glog.V(3).Infof("Non-running container probed: %v - %v",
+		klog.V(3).Infof("Non-running container probed: %v - %v",
 			format.Pod(w.pod), w.container.Name)
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
@@ -202,6 +229,15 @@ func (w *worker) doProbe() (keepGoing bool) {
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
+	}
+
+	switch result {
+	case results.Success:
+		ProberResults.With(w.proberResultsSuccessfulMetricLabels).Inc()
+	case results.Failure:
+		ProberResults.With(w.proberResultsFailedMetricLabels).Inc()
+	default:
+		ProberResults.With(w.proberResultsUnknownMetricLabels).Inc()
 	}
 
 	if w.lastResult == result {
@@ -225,8 +261,16 @@ func (w *worker) doProbe() (keepGoing bool) {
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.
 		w.onHold = true
-		w.resultRun = 1
+		w.resultRun = 0
 	}
 
 	return true
+}
+
+func deepCopyPrometheusLabels(m prometheus.Labels) prometheus.Labels {
+	ret := make(prometheus.Labels, len(m))
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

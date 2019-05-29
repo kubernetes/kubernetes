@@ -18,8 +18,10 @@ package rest
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 
+	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/transport"
 )
 
@@ -58,25 +60,10 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 
 // TransportConfig converts a client config to an appropriate transport config.
 func (c *Config) TransportConfig() (*transport.Config, error) {
-	wt := c.WrapTransport
-	if c.AuthProvider != nil {
-		provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
-		if err != nil {
-			return nil, err
-		}
-		if wt != nil {
-			previousWT := wt
-			wt = func(rt http.RoundTripper) http.RoundTripper {
-				return provider.WrapTransport(previousWT(rt))
-			}
-		} else {
-			wt = provider.WrapTransport
-		}
-	}
-	return &transport.Config{
+	conf := &transport.Config{
 		UserAgent:     c.UserAgent,
 		Transport:     c.Transport,
-		WrapTransport: wt,
+		WrapTransport: c.WrapTransport,
 		TLS: transport.TLSConfig{
 			Insecure:   c.Insecure,
 			ServerName: c.ServerName,
@@ -87,15 +74,45 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 			KeyFile:    c.KeyFile,
 			KeyData:    c.KeyData,
 		},
-		Username:    c.Username,
-		Password:    c.Password,
-		CacheDir:    c.CacheDir,
-		BearerToken: c.BearerToken,
+		Username:        c.Username,
+		Password:        c.Password,
+		BearerToken:     c.BearerToken,
+		BearerTokenFile: c.BearerTokenFile,
 		Impersonate: transport.ImpersonationConfig{
 			UserName: c.Impersonate.UserName,
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
 		Dial: c.Dial,
-	}, nil
+	}
+
+	if c.ExecProvider != nil && c.AuthProvider != nil {
+		return nil, errors.New("execProvider and authProvider cannot be used in combination")
+	}
+
+	if c.ExecProvider != nil {
+		provider, err := exec.GetAuthenticator(c.ExecProvider)
+		if err != nil {
+			return nil, err
+		}
+		if err := provider.UpdateTransportConfig(conf); err != nil {
+			return nil, err
+		}
+	}
+	if c.AuthProvider != nil {
+		provider, err := GetAuthProvider(c.Host, c.AuthProvider, c.AuthConfigPersister)
+		if err != nil {
+			return nil, err
+		}
+		conf.Wrap(provider.WrapTransport)
+	}
+	return conf, nil
+}
+
+// Wrap adds a transport middleware function that will give the caller
+// an opportunity to wrap the underlying http.RoundTripper prior to the
+// first API call being made. The provided function is invoked after any
+// existing transport wrappers are invoked.
+func (c *Config) Wrap(fn transport.WrapperFunc) {
+	c.WrapTransport = transport.Wrappers(c.WrapTransport, fn)
 }

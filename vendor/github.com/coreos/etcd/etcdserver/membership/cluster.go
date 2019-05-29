@@ -16,6 +16,7 @@ package membership
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/binary"
 	"encoding/json"
@@ -26,8 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/coreos/etcd/mvcc/backend"
 	"github.com/coreos/etcd/pkg/netutil"
 	"github.com/coreos/etcd/pkg/types"
@@ -35,6 +34,7 @@ import (
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/store"
 	"github.com/coreos/etcd/version"
+
 	"github.com/coreos/go-semver/semver"
 )
 
@@ -178,7 +178,7 @@ func (c *RaftCluster) String() string {
 	fmt.Fprintf(b, "Members:[%s] ", strings.Join(ms, " "))
 	var ids []string
 	for id := range c.removed {
-		ids = append(ids, fmt.Sprintf("%s", id))
+		ids = append(ids, id.String())
 	}
 	fmt.Fprintf(b, "RemovedMemberIDs:[%s]}", strings.Join(ids, " "))
 	return b.String()
@@ -490,8 +490,8 @@ func ValidateClusterAndAssignIDs(local *RaftCluster, existing *RaftCluster) erro
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
 	for i := range ems {
-		if !netutil.URLStringsEqual(ctx, ems[i].PeerURLs, lms[i].PeerURLs) {
-			return fmt.Errorf("unmatched member while checking PeerURLs")
+		if ok, err := netutil.URLStringsEqual(ctx, ems[i].PeerURLs, lms[i].PeerURLs); !ok {
+			return fmt.Errorf("unmatched member while checking PeerURLs (%v)", err)
 		}
 		lms[i].ID = ems[i].ID
 	}

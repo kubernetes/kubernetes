@@ -15,20 +15,15 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl",
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["mustmatchpatterns_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl",
-    library = ":go_default_library",
-    deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
-    ],
+    embed = [":go_default_library"],
+    deps = ["//pkg/apis/core:go_default_library"],
 )
 
 filegroup(

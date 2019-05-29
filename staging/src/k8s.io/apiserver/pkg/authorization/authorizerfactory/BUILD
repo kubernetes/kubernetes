@@ -9,11 +9,10 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["builtin_test.go"],
-    importpath = "k8s.io/apiserver/pkg/authorization/authorizerfactory",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
     ],
 )
 
@@ -23,12 +22,13 @@ go_library(
         "builtin.go",
         "delegating.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authorization/authorizerfactory",
     importpath = "k8s.io/apiserver/pkg/authorization/authorizerfactory",
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
-        "//vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/apiserver/plugin/pkg/authorizer/webhook:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/authorization/v1beta1:go_default_library",
     ],
 )
 

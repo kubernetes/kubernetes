@@ -4,30 +4,39 @@ go_library(
     name = "go_default_library",
     srcs = [
         "terminal.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "util.go",
-            "util_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "util.go",
-            "util_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "util_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "util.go",
+        "util_bsd.go",
+        "util_linux.go",
+        "util_plan9.go",
+        "util_solaris.go",
+        "util_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/ssh/terminal",
     importpath = "golang.org/x/crypto/ssh/terminal",
     visibility = ["//visibility:public"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
+        "@io_bazel_rules_go//go/platform:darwin": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:dragonfly": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows:go_default_library",
         ],
         "//conditions:default": [],

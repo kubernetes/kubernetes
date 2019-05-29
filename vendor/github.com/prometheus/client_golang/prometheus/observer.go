@@ -45,6 +45,8 @@ type ObserverVec interface {
 	GetMetricWithLabelValues(lvs ...string) (Observer, error)
 	With(Labels) Observer
 	WithLabelValues(...string) Observer
+	CurryWith(Labels) (ObserverVec, error)
+	MustCurryWith(Labels) ObserverVec
 
 	Collector
 }

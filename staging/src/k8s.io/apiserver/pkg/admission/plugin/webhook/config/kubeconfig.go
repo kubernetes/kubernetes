@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1"
@@ -35,8 +36,8 @@ var (
 )
 
 func init() {
-	webhookadmission.AddToScheme(scheme)
-	v1alpha1.AddToScheme(scheme)
+	utilruntime.Must(webhookadmission.AddToScheme(scheme))
+	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 }
 
 // LoadConfig extract the KubeConfigFile from configFile

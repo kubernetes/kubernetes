@@ -5,18 +5,15 @@ go_library(
     srcs = [
         "dialer.go",
         "dialer_unix.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "dialer_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "dialer_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/containerd/containerd/dialer",
     importpath = "github.com/containerd/containerd/dialer",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/pkg/errors:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
+        "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/github.com/Microsoft/go-winio:go_default_library",
         ],
         "//conditions:default": [],

@@ -18,7 +18,6 @@ package server
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/http"
 	rt "runtime"
@@ -26,15 +25,13 @@ import (
 	"strings"
 
 	"github.com/emicklei/go-restful"
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/mux"
-	genericmux "k8s.io/apiserver/pkg/server/mux"
 )
 
 // APIServerHandlers holds the different http.Handlers used by the API server.
@@ -73,8 +70,8 @@ type APIServerHandler struct {
 // It is normally used to apply filtering like authentication and authorization
 type HandlerChainBuilderFn func(apiHandler http.Handler) http.Handler
 
-func NewAPIServerHandler(name string, contextMapper request.RequestContextMapper, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
-	nonGoRestfulMux := genericmux.NewPathRecorderMux(name)
+func NewAPIServerHandler(name string, s runtime.NegotiatedSerializer, handlerChainBuilder HandlerChainBuilderFn, notFoundHandler http.Handler) *APIServerHandler {
+	nonGoRestfulMux := mux.NewPathRecorderMux(name)
 	if notFoundHandler != nil {
 		nonGoRestfulMux.NotFoundHandler(notFoundHandler)
 	}
@@ -86,11 +83,7 @@ func NewAPIServerHandler(name string, contextMapper request.RequestContextMapper
 		logStackOnRecover(s, panicReason, httpWriter)
 	})
 	gorestfulContainer.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-		ctx, ok := contextMapper.Get(request.Request)
-		if !ok {
-			responsewriters.InternalError(response.ResponseWriter, request.Request, errors.New("no context found for request"))
-		}
-		serviceErrorHandler(ctx, s, serviceErr, request, response)
+		serviceErrorHandler(s, serviceErr, request, response)
 	})
 
 	director := director{
@@ -137,7 +130,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// normally these are passed to the nonGoRestfulMux, but if discovery is enabled, it will go directly.
 			// We can't rely on a prefix match since /apis matches everything (see the big comment on Director above)
 			if path == "/apis" || path == "/apis/" {
-				glog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+				klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
 				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
 				// TODO fix gorestful, remove TPRs, or stop using gorestful
 				d.goRestfulContainer.Dispatch(w, req)
@@ -147,7 +140,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		case strings.HasPrefix(path, ws.RootPath()):
 			// ensure an exact match or a path boundary match
 			if len(path) == len(ws.RootPath()) || path[len(ws.RootPath())] == '/' {
-				glog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
+				klog.V(5).Infof("%v: %v %q satisfied by gorestful with webservice %v", d.name, req.Method, path, ws.RootPath())
 				// don't use servemux here because gorestful servemuxes get messed up when removing webservices
 				// TODO fix gorestful, remove TPRs, or stop using gorestful
 				d.goRestfulContainer.Dispatch(w, req)
@@ -157,7 +150,7 @@ func (d director) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// if we didn't find a match, then we just skip gorestful altogether
-	glog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)
+	klog.V(5).Infof("%v: %v %q satisfied by nonGoRestful", d.name, req.Method, path)
 	d.nonGoRestfulMux.ServeHTTP(w, req)
 }
 
@@ -172,19 +165,17 @@ func logStackOnRecover(s runtime.NegotiatedSerializer, panicReason interface{}, 
 		}
 		buffer.WriteString(fmt.Sprintf("    %s:%d\r\n", file, line))
 	}
-	glog.Errorln(buffer.String())
+	klog.Errorln(buffer.String())
 
 	headers := http.Header{}
 	if ct := w.Header().Get("Content-Type"); len(ct) > 0 {
 		headers.Set("Accept", ct)
 	}
-	emptyContext := request.NewContext() // best we can do here: we don't know the request
-	responsewriters.ErrorNegotiated(emptyContext, apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", schema.GroupResource{}, "", "", 0, false), s, schema.GroupVersion{}, w, &http.Request{Header: headers})
+	responsewriters.ErrorNegotiated(apierrors.NewGenericServerResponse(http.StatusInternalServerError, "", schema.GroupResource{}, "", "", 0, false), s, schema.GroupVersion{}, w, &http.Request{Header: headers})
 }
 
-func serviceErrorHandler(ctx request.Context, s runtime.NegotiatedSerializer, serviceErr restful.ServiceError, request *restful.Request, resp *restful.Response) {
+func serviceErrorHandler(s runtime.NegotiatedSerializer, serviceErr restful.ServiceError, request *restful.Request, resp *restful.Response) {
 	responsewriters.ErrorNegotiated(
-		ctx,
 		apierrors.NewGenericServerResponse(serviceErr.Code, "", schema.GroupResource{}, "", serviceErr.Message, 0, false),
 		s,
 		schema.GroupVersion{},

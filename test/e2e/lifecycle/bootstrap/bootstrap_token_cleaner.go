@@ -20,11 +20,10 @@ import (
 	"time"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/lifecycle"
 )
@@ -45,41 +44,41 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 			By("delete the bootstrap token secret")
 			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(secretNeedClean, &metav1.DeleteOptions{})
 			secretNeedClean = ""
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 		}
 	})
 	It("should delete the token secret when the secret expired", func() {
 		By("create a new expired bootstrap token secret")
 		tokenId, err := GenerateTokenId()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		tokenSecret, err := GenerateTokenSecret()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		secret := newTokenSecret(tokenId, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(-time.Hour))
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
 
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("wait for the bootstrap token secret be deleted")
 		err = WaitForBootstrapTokenSecretToDisappear(c, tokenId)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 
 	It("should not delete the token secret when the secret is not expired", func() {
 		By("create a new expired bootstrap token secret")
 		tokenId, err := GenerateTokenId()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		tokenSecret, err := GenerateTokenSecret()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		secret := newTokenSecret(tokenId, tokenSecret)
 		addSecretExpiration(secret, TimeStringFromNow(time.Hour))
 		_, err = c.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret)
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 
 		By("wait for the bootstrap token secret not be deleted")
 		err = WaitForBootstrapTokenSecretNotDisappear(c, tokenId, 20*time.Second)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 })

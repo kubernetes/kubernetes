@@ -1,11 +1,11 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
-	"golang.org/x/net/context"
 )
 
 // ConfigCreate creates a new Config.
@@ -15,11 +15,11 @@ func (cli *Client) ConfigCreate(ctx context.Context, config swarm.ConfigSpec) (t
 		return response, err
 	}
 	resp, err := cli.post(ctx, "/configs/create", nil, config, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&response)
-	ensureReaderClosed(resp)
 	return response, err
 }

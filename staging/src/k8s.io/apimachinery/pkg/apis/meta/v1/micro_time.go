@@ -20,9 +20,6 @@ import (
 	"encoding/json"
 	"time"
 
-	openapi "k8s.io/kube-openapi/pkg/common"
-
-	"github.com/go-openapi/spec"
 	"github.com/google/gofuzz"
 )
 
@@ -42,11 +39,6 @@ type MicroTime struct {
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
 func (t *MicroTime) DeepCopyInto(out *MicroTime) {
 	*out = *t
-}
-
-// String returns the representation of the time.
-func (t MicroTime) String() string {
-	return t.Time.String()
 }
 
 // NewMicroTime returns a wrapped instance of the provided time
@@ -75,22 +67,40 @@ func (t *MicroTime) IsZero() bool {
 
 // Before reports whether the time instant t is before u.
 func (t *MicroTime) Before(u *MicroTime) bool {
-	return t.Time.Before(u.Time)
+	if t != nil && u != nil {
+		return t.Time.Before(u.Time)
+	}
+	return false
 }
 
 // Equal reports whether the time instant t is equal to u.
 func (t *MicroTime) Equal(u *MicroTime) bool {
-	return t.Time.Equal(u.Time)
+	if t == nil && u == nil {
+		return true
+	}
+	if t != nil && u != nil {
+		return t.Time.Equal(u.Time)
+	}
+	return false
 }
 
 // BeforeTime reports whether the time instant t is before second-lever precision u.
 func (t *MicroTime) BeforeTime(u *Time) bool {
-	return t.Time.Before(u.Time)
+	if t != nil && u != nil {
+		return t.Time.Before(u.Time)
+	}
+	return false
 }
 
 // EqualTime reports whether the time instant t is equal to second-lever precision u.
 func (t *MicroTime) EqualTime(u *Time) bool {
-	return t.Time.Equal(u.Time)
+	if t == nil && u == nil {
+		return true
+	}
+	if t != nil && u != nil {
+		return t.Time.Equal(u.Time)
+	}
+	return false
 }
 
 // UnixMicro returns the local time corresponding to the given Unix time
@@ -107,7 +117,10 @@ func (t *MicroTime) UnmarshalJSON(b []byte) error {
 	}
 
 	var str string
-	json.Unmarshal(b, &str)
+	err := json.Unmarshal(b, &str)
+	if err != nil {
+		return err
+	}
 
 	pt, err := time.Parse(RFC3339Micro, str)
 	if err != nil {
@@ -149,16 +162,15 @@ func (t MicroTime) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t.UTC().Format(RFC3339Micro))
 }
 
-func (_ MicroTime) OpenAPIDefinition() openapi.OpenAPIDefinition {
-	return openapi.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type:   []string{"string"},
-				Format: "date-time",
-			},
-		},
-	}
-}
+// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ MicroTime) OpenAPISchemaType() []string { return []string{"string"} }
+
+// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+func (_ MicroTime) OpenAPISchemaFormat() string { return "date-time" }
 
 // MarshalQueryParameter converts to a URL query parameter value
 func (t MicroTime) MarshalQueryParameter() (string, error) {

@@ -17,20 +17,20 @@ go_library(
         "types_jsonschema.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
-    importpath = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions",
-    library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
+    embed = [":go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 filegroup(

@@ -15,14 +15,13 @@
 package compactor
 
 import (
-	"sync"
+	"context"
+	"fmt"
 	"time"
 
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/coreos/etcd/mvcc"
+
 	"github.com/coreos/pkg/capnslog"
-	"github.com/jonboulle/clockwork"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -30,8 +29,22 @@ var (
 )
 
 const (
-	checkCompactionInterval = 5 * time.Minute
+	ModePeriodic = "periodic"
+	ModeRevision = "revision"
 )
+
+// Compactor purges old log from the storage periodically.
+type Compactor interface {
+	// Run starts the main loop of the compactor in background.
+	// Use Stop() to halt the loop and release the resource.
+	Run()
+	// Stop halts the main loop of the compactor.
+	Stop()
+	// Pause temporally suspend the compactor not to run compaction. Resume() to unpose.
+	Pause()
+	// Resume restarts the compactor suspended by Pause().
+	Resume()
+}
 
 type Compactable interface {
 	Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.CompactionResponse, error)
@@ -41,93 +54,13 @@ type RevGetter interface {
 	Rev() int64
 }
 
-type Periodic struct {
-	clock        clockwork.Clock
-	periodInHour int
-
-	rg RevGetter
-	c  Compactable
-
-	revs   []int64
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	mu     sync.Mutex
-	paused bool
-}
-
-func NewPeriodic(h int, rg RevGetter, c Compactable) *Periodic {
-	return &Periodic{
-		clock:        clockwork.NewRealClock(),
-		periodInHour: h,
-		rg:           rg,
-		c:            c,
+func New(mode string, retention time.Duration, rg RevGetter, c Compactable) (Compactor, error) {
+	switch mode {
+	case ModePeriodic:
+		return NewPeriodic(retention, rg, c), nil
+	case ModeRevision:
+		return NewRevision(int64(retention), rg, c), nil
+	default:
+		return nil, fmt.Errorf("unsupported compaction mode %s", mode)
 	}
-}
-
-func (t *Periodic) Run() {
-	t.ctx, t.cancel = context.WithCancel(context.Background())
-	t.revs = make([]int64, 0)
-	clock := t.clock
-
-	go func() {
-		last := clock.Now()
-		for {
-			t.revs = append(t.revs, t.rg.Rev())
-			select {
-			case <-t.ctx.Done():
-				return
-			case <-clock.After(checkCompactionInterval):
-				t.mu.Lock()
-				p := t.paused
-				t.mu.Unlock()
-				if p {
-					continue
-				}
-			}
-			if clock.Now().Sub(last) < time.Duration(t.periodInHour)*time.Hour {
-				continue
-			}
-
-			rev := t.getRev(t.periodInHour)
-			if rev < 0 {
-				continue
-			}
-
-			plog.Noticef("Starting auto-compaction at revision %d", rev)
-			_, err := t.c.Compact(t.ctx, &pb.CompactionRequest{Revision: rev})
-			if err == nil || err == mvcc.ErrCompacted {
-				t.revs = make([]int64, 0)
-				last = clock.Now()
-				plog.Noticef("Finished auto-compaction at revision %d", rev)
-			} else {
-				plog.Noticef("Failed auto-compaction at revision %d (%v)", err, rev)
-				plog.Noticef("Retry after %v", checkCompactionInterval)
-			}
-		}
-	}()
-}
-
-func (t *Periodic) Stop() {
-	t.cancel()
-}
-
-func (t *Periodic) Pause() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.paused = true
-}
-
-func (t *Periodic) Resume() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.paused = false
-}
-
-func (t *Periodic) getRev(h int) int64 {
-	i := len(t.revs) - int(time.Duration(h)*time.Hour/checkCompactionInterval)
-	if i < 0 {
-		return -1
-	}
-	return t.revs[i]
 }

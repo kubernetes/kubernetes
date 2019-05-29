@@ -4,23 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = [
         "hsalsa20.go",
+        "salsa2020_amd64.s",
         "salsa208.go",
+        "salsa20_amd64.go",
         "salsa20_ref.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "salsa2020_amd64.s",
-            "salsa20_amd64.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "salsa2020_amd64.s",
-            "salsa20_amd64.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "salsa2020_amd64.s",
-            "salsa20_amd64.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/golang.org/x/crypto/salsa20/salsa",
     importpath = "golang.org/x/crypto/salsa20/salsa",
     visibility = ["//visibility:public"],
 )

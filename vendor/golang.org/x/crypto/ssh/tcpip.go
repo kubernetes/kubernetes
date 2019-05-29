@@ -90,10 +90,19 @@ type channelForwardMsg struct {
 	rport uint32
 }
 
+// handleForwards starts goroutines handling forwarded connections.
+// It's called on first use by (*Client).ListenTCP to not launch
+// goroutines until needed.
+func (c *Client) handleForwards() {
+	go c.forwards.handleChannels(c.HandleChannelOpen("forwarded-tcpip"))
+	go c.forwards.handleChannels(c.HandleChannelOpen("forwarded-streamlocal@openssh.com"))
+}
+
 // ListenTCP requests the remote peer open a listening socket
 // on laddr. Incoming connections will be available by calling
 // Accept on the returned net.Listener.
 func (c *Client) ListenTCP(laddr *net.TCPAddr) (net.Listener, error) {
+	c.handleForwardsOnce.Do(c.handleForwards)
 	if laddr.Port == 0 && isBrokenOpenSSHVersion(string(c.ServerVersion())) {
 		return c.autoPortListenWorkaround(laddr)
 	}

@@ -60,12 +60,12 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
 	for _, group := range g.groups {
 		for _, version := range group.Versions {
-			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", group.PackageName, version.NonEmpty())
+			groupClientPackage := filepath.Join(g.fakeClientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
 			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
 
-			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{group.Group, version}])
-			imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", groupAlias, version.NonEmpty(), groupClientPackage)))
-			imports = append(imports, strings.ToLower(fmt.Sprintf("fake%s%s \"%s\"", groupAlias, version.NonEmpty(), fakeGroupClientPackage)))
+			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
+			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), groupClientPackage))
+			imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), fakeGroupClientPackage))
 		}
 	}
 	// the package that has the clientset Interface
@@ -87,7 +87,7 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	// perhaps we can adapt the go2ild framework to this kind of usage.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	allGroups := clientgentypes.ToGroupVersionPackages(g.groups, g.groupGoNames)
+	allGroups := clientgentypes.ToGroupVersionInfo(g.groups, g.groupGoNames)
 
 	sw.Do(common, nil)
 	sw.Do(checkImpl, nil)
@@ -102,10 +102,6 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 		}
 
 		sw.Do(clientsetInterfaceImplTemplate, m)
-		// don't generated the default method if generating internalversion clientset
-		if group.IsDefaultVersion && group.Version != "" {
-			sw.Do(clientsetInterfaceDefaultVersionImpl, m)
-		}
 	}
 
 	return sw.Error()
@@ -125,11 +121,20 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 	}
 
-	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
-	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
+	cs := &Clientset{tracker: o}
+	cs.discovery = &fakediscovery.FakeDiscovery{Fake: &cs.Fake}
+	cs.AddReactor("*", "*", testing.ObjectReaction(o))
+	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := o.Watch(gvr, ns)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, watch, nil
+	})
 
-	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
+	return cs
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -138,10 +143,15 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 type Clientset struct {
 	testing.Fake
 	discovery *fakediscovery.FakeDiscovery
+	tracker testing.ObjectTracker
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.discovery
+}
+
+func (c *Clientset) Tracker() testing.ObjectTracker {
+	return c.tracker
 }
 `
 

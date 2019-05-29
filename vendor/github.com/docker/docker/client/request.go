@@ -1,7 +1,8 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,9 +15,8 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/versions"
+	"github.com/docker/docker/errdefs"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
-	"golang.org/x/net/context/ctxhttp"
 )
 
 // serverResponse is a wrapper for http API responses.
@@ -121,25 +121,24 @@ func (cli *Client) sendRequest(ctx context.Context, method, path string, query u
 	}
 	resp, err := cli.doRequest(ctx, req)
 	if err != nil {
-		return resp, err
+		return resp, errdefs.FromStatusCode(err, resp.statusCode)
 	}
-	if err := cli.checkResponseErr(resp); err != nil {
-		return resp, err
-	}
-	return resp, nil
+	err = cli.checkResponseErr(resp)
+	return resp, errdefs.FromStatusCode(err, resp.statusCode)
 }
 
 func (cli *Client) doRequest(ctx context.Context, req *http.Request) (serverResponse, error) {
 	serverResp := serverResponse{statusCode: -1, reqURL: req.URL}
 
-	resp, err := ctxhttp.Do(ctx, cli.client, req)
+	req = req.WithContext(ctx)
+	resp, err := cli.client.Do(req)
 	if err != nil {
 		if cli.scheme != "https" && strings.Contains(err.Error(), "malformed HTTP response") {
 			return serverResp, fmt.Errorf("%v.\n* Are you trying to connect to a TLS-enabled daemon without TLS?", err)
 		}
 
 		if cli.scheme == "https" && strings.Contains(err.Error(), "bad certificate") {
-			return serverResp, fmt.Errorf("The server probably has client authentication (--tlsverify) enabled. Please check your TLS client certification settings: %v", err)
+			return serverResp, errors.Wrap(err, "The server probably has client authentication (--tlsverify) enabled. Please check your TLS client certification settings")
 		}
 
 		// Don't decorate context sentinel errors; users may be comparing to
@@ -198,12 +197,24 @@ func (cli *Client) checkResponseErr(serverResp serverResponse) error {
 		return nil
 	}
 
-	body, err := ioutil.ReadAll(serverResp.body)
-	if err != nil {
-		return err
+	var body []byte
+	var err error
+	if serverResp.body != nil {
+		bodyMax := 1 * 1024 * 1024 // 1 MiB
+		bodyR := &io.LimitedReader{
+			R: serverResp.body,
+			N: int64(bodyMax),
+		}
+		body, err = ioutil.ReadAll(bodyR)
+		if err != nil {
+			return err
+		}
+		if bodyR.N == 0 {
+			return fmt.Errorf("request returned %s with a message (> %d bytes) for API route and version %s, check if the server supports the requested API version", http.StatusText(serverResp.statusCode), bodyMax, serverResp.reqURL)
+		}
 	}
 	if len(body) == 0 {
-		return fmt.Errorf("Error: request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(serverResp.statusCode), serverResp.reqURL)
+		return fmt.Errorf("request returned %s for API route and version %s, check if the server supports the requested API version", http.StatusText(serverResp.statusCode), serverResp.reqURL)
 	}
 
 	var ct string
@@ -215,14 +226,14 @@ func (cli *Client) checkResponseErr(serverResp serverResponse) error {
 	if (cli.version == "" || versions.GreaterThan(cli.version, "1.23")) && ct == "application/json" {
 		var errorResponse types.ErrorResponse
 		if err := json.Unmarshal(body, &errorResponse); err != nil {
-			return fmt.Errorf("Error reading JSON: %v", err)
+			return errors.Wrap(err, "Error reading JSON")
 		}
-		errorMessage = errorResponse.Message
+		errorMessage = strings.TrimSpace(errorResponse.Message)
 	} else {
-		errorMessage = string(body)
+		errorMessage = strings.TrimSpace(string(body))
 	}
 
-	return fmt.Errorf("Error response from daemon: %s", strings.TrimSpace(errorMessage))
+	return errors.Wrap(errors.New(errorMessage), "Error response from daemon")
 }
 
 func (cli *Client) addHeaders(req *http.Request, headers headers) *http.Request {

@@ -1,10 +1,11 @@
-// +build linux
+// +build linux,!static_build
 
 package systemd
 
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/sirupsen/logrus"
 )
 
 type Manager struct {
@@ -74,7 +76,8 @@ var (
 	hasStartTransientUnit           bool
 	hasStartTransientSliceUnit      bool
 	hasTransientDefaultDependencies bool
-	hasDelegate                     bool
+	hasDelegateScope                bool
+	hasDelegateSlice                bool
 )
 
 func newProp(name string, units interface{}) systemdDbus.Property {
@@ -149,12 +152,12 @@ func UseSystemd() bool {
 		theConn.StopUnit(scope, "replace", nil)
 
 		// Assume StartTransientUnit on a scope allows Delegate
-		hasDelegate = true
-		dl := newProp("Delegate", true)
-		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dl}, nil); err != nil {
+		hasDelegateScope = true
+		dlScope := newProp("Delegate", true)
+		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dlScope}, nil); err != nil {
 			if dbusError, ok := err.(dbus.Error); ok {
 				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") {
-					hasDelegate = false
+					hasDelegateScope = false
 				}
 			}
 		}
@@ -184,6 +187,22 @@ func UseSystemd() bool {
 				break
 			}
 			time.Sleep(time.Millisecond)
+		}
+
+		// Not critical because of the stop unit logic above.
+		theConn.StopUnit(slice, "replace", nil)
+
+		// Assume StartTransientUnit on a slice allows Delegate
+		hasDelegateSlice = true
+		dlSlice := newProp("Delegate", true)
+		if _, err := theConn.StartTransientUnit(slice, "replace", []systemdDbus.Property{dlSlice}, nil); err != nil {
+			if dbusError, ok := err.(dbus.Error); ok {
+				// Starting with systemd v237, Delegate is not even a property of slices anymore,
+				// so the D-Bus call fails with "InvalidArgs" error.
+				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") || strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.InvalidArgs") {
+					hasDelegateSlice = false
+				}
+			}
 		}
 
 		// Not critical because of the stop unit logic above.
@@ -241,9 +260,16 @@ func (m *Manager) Apply(pid int) error {
 		properties = append(properties, newProp("PIDs", []uint32{uint32(pid)}))
 	}
 
-	if hasDelegate {
-		// This is only supported on systemd versions 218 and above.
-		properties = append(properties, newProp("Delegate", true))
+	// Check if we can delegate. This is only supported on systemd versions 218 and above.
+	if strings.HasSuffix(unitName, ".slice") {
+		if hasDelegateSlice {
+			// systemd 237 and above no longer allows delegation on a slice
+			properties = append(properties, newProp("Delegate", true))
+		}
+	} else {
+		if hasDelegateScope {
+			properties = append(properties, newProp("Delegate", true))
+		}
 	}
 
 	// Always enable accounting, this gets us the same behaviour as the fs implementation,
@@ -270,7 +296,20 @@ func (m *Manager) Apply(pid int) error {
 
 	// cpu.cfs_quota_us and cpu.cfs_period_us are controlled by systemd.
 	if c.Resources.CpuQuota != 0 && c.Resources.CpuPeriod != 0 {
-		cpuQuotaPerSecUSec := uint64(c.Resources.CpuQuota*1000000) / c.Resources.CpuPeriod
+		// corresponds to USEC_INFINITY in systemd
+		// if USEC_INFINITY is provided, CPUQuota is left unbound by systemd
+		// always setting a property value ensures we can apply a quota and remove it later
+		cpuQuotaPerSecUSec := uint64(math.MaxUint64)
+		if c.Resources.CpuQuota > 0 {
+			// systemd converts CPUQuotaPerSecUSec (microseconds per CPU second) to CPUQuota
+			// (integer percentage of CPU) internally.  This means that if a fractional percent of
+			// CPU is indicated by Resources.CpuQuota, we need to round up to the nearest
+			// 10ms (1% of a second) such that child cgroups can set the cpu.cfs_quota_us they expect.
+			cpuQuotaPerSecUSec = uint64(c.Resources.CpuQuota*1000000) / c.Resources.CpuPeriod
+			if cpuQuotaPerSecUSec%10000 != 0 {
+				cpuQuotaPerSecUSec = ((cpuQuotaPerSecUSec / 10000) + 1) * 10000
+			}
+		}
 		properties = append(properties,
 			newProp("CPUQuotaPerSecUSec", cpuQuotaPerSecUSec))
 	}
@@ -278,6 +317,12 @@ func (m *Manager) Apply(pid int) error {
 	if c.Resources.BlkioWeight != 0 {
 		properties = append(properties,
 			newProp("BlockIOWeight", uint64(c.Resources.BlkioWeight)))
+	}
+
+	if c.Resources.PidsLimit > 0 {
+		properties = append(properties,
+			newProp("TasksAccounting", true),
+			newProp("TasksMax", uint64(c.Resources.PidsLimit)))
 	}
 
 	// We have to set kernel memory here, as we can't change it once
@@ -288,7 +333,14 @@ func (m *Manager) Apply(pid int) error {
 		}
 	}
 
-	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, nil); err != nil && !isUnitExists(err) {
+	statusChan := make(chan string, 1)
+	if _, err := theConn.StartTransientUnit(unitName, "replace", properties, statusChan); err == nil {
+		select {
+		case <-statusChan:
+		case <-time.After(time.Second):
+			logrus.Warnf("Timed out while waiting for StartTransientUnit(%s) completion signal from dbus. Continuing...", unitName)
+		}
+	} else if !isUnitExists(err) {
 		return err
 	}
 
@@ -385,7 +437,7 @@ func joinCgroups(c *configs.Cgroup, pid int) error {
 
 // systemd represents slice hierarchy using `-`, so we need to follow suit when
 // generating the path of slice. Essentially, test-a-b.slice becomes
-// test.slice/test-a.slice/test-a-b.slice.
+// /test.slice/test-a.slice/test-a-b.slice.
 func ExpandSlice(slice string) (string, error) {
 	suffix := ".slice"
 	// Name has to end with ".slice", but can't be just ".slice".
@@ -411,10 +463,9 @@ func ExpandSlice(slice string) (string, error) {
 		}
 
 		// Append the component to the path and to the prefix.
-		path += prefix + component + suffix + "/"
+		path += "/" + prefix + component + suffix
 		prefix += component + "-"
 	}
-
 	return path, nil
 }
 

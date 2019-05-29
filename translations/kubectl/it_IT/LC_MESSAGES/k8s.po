@@ -1,6 +1,6 @@
 # Italian translation.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR evolution85@gmail.com, 2017.
 #
 msgid ""
@@ -1967,7 +1967,7 @@ msgstr ""
 msgid ""
 "\n"
 "\t\tOutput shell completion code for the specified shell (bash or zsh).\n"
-"\t\tThe shell code must be evalutated to provide interactive\n"
+"\t\tThe shell code must be evaluated to provide interactive\n"
 "\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n"
 "\t\tthe .bash_profile.\n"
 "\n"
@@ -3092,7 +3092,7 @@ msgstr "Imposta il current-context in un file kubeconfig"
 
 #: pkg/kubectl/cmd/describe.go:86
 msgid "Show details of a specific resource or group of resources"
-msgstr "Mostra i dettagli di una specifiche risorsa o un gruppo di risorse"
+msgstr "Mostra i dettagli di una specifica risorsa o un gruppo di risorse"
 
 #: pkg/kubectl/cmd/rollout/rollout_status.go:58
 msgid "Show the status of the rollout"

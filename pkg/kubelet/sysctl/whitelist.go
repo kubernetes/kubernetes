@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
+	policyvalidation "k8s.io/kubernetes/pkg/apis/policy/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -32,52 +30,29 @@ const (
 	ForbiddenReason         = "SysctlForbidden"
 )
 
-// SafeSysctlWhitelist returns the whitelist of safe sysctls and safe sysctl patterns (ending in *).
-//
-// A sysctl is called safe iff
-// - it is namespaced in the container or the pod
-// - it is isolated, i.e. has no influence on any other pod on the same node.
-func SafeSysctlWhitelist() []string {
-	return []string{
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_syncookies",
-	}
-}
-
-// Whitelist provides a list of allowed sysctls and sysctl patterns (ending in *)
-// and a function to check whether a given sysctl matches this list.
-type Whitelist interface {
-	// Validate checks that all sysctls given in a v1.SysctlsPodAnnotationKey annotation
-	// are valid according to the whitelist.
-	Validate(pod *v1.Pod) error
-}
-
 // patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
 // checks validity via a sysctl and prefix map, rejecting those which are not known
 // to be namespaced.
 type patternWhitelist struct {
-	sysctls       map[string]Namespace
-	prefixes      map[string]Namespace
-	annotationKey string
+	sysctls  map[string]Namespace
+	prefixes map[string]Namespace
 }
 
 var _ lifecycle.PodAdmitHandler = &patternWhitelist{}
 
 // NewWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
-func NewWhitelist(patterns []string, annotationKey string) (*patternWhitelist, error) {
+func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 	w := &patternWhitelist{
-		sysctls:       map[string]Namespace{},
-		prefixes:      map[string]Namespace{},
-		annotationKey: annotationKey,
+		sysctls:  map[string]Namespace{},
+		prefixes: map[string]Namespace{},
 	}
 
 	for _, s := range patterns {
-		if !extvalidation.IsValidSysctlPattern(s) {
+		if !policyvalidation.IsValidSysctlPattern(s) {
 			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
 				s,
 				validation.SysctlMaxLength,
-				extvalidation.SysctlPatternFmt,
+				policyvalidation.SysctlPatternFmt,
 			)
 		}
 		if strings.HasSuffix(s, "*") {
@@ -130,23 +105,13 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 	return fmt.Errorf("%q not whitelisted", sysctl)
 }
 
-// Admit checks that all sysctls given in a v1.SysctlsPodAnnotationKey annotation
+// Admit checks that all sysctls given in pod's security context
 // are valid according to the whitelist.
 func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
-	a := pod.Annotations[w.annotationKey]
-	if a == "" {
+	if pod.Spec.SecurityContext == nil || len(pod.Spec.SecurityContext.Sysctls) == 0 {
 		return lifecycle.PodAdmitResult{
 			Admit: true,
-		}
-	}
-
-	sysctls, err := v1helper.SysctlsFromPodAnnotation(a)
-	if err != nil {
-		return lifecycle.PodAdmitResult{
-			Admit:   false,
-			Reason:  AnnotationInvalidReason,
-			Message: fmt.Sprintf("invalid %s annotation: %v", w.annotationKey, err),
 		}
 	}
 
@@ -155,7 +120,7 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		hostNet = pod.Spec.HostNetwork
 		hostIPC = pod.Spec.HostIPC
 	}
-	for _, s := range sysctls {
+	for _, s := range pod.Spec.SecurityContext.Sysctls {
 		if err := w.validateSysctl(s.Name, hostNet, hostIPC); err != nil {
 			return lifecycle.PodAdmitResult{
 				Admit:   false,

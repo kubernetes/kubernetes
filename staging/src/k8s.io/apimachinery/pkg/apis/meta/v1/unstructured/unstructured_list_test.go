@@ -35,8 +35,9 @@ func TestUnstructuredList(t *testing.T) {
 	content := list.UnstructuredContent()
 	items := content["items"].([]interface{})
 	require.Len(t, items, 1)
-	val, ok := NestedFieldCopy(items[0].(map[string]interface{}), "metadata", "name")
-	require.True(t, ok)
+	val, found, err := NestedFieldCopy(items[0].(map[string]interface{}), "metadata", "name")
+	require.True(t, found)
+	require.NoError(t, err)
 	assert.Equal(t, "test", val)
 }
 

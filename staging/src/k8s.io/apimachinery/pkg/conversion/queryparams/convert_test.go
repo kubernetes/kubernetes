@@ -70,6 +70,7 @@ type childStructs struct {
 	Follow         bool         `json:"follow,omitempty"`
 	Previous       bool         `json:"previous,omitempty"`
 	SinceSeconds   *int64       `json:"sinceSeconds,omitempty"`
+	TailLines      *int64       `json:"tailLines,omitempty"`
 	SinceTime      *metav1.Time `json:"sinceTime,omitempty"`
 	EmptyTime      *metav1.Time `json:"emptyTime"`
 	NonPointerTime metav1.Time  `json:"nonPointerTime"`
@@ -99,6 +100,7 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 
 func TestConvert(t *testing.T) {
 	sinceSeconds := int64(123)
+	tailLines := int64(0)
 	sinceTime := metav1.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
 
 	tests := []struct {
@@ -182,6 +184,7 @@ func TestConvert(t *testing.T) {
 				Follow:         true,
 				Previous:       true,
 				SinceSeconds:   &sinceSeconds,
+				TailLines:      nil,
 				SinceTime:      &sinceTime, // test a custom marshaller
 				EmptyTime:      nil,        // test a nil custom marshaller without omitempty
 				NonPointerTime: sinceTime,
@@ -194,10 +197,11 @@ func TestConvert(t *testing.T) {
 				Follow:         true,
 				Previous:       true,
 				SinceSeconds:   &sinceSeconds,
+				TailLines:      &tailLines,
 				SinceTime:      nil, // test a nil custom marshaller with omitempty
 				NonPointerTime: sinceTime,
 			},
-			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "emptyTime": {""}, "nonPointerTime": {"2000-01-01T12:34:56Z"}},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "tailLines": {"0"}, "emptyTime": {""}, "nonPointerTime": {"2000-01-01T12:34:56Z"}},
 		},
 	}
 

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +groupName=wardle.k8s.io
 
 // Package api is the internal version of the API.
-// +groupName=wardle.k8s.io
-package wardle
+package wardle // import "k8s.io/sample-apiserver/pkg/apis/wardle"

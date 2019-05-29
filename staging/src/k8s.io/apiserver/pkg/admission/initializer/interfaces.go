@@ -17,7 +17,6 @@ limitations under the License.
 package initializer
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
@@ -39,11 +38,5 @@ type WantsExternalKubeInformerFactory interface {
 // WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
 type WantsAuthorizer interface {
 	SetAuthorizer(authorizer.Authorizer)
-	admission.InitializationValidator
-}
-
-// WantsScheme defines a function that accepts runtime.Scheme for admission plugins that need it.
-type WantsScheme interface {
-	SetScheme(*runtime.Scheme)
 	admission.InitializationValidator
 }

@@ -11,13 +11,13 @@ func newCountValue(val int, p *int) *countValue {
 }
 
 func (i *countValue) Set(s string) error {
-	v, err := strconv.ParseInt(s, 0, 64)
-	// -1 means that no specific value was passed, so increment
-	if v == -1 {
+	// "+1" means that no specific value was passed, so increment
+	if s == "+1" {
 		*i = countValue(*i + 1)
-	} else {
-		*i = countValue(v)
+		return nil
 	}
+	v, err := strconv.ParseInt(s, 0, 0)
+	*i = countValue(v)
 	return err
 }
 
@@ -54,7 +54,7 @@ func (f *FlagSet) CountVar(p *int, name string, usage string) {
 // CountVarP is like CountVar only take a shorthand for the flag name.
 func (f *FlagSet) CountVarP(p *int, name, shorthand string, usage string) {
 	flag := f.VarPF(newCountValue(0, p), name, shorthand, usage)
-	flag.NoOptDefVal = "-1"
+	flag.NoOptDefVal = "+1"
 }
 
 // CountVar like CountVar only the flag is placed on the CommandLine instead of a given flag set
@@ -83,7 +83,9 @@ func (f *FlagSet) CountP(name, shorthand string, usage string) *int {
 	return p
 }
 
-// Count like Count only the flag is placed on the CommandLine isntead of a given flag set
+// Count defines a count flag with specified name, default value, and usage string.
+// The return value is the address of an int variable that stores the value of the flag.
+// A count flag will add 1 to its value evey time it is found on the command line
 func Count(name string, usage string) *int {
 	return CommandLine.CountP(name, "", usage)
 }

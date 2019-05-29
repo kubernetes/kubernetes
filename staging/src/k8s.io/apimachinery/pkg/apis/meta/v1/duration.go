@@ -31,7 +31,10 @@ type Duration struct {
 // UnmarshalJSON implements the json.Unmarshaller interface.
 func (d *Duration) UnmarshalJSON(b []byte) error {
 	var str string
-	json.Unmarshal(b, &str)
+	err := json.Unmarshal(b, &str)
+	if err != nil {
+		return err
+	}
 
 	pd, err := time.ParseDuration(str)
 	if err != nil {
@@ -45,3 +48,13 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
 }
+
+// OpenAPISchemaType is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+//
+// See: https://github.com/kubernetes/kube-openapi/tree/master/pkg/generators
+func (_ Duration) OpenAPISchemaType() []string { return []string{"string"} }
+
+// OpenAPISchemaFormat is used by the kube-openapi generator when constructing
+// the OpenAPI spec of this type.
+func (_ Duration) OpenAPISchemaFormat() string { return "" }

@@ -12,11 +12,10 @@ go_test(
         "labels_test.go",
         "selector_test.go",
     ],
-    importpath = "k8s.io/apimachinery/pkg/labels",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/selection:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -28,12 +27,13 @@ go_library(
         "selector.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/labels",
     importpath = "k8s.io/apimachinery/pkg/labels",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/selection:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

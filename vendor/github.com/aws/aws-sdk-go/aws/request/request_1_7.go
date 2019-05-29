@@ -21,7 +21,7 @@ func (noBody) WriteTo(io.Writer) (int64, error) { return 0, nil }
 var NoBody = noBody{}
 
 // ResetBody rewinds the request body back to its starting position, and
-// set's the HTTP Request body reference. When the body is read prior
+// sets the HTTP Request body reference. When the body is read prior
 // to being sent in the HTTP request it will need to be rewound.
 //
 // ResetBody will automatically be called by the SDK's build handler, but if

@@ -12,21 +12,17 @@ go_library(
         "doc.go",
         "fake_shaper.go",
         "interfaces.go",
+        "linux.go",
         "unsupported.go",
         "utils.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/bandwidth",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//vendor/github.com/golang/glog:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
         ],
         "//conditions:default": [],
@@ -36,21 +32,16 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "linux_test.go",
         "utils_test.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
-    importpath = "k8s.io/kubernetes/pkg/util/bandwidth",
-    library = ":go_default_library",
+    ],
+    embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/exec/testing:go_default_library",
         ],

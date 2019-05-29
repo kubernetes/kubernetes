@@ -15,9 +15,10 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/authentication",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -36,6 +37,7 @@ filegroup(
         "//pkg/apis/authentication/install:all-srcs",
         "//pkg/apis/authentication/v1:all-srcs",
         "//pkg/apis/authentication/v1beta1:all-srcs",
+        "//pkg/apis/authentication/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

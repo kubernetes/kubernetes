@@ -1,10 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 reviewers:
 - smarterclayton
 - wojtek-t
 - caesarxuchao
 - liggitt
 - erictune
-- timothysc
 - soltysh
 - mml
 - mbohlool

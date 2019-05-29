@@ -8,8 +8,7 @@ load(
 
 go_binary(
     name = "porter",
-    importpath = "k8s.io/kubernetes/test/images/porter",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(

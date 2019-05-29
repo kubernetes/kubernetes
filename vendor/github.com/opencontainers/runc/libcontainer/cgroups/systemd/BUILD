@@ -4,23 +4,60 @@ go_library(
     name = "go_default_library",
     srcs = [
         "apply_nosystemd.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "apply_systemd.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "apply_systemd.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
-        "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+    deps = select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/coreos/go-systemd/dbus:go_default_library",
             "//vendor/github.com/coreos/go-systemd/util:go_default_library",
             "//vendor/github.com/godbus/dbus:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+            "//vendor/github.com/sirupsen/logrus:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
+            "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
         ],
         "//conditions:default": [],
     }),

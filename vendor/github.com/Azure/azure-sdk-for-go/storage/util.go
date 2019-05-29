@@ -71,6 +71,10 @@ func timeRfc1123Formatted(t time.Time) string {
 	return t.Format(http.TimeFormat)
 }
 
+func timeRFC3339Formatted(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05.0000000Z")
+}
+
 func mergeParams(v1, v2 url.Values) url.Values {
 	out := url.Values{}
 	for k, v := range v1 {
@@ -172,7 +176,7 @@ func addTimeout(params url.Values, timeout uint) url.Values {
 
 func addSnapshot(params url.Values, snapshot *time.Time) url.Values {
 	if snapshot != nil {
-		params.Add("snapshot", snapshot.Format("2006-01-02T15:04:05.0000000Z"))
+		params.Add("snapshot", timeRFC3339Formatted(*snapshot))
 	}
 	return params
 }
@@ -203,6 +207,11 @@ func (t *TimeRFC1123) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 	}
 	*t = TimeRFC1123(parse)
 	return nil
+}
+
+// MarshalXML marshals using time.RFC1123.
+func (t *TimeRFC1123) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
+	return e.EncodeElement(time.Time(*t).Format(time.RFC1123), start)
 }
 
 // returns a map of custom metadata values from the specified HTTP header

@@ -17,17 +17,13 @@ limitations under the License.
 package set
 
 import (
-	"fmt"
-	"io"
 	"strings"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/cli-runtime/pkg/resource"
 )
 
 // selectContainers allows one or more containers to be matched against a string or wildcard
@@ -42,33 +38,6 @@ func selectContainers(containers []v1.Container, spec string) ([]*v1.Container, 
 		}
 	}
 	return out, skipped
-}
-
-// handlePodUpdateError prints a more useful error to the end user when mutating a pod.
-func handlePodUpdateError(out io.Writer, err error, resource string) {
-	if statusError, ok := err.(*errors.StatusError); ok && errors.IsInvalid(err) {
-		errorDetails := statusError.Status().Details
-		if errorDetails.Kind == "Pod" {
-			all, match := true, false
-			for _, cause := range errorDetails.Causes {
-				if cause.Field == "spec" && strings.Contains(cause.Message, "may not update fields other than") {
-					fmt.Fprintf(out, "error: may not update %s in pod %q directly\n", resource, errorDetails.Name)
-					match = true
-				} else {
-					all = false
-				}
-			}
-			if all && match {
-				return
-			}
-		} else {
-			if ok := cmdutil.PrintErrorWithCauses(err, out); ok {
-				return
-			}
-		}
-	}
-
-	fmt.Fprintf(out, "error: %v\n", err)
 }
 
 // selectString returns true if the provided string matches spec, where spec is a string with
@@ -118,16 +87,16 @@ type Patch struct {
 	Patch  []byte
 }
 
-// patchFn is a function type that accepts an info object and returns a byte slice.
-// Implementations of patchFn should update the object and return it encoded.
-type patchFn func(*resource.Info) ([]byte, error)
+// PatchFn is a function type that accepts an info object and returns a byte slice.
+// Implementations of PatchFn should update the object and return it encoded.
+type PatchFn func(runtime.Object) ([]byte, error)
 
 // CalculatePatch calls the mutation function on the provided info object, and generates a strategic merge patch for
 // the changes in the object. Encoder must be able to encode the info into the appropriate destination type.
 // This function returns whether the mutation function made any change in the original object.
-func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn patchFn) bool {
+func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn PatchFn) bool {
 	patch.Before, patch.Err = runtime.Encode(encoder, patch.Info.Object)
-	patch.After, patch.Err = mutateFn(patch.Info)
+	patch.After, patch.Err = mutateFn(patch.Info.Object)
 	if patch.Err != nil {
 		return true
 	}
@@ -141,7 +110,7 @@ func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn patchFn) boo
 
 // CalculatePatches calculates patches on each provided info object. If the provided mutateFn
 // makes no change in an object, the object is not included in the final list of patches.
-func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn patchFn) []*Patch {
+func CalculatePatches(infos []*resource.Info, encoder runtime.Encoder, mutateFn PatchFn) []*Patch {
 	var patches []*Patch
 	for _, info := range infos {
 		patch := &Patch{Info: info}

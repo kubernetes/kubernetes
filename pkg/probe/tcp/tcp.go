@@ -23,19 +23,22 @@ import (
 
 	"k8s.io/kubernetes/pkg/probe"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
-func New() TCPProber {
+// New creates Prober.
+func New() Prober {
 	return tcpProber{}
 }
 
-type TCPProber interface {
+// Prober is an interface that defines the Probe function for doing TCP readiness/liveness checks.
+type Prober interface {
 	Probe(host string, port int, timeout time.Duration) (probe.Result, string, error)
 }
 
 type tcpProber struct{}
 
+// Probe returns a ProbeRunner capable of running an TCP check.
 func (pr tcpProber) Probe(host string, port int, timeout time.Duration) (probe.Result, string, error) {
 	return DoTCPProbe(net.JoinHostPort(host, strconv.Itoa(port)), timeout)
 }
@@ -52,7 +55,7 @@ func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error
 	}
 	err = conn.Close()
 	if err != nil {
-		glog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
+		klog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
 	}
 	return probe.Success, "", nil
 }

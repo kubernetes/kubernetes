@@ -27,7 +27,7 @@ write_files:
     permissions: 0644
     owner: root
     content: |
-      # This script reads a GCE metadata key for the user speficied Docker
+      # This script reads a GCE metadata key for the user specified Docker
       # version, downloads, and replaces the builtin Docker with it.
 
       set -x

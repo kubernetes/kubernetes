@@ -1,9 +1,0 @@
-[Unit]
-Description=Trigger docker-healthcheck periodically
-
-[Timer]
-OnUnitInactiveSec=10s
-Unit=docker-healthcheck.service
-
-[Install]
-WantedBy=multi-user.target

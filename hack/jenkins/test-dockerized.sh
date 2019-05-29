@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2015 The Kubernetes Authors.
 #
@@ -21,7 +21,11 @@ set -o xtrace
 
 retry() {
   for i in {1..5}; do
-    "$@" && return 0 || sleep $i
+    if "$@"; then
+      return 0
+    else
+      sleep "${i}"
+    fi
   done
   "$@"
 }
@@ -33,23 +37,22 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/tools/godep && godep version
-retry go get github.com/jstemmer/go-junit-report
+go install k8s.io/kubernetes/vendor/github.com/jstemmer/go-junit-report
 
 # Enable the Go race detector.
 export KUBE_RACE=-race
 # Disable coverage report
 export KUBE_COVER="n"
-# Produce a JUnit-style XML test report for Jenkins.
-export KUBE_JUNIT_REPORT_DIR=${WORKSPACE}/artifacts
-export ARTIFACTS_DIR=${WORKSPACE}/artifacts
+# Set artifacts directory
+export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
+# Produce a JUnit-style XML test report
+export KUBE_JUNIT_REPORT_DIR="${ARTIFACTS}"
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
-export KUBE_TIMEOUT='-timeout 300s'
 export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
 
-cd /go/src/k8s.io/kubernetes
+cd "${GOPATH}/src/k8s.io/kubernetes"
 
 make generated_files
 go install ./cmd/...
@@ -57,4 +60,3 @@ go install ./cmd/...
 
 make test-cmd
 make test-integration
-./hack/test-update-storage-objects.sh

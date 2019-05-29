@@ -1,0 +1,24 @@
+{
+	"Rules": [
+		{
+			"SelectorRegexp": "k8s[.]io/utils",
+			"AllowedPrefixes": [
+				"k8s.io/utils/net",
+				"k8s.io/utils/nsenter",
+				"k8s.io/utils/io",
+				"k8s.io/utils/strings",
+				"k8s.io/utils/exec",
+				"k8s.io/utils/path",
+				"k8s.io/utils/keymutex"
+			]
+		},
+		{
+			"SelectorRegexp": "k8s[.]io/kubernetes",
+			"AllowedPrefixes": [
+				"k8s.io/kubernetes/pkg/cloudprovider/providers",
+				"k8s.io/kubernetes/pkg/util/mount"
+			],
+			"ForbiddenPrefixes": []
+		}
+	]
+}

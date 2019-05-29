@@ -8,15 +8,18 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-# https://github.com/kubernetes-incubator/ip-masq-agent/blob/v2.0.0/README.md
-apiVersion: extensions/v1beta1
+# https://github.com/kubernetes-incubator/ip-masq-agent/blob/v2.4.1/README.md
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: ip-masq-agent
   namespace: kube-system
   labels:
-    addonmanager.kubernetes.io/mode: Reconcile  
+    addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: ip-masq-agent
   template:
     metadata:
       labels:
@@ -24,11 +27,15 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       serviceAccountName: ip-masq-agent
       hostNetwork: true
       containers:
       - name: ip-masq-agent
-        image: gcr.io/google-containers/ip-masq-agent-amd64:v2.0.2
+        image: k8s.gcr.io/ip-masq-agent-amd64:v2.4.1
+        args:
+          - --masq-chain=IP-MASQ
+          - --nomasq-all-reserved-ranges
         resources:
           requests:
             cpu: 10m
@@ -39,7 +46,8 @@ spec:
           - name: config
             mountPath: /etc/config
       nodeSelector:
-        beta.kubernetes.io/masq-agent-ds-ready: "true"  
+        # TODO(liggitt): switch to node.kubernetes.io/masq-agent-ds-ready in 1.16
+        beta.kubernetes.io/masq-agent-ds-ready: "true"
       volumes:
         - name: config
           configMap:
@@ -51,5 +59,9 @@ spec:
               - key: config
                 path: ip-masq-agent
       tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
       - key: "CriticalAddonsOnly"
         operator: "Exists"

@@ -4,14 +4,11 @@ go_library(
     name = "go_default_library",
     srcs = [
         "dlopen.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "dlopen_example.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "dlopen_example.go",
+    ],
     cgo = True,
     clinkopts = ["-ldl"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/pkg/dlopen",
     importpath = "github.com/coreos/pkg/dlopen",
     visibility = ["//visibility:public"],
 )

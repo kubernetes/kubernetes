@@ -12,5 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package lease provides an interface and implemetation for time-limited leases over arbitrary resources.
+// Package lease provides an interface and implementation for time-limited leases over arbitrary resources.
 package lease

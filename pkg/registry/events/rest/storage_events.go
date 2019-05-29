@@ -34,26 +34,23 @@ type RESTStorageProvider struct {
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(events.GroupName, legacyscheme.Registry, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
+	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(events.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(eventsapiv1beta1.SchemeGroupVersion) {
+	if apiResourceConfigSource.VersionEnabled(eventsapiv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[eventsapiv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
-		apiGroupInfo.GroupMeta.GroupVersion = eventsapiv1beta1.SchemeGroupVersion
 	}
 
 	return apiGroupInfo, true
 }
 
 func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
-	version := eventsapiv1beta1.SchemeGroupVersion
-
 	storage := map[string]rest.Storage{}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("events")) {
-		eventsStorage := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
-		storage["events"] = eventsStorage
-	}
+	// events
+	eventsStorage := eventstore.NewREST(restOptionsGetter, uint64(p.TTL.Seconds()))
+	storage["events"] = eventsStorage
+
 	return storage
 }
 

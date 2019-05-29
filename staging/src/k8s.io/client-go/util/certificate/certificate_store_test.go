@@ -17,12 +17,11 @@ limitations under the License.
 package certificate
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"k8s.io/client-go/util/cert"
 )
 
 func TestUpdateSymlinkExistingFileError(t *testing.T) {
@@ -69,16 +68,16 @@ func TestUpdateSymlinkNewFileNotExist(t *testing.T) {
 		pairNamePrefix: "kubelet",
 	}
 	if err := s.updateSymlink(oldPairFile); err != nil {
-		t.Errorf("Got %v, wanted successful update of the symlink to point to %q", err, oldPairFile)
+		t.Errorf("Got error %v, wanted successful update of the symlink to point to %q", err, oldPairFile)
 	}
 
 	if _, err := os.Stat(oldPairFile); err != nil {
-		t.Errorf("Got %v, wanted file %q to be there.", oldPairFile, err)
+		t.Errorf("Got error %v, wanted file %q to be there.", err, oldPairFile)
 	}
 
 	currentPairFile := filepath.Join(dir, "kubelet-current.pem")
 	if fi, err := os.Lstat(currentPairFile); err != nil {
-		t.Errorf("Got %v, wanted file %q to be there", currentPairFile, err)
+		t.Errorf("Got error %v, wanted file %q to be there", err, currentPairFile)
 	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
 		t.Errorf("Got %q not a symlink.", currentPairFile)
 	}
@@ -113,7 +112,7 @@ func TestUpdateSymlinkNoSymlink(t *testing.T) {
 	}
 
 	if _, err := os.Stat(pairFile); err != nil {
-		t.Errorf("Got error %v, wanted file %q to be there", pairFile, err)
+		t.Errorf("Got error %v, wanted file %q to be there", err, pairFile)
 	}
 	currentPairFile := filepath.Join(dir, "kubelet-current.pem")
 	if fi, err := os.Lstat(currentPairFile); err != nil {
@@ -178,96 +177,6 @@ func TestUpdateSymlinkReplaceExistingSymlink(t *testing.T) {
 	}
 }
 
-func TestLoadCertKeyBlocksNoFile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
-	if err != nil {
-		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-
-	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-
-	if _, _, err := loadCertKeyBlocks(pairFile); err == nil {
-		t.Errorf("Got no error, but expected %q not found.", pairFile)
-	}
-}
-
-func TestLoadCertKeyBlocksEmptyFile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
-	if err != nil {
-		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-
-	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	if err := ioutil.WriteFile(pairFile, nil, 0600); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
-	}
-
-	if _, _, err := loadCertKeyBlocks(pairFile); err == nil {
-		t.Errorf("Got no error, but expected %q not found.", pairFile)
-	}
-}
-
-func TestLoadCertKeyBlocksPartialFile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
-	if err != nil {
-		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-
-	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	if err := ioutil.WriteFile(pairFile, storeCertData.certificatePEM, 0600); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
-	}
-
-	if _, _, err := loadCertKeyBlocks(pairFile); err == nil {
-		t.Errorf("Got no error, but expected %q invalid.", pairFile)
-	}
-}
-
-func TestLoadCertKeyBlocks(t *testing.T) {
-	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
-	if err != nil {
-		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
-	}
-	defer func() {
-		if err := os.RemoveAll(dir); err != nil {
-			t.Errorf("Unable to clean up test directory %q: %v", dir, err)
-		}
-	}()
-
-	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	data := append(storeCertData.certificatePEM, []byte("\n")...)
-	data = append(data, storeCertData.keyPEM...)
-	if err := ioutil.WriteFile(pairFile, data, 0600); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
-	}
-
-	certBlock, keyBlock, err := loadCertKeyBlocks(pairFile)
-	if err != nil {
-		t.Errorf("Got %v, but expected no error.", pairFile)
-	}
-	if certBlock.Type != cert.CertificateBlockType {
-		t.Errorf("Got %q loaded from the pair file, expected a %q.", certBlock.Type, cert.CertificateBlockType)
-	}
-	if keyBlock.Type != cert.RSAPrivateKeyBlockType {
-		t.Errorf("Got %q loaded from the pair file, expected a %q.", keyBlock.Type, cert.RSAPrivateKeyBlockType)
-	}
-}
-
 func TestLoadFile(t *testing.T) {
 	dir, err := ioutil.TempDir("", "k8s-test-load-cert-key-blocks")
 	if err != nil {
@@ -280,21 +189,30 @@ func TestLoadFile(t *testing.T) {
 	}()
 
 	pairFile := filepath.Join(dir, "kubelet-pair.pem")
-	data := append(storeCertData.certificatePEM, []byte("\n")...)
-	data = append(data, storeCertData.keyPEM...)
-	if err := ioutil.WriteFile(pairFile, data, 0600); err != nil {
-		t.Fatalf("Unable to create the file %q: %v", pairFile, err)
-	}
 
-	cert, err := loadFile(pairFile)
-	if err != nil {
-		t.Fatalf("Could not load certificate from disk: %v", err)
+	tests := []struct {
+		desc string
+		data []byte
+	}{
+		{desc: "cert and key", data: bytes.Join([][]byte{storeCertData.certificatePEM, storeCertData.keyPEM}, []byte("\n"))},
+		{desc: "key and cert", data: bytes.Join([][]byte{storeCertData.keyPEM, storeCertData.certificatePEM}, []byte("\n"))},
 	}
-	if cert == nil {
-		t.Fatalf("There was no error, but no certificate data was returned.")
-	}
-	if cert.Leaf == nil {
-		t.Fatalf("Got an empty leaf, expected private data.")
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if err := ioutil.WriteFile(pairFile, tt.data, 0600); err != nil {
+				t.Fatalf("Unable to create the file %q: %v", pairFile, err)
+			}
+			cert, err := loadFile(pairFile)
+			if err != nil {
+				t.Fatalf("Could not load certificate from disk: %v", err)
+			}
+			if cert == nil {
+				t.Fatalf("There was no error, but no certificate data was returned.")
+			}
+			if cert.Leaf == nil {
+				t.Fatalf("Got an empty leaf, expected private data.")
+			}
+		})
 	}
 }
 

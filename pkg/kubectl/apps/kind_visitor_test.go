@@ -173,7 +173,7 @@ type TestKindVisitor struct {
 
 var _ apps.KindVisitor = &TestKindVisitor{}
 
-func (t *TestKindVisitor) Visit(kind apps.GroupKindElement) { t.visits[kind.Kind] += 1 }
+func (t *TestKindVisitor) Visit(kind apps.GroupKindElement) { t.visits[kind.Kind]++ }
 
 func (t *TestKindVisitor) VisitDaemonSet(kind apps.GroupKindElement)             { t.Visit(kind) }
 func (t *TestKindVisitor) VisitDeployment(kind apps.GroupKindElement)            { t.Visit(kind) }

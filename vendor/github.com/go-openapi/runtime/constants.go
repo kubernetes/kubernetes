@@ -36,6 +36,10 @@ const (
 	XMLMime = "application/xml"
 	// TextMime the text mime type
 	TextMime = "text/plain"
+	// HTMLMime the html mime type
+	HTMLMime = "text/html"
 	// MultipartFormMime the multipart form mime type
 	MultipartFormMime = "multipart/form-data"
+	// URLencodedFormMime the url encoded form mime type
+	URLencodedFormMime = "application/x-www-form-urlencoded"
 )

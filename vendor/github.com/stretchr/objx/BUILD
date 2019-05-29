@@ -14,6 +14,7 @@ go_library(
         "type_specific_codegen.go",
         "value.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/stretchr/objx",
     importpath = "github.com/stretchr/objx",
     visibility = ["//visibility:public"],
 )

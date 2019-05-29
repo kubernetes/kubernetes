@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-build:
-	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o webhook .
-	docker build --no-cache -t gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v6 .
-	rm -rf webhook
-push:
-	gcloud docker -- push gcr.io/kubernetes-e2e-test-images/k8s-sample-admission-webhook-amd64:1.8v6
+SRCS=webhook
+ARCH ?= amd64
+TARGET ?= $(CURDIR)
+GOLANG_VERSION ?= latest
+SRC_DIR = $(notdir $(shell pwd))
+export
+
+bin:
+	../image-util.sh bin $(SRCS)
+
+.PHONY: bin

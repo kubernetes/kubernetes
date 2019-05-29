@@ -21,14 +21,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
-	"k8s.io/api/core/v1"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	v1 "k8s.io/api/core/v1"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
 	"fmt"
 	"strconv"
@@ -70,9 +72,10 @@ type ContainerManager interface {
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
 	GetCapacity() v1.ResourceList
 
-	// GetDevicePluginResourceCapacity returns the amount of device plugin resources available on the node
+	// GetDevicePluginResourceCapacity returns the node capacity (amount of total device plugin resources),
+	// node allocatable (amount of total healthy resources reported by device plugin),
 	// and inactive device plugin resources previously registered on the node.
-	GetDevicePluginResourceCapacity() (v1.ResourceList, []string)
+	GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string)
 
 	// UpdateQOSCgroups performs housekeeping updates to ensure that the top
 	// level QoS containers have their desired state in a thread-safe way
@@ -87,9 +90,24 @@ type ContainerManager interface {
 	// Otherwise, it updates allocatableResource in nodeInfo if necessary,
 	// to make sure it is at least equal to the pod's requested capacity for
 	// any registered device plugin resource
-	UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error
+	UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
 	InternalContainerLifecycle() InternalContainerLifecycle
+
+	// GetPodCgroupRoot returns the cgroup which contains all pods.
+	GetPodCgroupRoot() string
+
+	// GetPluginRegistrationHandler returns a plugin registration handler
+	// The pluginwatcher's Handlers allow to have a single module for handling
+	// registration.
+	GetPluginRegistrationHandler() pluginwatcher.PluginHandler
+
+	// GetDevices returns information about the devices assigned to pods and containers
+	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+
+	// ShouldResetExtendedResourceCapacity returns whether or not the extended resources should be zeroed,
+	// due to node recreation.
+	ShouldResetExtendedResourceCapacity() bool
 }
 
 type NodeConfig struct {
@@ -103,9 +121,12 @@ type NodeConfig struct {
 	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
-	ExperimentalQOSReserved               map[v1.ResourceName]int64
+	QOSReserved                           map[v1.ResourceName]int64
 	ExperimentalCPUManagerPolicy          string
 	ExperimentalCPUManagerReconcilePeriod time.Duration
+	ExperimentalPodPidsLimit              int64
+	EnforceCPULimits                      bool
+	CPUCFSQuotaPeriod                     time.Duration
 }
 
 type NodeAllocatableConfig struct {
@@ -122,18 +143,7 @@ type Status struct {
 	SoftRequirements error
 }
 
-const (
-	// Uer visible keys for managing node allocatable enforcement on the node.
-	NodeAllocatableEnforcementKey = "pods"
-	SystemReservedEnforcementKey  = "system-reserved"
-	KubeReservedEnforcementKey    = "kube-reserved"
-)
-
-// containerManager for the kubelet is currently an injected dependency.
-// We need to parse the --qos-reserve-requests option in
-// cmd/kubelet/app/server.go and there isn't really a good place to put
-// the code.  If/When the kubelet dependency injection gets worked out,
-// maybe there will be a better place for it.
+// parsePercentage parses the percentage string to numeric value.
 func parsePercentage(v string) (int64, error) {
 	if !strings.HasSuffix(v, "%") {
 		return 0, fmt.Errorf("percentage expected, got '%s'", v)

@@ -44,7 +44,9 @@ type Signature struct {
 const CertTimeInfinity = 1<<64 - 1
 
 // An Certificate represents an OpenSSH certificate as defined in
-// [PROTOCOL.certkeys]?rev=1.8.
+// [PROTOCOL.certkeys]?rev=1.8. The Certificate type implements the
+// PublicKey interface, so it can be unmarshaled using
+// ParsePublicKey.
 type Certificate struct {
 	Nonce           []byte
 	Key             PublicKey
@@ -340,10 +342,10 @@ func (c *CertChecker) Authenticate(conn ConnMetadata, pubKey PublicKey) (*Permis
 // the signature of the certificate.
 func (c *CertChecker) CheckCert(principal string, cert *Certificate) error {
 	if c.IsRevoked != nil && c.IsRevoked(cert) {
-		return fmt.Errorf("ssh: certicate serial %d revoked", cert.Serial)
+		return fmt.Errorf("ssh: certificate serial %d revoked", cert.Serial)
 	}
 
-	for opt, _ := range cert.CriticalOptions {
+	for opt := range cert.CriticalOptions {
 		// sourceAddressCriticalOption will be enforced by
 		// serverAuthenticate
 		if opt == sourceAddressCriticalOption {

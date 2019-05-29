@@ -6,19 +6,17 @@ go_library(
         "doc.go",
         "keysparsing.go",
         "lexer.go",
-        "match.go",
+        "marshal.go",
         "parser.go",
         "position.go",
-        "query.go",
-        "querylexer.go",
-        "queryparser.go",
         "token.go",
         "toml.go",
-        "tomltree_conversions.go",
+        "tomltree_create.go",
+        "tomltree_write.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/pelletier/go-toml",
     importpath = "github.com/pelletier/go-toml",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/pelletier/go-buffruneio:go_default_library"],
 )
 
 filegroup(

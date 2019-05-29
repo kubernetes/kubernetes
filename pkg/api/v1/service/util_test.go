@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	netsets "k8s.io/kubernetes/pkg/util/net/sets"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
@@ -48,18 +48,18 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 	checkError("10.0.0.1/32, ")
 	checkError("10.0.0.1")
 
-	checkOK := func(v string) netsets.IPNet {
+	checkOK := func(v string) utilnet.IPNetSet {
 		annotations := make(map[string]string)
 		annotations[v1.AnnotationLoadBalancerSourceRangesKey] = v
 		svc := v1.Service{}
 		svc.Annotations = annotations
-		cidrs, err := GetLoadBalancerSourceRanges(&svc)
+		_, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
 		svc = v1.Service{}
 		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
-		cidrs, err = GetLoadBalancerSourceRanges(&svc)
+		cidrs, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
@@ -112,7 +112,7 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 
 func TestAllowAll(t *testing.T) {
 	checkAllowAll := func(allowAll bool, cidrs ...string) {
-		ipnets, err := netsets.ParseIPNets(cidrs...)
+		ipnets, err := utilnet.ParseIPNets(cidrs...)
 		if err != nil {
 			t.Errorf("Unexpected error parsing cidrs: %v", cidrs)
 		}
@@ -151,25 +151,25 @@ func TestRequestsOnlyLocalTraffic(t *testing.T) {
 	})
 	checkRequestsOnlyLocalTraffic(false, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
+			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(true, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
+			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(false, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
+			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkRequestsOnlyLocalTraffic(true, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
+			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
@@ -191,25 +191,25 @@ func TestNeedsHealthCheck(t *testing.T) {
 	})
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
+			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeNodePort,
+			Type:                  v1.ServiceTypeNodePort,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})
 	checkNeedsHealthCheck(false, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
+			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
 		},
 	})
 	checkNeedsHealthCheck(true, &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: v1.ServiceTypeLoadBalancer,
+			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	})

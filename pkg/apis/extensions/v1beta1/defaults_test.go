@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta1_test
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -33,6 +34,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	. "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
@@ -81,7 +83,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
 						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
-					RevisionHistoryLimit: newInt32(10),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
 			},
 		},
@@ -94,7 +96,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				},
 				Spec: extensionsv1beta1.DaemonSetSpec{
 					Template:             defaultTemplate,
-					RevisionHistoryLimit: newInt32(1),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
 				},
 			},
 			expected: &extensionsv1beta1.DaemonSet{
@@ -111,7 +113,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
 						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
-					RevisionHistoryLimit: newInt32(1),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
 				},
 			},
 		},
@@ -123,7 +125,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
 						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
-					RevisionHistoryLimit: newInt32(10),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
 			},
 		},
@@ -137,7 +139,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 					UpdateStrategy: extensionsv1beta1.DaemonSetUpdateStrategy{
 						Type: extensionsv1beta1.OnDeleteDaemonSetStrategyType,
 					},
-					RevisionHistoryLimit: newInt32(10),
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
 				},
 			},
 		},
@@ -179,7 +181,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			original: &extensionsv1beta1.Deployment{},
 			expected: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(1),
+					Replicas: utilpointer.Int32Ptr(1),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
@@ -187,14 +189,16 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
+					RevisionHistoryLimit:    utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
 		{
 			original: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
 							MaxSurge: &differentIntOrString,
@@ -204,7 +208,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
@@ -212,14 +216,16 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
+					RevisionHistoryLimit:    utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
 		{
 			original: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(3),
+					Replicas: utilpointer.Int32Ptr(3),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type:          extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: nil,
@@ -228,7 +234,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(3),
+					Replicas: utilpointer.Int32Ptr(3),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &extensionsv1beta1.RollingUpdateDeployment{
@@ -236,14 +242,16 @@ func TestSetDefaultDeployment(t *testing.T) {
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},
-					Template: defaultTemplate,
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
+					RevisionHistoryLimit:    utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
 		{
 			original: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
@@ -251,32 +259,35 @@ func TestSetDefaultDeployment(t *testing.T) {
 			},
 			expected: &extensionsv1beta1.Deployment{
 				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(5),
-					Strategy: extensionsv1beta1.DeploymentStrategy{
-						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
-					},
-					Template: defaultTemplate,
-				},
-			},
-		},
-		{
-			original: &extensionsv1beta1.Deployment{
-				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(5),
-					Strategy: extensionsv1beta1.DeploymentStrategy{
-						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
-					},
-					ProgressDeadlineSeconds: newInt32(30),
-				},
-			},
-			expected: &extensionsv1beta1.Deployment{
-				Spec: extensionsv1beta1.DeploymentSpec{
-					Replicas: newInt32(5),
+					Replicas: utilpointer.Int32Ptr(5),
 					Strategy: extensionsv1beta1.DeploymentStrategy{
 						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
 					},
 					Template:                defaultTemplate,
-					ProgressDeadlineSeconds: newInt32(30),
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(math.MaxInt32),
+					RevisionHistoryLimit:    utilpointer.Int32Ptr(math.MaxInt32),
+				},
+			},
+		},
+		{
+			original: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
+					Replicas: utilpointer.Int32Ptr(5),
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
+					},
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(30),
+				},
+			},
+			expected: &extensionsv1beta1.Deployment{
+				Spec: extensionsv1beta1.DeploymentSpec{
+					Replicas: utilpointer.Int32Ptr(5),
+					Strategy: extensionsv1beta1.DeploymentStrategy{
+						Type: extensionsv1beta1.RecreateDeploymentStrategyType,
+					},
+					Template:                defaultTemplate,
+					ProgressDeadlineSeconds: utilpointer.Int32Ptr(30),
+					RevisionHistoryLimit:    utilpointer.Int32Ptr(math.MaxInt32),
 				},
 			},
 		},
@@ -432,7 +443,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: extensionsv1beta1.ReplicaSet{
 				Spec: extensionsv1beta1.ReplicaSetSpec{
-					Replicas: newInt32(0),
+					Replicas: utilpointer.Int32Ptr(0),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -447,7 +458,7 @@ func TestSetDefaultReplicaSetReplicas(t *testing.T) {
 		{
 			rs: extensionsv1beta1.ReplicaSet{
 				Spec: extensionsv1beta1.ReplicaSetSpec{
-					Replicas: newInt32(3),
+					Replicas: utilpointer.Int32Ptr(3),
 					Template: v1.PodTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Labels: map[string]string{
@@ -490,7 +501,7 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 	rs := &extensionsv1beta1.ReplicaSet{
 		Spec: extensionsv1beta1.ReplicaSetSpec{
-			Replicas: newInt32(3),
+			Replicas: utilpointer.Int32Ptr(3),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -741,10 +752,4 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		return nil
 	}
 	return obj3
-}
-
-func newInt32(val int32) *int32 {
-	p := new(int32)
-	*p = val
-	return p
 }

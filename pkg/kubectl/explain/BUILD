@@ -15,7 +15,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/explain",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
@@ -45,13 +46,15 @@ go_test(
         "recursive_fields_printer_test.go",
         "typename_test.go",
     ],
-    data = ["test-swagger.json"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/explain",
-    library = ":go_default_library",
+    data = [
+        "test-recursive-swagger.json",
+        "test-swagger.json",
+    ],
+    embed = [":go_default_library"],
     deps = [
-        "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//pkg/kubectl/scheme:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )

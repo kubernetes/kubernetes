@@ -1,6 +1,6 @@
-package client
+package client // import "github.com/docker/docker/client"
 
-import "golang.org/x/net/context"
+import "context"
 
 // SecretRemove removes a Secret.
 func (cli *Client) SecretRemove(ctx context.Context, id string) error {
@@ -8,6 +8,6 @@ func (cli *Client) SecretRemove(ctx context.Context, id string) error {
 		return err
 	}
 	resp, err := cli.delete(ctx, "/secrets/"+id, nil, nil)
-	ensureReaderClosed(resp)
-	return err
+	defer ensureReaderClosed(resp)
+	return wrapResponseError(err, resp, "secret", id)
 }

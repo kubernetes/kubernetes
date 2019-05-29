@@ -22,9 +22,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/apis/apiserver"
-	apiserverapi "k8s.io/apiserver/pkg/apis/apiserver"
 	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 )
 
@@ -49,7 +51,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 		ExpectedAdmissionConfig *apiserver.AdmissionConfiguration
 		PluginNames             []string
 	}{
-		"v1Alpha1 configuration - path fixup": {
+		"v1alpha1 configuration - path fixup": {
 			ConfigBody: `{
 "apiVersion": "apiserver.k8s.io/v1alpha1",
 "kind": "AdmissionConfiguration",
@@ -70,7 +72,7 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 			},
 			PluginNames: []string{},
 		},
-		"v1Alpha1 configuration - abspath": {
+		"v1alpha1 configuration - abspath": {
 			ConfigBody: `{
 "apiVersion": "apiserver.k8s.io/v1alpha1",
 "kind": "AdmissionConfiguration",
@@ -137,8 +139,8 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 	}
 
 	scheme := runtime.NewScheme()
-	apiserverapi.AddToScheme(scheme)
-	apiserverapiv1alpha1.AddToScheme(scheme)
+	require.NoError(t, apiserver.AddToScheme(scheme))
+	require.NoError(t, apiserverapiv1alpha1.AddToScheme(scheme))
 
 	for testName, testCase := range testCases {
 		if err = ioutil.WriteFile(configFileName, []byte(testCase.ConfigBody), 0644); err != nil {
@@ -152,4 +154,99 @@ func TestReadAdmissionConfiguration(t *testing.T) {
 			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", testName, testCase.ExpectedAdmissionConfig, config.(configProvider).config)
 		}
 	}
+}
+
+func TestEmbeddedConfiguration(t *testing.T) {
+	// create a place holder file to hold per test config
+	configFile, err := ioutil.TempFile("", "admission-plugin-config")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if err = configFile.Close(); err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	configFileName := configFile.Name()
+
+	testCases := map[string]struct {
+		ConfigBody     string
+		ExpectedConfig string
+	}{
+		"versioned configuration": {
+			ConfigBody: `{
+				"apiVersion": "apiserver.k8s.io/v1alpha1",
+				"kind": "AdmissionConfiguration",
+				"plugins": [
+				  {
+					"name": "Foo",
+					"configuration": {
+					  "apiVersion": "foo.admission.k8s.io/v1alpha1",
+					  "kind": "Configuration",
+					  "foo": "bar"
+					}
+				  }
+				]}`,
+			ExpectedConfig: `{
+			  "apiVersion": "foo.admission.k8s.io/v1alpha1",
+			  "kind": "Configuration",
+			  "foo": "bar"
+			}`,
+		},
+		"legacy configuration": {
+			ConfigBody: `{
+				"apiVersion": "apiserver.k8s.io/v1alpha1",
+				"kind": "AdmissionConfiguration",
+				"plugins": [
+				  {
+					"name": "Foo",
+					"configuration": {
+					  "foo": "bar"
+					}
+				  }
+				]}`,
+			ExpectedConfig: `{
+			  "foo": "bar"
+			}`,
+		},
+	}
+
+	for desc, test := range testCases {
+		scheme := runtime.NewScheme()
+		require.NoError(t, apiserver.AddToScheme(scheme))
+		require.NoError(t, apiserverapiv1alpha1.AddToScheme(scheme))
+
+		if err = ioutil.WriteFile(configFileName, []byte(test.ConfigBody), 0644); err != nil {
+			t.Errorf("[%s] unexpected err writing temp file: %v", desc, err)
+			continue
+		}
+		config, err := ReadAdmissionConfiguration([]string{"Foo"}, configFileName, scheme)
+		if err != nil {
+			t.Errorf("[%s] unexpected err: %v", desc, err)
+			continue
+		}
+		r, err := config.ConfigFor("Foo")
+		if err != nil {
+			t.Errorf("[%s] Failed to get Foo config: %v", desc, err)
+			continue
+		}
+		bs, err := ioutil.ReadAll(r)
+		if err != nil {
+			t.Errorf("[%s] Failed to read Foo config data: %v", desc, err)
+			continue
+		}
+
+		if !equalJSON(test.ExpectedConfig, string(bs)) {
+			t.Errorf("Unexpected config: expected=%q got=%q", test.ExpectedConfig, string(bs))
+		}
+	}
+}
+
+func equalJSON(a, b string) bool {
+	var x, y interface{}
+	if err := json.Unmarshal([]byte(a), &x); err != nil {
+		return false
+	}
+	if err := json.Unmarshal([]byte(b), &y); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(x, y)
 }

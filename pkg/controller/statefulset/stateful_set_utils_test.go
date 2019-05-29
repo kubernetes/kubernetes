@@ -19,6 +19,7 @@ package statefulset
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"sort"
 	"strconv"
 	"testing"
@@ -28,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	apps "k8s.io/api/apps/v1beta1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -288,6 +289,68 @@ func TestCreateApplyRevision(t *testing.T) {
 	}
 }
 
+func TestGetPersistentVolumeClaims(t *testing.T) {
+
+	// nil inherits statefulset labels
+	pod := newPod()
+	statefulSet := newStatefulSet(1)
+	statefulSet.Spec.Selector.MatchLabels = nil
+	claims := getPersistentVolumeClaims(statefulSet, pod)
+	pvc := newPVC("datadir-foo-0")
+	pvc.SetNamespace(v1.NamespaceDefault)
+	resultClaims := map[string]v1.PersistentVolumeClaim{"datadir": pvc}
+
+	if !reflect.DeepEqual(claims, resultClaims) {
+		t.Fatalf("Unexpected pvc:\n %+v\n, desired pvc:\n %+v", claims, resultClaims)
+	}
+
+	// nil inherits statefulset labels
+	statefulSet.Spec.Selector.MatchLabels = map[string]string{"test": "test"}
+	claims = getPersistentVolumeClaims(statefulSet, pod)
+	pvc.SetLabels(map[string]string{"test": "test"})
+	resultClaims = map[string]v1.PersistentVolumeClaim{"datadir": pvc}
+	if !reflect.DeepEqual(claims, resultClaims) {
+		t.Fatalf("Unexpected pvc:\n %+v\n, desired pvc:\n %+v", claims, resultClaims)
+	}
+
+	// non-nil with non-overlapping labels merge pvc and statefulset labels
+	statefulSet.Spec.Selector.MatchLabels = map[string]string{"name": "foo"}
+	statefulSet.Spec.VolumeClaimTemplates[0].ObjectMeta.Labels = map[string]string{"test": "test"}
+	claims = getPersistentVolumeClaims(statefulSet, pod)
+	pvc.SetLabels(map[string]string{"test": "test", "name": "foo"})
+	resultClaims = map[string]v1.PersistentVolumeClaim{"datadir": pvc}
+	if !reflect.DeepEqual(claims, resultClaims) {
+		t.Fatalf("Unexpected pvc:\n %+v\n, desired pvc:\n %+v", claims, resultClaims)
+	}
+
+	// non-nil with overlapping labels merge pvc and statefulset labels and prefer statefulset labels
+	statefulSet.Spec.Selector.MatchLabels = map[string]string{"test": "foo"}
+	statefulSet.Spec.VolumeClaimTemplates[0].ObjectMeta.Labels = map[string]string{"test": "test"}
+	claims = getPersistentVolumeClaims(statefulSet, pod)
+	pvc.SetLabels(map[string]string{"test": "foo"})
+	resultClaims = map[string]v1.PersistentVolumeClaim{"datadir": pvc}
+	if !reflect.DeepEqual(claims, resultClaims) {
+		t.Fatalf("Unexpected pvc:\n %+v\n, desired pvc:\n %+v", claims, resultClaims)
+	}
+}
+
+func newPod() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo-0",
+			Namespace: v1.NamespaceDefault,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx",
+				},
+			},
+		},
+	}
+}
+
 func newPVC(name string) v1.PersistentVolumeClaim {
 	return v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -340,7 +403,7 @@ func newStatefulSetWithVolumes(replicas int, name string, petMounts []v1.VolumeM
 	return &apps.StatefulSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "StatefulSet",
-			APIVersion: "apps/v1beta1",
+			APIVersion: "apps/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

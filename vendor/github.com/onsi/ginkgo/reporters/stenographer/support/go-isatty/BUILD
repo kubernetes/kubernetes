@@ -4,20 +4,20 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:darwin_amd64": [
-            "isatty_bsd.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "isatty_linux.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "isatty_windows.go",
+        "isatty_bsd.go",
+        "isatty_linux.go",
+        "isatty_solaris.go",
+        "isatty_windows.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty",
+    importpath = "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
     }),
-    importpath = "github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty",
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

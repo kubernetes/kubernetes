@@ -8,15 +8,18 @@ go_library(
         "helpers.go",
         "inotify_watcher.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/google/cadvisor/container/common",
     importpath = "github.com/google/cadvisor/container/common",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/fs:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/utils:go_default_library",
-        "//vendor/golang.org/x/exp/inotify:go_default_library",
+        "//vendor/github.com/karrick/godirwalk:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/github.com/sigma/go-inotify:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

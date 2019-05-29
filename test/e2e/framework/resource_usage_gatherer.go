@@ -32,22 +32,30 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/util/system"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
+// ResourceConstraint is a struct to hold constraints.
 type ResourceConstraint struct {
 	CPUConstraint    float64
 	MemoryConstraint uint64
 }
 
+// SingleContainerSummary is a struct to hold single container summary.
 type SingleContainerSummary struct {
 	Name string
-	Cpu  float64
+	CPU  float64
 	Mem  uint64
 }
 
+// ResourceUsageSummary is a struct to hold resource usage summary.
 // we can't have int here, as JSON does not accept integer keys.
 type ResourceUsageSummary map[string][]SingleContainerSummary
 
+// NoCPUConstraint is the number of constraint for CPU.
+const NoCPUConstraint = math.MaxFloat64
+
+// PrintHumanReadable prints resource usage summary in human readable.
 func (s *ResourceUsageSummary) PrintHumanReadable() string {
 	buf := &bytes.Buffer{}
 	w := tabwriter.NewWriter(buf, 1, 0, 1, ' ', 0)
@@ -55,17 +63,19 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 		buf.WriteString(fmt.Sprintf("%v percentile:\n", perc))
 		fmt.Fprintf(w, "container\tcpu(cores)\tmemory(MB)\n")
 		for _, summary := range summaries {
-			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.Name, summary.Cpu, float64(summary.Mem)/(1024*1024))
+			fmt.Fprintf(w, "%q\t%.3f\t%.2f\n", summary.Name, summary.CPU, float64(summary.Mem)/(1024*1024))
 		}
 		w.Flush()
 	}
 	return buf.String()
 }
 
+// PrintJSON prints resource usage summary in JSON.
 func (s *ResourceUsageSummary) PrintJSON() string {
 	return PrettyPrintJSON(*s)
 }
 
+// SummaryKind returns string of ResourceUsageSummary
 func (s *ResourceUsageSummary) SummaryKind() string {
 	return "ResourceUsageSummary"
 }
@@ -149,7 +159,7 @@ func (w *resourceGatherWorker) singleProbe() {
 		}
 		for k, v := range kubemarkData {
 			data[k] = &ContainerResourceUsage{
-				Name: v.Name,
+				Name:                    v.Name,
 				MemoryWorkingSetInBytes: v.MemoryWorkingSetInBytes,
 				CPUUsageInCores:         v.CPUUsageInCores,
 			}
@@ -157,13 +167,13 @@ func (w *resourceGatherWorker) singleProbe() {
 	} else {
 		nodeUsage, err := getOneTimeResourceUsageOnNode(w.c, w.nodeName, w.probeDuration, func() []string { return w.containerIDs })
 		if err != nil {
-			Logf("Error while reading data from %v: %v", w.nodeName, err)
+			e2elog.Logf("Error while reading data from %v: %v", w.nodeName, err)
 			return
 		}
 		for k, v := range nodeUsage {
 			data[k] = v
 			if w.printVerboseLogs {
-				Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
+				e2elog.Logf("Get container %v usage on node %v. CPUUsageInCores: %v, MemoryUsageInBytes: %v, MemoryWorkingSetInBytes: %v", k, w.nodeName, v.CPUUsageInCores, v.MemoryUsageInBytes, v.MemoryWorkingSetInBytes)
 			}
 		}
 	}
@@ -173,7 +183,7 @@ func (w *resourceGatherWorker) singleProbe() {
 func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	defer utilruntime.HandleCrash()
 	defer w.wg.Done()
-	defer Logf("Closing worker for %v", w.nodeName)
+	defer e2elog.Logf("Closing worker for %v", w.nodeName)
 	defer func() { w.finished = true }()
 	select {
 	case <-time.After(initialSleep):
@@ -191,7 +201,8 @@ func (w *resourceGatherWorker) gather(initialSleep time.Duration) {
 	}
 }
 
-type containerResourceGatherer struct {
+// ContainerResourceGatherer is a struct for gathering container resource.
+type ContainerResourceGatherer struct {
 	client       clientset.Interface
 	stopCh       chan struct{}
 	workers      []resourceGatherWorker
@@ -200,16 +211,30 @@ type containerResourceGatherer struct {
 	options      ResourceGathererOptions
 }
 
+// ResourceGathererOptions is a struct to hold options for resource.
 type ResourceGathererOptions struct {
 	InKubemark                  bool
-	MasterOnly                  bool
+	Nodes                       NodesSet
 	ResourceDataGatheringPeriod time.Duration
 	ProbeDuration               time.Duration
 	PrintVerboseLogs            bool
 }
 
-func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*containerResourceGatherer, error) {
-	g := containerResourceGatherer{
+// NodesSet is a value of nodes set.
+type NodesSet int
+
+const (
+	// AllNodes means all containers on all nodes.
+	AllNodes NodesSet = 0
+	// MasterNodes means all containers on Master nodes only.
+	MasterNodes NodesSet = 1
+	// MasterAndDNSNodes means all containers on Master nodes and DNS containers on other nodes.
+	MasterAndDNSNodes NodesSet = 2
+)
+
+// NewResourceUsageGatherer returns a new ContainerResourceGatherer.
+func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOptions, pods *v1.PodList) (*ContainerResourceGatherer, error) {
+	g := ContainerResourceGatherer{
 		client:       c,
 		stopCh:       make(chan struct{}),
 		containerIDs: make([]string, 0),
@@ -233,26 +258,36 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		if pods == nil {
 			pods, err = c.CoreV1().Pods("kube-system").List(metav1.ListOptions{})
 			if err != nil {
-				Logf("Error while listing Pods: %v", err)
+				e2elog.Logf("Error while listing Pods: %v", err)
 				return nil, err
 			}
 		}
+		dnsNodes := make(map[string]bool)
 		for _, pod := range pods.Items {
+			if (options.Nodes == MasterNodes) && !system.IsMasterNode(pod.Spec.NodeName) {
+				continue
+			}
+			if (options.Nodes == MasterAndDNSNodes) && !system.IsMasterNode(pod.Spec.NodeName) && pod.Labels["k8s-app"] != "kube-dns" {
+				continue
+			}
 			for _, container := range pod.Status.InitContainerStatuses {
 				g.containerIDs = append(g.containerIDs, container.Name)
 			}
 			for _, container := range pod.Status.ContainerStatuses {
 				g.containerIDs = append(g.containerIDs, container.Name)
 			}
+			if options.Nodes == MasterAndDNSNodes {
+				dnsNodes[pod.Spec.NodeName] = true
+			}
 		}
 		nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
-			Logf("Error while listing Nodes: %v", err)
+			e2elog.Logf("Error while listing Nodes: %v", err)
 			return nil, err
 		}
 
 		for _, node := range nodeList.Items {
-			if !options.MasterOnly || system.IsMasterNode(node.Name) {
+			if options.Nodes == AllNodes || system.IsMasterNode(node.Name) || dnsNodes[node.Name] {
 				g.workerWg.Add(1)
 				g.workers = append(g.workers, resourceGatherWorker{
 					c:                           c,
@@ -266,7 +301,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 					probeDuration:               options.ProbeDuration,
 					printVerboseLogs:            options.PrintVerboseLogs,
 				})
-				if options.MasterOnly {
+				if options.Nodes == MasterNodes {
 					break
 				}
 			}
@@ -277,7 +312,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 
 // StartGatheringData starts a stat gathering worker blocks for each node to track,
 // and blocks until StopAndSummarize is called.
-func (g *containerResourceGatherer) StartGatheringData() {
+func (g *ContainerResourceGatherer) StartGatheringData() {
 	if len(g.workers) == 0 {
 		return
 	}
@@ -294,9 +329,9 @@ func (g *containerResourceGatherer) StartGatheringData() {
 // generates resource summary for the passed-in percentiles, and returns the summary.
 // It returns an error if the resource usage at any percentile is beyond the
 // specified resource constraints.
-func (g *containerResourceGatherer) StopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
+func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
 	close(g.stopCh)
-	Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
+	e2elog.Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
 	finished := make(chan struct{})
 	go func() {
 		g.workerWg.Wait()
@@ -304,7 +339,7 @@ func (g *containerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 	}()
 	select {
 	case <-finished:
-		Logf("Waitgroup finished.")
+		e2elog.Logf("Waitgroup finished.")
 	case <-time.After(2 * time.Minute):
 		unfinished := make([]string, 0)
 		for i := range g.workers {
@@ -312,11 +347,11 @@ func (g *containerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 				unfinished = append(unfinished, g.workers[i].nodeName)
 			}
 		}
-		Logf("Timed out while waiting for waitgroup, some workers failed to finish: %v", unfinished)
+		e2elog.Logf("Timed out while waiting for waitgroup, some workers failed to finish: %v", unfinished)
 	}
 
 	if len(percentiles) == 0 {
-		Logf("Warning! Empty percentile list for stopAndPrintData.")
+		e2elog.Logf("Warning! Empty percentile list for stopAndPrintData.")
 		return &ResourceUsageSummary{}, fmt.Errorf("Failed to get any resource usage data")
 	}
 	data := make(map[int]ResourceUsagePerContainer)
@@ -340,7 +375,7 @@ func (g *containerResourceGatherer) StopAndSummarize(percentiles []int, constrai
 			usage := data[perc][name]
 			summary[strconv.Itoa(perc)] = append(summary[strconv.Itoa(perc)], SingleContainerSummary{
 				Name: name,
-				Cpu:  usage.CPUUsageInCores,
+				CPU:  usage.CPUUsageInCores,
 				Mem:  usage.MemoryWorkingSetInBytes,
 			})
 			// Verifying 99th percentile of resource usage

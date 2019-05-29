@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	dockertypes "github.com/docker/docker/api/types"
 )
 
 func TestUrlsMatch(t *testing.T) {
@@ -466,13 +464,13 @@ func (d *testProvider) Enabled() bool {
 }
 
 // LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *testProvider) LazyProvide() *DockerConfigEntry {
+func (d *testProvider) LazyProvide(image string) *DockerConfigEntry {
 	return nil
 }
 
 // Provide implements dockerConfigProvider
-func (d *testProvider) Provide() DockerConfig {
-	d.Count += 1
+func (d *testProvider) Provide(image string) DockerConfig {
+	d.Count++
 	return DockerConfig{}
 }
 
@@ -505,7 +503,7 @@ func TestLazyKeyring(t *testing.T) {
 
 func TestDockerKeyringLookup(t *testing.T) {
 	ada := LazyAuthConfiguration{
-		AuthConfig: dockertypes.AuthConfig{
+		AuthConfig: AuthConfig{
 			Username: "ada",
 			Password: "smash",
 			Email:    "ada@example.com",
@@ -513,7 +511,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 	}
 
 	grace := LazyAuthConfiguration{
-		AuthConfig: dockertypes.AuthConfig{
+		AuthConfig: AuthConfig{
 			Username: "grace",
 			Password: "squash",
 			Email:    "grace@example.com",
@@ -576,7 +574,7 @@ func TestDockerKeyringLookup(t *testing.T) {
 // NOTE: the above covers the case of a more specific match trumping just hostname.
 func TestIssue3797(t *testing.T) {
 	rex := LazyAuthConfiguration{
-		AuthConfig: dockertypes.AuthConfig{
+		AuthConfig: AuthConfig{
 			Username: "rex",
 			Password: "tiny arms",
 			Email:    "rex@example.com",

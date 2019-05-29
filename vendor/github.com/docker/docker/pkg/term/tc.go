@@ -1,7 +1,6 @@
 // +build !windows
-// +build !solaris !cgo
 
-package term
+package term // import "github.com/docker/docker/pkg/term"
 
 import (
 	"syscall"

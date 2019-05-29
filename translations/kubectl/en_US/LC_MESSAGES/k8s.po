@@ -1,6 +1,6 @@
 # Test translations for unit tests.
 # Copyright (C) 2016
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR brendan.d.burns@gmail.com, 2016.
 #
 msgid ""
@@ -1963,7 +1963,7 @@ msgstr ""
 msgid ""
 "\n"
 "\t\tOutput shell completion code for the specified shell (bash or zsh).\n"
-"\t\tThe shell code must be evalutated to provide interactive\n"
+"\t\tThe shell code must be evaluated to provide interactive\n"
 "\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n"
 "\t\tthe .bash_profile.\n"
 "\n"
@@ -1984,7 +1984,7 @@ msgid ""
 msgstr ""
 "\n"
 "\t\tOutput shell completion code for the specified shell (bash or zsh).\n"
-"\t\tThe shell code must be evalutated to provide interactive\n"
+"\t\tThe shell code must be evaluated to provide interactive\n"
 "\t\tcompletion of kubectl commands.  This can be done by sourcing it from\n"
 "\t\tthe .bash_profile.\n"
 "\n"

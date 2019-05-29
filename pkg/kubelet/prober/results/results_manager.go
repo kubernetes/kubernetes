@@ -58,6 +58,18 @@ func (r Result) String() string {
 	}
 }
 
+// ToPrometheusType translates a Result to a form which is better understood by prometheus.
+func (r Result) ToPrometheusType() float64 {
+	switch r {
+	case Success:
+		return 0
+	case Failure:
+		return 1
+	default:
+		return -1
+	}
+}
+
 // Update is an enum of the types of updates sent over the Updates channel.
 type Update struct {
 	ContainerID kubecontainer.ContainerID
@@ -77,7 +89,7 @@ type manager struct {
 
 var _ Manager = &manager{}
 
-// NewManager creates ane returns an empty results manager.
+// NewManager creates and returns an empty results manager.
 func NewManager() Manager {
 	return &manager{
 		cache:   make(map[kubecontainer.ContainerID]Result),

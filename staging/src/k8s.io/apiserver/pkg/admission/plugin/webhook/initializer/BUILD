@@ -3,22 +3,22 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["initializer.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/initializer",
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["initializer_test.go"],
-    importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/config:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
     ],
 )
 

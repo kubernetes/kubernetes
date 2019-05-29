@@ -18,7 +18,7 @@ package wardleinitializer
 
 import (
 	"k8s.io/apiserver/pkg/admission"
-	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/generated/informers/externalversions"
 )
 
 type pluginInitializer struct {
@@ -28,10 +28,10 @@ type pluginInitializer struct {
 var _ admission.PluginInitializer = pluginInitializer{}
 
 // New creates an instance of wardle admission plugins initializer.
-func New(informers informers.SharedInformerFactory) (pluginInitializer, error) {
+func New(informers informers.SharedInformerFactory) pluginInitializer {
 	return pluginInitializer{
 		informers: informers,
-	}, nil
+	}
 }
 
 // Initialize checks the initialization interfaces implemented by a plugin

@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 source "${KUBE_ROOT}/hack/lib/version.sh"
 kube::version::get_version_vars
@@ -38,10 +38,14 @@ STABLE_BUILD_SCM_REVISION ${KUBE_GIT_VERSION-}
 STABLE_BUILD_MAJOR_VERSION ${KUBE_GIT_MAJOR-}
 STABLE_BUILD_MINOR_VERSION ${KUBE_GIT_MINOR-}
 STABLE_DOCKER_TAG ${KUBE_GIT_VERSION/+/_}
+STABLE_DOCKER_REGISTRY ${KUBE_DOCKER_REGISTRY:-k8s.gcr.io}
+STABLE_DOCKER_PUSH_REGISTRY ${KUBE_DOCKER_PUSH_REGISTRY:-${KUBE_DOCKER_REGISTRY:-staging-k8s.gcr.io}}
 gitCommit ${KUBE_GIT_COMMIT-}
 gitTreeState ${KUBE_GIT_TREE_STATE-}
 gitVersion ${KUBE_GIT_VERSION-}
 gitMajor ${KUBE_GIT_MAJOR-}
 gitMinor ${KUBE_GIT_MINOR-}
-buildDate $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+buildDate $(date \
+  ${SOURCE_DATE_EPOCH:+"--date=@${SOURCE_DATE_EPOCH}"} \
+ -u +'%Y-%m-%dT%H:%M:%SZ')
 EOF

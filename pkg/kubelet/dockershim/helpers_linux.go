@@ -30,7 +30,8 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 func DefaultMemorySwap() int64 {
@@ -53,7 +54,7 @@ func getSeccompDockerOpts(seccompProfile string) ([]dockerOpt, error) {
 		return defaultSeccompOpt, nil
 	}
 
-	if seccompProfile == "docker/default" {
+	if seccompProfile == v1.SeccompProfileRuntimeDefault || seccompProfile == v1.DeprecatedSeccompProfileDockerDefault {
 		// return nil so docker will load the default seccomp profile
 		return nil, nil
 	}
@@ -104,8 +105,9 @@ func (ds *dockerService) updateCreateConfig(
 		rOpts := lc.GetResources()
 		if rOpts != nil {
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
+				// Memory and MemorySwap are set to the same value, this prevents containers from using any swap.
 				Memory:     rOpts.MemoryLimitInBytes,
-				MemorySwap: DefaultMemorySwap(),
+				MemorySwap: rOpts.MemoryLimitInBytes,
 				CPUShares:  rOpts.CpuShares,
 				CPUQuota:   rOpts.CpuQuota,
 				CPUPeriod:  rOpts.CpuPeriod,
@@ -118,7 +120,7 @@ func (ds *dockerService) updateCreateConfig(
 		if err := applyContainerSecurityContext(lc, podSandboxID, createConfig.Config, createConfig.HostConfig, securityOptSep); err != nil {
 			return fmt.Errorf("failed to apply container security context for container %q: %v", config.Metadata.Name, err)
 		}
-		modifyPIDNamespaceOverrides(ds.disableSharedPID, apiVersion, createConfig.HostConfig)
+		modifyContainerPIDNamespaceOverrides(apiVersion, createConfig.HostConfig, podSandboxID)
 	}
 
 	// Apply cgroupsParent derived from the sandbox config.
@@ -144,4 +146,8 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 		return "", fmt.Errorf("cannot find network namespace for the terminated container %q", c.ID)
 	}
 	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
+}
+
+// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
+func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

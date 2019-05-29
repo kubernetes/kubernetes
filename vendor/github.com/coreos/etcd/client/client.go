@@ -15,6 +15,8 @@
 package client
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -27,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
+	"github.com/coreos/etcd/version"
 )
 
 var (
@@ -201,6 +203,9 @@ type Client interface {
 	// returned
 	SetEndpoints(eps []string) error
 
+	// GetVersion retrieves the current etcd server and cluster version
+	GetVersion(ctx context.Context) (*version.Versions, error)
+
 	httpClient
 }
 
@@ -366,12 +371,7 @@ func (c *httpClusterClient) Do(ctx context.Context, act httpAction) (*http.Respo
 			if err == context.Canceled || err == context.DeadlineExceeded {
 				return nil, nil, err
 			}
-			if isOneShot {
-				return nil, nil, err
-			}
-			continue
-		}
-		if resp.StatusCode/100 == 5 {
+		} else if resp.StatusCode/100 == 5 {
 			switch resp.StatusCode {
 			case http.StatusInternalServerError, http.StatusServiceUnavailable:
 				// TODO: make sure this is a no leader response
@@ -379,10 +379,16 @@ func (c *httpClusterClient) Do(ctx context.Context, act httpAction) (*http.Respo
 			default:
 				cerr.Errors = append(cerr.Errors, fmt.Errorf("client: etcd member %s returns server error [%s]", eps[k].String(), http.StatusText(resp.StatusCode)))
 			}
-			if isOneShot {
-				return nil, nil, cerr.Errors[0]
+			err = cerr.Errors[0]
+		}
+		if err != nil {
+			if !isOneShot {
+				continue
 			}
-			continue
+			c.Lock()
+			c.pinned = (k + 1) % leps
+			c.Unlock()
+			return nil, nil, err
 		}
 		if k != pinned {
 			c.Lock()
@@ -474,6 +480,33 @@ func (c *httpClusterClient) AutoSync(ctx context.Context, interval time.Duration
 			return ctx.Err()
 		case <-ticker.C:
 		}
+	}
+}
+
+func (c *httpClusterClient) GetVersion(ctx context.Context) (*version.Versions, error) {
+	act := &getAction{Prefix: "/version"}
+
+	resp, body, err := c.Do(ctx, act)
+	if err != nil {
+		return nil, err
+	}
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		if len(body) == 0 {
+			return nil, ErrEmptyBody
+		}
+		var vresp version.Versions
+		if err := json.Unmarshal(body, &vresp); err != nil {
+			return nil, ErrInvalidJSON
+		}
+		return &vresp, nil
+	default:
+		var etcdErr Error
+		if err := json.Unmarshal(body, &etcdErr); err != nil {
+			return nil, ErrInvalidJSON
+		}
+		return nil, etcdErr
 	}
 }
 
@@ -637,8 +670,15 @@ func (r *redirectedHTTPAction) HTTPRequest(ep url.URL) *http.Request {
 }
 
 func shuffleEndpoints(r *rand.Rand, eps []url.URL) []url.URL {
-	p := r.Perm(len(eps))
-	neps := make([]url.URL, len(eps))
+	// copied from Go 1.9<= rand.Rand.Perm
+	n := len(eps)
+	p := make([]int, n)
+	for i := 0; i < n; i++ {
+		j := r.Intn(i + 1)
+		p[i] = p[j]
+		p[j] = i
+	}
+	neps := make([]url.URL, n)
 	for i, k := range p {
 		neps[i] = eps[k]
 	}

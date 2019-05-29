@@ -13,36 +13,64 @@ go_library(
         "cloudstack_instances.go",
         "cloudstack_loadbalancer.go",
         "metadata.go",
+        "metadata_linux.go",
         "metadata_other.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "metadata_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
     deps = [
-        "//pkg/cloudprovider:go_default_library",
-        "//pkg/controller:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//vendor/github.com/d2g/dhcp4:go_default_library",
-        "//vendor/github.com/d2g/dhcp4client:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/kardianos/osext:go_default_library",
         "//vendor/github.com/xanzy/go-cloudstack/cloudstack:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-    ],
+        "//vendor/k8s.io/klog:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:darwin": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:dragonfly": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:nacl": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:netbsd": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:openbsd": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:plan9": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:solaris": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//vendor/github.com/d2g/dhcp4client:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["cloudstack_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

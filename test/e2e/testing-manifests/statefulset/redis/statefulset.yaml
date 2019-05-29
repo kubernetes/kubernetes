@@ -1,10 +1,13 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: rd
 spec:
   serviceName: "redis"
   replicas: 3
+  selector:
+    matchLabels:
+      app: redis
   template:
     metadata:
       labels:
@@ -12,7 +15,7 @@ spec:
     spec:
       initContainers:
       - name: install
-        image: gcr.io/google_containers/redis-install-3.2.0:e2e
+        image: gcr.io/kubernetes-e2e-test-images/pets/redis-installer:1.2
         imagePullPolicy: Always
         args:
         - "--install-into=/opt"

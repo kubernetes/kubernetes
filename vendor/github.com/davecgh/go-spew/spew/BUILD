@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "bypass.go",
+        "bypasssafe.go",
         "common.go",
         "config.go",
         "doc.go",
@@ -11,6 +12,7 @@ go_library(
         "format.go",
         "spew.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/davecgh/go-spew/spew",
     importpath = "github.com/davecgh/go-spew/spew",
     visibility = ["//visibility:public"],
 )

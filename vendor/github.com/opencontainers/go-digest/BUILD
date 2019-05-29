@@ -9,6 +9,7 @@ go_library(
         "doc.go",
         "verifiers.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/go-digest",
     importpath = "github.com/opencontainers/go-digest",
     visibility = ["//visibility:public"],
 )

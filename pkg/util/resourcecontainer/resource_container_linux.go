@@ -25,7 +25,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-// Creates resource-only containerName if it does not already exist and moves
+// RunInResourceContainer creates resource-only containerName if it does not already exist and moves
 // the current process to it.
 //
 // containerName must be an absolute container name.

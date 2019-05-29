@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -24,12 +24,20 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION="v0.6.0"
-DEFAULT_CNI_SHA1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f" 
-DEFAULT_NPD_VERSION="v0.4.1"
-DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+DEFAULT_CNI_VERSION="v0.7.5"
+DEFAULT_CNI_SHA1="52e9d2de8a5f927307d9397308735658ee44ab8d"
+DEFAULT_NPD_VERSION="v0.6.3"
+DEFAULT_NPD_SHA1="3a6ac56be6c121f1b94450bfd1a81ad28d532369"
+DEFAULT_CRICTL_VERSION="v1.14.0"
+DEFAULT_CRICTL_SHA1="1f93c6183d0a4e186708efe7899da7a7bce9c736"
 DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
 ###
+
+# Use --retry-connrefused opt only if it's supported by curl.
+CURL_RETRY_CONNREFUSED=""
+if curl --help | grep -q -- '--retry-connrefused'; then
+  CURL_RETRY_CONNREFUSED='--retry-connrefused'
+fi
 
 function set-broken-motd {
   cat > /etc/motd <<EOF
@@ -48,34 +56,60 @@ EOF
 
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
-  local -r tmp_kube_env="/tmp/kube-env.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
-    -H "X-Google-Metadata-Request: True" \
-    -o "${tmp_kube_env}" \
-    http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
-  # Convert the yaml format file into a shell-style file.
-  eval $(python -c '''
+  (
+    umask 077
+    local -r tmp_kube_env="/tmp/kube-env.yaml"
+    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+      -H "X-Google-Metadata-Request: True" \
+      -o "${tmp_kube_env}" \
+      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+    # Convert the yaml format file into a shell-style file.
+    eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
-  rm -f "${tmp_kube_env}"
+    rm -f "${tmp_kube_env}"
+  )
+}
+
+function download-kubelet-config {
+  local -r dest="$1"
+  echo "Downloading Kubelet config file, if it exists"
+  # Fetch kubelet config file from GCE metadata server.
+  (
+    umask 077
+    local -r tmp_kubelet_config="/tmp/kubelet-config.yaml"
+    if curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o "${tmp_kubelet_config}" \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/kubelet-config; then
+      # only write to the final location if curl succeeds
+      mv "${tmp_kubelet_config}" "${dest}"
+    elif [[ "${REQUIRE_METADATA_KUBELET_CONFIG_FILE:-false}" == "true" ]]; then
+      echo "== Failed to download required Kubelet config file from metadata server =="
+      exit 1
+    fi
+  )
 }
 
 function download-kube-master-certs {
   # Fetch kube-env from GCE metadata server.
-  local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
-  curl --fail --retry 5 --retry-delay 3 --silent --show-error \
-    -H "X-Google-Metadata-Request: True" \
-    -o "${tmp_kube_master_certs}" \
-    http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
-  # Convert the yaml format file into a shell-style file.
-  eval $(python -c '''
+  (
+    umask 077
+    local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
+    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+      -H "X-Google-Metadata-Request: True" \
+      -o "${tmp_kube_master_certs}" \
+      http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
+    # Convert the yaml format file into a shell-style file.
+    eval $(python -c '''
 import pipes,sys,yaml
 for k,v in yaml.load(sys.stdin).iteritems():
   print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")
-  rm -f "${tmp_kube_master_certs}"
+    rm -f "${tmp_kube_master_certs}"
+  )
 }
 
 function validate-hash {
@@ -87,6 +121,17 @@ function validate-hash {
     echo "== ${file} corrupted, sha1 ${actual} doesn't match expected ${expected} =="
     return 1
   fi
+}
+
+# Get default service account credentials of the VM.
+GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
+function get-credentials {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python -c \
+    'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
+}
+
+function valid-storage-scope {
+  curl "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -q "auth/devstorage"
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -102,7 +147,12 @@ function download-or-bust {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
+      # if the url belongs to GCS API we should use oauth2_token in the headers
+      local curl_headers=""
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
+        curl_headers="Authorization: Bearer $(get-credentials)"
+      fi
+      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -126,6 +176,13 @@ function is-preloaded {
 
 function split-commas {
   echo $1 | tr "," "\n"
+}
+
+function remount-flexvolume-directory {
+  local -r flexvolume_plugin_dir=$1
+  mkdir -p $flexvolume_plugin_dir
+  mount --bind $flexvolume_plugin_dir $flexvolume_plugin_dir
+  mount -o remount,exec $flexvolume_plugin_dir
 }
 
 function install-gci-mounter-tools {
@@ -158,15 +215,15 @@ function install-node-problem-detector {
       local -r npd_version="${DEFAULT_NPD_VERSION}"
       local -r npd_sha1="${DEFAULT_NPD_SHA1}"
   fi
+  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
 
-  if is-preloaded "node-problem-detector" "${npd_sha1}"; then
-    echo "node-problem-detector is preloaded."
+  if is-preloaded "${npd_tar}" "${npd_sha1}"; then
+    echo "${npd_tar} is preloaded."
     return
   fi
 
-  echo "Downloading node problem detector."
-  local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
-  local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
+  echo "Downloading ${npd_tar}."
+  local -r npd_release_path="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-https://storage.googleapis.com/kubernetes-release}"
   download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
@@ -178,8 +235,13 @@ function install-node-problem-detector {
 }
 
 function install-cni-binaries {
-  local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
-  local -r cni_sha1="${DEFAULT_CNI_SHA1}"
+  if [[ -n "${CNI_VERSION:-}" ]]; then
+      local -r cni_tar="cni-plugins-amd64-${CNI_VERSION}.tgz"
+      local -r cni_sha1="${CNI_SHA1}"
+  else
+      local -r cni_tar="cni-plugins-amd64-${DEFAULT_CNI_VERSION}.tgz"
+      local -r cni_sha1="${DEFAULT_CNI_SHA1}"
+  fi
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
@@ -193,6 +255,55 @@ function install-cni-binaries {
   mv "${cni_dir}/bin"/* "${KUBE_BIN}"
   rmdir "${cni_dir}/bin"
   rm -f "${KUBE_HOME}/${cni_tar}"
+}
+
+# Install crictl binary.
+function install-crictl {
+  if [[ -n "${CRICTL_VERSION:-}" ]]; then
+    local -r crictl_version="${CRICTL_VERSION}"
+    local -r crictl_sha1="${CRICTL_TAR_HASH}"
+  else
+    local -r crictl_version="${DEFAULT_CRICTL_VERSION}"
+    local -r crictl_sha1="${DEFAULT_CRICTL_SHA1}"
+  fi
+  local -r crictl="crictl-${crictl_version}-linux-amd64"
+
+  # Create crictl config file.
+  cat > /etc/crictl.yaml <<EOF
+runtime-endpoint: ${CONTAINER_RUNTIME_ENDPOINT:-unix:///var/run/dockershim.sock}
+EOF
+
+  if is-preloaded "${crictl}" "${crictl_sha1}"; then
+    echo "crictl is preloaded"
+    return
+  fi
+
+  echo "Downloading crictl"
+  local -r crictl_path="https://storage.googleapis.com/kubernetes-release/crictl"
+  download-or-bust "${crictl_sha1}" "${crictl_path}/${crictl}"
+  mv "${KUBE_HOME}/${crictl}" "${KUBE_BIN}/crictl"
+  chmod a+x "${KUBE_BIN}/crictl"
+}
+
+function install-exec-auth-plugin {
+  if [[ ! "${EXEC_AUTH_PLUGIN_URL:-}" ]]; then
+      return
+  fi
+  local -r plugin_url="${EXEC_AUTH_PLUGIN_URL}"
+  local -r plugin_sha1="${EXEC_AUTH_PLUGIN_SHA1}"
+
+  echo "Downloading gke-exec-auth-plugin binary"
+  download-or-bust "${plugin_sha1}" "${plugin_url}"
+  mv "${KUBE_HOME}/gke-exec-auth-plugin" "${KUBE_BIN}/gke-exec-auth-plugin"
+  chmod a+x "${KUBE_BIN}/gke-exec-auth-plugin"
+
+  if [[ ! "${EXEC_AUTH_PLUGIN_LICENSE_URL:-}" ]]; then
+      return
+  fi
+  local -r license_url="${EXEC_AUTH_PLUGIN_LICENSE_URL}"
+  echo "Downloading gke-exec-auth-plugin license"
+  download-or-bust "" "${license_url}"
+  mv "${KUBE_HOME}/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
 }
 
 function install-kube-manifests {
@@ -217,14 +328,18 @@ function install-kube-manifests {
   echo "Downloading k8s manifests tar"
   download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
-  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
-  if [[ "${kube_addon_registry}" != "gcr.io/google_containers" ]]; then
+  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
+  if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
     find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
-      xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
+      xargs sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
     find "${dst_dir}" -name \*.manifest -or -name \*.json | \
-      xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
+      xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
+  if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
+    cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
+  fi
+
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_BIN}/health-monitor.sh"
 
   rm -f "${KUBE_HOME}/${manifests_tar}"
@@ -326,6 +441,17 @@ function install-kube-binary-config {
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
   install-gci-mounter-tools
 
+  # Remount the Flexvolume directory with the "exec" option, if needed.
+  if [[ "${REMOUNT_VOLUME_PLUGIN_DIR:-}" == "true" && -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
+    remount-flexvolume-directory "${VOLUME_PLUGIN_DIR}"
+  fi
+
+  # Install crictl on each node.
+  install-crictl
+
+  # TODO(awly): include the binary and license in the OS image.
+  install-exec-auth-plugin
+
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"
@@ -334,13 +460,24 @@ function install-kube-binary-config {
 
 ######### Main Function ##########
 echo "Start to install kubernetes files"
+# if install fails, message-of-the-day (motd) will warn at login shell
 set-broken-motd
+
 KUBE_HOME="/home/kubernetes"
 KUBE_BIN="${KUBE_HOME}/bin"
+
+# download and source kube-env
 download-kube-env
 source "${KUBE_HOME}/kube-env"
+
+download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
+
+# master certs
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   download-kube-master-certs
 fi
+
+# binaries and kube-system manifests
 install-kube-binary-config
+
 echo "Done for installing kubernetes files"

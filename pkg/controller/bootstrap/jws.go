@@ -20,19 +20,28 @@ import (
 	"fmt"
 	"strings"
 
-	jose "github.com/square/go-jose"
+	jose "gopkg.in/square/go-jose.v2"
 )
 
 // computeDetachedSig takes content and token details and computes a detached
 // JWS signature.  This is described in Appendix F of RFC 7515.  Basically, this
 // is a regular JWS with the content part of the signature elided.
 func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
-	jwk := &jose.JsonWebKey{
+	jwk := &jose.JSONWebKey{
 		Key:   []byte(tokenSecret),
 		KeyID: tokenID,
 	}
 
-	signer, err := jose.NewSigner(jose.HS256, jwk)
+	opts := &jose.SignerOptions{
+		// Since this is a symmetric key, go-jose doesn't automatically include
+		// the KeyID as part of the protected header. We have to pass it here
+		// explicitly.
+		ExtraHeaders: map[jose.HeaderKey]interface{}{
+			"kid": tokenID,
+		},
+	}
+
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.HS256, Key: jwk}, opts)
 	if err != nil {
 		return "", fmt.Errorf("can't make a HS256 signer from the given token: %v", err)
 	}
@@ -51,7 +60,7 @@ func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
 
 // stripContent will remove the content part of a compact JWS
 //
-// The `go-jose` library doesn't support generating signatures with "detatched"
+// The `go-jose` library doesn't support generating signatures with "detached"
 // content. To make up for this we take the full compact signature, break it
 // apart and put it back together without the content section.
 func stripContent(fullSig string) (string, error) {

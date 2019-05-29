@@ -8,10 +8,16 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["requestinfo_test.go"],
-    importpath = "k8s.io/apiserver/pkg/endpoints/request",
-    library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    srcs = [
+        "context_test.go",
+        "requestinfo_test.go",
+    ],
+    embed = [":go_default_library"],
+    deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+    ],
 )
 
 go_library(
@@ -19,29 +25,18 @@ go_library(
     srcs = [
         "context.go",
         "doc.go",
-        "requestcontext.go",
         "requestinfo.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/request",
     importpath = "k8s.io/apiserver/pkg/endpoints/request",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/golang.org/x/net/context:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_xtest",
-    srcs = ["context_test.go"],
-    importpath = "k8s.io/apiserver/pkg/endpoints/request_test",
-    deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

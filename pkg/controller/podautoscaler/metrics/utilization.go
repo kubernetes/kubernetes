@@ -28,14 +28,14 @@ func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int
 	requestsTotal := int64(0)
 	numEntries := 0
 
-	for podName, metricValue := range metrics {
+	for podName, metric := range metrics {
 		request, hasRequest := requests[podName]
 		if !hasRequest {
 			// we check for missing requests elsewhere, so assuming missing requests == extraneous metrics
 			continue
 		}
 
-		metricsTotal += metricValue
+		metricsTotal += metric.Value
 		requestsTotal += request
 		numEntries++
 	}
@@ -56,8 +56,8 @@ func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int
 // (returning that and the actual utilization)
 func GetMetricUtilizationRatio(metrics PodMetricsInfo, targetUtilization int64) (utilizationRatio float64, currentUtilization int64) {
 	metricsTotal := int64(0)
-	for _, metricValue := range metrics {
-		metricsTotal += metricValue
+	for _, metric := range metrics {
+		metricsTotal += metric.Value
 	}
 
 	currentUtilization = metricsTotal / int64(len(metrics))

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -55,7 +56,7 @@ func HugePageResourceName(pageSize resource.Quantity) core.ResourceName {
 // an error is returned.
 func HugePageSizeFromResourceName(name core.ResourceName) (resource.Quantity, error) {
 	if !IsHugePageResourceName(name) {
-		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is an invalid hugepage name", name)
 	}
 	pageSize := strings.TrimPrefix(string(name), core.ResourceHugePagesPrefix)
 	return resource.ParseQuantity(pageSize)
@@ -102,6 +103,7 @@ var standardResourceQuotaScopes = sets.NewString(
 	string(core.ResourceQuotaScopeNotTerminating),
 	string(core.ResourceQuotaScopeBestEffort),
 	string(core.ResourceQuotaScopeNotBestEffort),
+	string(core.ResourceQuotaScopePriorityClass),
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
@@ -125,7 +127,7 @@ var podComputeQuotaResources = sets.NewString(
 // IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
 func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
 	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort:
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopePriorityClass:
 		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
 	case core.ResourceQuotaScopeBestEffort:
 		return podObjectCountQuotaResources.Has(resource)
@@ -146,28 +148,36 @@ func IsStandardContainerResourceName(str string) bool {
 	return standardContainerResources.Has(str) || IsHugePageResourceName(core.ResourceName(str))
 }
 
-// IsExtendedResourceName returns true if the resource name is not in the
-// default namespace.
+// IsExtendedResourceName returns true if:
+// 1. the resource name is not in the default namespace;
+// 2. resource name does not have "requests." prefix,
+// to avoid confusion with the convention in quota
+// 3. it satisfies the rules in IsQualifiedName() after converted into quota resource name
 func IsExtendedResourceName(name core.ResourceName) bool {
-	return !IsDefaultNamespaceResource(name)
+	if IsNativeResource(name) || strings.HasPrefix(string(name), core.DefaultResourceRequestsPrefix) {
+		return false
+	}
+	// Ensure it satisfies the rules in IsQualifiedName() after converted into quota resource name
+	nameForQuota := fmt.Sprintf("%s%s", core.DefaultResourceRequestsPrefix, string(name))
+	if errs := validation.IsQualifiedName(string(nameForQuota)); len(errs) != 0 {
+		return false
+	}
+	return true
 }
 
-// IsDefaultNamespaceResource returns true if the resource name is in the
+// IsNativeResource returns true if the resource name is in the
 // *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
 // implicitly in the kubernetes.io/ namespace.
-func IsDefaultNamespaceResource(name core.ResourceName) bool {
+func IsNativeResource(name core.ResourceName) bool {
 	return !strings.Contains(string(name), "/") ||
 		strings.Contains(string(name), core.ResourceDefaultNamespacePrefix)
 }
 
-var overcommitBlacklist = sets.NewString(string(core.ResourceNvidiaGPU))
-
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted.
+// namespace and is not hugepages.
 func IsOvercommitAllowed(name core.ResourceName) bool {
-	return IsDefaultNamespaceResource(name) &&
-		!IsHugePageResourceName(name) &&
-		!overcommitBlacklist.Has(string(name))
+	return IsNativeResource(name) &&
+		!IsHugePageResourceName(name)
 }
 
 var standardLimitRangeTypes = sets.NewString(
@@ -254,24 +264,10 @@ func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsExtendedResourceName(core.ResourceName(str))
 }
 
-// Extended and HugePages resources
-func IsScalarResourceName(name core.ResourceName) bool {
-	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
-}
-
-// this function aims to check if the service's ClusterIP is set or not
+// IsServiceIPSet aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *core.Service) bool {
 	return service.Spec.ClusterIP != core.ClusterIPNone && service.Spec.ClusterIP != ""
-}
-
-// this function aims to check if the service's cluster IP is requested or not
-func IsServiceIPRequested(service *core.Service) bool {
-	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
-	if service.Spec.Type == core.ServiceTypeExternalName {
-		return false
-	}
-	return service.Spec.ClusterIP == ""
 }
 
 var standardFinalizers = sets.NewString(
@@ -280,41 +276,12 @@ var standardFinalizers = sets.NewString(
 	metav1.FinalizerDeleteDependents,
 )
 
-// HasAnnotation returns a bool if passed in annotation exists
-func HasAnnotation(obj core.ObjectMeta, ann string) bool {
-	_, found := obj.Annotations[ann]
-	return found
-}
-
-// SetMetaDataAnnotation sets the annotation and value
-func SetMetaDataAnnotation(obj *core.ObjectMeta, ann string, value string) {
-	if obj.Annotations == nil {
-		obj.Annotations = make(map[string]string)
-	}
-	obj.Annotations[ann] = value
-}
-
+// IsStandardFinalizerName checks if the input string is a standard finalizer name
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)
 }
 
-// AddToNodeAddresses appends the NodeAddresses to the passed-by-pointer slice,
-// only if they do not already exist
-func AddToNodeAddresses(addresses *[]core.NodeAddress, addAddresses ...core.NodeAddress) {
-	for _, add := range addAddresses {
-		exists := false
-		for _, existing := range *addresses {
-			if existing.Address == add.Address && existing.Type == add.Type {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			*addresses = append(*addresses, add)
-		}
-	}
-}
-
+// LoadBalancerStatusEqual checks if the status of the load balancer is equal to the target status
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *core.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
@@ -342,16 +309,6 @@ func ingressEqual(lhs, rhs *core.LoadBalancerIngress) bool {
 	return true
 }
 
-// TODO: make method on LoadBalancerStatus?
-func LoadBalancerStatusDeepCopy(lb *core.LoadBalancerStatus) *core.LoadBalancerStatus {
-	c := &core.LoadBalancerStatus{}
-	c.Ingress = make([]core.LoadBalancerIngress, len(lb.Ingress))
-	for i := range lb.Ingress {
-		c.Ingress[i] = lb.Ingress[i]
-	}
-	return c
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
@@ -369,7 +326,7 @@ func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
 	return strings.Join(modesStr, ",")
 }
 
-// GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
+// GetAccessModesFromString returns an array of AccessModes from a string created by GetAccessModesAsString
 func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 	strmodes := strings.Split(modes, ",")
 	accessModes := []core.PersistentVolumeAccessMode{}
@@ -441,6 +398,38 @@ func NodeSelectorRequirementsAsSelector(nsm []core.NodeSelectorRequirement) (lab
 	return selector, nil
 }
 
+// NodeSelectorRequirementsAsFieldSelector converts the []NodeSelectorRequirement core type into a struct that implements
+// fields.Selector.
+func NodeSelectorRequirementsAsFieldSelector(nsm []core.NodeSelectorRequirement) (fields.Selector, error) {
+	if len(nsm) == 0 {
+		return fields.Nothing(), nil
+	}
+
+	selectors := []fields.Selector{}
+	for _, expr := range nsm {
+		switch expr.Operator {
+		case core.NodeSelectorOpIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermEqualSelector(expr.Key, expr.Values[0]))
+
+		case core.NodeSelectorOpNotIn:
+			if len(expr.Values) != 1 {
+				return nil, fmt.Errorf("unexpected number of value (%d) for node field selector operator %q",
+					len(expr.Values), expr.Operator)
+			}
+			selectors = append(selectors, fields.OneTermNotEqualSelector(expr.Key, expr.Values[0]))
+
+		default:
+			return nil, fmt.Errorf("%q is not a valid node field selector operator", expr.Operator)
+		}
+	}
+
+	return fields.AndSelectors(selectors...), nil
+}
+
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
 // and converts it to the []Toleration type in core.
 func GetTolerationsFromPodAnnotations(annotations map[string]string) ([]core.Toleration, error) {
@@ -482,37 +471,6 @@ func AddOrUpdateTolerationInPod(pod *core.Pod, toleration *core.Toleration) bool
 	return true
 }
 
-// TolerationToleratesTaint checks if the toleration tolerates the taint.
-func TolerationToleratesTaint(toleration *core.Toleration, taint *core.Taint) bool {
-	if len(toleration.Effect) != 0 && toleration.Effect != taint.Effect {
-		return false
-	}
-
-	if toleration.Key != taint.Key {
-		return false
-	}
-	// TODO: Use proper defaulting when Toleration becomes a field of PodSpec
-	if (len(toleration.Operator) == 0 || toleration.Operator == core.TolerationOpEqual) && toleration.Value == taint.Value {
-		return true
-	}
-	if toleration.Operator == core.TolerationOpExists {
-		return true
-	}
-	return false
-}
-
-// TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint *core.Taint, tolerations []core.Toleration) bool {
-	tolerated := false
-	for i := range tolerations {
-		if TolerationToleratesTaint(&tolerations[i], taint) {
-			tolerated = true
-			break
-		}
-	}
-	return tolerated
-}
-
 // GetTaintsFromNodeAnnotations gets the json serialized taints data from Pod.Annotations
 // and converts it to the []Taint type in core.
 func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, error) {
@@ -524,54 +482,6 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, 
 		}
 	}
 	return taints, nil
-}
-
-// SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
-// and a slice of unsafe Sysctls. This is only a convenience wrapper around
-// SysctlsFromPodAnnotation.
-func SysctlsFromPodAnnotations(a map[string]string) ([]core.Sysctl, []core.Sysctl, error) {
-	safe, err := SysctlsFromPodAnnotation(a[core.SysctlsPodAnnotationKey])
-	if err != nil {
-		return nil, nil, err
-	}
-	unsafe, err := SysctlsFromPodAnnotation(a[core.UnsafeSysctlsPodAnnotationKey])
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return safe, unsafe, nil
-}
-
-// SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
-func SysctlsFromPodAnnotation(annotation string) ([]core.Sysctl, error) {
-	if len(annotation) == 0 {
-		return nil, nil
-	}
-
-	kvs := strings.Split(annotation, ",")
-	sysctls := make([]core.Sysctl, len(kvs))
-	for i, kv := range kvs {
-		cs := strings.Split(kv, "=")
-		if len(cs) != 2 || len(cs[0]) == 0 {
-			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
-		}
-		sysctls[i].Name = cs[0]
-		sysctls[i].Value = cs[1]
-	}
-	return sysctls, nil
-}
-
-// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
-func PodAnnotationsFromSysctls(sysctls []core.Sysctl) string {
-	if len(sysctls) == 0 {
-		return ""
-	}
-
-	kvs := make([]string, len(sysctls))
-	for i := range sysctls {
-		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
-	}
-	return strings.Join(kvs, ",")
 }
 
 // GetPersistentVolumeClass returns StorageClassName.
@@ -611,34 +521,4 @@ func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
 	}
 
 	return false
-}
-
-// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
-// and converts it to the NodeAffinity type in core.
-// TODO: update when storage node affinity graduates to beta
-func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*core.NodeAffinity, error) {
-	if len(annotations) > 0 && annotations[core.AlphaStorageNodeAffinityAnnotation] != "" {
-		var affinity core.NodeAffinity
-		err := json.Unmarshal([]byte(annotations[core.AlphaStorageNodeAffinityAnnotation]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
-// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
-// TODO: update when storage node affinity graduates to beta
-func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *core.NodeAffinity) error {
-	if affinity == nil {
-		return nil
-	}
-
-	json, err := json.Marshal(*affinity)
-	if err != nil {
-		return err
-	}
-	annotations[core.AlphaStorageNodeAffinityAnnotation] = string(json)
-	return nil
 }

@@ -22,10 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apimachinery/pkg/watch"
-	kubeversion "k8s.io/client-go/pkg/version"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -134,13 +131,14 @@ func (c *Fake) Invokes(action Action, defaultReturnObj runtime.Object) (runtime.
 	c.Lock()
 	defer c.Unlock()
 
-	c.actions = append(c.actions, action)
+	actionCopy := action.DeepCopy()
+	c.actions = append(c.actions, action.DeepCopy())
 	for _, reactor := range c.ReactionChain {
-		if !reactor.Handles(action) {
+		if !reactor.Handles(actionCopy) {
 			continue
 		}
 
-		handled, ret, err := reactor.React(action)
+		handled, ret, err := reactor.React(actionCopy)
 		if !handled {
 			continue
 		}
@@ -157,13 +155,14 @@ func (c *Fake) InvokesWatch(action Action) (watch.Interface, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	c.actions = append(c.actions, action)
+	actionCopy := action.DeepCopy()
+	c.actions = append(c.actions, action.DeepCopy())
 	for _, reactor := range c.WatchReactionChain {
-		if !reactor.Handles(action) {
+		if !reactor.Handles(actionCopy) {
 			continue
 		}
 
-		handled, ret, err := reactor.React(action)
+		handled, ret, err := reactor.React(actionCopy)
 		if !handled {
 			continue
 		}
@@ -180,13 +179,14 @@ func (c *Fake) InvokesProxy(action Action) restclient.ResponseWrapper {
 	c.Lock()
 	defer c.Unlock()
 
-	c.actions = append(c.actions, action)
+	actionCopy := action.DeepCopy()
+	c.actions = append(c.actions, action.DeepCopy())
 	for _, reactor := range c.ProxyReactionChain {
-		if !reactor.Handles(action) {
+		if !reactor.Handles(actionCopy) {
 			continue
 		}
 
-		handled, ret, err := reactor.React(action)
+		handled, ret, err := reactor.React(actionCopy)
 		if !handled || err != nil {
 			continue
 		}
@@ -213,47 +213,4 @@ func (c *Fake) Actions() []Action {
 	fa := make([]Action, len(c.actions))
 	copy(fa, c.actions)
 	return fa
-}
-
-// TODO: this probably should be moved to somewhere else.
-type FakeDiscovery struct {
-	*Fake
-}
-
-func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	action := ActionImpl{
-		Verb:     "get",
-		Resource: schema.GroupVersionResource{Resource: "resource"},
-	}
-	c.Invokes(action, nil)
-	for _, rl := range c.Resources {
-		if rl.GroupVersion == groupVersion {
-			return rl, nil
-		}
-	}
-
-	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
-}
-
-func (c *FakeDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	action := ActionImpl{
-		Verb:     "get",
-		Resource: schema.GroupVersionResource{Resource: "resource"},
-	}
-	c.Invokes(action, nil)
-	return c.Resources, nil
-}
-
-func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
-	return nil, nil
-}
-
-func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
-	action := ActionImpl{}
-	action.Verb = "get"
-	action.Resource = schema.GroupVersionResource{Resource: "version"}
-
-	c.Invokes(action, nil)
-	versionInfo := kubeversion.Get()
-	return &versionInfo, nil
 }

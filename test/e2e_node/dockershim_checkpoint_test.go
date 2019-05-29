@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -42,8 +44,12 @@ const (
 	testCheckpointContent = `{"version":"v1","name":"fluentd-gcp-v2.0-vmnqx","namespace":"kube-system","data":{},"checksum":1799154314}`
 )
 
-var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() {
+var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Docker]", func() {
 	f := framework.NewDefaultFramework("dockerhism-checkpoint-test")
+
+	BeforeEach(func() {
+		framework.RunIfContainerRuntimeIs("docker")
+	})
 
 	It("should clean up pod sandbox checkpoint after pod deletion", func() {
 		podName := "pod-checkpoint-no-disrupt"
@@ -86,7 +92,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker]", func() 
 					if len(filename) == 0 {
 						continue
 					}
-					framework.Logf("Removing checkpiont %q", filename)
+					e2elog.Logf("Removing checkpoint %q", filename)
 					_, err := exec.Command("sudo", "rm", filename).CombinedOutput()
 					framework.ExpectNoError(err, "Failed to remove checkpoint file %q: %v", string(filename), err)
 				}
@@ -151,7 +157,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Image: framework.GetPauseImageName(f.ClientSet),
+					Image: imageutils.GetPauseImageName(),
 					Name:  "pause-container",
 				},
 			},
@@ -170,7 +176,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 		if len(checkpoints) == 0 {
 			return true, nil
 		}
-		framework.Logf("Checkpoint of %q still exists: %v", podName, checkpoints)
+		e2elog.Logf("Checkpoint of %q still exists: %v", podName, checkpoints)
 		return false, nil
 	}); err != nil {
 		framework.Failf("Failed to observe checkpoint being removed within timeout: %v", err)
@@ -207,7 +213,7 @@ func findCheckpoints(match string) []string {
 	checkpoints := []string{}
 	stdout, err := exec.Command("sudo", "grep", "-rl", match, framework.TestContext.DockershimCheckpointDir).CombinedOutput()
 	if err != nil {
-		framework.Logf("grep from dockershim checkpoint directory returns error: %v", err)
+		e2elog.Logf("grep from dockershim checkpoint directory returns error: %v", err)
 	}
 	if stdout == nil {
 		return checkpoints

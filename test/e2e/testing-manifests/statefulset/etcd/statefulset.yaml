@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: etcd
@@ -7,6 +7,9 @@ metadata:
 spec:
   serviceName: etcd
   replicas: 3
+  selector:
+    matchLabels:
+      app: etcd
   template:
     metadata:
       name: etcd
@@ -15,7 +18,7 @@ spec:
     spec:
       containers:
       - name: etcd
-        image: gcr.io/google_containers/etcd-amd64:2.2.5
+        image: k8s.gcr.io/etcd:3.2.24
         imagePullPolicy: Always
         ports:
         - containerPort: 2380

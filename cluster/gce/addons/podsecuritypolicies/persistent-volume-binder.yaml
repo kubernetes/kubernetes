@@ -1,12 +1,12 @@
-apiVersion: extensions/v1beta1
+apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   name: gce.persistent-volume-binder
   annotations:
     kubernetes.io/description: 'Policy used by the persistent-volume-binder
       (a.k.a. persistentvolume-controller) to run recycler pods.'
-    # TODO: This should use the default seccomp profile.
-    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+    seccomp.security.alpha.kubernetes.io/defaultProfileName:  'docker/default'
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default,docker/default'
   labels:
     kubernetes.io/cluster-service: 'true'
     addonmanager.kubernetes.io/mode: Reconcile
@@ -15,6 +15,7 @@ spec:
   volumes:
   - 'nfs'
   - 'secret'   # Required for service account credentials.
+  - 'projected'
   hostNetwork: false
   hostIPC: false
   hostPID: false

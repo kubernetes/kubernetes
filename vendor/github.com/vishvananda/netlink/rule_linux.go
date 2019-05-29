@@ -37,6 +37,9 @@ func (h *Handle) RuleDel(rule *Rule) error {
 func ruleHandle(rule *Rule, req *nl.NetlinkRequest) error {
 	msg := nl.NewRtMsg()
 	msg.Family = syscall.AF_INET
+	if rule.Family != 0 {
+		msg.Family = uint8(rule.Family)
+	}
 	var dstFamily uint8
 
 	var rtAttrs []*nl.RtAttr

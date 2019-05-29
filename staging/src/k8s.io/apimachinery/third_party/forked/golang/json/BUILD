@@ -9,14 +9,14 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fields.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/third_party/forked/golang/json",
     importpath = "k8s.io/apimachinery/third_party/forked/golang/json",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["fields_test.go"],
-    importpath = "k8s.io/apimachinery/third_party/forked/golang/json",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

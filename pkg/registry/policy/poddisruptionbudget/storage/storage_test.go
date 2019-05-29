@@ -39,17 +39,6 @@ func newStorage(t *testing.T) (*REST, *StatusREST, *etcdtesting.EtcdTestServer) 
 	return podDisruptionBudgetStorage, statusStorage, server
 }
 
-// createPodDisruptionBudget is a helper function that returns a PodDisruptionBudget with the updated resource version.
-func createPodDisruptionBudget(storage *REST, pdb policy.PodDisruptionBudget, t *testing.T) (policy.PodDisruptionBudget, error) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), pdb.Namespace)
-	obj, err := storage.Create(ctx, &pdb, rest.ValidateAllObjectFunc, false)
-	if err != nil {
-		t.Errorf("Failed to create PodDisruptionBudget, %v", err)
-	}
-	newPS := obj.(*policy.PodDisruptionBudget)
-	return *newPS, nil
-}
-
 func validNewPodDisruptionBudget() *policy.PodDisruptionBudget {
 	minAvailable := intstr.FromInt(7)
 	return &policy.PodDisruptionBudget{
@@ -89,7 +78,7 @@ func TestStatusUpdate(t *testing.T) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 	key := "/poddisruptionbudgets/" + metav1.NamespaceDefault + "/foo"
 	validPodDisruptionBudget := validNewPodDisruptionBudget()
-	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0); err != nil {
+	if err := storage.Storage.Create(ctx, key, validPodDisruptionBudget, nil, 0, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -110,7 +99,7 @@ func TestStatusUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if _, _, err := statusStorage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err = storage.Get(ctx, "foo", &metav1.GetOptions{})

@@ -23,12 +23,19 @@ import (
 	"time"
 )
 
+const (
+	proxyTimeout = 2 * time.Minute
+)
+
+// KubeletMetrics is metrics for kubelet
 type KubeletMetrics Metrics
 
+// Equal returns true if all metrics are the same as the arguments.
 func (m *KubeletMetrics) Equal(o KubeletMetrics) bool {
 	return (*Metrics)(m).Equal(Metrics(o))
 }
 
+// NewKubeletMetrics returns new metrics which are initialized.
 func NewKubeletMetrics() KubeletMetrics {
 	result := NewMetrics()
 	return KubeletMetrics(result)
@@ -36,9 +43,8 @@ func NewKubeletMetrics() KubeletMetrics {
 
 // GrabKubeletMetricsWithoutProxy retrieve metrics from the kubelet on the given node using a simple GET over http.
 // Currently only used in integration tests.
-func GrabKubeletMetricsWithoutProxy(nodeName string) (KubeletMetrics, error) {
-	metricsEndpoint := "http://%s/metrics"
-	resp, err := http.Get(fmt.Sprintf(metricsEndpoint, nodeName))
+func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, error) {
+	resp, err := http.Get(fmt.Sprintf("http://%s%s", nodeName, path))
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -58,7 +64,7 @@ func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 	return result, nil
 }
 
-func (g *MetricsGrabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
+func (g *Grabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
 	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
 	// Hanging goroutine will be leaked.
 	finished := make(chan struct{})
@@ -74,7 +80,7 @@ func (g *MetricsGrabber) getMetricsFromNode(nodeName string, kubeletPort int) (s
 		finished <- struct{}{}
 	}()
 	select {
-	case <-time.After(ProxyTimeout):
+	case <-time.After(proxyTimeout):
 		return "", fmt.Errorf("Timed out when waiting for proxy to gather metrics from %v", nodeName)
 	case <-finished:
 		if err != nil {

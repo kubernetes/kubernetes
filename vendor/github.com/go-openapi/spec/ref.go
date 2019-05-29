@@ -145,7 +145,10 @@ func (r *Ref) UnmarshalJSON(d []byte) error {
 	if err := json.Unmarshal(d, &v); err != nil {
 		return err
 	}
+	return r.fromMap(v)
+}
 
+func (r *Ref) fromMap(v map[string]interface{}) error {
 	if v == nil {
 		return nil
 	}

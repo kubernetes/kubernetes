@@ -3,11 +3,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission/metrics",
     importpath = "k8s.io/apiserver/pkg/admission/metrics",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
@@ -17,13 +18,14 @@ go_test(
         "metrics_test.go",
         "testutil_test.go",
     ],
-    importpath = "k8s.io/apiserver/pkg/admission/metrics",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 

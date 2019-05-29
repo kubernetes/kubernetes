@@ -42,25 +42,28 @@ func (g Group) NonEmpty() string {
 	return string(g)
 }
 
+type PackageVersion struct {
+	Version
+	// The fully qualified package, e.g. k8s.io/kubernetes/pkg/apis/apps, where the types.go is found.
+	Package string
+}
+
 type GroupVersion struct {
 	Group   Group
 	Version Version
 }
 
 type GroupVersions struct {
-	// The package name of the group, e.g. extensions or networking
+	// The name of the package for this group, e.g. apps.
 	PackageName string
 	Group       Group
-	Versions    []Version
+	Versions    []PackageVersion
 }
 
-// GroupVersionPackage contains group name, version name, and the package name client-gen will generate for this group version.
-type GroupVersionPackage struct {
-	Group   Group
-	Version Version
-	// If a user calls a group client without specifying the version (e.g.,
-	// c.Core(), instead of c.CoreV1()), the default version will be returned.
-	IsDefaultVersion     bool
+// GroupVersionInfo contains all the info around a group version.
+type GroupVersionInfo struct {
+	Group                Group
+	Version              Version
 	PackageAlias         string
 	GroupGoName          string
 	LowerCaseGroupGoName string

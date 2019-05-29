@@ -8,20 +8,21 @@ load(
 
 go_binary(
     name = "client-gen",
-    importpath = "k8s.io/code-generator/cmd/client-gen",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen",
     importpath = "k8s.io/code-generator/cmd/client-gen",
     deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
+        "//staging/src/k8s.io/code-generator/cmd/client-gen/args:go_default_library",
+        "//staging/src/k8s.io/code-generator/cmd/client-gen/generators:go_default_library",
+        "//staging/src/k8s.io/code-generator/pkg/util:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
-        "//vendor/k8s.io/code-generator/cmd/client-gen/args:go_default_library",
-        "//vendor/k8s.io/code-generator/cmd/client-gen/generators:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 

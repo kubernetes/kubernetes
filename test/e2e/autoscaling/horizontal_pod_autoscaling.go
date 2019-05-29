@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 // These tests don't seem to be running properly in parallel: issue: #20338.
@@ -37,20 +37,20 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 
 	SIGDescribe("[Serial] [Slow] Deployment", func() {
 		// CPU tests via deployments
-		It(titleUp, func() {
+		ginkgo.It(titleUp, func() {
 			scaleUp("test-deployment", common.KindDeployment, false, rc, f)
 		})
-		It(titleDown, func() {
+		ginkgo.It(titleDown, func() {
 			scaleDown("test-deployment", common.KindDeployment, false, rc, f)
 		})
 	})
 
 	SIGDescribe("[Serial] [Slow] ReplicaSet", func() {
-		// CPU tests via deployments
-		It(titleUp, func() {
+		// CPU tests via ReplicaSets
+		ginkgo.It(titleUp, func() {
 			scaleUp("rs", common.KindReplicaSet, false, rc, f)
 		})
-		It(titleDown, func() {
+		ginkgo.It(titleDown, func() {
 			scaleDown("rs", common.KindReplicaSet, false, rc, f)
 		})
 	})
@@ -58,17 +58,16 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 	// These tests take ~20 minutes each.
 	SIGDescribe("[Serial] [Slow] ReplicationController", func() {
 		// CPU tests via replication controllers
-		It(titleUp+" and verify decision stability", func() {
+		ginkgo.It(titleUp+" and verify decision stability", func() {
 			scaleUp("rc", common.KindRC, true, rc, f)
 		})
-		It(titleDown+" and verify decision stability", func() {
+		ginkgo.It(titleDown+" and verify decision stability", func() {
 			scaleDown("rc", common.KindRC, true, rc, f)
 		})
 	})
 
-	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #54637 is fixed.
-	SIGDescribe("[DisabledForLargeClusters] ReplicationController light", func() {
-		It("Should scale from 1 pod to 2 pods", func() {
+	SIGDescribe("ReplicationController light", func() {
+		ginkgo.It("Should scale from 1 pod to 2 pods", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    1,
 				totalInitialCPUUsage:        150,
@@ -80,7 +79,7 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 			}
 			scaleTest.run("rc-light", common.KindRC, rc, f)
 		})
-		It("Should scale from 2 pods to 1 pod", func() {
+		ginkgo.It("Should scale from 2 pods to 1 pod", func() {
 			scaleTest := &HPAScaleTest{
 				initPods:                    2,
 				totalInitialCPUUsage:        50,
@@ -97,13 +96,13 @@ var _ = SIGDescribe("[HPA] Horizontal pod autoscaling (scale resource: CPU)", fu
 
 // HPAScaleTest struct is used by the scale(...) function.
 type HPAScaleTest struct {
-	initPods                    int32
-	totalInitialCPUUsage        int32
+	initPods                    int
+	totalInitialCPUUsage        int
 	perPodCPURequest            int64
 	targetCPUUtilizationPercent int32
 	minPods                     int32
 	maxPods                     int32
-	firstScale                  int32
+	firstScale                  int
 	firstScaleStasis            time.Duration
 	cpuBurst                    int
 	secondScale                 int32
@@ -117,13 +116,14 @@ type HPAScaleTest struct {
 // TODO The use of 3 states is arbitrary, we could eventually make this test handle "n" states once this test stabilizes.
 func (scaleTest *HPAScaleTest) run(name string, kind schema.GroupVersionKind, rc *common.ResourceConsumer, f *framework.Framework) {
 	const timeToWait = 15 * time.Minute
-	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, int(scaleTest.initPods), int(scaleTest.totalInitialCPUUsage), 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.InternalClientset)
+	rc = common.NewDynamicResourceConsumer(name, f.Namespace.Name, kind, scaleTest.initPods, scaleTest.totalInitialCPUUsage, 0, 0, scaleTest.perPodCPURequest, 200, f.ClientSet, f.ScalesGetter)
 	defer rc.CleanUp()
 	hpa := common.CreateCPUHorizontalPodAutoscaler(rc, scaleTest.targetCPUUtilizationPercent, scaleTest.minPods, scaleTest.maxPods)
 	defer common.DeleteHorizontalPodAutoscaler(rc, hpa.Name)
-	rc.WaitForReplicas(int(scaleTest.firstScale), timeToWait)
+
+	rc.WaitForReplicas(scaleTest.firstScale, timeToWait)
 	if scaleTest.firstScaleStasis > 0 {
-		rc.EnsureDesiredReplicas(int(scaleTest.firstScale), scaleTest.firstScaleStasis)
+		rc.EnsureDesiredReplicasInRange(scaleTest.firstScale, scaleTest.firstScale+1, scaleTest.firstScaleStasis, hpa.Name)
 	}
 	if scaleTest.cpuBurst > 0 && scaleTest.secondScale > 0 {
 		rc.ConsumeCPU(scaleTest.cpuBurst)
@@ -158,7 +158,7 @@ func scaleDown(name string, kind schema.GroupVersionKind, checkStability bool, r
 	}
 	scaleTest := &HPAScaleTest{
 		initPods:                    5,
-		totalInitialCPUUsage:        375,
+		totalInitialCPUUsage:        325,
 		perPodCPURequest:            500,
 		targetCPUUtilizationPercent: 30,
 		minPods:                     1,

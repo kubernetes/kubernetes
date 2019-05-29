@@ -14,7 +14,17 @@
 
 package grpcproxy
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"fmt"
+	"io/ioutil"
+	"math/rand"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/coreos/etcd/etcdserver/api/etcdhttp"
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 var (
 	watchersCoalescing = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -28,6 +38,12 @@ var (
 		Subsystem: "grpc_proxy",
 		Name:      "events_coalescing_total",
 		Help:      "Total number of events coalescing",
+	})
+	cacheKeys = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "etcd",
+		Subsystem: "grpc_proxy",
+		Name:      "cache_keys_total",
+		Help:      "Total number of keys/ranges cached",
 	})
 	cacheHits = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",
@@ -46,6 +62,53 @@ var (
 func init() {
 	prometheus.MustRegister(watchersCoalescing)
 	prometheus.MustRegister(eventsCoalescing)
+	prometheus.MustRegister(cacheKeys)
 	prometheus.MustRegister(cacheHits)
 	prometheus.MustRegister(cachedMisses)
+}
+
+// HandleMetrics performs a GET request against etcd endpoint and returns '/metrics'.
+func HandleMetrics(mux *http.ServeMux, c *http.Client, eps []string) {
+	// random shuffle endpoints
+	r := rand.New(rand.NewSource(int64(time.Now().Nanosecond())))
+	if len(eps) > 1 {
+		eps = shuffleEndpoints(r, eps)
+	}
+
+	pathMetrics := etcdhttp.PathMetrics
+	mux.HandleFunc(pathMetrics, func(w http.ResponseWriter, r *http.Request) {
+		target := fmt.Sprintf("%s%s", eps[0], pathMetrics)
+		if !strings.HasPrefix(target, "http") {
+			scheme := "http"
+			if r.TLS != nil {
+				scheme = "https"
+			}
+			target = fmt.Sprintf("%s://%s", scheme, target)
+		}
+
+		resp, err := c.Get(target)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+		defer resp.Body.Close()
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		body, _ := ioutil.ReadAll(resp.Body)
+		fmt.Fprintf(w, "%s", body)
+	})
+}
+
+func shuffleEndpoints(r *rand.Rand, eps []string) []string {
+	// copied from Go 1.9<= rand.Rand.Perm
+	n := len(eps)
+	p := make([]int, n)
+	for i := 0; i < n; i++ {
+		j := r.Intn(i + 1)
+		p[i] = p[j]
+		p[j] = i
+	}
+	neps := make([]string, n)
+	for i, k := range p {
+		neps[i] = eps[k]
+	}
+	return neps
 }

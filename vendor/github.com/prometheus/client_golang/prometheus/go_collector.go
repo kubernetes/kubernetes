@@ -1,3 +1,16 @@
+// Copyright 2018 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package prometheus
 
 import (
@@ -11,13 +24,18 @@ type goCollector struct {
 	goroutinesDesc *Desc
 	threadsDesc    *Desc
 	gcDesc         *Desc
+	goInfoDesc     *Desc
 
 	// metrics to describe and collect
 	metrics memStatsMetrics
 }
 
-// NewGoCollector returns a collector which exports metrics about the current
-// go process.
+// NewGoCollector returns a collector which exports metrics about the current Go
+// process. This includes memory stats. To collect those, runtime.ReadMemStats
+// is called. This causes a stop-the-world, which is very short with Go1.9+
+// (~25µs). However, with older Go versions, the stop-the-world duration depends
+// on the heap size and can be quite significant (~1.7 ms/GiB as per
+// https://go-review.googlesource.com/c/go/+/34937).
 func NewGoCollector() Collector {
 	return &goCollector{
 		goroutinesDesc: NewDesc(
@@ -26,12 +44,16 @@ func NewGoCollector() Collector {
 			nil, nil),
 		threadsDesc: NewDesc(
 			"go_threads",
-			"Number of OS threads created",
+			"Number of OS threads created.",
 			nil, nil),
 		gcDesc: NewDesc(
 			"go_gc_duration_seconds",
 			"A summary of the GC invocation durations.",
 			nil, nil),
+		goInfoDesc: NewDesc(
+			"go_info",
+			"Information about the Go environment.",
+			nil, Labels{"version": runtime.Version()}),
 		metrics: memStatsMetrics{
 			{
 				desc: NewDesc(
@@ -239,6 +261,7 @@ func (c *goCollector) Describe(ch chan<- *Desc) {
 	ch <- c.goroutinesDesc
 	ch <- c.threadsDesc
 	ch <- c.gcDesc
+	ch <- c.goInfoDesc
 	for _, i := range c.metrics {
 		ch <- i.desc
 	}
@@ -259,7 +282,9 @@ func (c *goCollector) Collect(ch chan<- Metric) {
 		quantiles[float64(idx+1)/float64(len(stats.PauseQuantiles)-1)] = pq.Seconds()
 	}
 	quantiles[0.0] = stats.PauseQuantiles[0].Seconds()
-	ch <- MustNewConstSummary(c.gcDesc, uint64(stats.NumGC), float64(stats.PauseTotal.Seconds()), quantiles)
+	ch <- MustNewConstSummary(c.gcDesc, uint64(stats.NumGC), stats.PauseTotal.Seconds(), quantiles)
+
+	ch <- MustNewConstMetric(c.goInfoDesc, GaugeValue, 1)
 
 	ms := &runtime.MemStats{}
 	runtime.ReadMemStats(ms)

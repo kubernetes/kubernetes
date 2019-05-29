@@ -8,6 +8,7 @@ go_library(
         "descriptor_gostring.gen.go",
         "helper.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
     importpath = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gogo/protobuf/proto:go_default_library"],

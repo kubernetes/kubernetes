@@ -9,8 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["httplog_test.go"],
-    importpath = "k8s.io/apiserver/pkg/server/httplog",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 go_library(
@@ -19,8 +18,9 @@ go_library(
         "doc.go",
         "httplog.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/httplog",
     importpath = "k8s.io/apiserver/pkg/server/httplog",
-    deps = ["//vendor/github.com/golang/glog:go_default_library"],
+    deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
 filegroup(

@@ -21,24 +21,48 @@ import (
 	"encoding/csv"
 	"flag"
 	"path"
-	"strings"
-
-	"path/filepath"
 	"sort"
+	"strings"
 
 	"k8s.io/code-generator/cmd/client-gen/types"
 )
 
-type gvPackagesValue struct {
-	gvToPath *map[types.GroupVersion]string
-	groups   *[]types.GroupVersions
-	changed  bool
+type inputBasePathValue struct {
+	builder *groupVersionsBuilder
 }
 
-func NewGVPackagesValue(gvToPath *map[types.GroupVersion]string, groups *[]types.GroupVersions, def []string) *gvPackagesValue {
+var _ flag.Value = &inputBasePathValue{}
+
+func NewInputBasePathValue(builder *groupVersionsBuilder, def string) *inputBasePathValue {
+	v := &inputBasePathValue{
+		builder: builder,
+	}
+	v.Set(def)
+	return v
+}
+
+func (s *inputBasePathValue) Set(val string) error {
+	s.builder.importBasePath = val
+	return s.builder.update()
+}
+
+func (s *inputBasePathValue) Type() string {
+	return "string"
+}
+
+func (s *inputBasePathValue) String() string {
+	return s.builder.importBasePath
+}
+
+type gvPackagesValue struct {
+	builder *groupVersionsBuilder
+	groups  []string
+	changed bool
+}
+
+func NewGVPackagesValue(builder *groupVersionsBuilder, def []string) *gvPackagesValue {
 	gvp := new(gvPackagesValue)
-	gvp.gvToPath = gvToPath
-	gvp.groups = groups
+	gvp.builder = builder
 	if def != nil {
 		if err := gvp.set(def); err != nil {
 			panic(err)
@@ -49,68 +73,15 @@ func NewGVPackagesValue(gvToPath *map[types.GroupVersion]string, groups *[]types
 
 var _ flag.Value = &gvPackagesValue{}
 
-func readAsCSV(val string) ([]string, error) {
-	if val == "" {
-		return []string{}, nil
-	}
-	stringReader := strings.NewReader(val)
-	csvReader := csv.NewReader(stringReader)
-	return csvReader.Read()
-}
-
-func writeAsCSV(vals []string) (string, error) {
-	b := &bytes.Buffer{}
-	w := csv.NewWriter(b)
-	err := w.Write(vals)
-	if err != nil {
-		return "", err
-	}
-	w.Flush()
-	return strings.TrimSuffix(b.String(), "\n"), nil
-}
-
 func (s *gvPackagesValue) set(vs []string) error {
-	if !s.changed {
-		*s.gvToPath = map[types.GroupVersion]string{}
-		*s.groups = []types.GroupVersions{}
+	if s.changed {
+		s.groups = append(s.groups, vs...)
+	} else {
+		s.groups = append([]string(nil), vs...)
 	}
 
-	var seenGroups = make(map[types.Group]*types.GroupVersions)
-	for _, g := range *s.groups {
-		seenGroups[g.Group] = &g
-	}
-
-	for _, v := range vs {
-		pth, gvString := parsePathGroupVersion(v)
-		gv, err := types.ToGroupVersion(gvString)
-		if err != nil {
-			return err
-		}
-
-		if group, ok := seenGroups[gv.Group]; ok {
-			seenGroups[gv.Group].Versions = append(group.Versions, gv.Version)
-		} else {
-			seenGroups[gv.Group] = &types.GroupVersions{
-				PackageName: gv.Group.NonEmpty(),
-				Group:       gv.Group,
-				Versions:    []types.Version{gv.Version},
-			}
-		}
-
-		(*s.gvToPath)[gv] = groupVersionPath(pth, gv.Group.String(), gv.Version.String())
-	}
-
-	var groupNames []string
-	for groupName := range seenGroups {
-		groupNames = append(groupNames, groupName.String())
-	}
-	sort.Strings(groupNames)
-	*s.groups = []types.GroupVersions{}
-	for _, groupName := range groupNames {
-		*s.groups = append(*s.groups, *seenGroups[types.Group(groupName)])
-	}
-
-	return nil
+	s.builder.groups = s.groups
+	return s.builder.update()
 }
 
 func (s *gvPackagesValue) Set(val string) error {
@@ -130,12 +101,54 @@ func (s *gvPackagesValue) Type() string {
 }
 
 func (s *gvPackagesValue) String() string {
-	strs := make([]string, 0, len(*s.gvToPath))
-	for gv, pth := range *s.gvToPath {
-		strs = append(strs, path.Join(pth, gv.Group.String(), gv.Version.String()))
-	}
-	str, _ := writeAsCSV(strs)
+	str, _ := writeAsCSV(s.groups)
 	return "[" + str + "]"
+}
+
+type groupVersionsBuilder struct {
+	value          *[]types.GroupVersions
+	groups         []string
+	importBasePath string
+}
+
+func NewGroupVersionsBuilder(groups *[]types.GroupVersions) *groupVersionsBuilder {
+	return &groupVersionsBuilder{
+		value: groups,
+	}
+}
+
+func (p *groupVersionsBuilder) update() error {
+	var seenGroups = make(map[types.Group]*types.GroupVersions)
+	for _, v := range p.groups {
+		pth, gvString := parsePathGroupVersion(v)
+		gv, err := types.ToGroupVersion(gvString)
+		if err != nil {
+			return err
+		}
+
+		versionPkg := types.PackageVersion{Package: path.Join(p.importBasePath, pth, gv.Group.NonEmpty(), gv.Version.String()), Version: gv.Version}
+		if group, ok := seenGroups[gv.Group]; ok {
+			seenGroups[gv.Group].Versions = append(group.Versions, versionPkg)
+		} else {
+			seenGroups[gv.Group] = &types.GroupVersions{
+				PackageName: gv.Group.NonEmpty(),
+				Group:       gv.Group,
+				Versions:    []types.PackageVersion{versionPkg},
+			}
+		}
+	}
+
+	var groupNames []string
+	for groupName := range seenGroups {
+		groupNames = append(groupNames, groupName.String())
+	}
+	sort.Strings(groupNames)
+	*p.value = []types.GroupVersions{}
+	for _, groupName := range groupNames {
+		*p.value = append(*p.value, *seenGroups[types.Group(groupName)])
+	}
+
+	return nil
 }
 
 func parsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
@@ -149,12 +162,22 @@ func parsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
 	}
 }
 
-func groupVersionPath(gvPath string, group string, version string) (path string) {
-	// special case for the core group
-	if group == "api" {
-		path = filepath.Join("core", version)
-	} else {
-		path = filepath.Join(gvPath, group, version)
+func readAsCSV(val string) ([]string, error) {
+	if val == "" {
+		return []string{}, nil
 	}
-	return
+	stringReader := strings.NewReader(val)
+	csvReader := csv.NewReader(stringReader)
+	return csvReader.Read()
+}
+
+func writeAsCSV(vals []string) (string, error) {
+	b := &bytes.Buffer{}
+	w := csv.NewWriter(b)
+	err := w.Write(vals)
+	if err != nil {
+		return "", err
+	}
+	w.Flush()
+	return strings.TrimSuffix(b.String(), "\n"), nil
 }

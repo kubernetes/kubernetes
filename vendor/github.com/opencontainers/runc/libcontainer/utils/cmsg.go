@@ -84,12 +84,10 @@ func RecvFd(socket *os.File) (*os.File, error) {
 // addition, the file.Name() of the given file will also be sent as
 // non-auxiliary data in the same payload (allowing to send contextual
 // information for a file descriptor).
-func SendFd(socket, file *os.File) error {
-	name := []byte(file.Name())
+func SendFd(socket *os.File, name string, fd uintptr) error {
 	if len(name) >= MaxNameLen {
-		return fmt.Errorf("sendfd: filename too long: %s", file.Name())
+		return fmt.Errorf("sendfd: filename too long: %s", name)
 	}
-	oob := unix.UnixRights(int(file.Fd()))
-
-	return unix.Sendmsg(int(socket.Fd()), name, oob, nil, 0)
+	oob := unix.UnixRights(int(fd))
+	return unix.Sendmsg(int(socket.Fd()), []byte(name), oob, nil, 0)
 }

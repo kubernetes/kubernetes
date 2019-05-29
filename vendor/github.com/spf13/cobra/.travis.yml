@@ -1,11 +1,10 @@
 language: go
-go:
-  - 1.4.3
-  - 1.5.4
-  - 1.6.3
-  - tip
 
 matrix:
+  include:
+    - go: 1.7.6
+    - go: 1.8.3
+    - go: tip
   allow_failures:
     - go: tip
 
@@ -16,3 +15,7 @@ before_install:
 script:
   - PATH=$PATH:$PWD/bin go test -v ./...
   - go build
+  - diff -u <(echo -n) <(gofmt -d -s .)
+  - if [ -z $NOVET ]; then
+      diff -u <(echo -n) <(go tool vet . 2>&1 | grep -vE 'ExampleCommand|bash_completions.*Fprint');
+    fi

@@ -18,11 +18,11 @@ type ARCCache struct {
 	size int // Size is the total capacity of the cache
 	p    int // P is the dynamic preference towards T1 or T2
 
-	t1 *simplelru.LRU // T1 is the LRU for recently accessed items
-	b1 *simplelru.LRU // B1 is the LRU for evictions from t1
+	t1 simplelru.LRUCache // T1 is the LRU for recently accessed items
+	b1 simplelru.LRUCache // B1 is the LRU for evictions from t1
 
-	t2 *simplelru.LRU // T2 is the LRU for frequently accessed items
-	b2 *simplelru.LRU // B2 is the LRU for evictions from t2
+	t2 simplelru.LRUCache // T2 is the LRU for frequently accessed items
+	b2 simplelru.LRUCache // B2 is the LRU for evictions from t2
 
 	lock sync.RWMutex
 }
@@ -60,11 +60,11 @@ func NewARC(size int) (*ARCCache, error) {
 }
 
 // Get looks up a key's value from the cache.
-func (c *ARCCache) Get(key interface{}) (interface{}, bool) {
+func (c *ARCCache) Get(key interface{}) (value interface{}, ok bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// Ff the value is contained in T1 (recent), then
+	// If the value is contained in T1 (recent), then
 	// promote it to T2 (frequent)
 	if val, ok := c.t1.Peek(key); ok {
 		c.t1.Remove(key)
@@ -153,7 +153,7 @@ func (c *ARCCache) Add(key, value interface{}) {
 		// Remove from B2
 		c.b2.Remove(key)
 
-		// Add the key to the frequntly used list
+		// Add the key to the frequently used list
 		c.t2.Add(key, value)
 		return
 	}
@@ -247,7 +247,7 @@ func (c *ARCCache) Contains(key interface{}) bool {
 
 // Peek is used to inspect the cache value of a key
 // without updating recency or frequency.
-func (c *ARCCache) Peek(key interface{}) (interface{}, bool) {
+func (c *ARCCache) Peek(key interface{}) (value interface{}, ok bool) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	if val, ok := c.t1.Peek(key); ok {

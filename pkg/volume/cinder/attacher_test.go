@@ -17,21 +17,22 @@ limitations under the License.
 package cinder
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/cloudprovider"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
 	"fmt"
 	"sort"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog"
 )
 
 const (
@@ -132,7 +133,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Attach_Positive",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, nil},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, nil},
 			attach:           attachCall{instanceID, volumeID, "", nil},
 			diskPath:         diskPathCall{instanceID, volumeID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
@@ -147,7 +148,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Attach_Positive_AlreadyAttached",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, true, nil},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, true, nil},
 			diskPath:         diskPathCall{instanceID, volumeID, "/dev/sda", nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
@@ -173,7 +174,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Attach_Negative",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, diskCheckError},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, diskCheckError},
 			attach:           attachCall{instanceID, volumeID, "/dev/sda", attachError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
@@ -187,7 +188,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Attach_Negative_DiskPatchFails",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, nil},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, nil},
 			attach:           attachCall{instanceID, volumeID, "", nil},
 			diskPath:         diskPathCall{instanceID, volumeID, "", diskPathError},
 			test: func(testcase *testcase) (string, error) {
@@ -201,7 +202,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:             "VolumesAreAttached_Positive",
 			instanceID:       instanceID,
-			disksAreAttached: disksAreAttachedCall{instanceID, []string{volumeID}, map[string]bool{volumeID: true}, nil},
+			disksAreAttached: disksAreAttachedCall{instanceID, nodeName, []string{volumeID}, map[string]bool{volumeID: true}, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
 				attachments, err := attacher.VolumesAreAttached([]*volume.Spec{spec}, nodeName)
@@ -214,7 +215,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:             "VolumesAreAttached_Negative",
 			instanceID:       instanceID,
-			disksAreAttached: disksAreAttachedCall{instanceID, []string{volumeID}, map[string]bool{volumeID: false}, nil},
+			disksAreAttached: disksAreAttachedCall{instanceID, nodeName, []string{volumeID}, map[string]bool{volumeID: false}, nil},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
 				attachments, err := attacher.VolumesAreAttached([]*volume.Spec{spec}, nodeName)
@@ -227,7 +228,7 @@ func TestAttachDetach(t *testing.T) {
 		{
 			name:             "VolumesAreAttached_CinderFailed",
 			instanceID:       instanceID,
-			disksAreAttached: disksAreAttachedCall{instanceID, []string{volumeID}, nil, disksCheckError},
+			disksAreAttached: disksAreAttachedCall{instanceID, nodeName, []string{volumeID}, nil, disksCheckError},
 			test: func(testcase *testcase) (string, error) {
 				attacher := newAttacher(testcase)
 				attachments, err := attacher.VolumesAreAttached([]*volume.Spec{spec}, nodeName)
@@ -242,7 +243,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Detach_Positive",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, true, nil},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, true, nil},
 			detach:           detachCall{instanceID, volumeID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
@@ -255,7 +256,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Detach_Positive_AlreadyDetached",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, nil},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
 				return "", detacher.Detach(volumeID, nodeName)
@@ -267,7 +268,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Detach_Positive_CheckFails",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, diskCheckError},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, diskCheckError},
 			detach:           detachCall{instanceID, volumeID, nil},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
@@ -280,7 +281,7 @@ func TestAttachDetach(t *testing.T) {
 			name:             "Detach_Negative",
 			instanceID:       instanceID,
 			operationPending: operationPendingCall{volumeID, false, done, nil},
-			diskIsAttached:   diskIsAttachedCall{instanceID, volumeID, false, diskCheckError},
+			diskIsAttached:   diskIsAttachedCall{instanceID, nodeName, volumeID, false, diskCheckError},
 			detach:           detachCall{instanceID, volumeID, detachError},
 			test: func(testcase *testcase) (string, error) {
 				detacher := newDetacher(testcase)
@@ -392,7 +393,7 @@ func createPVSpec(name string, readOnly bool) *volume.Spec {
 		PersistentVolume: &v1.PersistentVolume{
 			Spec: v1.PersistentVolumeSpec{
 				PersistentVolumeSource: v1.PersistentVolumeSource{
-					Cinder: &v1.CinderVolumeSource{
+					Cinder: &v1.CinderPersistentVolumeSource{
 						VolumeID: name,
 						ReadOnly: readOnly,
 					},
@@ -426,6 +427,7 @@ type operationPendingCall struct {
 
 type diskIsAttachedCall struct {
 	instanceID string
+	nodeName   types.NodeName
 	volumeID   string
 	isAttached bool
 	ret        error
@@ -440,6 +442,7 @@ type diskPathCall struct {
 
 type disksAreAttachedCall struct {
 	instanceID  string
+	nodeName    types.NodeName
 	volumeIDs   []string
 	areAttached map[string]bool
 	ret         error
@@ -451,21 +454,21 @@ func (testcase *testcase) AttachDisk(instanceID, volumeID string) (string, error
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
-		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return "", errors.New("Unexpected AttachDisk call!")
+		testcase.t.Errorf("unexpected AttachDisk call")
+		return "", errors.New("unexpected AttachDisk call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected AttachDisk call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return "", errors.New("Unexpected AttachDisk call: wrong volumeID")
+		testcase.t.Errorf("unexpected AttachDisk call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return "", errors.New("unexpected AttachDisk call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected AttachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return "", errors.New("Unexpected AttachDisk call: wrong instanceID")
+		testcase.t.Errorf("unexpected AttachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return "", errors.New("unexpected AttachDisk call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", volumeID, instanceID, expected.retDeviceName, expected.ret)
+	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", volumeID, instanceID, expected.retDeviceName, expected.ret)
 
 	testcase.attachOrDetach = &attachStatus
 	return expected.retDeviceName, expected.ret
@@ -477,21 +480,21 @@ func (testcase *testcase) DetachDisk(instanceID, volumeID string) error {
 	if expected.devicePath == "" && expected.instanceID == "" {
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
-		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return errors.New("Unexpected DetachDisk call!")
+		testcase.t.Errorf("unexpected DetachDisk call")
+		return errors.New("unexpected DetachDisk call")
 	}
 
 	if expected.devicePath != volumeID {
-		testcase.t.Errorf("Unexpected DetachDisk call: expected volumeID %s, got %s", expected.devicePath, volumeID)
-		return errors.New("Unexpected DetachDisk call: wrong volumeID")
+		testcase.t.Errorf("unexpected DetachDisk call: expected volumeID %s, got %s", expected.devicePath, volumeID)
+		return errors.New("unexpected DetachDisk call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected DetachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return errors.New("Unexpected DetachDisk call: wrong instanceID")
+		testcase.t.Errorf("unexpected DetachDisk call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return errors.New("unexpected DetachDisk call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DetachDisk call: %s, %s, returning %v", volumeID, instanceID, expected.ret)
+	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", volumeID, instanceID, expected.ret)
 
 	testcase.attachOrDetach = &detachStatus
 	return expected.ret
@@ -501,11 +504,11 @@ func (testcase *testcase) OperationPending(diskName string) (bool, string, error
 	expected := &testcase.operationPending
 
 	if expected.volumeStatus == VolumeStatusPending {
-		glog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
+		klog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
 		return true, expected.volumeStatus, expected.ret
 	}
 
-	glog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
+	klog.V(4).Infof("OperationPending call: %s, returning %v, %v, %v", diskName, expected.pending, expected.volumeStatus, expected.ret)
 
 	return false, expected.volumeStatus, expected.ret
 }
@@ -525,21 +528,21 @@ func (testcase *testcase) DiskIsAttached(instanceID, volumeID string) (bool, err
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
-		testcase.t.Errorf("Unexpected DiskIsAttached call!")
-		return false, errors.New("Unexpected DiskIsAttached call!")
+		testcase.t.Errorf("unexpected DiskIsAttached call")
+		return false, errors.New("unexpected DiskIsAttached call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong volumeID")
+		testcase.t.Errorf("unexpected DiskIsAttached call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return false, errors.New("unexpected DiskIsAttached call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected DiskIsAttached call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return false, errors.New("Unexpected DiskIsAttached call: wrong instanceID")
+		testcase.t.Errorf("unexpected DiskIsAttached call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return false, errors.New("unexpected DiskIsAttached call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", volumeID, instanceID, expected.isAttached, expected.ret)
+	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", volumeID, instanceID, expected.isAttached, expected.ret)
 
 	return expected.isAttached, expected.ret
 }
@@ -549,21 +552,21 @@ func (testcase *testcase) GetAttachmentDiskPath(instanceID, volumeID string) (st
 	if expected.volumeID == "" && expected.instanceID == "" {
 		// testcase.diskPath looks uninitialized, test did not expect to
 		// call GetAttachmentDiskPath
-		testcase.t.Errorf("Unexpected GetAttachmentDiskPath call!")
-		return "", errors.New("Unexpected GetAttachmentDiskPath call!")
+		testcase.t.Errorf("unexpected GetAttachmentDiskPath call")
+		return "", errors.New("unexpected GetAttachmentDiskPath call")
 	}
 
 	if expected.volumeID != volumeID {
-		testcase.t.Errorf("Unexpected GetAttachmentDiskPath call: expected volumeID %s, got %s", expected.volumeID, volumeID)
-		return "", errors.New("Unexpected GetAttachmentDiskPath call: wrong volumeID")
+		testcase.t.Errorf("unexpected GetAttachmentDiskPath call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return "", errors.New("unexpected GetAttachmentDiskPath call: wrong volumeID")
 	}
 
 	if expected.instanceID != instanceID {
-		testcase.t.Errorf("Unexpected GetAttachmentDiskPath call: expected instanceID %s, got %s", expected.instanceID, instanceID)
-		return "", errors.New("Unexpected GetAttachmentDiskPath call: wrong instanceID")
+		testcase.t.Errorf("unexpected GetAttachmentDiskPath call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return "", errors.New("unexpected GetAttachmentDiskPath call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("GetAttachmentDiskPath call: %s, %s, returning %v, %v", volumeID, instanceID, expected.retPath, expected.ret)
+	klog.V(4).Infof("GetAttachmentDiskPath call: %s, %s, returning %v, %v", volumeID, instanceID, expected.retPath, expected.ret)
 
 	return expected.retPath, expected.ret
 }
@@ -572,8 +575,48 @@ func (testcase *testcase) ShouldTrustDevicePath() bool {
 	return true
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
-	return "", "", false, errors.New("Not implemented")
+func (testcase *testcase) DiskIsAttachedByName(nodeName types.NodeName, volumeID string) (bool, string, error) {
+	expected := &testcase.diskIsAttached
+	instanceID := expected.instanceID
+	// If testcase call DetachDisk*, return false
+	if *testcase.attachOrDetach == detachStatus {
+		return false, instanceID, nil
+	}
+
+	// If testcase call AttachDisk*, return true
+	if *testcase.attachOrDetach == attachStatus {
+		return true, instanceID, nil
+	}
+
+	if expected.nodeName != nodeName {
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call: expected nodename %s, got %s", expected.nodeName, nodeName)
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong nodename")
+	}
+
+	if expected.volumeID == "" && expected.instanceID == "" {
+		// testcase.diskIsAttached looks uninitialized, test did not expect to
+		// call DiskIsAttached
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call")
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call")
+	}
+
+	if expected.volumeID != volumeID {
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call: expected volumeID %s, got %s", expected.volumeID, volumeID)
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong volumeID")
+	}
+
+	if expected.instanceID != instanceID {
+		testcase.t.Errorf("unexpected DiskIsAttachedByName call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return false, instanceID, errors.New("unexpected DiskIsAttachedByName call: wrong instanceID")
+	}
+
+	klog.V(4).Infof("DiskIsAttachedByName call: %s, %s, returning %v, %v, %v", volumeID, nodeName, expected.isAttached, expected.instanceID, expected.ret)
+
+	return expected.isAttached, expected.instanceID, expected.ret
+}
+
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, string, bool, error) {
+	return "", "", "", false, errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(volumeID string) string {
@@ -621,7 +664,37 @@ func (testcase *testcase) DisksAreAttached(instanceID string, volumeIDs []string
 		return areAttached, errors.New("Unexpected DisksAreAttached call: wrong instanceID")
 	}
 
-	glog.V(4).Infof("DisksAreAttached call: %v, %s, returning %v, %v", volumeIDs, instanceID, expected.areAttached, expected.ret)
+	klog.V(4).Infof("DisksAreAttached call: %v, %s, returning %v, %v", volumeIDs, instanceID, expected.areAttached, expected.ret)
+
+	return expected.areAttached, expected.ret
+}
+
+func (testcase *testcase) DisksAreAttachedByName(nodeName types.NodeName, volumeIDs []string) (map[string]bool, error) {
+	expected := &testcase.disksAreAttached
+	areAttached := make(map[string]bool)
+
+	instanceID := expected.instanceID
+	if expected.nodeName != nodeName {
+		testcase.t.Errorf("Unexpected DisksAreAttachedByName call: expected nodeName %s, got %s", expected.nodeName, nodeName)
+		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong nodename")
+	}
+	if len(expected.volumeIDs) == 0 && expected.instanceID == "" {
+		// testcase.volumeIDs looks uninitialized, test did not expect to call DisksAreAttached
+		testcase.t.Errorf("Unexpected DisksAreAttachedByName call!")
+		return areAttached, errors.New("Unexpected DisksAreAttachedByName call")
+	}
+
+	if !reflect.DeepEqual(expected.volumeIDs, volumeIDs) {
+		testcase.t.Errorf("Unexpected DisksAreAttachedByName call: expected volumeIDs %v, got %v", expected.volumeIDs, volumeIDs)
+		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong volumeID")
+	}
+
+	if expected.instanceID != instanceID {
+		testcase.t.Errorf("Unexpected DisksAreAttachedByName call: expected instanceID %s, got %s", expected.instanceID, instanceID)
+		return areAttached, errors.New("Unexpected DisksAreAttachedByName call: wrong instanceID")
+	}
+
+	klog.V(4).Infof("DisksAreAttachedByName call: %v, %s, returning %v, %v", volumeIDs, nodeName, expected.areAttached, expected.ret)
 
 	return expected.areAttached, expected.ret
 }
@@ -631,31 +704,31 @@ type instances struct {
 	instanceID string
 }
 
-func (instances *instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
+func (instances *instances) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
+func (instances *instances) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
 	return []v1.NodeAddress{}, errors.New("Not implemented")
 }
 
-func (instances *instances) ExternalID(name types.NodeName) (string, error) {
-	return "", errors.New("Not implemented")
-}
-
-func (instances *instances) InstanceID(name types.NodeName) (string, error) {
+func (instances *instances) InstanceID(ctx context.Context, name types.NodeName) (string, error) {
 	return instances.instanceID, nil
 }
 
-func (instances *instances) InstanceType(name types.NodeName) (string, error) {
+func (instances *instances) InstanceType(ctx context.Context, name types.NodeName) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceTypeByProviderID(providerID string) (string, error) {
+func (instances *instances) InstanceTypeByProviderID(ctx context.Context, providerID string) (string, error) {
 	return "", errors.New("Not implemented")
 }
 
-func (instances *instances) InstanceExistsByProviderID(providerID string) (bool, error) {
+func (instances *instances) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
+	return false, errors.New("unimplemented")
+}
+
+func (instances *instances) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	return false, errors.New("unimplemented")
 }
 
@@ -663,10 +736,10 @@ func (instances *instances) List(filter string) ([]types.NodeName, error) {
 	return []types.NodeName{}, errors.New("Not implemented")
 }
 
-func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("Not implemented")
+func (instances *instances) AddSSHKeyToAllInstances(ctx context.Context, user string, keyData []byte) error {
+	return cloudprovider.NotImplemented
 }
 
-func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
+func (instances *instances) CurrentNodeName(ctx context.Context, hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
 }

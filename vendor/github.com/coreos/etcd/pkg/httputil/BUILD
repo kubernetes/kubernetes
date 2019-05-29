@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["httputil.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/pkg/httputil",
     importpath = "github.com/coreos/etcd/pkg/httputil",
     visibility = ["//visibility:public"],
 )

@@ -49,17 +49,65 @@ type Rule struct {
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
+
+	// scope specifies the scope of this rule.
+	// Valid values are "Cluster", "Namespaced", and "*"
+	// "Cluster" means that only cluster-scoped resources will match this rule.
+	// Namespace API objects are cluster-scoped.
+	// "Namespaced" means that only namespaced resources will match this rule.
+	// "*" means that there are no scope restrictions.
+	// Subresources match the scope of their parent resource.
+	// Default is "*".
+	//
+	// +optional
+	Scope *ScopeType `json:"scope,omitempty" protobuf:"bytes,4,rep,name=scope"`
 }
+
+type ScopeType string
+
+const (
+	// ClusterScope means that scope is limited to cluster-scoped objects.
+	// Namespace objects are cluster-scoped.
+	ClusterScope ScopeType = "Cluster"
+	// NamespacedScope means that scope is limited to namespaced objects.
+	NamespacedScope ScopeType = "Namespaced"
+	// AllScopes means that all scopes are included.
+	AllScopes ScopeType = "*"
+)
 
 type FailurePolicyType string
 
 const (
-	// Ignore means the initializer is removed from the initializers list of an
-	// object if the initializer is timed out.
+	// Ignore means that an error calling the webhook is ignored.
 	Ignore FailurePolicyType = "Ignore"
-	// For 1.7, only "Ignore" is allowed. "Fail" will be allowed when the
-	// extensible admission feature is beta.
+	// Fail means that an error calling the webhook causes the admission to fail.
 	Fail FailurePolicyType = "Fail"
+)
+
+// MatchPolicyType specifies the type of match policy
+type MatchPolicyType string
+
+const (
+	// Exact means requests should only be sent to the webhook if they exactly match a given rule
+	Exact MatchPolicyType = "Exact"
+	// Equivalent means requests should be sent to the webhook if they modify a resource listed in rules via another API group or version.
+	Equivalent MatchPolicyType = "Equivalent"
+)
+
+type SideEffectClass string
+
+const (
+	// SideEffectClassUnknown means that no information is known about the side effects of calling the webhook.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassUnknown SideEffectClass = "Unknown"
+	// SideEffectClassNone means that calling the webhook will have no side effects.
+	SideEffectClassNone SideEffectClass = "None"
+	// SideEffectClassSome means that calling the webhook will possibly have side effects.
+	// If a request with the dry-run attribute would trigger a call to this webhook, the request will instead fail.
+	SideEffectClassSome SideEffectClass = "Some"
+	// SideEffectClassNoneOnDryRun means that calling the webhook will possibly have side effects, but if the
+	// request being reviewed has the dry-run attribute, the side effects will be suppressed.
+	SideEffectClassNoneOnDryRun SideEffectClass = "NoneOnDryRun"
 )
 
 // +genclient
@@ -137,6 +185,10 @@ type Webhook struct {
 
 	// Rules describes what operations on what resources/subresources the webhook cares about.
 	// The webhook cares about an operation if it matches _any_ Rule.
+	// However, in order to prevent ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks
+	// from putting the cluster in a state which cannot be recovered from without completely
+	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
+	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -144,11 +196,28 @@ type Webhook struct {
 	// +optional
 	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,4,opt,name=failurePolicy,casttype=FailurePolicyType"`
 
+	// matchPolicy defines how the "rules" list is used to match incoming requests.
+	// Allowed values are "Exact" or "Equivalent".
+	//
+	// - Exact: match a request only if it exactly matches a specified rule.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// but "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would not be sent to the webhook.
+	//
+	// - Equivalent: match a request if modifies a resource listed in rules, even via another API group or version.
+	// For example, if deployments can be modified via apps/v1, apps/v1beta1, and extensions/v1beta1,
+	// and "rules" only included `apiGroups:["apps"], apiVersions:["v1"], resources: ["deployments"]`,
+	// a request to apps/v1beta1 or extensions/v1beta1 would be converted to apps/v1 and sent to the webhook.
+	//
+	// Defaults to "Exact"
+	// +optional
+	MatchPolicy *MatchPolicyType `json:"matchPolicy,omitempty" protobuf:"bytes,9,opt,name=matchPolicy,casttype=MatchPolicyType"`
+
 	// NamespaceSelector decides whether to run the webhook on an object based
 	// on whether the namespace for that object matches the selector. If the
 	// object itself is a namespace, the matching is performed on
-	// object.metadata.labels. If the object is other cluster scoped resource,
-	// it is not subjected to the webhook.
+	// object.metadata.labels. If the object is another cluster scoped resource,
+	// it never skips the webhook.
 	//
 	// For example, to run the webhook on any objects whose namespace is not
 	// associated with "runlevel" of "0" or "1";  you will set the selector as
@@ -189,6 +258,34 @@ type Webhook struct {
 	// Default to the empty LabelSelector, which matches everything.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,5,opt,name=namespaceSelector"`
+
+	// SideEffects states whether this webhookk has side effects.
+	// Acceptable values are: Unknown, None, Some, NoneOnDryRun
+	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
+	// rejected by a future step in the admission change and the side effects therefore need to be undone.
+	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
+	// sideEffects == Unknown or Some. Defaults to Unknown.
+	// +optional
+	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
+
+	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
+	// the webhook call will be ignored or the API call will fail based on the
+	// failure policy.
+	// The timeout value must be between 1 and 30 seconds.
+	// Default to 30 seconds.
+	// +optional
+	TimeoutSeconds *int32 `json:"timeoutSeconds,omitempty" protobuf:"varint,7,opt,name=timeoutSeconds"`
+
+	// AdmissionReviewVersions is an ordered list of preferred `AdmissionReview`
+	// versions the Webhook expects. API server will try to use first version in
+	// the list which it supports. If none of the versions specified in this list
+	// supported by API server, validation will fail for this object.
+	// If a persisted webhook configuration specifies allowed versions and does not
+	// include any versions known to the API Server, calls to the webhook will fail
+	// and be subject to the failure policy.
+	// Default to `['v1beta1']`.
+	// +optional
+	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 }
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
@@ -219,7 +316,7 @@ const (
 // connection with the webhook
 type WebhookClientConfig struct {
 	// `url` gives the location of the webhook, in standard URL form
-	// (`[scheme://]host:port/path`). Exactly one of `url` or `service`
+	// (`scheme://host:port/path`). Exactly one of `url` or `service`
 	// must be specified.
 	//
 	// The `host` should not refer to a service running in the cluster; use
@@ -252,17 +349,13 @@ type WebhookClientConfig struct {
 	//
 	// If the webhook is running within the cluster, then you should use `service`.
 	//
-	// If there is only one port open for the service, that port will be
-	// used. If there are multiple ports open, port 443 will be used if it
-	// is open, otherwise it is an error.
-	//
 	// +optional
-	Service *ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`
+	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate
-	// the webhook's server certificate.
-	// Required.
-	CABundle []byte `json:"caBundle" protobuf:"bytes,2,opt,name=caBundle"`
+	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// If unspecified, system trust roots on the apiserver are used.
+	// +optional
+	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -278,4 +371,10 @@ type ServiceReference struct {
 	// this service.
 	// +optional
 	Path *string `json:"path,omitempty" protobuf:"bytes,3,opt,name=path"`
+
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,4,opt,name=port"`
 }

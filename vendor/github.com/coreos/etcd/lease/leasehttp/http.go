@@ -16,6 +16,7 @@ package leasehttp
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,7 +27,6 @@ import (
 	"github.com/coreos/etcd/lease"
 	"github.com/coreos/etcd/lease/leasepb"
 	"github.com/coreos/etcd/pkg/httputil"
-	"golang.org/x/net/context"
 )
 
 var (
@@ -191,7 +191,12 @@ func RenewHTTP(ctx context.Context, id lease.LeaseID, url string, rt http.RoundT
 // TimeToLiveHTTP retrieves lease information of the given lease ID.
 func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string, rt http.RoundTripper) (*leasepb.LeaseInternalResponse, error) {
 	// will post lreq protobuf to leader
-	lreq, err := (&leasepb.LeaseInternalRequest{&pb.LeaseTimeToLiveRequest{ID: int64(id), Keys: keys}}).Marshal()
+	lreq, err := (&leasepb.LeaseInternalRequest{
+		LeaseTimeToLiveRequest: &pb.LeaseTimeToLiveRequest{
+			ID:   int64(id),
+			Keys: keys,
+		},
+	}).Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -202,45 +207,27 @@ func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string
 	}
 	req.Header.Set("Content-Type", "application/protobuf")
 
-	cancel := httputil.RequestCanceler(req)
+	req = req.WithContext(ctx)
 
 	cc := &http.Client{Transport: rt}
 	var b []byte
 	// buffer errc channel so that errc don't block inside the go routinue
-	errc := make(chan error, 2)
-	go func() {
-		resp, err := cc.Do(req)
-		if err != nil {
-			errc <- err
-			return
-		}
-		b, err = readResponse(resp)
-		if err != nil {
-			errc <- err
-			return
-		}
-		if resp.StatusCode == http.StatusRequestTimeout {
-			errc <- ErrLeaseHTTPTimeout
-			return
-		}
-		if resp.StatusCode == http.StatusNotFound {
-			errc <- lease.ErrLeaseNotFound
-			return
-		}
-		if resp.StatusCode != http.StatusOK {
-			errc <- fmt.Errorf("lease: unknown error(%s)", string(b))
-			return
-		}
-		errc <- nil
-	}()
-	select {
-	case derr := <-errc:
-		if derr != nil {
-			return nil, derr
-		}
-	case <-ctx.Done():
-		cancel()
-		return nil, ctx.Err()
+	resp, err := cc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	b, err = readResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode == http.StatusRequestTimeout {
+		return nil, ErrLeaseHTTPTimeout
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, lease.ErrLeaseNotFound
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("lease: unknown error(%s)", string(b))
 	}
 
 	lresp := &leasepb.LeaseInternalResponse{}

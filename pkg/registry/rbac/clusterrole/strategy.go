@@ -17,9 +17,10 @@ limitations under the License.
 package clusterrole
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -33,7 +34,7 @@ type strategy struct {
 	names.NameGenerator
 }
 
-// strategy is the default logic that applies when creating and updating
+// Strategy is the default logic that applies when creating and updating
 // ClusterRole objects.
 var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
@@ -43,7 +44,7 @@ var _ rest.RESTCreateStrategy = Strategy
 // Strategy should implement rest.RESTUpdateStrategy
 var _ rest.RESTUpdateStrategy = Strategy
 
-// NamespaceScoped is true for ClusterRoles.
+// NamespaceScoped is false for ClusterRoles.
 func (strategy) NamespaceScoped() bool {
 	return false
 }
@@ -55,12 +56,12 @@ func (strategy) AllowCreateOnUpdate() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users
 // on creation.
-func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	_ = obj.(*rbac.ClusterRole)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClusterRole := obj.(*rbac.ClusterRole)
 	oldClusterRole := old.(*rbac.ClusterRole)
 
@@ -68,7 +69,7 @@ func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime
 }
 
 // Validate validates a new ClusterRole. Validation must check for a correct signature.
-func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
+func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	clusterRole := obj.(*rbac.ClusterRole)
 	return validation.ValidateClusterRole(clusterRole)
 }
@@ -79,7 +80,7 @@ func (strategy) Canonicalize(obj runtime.Object) {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (strategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
+func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newObj := obj.(*rbac.ClusterRole)
 	errorList := validation.ValidateClusterRole(newObj)
 	return append(errorList, validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole))...)

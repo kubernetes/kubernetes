@@ -12,18 +12,14 @@ go_library(
         "doc.go",
         "procfs.go",
         "procfs_fake.go",
+        "procfs_linux.go",
         "procfs_unsupported.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "procfs_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
     importpath = "k8s.io/kubernetes/pkg/util/procfs",
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//vendor/github.com/golang/glog:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "@io_bazel_rules_go//go/platform:linux": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+            "//vendor/k8s.io/klog:go_default_library",
         ],
         "//conditions:default": [],
     }),
@@ -31,19 +27,13 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "procfs_linux_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["procfs_linux_test.go"],
     data = [
         "example_proc_cgroup",
     ],
-    importpath = "k8s.io/kubernetes/pkg/util/procfs",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
+        "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
         ],
         "//conditions:default": [],

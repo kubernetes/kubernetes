@@ -114,3 +114,60 @@ func TestOpenstackAuthProvider(t *testing.T) {
 	}
 
 }
+
+type fakePersister struct{}
+
+func (i *fakePersister) Persist(map[string]string) error {
+	return nil
+}
+
+func TestNewOpenstackAuthProvider(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      map[string]string
+		expectError bool
+	}{
+		{
+			name: "normal config without openstack configurations",
+			config: map[string]string{
+				"ttl": "1s",
+				"foo": "bar",
+			},
+		},
+		{
+			name: "openstack auth provider: missing identityEndpoint",
+			config: map[string]string{
+				"ttl":        "1s",
+				"foo":        "bar",
+				"username":   "xyz",
+				"password":   "123",
+				"tenantName": "admin",
+			},
+			expectError: true,
+		},
+		{
+			name: "openstack auth provider",
+			config: map[string]string{
+				"ttl":              "1s",
+				"foo":              "bar",
+				"identityEndpoint": "http://controller:35357/v3",
+				"username":         "xyz",
+				"password":         "123",
+				"tenantName":       "admin",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		_, err := newOpenstackAuthProvider("test", test.config, &fakePersister{})
+		if err != nil {
+			if !test.expectError {
+				t.Errorf("unexpected error: %v", err)
+			}
+		} else {
+			if test.expectError {
+				t.Error("expect error, but nil")
+			}
+		}
+	}
+}

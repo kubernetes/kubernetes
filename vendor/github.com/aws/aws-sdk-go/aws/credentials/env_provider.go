@@ -12,14 +12,10 @@ const EnvProviderName = "EnvProvider"
 var (
 	// ErrAccessKeyIDNotFound is returned when the AWS Access Key ID can't be
 	// found in the process's environment.
-	//
-	// @readonly
 	ErrAccessKeyIDNotFound = awserr.New("EnvAccessKeyNotFound", "AWS_ACCESS_KEY_ID or AWS_ACCESS_KEY not found in environment", nil)
 
 	// ErrSecretAccessKeyNotFound is returned when the AWS Secret Access Key
 	// can't be found in the process's environment.
-	//
-	// @readonly
 	ErrSecretAccessKeyNotFound = awserr.New("EnvSecretNotFound", "AWS_SECRET_ACCESS_KEY or AWS_SECRET_KEY not found in environment", nil)
 )
 

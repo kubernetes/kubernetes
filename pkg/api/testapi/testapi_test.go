@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// TODO these tests don't add much value for testing things that have groups
-
 func TestResourcePathWithPrefix(t *testing.T) {
 	testCases := []struct {
 		prefix    string
@@ -46,6 +44,25 @@ func TestResourcePathWithPrefix(t *testing.T) {
 			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
 		}
 	}
+
+	testGroupCases := []struct {
+		prefix    string
+		resource  string
+		namespace string
+		name      string
+		expected  string
+	}{
+		{"prefix", "resource", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource/myresource"},
+		{"prefix", "resource", "", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/resource/myresource"},
+		{"prefix", "resource", "mynamespace", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/namespaces/mynamespace/resource"},
+		{"prefix", "resource", "", "", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/prefix/resource"},
+		{"", "resource", "mynamespace", "myresource", "/apis/" + Admission.GroupVersion().Group + "/" + Admission.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource"},
+	}
+	for _, item := range testGroupCases {
+		if actual := Admission.ResourcePathWithPrefix(item.prefix, item.resource, item.namespace, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for prefix: %s, resource: %s, namespace: %s and name: %s", item.expected, actual, item.prefix, item.resource, item.namespace, item.name)
+		}
+	}
 }
 
 func TestResourcePath(t *testing.T) {
@@ -62,6 +79,26 @@ func TestResourcePath(t *testing.T) {
 	}
 	for _, item := range testCases {
 		if actual := Default.ResourcePath(item.resource, item.namespace, item.name); actual != item.expected {
+			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
+		}
+	}
+}
+
+func TestSubResourcePath(t *testing.T) {
+	testCases := []struct {
+		resource  string
+		namespace string
+		name      string
+		sub       string
+		expected  string
+	}{
+		{"resource", "mynamespace", "myresource", "mysub", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/myresource/mysub"},
+		{"resource", "", "myresource", "mysub", "/api/" + Default.GroupVersion().Version + "/resource/myresource/mysub"},
+		{"resource", "mynamespace", "", "mysub", "/api/" + Default.GroupVersion().Version + "/namespaces/mynamespace/resource/mysub"},
+		{"resource", "", "", "mysub", "/api/" + Default.GroupVersion().Version + "/resource/mysub"},
+	}
+	for _, item := range testCases {
+		if actual := Default.SubResourcePath(item.resource, item.namespace, item.name, item.sub); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 		}
 	}

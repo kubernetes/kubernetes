@@ -18,7 +18,6 @@ package componentstatus
 
 import (
 	"crypto/tls"
-	"net/http"
 	"sync"
 	"time"
 
@@ -31,11 +30,6 @@ const (
 	probeTimeOut = 20 * time.Second
 )
 
-// TODO: this basic interface is duplicated in N places.  consolidate?
-type httpGet interface {
-	Get(url string) (*http.Response, error)
-}
-
 type ValidatorFn func([]byte) error
 
 type Server struct {
@@ -45,7 +39,7 @@ type Server struct {
 	EnableHTTPS bool
 	TLSConfig   *tls.Config
 	Validate    ValidatorFn
-	Prober      httpprober.HTTPProber
+	Prober      httpprober.Prober
 	Once        sync.Once
 }
 
@@ -68,7 +62,8 @@ func (server *Server) DoServerCheck() (probe.Result, string, error) {
 		if server.Prober != nil {
 			return
 		}
-		server.Prober = httpprober.NewWithTLSConfig(server.TLSConfig)
+		const followNonLocalRedirects = true
+		server.Prober = httpprober.NewWithTLSConfig(server.TLSConfig, followNonLocalRedirects)
 	})
 
 	scheme := "http"

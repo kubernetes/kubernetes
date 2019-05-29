@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2014-2017 VMware, Inc. All Rights Reserved.
+Copyright (c) 2014-2018 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -786,6 +786,7 @@ func (b *DvsFilterConfig) GetDvsFilterConfig() *DvsFilterConfig { return b }
 
 type BaseDvsFilterConfig interface {
 	GetDvsFilterConfig() *DvsFilterConfig
+	GetDvsTrafficFilterConfig() *DvsTrafficFilterConfig
 }
 
 func init() {
@@ -828,10 +829,19 @@ func (b *DvsNetworkRuleQualifier) GetDvsNetworkRuleQualifier() *DvsNetworkRuleQu
 
 type BaseDvsNetworkRuleQualifier interface {
 	GetDvsNetworkRuleQualifier() *DvsNetworkRuleQualifier
+	GetDvsIpNetworkRuleQualifier() *DvsIpNetworkRuleQualifier
 }
 
 func init() {
 	t["BaseDvsNetworkRuleQualifier"] = reflect.TypeOf((*DvsNetworkRuleQualifier)(nil)).Elem()
+}
+
+func (b *DvsIpNetworkRuleQualifier) GetDvsIpNetworkRuleQualifier() *DvsIpNetworkRuleQualifier {
+	return b
+}
+
+type BaseDvsIpNetworkRuleQualifier interface {
+	GetDvsIpNetworkRuleQualifier() *DvsIpNetworkRuleQualifier
 }
 
 func (b *DvsTrafficFilterConfig) GetDvsTrafficFilterConfig() *DvsTrafficFilterConfig { return b }
@@ -2358,16 +2368,6 @@ type BaseReplicationVmFault interface {
 
 func init() {
 	t["BaseReplicationVmFault"] = reflect.TypeOf((*ReplicationVmFault)(nil)).Elem()
-}
-
-func (b *ResourceAllocationInfo) GetResourceAllocationInfo() *ResourceAllocationInfo { return b }
-
-type BaseResourceAllocationInfo interface {
-	GetResourceAllocationInfo() *ResourceAllocationInfo
-}
-
-func init() {
-	t["BaseResourceAllocationInfo"] = reflect.TypeOf((*ResourceAllocationInfo)(nil)).Elem()
 }
 
 func (b *ResourceInUse) GetResourceInUse() *ResourceInUse { return b }

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright 2014 The Kubernetes Authors.
 #
@@ -17,6 +17,16 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+
+# Unset CDPATH so that path interpolation can work correctly
+# https://github.com/kubernetes/kubernetes/issues/52255
+unset CDPATH
+
+# Until all GOPATH references are removed from all build scripts as well,
+# explicitly reset to auto mode to avoid picking up user-set GO111MODULE preferences.
+# As individual scripts (like hack/update-vendor.sh) make use of go modules,
+# they can explicitly set GO111MODULE=on
+export GO111MODULE=auto
 
 # The root of the build/dist directory
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
@@ -37,7 +47,7 @@ export no_proxy=127.0.0.1,localhost
 THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
+source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 kube::log::install_errexit
 
@@ -52,31 +62,39 @@ KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 # most preferred version for a group should appear first
 KUBE_AVAILABLE_GROUP_VERSIONS="${KUBE_AVAILABLE_GROUP_VERSIONS:-\
 v1 \
-admissionregistration.k8s.io/v1alpha1 \
 admissionregistration.k8s.io/v1beta1 \
 admission.k8s.io/v1beta1 \
+apps/v1 \
 apps/v1beta1 \
 apps/v1beta2 \
-apps/v1 \
+auditregistration.k8s.io/v1alpha1 \
 authentication.k8s.io/v1 \
 authentication.k8s.io/v1beta1 \
 authorization.k8s.io/v1 \
 authorization.k8s.io/v1beta1 \
 autoscaling/v1 \
 autoscaling/v2beta1 \
+autoscaling/v2beta2 \
 batch/v1 \
 batch/v1beta1 \
 batch/v2alpha1 \
 certificates.k8s.io/v1beta1 \
+coordination.k8s.io/v1beta1 \
+coordination.k8s.io/v1 \
 extensions/v1beta1 \
 events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
+networking.k8s.io/v1beta1 \
+node.k8s.io/v1alpha1 \
+node.k8s.io/v1beta1 \
 policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \
 rbac.authorization.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1alpha1 \
+scheduling.k8s.io/v1beta1 \
+scheduling.k8s.io/v1 \
 settings.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
@@ -123,15 +141,15 @@ KUBE_NONSERVER_GROUP_VERSIONS="
 function kube::readlinkdashf {
   # run in a subshell for simpler 'cd'
   (
-    if [[ -d "$1" ]]; then # This also catch symlinks to dirs.
-      cd "$1"
+    if [[ -d "${1}" ]]; then # This also catch symlinks to dirs.
+      cd "${1}"
       pwd -P
     else
-      cd $(dirname "$1")
+      cd "$(dirname "${1}")"
       local f
-      f=$(basename "$1")
-      if [[ -L "$f" ]]; then
-        readlink "$f"
+      f=$(basename "${1}")
+      if [[ -L "${f}" ]]; then
+        readlink "${f}"
       else
         echo "$(pwd -P)/${f}"
       fi
@@ -167,10 +185,9 @@ function kube::readlinkdashf {
 # testone $T/linkdir/linkfile
 # testone $T/linkdir/linkdir
 kube::realpath() {
-  if [[ ! -e "$1" ]]; then
-    echo "$1: No such file or directory" >&2
+  if [[ ! -e "${1}" ]]; then
+    echo "${1}: No such file or directory" >&2
     return 1
   fi
-  kube::readlinkdashf "$1"
+  kube::readlinkdashf "${1}"
 }
-

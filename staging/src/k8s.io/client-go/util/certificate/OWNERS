@@ -1,8 +1,9 @@
-reviewers:
-- mikedanese
-- liggit
-- smarterclayton
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- mikedanese
-- liggit
-- smarterclayton
+- sig-auth-certificates-approvers
+reviewers:
+- sig-auth-certificates-reviewers
+labels:
+- sig/auth
+

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015 VMware, Inc. All Rights Reserved.
+Copyright (c) 2015-2017 VMware, Inc. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"net"
 	"path"
 
+	"github.com/vmware/govmomi/nfc"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
@@ -79,6 +80,20 @@ func (v VirtualMachine) PowerOff(ctx context.Context) (*Task, error) {
 	}
 
 	return NewTask(v.c, res.Returnval), nil
+}
+
+func (v VirtualMachine) PutUsbScanCodes(ctx context.Context, spec types.UsbScanCodeSpec) (int32, error) {
+	req := types.PutUsbScanCodes{
+		This: v.Reference(),
+		Spec: spec,
+	}
+
+	res, err := methods.PutUsbScanCodes(ctx, v.c, &req)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.Returnval, nil
 }
 
 func (v VirtualMachine) Reset(ctx context.Context) (*Task, error) {
@@ -195,6 +210,15 @@ func (v VirtualMachine) Reconfigure(ctx context.Context, config types.VirtualMac
 	}
 
 	return NewTask(v.c, res.Returnval), nil
+}
+
+func (v VirtualMachine) RefreshStorageInfo(ctx context.Context) error {
+	req := types.RefreshStorageInfo{
+		This: v.Reference(),
+	}
+
+	_, err := methods.RefreshStorageInfo(ctx, v.c, &req)
+	return err
 }
 
 func (v VirtualMachine) WaitForIP(ctx context.Context) (string, error) {
@@ -464,6 +488,20 @@ func (v VirtualMachine) Answer(ctx context.Context, id, answer string) error {
 	return nil
 }
 
+func (v VirtualMachine) AcquireTicket(ctx context.Context, kind string) (*types.VirtualMachineTicket, error) {
+	req := types.AcquireTicket{
+		This:       v.Reference(),
+		TicketType: kind,
+	}
+
+	res, err := methods.AcquireTicket(ctx, v.c, &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res.Returnval, nil
+}
+
 // CreateSnapshot creates a new snapshot of a virtual machine.
 func (v VirtualMachine) CreateSnapshot(ctx context.Context, name string, description string, memory bool, quiesce bool) (*Task, error) {
 	req := types.CreateSnapshot_Task{
@@ -497,7 +535,7 @@ func (v VirtualMachine) RemoveAllSnapshot(ctx context.Context, consolidate *bool
 	return NewTask(v.c, res.Returnval), nil
 }
 
-type snapshotMap map[string][]Reference
+type snapshotMap map[string][]types.ManagedObjectReference
 
 func (m snapshotMap) add(parent string, tree []types.VirtualMachineSnapshotTree) {
 	for i, st := range tree {
@@ -511,18 +549,18 @@ func (m snapshotMap) add(parent string, tree []types.VirtualMachineSnapshotTree)
 		}
 
 		for _, name := range names {
-			m[name] = append(m[name], &tree[i].Snapshot)
+			m[name] = append(m[name], tree[i].Snapshot)
 		}
 
 		m.add(sname, st.ChildSnapshotList)
 	}
 }
 
-// findSnapshot supports snapshot lookup by name, where name can be:
+// FindSnapshot supports snapshot lookup by name, where name can be:
 // 1) snapshot ManagedObjectReference.Value (unique)
 // 2) snapshot name (may not be unique)
 // 3) snapshot tree path (may not be unique)
-func (v VirtualMachine) findSnapshot(ctx context.Context, name string) (Reference, error) {
+func (v VirtualMachine) FindSnapshot(ctx context.Context, name string) (*types.ManagedObjectReference, error) {
 	var o mo.VirtualMachine
 
 	err := v.Properties(ctx, v.Reference(), []string{"snapshot"}, &o)
@@ -542,7 +580,7 @@ func (v VirtualMachine) findSnapshot(ctx context.Context, name string) (Referenc
 	case 0:
 		return nil, fmt.Errorf("snapshot %q not found", name)
 	case 1:
-		return s[0], nil
+		return &s[0], nil
 	default:
 		return nil, fmt.Errorf("%q resolves to %d snapshots", name, len(s))
 	}
@@ -550,7 +588,7 @@ func (v VirtualMachine) findSnapshot(ctx context.Context, name string) (Referenc
 
 // RemoveSnapshot removes a named snapshot
 func (v VirtualMachine) RemoveSnapshot(ctx context.Context, name string, removeChildren bool, consolidate *bool) (*Task, error) {
-	snapshot, err := v.findSnapshot(ctx, name)
+	snapshot, err := v.FindSnapshot(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +624,7 @@ func (v VirtualMachine) RevertToCurrentSnapshot(ctx context.Context, suppressPow
 
 // RevertToSnapshot reverts to a named snapshot
 func (v VirtualMachine) RevertToSnapshot(ctx context.Context, name string, suppressPowerOn bool) (*Task, error) {
-	snapshot, err := v.findSnapshot(ctx, name)
+	snapshot, err := v.FindSnapshot(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -756,4 +794,44 @@ func (v VirtualMachine) UpgradeTools(ctx context.Context, options string) (*Task
 	}
 
 	return NewTask(v.c, res.Returnval), nil
+}
+
+func (v VirtualMachine) Export(ctx context.Context) (*nfc.Lease, error) {
+	req := types.ExportVm{
+		This: v.Reference(),
+	}
+
+	res, err := methods.ExportVm(ctx, v.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return nfc.NewLease(v.c, res.Returnval), nil
+}
+
+func (v VirtualMachine) UpgradeVM(ctx context.Context, version string) (*Task, error) {
+	req := types.UpgradeVM_Task{
+		This:    v.Reference(),
+		Version: version,
+	}
+
+	res, err := methods.UpgradeVM_Task(ctx, v.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(v.c, res.Returnval), nil
+}
+
+// UUID is a helper to get the UUID of the VirtualMachine managed object.
+// This method returns an empty string if an error occurs when retrieving UUID from the VirtualMachine object.
+func (v VirtualMachine) UUID(ctx context.Context) string {
+	var o mo.VirtualMachine
+
+	err := v.Properties(ctx, v.Reference(), []string{"config.uuid"}, &o)
+	if err != nil {
+		return ""
+	}
+
+	return o.Config.Uuid
 }

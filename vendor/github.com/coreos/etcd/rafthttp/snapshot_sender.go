@@ -16,6 +16,7 @@ package rafthttp
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -63,7 +64,10 @@ func newSnapshotSender(tr *Transport, picker *urlPicker, to types.ID, status *pe
 func (s *snapshotSender) stop() { close(s.stopc) }
 
 func (s *snapshotSender) send(merged snap.Message) {
+	start := time.Now()
+
 	m := merged.Message
+	to := types.ID(m.To).String()
 
 	body := createSnapBody(merged)
 	defer body.Close()
@@ -91,20 +95,26 @@ func (s *snapshotSender) send(merged snap.Message) {
 		// machine knows about it, it would pause a while and retry sending
 		// new snapshot message.
 		s.r.ReportSnapshot(m.To, raft.SnapshotFailure)
-		sentFailures.WithLabelValues(types.ID(m.To).String()).Inc()
+		sentFailures.WithLabelValues(to).Inc()
+		snapshotSendFailures.WithLabelValues(to).Inc()
 		return
 	}
 	s.status.activate()
 	s.r.ReportSnapshot(m.To, raft.SnapshotFinish)
 	plog.Infof("database snapshot [index: %d, to: %s] sent out successfully", m.Snapshot.Metadata.Index, types.ID(m.To))
 
-	sentBytes.WithLabelValues(types.ID(m.To).String()).Add(float64(merged.TotalSize))
+	sentBytes.WithLabelValues(to).Add(float64(merged.TotalSize))
+
+	snapshotSend.WithLabelValues(to).Inc()
+	snapshotSendSeconds.WithLabelValues(to).Observe(time.Since(start).Seconds())
 }
 
 // post posts the given request.
 // It returns nil when request is sent out and processed successfully.
 func (s *snapshotSender) post(req *http.Request) (err error) {
-	cancel := httputil.RequestCanceler(req)
+	ctx, cancel := context.WithCancel(context.Background())
+	req = req.WithContext(ctx)
+	defer cancel()
 
 	type responseAndError struct {
 		resp *http.Response
@@ -130,7 +140,6 @@ func (s *snapshotSender) post(req *http.Request) (err error) {
 
 	select {
 	case <-s.stopc:
-		cancel()
 		return errStopped
 	case r := <-result:
 		if r.err != nil {

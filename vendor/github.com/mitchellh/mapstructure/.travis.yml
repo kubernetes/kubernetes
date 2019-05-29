@@ -1,7 +1,8 @@
-language: go 
+language: go
 
-go: 
-  - 1.4
-  
+go:
+  - "1.11.x"
+  - tip
+
 script:
-  - go test 
+  - go test

@@ -23,19 +23,20 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
-func stringFlagFor(s string) flag.StringFlag {
-	var f flag.StringFlag
+func stringFlagFor(s string) cliflag.StringFlag {
+	var f cliflag.StringFlag
 	f.Set(s)
 	return f
 }
 
 func TestCreateAuthInfoOptions(t *testing.T) {
 	tests := []struct {
+		name            string
 		flags           []string
 		wantParseErr    bool
 		wantCompleteErr bool
@@ -44,6 +45,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 		wantOptions *createAuthInfoOptions
 	}{
 		{
+			name: "test1",
 			flags: []string{
 				"me",
 			},
@@ -52,6 +54,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test2",
 			flags: []string{
 				"me",
 				"--token=foo",
@@ -62,6 +65,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test3",
 			flags: []string{
 				"me",
 				"--username=jane",
@@ -74,6 +78,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test4",
 			// Cannot provide both token and basic auth.
 			flags: []string{
 				"me",
@@ -84,6 +89,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			wantValidateErr: true,
 		},
 		{
+			name: "test5",
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id=foo",
@@ -101,6 +107,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test6",
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id-",
@@ -118,6 +125,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test7",
 			flags: []string{
 				"--auth-provider-arg=client-id-", // auth provider name not required
 				"--auth-provider-arg=client-secret-",
@@ -133,6 +141,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
+			name: "test8",
 			flags: []string{
 				"--auth-provider=oidc",
 				"--auth-provider-arg=client-id", // values must be of form 'key=value' or 'key-'
@@ -141,55 +150,279 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			wantCompleteErr: true,
 		},
 		{
+			name:  "test9",
 			flags: []string{
-			// No name for authinfo provided.
+				// No name for authinfo provided.
 			},
 			wantCompleteErr: true,
 		},
+		{
+			name: "test10",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"me",
+			},
+			wantOptions: &createAuthInfoOptions{
+				name:        "me",
+				execCommand: stringFlagFor("example-client-go-exec-plugin"),
+			},
+		},
+		{
+			name: "test11",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-arg=arg1",
+				"--exec-arg=arg2",
+				"me",
+			},
+			wantOptions: &createAuthInfoOptions{
+				name:        "me",
+				execCommand: stringFlagFor("example-client-go-exec-plugin"),
+				execArgs:    []string{"arg1", "arg2"},
+			},
+		},
+		{
+			name: "test12",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-env=key1=val1",
+				"--exec-env=key2=val2",
+				"--exec-env=env-remove1-",
+				"--exec-env=env-remove2-",
+				"me",
+			},
+			wantOptions: &createAuthInfoOptions{
+				name:            "me",
+				execCommand:     stringFlagFor("example-client-go-exec-plugin"),
+				execEnv:         map[string]string{"key1": "val1", "key2": "val2"},
+				execEnvToRemove: []string{"env-remove1", "env-remove2"},
+			},
+		},
 	}
 
-	for i, test := range tests {
-		buff := new(bytes.Buffer)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buff := new(bytes.Buffer)
 
-		opts := new(createAuthInfoOptions)
-		cmd := newCmdConfigSetAuthInfo(buff, opts)
-		if err := cmd.ParseFlags(test.flags); err != nil {
-			if !test.wantParseErr {
-				t.Errorf("case %d: parsing error for flags %q: %v: %s", i, test.flags, err, buff)
+			opts := new(createAuthInfoOptions)
+			cmd := newCmdConfigSetAuthInfo(buff, opts)
+			if err := cmd.ParseFlags(tt.flags); err != nil {
+				if !tt.wantParseErr {
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+				}
+				return
 			}
-			continue
-		}
-		if test.wantParseErr {
-			t.Errorf("case %d: expected parsing error for flags %q: %s", i, test.flags, buff)
-			continue
-		}
-
-		if err := opts.complete(cmd, buff); err != nil {
-			if !test.wantCompleteErr {
-				t.Errorf("case %d: complete() error for flags %q: %s", i, test.flags, buff)
+			if tt.wantParseErr {
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				return
 			}
-			continue
-		}
-		if test.wantCompleteErr {
-			t.Errorf("case %d: complete() expected errors for flags %q: %s", i, test.flags, buff)
-			continue
-		}
 
-		if err := opts.validate(); err != nil {
-			if !test.wantValidateErr {
-				t.Errorf("case %d: flags %q: validate failed: %v", i, test.flags, err)
+			if err := opts.complete(cmd, buff); err != nil {
+				if !tt.wantCompleteErr {
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+				}
+				return
 			}
-			continue
-		}
+			if tt.wantCompleteErr {
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				return
+			}
 
-		if test.wantValidateErr {
-			t.Errorf("case %d: flags %q: expected validate to fail", i, test.flags)
-			continue
-		}
+			if err := opts.validate(); err != nil {
+				if !tt.wantValidateErr {
+					t.Errorf("case %s: flags %q: validate failed: %v", tt.name, tt.flags, err)
+				}
+				return
+			}
 
-		if !reflect.DeepEqual(opts, test.wantOptions) {
-			t.Errorf("case %d: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", i, test.flags, test.wantOptions, opts)
-		}
+			if tt.wantValidateErr {
+				t.Errorf("case %s: flags %q: expected validate to fail", tt.name, tt.flags)
+				return
+			}
+
+			if !reflect.DeepEqual(opts, tt.wantOptions) {
+				t.Errorf("case %s: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantOptions, opts)
+			}
+		})
+	}
+}
+
+func TestModifyExistingAuthInfo(t *testing.T) {
+	tests := []struct {
+		name            string
+		flags           []string
+		wantParseErr    bool
+		wantCompleteErr bool
+		wantValidateErr bool
+
+		existingAuthInfo clientcmdapi.AuthInfo
+		wantAuthInfo     clientcmdapi.AuthInfo
+	}{
+		{
+			name: "1. create new exec config",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-api-version=client.authentication.k8s.io/v1",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1",
+				},
+			},
+		},
+		{
+			name: "2. redefine exec args",
+			flags: []string{
+				"--exec-arg=new-arg1",
+				"--exec-arg=new-arg2",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1beta1",
+					Args:       []string{"existing-arg1", "existing-arg2"},
+				},
+			},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1beta1",
+					Args:       []string{"new-arg1", "new-arg2"},
+				},
+			},
+		},
+		{
+			name: "3. reset exec args",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1beta1",
+					Args:       []string{"existing-arg1", "existing-arg2"},
+				},
+			},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1beta1",
+				},
+			},
+		},
+		{
+			name: "4. modify exec env variables",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-env=name1=value1000",
+				"--exec-env=name3=value3",
+				"--exec-env=name2-",
+				"--exec-env=non-existing-",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "existing-command",
+					APIVersion: "client.authentication.k8s.io/v1beta1",
+					Env: []clientcmdapi.ExecEnvVar{
+						{Name: "name1", Value: "value1"},
+						{Name: "name2", Value: "value2"},
+					},
+				},
+			},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1beta1",
+					Env: []clientcmdapi.ExecEnvVar{
+						{Name: "name1", Value: "value1000"},
+						{Name: "name3", Value: "value3"},
+					},
+				},
+			},
+		},
+		{
+			name: "5. modify auth provider arguments",
+			flags: []string{
+				"--auth-provider=new-auth-provider",
+				"--auth-provider-arg=key1=val1000",
+				"--auth-provider-arg=key3=val3",
+				"--auth-provider-arg=key2-",
+				"--auth-provider-arg=non-existing-",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Name: "auth-provider",
+					Config: map[string]string{
+						"key1": "val1",
+						"key2": "val2",
+					},
+				},
+			},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				AuthProvider: &clientcmdapi.AuthProviderConfig{
+					Name: "new-auth-provider",
+					Config: map[string]string{
+						"key1": "val1000",
+						"key3": "val3",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buff := new(bytes.Buffer)
+
+			opts := new(createAuthInfoOptions)
+			cmd := newCmdConfigSetAuthInfo(buff, opts)
+			if err := cmd.ParseFlags(tt.flags); err != nil {
+				if !tt.wantParseErr {
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+				}
+				return
+			}
+			if tt.wantParseErr {
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				return
+			}
+
+			if err := opts.complete(cmd, buff); err != nil {
+				if !tt.wantCompleteErr {
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+				}
+				return
+			}
+			if tt.wantCompleteErr {
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				return
+			}
+
+			if err := opts.validate(); err != nil {
+				if !tt.wantValidateErr {
+					t.Errorf("case %s: flags %q: validate failed: %v", tt.name, tt.flags, err)
+				}
+				return
+			}
+
+			if tt.wantValidateErr {
+				t.Errorf("case %s: flags %q: expected validate to fail", tt.name, tt.flags)
+				return
+			}
+
+			modifiedAuthInfo := opts.modifyAuthInfo(tt.existingAuthInfo)
+
+			if !reflect.DeepEqual(modifiedAuthInfo, tt.wantAuthInfo) {
+				t.Errorf("case %s: flags %q: mis-matched auth info,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantAuthInfo, modifiedAuthInfo)
+			}
+		})
 	}
 }
 

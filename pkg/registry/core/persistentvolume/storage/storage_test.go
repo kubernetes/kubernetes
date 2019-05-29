@@ -77,11 +77,6 @@ func validNewPersistentVolume(name string) *api.PersistentVolume {
 	return pv
 }
 
-func validChangedPersistentVolume() *api.PersistentVolume {
-	pv := validNewPersistentVolume("foo")
-	return pv
-}
-
 func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
@@ -174,7 +169,7 @@ func TestUpdateStatus(t *testing.T) {
 	ctx := genericapirequest.NewContext()
 	key, _ := storage.KeyFunc(ctx, "foo")
 	pvStart := validNewPersistentVolume("foo")
-	err := storage.Storage.Create(ctx, key, pvStart, nil, 0)
+	err := storage.Storage.Create(ctx, key, pvStart, nil, 0, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -188,7 +183,7 @@ func TestUpdateStatus(t *testing.T) {
 		},
 	}
 
-	_, _, err = statusStorage.Update(ctx, pvIn.Name, rest.DefaultUpdatedObjectInfo(pvIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = statusStorage.Update(ctx, pvIn.Name, rest.DefaultUpdatedObjectInfo(pvIn), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

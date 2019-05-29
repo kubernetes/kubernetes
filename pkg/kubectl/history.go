@@ -22,9 +22,9 @@ import (
 	"io"
 	"text/tabwriter"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,14 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/kubernetes"
-	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
-	clientextv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	clientappsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
+	describe "k8s.io/kubernetes/pkg/kubectl/describe/versioned"
+	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 const (
@@ -103,12 +100,12 @@ type DeploymentHistoryViewer struct {
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
 // TODO: this should be a describer
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	versionedExtensionsClient := h.c.ExtensionsV1beta1()
-	deployment, err := versionedExtensionsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
+	versionedAppsClient := h.c.AppsV1()
+	deployment, err := versionedAppsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve deployment %s: %v", name, err)
 	}
-	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedExtensionsClient)
+	_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, versionedAppsClient)
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve replica sets from deployment %s: %v", name, err)
 	}
@@ -117,7 +114,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		allRSs = append(allRSs, newRS)
 	}
 
-	historyInfo := make(map[int64]*v1.PodTemplateSpec)
+	historyInfo := make(map[int64]*corev1.PodTemplateSpec)
 	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
@@ -167,14 +164,10 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	})
 }
 
-func printTemplate(template *v1.PodTemplateSpec) (string, error) {
+func printTemplate(template *corev1.PodTemplateSpec) (string, error) {
 	buf := bytes.NewBuffer([]byte{})
-	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
-		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
-	}
-	w := printersinternal.NewPrefixWriter(buf)
-	printersinternal.DescribePodTemplate(internalTemplate, w)
+	w := describe.NewPrefixWriter(buf)
+	describe.DescribePodTemplate(template, w)
 	return buf.String(), nil
 }
 
@@ -185,11 +178,11 @@ type DaemonSetHistoryViewer struct {
 // ViewHistory returns a revision-to-history map as the revision history of a deployment
 // TODO: this should be a describer
 func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	ds, history, err := daemonSetHistory(h.c.ExtensionsV1beta1(), h.c.AppsV1beta1(), namespace, name)
+	ds, history, err := daemonSetHistory(h.c.AppsV1(), namespace, name)
 	if err != nil {
 		return "", err
 	}
-	historyInfo := make(map[int64]*appsv1beta1.ControllerRevision)
+	historyInfo := make(map[int64]*appsv1.ControllerRevision)
 	for _, history := range history {
 		// TODO: for now we assume revisions don't overlap, we may need to handle it
 		historyInfo[history.Revision] = history
@@ -241,7 +234,7 @@ type StatefulSetHistoryViewer struct {
 // TODO: this should be a describer
 // TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	_, history, err := statefulSetHistory(h.c.AppsV1beta1(), namespace, name)
+	_, history, err := statefulSetHistory(h.c.AppsV1(), namespace, name)
 	if err != nil {
 		return "", err
 	}
@@ -265,12 +258,34 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 }
 
 // controlledHistories returns all ControllerRevisions in namespace that selected by selector and owned by accessor
-func controlledHistory(
-	apps clientappsv1beta1.AppsV1beta1Interface,
+// TODO: Rename this to controllerHistory when other controllers have been upgraded
+func controlledHistoryV1(
+	apps clientappsv1.AppsV1Interface,
 	namespace string,
 	selector labels.Selector,
-	accessor metav1.Object) ([]*appsv1beta1.ControllerRevision, error) {
-	var result []*appsv1beta1.ControllerRevision
+	accessor metav1.Object) ([]*appsv1.ControllerRevision, error) {
+	var result []*appsv1.ControllerRevision
+	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		return nil, err
+	}
+	for i := range historyList.Items {
+		history := historyList.Items[i]
+		// Only add history that belongs to the API object
+		if metav1.IsControlledBy(&history, accessor) {
+			result = append(result, &history)
+		}
+	}
+	return result, nil
+}
+
+// controlledHistories returns all ControllerRevisions in namespace that selected by selector and owned by accessor
+func controlledHistory(
+	apps clientappsv1.AppsV1Interface,
+	namespace string,
+	selector labels.Selector,
+	accessor metav1.Object) ([]*appsv1.ControllerRevision, error) {
+	var result []*appsv1.ControllerRevision
 	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, err
@@ -287,10 +302,9 @@ func controlledHistory(
 
 // daemonSetHistory returns the DaemonSet named name in namespace and all ControllerRevisions in its history.
 func daemonSetHistory(
-	ext clientextv1beta1.ExtensionsV1beta1Interface,
-	apps clientappsv1beta1.AppsV1beta1Interface,
-	namespace, name string) (*extensionsv1beta1.DaemonSet, []*appsv1beta1.ControllerRevision, error) {
-	ds, err := ext.DaemonSets(namespace).Get(name, metav1.GetOptions{})
+	apps clientappsv1.AppsV1Interface,
+	namespace, name string) (*appsv1.DaemonSet, []*appsv1.ControllerRevision, error) {
+	ds, err := apps.DaemonSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
 	}
@@ -311,8 +325,8 @@ func daemonSetHistory(
 
 // statefulSetHistory returns the StatefulSet named name in namespace and all ControllerRevisions in its history.
 func statefulSetHistory(
-	apps clientappsv1beta1.AppsV1beta1Interface,
-	namespace, name string) (*appsv1beta1.StatefulSet, []*appsv1beta1.ControllerRevision, error) {
+	apps clientappsv1.AppsV1Interface,
+	namespace, name string) (*appsv1.StatefulSet, []*appsv1.ControllerRevision, error) {
 	sts, err := apps.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
@@ -325,7 +339,7 @@ func statefulSetHistory(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %s", name, err.Error())
 	}
-	history, err := controlledHistory(apps, namespace, selector, accessor)
+	history, err := controlledHistoryV1(apps, namespace, selector, accessor)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to find history controlled by StatefulSet %s: %v", name, err)
 	}
@@ -333,7 +347,7 @@ func statefulSetHistory(
 }
 
 // applyDaemonSetHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet
-func applyDaemonSetHistory(ds *extensionsv1beta1.DaemonSet, history *appsv1beta1.ControllerRevision) (*extensionsv1beta1.DaemonSet, error) {
+func applyDaemonSetHistory(ds *appsv1.DaemonSet, history *appsv1.ControllerRevision) (*appsv1.DaemonSet, error) {
 	clone := ds.DeepCopy()
 	cloneBytes, err := json.Marshal(clone)
 	if err != nil {

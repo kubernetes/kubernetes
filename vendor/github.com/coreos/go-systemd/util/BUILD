@@ -5,8 +5,10 @@ go_library(
     srcs = [
         "util.go",
         "util_cgo.go",
+        "util_stub.go",
     ],
     cgo = True,
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/util",
     importpath = "github.com/coreos/go-systemd/util",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/pkg/dlopen:go_default_library"],

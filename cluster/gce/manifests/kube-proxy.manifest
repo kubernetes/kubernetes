@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-proxy
+  namespace: kube-system
+  # This annotation ensures that kube-proxy does not get evicted if the node
+  # supports critical pod annotation based priority scheme.
+  # Note that kube-proxy runs as a static pod so this annotation does NOT have
+  # any effect on default scheduler which scheduling kube-proxy.
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
+  labels:
+    tier: node
+    component: kube-proxy
+spec:
+  priorityClassName: system-node-critical
+  hostNetwork: true
+  tolerations:
+  - operator: "Exists"
+    effect: "NoExecute"
+  - operator: "Exists"
+    effect: "NoSchedule"
+  containers:
+  - name: kube-proxy
+    image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    resources:
+      requests:
+        cpu: {{ cpurequest }}
+    command:
+    - /bin/sh
+    - -c
+    - exec kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" --oom-score-adj=-998 {{params}} 1>>/var/log/kube-proxy.log 2>&1
+    {{container_env}}
+    {{kube_cache_mutation_detector_env_name}}
+      {{kube_cache_mutation_detector_env_value}}
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /etc/ssl/certs
+      name: etc-ssl-certs
+      readOnly: true
+    - mountPath: /usr/share/ca-certificates
+      name: usr-ca-certs
+      readOnly: true
+    - mountPath: /var/log
+      name: varlog
+      readOnly: false
+    - mountPath: /var/lib/kube-proxy/kubeconfig
+      name: kubeconfig
+      readOnly: false
+    - mountPath: /run/xtables.lock
+      name: iptableslock
+      readOnly: false
+    - mountPath: /lib/modules
+      name: lib-modules
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: /usr/share/ca-certificates
+    name: usr-ca-certs
+  - hostPath:
+      path: /etc/ssl/certs
+    name: etc-ssl-certs
+  - hostPath:
+      path: /var/lib/kube-proxy/kubeconfig
+      type: FileOrCreate
+    name: kubeconfig
+  - hostPath:
+      path: /var/log
+    name: varlog
+  - hostPath:
+      path: /run/xtables.lock
+      type: FileOrCreate
+    name: iptableslock
+  - name: lib-modules
+    hostPath:
+      path: /lib/modules

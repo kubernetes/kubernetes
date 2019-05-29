@@ -8,10 +8,10 @@ go_library(
         "fault.go",
         "helpers.go",
         "if.go",
-        "internal.go",
         "registry.go",
         "types.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/vim25/types",
     importpath = "github.com/vmware/govmomi/vim25/types",
     visibility = ["//visibility:public"],
 )

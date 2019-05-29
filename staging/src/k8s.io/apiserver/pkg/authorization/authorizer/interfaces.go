@@ -56,7 +56,7 @@ type Attributes interface {
 	GetAPIVersion() string
 
 	// IsResourceRequest returns true for requests to API resources, like /api/v1/nodes,
-	// and false for non-resource endpoints like /api, /healthz, and /swaggerapi
+	// and false for non-resource endpoints like /api, /healthz
 	IsResourceRequest() bool
 
 	// GetPath returns the path of the request
@@ -152,7 +152,7 @@ const (
 	DecisionDeny Decision = iota
 	// DecisionAllow means that an authorizer decided to allow the action.
 	DecisionAllow
-	// DecisionNoOpionion means that an authorizer has no opinion on wether
+	// DecisionNoOpionion means that an authorizer has no opinion on whether
 	// to allow or deny an action.
 	DecisionNoOpinion
 )

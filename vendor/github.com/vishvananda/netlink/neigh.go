@@ -14,6 +14,7 @@ type Neigh struct {
 	Flags        int
 	IP           net.IP
 	HardwareAddr net.HardwareAddr
+	LLIPAddr     net.IP //Used in the case of NHRP
 }
 
 // String returns $ip/$hwaddr $label

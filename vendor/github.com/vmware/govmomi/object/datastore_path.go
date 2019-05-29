@@ -18,6 +18,7 @@ package object
 
 import (
 	"fmt"
+	"path"
 	"strings"
 )
 
@@ -62,4 +63,9 @@ func (p *DatastorePath) String() string {
 	}
 
 	return strings.Join([]string{s, p.Path}, " ")
+}
+
+// IsVMDK returns true if Path has a ".vmdk" extension
+func (p *DatastorePath) IsVMDK() bool {
+	return path.Ext(p.Path) == ".vmdk"
 }

@@ -1,4 +1,4 @@
-package term
+package term // import "github.com/docker/docker/pkg/term"
 
 import (
 	"fmt"
@@ -59,7 +59,7 @@ next:
 				return nil, fmt.Errorf("Unknown character: '%s'", key)
 			}
 		} else {
-			codes = append(codes, byte(key[0]))
+			codes = append(codes, key[0])
 		}
 	}
 	return codes, nil

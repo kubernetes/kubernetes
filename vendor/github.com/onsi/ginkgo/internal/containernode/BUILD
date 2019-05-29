@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["container_node.go"],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/containernode",
     importpath = "github.com/onsi/ginkgo/internal/containernode",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [

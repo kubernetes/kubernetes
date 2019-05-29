@@ -90,11 +90,20 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 	namespaceName := attr.GetNamespace()
 	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
 		// If the request is about a cluster scoped resource, and it is not a
-		// namespace, it is exempted from all webhooks for now.
+		// namespace, it is never exempted.
 		// TODO: figure out a way selective exempt cluster scoped resources.
 		// Also update the comment in types.go
-		return false, nil
+		return true, nil
 	}
+	// TODO: adding an LRU cache to cache the translation
+	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
+	if err != nil {
+		return false, apierrors.NewInternalError(err)
+	}
+	if selector.Empty() {
+		return true, nil
+	}
+
 	namespaceLabels, err := m.GetNamespaceLabels(attr)
 	// this means the namespace is not found, for backwards compatibility,
 	// return a 404
@@ -105,11 +114,6 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 		}
 		return false, &apierrors.StatusError{status.Status()}
 	}
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
-	}
-	// TODO: adding an LRU cache to cache the translation
-	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
 	}

@@ -1,14 +1,14 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-
-	"golang.org/x/net/context"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -29,6 +29,7 @@ func (cli *Client) ImageBuild(ctx context.Context, buildContext io.Reader, optio
 		return types.ImageBuildResponse{}, err
 	}
 	headers.Add("X-Registry-Config", base64.URLEncoding.EncodeToString(buf))
+
 	headers.Set("Content-Type", "application/x-tar")
 
 	serverResp, err := cli.postRaw(ctx, "/build", query, buildContext, headers)
@@ -123,6 +124,23 @@ func (cli *Client) imageBuildOptionsToQuery(options types.ImageBuildOptions) (ur
 	if options.SessionID != "" {
 		query.Set("session", options.SessionID)
 	}
+	if options.Platform != "" {
+		if err := cli.NewVersionError("1.32", "platform"); err != nil {
+			return query, err
+		}
+		query.Set("platform", strings.ToLower(options.Platform))
+	}
+	if options.BuildID != "" {
+		query.Set("buildid", options.BuildID)
+	}
+	query.Set("version", string(options.Version))
 
+	if options.Outputs != nil {
+		outputsJSON, err := json.Marshal(options.Outputs)
+		if err != nil {
+			return query, err
+		}
+		query.Set("outputs", string(outputsJSON))
+	}
 	return query, nil
 }

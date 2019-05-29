@@ -12,21 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: all push push-legacy container clean orphan
+.PHONY: all push container clean orphan all-push push-manifest
 
-REGISTRY ?= gcr.io/google_containers
-IMAGE = $(REGISTRY)/pause-$(ARCH)
-LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
+include ../../hack/make-rules/Makefile.manifest
 
-TAG = 3.0
+REGISTRY ?= staging-k8s.gcr.io
+IMAGE = $(REGISTRY)/pause
+IMAGE_WITH_ARCH = $(IMAGE)-$(ARCH)
+
+TAG = 3.1
+REV = $(shell git describe --contains --always --match='v*')
 
 # Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
-CFLAGS = -Os -Wall -Werror -static
-KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
+CFLAGS = -Os -Wall -Werror -static -DVERSION=v$(TAG)-$(REV)
+KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause
@@ -37,7 +40,7 @@ ifeq ($(ARCH),amd64)
 endif
 
 ifeq ($(ARCH),arm)
-	TRIPLE ?= arm-linux-gnueabi
+	TRIPLE ?= arm-linux-gnueabihf
 endif
 
 ifeq ($(ARCH),arm64)
@@ -55,6 +58,11 @@ endif
 # If you want to build AND push all containers, see the 'all-push' rule.
 all: all-container
 
+all-push: all-push-images push-manifest
+
+push-manifest: manifest-tool
+	manifest-tool push from-args --platforms $(call join_platforms,$(ALL_ARCH)) --template $(IMAGE)-ARCH:$(TAG) --target $(IMAGE):$(TAG)
+
 sub-container-%:
 	$(MAKE) ARCH=$* container
 
@@ -63,7 +71,7 @@ sub-push-%:
 
 all-container: $(addprefix sub-container-,$(ALL_ARCH))
 
-all-push: $(addprefix sub-push-,$(ALL_ARCH))
+all-push-images: $(addprefix sub-push-,$(ALL_ARCH))
 
 build: bin/$(BIN)-$(ARCH)
 
@@ -78,23 +86,12 @@ bin/$(BIN)-$(ARCH): $(SRCS)
 
 container: .container-$(ARCH)
 .container-$(ARCH): bin/$(BIN)-$(ARCH)
-	docker build --pull -t $(IMAGE):$(TAG) --build-arg ARCH=$(ARCH) .
-ifeq ($(ARCH),amd64)
-	docker rmi $(LEGACY_AMD64_IMAGE):$(TAG) 2>/dev/null || true
-	docker tag $(IMAGE):$(TAG) $(LEGACY_AMD64_IMAGE):$(TAG)
-endif
+	docker build --pull -t $(IMAGE_WITH_ARCH):$(TAG) --build-arg ARCH=$(ARCH) .
 	touch $@
 
 push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
-	gcloud docker -- push $(IMAGE):$(TAG)
-	touch $@
-
-push-legacy: .push-legacy-$(ARCH)
-.push-legacy-$(ARCH): .container-$(ARCH)
-ifeq ($(ARCH),amd64)
-	gcloud docker -- push $(LEGACY_AMD64_IMAGE):$(TAG)
-endif
+	docker push $(IMAGE_WITH_ARCH):$(TAG)
 	touch $@
 
 # Useful for testing, not automatically included in container image

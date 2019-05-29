@@ -1,0 +1,25 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+- luxas
+- timothysc
+- fabriziopandini
+- neolit123
+- rosti
+reviewers:
+- luxas
+- timothysc
+- fabriziopandini
+- neolit123
+- kad
+- liztio
+- chuckha
+- detiber
+- dixudx
+- rosti
+- yagonobre
+- ereslibre 
+
+labels:
+- area/kubeadm
+- sig/cluster-lifecycle

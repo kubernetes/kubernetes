@@ -1,0 +1,28 @@
+version: 0.1.{build}
+
+image: Visual Studio 2017
+
+clone_folder: c:\gopath\src\github.com\Microsoft\hcsshim
+
+environment:
+  GOPATH: c:\gopath
+  PATH: C:\mingw-w64\x86_64-7.2.0-posix-seh-rt_v5-rev1\mingw64\bin;%GOPATH%\bin;%PATH%
+
+build_script:
+  - go get -u github.com/alecthomas/gometalinter
+  - gometalinter.exe --install
+  - gometalinter.exe --config .gometalinter.json ./...
+  - go get -v -d -t -tags "functional integration admin" ./...
+  - go build ./cmd/wclayer
+  - go build ./cmd/runhcs
+  - go build ./cmd/tar2ext4
+  - go test -v ./... -tags admin
+  - go test -c ./test/functional/ -tags functional
+  - go test -c ./test/runhcs/ -tags integration
+
+artifacts:
+  - path: 'wclayer.exe'
+  - path: 'runhcs.exe'
+  - path: 'tar2ext4.exe'
+  - path: 'functional.test.exe'
+  - path: 'runhcs.test.exe'

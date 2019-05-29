@@ -1,3 +1,5 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - deads2k
 - derekwaynecarr
@@ -39,3 +41,5 @@ reviewers:
 - hongchaodeng
 - jszczepkowski
 - enj
+labels:
+- sig/api-machinery

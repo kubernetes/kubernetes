@@ -8,16 +8,18 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/util/ipset",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/k8s.io/utils/exec:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+    ],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["ipset_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/ipset",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],

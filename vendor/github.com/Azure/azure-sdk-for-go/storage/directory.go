@@ -107,10 +107,10 @@ func (d *Directory) CreateIfNotExists(options *FileRequestOptions) (bool, error)
 	params := prepareOptions(options)
 	resp, err := d.fsc.createResourceNoClose(d.buildPath(), resourceDirectory, params, nil)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusCreated || resp.statusCode == http.StatusConflict {
-			if resp.statusCode == http.StatusCreated {
-				d.updateEtagAndLastModified(resp.headers)
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+			if resp.StatusCode == http.StatusCreated {
+				d.updateEtagAndLastModified(resp.Header)
 				return true, nil
 			}
 
@@ -135,9 +135,9 @@ func (d *Directory) Delete(options *FileRequestOptions) error {
 func (d *Directory) DeleteIfExists(options *FileRequestOptions) (bool, error) {
 	resp, err := d.fsc.deleteResourceNoClose(d.buildPath(), resourceDirectory, options)
 	if resp != nil {
-		defer readAndCloseBody(resp.body)
-		if resp.statusCode == http.StatusAccepted || resp.statusCode == http.StatusNotFound {
-			return resp.statusCode == http.StatusAccepted, nil
+		defer drainRespBody(resp)
+		if resp.StatusCode == http.StatusAccepted || resp.StatusCode == http.StatusNotFound {
+			return resp.StatusCode == http.StatusAccepted, nil
 		}
 	}
 	return false, err
@@ -200,9 +200,9 @@ func (d *Directory) ListDirsAndFiles(params ListDirsAndFilesParameters) (*DirsAn
 		return nil, err
 	}
 
-	defer resp.body.Close()
+	defer resp.Body.Close()
 	var out DirsAndFilesListResponse
-	err = xmlUnmarshal(resp.body, &out)
+	err = xmlUnmarshal(resp.Body, &out)
 	return &out, err
 }
 

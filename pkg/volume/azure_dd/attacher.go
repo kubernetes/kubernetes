@@ -19,25 +19,23 @@ package azure_dd
 import (
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
-	"github.com/golang/glog"
-	"k8s.io/api/core/v1"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"k8s.io/klog"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
-	"k8s.io/kubernetes/pkg/util/keymutex"
+	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/azure"
 )
 
 type azureDiskDetacher struct {
@@ -53,24 +51,15 @@ type azureDiskAttacher struct {
 var _ volume.Attacher = &azureDiskAttacher{}
 var _ volume.Detacher = &azureDiskDetacher{}
 
-// acquire lock to get an lun number
-var getLunMutex = keymutex.NewKeyMutex()
+var _ volume.DeviceMounter = &azureDiskAttacher{}
+var _ volume.DeviceUnmounter = &azureDiskDetacher{}
 
 // Attach attaches a volume.Spec to an Azure VM referenced by NodeName, returning the disk's LUN
 func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
-	volumeSource, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
-		glog.Warningf("failed to get azure disk spec")
+		klog.Warningf("failed to get azure disk spec (%v)", err)
 		return "", err
-	}
-
-	instanceid, err := a.cloud.InstanceID(nodeName)
-	if err != nil {
-		glog.Warningf("failed to get azure instance id")
-		return "", fmt.Errorf("failed to get azure instance id for node %q", nodeName)
-	}
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
 	}
 
 	diskController, err := getDiskController(a.plugin.host)
@@ -81,32 +70,24 @@ func (a *azureDiskAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (
 	lun, err := diskController.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, nodeName)
 	if err == cloudprovider.InstanceNotFound {
 		// Log error and continue with attach
-		glog.Warningf(
+		klog.Warningf(
 			"Error checking if volume is already attached to current node (%q). Will continue and try attach anyway. err=%v",
-			instanceid, err)
+			nodeName, err)
 	}
 
 	if err == nil {
 		// Volume is already attached to node.
-		glog.V(4).Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
+		klog.V(2).Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, nodeName, lun)
 	} else {
-		glog.V(4).Infof("GetDiskLun returned: %v. Initiating attaching volume %q to node %q.", err, volumeSource.DataDiskURI, nodeName)
-		getLunMutex.LockKey(instanceid)
-		defer getLunMutex.UnlockKey(instanceid)
+		klog.V(2).Infof("GetDiskLun returned: %v. Initiating attaching volume %q to node %q.", err, volumeSource.DataDiskURI, nodeName)
 
-		lun, err = diskController.GetNextDiskLun(nodeName)
-		if err != nil {
-			glog.Warningf("no LUN available for instance %q", nodeName)
-			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
-		}
-		glog.V(4).Infof("Trying to attach volume %q lun %d to node %q.", volumeSource.DataDiskURI, lun, nodeName)
 		isManagedDisk := (*volumeSource.Kind == v1.AzureManagedDisk)
-		err = diskController.AttachDisk(isManagedDisk, volumeSource.DiskName, volumeSource.DataDiskURI, nodeName, lun, compute.CachingTypes(*volumeSource.CachingMode))
+		lun, err = diskController.AttachDisk(isManagedDisk, volumeSource.DiskName, volumeSource.DataDiskURI, nodeName, compute.CachingTypes(*volumeSource.CachingMode))
 		if err == nil {
-			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)
+			klog.V(2).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, nodeName)
 		} else {
-			glog.V(2).Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, instanceid, err)
-			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, instanceid, err)
+			klog.V(2).Infof("Attach volume %q to instance %q failed with %v", volumeSource.DataDiskURI, nodeName, err)
+			return "", fmt.Errorf("Attach volume %q to instance %q failed with %v", volumeSource.DiskName, nodeName, err)
 		}
 	}
 
@@ -118,9 +99,9 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	volumeSpecMap := make(map[string]*volume.Spec)
 	volumeIDList := []string{}
 	for _, spec := range specs {
-		volumeSource, err := getVolumeSource(spec)
+		volumeSource, _, err := getVolumeSource(spec)
 		if err != nil {
-			glog.Errorf("azureDisk - Error getting volume (%q) source : %v", spec.Name(), err)
+			klog.Errorf("azureDisk - Error getting volume (%q) source : %v", spec.Name(), err)
 			continue
 		}
 
@@ -136,7 +117,7 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 	attachedResult, err := diskController.DisksAreAttached(volumeIDList, nodeName)
 	if err != nil {
 		// Log error and continue with attach
-		glog.Errorf(
+		klog.Errorf(
 			"azureDisk - Error checking if volumes (%v) are attached to current node (%q). err=%v",
 			volumeIDList, nodeName, err)
 		return volumesAttachedCheck, err
@@ -146,22 +127,31 @@ func (a *azureDiskAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName ty
 		if !attached {
 			spec := volumeSpecMap[volumeID]
 			volumesAttachedCheck[spec] = false
-			glog.V(2).Infof("azureDisk - VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
+			klog.V(2).Infof("azureDisk - VolumesAreAttached: check volume %q (specName: %q) is no longer attached", volumeID, spec.Name())
 		}
 	}
 	return volumesAttachedCheck, nil
 }
 
 func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, _ *v1.Pod, timeout time.Duration) (string, error) {
-	var err error
-	lun, err := strconv.Atoi(devicePath)
-	if err != nil {
-		return "", fmt.Errorf("azureDisk - Wait for attach expect device path as a lun number, instead got: %s", devicePath)
+	// devicePath could be a LUN number or
+	// "/dev/disk/azure/scsi1/lunx", "/dev/sdx" on Linux node
+	// "/dev/diskx" on Windows node
+	if strings.HasPrefix(devicePath, "/dev/") {
+		return devicePath, nil
 	}
 
-	volumeSource, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
+	}
+
+	nodeName := types.NodeName(a.plugin.host.GetHostName())
+	diskName := volumeSource.DiskName
+
+	lun, err := strconv.Atoi(devicePath)
+	if err != nil {
+		return "", fmt.Errorf("parse %s failed with error: %v, diskName: %s, nodeName: %s", devicePath, err, diskName, nodeName)
 	}
 
 	exec := a.plugin.host.GetExec(a.plugin.GetPluginName())
@@ -169,21 +159,15 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 	io := &osIOHandler{}
 	scsiHostRescan(io, exec)
 
-	diskName := volumeSource.DiskName
-	nodeName := a.plugin.host.GetHostName()
 	newDevicePath := ""
 
 	err = wait.Poll(1*time.Second, timeout, func() (bool, error) {
-		if newDevicePath, err = findDiskByLun(lun, io, exec); err != nil {
+		if newDevicePath, err = findDiskByLun(int(lun), io, exec); err != nil {
 			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
 		}
 
 		// did we find it?
 		if newDevicePath != "" {
-			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
-			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
-			// the root case on Azure.
-			formatIfNotFormatted(newDevicePath, *volumeSource.FSType, exec)
 			return true, nil
 		}
 
@@ -198,13 +182,13 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 // this is generalized for both managed and blob disks
 // we also prefix the hash with m/b based on disk kind
 func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
-	volumeSource, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
 	if volumeSource.Kind == nil { // this spec was constructed from info on the node
-		pdPath := path.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), mount.MountsInGlobalPDPath, volumeSource.DataDiskURI)
+		pdPath := filepath.Join(a.plugin.host.GetPluginDir(azureDataDiskPluginName), util.MountsInGlobalPDPath, volumeSource.DataDiskURI)
 		return pdPath, nil
 	}
 
@@ -232,15 +216,36 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 		}
 	}
 
-	volumeSource, err := getVolumeSource(spec)
+	if !notMnt {
+		// testing original mount point, make sure the mount link is valid
+		if _, err := (&osIOHandler{}).ReadDir(deviceMountPath); err != nil {
+			// mount link is invalid, now unmount and remount later
+			klog.Warningf("azureDisk - ReadDir %s failed with %v, unmount this directory", deviceMountPath, err)
+			if err := mounter.Unmount(deviceMountPath); err != nil {
+				klog.Errorf("azureDisk - Unmount deviceMountPath %s failed with %v", deviceMountPath, err)
+				return err
+			}
+			notMnt = true
+		}
+	}
+
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return err
 	}
 
 	options := []string{}
 	if notMnt {
-		diskMounter := volumehelper.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
-		mountOptions := volume.MountOptionFromSpec(spec, options...)
+		diskMounter := util.NewSafeFormatAndMountFromHost(azureDataDiskPluginName, attacher.plugin.host)
+		mountOptions := util.MountOptionFromSpec(spec, options...)
+		if runtime.GOOS == "windows" {
+			// only parse devicePath on Windows node
+			diskNum, err := getDiskNum(devicePath)
+			if err != nil {
+				return err
+			}
+			devicePath = diskNum
+		}
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, mountOptions)
 		if err != nil {
 			if cleanErr := os.Remove(deviceMountPath); cleanErr != nil {
@@ -258,37 +263,27 @@ func (d *azureDiskDetacher) Detach(diskURI string, nodeName types.NodeName) erro
 		return fmt.Errorf("invalid disk to detach: %q", diskURI)
 	}
 
-	instanceid, err := d.cloud.InstanceID(nodeName)
-	if err != nil {
-		glog.Warningf("no instance id for node %q, skip detaching", nodeName)
-		return nil
-	}
-	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
-		instanceid = instanceid[(ind + 1):]
-	}
-
-	glog.V(4).Infof("detach %v from node %q", diskURI, nodeName)
-
 	diskController, err := getDiskController(d.plugin.host)
 	if err != nil {
 		return err
 	}
-	err = diskController.DetachDiskByName("", diskURI, nodeName)
+
+	err = diskController.DetachDisk("", diskURI, nodeName)
 	if err != nil {
-		glog.Errorf("failed to detach azure disk %q, err %v", diskURI, err)
+		klog.Errorf("failed to detach azure disk %q, err %v", diskURI, err)
 	}
 
-	glog.V(2).Infof("azureDisk - disk:%s was detached from node:%v", diskURI, nodeName)
+	klog.V(2).Infof("azureDisk - disk:%s was detached from node:%v", diskURI, nodeName)
 	return err
 }
 
 // UnmountDevice unmounts the volume on the node
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	err := volumeutil.UnmountPath(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()))
+	err := mount.CleanupMountPoint(deviceMountPath, detacher.plugin.host.GetMounter(detacher.plugin.GetPluginName()), false)
 	if err == nil {
-		glog.V(4).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
+		klog.V(2).Infof("azureDisk - Device %s was unmounted", deviceMountPath)
 	} else {
-		glog.Infof("azureDisk - Device %s failed to unmount with error: %s", deviceMountPath, err.Error())
+		klog.Warningf("azureDisk - Device %s failed to unmount with error: %s", deviceMountPath, err.Error())
 	}
 	return err
 }

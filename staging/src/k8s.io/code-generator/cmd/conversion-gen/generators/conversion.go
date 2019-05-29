@@ -29,32 +29,10 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
+
+	conversionargs "k8s.io/code-generator/cmd/conversion-gen/args"
 )
-
-// DefaultBasePeerDirs are the peer-dirs nearly everybody will use, i.e. those coming from
-// apimachinery.
-var DefaultBasePeerDirs = []string{
-	"k8s.io/apimachinery/pkg/apis/meta/v1",
-	"k8s.io/apimachinery/pkg/conversion",
-	"k8s.io/apimachinery/pkg/runtime",
-}
-
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
-	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core.
-	BasePeerDirs []string
-
-	// Custom peer dirs which are application specific. Always consider these as
-	// last-ditch possibilities for conversions.
-	ExtraPeerDirs []string //
-
-	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
-	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
-	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
-	// allow structs that are identical to be assigned to each other.
-	SkipUnsafe bool
-}
 
 // These are the comment tags that carry parameters for conversion generation.
 const (
@@ -146,10 +124,10 @@ type conversionFuncMap map[conversionPair]*types.Type
 // Returns all manually-defined conversion functions in the package.
 func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
 	if pkg == nil {
-		glog.Warningf("Skipping nil package passed to getManualConversionFunctions")
+		klog.Warningf("Skipping nil package passed to getManualConversionFunctions")
 		return
 	}
-	glog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
+	klog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
 
 	scopeName := types.Ref(conversionPackagePath, "Scope").Name
 	errorName := types.Ref("", "error").Name
@@ -158,34 +136,34 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 
 	for _, f := range pkg.Functions {
 		if f.Underlying == nil || f.Underlying.Kind != types.Func {
-			glog.Errorf("Malformed function: %#v", f)
+			klog.Errorf("Malformed function: %#v", f)
 			continue
 		}
 		if f.Underlying.Signature == nil {
-			glog.Errorf("Function without signature: %#v", f)
+			klog.Errorf("Function without signature: %#v", f)
 			continue
 		}
-		glog.V(8).Infof("Considering function %s", f.Name)
+		klog.V(8).Infof("Considering function %s", f.Name)
 		signature := f.Underlying.Signature
 		// Check whether the function is conversion function.
 		// Note that all of them have signature:
 		// func Convert_inType_To_outType(inType, outType, conversion.Scope) error
 		if signature.Receiver != nil {
-			glog.V(8).Infof("%s has a receiver", f.Name)
+			klog.V(8).Infof("%s has a receiver", f.Name)
 			continue
 		}
 		if len(signature.Parameters) != 3 || signature.Parameters[2].Name != scopeName {
-			glog.V(8).Infof("%s has wrong parameters", f.Name)
+			klog.V(8).Infof("%s has wrong parameters", f.Name)
 			continue
 		}
 		if len(signature.Results) != 1 || signature.Results[0].Name != errorName {
-			glog.V(8).Infof("%s has wrong results", f.Name)
+			klog.V(8).Infof("%s has wrong results", f.Name)
 			continue
 		}
 		inType := signature.Parameters[0]
 		outType := signature.Parameters[1]
 		if inType.Kind != types.Pointer || outType.Kind != types.Pointer {
-			glog.V(8).Infof("%s has wrong parameter types", f.Name)
+			klog.V(8).Infof("%s has wrong parameter types", f.Name)
 			continue
 		}
 		// Now check if the name satisfies the convention.
@@ -193,15 +171,19 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 		args := argsFromType(inType.Elem, outType.Elem)
 		sw.Do("Convert_$.inType|public$_To_$.outType|public$", args)
 		if f.Name.Name == buffer.String() {
-			glog.V(4).Infof("Found conversion function %s", f.Name)
+			klog.V(4).Infof("Found conversion function %s", f.Name)
 			key := conversionPair{inType.Elem, outType.Elem}
 			// We might scan the same package twice, and that's OK.
 			if v, ok := manualMap[key]; ok && v != nil && v.Name.Package != pkg.Path {
-				panic(fmt.Sprintf("duplicate static conversion defined: %s -> %s", key.inType, key.outType))
+				panic(fmt.Sprintf("duplicate static conversion defined: %s -> %s from:\n%s.%s\n%s.%s", key.inType, key.outType, v.Name.Package, v.Name.Name, f.Name.Package, f.Name.Name))
 			}
 			manualMap[key] = f
 		} else {
-			glog.V(8).Infof("%s has wrong name", f.Name)
+			// prevent user error when they don't get the correct conversion signature
+			if strings.HasPrefix(f.Name.Name, "Convert_") {
+				klog.Errorf("Rename function %s %s -> %s to match expected conversion signature", f.Name.Package, f.Name.Name, buffer.String())
+			}
+			klog.V(8).Infof("%s has wrong name", f.Name)
 		}
 		buffer.Reset()
 	}
@@ -210,12 +192,11 @@ func getManualConversionFunctions(context *generator.Context, pkg *types.Package
 func Packages(context *generator.Context, arguments *args.GeneratorArgs) generator.Packages {
 	boilerplate, err := arguments.LoadGoBoilerplate()
 	if err != nil {
-		glog.Fatalf("Failed loading boilerplate: %v", err)
+		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
 	packages := generator.Packages{}
 	header := append([]byte(fmt.Sprintf("// +build !%s\n\n", arguments.GeneratedBuildTag)), boilerplate...)
-	header = append(header, []byte("\n// This file was autogenerated by conversion-gen. Do not edit it manually!\n\n")...)
 
 	// Accumulate pre-existing conversion functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -239,7 +220,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 		processed[i] = true
 
-		glog.V(5).Infof("considering pkg %q", i)
+		klog.V(5).Infof("considering pkg %q", i)
 		pkg := context.Universe[i]
 		// typesPkg is where the versioned types are defined. Sometimes it is
 		// different from pkg. For example, kubernetes core/v1 types are defined
@@ -258,13 +239,13 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// in their doc.go file.
 		peerPkgs := extractTag(pkg.Comments)
 		if peerPkgs != nil {
-			glog.V(5).Infof("  tags: %q", peerPkgs)
+			klog.V(5).Infof("  tags: %q", peerPkgs)
 		} else {
-			glog.V(5).Infof("  no tag")
+			klog.V(5).Infof("  no tag")
 			continue
 		}
 		skipUnsafe := false
-		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
+		if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
 			peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
 			peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
 			skipUnsafe = customArgs.SkipUnsafe
@@ -274,14 +255,14 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		externalTypesValues := extractExternalTypesTag(pkg.Comments)
 		if externalTypesValues != nil {
 			if len(externalTypesValues) != 1 {
-				glog.Fatalf("  expect only one value for %q tag, got: %q", externalTypesTagName, externalTypesValues)
+				klog.Fatalf("  expect only one value for %q tag, got: %q", externalTypesTagName, externalTypesValues)
 			}
 			externalTypes := externalTypesValues[0]
-			glog.V(5).Infof("  external types tags: %q", externalTypes)
+			klog.V(5).Infof("  external types tags: %q", externalTypes)
 			var err error
 			typesPkg, err = context.AddDirectory(externalTypes)
 			if err != nil {
-				glog.Fatalf("cannot import package %s", externalTypes)
+				klog.Fatalf("cannot import package %s", externalTypes)
 			}
 			// update context.Order to the latest context.Universe
 			orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}
@@ -310,7 +291,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			context.AddDir(pp)
 			p := context.Universe[pp]
 			if nil == p {
-				glog.Fatalf("failed to find pkg: %s", pp)
+				klog.Fatalf("failed to find pkg: %s", pp)
 			}
 			getManualConversionFunctions(context, p, manualConversions)
 		}
@@ -354,7 +335,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	// from being a candidate for unsafe conversion
 	for k, v := range manualConversions {
 		if isCopyOnly(v.CommentLines) {
-			glog.V(5).Infof("Conversion function %s will not block memory copy because it is copy-only", v.Name)
+			klog.V(5).Infof("Conversion function %s will not block memory copy because it is copy-only", v.Name)
 			continue
 		}
 		// this type should be excluded from all equivalence, because the converter must be called.
@@ -537,9 +518,9 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 	tagvals := extractTag(t.CommentLines)
 	if tagvals != nil {
 		if tagvals[0] != "false" {
-			glog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tagvals[0])
+			klog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tagvals[0])
 		}
-		glog.V(5).Infof("type %v requests no conversion generation, skipping", t)
+		klog.V(5).Infof("type %v requests no conversion generation, skipping", t)
 		return false
 	}
 	// TODO: Consider generating functions for other kinds too.
@@ -593,12 +574,6 @@ func argsFromType(inType, outType *types.Type) generator.Args {
 	}
 }
 
-func defaultingArgsFromType(inType *types.Type) generator.Args {
-	return generator.Args{
-		"inType": inType,
-	}
-}
-
 const nameTmpl = "Convert_$.inType|publicIT$_To_$.outType|publicIT$"
 
 func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, bool) {
@@ -607,10 +582,10 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	if glog.V(5) {
+	if klog.V(5) {
 		if m, ok := g.useUnsafe.(equalMemoryTypes); ok {
 			var result []string
-			glog.Infof("All objects without identical memory layout:")
+			klog.Infof("All objects without identical memory layout:")
 			for k, v := range m {
 				if v {
 					continue
@@ -619,7 +594,7 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 			}
 			sort.Strings(result)
 			for _, s := range result {
-				glog.Infof(s)
+				klog.Infof(s)
 			}
 		}
 	}
@@ -635,20 +610,40 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	}
 	sw.Do("// RegisterConversions adds conversion functions to the given scheme.\n", nil)
 	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
-	sw.Do("func RegisterConversions(scheme $.|raw$) error {\n", schemePtr)
-	sw.Do("return scheme.AddGeneratedConversionFuncs(\n", nil)
+	sw.Do("func RegisterConversions(s $.|raw$) error {\n", schemePtr)
 	for _, t := range g.types {
 		peerType := getPeerTypeFor(c, t, g.peerPackages)
-		sw.Do(nameTmpl+",\n", argsFromType(t, peerType))
-		sw.Do(nameTmpl+",\n", argsFromType(peerType, t))
+		args := argsFromType(t, peerType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		args = argsFromType(peerType, t).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
 	}
-	sw.Do(")\n", nil)
+	var pairs []conversionPair
+	for pair, t := range g.manualConversions {
+		if t.Name.Package != g.outputPackage {
+			continue
+		}
+		pairs = append(pairs, pair)
+	}
+	// sort by name of the conversion function
+	sort.Slice(pairs, func(i, j int) bool {
+		if g.manualConversions[pairs[i]].Name.Name < g.manualConversions[pairs[j]].Name.Name {
+			return true
+		}
+		return false
+	})
+	for _, pair := range pairs {
+		args := argsFromType(pair.inType, pair.outType).With("Scope", types.Ref(conversionPackagePath, "Scope")).With("fn", g.manualConversions[pair])
+		sw.Do("if err := s.AddConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return $.fn|raw$(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+	}
+
+	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
 	return sw.Error()
 }
 
 func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
-	glog.V(5).Infof("generating for type %v", t)
+	klog.V(5).Infof("generating for type %v", t)
 	peerType := getPeerTypeFor(c, t, g.peerPackages)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	g.generateConversion(t, peerType, sw)
@@ -669,10 +664,10 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 		// There is a public manual Conversion method: use it.
 	} else if skipped := g.skippedFields[inType]; len(skipped) != 0 {
 		// The inType had some fields we could not generate.
-		glog.Errorf("Warning: could not find nor generate a final Conversion function for %v -> %v", inType, outType)
-		glog.Errorf("  the following fields need manual conversion:")
+		klog.Errorf("Warning: could not find nor generate a final Conversion function for %v -> %v", inType, outType)
+		klog.Errorf("  the following fields need manual conversion:")
 		for _, f := range skipped {
-			glog.Errorf("      - %v", f)
+			klog.Errorf("      - %v", f)
 		}
 	} else {
 		// Emit a public conversion function.
@@ -687,7 +682,7 @@ func (g *genConversion) generateConversion(inType, outType *types.Type, sw *gene
 // at any nesting level. This makes the autogenerator easy to understand, and
 // the compiler shouldn't care.
 func (g *genConversion) generateFor(inType, outType *types.Type, sw *generator.SnippetWriter) {
-	glog.V(5).Infof("generating %v -> %v", inType, outType)
+	klog.V(5).Infof("generating %v -> %v", inType, outType)
 	var f func(*types.Type, *types.Type, *generator.SnippetWriter)
 
 	switch inType.Kind {
@@ -858,7 +853,7 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("}\n", nil)
 				continue
 			}
-			glog.V(5).Infof("Skipped function %s because it is copy-only and we can use direct assignment", function.Name)
+			klog.V(5).Infof("Skipped function %s because it is copy-only and we can use direct assignment", function.Name)
 		}
 
 		// If we can't auto-convert, punt before we emit any code.

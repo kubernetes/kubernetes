@@ -4,16 +4,13 @@ go_library(
     name = "go_default_library",
     srcs = [
         "capability.go",
+        "capability_linux.go",
         "capability_noop.go",
         "enum.go",
         "enum_gen.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "capability_linux.go",
-            "syscall_linux.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "syscall_linux.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/syndtr/gocapability/capability",
     importpath = "github.com/syndtr/gocapability/capability",
     visibility = ["//visibility:public"],
 )

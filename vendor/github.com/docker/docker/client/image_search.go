@@ -1,15 +1,15 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/registry"
-	"golang.org/x/net/context"
+	"github.com/docker/docker/errdefs"
 )
 
 // ImageSearch makes the docker host to search by a term in a remote registry.
@@ -21,7 +21,7 @@ func (cli *Client) ImageSearch(ctx context.Context, term string, options types.I
 	query.Set("limit", fmt.Sprintf("%d", options.Limit))
 
 	if options.Filters.Len() > 0 {
-		filterJSON, err := filters.ToParam(options.Filters)
+		filterJSON, err := filters.ToJSON(options.Filters)
 		if err != nil {
 			return results, err
 		}
@@ -29,7 +29,8 @@ func (cli *Client) ImageSearch(ctx context.Context, term string, options types.I
 	}
 
 	resp, err := cli.tryImageSearch(ctx, query, options.RegistryAuth)
-	if resp.statusCode == http.StatusUnauthorized && options.PrivilegeFunc != nil {
+	defer ensureReaderClosed(resp)
+	if errdefs.IsUnauthorized(err) && options.PrivilegeFunc != nil {
 		newAuthHeader, privilegeErr := options.PrivilegeFunc()
 		if privilegeErr != nil {
 			return results, privilegeErr
@@ -41,7 +42,6 @@ func (cli *Client) ImageSearch(ctx context.Context, term string, options types.I
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&results)
-	ensureReaderClosed(resp)
 	return results, err
 }
 

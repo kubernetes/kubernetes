@@ -20,11 +20,15 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/utils/pointer"
 )
+
+var swaggerMetadataDescriptions = metav1.ObjectMeta{}.SwaggerDoc()
 
 // Funcs returns the fuzzer functions for the apiextensions apis.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
@@ -41,6 +45,44 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			if len(obj.Names.ListKind) == 0 && len(obj.Names.Kind) > 0 {
 				obj.Names.ListKind = obj.Names.Kind + "List"
+			}
+			if len(obj.Versions) == 0 && len(obj.Version) != 0 {
+				obj.Versions = []apiextensions.CustomResourceDefinitionVersion{
+					{
+						Name:    obj.Version,
+						Served:  true,
+						Storage: true,
+					},
+				}
+			} else if len(obj.Versions) != 0 {
+				obj.Version = obj.Versions[0].Name
+			}
+			if len(obj.AdditionalPrinterColumns) == 0 {
+				obj.AdditionalPrinterColumns = []apiextensions.CustomResourceColumnDefinition{
+					{Name: "Age", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"], JSONPath: ".metadata.creationTimestamp"},
+				}
+			}
+			if obj.Conversion == nil {
+				obj.Conversion = &apiextensions.CustomResourceConversion{
+					Strategy: apiextensions.NoneConverter,
+				}
+			}
+			if obj.Conversion.Strategy == apiextensions.WebhookConverter && len(obj.Conversion.ConversionReviewVersions) == 0 {
+				obj.Conversion.ConversionReviewVersions = []string{"v1beta1"}
+			}
+			if obj.PreserveUnknownFields == nil {
+				obj.PreserveUnknownFields = pointer.BoolPtr(true)
+			}
+		},
+		func(obj *apiextensions.CustomResourceDefinition, c fuzz.Continue) {
+			c.FuzzNoCustom(obj)
+
+			if len(obj.Status.StoredVersions) == 0 {
+				for _, v := range obj.Spec.Versions {
+					if v.Storage && !apiextensions.IsStoredVersion(obj, v.Name) {
+						obj.Status.StoredVersions = append(obj.Status.StoredVersions, v.Name)
+					}
+				}
 			}
 		},
 		func(obj *apiextensions.JSONSchemaProps, c fuzz.Continue) {
@@ -60,22 +102,6 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					}
 					if isValue || c.Intn(10) == 0 {
 						c.Fuzz(vobj.Field(i).Addr().Interface())
-
-						// JSON keys must not contain escape char with our JSON codec (jsoniter)
-						// TODO: remove this when/if we moved from jsoniter.ConfigFastest to ConfigCompatibleWithStandardLibrary
-						if field.Type.Kind() == reflect.Map {
-							keys := append([]reflect.Value(nil), vobj.Field(i).MapKeys()...)
-							for _, k := range keys {
-								stripped := toJSONString(k.String())
-								if stripped == k.String() {
-									continue
-								}
-								// set new key
-								vobj.Field(i).SetMapIndex(reflect.ValueOf(stripped), vobj.Field(i).MapIndex(k))
-								// remove old
-								vobj.Field(i).SetMapIndex(k, reflect.Value{})
-							}
-						}
 					}
 				}
 			}
@@ -94,9 +120,13 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				validRef := "validRef"
 				obj.Ref = &validRef
 			}
+			if len(obj.Type) == 0 {
+				obj.Nullable = false // because this does not roundtrip through go-openapi
+			}
 		},
 		func(obj *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {
 			if c.RandBool() {
+				obj.Allows = true
 				obj.Schema = &apiextensions.JSONSchemaProps{}
 				c.Fuzz(obj.Schema)
 			} else {
@@ -123,15 +153,9 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				c.Fuzz(&obj.Property)
 			}
 		},
+		func(obj *int64, c fuzz.Continue) {
+			// JSON only supports 53 bits because everything is a float
+			*obj = int64(c.Uint64()) & ((int64(1) << 53) - 1)
+		},
 	}
-}
-
-func toJSONString(s string) string {
-	return strings.Map(func(r rune) rune {
-		// replace chars which are not supported in keys by jsoniter.ConfigFastest
-		if r == '\\' || r == '"' {
-			return 'x'
-		}
-		return r
-	}, s)
 }

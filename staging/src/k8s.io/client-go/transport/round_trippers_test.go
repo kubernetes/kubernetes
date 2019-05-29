@@ -17,11 +17,8 @@ limitations under the License.
 package transport
 
 import (
-	"bytes"
-	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -129,6 +126,32 @@ func TestImpersonationRoundTripper(t *testing.T) {
 				ImpersonateUserExtraHeaderPrefix + "Second": {"B", "b"},
 			},
 		},
+		{
+			name: "escape handling",
+			impersonationConfig: ImpersonationConfig{
+				UserName: "user",
+				Extra: map[string][]string{
+					"test.example.com/thing.thing": {"A", "a"},
+				},
+			},
+			expected: map[string][]string{
+				ImpersonateUserHeader: {"user"},
+				ImpersonateUserExtraHeaderPrefix + `Test.example.com%2fthing.thing`: {"A", "a"},
+			},
+		},
+		{
+			name: "double escape handling",
+			impersonationConfig: ImpersonationConfig{
+				UserName: "user",
+				Extra: map[string][]string{
+					"test.example.com/thing.thing%20another.thing": {"A", "a"},
+				},
+			},
+			expected: map[string][]string{
+				ImpersonateUserHeader: {"user"},
+				ImpersonateUserExtraHeaderPrefix + `Test.example.com%2fthing.thing%2520another.thing`: {"A", "a"},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -163,9 +186,10 @@ func TestImpersonationRoundTripper(t *testing.T) {
 
 func TestAuthProxyRoundTripper(t *testing.T) {
 	for n, tc := range map[string]struct {
-		username string
-		groups   []string
-		extra    map[string][]string
+		username      string
+		groups        []string
+		extra         map[string][]string
+		expectedExtra map[string][]string
 	}{
 		"allfields": {
 			username: "user",
@@ -173,6 +197,34 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 			extra: map[string][]string{
 				"one": {"alpha", "bravo"},
 				"two": {"charlie", "delta"},
+			},
+			expectedExtra: map[string][]string{
+				"one": {"alpha", "bravo"},
+				"two": {"charlie", "delta"},
+			},
+		},
+		"escaped extra": {
+			username: "user",
+			groups:   []string{"groupA", "groupB"},
+			extra: map[string][]string{
+				"one":             {"alpha", "bravo"},
+				"example.com/two": {"charlie", "delta"},
+			},
+			expectedExtra: map[string][]string{
+				"one":               {"alpha", "bravo"},
+				"example.com%2ftwo": {"charlie", "delta"},
+			},
+		},
+		"double escaped extra": {
+			username: "user",
+			groups:   []string{"groupA", "groupB"},
+			extra: map[string][]string{
+				"one":                     {"alpha", "bravo"},
+				"example.com/two%20three": {"charlie", "delta"},
+			},
+			expectedExtra: map[string][]string{
+				"one":                         {"alpha", "bravo"},
+				"example.com%2ftwo%2520three": {"charlie", "delta"},
 			},
 		},
 	} {
@@ -214,66 +266,64 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 				actualExtra[extraKey] = append(actualExtra[key], values...)
 			}
 		}
-		if e, a := tc.extra, actualExtra; !reflect.DeepEqual(e, a) {
+		if e, a := tc.expectedExtra, actualExtra; !reflect.DeepEqual(e, a) {
 			t.Errorf("%s expected %v, got %v", n, e, a)
 			continue
 		}
 	}
 }
 
-func TestCacheRoundTripper(t *testing.T) {
-	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
-	defer os.RemoveAll(cacheDir)
-	if err != nil {
-		t.Fatal(err)
+// TestHeaderEscapeRoundTrip tests to see if foo == url.PathUnescape(headerEscape(foo))
+// This behavior is important for client -> API server transmission of extra values.
+func TestHeaderEscapeRoundTrip(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		key  string
+	}{
+		{
+			name: "alpha",
+			key:  "alphabetical",
+		},
+		{
+			name: "alphanumeric",
+			key:  "alph4num3r1c",
+		},
+		{
+			name: "percent encoded",
+			key:  "percent%20encoded",
+		},
+		{
+			name: "almost percent encoded",
+			key:  "almost%zzpercent%xxencoded",
+		},
+		{
+			name: "illegal char & percent encoding",
+			key:  "example.com/percent%20encoded",
+		},
+		{
+			name: "weird unicode stuff",
+			key:  "example.com/ᛒᚥᛏᛖᚥᚢとロビン",
+		},
+		{
+			name: "header legal chars",
+			key:  "abc123!#$+.-_*\\^`~|'",
+		},
+		{
+			name: "legal path, illegal header",
+			key:  "@=:",
+		},
 	}
-	cache := NewCacheRoundTripper(cacheDir, rt)
-
-	// First call, caches the response
-	req := &http.Request{
-		Method: http.MethodGet,
-		URL:    &url.URL{Host: "localhost"},
-	}
-	rt.Response = &http.Response{
-		Header:     http.Header{"ETag": []string{`"123456"`}},
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
-		StatusCode: http.StatusOK,
-	}
-	resp, err := cache.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != "Content" {
-		t.Errorf(`Expected Body to be "Content", got %q`, string(content))
-	}
-
-	// Second call, returns cached response
-	req = &http.Request{
-		Method: http.MethodGet,
-		URL:    &url.URL{Host: "localhost"},
-	}
-	rt.Response = &http.Response{
-		StatusCode: http.StatusNotModified,
-		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Other Content"))),
-	}
-
-	resp, err = cache.RoundTrip(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Read body and make sure we have the initial content
-	content, err = ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(content) != "Content" {
-		t.Errorf("Invalid content read from cache %q", string(content))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			escaped := headerKeyEscape(tc.key)
+			unescaped, err := url.PathUnescape(escaped)
+			if err != nil {
+				t.Fatalf("url.PathUnescape(%q) returned error: %v", escaped, err)
+			}
+			if tc.key != unescaped {
+				t.Errorf("url.PathUnescape(headerKeyEscape(%q)) returned %q, wanted %q", tc.key, unescaped, tc.key)
+			}
+		})
 	}
 }

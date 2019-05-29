@@ -110,13 +110,13 @@ func (b *Blob) StartCopy(sourceBlob string, options *CopyOptions) (string, error
 	if err != nil {
 		return "", err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusAccepted, http.StatusCreated}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusAccepted, http.StatusCreated}); err != nil {
 		return "", err
 	}
 
-	copyID := resp.headers.Get("x-ms-copy-id")
+	copyID := resp.Header.Get("x-ms-copy-id")
 	if copyID == "" {
 		return "", errors.New("Got empty copy id header")
 	}
@@ -152,8 +152,8 @@ func (b *Blob) AbortCopy(copyID string, options *AbortCopyOptions) error {
 	if err != nil {
 		return err
 	}
-	readAndCloseBody(resp.body)
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+	defer drainRespBody(resp)
+	return checkRespCode(resp, []int{http.StatusNoContent})
 }
 
 // WaitForCopy loops until a BlobCopy operation is completed (or fails with error)
@@ -223,13 +223,13 @@ func (b *Blob) IncrementalCopyBlob(sourceBlobURL string, snapshotTime time.Time,
 	if err != nil {
 		return "", err
 	}
-	defer readAndCloseBody(resp.body)
+	defer drainRespBody(resp)
 
-	if err := checkRespCode(resp.statusCode, []int{http.StatusAccepted}); err != nil {
+	if err := checkRespCode(resp, []int{http.StatusAccepted}); err != nil {
 		return "", err
 	}
 
-	copyID := resp.headers.Get("x-ms-copy-id")
+	copyID := resp.Header.Get("x-ms-copy-id")
 	if copyID == "" {
 		return "", errors.New("Got empty copy id header")
 	}

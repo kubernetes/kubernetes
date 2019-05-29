@@ -10,14 +10,13 @@ go_library(
     name = "go_default_library",
     srcs = ["slice.go"],
     importpath = "k8s.io/kubernetes/pkg/util/slice",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
+    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["slice_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/slice",
-    library = ":go_default_library",
+    embed = [":go_default_library"],
 )
 
 filegroup(

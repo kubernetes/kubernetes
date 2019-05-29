@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/etcdserver/api"
-	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 	"github.com/coreos/etcd/etcdserver/membership"
 	"github.com/coreos/etcd/pkg/pbutil"
 	"github.com/coreos/etcd/store"
@@ -29,11 +28,11 @@ import (
 
 // ApplierV2 is the interface for processing V2 raft messages
 type ApplierV2 interface {
-	Delete(r *pb.Request) Response
-	Post(r *pb.Request) Response
-	Put(r *pb.Request) Response
-	QGet(r *pb.Request) Response
-	Sync(r *pb.Request) Response
+	Delete(r *RequestV2) Response
+	Post(r *RequestV2) Response
+	Put(r *RequestV2) Response
+	QGet(r *RequestV2) Response
+	Sync(r *RequestV2) Response
 }
 
 func NewApplierV2(s store.Store, c *membership.RaftCluster) ApplierV2 {
@@ -45,7 +44,7 @@ type applierV2store struct {
 	cluster *membership.RaftCluster
 }
 
-func (a *applierV2store) Delete(r *pb.Request) Response {
+func (a *applierV2store) Delete(r *RequestV2) Response {
 	switch {
 	case r.PrevIndex > 0 || r.PrevValue != "":
 		return toResponse(a.store.CompareAndDelete(r.Path, r.PrevValue, r.PrevIndex))
@@ -54,12 +53,12 @@ func (a *applierV2store) Delete(r *pb.Request) Response {
 	}
 }
 
-func (a *applierV2store) Post(r *pb.Request) Response {
-	return toResponse(a.store.Create(r.Path, r.Dir, r.Val, true, toTTLOptions(r)))
+func (a *applierV2store) Post(r *RequestV2) Response {
+	return toResponse(a.store.Create(r.Path, r.Dir, r.Val, true, r.TTLOptions()))
 }
 
-func (a *applierV2store) Put(r *pb.Request) Response {
-	ttlOptions := toTTLOptions(r)
+func (a *applierV2store) Put(r *RequestV2) Response {
+	ttlOptions := r.TTLOptions()
 	exists, existsSet := pbutil.GetBool(r.PrevExist)
 	switch {
 	case existsSet:
@@ -96,19 +95,20 @@ func (a *applierV2store) Put(r *pb.Request) Response {
 	}
 }
 
-func (a *applierV2store) QGet(r *pb.Request) Response {
+func (a *applierV2store) QGet(r *RequestV2) Response {
 	return toResponse(a.store.Get(r.Path, r.Recursive, r.Sorted))
 }
 
-func (a *applierV2store) Sync(r *pb.Request) Response {
+func (a *applierV2store) Sync(r *RequestV2) Response {
 	a.store.DeleteExpiredKeys(time.Unix(0, r.Time))
 	return Response{}
 }
 
 // applyV2Request interprets r as a call to store.X and returns a Response interpreted
 // from store.Event
-func (s *EtcdServer) applyV2Request(r *pb.Request) Response {
-	toTTLOptions(r)
+func (s *EtcdServer) applyV2Request(r *RequestV2) Response {
+	defer warnOfExpensiveRequest(time.Now(), r, nil, nil)
+
 	switch r.Method {
 	case "POST":
 		return s.applyV2.Post(r)
@@ -122,11 +122,11 @@ func (s *EtcdServer) applyV2Request(r *pb.Request) Response {
 		return s.applyV2.Sync(r)
 	default:
 		// This should never be reached, but just in case:
-		return Response{err: ErrUnknownMethod}
+		return Response{Err: ErrUnknownMethod}
 	}
 }
 
-func toTTLOptions(r *pb.Request) store.TTLOptionSet {
+func (r *RequestV2) TTLOptions() store.TTLOptionSet {
 	refresh, _ := pbutil.GetBool(r.Refresh)
 	ttlOptions := store.TTLOptionSet{Refresh: refresh}
 	if r.Expiration != 0 {
@@ -136,5 +136,5 @@ func toTTLOptions(r *pb.Request) store.TTLOptionSet {
 }
 
 func toResponse(ev *store.Event, err error) Response {
-	return Response{Event: ev, err: err}
+	return Response{Event: ev, Err: err}
 }

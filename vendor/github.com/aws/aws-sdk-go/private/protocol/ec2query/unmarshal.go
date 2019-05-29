@@ -27,7 +27,11 @@ func Unmarshal(r *request.Request) {
 		decoder := xml.NewDecoder(r.HTTPResponse.Body)
 		err := xmlutil.UnmarshalXML(r.Data, decoder, "")
 		if err != nil {
-			r.Error = awserr.New("SerializationError", "failed decoding EC2 Query response", err)
+			r.Error = awserr.NewRequestFailure(
+				awserr.New("SerializationError", "failed decoding EC2 Query response", err),
+				r.HTTPResponse.StatusCode,
+				r.RequestID,
+			)
 			return
 		}
 	}
@@ -52,7 +56,11 @@ func UnmarshalError(r *request.Request) {
 	resp := &xmlErrorResponse{}
 	err := xml.NewDecoder(r.HTTPResponse.Body).Decode(resp)
 	if err != nil && err != io.EOF {
-		r.Error = awserr.New("SerializationError", "failed decoding EC2 Query error response", err)
+		r.Error = awserr.NewRequestFailure(
+			awserr.New("SerializationError", "failed decoding EC2 Query error response", err),
+			r.HTTPResponse.StatusCode,
+			r.RequestID,
+		)
 	} else {
 		r.Error = awserr.NewRequestFailure(
 			awserr.New(resp.Code, resp.Message, nil),

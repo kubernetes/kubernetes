@@ -41,7 +41,7 @@ pass in the parent provider, like so:
 
   opts := gophercloud.EndpointOpts{Region: "RegionOne"}
 
-  client := openstack.NewComputeV2(provider, opts)
+  client, err := openstack.NewComputeV2(provider, opts)
 
 Resources
 

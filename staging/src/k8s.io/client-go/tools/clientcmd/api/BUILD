@@ -12,9 +12,8 @@ go_test(
         "helpers_test.go",
         "types_test.go",
     ],
-    importpath = "k8s.io/client-go/tools/clientcmd/api",
-    library = ":go_default_library",
-    deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
+    embed = [":go_default_library"],
+    deps = ["//vendor/sigs.k8s.io/yaml:go_default_library"],
 )
 
 go_library(
@@ -26,10 +25,11 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/clientcmd/api",
     importpath = "k8s.io/client-go/tools/clientcmd/api",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

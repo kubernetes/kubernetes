@@ -29,7 +29,7 @@ import (
 type NetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -80,7 +80,7 @@ type NetworkPolicySpec struct {
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// List of rule types that the NetworkPolicy relates to.
-	// Valid options are Ingress, Egress, or Ingress,Egress.
+	// Valid options are "Ingress", "Egress", or "Ingress,Egress".
 	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
 	// policies that contain an Egress section are assumed to affect Egress, and all policies
 	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
@@ -136,7 +136,7 @@ type NetworkPolicyEgressRule struct {
 
 // NetworkPolicyPort describes a port to allow traffic on
 type NetworkPolicyPort struct {
-	// The protocol (TCP or UDP) which traffic must match. If not specified, this
+	// The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this
 	// field defaults to TCP.
 	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
@@ -161,22 +161,29 @@ type IPBlock struct {
 	Except []string `json:"except,omitempty" protobuf:"bytes,2,rep,name=except"`
 }
 
-// NetworkPolicyPeer describes a peer to allow traffic from. Exactly one of its fields
-// must be specified.
+// NetworkPolicyPeer describes a peer to allow traffic from. Only certain combinations of
+// fields are allowed
 type NetworkPolicyPeer struct {
-	// This is a label selector which selects Pods in this namespace. This field
-	// follows standard label selector semantics. If present but empty, this selector
-	// selects all pods in this namespace.
+	// This is a label selector which selects Pods. This field follows standard label
+	// selector semantics; if present but empty, it selects all pods.
+	//
+	// If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+	// the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+	// Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
 	// +optional
 	PodSelector *metav1.LabelSelector `json:"podSelector,omitempty" protobuf:"bytes,1,opt,name=podSelector"`
 
-	// Selects Namespaces using cluster scoped-labels. This matches all pods in all
-	// namespaces selected by this label selector. This field follows standard label
-	// selector semantics. If present but empty, this selector selects all namespaces.
+	// Selects Namespaces using cluster-scoped labels. This field follows standard label
+	// selector semantics; if present but empty, it selects all namespaces.
+	//
+	// If PodSelector is also set, then the NetworkPolicyPeer as a whole selects
+	// the Pods matching PodSelector in the Namespaces selected by NamespaceSelector.
+	// Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,2,opt,name=namespaceSelector"`
 
-	// IPBlock defines policy on a particular IPBlock
+	// IPBlock defines policy on a particular IPBlock. If this field is set then
+	// neither of the other fields can be.
 	// +optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
@@ -187,7 +194,7 @@ type NetworkPolicyPeer struct {
 type NetworkPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

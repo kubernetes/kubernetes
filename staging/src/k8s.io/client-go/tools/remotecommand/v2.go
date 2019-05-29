@@ -101,7 +101,7 @@ func (p *streamProtocolV2) copyStdin() {
 			// the executed command will remain running.
 			defer once.Do(func() { p.remoteStdin.Close() })
 
-			if _, err := io.Copy(p.remoteStdin, p.Stdin); err != nil {
+			if _, err := io.Copy(p.remoteStdin, readerWrapper{p.Stdin}); err != nil {
 				runtime.HandleError(err)
 			}
 		}()

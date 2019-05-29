@@ -19,53 +19,48 @@ package main
 
 import (
 	"flag"
-	"path"
 	"path/filepath"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
-
-	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
-	"k8s.io/code-generator/cmd/client-gen/generators"
 	"k8s.io/gengo/args"
+	"k8s.io/klog"
+
+	generatorargs "k8s.io/code-generator/cmd/client-gen/args"
+	"k8s.io/code-generator/cmd/client-gen/generators"
+	"k8s.io/code-generator/pkg/util"
 )
 
 func main() {
-	arguments := args.Default().WithoutDefaultFlagParsing()
-
-	// Custom args.
-	customArgs := &clientgenargs.CustomArgs{}
-	customArgs.AddFlags(pflag.CommandLine)
+	klog.InitFlags(nil)
+	genericArgs, customArgs := generatorargs.NewDefaults()
 
 	// Override defaults.
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	arguments.CustomArgs = customArgs
-	arguments.InputDirs = []string{
-		"k8s.io/apimachinery/pkg/fields",
-		"k8s.io/apimachinery/pkg/labels",
-		"k8s.io/apimachinery/pkg/watch",
-		"k8s.io/apimachinery/pkg/apimachinery/registered",
-	}
+	// TODO: move this out of client-gen
+	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
+	genericArgs.OutputPackagePath = "k8s.io/kubernetes/pkg/client/clientset_generated/"
 
-	// Register default flags. We do this manually here because we have to override InputDirs below after additional
-	// input dirs are parse fromt he command-line.
-	arguments.AddFlags(pflag.CommandLine)
+	genericArgs.AddFlags(pflag.CommandLine)
+	customArgs.AddFlags(pflag.CommandLine, "k8s.io/kubernetes/pkg/apis") // TODO: move this input path out of client-gen
+	flag.Set("logtostderr", "true")
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	// Prefix with InputBaseDir and add client dirs as input dirs.
-	for gv, pth := range customArgs.GroupVersionToInputPath {
-		customArgs.GroupVersionToInputPath[gv] = path.Join(customArgs.InputBasePath, pth)
-	}
-	for _, pkg := range customArgs.GroupVersionToInputPath {
-		arguments.InputDirs = append(arguments.InputDirs, pkg)
+	// add group version package as input dirs for gengo
+	for _, pkg := range customArgs.Groups {
+		for _, v := range pkg.Versions {
+			genericArgs.InputDirs = append(genericArgs.InputDirs, v.Package)
+		}
 	}
 
-	if err := arguments.Execute(
+	if err := generatorargs.Validate(genericArgs); err != nil {
+		klog.Fatalf("Error: %v", err)
+	}
+
+	if err := genericArgs.Execute(
 		generators.NameSystems(),
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {
-		glog.Fatalf("Error: %v", err)
+		klog.Fatalf("Error: %v", err)
 	}
 }

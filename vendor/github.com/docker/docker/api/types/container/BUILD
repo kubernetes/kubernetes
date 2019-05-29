@@ -11,13 +11,10 @@ go_library(
         "container_wait.go",
         "host_config.go",
         "hostconfig_unix.go",
+        "hostconfig_windows.go",
         "waitcondition.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "hostconfig_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/container",
     importpath = "github.com/docker/docker/api/types/container",
     visibility = ["//visibility:public"],
     deps = [
