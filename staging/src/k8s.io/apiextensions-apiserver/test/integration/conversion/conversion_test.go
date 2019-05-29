@@ -27,11 +27,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,13 +38,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -61,18 +59,14 @@ func checks(checkers ...Checker) []Checker {
 }
 
 func TestWebhookConverter(t *testing.T) {
-	testWebhookConverter(t, false, false)
-}
-
-func TestWebhookConverterWithPruning(t *testing.T) {
-	testWebhookConverter(t, true, false)
+	testWebhookConverter(t, false)
 }
 
 func TestWebhookConverterWithDefaulting(t *testing.T) {
-	testWebhookConverter(t, true, true)
+	testWebhookConverter(t, true)
 }
 
-func testWebhookConverter(t *testing.T, pruning, defaulting bool) {
+func testWebhookConverter(t *testing.T, defaulting bool) {
 	tests := []struct {
 		group   string
 		handler http.Handler
@@ -140,7 +134,6 @@ func testWebhookConverter(t *testing.T, pruning, defaulting bool) {
 	defer tearDown()
 
 	crd := multiVersionFixture.DeepCopy()
-	crd.Spec.PreserveUnknownFields = pointer.BoolPtr(!pruning)
 
 	if !defaulting {
 		for i := range crd.Spec.Versions {
@@ -995,7 +988,8 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 			ListKind:   "MultiVersionList",
 			Categories: []string{"all"},
 		},
-		Scope: apiextensionsv1beta1.NamespaceScoped,
+		Scope:                 apiextensionsv1beta1.NamespaceScoped,
+		PreserveUnknownFields: pointer.BoolPtr(false),
 		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 			{
 				// storage version, same schema as v1alpha1

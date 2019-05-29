@@ -61,11 +61,28 @@ var apiVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: true,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"hostPort": {Type: "string"},
+				},
+			},
+		},
 	},
 	{
 		Name:    "v2",
 		Served:  true,
 		Storage: false,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"host": {Type: "string"},
+					"port": {Type: "string"},
+				},
+			},
+		},
 	},
 }
 
@@ -74,11 +91,28 @@ var alternativeAPIVersions = []v1beta1.CustomResourceDefinitionVersion{
 		Name:    "v1",
 		Served:  true,
 		Storage: false,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"hostPort": {Type: "string"},
+				},
+			},
+		},
 	},
 	{
 		Name:    "v2",
 		Served:  true,
 		Storage: true,
+		Schema: &v1beta1.CustomResourceValidation{
+			OpenAPIV3Schema: &v1beta1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]v1beta1.JSONSchemaProps{
+					"host": {Type: "string"},
+					"port": {Type: "string"},
+				},
+			},
+		},
 	},
 }
 
@@ -122,6 +156,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 					},
 				},
 			}
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
 		})
 		if err != nil {
 			return
@@ -145,6 +180,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 					},
 				},
 			}
+			crd.Spec.PreserveUnknownFields = pointer.BoolPtr(false)
 		})
 		if err != nil {
 			return
