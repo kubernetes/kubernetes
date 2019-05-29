@@ -21,6 +21,7 @@ import (
 	"io"
 	"text/tabwriter"
 
+	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -61,6 +63,14 @@ var (
 	expirationLongDesc = normalizer.LongDesc(`
 	Checks expiration for the certificates in the local PKI managed by kubeadm.
 `)
+
+	certificateKeyLongDesc = dedent.Dedent(`
+	This command will print out a secure randomly-generated certificate key that can be used with
+	the "init" command.
+
+	You can also use "kubeadm init --experimental-upload-certs" without specifying a certificate key and it will
+	generate and print one for you.
+`)
 )
 
 // newCmdCertsUtility returns main command for certs phase
@@ -73,7 +83,23 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 
 	cmd.AddCommand(newCmdCertsRenewal())
 	cmd.AddCommand(newCmdCertsExpiration(out, kubeadmconstants.KubernetesDir))
+	cmd.AddCommand(NewCmdCertificateKey())
 	return cmd
+}
+
+// NewCmdCertificateKey returns cobra.Command for certificate key generate
+func NewCmdCertificateKey() *cobra.Command {
+	return &cobra.Command{
+		Use:   "certificate-key",
+		Short: "Generate certificate keys",
+		Long:  certificateKeyLongDesc,
+
+		Run: func(cmd *cobra.Command, args []string) {
+			key, err := copycerts.CreateCertificateKey()
+			kubeadmutil.CheckErr(err)
+			fmt.Println(key)
+		},
+	}
 }
 
 // newCmdCertsRenewal creates a new `cert renew` command.
