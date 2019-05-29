@@ -23,11 +23,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Security Context", func() {
@@ -89,6 +92,69 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		*/
 		It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(0)
+		})
+	})
+
+	Context("When creating a container with runAsNonRoot", func() {
+		rootImage := imageutils.GetE2EImage(imageutils.BusyBox)
+		nonRootImage := imageutils.GetE2EImage(imageutils.NonRoot)
+		makeNonRootPod := func(podName, image string, userid *int64) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: []string{"id", "-u"}, // Print UID and exit
+							SecurityContext: &v1.SecurityContext{
+								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsUser:    userid,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		It("should run with an explicit non-root user ID", func() {
+			name := "explicit-nonroot-uid"
+			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(1234))
+			pod = podClient.Create(pod)
+
+			podClient.WaitForSuccess(name, framework.PodStartTimeout)
+			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
+		})
+		It("should not run with an explicit root user ID", func() {
+			name := "explicit-root-uid"
+			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod = podClient.Create(pod)
+
+			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
+			framework.ExpectNoError(err)
+			Expect(ev).NotTo(BeNil())
+			Expect(ev.Reason).To(Equal(events.FailedToCreateContainer))
+		})
+		It("should run with an image specified user ID", func() {
+			name := "implicit-nonroot-uid"
+			pod := makeNonRootPod(name, nonRootImage, nil)
+			pod = podClient.Create(pod)
+
+			podClient.WaitForSuccess(name, framework.PodStartTimeout)
+			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
+		})
+		It("should not run without a specified user ID", func() {
+			name := "implicit-root-uid"
+			pod := makeNonRootPod(name, rootImage, nil)
+			pod = podClient.Create(pod)
+
+			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
+			framework.ExpectNoError(err)
+			Expect(ev).NotTo(BeNil())
+			Expect(ev.Reason).To(Equal(events.FailedToCreateContainer))
 		})
 	})
 
