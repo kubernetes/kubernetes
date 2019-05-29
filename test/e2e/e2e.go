@@ -99,34 +99,15 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		}
 	}
 
-	// In large clusters we may get to this point but still have a bunch
-	// of nodes without Routes created. Since this would make a node
-	// unschedulable, we need to wait until all of them are schedulable.
-	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+	if framework.TestContext.SkipStartupWait {
+		e2elog.Logf("Skipping checks which wait for testable state due to flag provided")
+	} else {
+		waitForTestableState(c)
+	}
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if framework.TestContext.CloudConfig.NumNodes == framework.DefaultNumNodes {
 		framework.TestContext.CloudConfig.NumNodes = len(framework.GetReadySchedulableNodesOrDie(c).Items)
-	}
-
-	// Ensure all pods are running and ready before starting tests (otherwise,
-	// cluster infrastructure pods that are being pulled or started can block
-	// test pods from running, and tests that ensure all pods are running and
-	// ready will fail).
-	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
-	// TODO: In large clusters, we often observe a non-starting pods due to
-	// #41007. To avoid those pods preventing the whole test runs (and just
-	// wasting the whole run), we allow for some not-ready pods (with the
-	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
-		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
-		framework.LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
-		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
-		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
-	}
-
-	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
-		e2elog.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 
 	// Log the version of the server and this client.
@@ -273,5 +254,32 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		e2elog.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
 	} else {
 		e2elog.Logf("Output of clusterapi-tester:\n%v", logs)
+	}
+}
+
+func waitForTestableState(c *clientset.Clientset) {
+	// In large clusters we may get to this point but still have a bunch
+	// of nodes without Routes created. Since this would make a node
+	// unschedulable, we need to wait until all of them are schedulable.
+	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
+
+	// Ensure all pods are running and ready before starting tests (otherwise,
+	// cluster infrastructure pods that are being pulled or started can block
+	// test pods from running, and tests that ensure all pods are running and
+	// ready will fail).
+	podStartupTimeout := framework.TestContext.SystemPodsStartupTimeout
+	// TODO: In large clusters, we often observe a non-starting pods due to
+	// #41007. To avoid those pods preventing the whole test runs (and just
+	// wasting the whole run), we allow for some not-ready pods (with the
+	// number equal to the number of allowed not-ready nodes).
+	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
+		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
+		framework.LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
+		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
+		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
+	}
+
+	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {
+		e2elog.Logf("WARNING: Waiting for all daemonsets to be ready failed: %v", err)
 	}
 }

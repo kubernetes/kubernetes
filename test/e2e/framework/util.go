@@ -83,12 +83,12 @@ import (
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
-	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
@@ -2618,6 +2618,31 @@ func isNodeUntainted(node *v1.Node) bool {
 	return fit
 }
 
+// isNodeConditionallyTainted confirms the node doesn't have one
+// of the well known taints which actually indicates a problem on the node.
+// Other taints such as variations on master node labeling, are not considered.
+// This is a less strict version of isNodeUntainted.
+func isNodeConditionallyTainted(node *v1.Node) bool {
+	knownTaints := map[string]struct{}{
+		schedulerapi.TaintNodeNotReady:           {},
+		schedulerapi.TaintNodeUnreachable:        {},
+		schedulerapi.TaintNodeUnschedulable:      {},
+		schedulerapi.TaintNodeMemoryPressure:     {},
+		schedulerapi.TaintNodeDiskPressure:       {},
+		schedulerapi.TaintNodeNetworkUnavailable: {},
+		schedulerapi.TaintNodePIDPressure:        {},
+		schedulerapi.TaintExternalCloudProvider:  {},
+		schedulerapi.TaintNodeShutdown:           {},
+	}
+	for _, t := range node.Spec.Taints {
+		_, isConditionalTaint := knownTaints[t.Key]
+		if isConditionalTaint && t.Effect == v1.TaintEffectNoSchedule {
+			return true
+		}
+	}
+	return false
+}
+
 // GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
@@ -2668,13 +2693,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[service.LabelNodeRoleMaster]; hasMasterRoleLabel {
-				// Kops clusters have masters with spec.unscheduable = false and
-				// node-role.kubernetes.io/master NoSchedule taint.
-				// Don't wait for them.
-				continue
-			}
-			if !isNodeSchedulable(node) || !isNodeUntainted(node) {
+			if !isNodeSchedulable(node) || isNodeConditionallyTainted(node) {
 				notSchedulable = append(notSchedulable, node)
 			}
 		}

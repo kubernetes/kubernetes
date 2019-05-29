@@ -119,6 +119,11 @@ type TestContextType struct {
 	DeleteNamespaceOnFailure bool
 	AllowedNotReadyNodes     int
 	CleanStart               bool
+
+	// SkipStartupWait skips all logic at the start of the test suite related to waiting
+	// for a known, good state (e.g. nodes schedulable, pods running, etc.)
+	SkipStartupWait bool
+
 	// If set to 'true' or 'all' framework will start a goroutine monitoring resource usage of system add-ons.
 	// It will read the data every 30 seconds from all Nodes and print summary during afterEach. If set to 'master'
 	// only master Node will be monitored.
@@ -320,6 +325,7 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
+	flag.BoolVar(&TestContext.SkipStartupWait, "start-now", false, "If true, disables multiple checks at the start of the test run ensuring nodes/pods/etc are in the proper state.")
 
 	nodeKiller := &TestContext.NodeKiller
 	flag.BoolVar(&nodeKiller.Enabled, "node-killer", false, "Whether NodeKiller should kill any nodes.")
