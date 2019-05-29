@@ -26,6 +26,7 @@ type SocketMask interface {
 	Remove(sockets ...int) error
 	And(masks ...SocketMask)
 	Or(masks ...SocketMask)
+	XOr(masks ...SocketMask)
 	Clear()
 	Fill()
 	IsEqual(mask SocketMask) bool
@@ -85,6 +86,13 @@ func (s *socketMask) And(masks ...SocketMask) {
 func (s *socketMask) Or(masks ...SocketMask) {
 	for _, m := range masks {
 		*s |= *m.(*socketMask)
+	}
+}
+
+//XOr performs xor operation on all bits in masks
+func (s *socketMask) XOr(masks ...SocketMask) {
+	for _, m := range masks {
+		*s ^= *m.(*socketMask)
 	}
 }
 

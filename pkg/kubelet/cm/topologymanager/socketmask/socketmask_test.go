@@ -137,6 +137,36 @@ func TestOr(t *testing.T) {
 	}
 }
 
+func TestXOr(t *testing.T) {
+	tcases := []struct {
+		name          string
+		firstMaskBit  int
+		secondMaskBit int
+		xorMask       string
+	}{
+		{
+			name:          "XOr socket masks 1",
+			firstMaskBit:  int(0),
+			secondMaskBit: int(1),
+			xorMask:       "1100000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:          "XOr socket masks 2",
+			firstMaskBit:  int(1),
+			secondMaskBit: int(1),
+			xorMask:       "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewSocketMask(tc.firstMaskBit)
+		secondMask, _ := NewSocketMask(tc.secondMaskBit)
+		firstMask.XOr(secondMask)
+		if firstMask.String() != string(tc.xorMask) {
+			t.Errorf("Expected mask to be %v, got %v", tc.xorMask, firstMask)
+		}
+	}
+}
+
 func TestClear(t *testing.T) {
 	tcases := []struct {
 		name        string
