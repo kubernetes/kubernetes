@@ -28,8 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -228,13 +231,13 @@ func TestMergeDNSOptions(t *testing.T) {
 		expectedOptions          []string
 	}{
 		{
-			desc:                     "Empty dnsConfigOptions",
+			desc: "Empty dnsConfigOptions",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions:         nil,
 			expectedOptions:          []string{"ndots:5", "debug"},
 		},
 		{
-			desc:                     "No duplicated entries",
+			desc: "No duplicated entries",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions: []v1.PodDNSConfigOption{
 				{Name: "single-request"},
@@ -243,7 +246,7 @@ func TestMergeDNSOptions(t *testing.T) {
 			expectedOptions: []string{"ndots:5", "debug", "single-request", "attempts:3"},
 		},
 		{
-			desc:                     "Overwrite duplicated entries",
+			desc: "Overwrite duplicated entries",
 			existingDNSConfigOptions: []string{"ndots:5", "debug"},
 			dnsConfigOptions: []v1.PodDNSConfigOption{
 				{Name: "ndots", Value: &testOptionValue},
@@ -504,11 +507,12 @@ func TestGetPodDNSCustom(t *testing.T) {
 	configurer := NewConfigurer(recorder, nodeRef, nil, []net.IP{net.ParseIP(testClusterNameserver)}, testClusterDNSDomain, tmpfile.Name())
 
 	testCases := []struct {
-		desc              string
-		hostnetwork       bool
-		dnsPolicy         v1.DNSPolicy
-		dnsConfig         *v1.PodDNSConfig
-		expectedDNSConfig *runtimeapi.DNSConfig
+		desc                         string
+		hostnetwork                  bool
+		podDNSConfigFirstFeatureGate bool
+		dnsPolicy                    v1.DNSPolicy
+		dnsConfig                    *v1.PodDNSConfig
+		expectedDNSConfig            *runtimeapi.DNSConfig
 	}{
 		{
 			desc:              "DNSNone without DNSConfig should have empty DNS settings",
@@ -584,9 +588,89 @@ func TestGetPodDNSCustom(t *testing.T) {
 				Options:  []string{"ndots:3", "debug"},
 			},
 		},
+		{
+			desc: "Feature gate PodDNSConfigFirst is enabled. DNSNone without DNSConfig should have empty DNS settings",
+			podDNSConfigFirstFeatureGate: true,
+			dnsPolicy:                    v1.DNSNone,
+			expectedDNSConfig:            &runtimeapi.DNSConfig{},
+		},
+		{
+			desc: "Feature gate PodDNSConfigFirst is enabled. DNSNone with DNSConfig should have a merged DNS settings",
+			podDNSConfigFirstFeatureGate: true,
+			dnsPolicy:                    v1.DNSNone,
+			dnsConfig: &v1.PodDNSConfig{
+				Nameservers: []string{"203.0.113.1"},
+				Searches:    []string{"my.domain", "second.domain"},
+				Options: []v1.PodDNSConfigOption{
+					{Name: "ndots", Value: &testNdotsOptionValue},
+					{Name: "debug"},
+				},
+			},
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{"203.0.113.1"},
+				Searches: []string{"my.domain", "second.domain"},
+				Options:  []string{"ndots:3", "debug"},
+			},
+		},
+		{
+			desc: "Feature gate PodDNSConfigFirst is enabled. DNSClusterFirst with DNSConfig should have a merged DNS settings; Pod.Spec.DNSConfig.Searches and Pod.Spec.DNSConfig.Servers should be at first",
+			podDNSConfigFirstFeatureGate: true,
+			dnsPolicy:                    v1.DNSClusterFirst,
+			dnsConfig: &v1.PodDNSConfig{
+				Nameservers: []string{"10.0.0.11"},
+				Searches:    []string{"my.domain"},
+				Options: []v1.PodDNSConfigOption{
+					{Name: "ndots", Value: &testNdotsOptionValue},
+					{Name: "debug"},
+				},
+			},
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{"10.0.0.11", testClusterNameserver},
+				Searches: []string{"my.domain", testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
+				Options:  []string{"ndots:3", "debug"},
+			},
+		},
+		{
+			desc:                         "Feature gate PodDNSConfigFirst is enabled. DNSClusterFirstWithHostNet with DNSConfig should have a merged DNS settings; Pod.Spec.DNSConfig.Searches and Pod.Spec.DNSConfig.Servers should be at first",
+			hostnetwork:                  true,
+			podDNSConfigFirstFeatureGate: true,
+			dnsPolicy:                    v1.DNSClusterFirstWithHostNet,
+			dnsConfig: &v1.PodDNSConfig{
+				Nameservers: []string{"10.0.0.11"},
+				Searches:    []string{"my.domain"},
+				Options: []v1.PodDNSConfigOption{
+					{Name: "ndots", Value: &testNdotsOptionValue},
+					{Name: "debug"},
+				},
+			},
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{"10.0.0.11", testClusterNameserver},
+				Searches: []string{"my.domain", testNsSvcDomain, testSvcDomain, testClusterDNSDomain, testHostDomain},
+				Options:  []string{"ndots:3", "debug"},
+			},
+		},
+		{
+			desc: "Feature gate PodDNSConfigFirst is enabled. DNSDefault with DNSConfig should have a merged DNS settings; Pod.Spec.DNSConfig.Searches and Pod.Spec.DNSConfig.Servers should be at first",
+			podDNSConfigFirstFeatureGate: true,
+			dnsPolicy:                    v1.DNSDefault,
+			dnsConfig: &v1.PodDNSConfig{
+				Nameservers: []string{"10.0.0.11"},
+				Searches:    []string{"my.domain"},
+				Options: []v1.PodDNSConfigOption{
+					{Name: "ndots", Value: &testNdotsOptionValue},
+					{Name: "debug"},
+				},
+			},
+			expectedDNSConfig: &runtimeapi.DNSConfig{
+				Servers:  []string{"10.0.0.11", testHostNameserver},
+				Searches: []string{"my.domain", testHostDomain},
+				Options:  []string{"ndots:3", "debug"},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodDNSConfigFirst, tc.podDNSConfigFirstFeatureGate)()
 		t.Run(tc.desc, func(t *testing.T) {
 			testPod.Spec.HostNetwork = tc.hostnetwork
 			testPod.Spec.DNSConfig = tc.dnsConfig
