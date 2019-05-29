@@ -166,7 +166,7 @@ filegroup(
         "//pkg/kubelet/cm/cpumanager:all-srcs",
         "//pkg/kubelet/cm/cpuset:all-srcs",
         "//pkg/kubelet/cm/devicemanager:all-srcs",
-        "//pkg/kubelet/cm/topologymanager/socketmask:all-srcs",
+        "//pkg/kubelet/cm/topologymanager:all-srcs",
         "//pkg/kubelet/cm/util:all-srcs",
     ],
     tags = ["automanaged"],
