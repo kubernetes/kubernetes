@@ -1577,25 +1577,23 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	// Need to translate the spec here if the plugin is migrated so that the metrics
-	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
-		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
-		if err == nil {
-			volumeToMount.VolumeSpec = csiSpec
-		}
-		// If we have an error here we ignore it, the metric emitted will then be for the
-		// in-tree plugin. This error case(skipped one) will also trigger an error
-		// while the generated function is executed. And those errors will be handled during the execution of the generated
-		// function with a back off policy.
-	}
-	volumePlugin, err :=
-		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
-	if err != nil || volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.FindPluginBySpec failed", err)
-	}
 
 	fsResizeFunc := func() (error, error) {
+		// Need to translate the spec here if the plugin is migrated so that the metrics
+		// emitted show the correct (migrated) plugin
+		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+			if err != nil {
+				return volumeToMount.GenerateError("VolumeFSResize.translateSpec failed", err)
+			}
+			volumeToMount.VolumeSpec = csiSpec
+		}
+		volumePlugin, err :=
+			og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+		if err != nil || volumePlugin == nil {
+			return volumeToMount.GenerateError("VolumeFSResize.FindPluginBySpec failed", err)
+		}
+
 		var resizeDone bool
 		var simpleErr, detailedErr error
 		resizeOptions := volume.NodeResizeOptions{
@@ -1643,7 +1641,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 			return nil, nil
 		}
 		// This is a placeholder error - we should NEVER reach here.
-		err := fmt.Errorf("volume resizing failed for unknown reason")
+		err = fmt.Errorf("volume resizing failed for unknown reason")
 		return volumeToMount.GenerateError("VolumeFSResize.resizeFileSystem failed to resize volume", err)
 	}
 
@@ -1651,6 +1649,24 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 		if *err != nil {
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
 		}
+	}
+
+	// Need to translate the spec here if the plugin is migrated so that the metrics
+	// emitted show the correct (migrated) plugin
+	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+		if err == nil {
+			volumeToMount.VolumeSpec = csiSpec
+		}
+		// If we have an error here we ignore it, the metric emitted will then be for the
+		// in-tree plugin. This error case(skipped one) will also trigger an error
+		// while the generated function is executed. And those errors will be handled during the execution of the generated
+		// function with a back off policy.
+	}
+	volumePlugin, err :=
+		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+	if err != nil || volumePlugin == nil {
+		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.FindPluginBySpec failed", err)
 	}
 
 	return volumetypes.GeneratedOperations{
