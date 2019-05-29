@@ -40,6 +40,7 @@ type framework struct {
 	pluginNameToWeightMap map[string]int
 	queueSortPlugins      []QueueSortPlugin
 	prefilterPlugins      []PrefilterPlugin
+	filterPlugins         []FilterPlugin
 	scorePlugins          []ScorePlugin
 	reservePlugins        []ReservePlugin
 	prebindPlugins        []PrebindPlugin
@@ -109,6 +110,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				f.prefilterPlugins = append(f.prefilterPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prefilter plugin %v does not exist", pf.Name)
+			}
+		}
+	}
+
+	if plugins.Filter != nil {
+		for _, r := range plugins.Filter.Enabled {
+			if pg, ok := pluginsMap[r.Name]; ok {
+				p, ok := pg.(FilterPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend filter plugin", r.Name)
+				}
+				f.filterPlugins = append(f.filterPlugins, p)
+			} else {
+				return nil, fmt.Errorf("filter plugin %v does not exist", r.Name)
 			}
 		}
 	}
@@ -260,6 +275,29 @@ func (f *framework) RunPrefilterPlugins(
 			return NewStatus(Error, msg)
 		}
 	}
+	return nil
+}
+
+// RunFilterPlugins runs the set of configured Filter plugins for pod on
+// the given node. If any of these plugins doesn't return "Success", the
+// given node is not suitable for running pod.
+// Meanwhile, the failure message and status are set for the given node.
+func (f *framework) RunFilterPlugins(pc *PluginContext,
+	pod *v1.Pod, nodeName string) *Status {
+
+	for _, p := range f.filterPlugins {
+		status := p.Filter(pc, pod, nodeName)
+		if !status.IsSuccess() {
+			if status.Code() != Unschedulable {
+				errMsg := fmt.Sprintf("RunFilterPlugins: error while running %s filter plugin for pod %s: %s",
+					p.Name(), pod.Name, status.Message())
+				klog.Error(errMsg)
+				return NewStatus(Error, errMsg)
+			}
+			return status
+		}
+	}
+
 	return nil
 }
 

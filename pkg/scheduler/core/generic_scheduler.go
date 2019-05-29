@@ -209,7 +209,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Basic checks done")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pod, nodes)
+	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pluginContext, pod, nodes)
 	if err != nil {
 		return result, err
 	}
@@ -460,7 +460,7 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
+func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 
@@ -486,6 +486,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		checkNode := func(i int) {
 			nodeName := g.cache.NodeTree().Next()
+
 			fits, failedPredicates, err := podFitsOnNode(
 				pod,
 				meta,
@@ -501,6 +502,19 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 				return
 			}
 			if fits {
+				// Iterate each plugin to verify current node
+				status := g.framework.RunFilterPlugins(pluginContext, pod, nodeName)
+				if !status.IsSuccess() {
+					predicateResultLock.Lock()
+					failedPredicateMap[nodeName] = append(failedPredicateMap[nodeName],
+						predicates.NewFailureReason(status.Message()))
+					if status.Code() != framework.Unschedulable {
+						errs[status.Message()]++
+					}
+					predicateResultLock.Unlock()
+					return
+				}
+
 				length := atomic.AddInt32(&filteredLen, 1)
 				if length > numNodesToFind {
 					cancel()

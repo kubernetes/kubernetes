@@ -42,6 +42,11 @@ type ScorePlugin struct {
 	highScoreNode string
 }
 
+type FilterPlugin struct {
+	numFilterCalled int
+	failFilter      bool
+}
+
 type ReservePlugin struct {
 	numReserveCalled int
 	failReserve      bool
@@ -86,6 +91,7 @@ type PermitPlugin struct {
 const (
 	prefilterPluginName = "prefilter-plugin"
 	scorePluginName     = "score-plugin"
+	filterPluginName    = "filter-plugin"
 	reservePluginName   = "reserve-plugin"
 	prebindPluginName   = "prebind-plugin"
 	unreservePluginName = "unreserve-plugin"
@@ -95,6 +101,7 @@ const (
 
 var _ = framework.PrefilterPlugin(&PrefilterPlugin{})
 var _ = framework.ScorePlugin(&ScorePlugin{})
+var _ = framework.FilterPlugin(&FilterPlugin{})
 var _ = framework.ReservePlugin(&ReservePlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
 var _ = framework.BindPlugin(&BindPlugin{})
@@ -132,6 +139,36 @@ func (sp *ScorePlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName st
 // NewScorePlugin is the factory for score plugin.
 func NewScorePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return scPlugin, nil
+}
+
+var filterPlugin = &FilterPlugin{}
+
+// Name returns name of the plugin.
+func (fp *FilterPlugin) Name() string {
+	return filterPluginName
+}
+
+// reset is used to reset filter plugin.
+func (fp *FilterPlugin) reset() {
+	fp.numFilterCalled = 0
+	fp.failFilter = false
+}
+
+// Filter is a test function that returns an error or nil, depending on the
+// value of "failFilter".
+func (fp *FilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+	fp.numFilterCalled++
+
+	if fp.failFilter {
+		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+
+	return nil
+}
+
+// NewFilterPlugin is the factory for filtler plugin.
+func NewFilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return filterPlugin, nil
 }
 
 // Name returns name of the plugin.
@@ -1282,5 +1319,64 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 
 		perPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{waitingPod, signallingPod})
+	}
+}
+
+// TestFilterPlugin tests invocation of filter plugins.
+func TestFilterPlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a filter plugin.
+	registry := framework.Registry{filterPluginName: NewFilterPlugin}
+
+	// Setup initial filter plugin for testing.
+	plugin := &schedulerconfig.Plugins{
+		Filter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: filterPluginName,
+				},
+			},
+		},
+	}
+	// Set empty plugin config for testing
+	emptyPluginConfig := []schedulerconfig.PluginConfig{}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "filter-plugin", nil),
+		false, nil, registry, plugin, emptyPluginConfig, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add a few nodes.
+	_, err := createNodes(cs, "test-node", nil, 2)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	for _, fail := range []bool{false, true} {
+		filterPlugin.failFilter = fail
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Errorf("Error while creating a test pod: %v", err)
+		}
+
+		if fail {
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err == nil {
+				t.Errorf("Didn't expect the pod to be scheduled.")
+			}
+		} else {
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("Expected the pod to be scheduled. error: %v", err)
+			}
+		}
+
+		if filterPlugin.numFilterCalled == 0 {
+			t.Errorf("Expected the filter plugin to be called.")
+		}
+
+		filterPlugin.reset()
+		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
