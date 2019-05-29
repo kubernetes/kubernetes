@@ -51,6 +51,11 @@ func (in *MutatingWebhook) DeepCopyInto(out *MutatingWebhook) {
 		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ObjectSelector != nil {
+		in, out := &in.ObjectSelector, &out.ObjectSelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.SideEffects != nil {
 		in, out := &in.SideEffects, &out.SideEffects
 		*out = new(SideEffectClass)
@@ -257,6 +262,11 @@ func (in *ValidatingWebhook) DeepCopyInto(out *ValidatingWebhook) {
 	}
 	if in.NamespaceSelector != nil {
 		in, out := &in.NamespaceSelector, &out.NamespaceSelector
+		*out = new(v1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.ObjectSelector != nil {
+		in, out := &in.ObjectSelector, &out.ObjectSelector
 		*out = new(v1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}

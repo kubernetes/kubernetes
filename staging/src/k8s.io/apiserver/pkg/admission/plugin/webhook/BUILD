@@ -29,6 +29,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/initializer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/mutating:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/namespace:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/object:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/rules:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts:all-srcs",
