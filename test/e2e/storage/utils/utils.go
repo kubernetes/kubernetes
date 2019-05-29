@@ -91,7 +91,7 @@ func VerifyExecInPodFail(pod *v1.Pod, bashExec string, exitCode int) {
 				bashExec, exitCode, err)
 		}
 	}
-	gomega.Expect(err).To(gomega.HaveOccurred(), "%q should fail with exit code %d, but exit without error", bashExec, exitCode)
+	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", bashExec, exitCode)
 }
 
 // KubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod and waits
