@@ -29,7 +29,7 @@ import (
 func (in *PartialObjectMetadataList) DeepCopyInto(out *PartialObjectMetadataList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]v1.PartialObjectMetadata, len(*in))

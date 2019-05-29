@@ -62,7 +62,7 @@ func (in *MutatingWebhookConfiguration) DeepCopyObject() runtime.Object {
 func (in *MutatingWebhookConfigurationList) DeepCopyInto(out *MutatingWebhookConfigurationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MutatingWebhookConfiguration, len(*in))
@@ -207,7 +207,7 @@ func (in *ValidatingWebhookConfiguration) DeepCopyObject() runtime.Object {
 func (in *ValidatingWebhookConfigurationList) DeepCopyInto(out *ValidatingWebhookConfigurationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ValidatingWebhookConfiguration, len(*in))
