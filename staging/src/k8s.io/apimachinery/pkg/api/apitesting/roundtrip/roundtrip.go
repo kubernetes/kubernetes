@@ -141,12 +141,7 @@ func RoundTripExternalTypes(t *testing.T, scheme *runtime.Scheme, codecFactory r
 			continue
 		}
 		t.Run(gvk.Group+"."+gvk.Version+"."+gvk.Kind, func(t *testing.T) {
-			// FIXME: this is explicitly testing w/o protobuf which was failing if enabled
-			// the reason for that is that protobuf is not setting Kind and APIVersion fields
-			// during obj2 decode, the same then applies to DecodeInto obj3. My guess is we
-			// should be setting these two fields accordingly when protobuf is passed as codec
-			// to roundTrip method.			
-			roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, true)
+			roundTripSpecificKind(t, gvk, scheme, codecFactory, fuzzer, nonRoundTrippableTypes, false)
 		})
 	}
 }
