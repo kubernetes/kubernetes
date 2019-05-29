@@ -23,21 +23,15 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
+	"k8s.io/kubernetes/pkg/kubelet/apis/config/constant"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/master/ports"
 	utilpointer "k8s.io/utils/pointer"
 )
 
-const (
-	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
-	DefaultIPTablesMasqueradeBit = 14
-	DefaultIPTablesDropBit       = 15
-)
-
 var (
 	zeroDuration = metav1.Duration{}
-	// TODO: Move these constants to k8s.io/kubelet/config/v1beta1 instead?
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	DefaultNodeAllocatableEnforcement = []string{"pods"}
 )
@@ -200,10 +194,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.MakeIPTablesUtilChains = utilpointer.BoolPtr(true)
 	}
 	if obj.IPTablesMasqueradeBit == nil {
-		obj.IPTablesMasqueradeBit = utilpointer.Int32Ptr(DefaultIPTablesMasqueradeBit)
+		obj.IPTablesMasqueradeBit = utilpointer.Int32Ptr(constant.DefaultIPTablesMasqueradeBit)
 	}
 	if obj.IPTablesDropBit == nil {
-		obj.IPTablesDropBit = utilpointer.Int32Ptr(DefaultIPTablesDropBit)
+		obj.IPTablesDropBit = utilpointer.Int32Ptr(constant.DefaultIPTablesDropBit)
 	}
 	if obj.FailSwapOn == nil {
 		obj.FailSwapOn = utilpointer.BoolPtr(true)

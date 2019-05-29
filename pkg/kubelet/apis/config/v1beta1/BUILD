@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "constant.go",
         "defaults.go",
         "defaults_linux.go",
         "defaults_others.go",
@@ -20,6 +21,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1",
     deps = [
         "//pkg/kubelet/apis/config:go_default_library",
+        "//pkg/kubelet/apis/config/constant:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/master/ports:go_default_library",
