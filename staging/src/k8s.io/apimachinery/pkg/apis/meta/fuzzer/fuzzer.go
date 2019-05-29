@@ -214,6 +214,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if len(j.Finalizers) == 0 {
 				j.Finalizers = nil
 			}
+			j.Initializers = nil
 		},
 		func(j *metav1.Initializers, c fuzz.Continue) {
 			j = nil
