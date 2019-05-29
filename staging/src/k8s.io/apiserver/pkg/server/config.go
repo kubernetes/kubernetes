@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
@@ -188,6 +189,10 @@ type Config struct {
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
 	PublicAddress net.IP
+
+	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
+	// and the kind associated with a given resource. As resources are installed, they are registered here.
+	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 }
 
 type RecommendedConfig struct {
@@ -417,6 +422,21 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 		c.RequestInfoResolver = NewRequestInfoResolver(c)
 	}
 
+	if c.EquivalentResourceRegistry == nil {
+		if c.RESTOptionsGetter == nil {
+			c.EquivalentResourceRegistry = runtime.NewEquivalentResourceRegistry()
+		} else {
+			c.EquivalentResourceRegistry = runtime.NewEquivalentResourceRegistryWithIdentity(func(groupResource schema.GroupResource) string {
+				// use the storage prefix as the key if possible
+				if opts, err := c.RESTOptionsGetter.GetRESTOptions(groupResource); err == nil {
+					return opts.ResourcePrefix
+				}
+				// otherwise return "" to use the default key (parent GV name)
+				return ""
+			})
+		}
+	}
+
 	return CompletedConfig{&completedConfig{c, informers}}
 }
 
@@ -436,6 +456,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	if c.LoopbackClientConfig == nil {
 		return nil, fmt.Errorf("Genericapiserver.New() called with config.LoopbackClientConfig == nil")
 	}
+	if c.EquivalentResourceRegistry == nil {
+		return nil, fmt.Errorf("Genericapiserver.New() called with config.EquivalentResourceRegistry == nil")
+	}
 
 	handlerChainBuilder := func(handler http.Handler) http.Handler {
 		return c.BuildHandlerChainFunc(handler, c.Config)
@@ -443,15 +466,16 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	apiServerHandler := NewAPIServerHandler(name, c.Serializer, handlerChainBuilder, delegationTarget.UnprotectedHandler())
 
 	s := &GenericAPIServer{
-		discoveryAddresses:     c.DiscoveryAddresses,
-		LoopbackClientConfig:   c.LoopbackClientConfig,
-		legacyAPIGroupPrefixes: c.LegacyAPIGroupPrefixes,
-		admissionControl:       c.AdmissionControl,
-		Serializer:             c.Serializer,
-		AuditBackend:           c.AuditBackend,
-		Authorizer:             c.Authorization.Authorizer,
-		delegationTarget:       delegationTarget,
-		HandlerChainWaitGroup:  c.HandlerChainWaitGroup,
+		discoveryAddresses:         c.DiscoveryAddresses,
+		LoopbackClientConfig:       c.LoopbackClientConfig,
+		legacyAPIGroupPrefixes:     c.LegacyAPIGroupPrefixes,
+		admissionControl:           c.AdmissionControl,
+		Serializer:                 c.Serializer,
+		AuditBackend:               c.AuditBackend,
+		Authorizer:                 c.Authorization.Authorizer,
+		delegationTarget:           delegationTarget,
+		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
+		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 		ShutdownTimeout:   c.RequestTimeout,

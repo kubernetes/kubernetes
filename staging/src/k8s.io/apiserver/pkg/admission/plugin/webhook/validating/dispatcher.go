@@ -27,6 +27,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
@@ -47,17 +48,33 @@ func newValidatingDispatcher(cm *webhook.ClientManager) generic.Dispatcher {
 
 var _ generic.Dispatcher = &validatingDispatcher{}
 
-func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, o admission.ObjectInterfaces, relevantHooks []*v1beta1.Webhook) error {
+func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, relevantHooks []*generic.WebhookInvocation) error {
+	// Construct all the versions we need to call our webhooks
+	versionedAttrs := map[schema.GroupVersionKind]*generic.VersionedAttributes{}
+	for _, call := range relevantHooks {
+		// If we already have this version, continue
+		if _, ok := versionedAttrs[call.Kind]; ok {
+			continue
+		}
+		versionedAttr, err := generic.NewVersionedAttributes(attr, call.Kind, o)
+		if err != nil {
+			return apierrors.NewInternalError(err)
+		}
+		versionedAttrs[call.Kind] = versionedAttr
+	}
+
 	wg := sync.WaitGroup{}
 	errCh := make(chan error, len(relevantHooks))
 	wg.Add(len(relevantHooks))
 	for i := range relevantHooks {
-		go func(hook *v1beta1.Webhook) {
+		go func(invocation *generic.WebhookInvocation) {
 			defer wg.Done()
+			hook := invocation.Webhook
+			versionedAttr := versionedAttrs[invocation.Kind]
 
 			t := time.Now()
-			err := d.callHook(ctx, hook, attr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "validating", hook.Name)
+			err := d.callHook(ctx, invocation, versionedAttr)
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}
@@ -98,8 +115,9 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes) error {
-	if attr.IsDryRun() {
+func (d *validatingDispatcher) callHook(ctx context.Context, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
+	h := invocation.Webhook
+	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
 			return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
@@ -115,7 +133,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 	}
 
 	// Make the webhook request
-	request := request.CreateAdmissionReview(attr)
+	request := request.CreateAdmissionReview(attr, invocation)
 	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(h))
 	if err != nil {
 		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
@@ -134,7 +152,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 	}
 	for k, v := range response.Response.AuditAnnotations {
 		key := h.Name + "/" + k
-		if err := attr.AddAnnotation(key, v); err != nil {
+		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
 			klog.Warningf("Failed to set admission audit annotation %s to %s for validating webhook %s: %v", key, v, h.Name, err)
 		}
 	}

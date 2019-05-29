@@ -57,6 +57,8 @@ type RequestScope struct {
 	UnsafeConvertor runtime.ObjectConvertor
 	Authorizer      authorizer.Authorizer
 
+	EquivalentResourceMapper runtime.EquivalentResourceMapper
+
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
@@ -108,6 +110,9 @@ func (r *RequestScope) GetObjectCreater() runtime.ObjectCreater     { return r.C
 func (r *RequestScope) GetObjectTyper() runtime.ObjectTyper         { return r.Typer }
 func (r *RequestScope) GetObjectDefaulter() runtime.ObjectDefaulter { return r.Defaulter }
 func (r *RequestScope) GetObjectConvertor() runtime.ObjectConvertor { return r.Convertor }
+func (r *RequestScope) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
+	return r.EquivalentResourceMapper
+}
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
 func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
