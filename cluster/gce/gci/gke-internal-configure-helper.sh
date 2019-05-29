@@ -249,3 +249,111 @@ function configure-node-sysctls {
     /lib/systemd/systemd-sysctl
   fi
 }
+
+function gke-setup-containerd {
+  local -r CONTAINERD_HOME="/home/containerd"
+  mkdir -p "${CONTAINERD_HOME}"
+
+  echo "Generating containerd config"
+  local -r config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
+  mkdir -p "$(dirname "${config_path}")"
+  local shim_path="$(which containerd-shim)"
+  if [[ -n "${GVISOR_CONTAINERD_SHIM_PATH:-}" ]]; then
+    shim_path="${GVISOR_CONTAINERD_SHIM_PATH}"
+  fi
+  local cni_template_path="${CONTAINERD_HOME}/cni.template"
+  cat > "${cni_template_path}" <<EOF
+{
+  "name": "k8s-pod-network",
+  "cniVersion": "0.3.1",
+  "plugins": [
+    {
+      "type": "ptp",
+      "mtu": 1460,
+      "ipam": {
+        "type": "host-local",
+        "subnet": "{{.PodCIDR}}",
+        "routes": [
+          {
+            "dst": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      },
+      "noSnat": true
+    }
+  ]
+}
+EOF
+  if [[ "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    if [[ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" || "${ENABLE_NETD:-}" == "true" ]]; then
+      # Use Kubernetes cni daemonset on node if network policy provider is specified
+      # or netd is enabled.
+      cni_template_path=""
+    fi
+  fi
+  # Reuse docker group for containerd.
+  local -r containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
+  cat > "${config_path}" <<EOF
+# Kubernetes doesn't use containerd restart manager.
+disabled_plugins = ["restart"]
+oom_score = -999
+
+[debug]
+  level = "${CONTAINERD_LOG_LEVEL:-"info"}"
+
+[grpc]
+  gid = ${containerd_gid}
+
+[plugins.linux]
+  shim = "${shim_path}"
+
+[plugins.cri]
+  stream_server_address = "127.0.0.1"
+  max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
+[plugins.cri.cni]
+  bin_dir = "${KUBE_HOME}/bin"
+  conf_dir = "/etc/cni/net.d"
+  conf_template = "${cni_template_path}"
+[plugins.cri.registry.mirrors."docker.io"]
+  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+EOF
+
+  if [[ -n "${CONTAINERD_SANDBOX_RUNTIME_HANDLER:-}" ]]; then
+    cat >> "${config_path}" <<EOF
+[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
+  runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
+  runtime_engine = "${CONTAINERD_SANDBOX_RUNTIME_ENGINE:-}"
+  runtime_root = "${CONTAINERD_SANDBOX_RUNTIME_ROOT:-}"
+EOF
+  fi
+  chmod 644 "${config_path}"
+
+  # Generate gvisor-containerd-shim config
+  if [[ -n "${GVISOR_CONTAINERD_SHIM_PATH:-}" ]]; then
+    # gvisor_platform is the platform to use for gvisor.
+    local -r gvisor_platform="${GVISOR_PLATFORM:-"ptrace"}"
+    # shim_config_path is the path of gvisor-containerd-shim config file.
+    local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"/etc/containerd/gvisor-containerd-shim.toml"}"
+    cat > "${shim_config_path}" <<EOF
+runc_shim = "$(which containerd-shim)"
+
+[runsc_config]
+  platform = "${gvisor_platform}"
+EOF
+    if [[ "${gvisor_platform}" == "xemu" ]]; then
+      insmod "${CONTAINERD_HOME}/xemu.ko"
+    fi
+  fi
+
+  # Mount /home/containerd as readonly to avoid security issues.
+  mount --bind -o ro "${CONTAINERD_HOME}" "${CONTAINERD_HOME}"
+
+  echo "Restart containerd to load the config change"
+  systemctl restart containerd
+}
