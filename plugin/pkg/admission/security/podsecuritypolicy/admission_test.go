@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -1779,7 +1780,7 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, nil, false, userInfo)
 	annotations := make(map[string]string)
 	attrs = &fakeAttributes{attrs, annotations}
-	err := plugin.Admit(attrs, nil)
+	err := admissiontesting.WithReinvocationTesting(t, plugin).Admit(attrs, nil)
 
 	if shouldPassAdmit && err != nil {
 		t.Errorf("%s: expected no errors on Admit but received %v", testCaseName, err)

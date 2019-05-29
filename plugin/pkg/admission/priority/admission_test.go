@@ -24,6 +24,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -605,7 +606,7 @@ func TestPodAdmission(t *testing.T) {
 			false,
 			nil,
 		)
-		err := ctrl.Admit(attrs, nil)
+		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(attrs, nil)
 		klog.Infof("Got %v", err)
 		if !test.expectError {
 			if err != nil {

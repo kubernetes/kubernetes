@@ -15,6 +15,7 @@ go_test(
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission/testing:go_default_library",
     ],
 )
 

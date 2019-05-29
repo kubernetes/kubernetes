@@ -21,12 +21,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestAdmissionNonNilAttribute(t *testing.T) {
-	handler := NewAlwaysAdmit()
-	err := handler.(*alwaysAdmit).Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
+	handler := admissiontesting.WithReinvocationTesting(t, NewAlwaysAdmit().(*alwaysAdmit))
+	err := handler.Admit(admission.NewAttributesRecord(nil, nil, api.Kind("kind").WithVersion("version"), "namespace", "name", api.Resource("resource").WithVersion("version"), "subresource", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler")
 	}
