@@ -48,6 +48,7 @@ filegroup(
         "//test/integration/disruption:all-srcs",
         "//test/integration/dryrun:all-srcs",
         "//test/integration/etcd:all-srcs",
+        "//test/integration/events:all-srcs",
         "//test/integration/evictions:all-srcs",
         "//test/integration/examples:all-srcs",
         "//test/integration/framework:all-srcs",
