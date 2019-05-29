@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "doc.go",
         "event.go",
+        "event_expansion.go",
         "events_client.go",
         "generated_expansion.go",
     ],

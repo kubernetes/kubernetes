@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	typedv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/klog"
 )
@@ -63,6 +64,28 @@ type eventBroadcasterImpl struct {
 	eventCache    map[eventKey]*v1beta1.Event
 	sleepDuration time.Duration
 	sink          EventSink
+}
+
+// EventSinkImpl wraps EventInterface to implement EventSink.
+// TODO: this makes it easier for testing purpose and masks the logic of performing API calls.
+// Note that rollbacking to raw clientset should also be transparent.
+type EventSinkImpl struct {
+	Interface typedv1beta1.EventInterface
+}
+
+// Create is the same as CreateWithEventNamespace of the EventExpansion
+func (e *EventSinkImpl) Create(event *v1beta1.Event) (*v1beta1.Event, error) {
+	return e.Interface.CreateWithEventNamespace(event)
+}
+
+// Update is the same as UpdateithEventNamespace of the EventExpansion
+func (e *EventSinkImpl) Update(event *v1beta1.Event) (*v1beta1.Event, error) {
+	return e.Interface.UpdateWithEventNamespace(event)
+}
+
+// Patch is the same as PatchWithEventNamespace of the EventExpansion
+func (e *EventSinkImpl) Patch(event *v1beta1.Event, data []byte) (*v1beta1.Event, error) {
+	return e.Interface.PatchWithEventNamespace(event, data)
 }
 
 // NewBroadcaster Creates a new event broadcaster.
