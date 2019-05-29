@@ -24,7 +24,14 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"k8s.io/klog"
 )
+
+func TestMain(m *testing.M) {
+	klog.InitFlags(nil)
+	os.Exit(m.Run())
+}
 
 func TestHandleCrash(t *testing.T) {
 	defer func() {
@@ -96,7 +103,7 @@ func TestHandleCrashLog(t *testing.T) {
 	// 	.../src/k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/runtime/runtime.go:69 +0x...
 	lines := strings.Split(log, "\n")
 	if len(lines) < 4 {
-		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call")
+		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call: %v", lines)
 	}
 	if match, _ := regexp.MatchString("Observed a panic: test panic", lines[0]); !match {
 		t.Errorf("mismatch panic message: %s", lines[0])
