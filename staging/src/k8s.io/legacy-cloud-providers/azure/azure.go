@@ -160,10 +160,10 @@ type Config struct {
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
 	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount,omitempty" yaml:"maximumLoadBalancerRuleCount,omitempty"`
 
-	// The configure type for Azure cloud provider secret.
-	ConfigType secretConfigureType `json:"configType,omitempty" yaml:"configType,omitempty"`
-	// The override type for Azure cloud provider secret.
-	OverrideType secretOverrideType `json:"overrideType,omitempty" yaml:"overrideType,omitempty"`
+	// The cloud configure type for Azure cloud provider. Supported values are file, secret and merge.
+	CloudConfigType cloudConfigType `json:"cloudConfigType,omitempty" yaml:"cloudConfigType,omitempty"`
+	// The cloud config scope for Azure cloud provider. Supported values are all, node and control-plane.
+	CloudConfigScope cloudConfigScope `json:"cloudConfigScope,omitempty" yaml:"cloudConfigScope,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)
@@ -273,29 +273,29 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		config.VMType = vmTypeStandard
 	}
 
-	if config.OverrideType == "" {
-		// The default override type is secretOverrideTypeCan.
-		config.OverrideType = secretOverrideTypeCan
+	if config.CloudConfigType == "" {
+		// The default cloud config type is cloudConfigTypeMerge.
+		config.CloudConfigType = cloudConfigTypeMerge
 	} else {
-		supportedOverrideTypes := sets.NewString(
-			string(secretOverrideTypeCan),
-			string(secretOverrideTypeMust),
-			string(secretOverrideTypeNo))
-		if !supportedOverrideTypes.Has(string(config.OverrideType)) {
-			return fmt.Errorf("overrideType %v is not supported, supported values are %v", config.OverrideType, supportedOverrideTypes.List())
+		supportedCloudConfigTypes := sets.NewString(
+			string(cloudConfigTypeMerge),
+			string(cloudConfigTypeFile),
+			string(cloudConfigTypeSecret))
+		if !supportedCloudConfigTypes.Has(string(config.CloudConfigType)) {
+			return fmt.Errorf("cloudConfigType %v is not supported, supported values are %v", config.CloudConfigType, supportedCloudConfigTypes.List())
 		}
 	}
 
-	if config.ConfigType == "" {
-		// The default config type is secretConfigureAll.
-		config.ConfigType = secretConfigureAll
+	if config.CloudConfigScope == "" {
+		// The default config scope is cloudConfigScopeAll.
+		config.CloudConfigScope = cloudConfigScopeAll
 	} else {
-		supportedConfigTypes := sets.NewString(
-			string(secretConfigureAll),
-			string(secretConfigureNode),
-			string(secretConfigureControlPlane))
-		if !supportedConfigTypes.Has(string(config.ConfigType)) {
-			return fmt.Errorf("configType %v is not supported, supported values are %v", config.ConfigType, supportedConfigTypes.List())
+		supportedCloudConfigScopes := sets.NewString(
+			string(cloudConfigScopeAll),
+			string(cloudConfigScopeNode),
+			string(cloudConfigScopeControlPlane))
+		if !supportedCloudConfigScopes.Has(string(config.CloudConfigScope)) {
+			return fmt.Errorf("cloudConfigScope %v is not supported, supported values are %v", config.CloudConfigScope, supportedCloudConfigScopes.List())
 		}
 	}
 
@@ -324,13 +324,13 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 				return err
 			}
 
-			// Credentials are required if override type is "no".
-			if az.Config.OverrideType == secretOverrideTypeNo {
+			// Credentials are required if cloud config type is "file".
+			if az.Config.CloudConfigType == cloudConfigTypeFile {
 				return fmt.Errorf("no credentials provided for Azure cloud provider")
 			}
 
 			// Controller manager could be initialized from secret.
-			klog.V(2).Infof("No credentials provided, lazy initialize from secret %s", getConfigSecretName(az.Config.ConfigType))
+			klog.V(2).Infof("No credentials provided, lazy initialize from secret %s", getConfigSecretName(az.Config.CloudConfigScope))
 			return nil
 		}
 

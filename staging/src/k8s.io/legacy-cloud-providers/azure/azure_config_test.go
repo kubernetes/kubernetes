@@ -50,7 +50,7 @@ func getTestConfig() *Config {
 	}
 }
 
-func getTestMustOverrideConfig() *Config {
+func getTestCloudConfigTypeSecretConfig() *Config {
 	return &Config{
 		AzureAuthConfig: auth.AzureAuthConfig{
 			TenantID:       "TenantID",
@@ -60,11 +60,11 @@ func getTestMustOverrideConfig() *Config {
 		RouteTableName:          "RouteTableName",
 		RouteTableResourceGroup: "RouteTableResourceGroup",
 		SecurityGroupName:       "SecurityGroupName",
-		OverrideType:            secretOverrideTypeMust,
+		CloudConfigType:         cloudConfigTypeSecret,
 	}
 }
 
-func getTestCanOverrideConfig() *Config {
+func getTestCloudConfigTypeMergeConfig() *Config {
 	return &Config{
 		AzureAuthConfig: auth.AzureAuthConfig{
 			TenantID:       "TenantID",
@@ -74,14 +74,14 @@ func getTestCanOverrideConfig() *Config {
 		RouteTableName:          "RouteTableName",
 		RouteTableResourceGroup: "RouteTableResourceGroup",
 		SecurityGroupName:       "SecurityGroupName",
-		OverrideType:            secretOverrideTypeCan,
+		CloudConfigType:         cloudConfigTypeMerge,
 	}
 }
 
-func getTestCanOverrideConfigExpected() *Config {
+func getTestCloudConfigTypeMergeConfigExpected() *Config {
 	config := getTestConfig()
 	config.SecurityGroupName = "SecurityGroupName"
-	config.OverrideType = secretOverrideTypeCan
+	config.CloudConfigType = cloudConfigTypeMerge
 	return config
 }
 
@@ -95,34 +95,34 @@ func TestGetConfigFromSecret(t *testing.T) {
 		expectErr      bool
 	}{
 		{
-			name: "Azure config shouldn't be override when override type is no",
+			name: "Azure config shouldn't be override when cloud config type is file",
 			existingConfig: &Config{
-				ResourceGroup: "ResourceGroup1",
-				OverrideType:  secretOverrideTypeNo,
+				ResourceGroup:   "ResourceGroup1",
+				CloudConfigType: cloudConfigTypeFile,
 			},
 			secretConfig: getTestConfig(),
 			expected:     nil,
 		},
 		{
-			name:           "Azure config should be override when override type is must",
-			existingConfig: getTestMustOverrideConfig(),
+			name:           "Azure config should be override when cloud config type is secret",
+			existingConfig: getTestCloudConfigTypeSecretConfig(),
 			secretConfig:   getTestConfig(),
 			expected:       getTestConfig(),
 		},
 		{
-			name:           "Azure config should be override when override type is can",
-			existingConfig: getTestCanOverrideConfig(),
+			name:           "Azure config should be override when cloud config type is merge",
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
 			secretConfig:   getTestConfig(),
-			expected:       getTestCanOverrideConfigExpected(),
+			expected:       getTestCloudConfigTypeMergeConfigExpected(),
 		},
 		{
 			name:           "Error should be reported when secret doesn't exists",
-			existingConfig: getTestCanOverrideConfig(),
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
 			expectErr:      true,
 		},
 		{
 			name:           "Error should be reported when secret exists but cloud-config data is not provided",
-			existingConfig: getTestCanOverrideConfig(),
+			existingConfig: getTestCloudConfigTypeMergeConfig(),
 			secretConfig:   emptyConfig,
 			expectErr:      true,
 		},
@@ -150,7 +150,7 @@ func TestGetConfigFromSecret(t *testing.T) {
 					"cloud-config": secretData,
 				}
 			}
-			_, err := az.kubeClient.CoreV1().Secrets(secretNamespace).Create(secret)
+			_, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(secret)
 			assert.NoError(t, err, test.name)
 		}
 

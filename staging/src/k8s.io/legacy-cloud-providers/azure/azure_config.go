@@ -25,37 +25,37 @@ import (
 )
 
 const (
-	secretNamespace      = "kube-system"
-	secretCloudConfigKey = "cloud-config"
+	cloudConfigNamespace = "kube-system"
+	cloudConfigKey       = "cloud-config"
 )
 
-// The configure type for Azure cloud provider secret. Supported values are:
+// The configure scope for Azure cloud provider secret. Supported values are:
 // * all            : configure applied for components (kubelet and controller-manager). This is the default value.
 // * node           : configure applied for nodes (kubelet).
 // * control-plane  : configure applied for control plane components (controller-manager).
 //
-// For different configure types, the secret name would also be different:
+// For different configure scope, the secret name would also be different:
 // * all            : secret name would be azure-cloud-provider.
 // * node           : secret name would azure-cloud-provider-node.
 // * control-plane  : secret name would be azure-cloud-provider-control-plane.
-type secretConfigureType string
+type cloudConfigScope string
 
 const (
-	secretConfigureAll          secretConfigureType = "all"
-	secretConfigureNode         secretConfigureType = "node"
-	secretConfigureControlPlane secretConfigureType = "control-plane"
+	cloudConfigScopeAll          cloudConfigScope = "all"
+	cloudConfigScopeNode         cloudConfigScope = "node"
+	cloudConfigScopeControlPlane cloudConfigScope = "control-plane"
 )
 
-// The override type for Azure cloud provider secret. Supported values are:
-// * no   : The values from secret won't override any configures from local cloud-config file.
-// * must : The values from secret would override all configures from local cloud-config file.
-// * can  : The values from secret would override only configurations that are explicitly set in the secret. This is the default value.
-type secretOverrideType string
+// The config type for Azure cloud provider secret. Supported values are:
+// * file   : The values are read from local cloud-config file.
+// * secret : The values from secret would override all configures from local cloud-config file.
+// * merge  : The values from secret would override only configurations that are explicitly set in the secret. This is the default value.
+type cloudConfigType string
 
 const (
-	secretOverrideTypeNo   secretOverrideType = "no"
-	secretOverrideTypeMust secretOverrideType = "must"
-	secretOverrideTypeCan  secretOverrideType = "can"
+	cloudConfigTypeFile   cloudConfigType = "file"
+	cloudConfigTypeSecret cloudConfigType = "secret"
+	cloudConfigTypeMerge  cloudConfigType = "merge"
 )
 
 // InitializeCloudFromSecret initializes Azure cloud provider from Kubernetes secret.
@@ -77,25 +77,25 @@ func (az *Cloud) InitializeCloudFromSecret() {
 }
 
 func (az *Cloud) getConfigFromSecret() (*Config, error) {
-	// No override, return nil.
-	if az.Config.OverrideType == secretOverrideTypeNo {
+	// Read config from file and no override, return nil.
+	if az.Config.CloudConfigType == cloudConfigTypeFile {
 		return nil, nil
 	}
 
-	secretName := getConfigSecretName(az.Config.ConfigType)
-	secret, err := az.kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+	secretName := getConfigSecretName(az.Config.CloudConfigScope)
+	secret, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get secret %s: %v", secretName, err)
 	}
 
-	cloudConfigData, ok := secret.Data[secretCloudConfigKey]
+	cloudConfigData, ok := secret.Data[cloudConfigKey]
 	if !ok {
 		return nil, fmt.Errorf("cloud-config is not set in the secret (%s)", secretName)
 	}
 
 	config := Config{}
-	if az.Config.OverrideType == "" || az.Config.OverrideType == secretOverrideTypeCan {
-		// "can" override, set default value to existing config.
+	if az.Config.CloudConfigType == "" || az.Config.CloudConfigType == cloudConfigTypeMerge {
+		// Merge cloud config, set default value to existing config.
 		config = az.Config
 	}
 
@@ -107,13 +107,13 @@ func (az *Cloud) getConfigFromSecret() (*Config, error) {
 	return &config, nil
 }
 
-func getConfigSecretName(configType secretConfigureType) string {
-	switch configType {
-	case secretConfigureAll:
+func getConfigSecretName(scope cloudConfigScope) string {
+	switch scope {
+	case cloudConfigScopeAll:
 		return azureSecretNamePrefix
-	case secretConfigureNode:
+	case cloudConfigScopeNode:
 		return fmt.Sprintf("%s-node", azureSecretNamePrefix)
-	case secretConfigureControlPlane:
+	case cloudConfigScopeControlPlane:
 		return fmt.Sprintf("%s-control-plane", azureSecretNamePrefix)
 
 	default:
