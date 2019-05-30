@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -177,7 +177,7 @@ var _ = SIGDescribe("PreStop", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 
-	ginkgo.It("graceful pod terminated should wait until preStop hook completes the process", func() {
+	ginkgo.It("should force a gracefully terminated pod, until preStop hook completes", func() {
 		gracefulTerminationPeriodSeconds := int64(30)
 		ginkgo.By("creating the pod")
 		name := "pod-prestop-hook-" + string(uuid.NewUUID())
