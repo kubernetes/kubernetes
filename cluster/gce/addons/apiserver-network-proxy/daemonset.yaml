@@ -32,7 +32,7 @@ spec:
           hostPath:
             path: /etc/srv/kubernetes/pki
       containers:
-        - image: gcr.io/wfender-test/proxy-agent:latest
+        - image: gcr.io/google-containers/proxy-agent:v0.0.1
           name: proxy-agent
           command: ["/proxy-agent"]
           args: ["--log-file=/var/log/network-agent.log", "--logtostderr=false", "--log-file-max-size=0", "--caCert=/etc/srv/kubernetes/pki/proxy-agent/ca.crt", "--agentCert=/etc/srv/kubernetes/pki/proxy-agent/client.crt", "--agentKey=/etc/srv/kubernetes/pki/proxy-agent/client.key", "--proxyServerHost=__APISERVER_IP__", "--proxyServerPort=8132"]

@@ -29,7 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/evanphx/json-patch"
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 	"k8s.io/klog"

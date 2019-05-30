@@ -14,7 +14,7 @@
 "containers": [
     {
     "name": "network-proxy-container",
-    "image": "gcr.io/wfender-test/proxy-server:latest",
+    "image": "gcr.io/google-containers/proxy-server:v0.0.1",
     "resources": {
       "requests": {
         "cpu": "{{ cpulimit }}"

@@ -1473,6 +1473,11 @@ EOF
 MAX_PODS_PER_NODE: $(yaml-quote ${MAX_PODS_PER_NODE})
 EOF
   fi
+  if [[ "${ENABLE_KAS_NETWORK_PROXY}" == "true" ]]; then
+      cat >>$file <<EOF
+ENABLE_KAS_NETWORK_PROXY: $(yaml-quote ${ENABLE_KAS_NETWORK_PROXY})
+EOF
+  fi
 }
 
 
@@ -1788,17 +1793,7 @@ function generate-network-proxy-certs {
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","client auth"]}}}' > "ca-config.json"
     # create the network-proxy server cert with the correct groups
     echo '{"CN":"network-proxy","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-server
-    #mv "server-key.pem" "pki/private/server.key"
-    #mv "server.pem" "pki/issued/server.crt"
-    #mv "client-key.pem" "pki/private/client.key"
-    #mv "client.pem" "pki/issued/client.crt"
     rm -f "proxy-server.csr"
-
-    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
-    #./easyrsa --dn-mode=org \
-    #  --req-cn=proxy-clientcfg --req-org=system:aggregator \
-    #  --req-c= --req-st= --req-city= --req-email= --req-ou= \
-    #  build-client-full proxy-clientcfg nopass
 
     # Make the agent <-> proxy-server server side certificates.
     cd "${KUBE_TEMP}/easy-rsa-master/proxy-agent"
@@ -1814,10 +1809,6 @@ function generate-network-proxy-certs {
     echo '{"signing":{"default":{"expiry":"43800h","usages":["signing","key encipherment","agent auth"]}}}' > "ca-config.json"
     # create the network-proxy server cert with the correct groups
     echo '{"CN":"network-proxy","hosts":[""],"key":{"algo":"rsa","size":2048}}' | "${CFSSL_BIN}" gencert -ca=pki/ca.crt -ca-key=pki/private/ca.key -config=ca-config.json - | "${CFSSLJSON_BIN}" -bare proxy-agent
-    #mv "server-key.pem" "pki/private/server.key"
-    #mv "server.pem" "pki/issued/server.crt"
-    #mv "client-key.pem" "pki/private/client.key"
-    #mv "client.pem" "pki/issued/client.crt"
     rm -f "proxy-agent.csr"
 
     echo `ls ${PROXY_SERVER_CERT_DIR}/pki/`
@@ -1828,12 +1819,6 @@ function generate-network-proxy-certs {
     echo `ls ${PROXY_AGENT_CERT_DIR}/pki/issued/`
     echo "completed main certificate section") &>${cert_create_debug_output} || true
 
-    # Make a superuser client cert with subject "O=system:masters, CN=kubecfg"
-    #./easyrsa --dn-mode=org \
-    #  --req-cn=proxy-clientcfg --req-org=system:aggregator \
-    #  --req-c= --req-st= --req-city= --req-email= --req-ou= \
-    #  build-client-full proxy-clientcfg nopass) &>${cert_create_debug_output} || true
-    #
   local output_file_missing=0
   local output_file
   for output_file in \
@@ -2651,11 +2636,13 @@ function create-master() {
     --allow tcp:443 &
 
   echo "Configuring firewall for apiserver network proxy"
-  gcloud compute firewall-rules create "${MASTER_NAME}-network-proxy" \
-    --project "${NETWORK_PROJECT}" \
-    --network "${NETWORK}" \
-    --target-tags "${MASTER_TAG}" \
-    --allow tcp:8132 &
+  if [[ "${ENABLE_KAS_NETWORK_PROXY:-false}" == "true" ]]; then
+    gcloud compute firewall-rules create "${MASTER_NAME}-network-proxy" \
+      --project "${NETWORK_PROJECT}" \
+      --network "${NETWORK}" \
+      --target-tags "${MASTER_TAG}" \
+      --allow tcp:8132 &
+  fi
 
   # We have to make sure the disk is created before creating the master VM, so
   # run this in the foreground.

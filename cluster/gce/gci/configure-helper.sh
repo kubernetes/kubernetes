@@ -514,13 +514,15 @@ function create-node-pki {
     write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
 
-  mkdir -p "${pki_dir}/proxy-agent"
-  PROXY_AGENT_CA_CERT_PATH="${pki_dir}/proxy-agent/ca.crt"
-  PROXY_AGENT_CLIENT_KEY_PATH="${pki_dir}/proxy-agent/client.key"
-  PROXY_AGENT_CLIENT_CERT_PATH="${pki_dir}/proxy-agent/client.crt"
-  write-pki-data "${PROXY_AGENT_CA_CERT}" "${PROXY_AGENT_CA_CERT_PATH}"
-  write-pki-data "${PROXY_AGENT_CLIENT_KEY}" "${PROXY_AGENT_CLIENT_KEY_PATH}"
-  write-pki-data "${PROXY_AGENT_CLIENT_CERT}" "${PROXY_AGENT_CLIENT_CERT_PATH}"
+  if [[ "${ENABLE_KAS_NETWORK_PROXY:-false}" == "true" ]]; then
+    mkdir -p "${pki_dir}/proxy-agent"
+    PROXY_AGENT_CA_CERT_PATH="${pki_dir}/proxy-agent/ca.crt"
+    PROXY_AGENT_CLIENT_KEY_PATH="${pki_dir}/proxy-agent/client.key"
+    PROXY_AGENT_CLIENT_CERT_PATH="${pki_dir}/proxy-agent/client.crt"
+    write-pki-data "${PROXY_AGENT_CA_CERT}" "${PROXY_AGENT_CA_CERT_PATH}"
+    write-pki-data "${PROXY_AGENT_CLIENT_KEY}" "${PROXY_AGENT_CLIENT_KEY_PATH}"
+    write-pki-data "${PROXY_AGENT_CLIENT_CERT}" "${PROXY_AGENT_CLIENT_CERT_PATH}"
+  fi
 }
 
 function create-master-pki {
@@ -2723,8 +2725,10 @@ EOF
       setup-node-termination-handler-manifest
   fi
   # Setting up the network-agent daemonset
-  setup-addon-manifests "addons" "apiserver-network-proxy"
-  setup-apiserver-network-proxy-manifest
+  if [[ "${ENABLE_KAS_NETWORK_PROXY:-false}" == "true" ]]; then
+    setup-addon-manifests "addons" "apiserver-network-proxy"
+    setup-apiserver-network-proxy-manifest
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     # Create a new directory for the DNS addon and prepend a "0" on the name.
     # Prepending "0" to the directory ensures that add-on manager
@@ -3109,7 +3113,9 @@ function main() {
     create-master-pki
     create-master-auth
     ensure-master-bootstrap-kubectl-auth
-    create-master-network-proxy-apiserver-auth
+    if [[ "${ENABLE_KAS_NETWORK_PROXY:-false}" == "true" ]]; then
+      create-master-network-proxy-apiserver-auth
+    fi
     create-master-kubelet-auth
     create-master-etcd-auth
     create-master-etcd-apiserver-auth
@@ -3143,7 +3149,9 @@ function main() {
       start-etcd-empty-dir-cleanup-pod
     fi
     start-kube-apiserver
-    start-network-proxy-servers
+    if [[ "${ENABLE_KAS_NETWORK_PROXY:-false}" == "true" ]]; then
+      start-network-proxy-servers
+    fi
     start-kube-controller-manager
     start-kube-scheduler
     wait-till-apiserver-ready

@@ -48,3 +48,47 @@ type AdmissionPluginConfiguration struct {
 	// +optional
 	Configuration *runtime.Unknown
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ConnectivityServiceConfiguration provides versioned configuration for network proxy clients.
+type ConnectivityServiceConfiguration struct {
+	metav1.TypeMeta
+
+	// ConnectionServices contains a list of network proxy client configurations
+	ConnectionServices []ConnectionService
+}
+
+// ConnectionService provides the configuration for a single network proxy client.
+type ConnectionService struct {
+	// Name is the name of the connectivity service.
+	// Currently supported values are "Master" and "Cluster"
+	Name string
+
+	// Connection is the exact information used to configure the network proxy
+	Connection Connection
+}
+
+// ConnectivityServiceConfiguration provides the configuration for a single network proxy client.
+type Connection struct {
+	// Type is the type of connection used to connect from client to network/proxy-server.
+	// Currently supported values are "http-connect" and "direct".
+	Type string
+
+	// URL is the location of the proxy server to connect to.
+	// As an example it might be "https://127.0.0.1:8131"
+	// +optional
+	URL string
+
+	// CABundle is the file location of the CA to be used to determine trust with the network-proxy.
+	// +optional
+	CABundle string
+
+	// ClientKeyFile is the file location of the client key to be used in mtls handshakes with the network-proxy.
+	// +optional
+	ClientKeyFile string
+
+	// ClientCertFile is the file location of the client certificate to be used in mtls handshakes with the network-proxy.
+	// +optional
+	ClientCertFile string
+}

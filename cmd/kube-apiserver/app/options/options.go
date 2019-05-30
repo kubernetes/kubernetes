@@ -48,6 +48,7 @@ type ServerRunOptions struct {
 	Authorization           *kubeoptions.BuiltInAuthorizationOptions
 	CloudProvider           *kubeoptions.CloudProviderOptions
 	APIEnablement           *genericoptions.APIEnablementOptions
+	NetworkProxy            *genericoptions.NetworkProxyOptions
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -87,6 +88,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		Authorization:           kubeoptions.NewBuiltInAuthorizationOptions(),
 		CloudProvider:           kubeoptions.NewCloudProviderOptions(),
 		APIEnablement:           genericoptions.NewAPIEnablementOptions(),
+		NetworkProxy:            genericoptions.NewNetworkProxyOptions(),
 
 		EnableLogsHandler:      true,
 		EventTTL:               1 * time.Hour,
@@ -134,6 +136,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.Authorization.AddFlags(fss.FlagSet("authorization"))
 	s.CloudProvider.AddFlags(fss.FlagSet("cloud provider"))
 	s.APIEnablement.AddFlags(fss.FlagSet("api enablement"))
+	s.NetworkProxy.AddFlags(fss.FlagSet("network proxy"))
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
