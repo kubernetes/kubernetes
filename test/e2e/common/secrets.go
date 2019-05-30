@@ -26,7 +26,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[sig-api-machinery] Secrets", func() {
@@ -133,7 +132,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 	*/
 	framework.ConformanceIt("should fail to create secret due to empty secret key", func() {
 		secret, err := createEmptyKeySecretForTest(f)
-		Expect(err).To(HaveOccurred(), "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
+		framework.ExpectError(err, "created secret %q with empty key in namespace %q", secret.Name, f.Namespace.Name)
 	})
 })
 
