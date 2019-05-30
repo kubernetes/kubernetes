@@ -157,7 +157,6 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 				t.Run(fmt.Sprintf("subresources feature enabled=%v, old CRD %v, new CRD %v", validationEnabled, oldCRDInfo.name, newCRDInfo.name),
 					func(t *testing.T) {
 						defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceSubresources, validationEnabled)()
-						defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 						var oldCRDSpec *apiextensions.CustomResourceDefinitionSpec
 						if oldCRD != nil {
 							oldCRDSpec = &oldCRD.Spec
