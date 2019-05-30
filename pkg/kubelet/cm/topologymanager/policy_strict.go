@@ -25,7 +25,7 @@ type strictPolicy struct{}
 var _ Policy = &strictPolicy{}
 
 // PolicyStrict policy name.
-const PolicyStrict policyName = "strict"
+const PolicyStrict string = "strict"
 
 // NewStrictPolicy returns strict policy.
 func NewStrictPolicy() Policy {
