@@ -24,6 +24,7 @@ import (
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
@@ -125,22 +126,72 @@ func (a *Webhook) ValidateInitialization() error {
 	return nil
 }
 
-// ShouldCallHook makes a decision on whether to call the webhook or not by the attribute.
-func (a *Webhook) ShouldCallHook(h *v1beta1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
-	var matches bool
+// shouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
+// or an error if an error was encountered during evaluation.
+func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
+	var err *apierrors.StatusError
+	var invocation *WebhookInvocation
 	for _, r := range h.Rules {
 		m := rules.Matcher{Rule: r, Attr: attr}
 		if m.Matches() {
-			matches = true
+			invocation = &WebhookInvocation{
+				Webhook:     h,
+				Resource:    attr.GetResource(),
+				Subresource: attr.GetSubresource(),
+				Kind:        attr.GetKind(),
+			}
 			break
 		}
 	}
-	if !matches {
-		return false, nil
+	if invocation == nil && h.MatchPolicy != nil && *h.MatchPolicy == v1beta1.Equivalent {
+		attrWithOverride := &attrWithResourceOverride{Attributes: attr}
+		equivalents := o.GetEquivalentResourceMapper().EquivalentResourcesFor(attr.GetResource(), attr.GetSubresource())
+		// honor earlier rules first
+	OuterLoop:
+		for _, r := range h.Rules {
+			// see if the rule matches any of the equivalent resources
+			for _, equivalent := range equivalents {
+				if equivalent == attr.GetResource() {
+					// exclude attr.GetResource(), which we already checked
+					continue
+				}
+				attrWithOverride.resource = equivalent
+				m := rules.Matcher{Rule: r, Attr: attrWithOverride}
+				if m.Matches() {
+					kind := o.GetEquivalentResourceMapper().KindFor(equivalent, attr.GetSubresource())
+					if kind.Empty() {
+						return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert to %v: unknown kind", equivalent))
+					}
+					invocation = &WebhookInvocation{
+						Webhook:     h,
+						Resource:    equivalent,
+						Subresource: attr.GetSubresource(),
+						Kind:        kind,
+					}
+					break OuterLoop
+				}
+			}
+		}
 	}
 
-	return a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	if invocation == nil {
+		return nil, nil
+	}
+
+	matches, err := a.namespaceMatcher.MatchNamespaceSelector(h, attr)
+	if !matches || err != nil {
+		return nil, err
+	}
+
+	return invocation, nil
 }
+
+type attrWithResourceOverride struct {
+	admission.Attributes
+	resource schema.GroupVersionResource
+}
+
+func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { return a.resource }
 
 // Dispatch is called by the downstream Validate or Admit methods.
 func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfaces) error {
@@ -154,14 +205,14 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 
-	var relevantHooks []*v1beta1.Webhook
+	var relevantHooks []*WebhookInvocation
 	for i := range hooks {
-		call, err := a.ShouldCallHook(&hooks[i], attr)
+		invocation, err := a.shouldCallHook(&hooks[i], attr, o)
 		if err != nil {
 			return err
 		}
-		if call {
-			relevantHooks = append(relevantHooks, &hooks[i])
+		if invocation != nil {
+			relevantHooks = append(relevantHooks, invocation)
 		}
 	}
 
@@ -170,23 +221,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 		return nil
 	}
 
-	// convert the object to the external version before sending it to the webhook
-	versionedAttr := VersionedAttributes{
-		Attributes: attr,
-	}
-	if oldObj := attr.GetOldObject(); oldObj != nil {
-		out, err := ConvertToGVK(oldObj, attr.GetKind(), o)
-		if err != nil {
-			return apierrors.NewInternalError(err)
-		}
-		versionedAttr.VersionedOldObject = out
-	}
-	if obj := attr.GetObject(); obj != nil {
-		out, err := ConvertToGVK(obj, attr.GetKind(), o)
-		if err != nil {
-			return apierrors.NewInternalError(err)
-		}
-		versionedAttr.VersionedObject = out
-	}
-	return a.dispatcher.Dispatch(ctx, &versionedAttr, o, relevantHooks)
+	return a.dispatcher.Dispatch(ctx, attr, o, relevantHooks)
 }

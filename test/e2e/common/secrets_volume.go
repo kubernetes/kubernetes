@@ -347,14 +347,14 @@ var _ = Describe("[sig-storage] Secrets", func() {
 
 		By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
 		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(deleteSecret.Name, &metav1.DeleteOptions{})
-		Expect(err).NotTo(HaveOccurred(), "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Updating secret %v", updateSecret.Name))
 		updateSecret.ResourceVersion = "" // to force update
 		delete(updateSecret.Data, "data-1")
 		updateSecret.Data["data-3"] = []byte("value-3")
 		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(updateSecret)
-		Expect(err).NotTo(HaveOccurred(), "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Creating secret with name %s", createSecret.Name))
 		if createSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(createSecret); err != nil {
@@ -375,7 +375,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		err := createNonOptionalSecretPod(f, volumeMountPath, podName)
-		Expect(err).To(HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 
 	//Secret object defined for the pod, If a key is specified which is not present in the secret,
@@ -385,7 +385,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		volumeMountPath := "/etc/secret-volumes"
 		podName := "pod-secrets-" + string(uuid.NewUUID())
 		err := createNonOptionalSecretPodWithSecret(f, volumeMountPath, podName)
-		Expect(err).To(HaveOccurred(), "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional secret in namespace %q", podName, f.Namespace.Name)
 	})
 })
 

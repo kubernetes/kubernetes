@@ -25,10 +25,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
-var _ = Describe("[sig-storage] Projected combined", func() {
+var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	// Test multiple projections
@@ -61,11 +61,11 @@ var _ = Describe("[sig-storage] Projected combined", func() {
 			},
 		}
 
-		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
-		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}

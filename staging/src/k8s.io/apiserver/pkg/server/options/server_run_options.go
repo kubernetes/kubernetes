@@ -18,7 +18,6 @@ package options
 
 import (
 	"fmt"
-	"k8s.io/apiserver/pkg/features"
 	"net"
 	"time"
 
@@ -28,7 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	// add the generic feature gates
-	_ "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
 )

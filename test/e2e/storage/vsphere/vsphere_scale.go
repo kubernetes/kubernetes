@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strconv"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	storageV1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -67,7 +67,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		scNames           = []string{storageclass1, storageclass2, storageclass3, storageclass4}
 	)
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		client = f.ClientSet
@@ -79,8 +79,8 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		volumesPerPod = GetAndExpectIntEnvVar(VCPScaleVolumesPerPod)
 
 		numberOfInstances = GetAndExpectIntEnvVar(VCPScaleInstances)
-		Expect(numberOfInstances > 5).NotTo(BeTrue(), "Maximum allowed instances are 5")
-		Expect(numberOfInstances > volumeCount).NotTo(BeTrue(), "Number of instances should be less than the total volume count")
+		gomega.Expect(numberOfInstances > 5).NotTo(gomega.BeTrue(), "Maximum allowed instances are 5")
+		gomega.Expect(numberOfInstances > volumeCount).NotTo(gomega.BeTrue(), "Number of instances should be less than the total volume count")
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
@@ -108,14 +108,14 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		}
 	})
 
-	It("vsphere scale tests", func() {
+	ginkgo.It("vsphere scale tests", func() {
 		var pvcClaimList []string
 		nodeVolumeMap := make(map[string][]string)
 		// Volumes will be provisioned with each different types of Storage Class
 		scArrays := make([]*storageV1.StorageClass, len(scNames))
 		for index, scname := range scNames {
 			// Create vSphere Storage Class
-			By(fmt.Sprintf("Creating Storage Class : %q", scname))
+			ginkgo.By(fmt.Sprintf("Creating Storage Class : %q", scname))
 			var sc *storageV1.StorageClass
 			scParams := make(map[string]string)
 			var err error
@@ -130,7 +130,7 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 				scParams[Datastore] = datastoreName
 			}
 			sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(scname, scParams, nil))
-			Expect(sc).NotTo(BeNil(), "Storage class is empty")
+			gomega.Expect(sc).NotTo(gomega.BeNil(), "Storage class is empty")
 			framework.ExpectNoError(err, "Failed to create storage class")
 			defer client.StorageV1().StorageClasses().Delete(scname, nil)
 			scArrays[index] = sc
@@ -154,11 +154,11 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		podList, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 		for _, pod := range podList.Items {
 			pvcClaimList = append(pvcClaimList, getClaimsForPod(&pod, volumesPerPod)...)
-			By("Deleting pod")
+			ginkgo.By("Deleting pod")
 			err = framework.DeletePodWithWait(f, client, &pod)
 			framework.ExpectNoError(err)
 		}
-		By("Waiting for volumes to be detached from the node")
+		ginkgo.By("Waiting for volumes to be detached from the node")
 		err = waitForVSphereDisksToDetach(nodeVolumeMap)
 		framework.ExpectNoError(err)
 
@@ -182,7 +182,7 @@ func getClaimsForPod(pod *v1.Pod, volumesPerPod int) []string {
 
 // VolumeCreateAndAttach peforms create and attach operations of vSphere persistent volumes at scale
 func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*storageV1.StorageClass, volumeCountPerInstance int, volumesPerPod int, nodeSelectorList []*NodeSelector, nodeVolumeMapChan chan map[string][]string) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	nodeVolumeMap := make(map[string][]string)
 	nodeSelectorIndex := 0
 	for index := 0; index < volumeCountPerInstance; index = index + volumesPerPod {
@@ -191,17 +191,17 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		}
 		pvclaims := make([]*v1.PersistentVolumeClaim, volumesPerPod)
 		for i := 0; i < volumesPerPod; i++ {
-			By("Creating PVC using the Storage Class")
+			ginkgo.By("Creating PVC using the Storage Class")
 			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", sc[index%len(sc)]))
 			framework.ExpectNoError(err)
 			pvclaims[i] = pvclaim
 		}
 
-		By("Waiting for claim to be in bound phase")
+		ginkgo.By("Waiting for claim to be in bound phase")
 		persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
-		By("Creating pod to attach PV to the node")
+		ginkgo.By("Creating pod to attach PV to the node")
 		nodeSelector := nodeSelectorList[nodeSelectorIndex%len(nodeSelectorList)]
 		// Create pod to attach Volume to Node
 		pod, err := framework.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
@@ -210,7 +210,7 @@ func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*s
 		for _, pv := range persistentvolumes {
 			nodeVolumeMap[pod.Spec.NodeName] = append(nodeVolumeMap[pod.Spec.NodeName], pv.Spec.VsphereVolume.VolumePath)
 		}
-		By("Verify the volume is accessible and available in the pod")
+		ginkgo.By("Verify the volume is accessible and available in the pod")
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 		nodeSelectorIndex++
 	}

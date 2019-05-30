@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/cloud-provider/fake"
 )
 
 func createNodeInternalIPAddress(address string) []v1.NodeAddress {
@@ -38,7 +38,7 @@ func createNodeInternalIPAddress(address string) []v1.NodeAddress {
 
 func TestNodeAddressesDelay(t *testing.T) {
 	syncPeriod := 100 * time.Millisecond
-	cloud := &fake.FakeCloud{
+	cloud := &fake.Cloud{
 		Addresses: createNodeInternalIPAddress("10.0.1.12"),
 		// Set the request delay so the manager timeouts and collects the node addresses later
 		RequestDelay: 200 * time.Millisecond,
@@ -82,7 +82,7 @@ func TestNodeAddressesDelay(t *testing.T) {
 }
 
 func TestNodeAddressesUsesLastSuccess(t *testing.T) {
-	cloud := &fake.FakeCloud{}
+	cloud := &fake.Cloud{}
 	manager := NewSyncManager(cloud, "defaultNode", 0).(*cloudResourceSyncManager)
 
 	// These tests are stateful and order dependant.

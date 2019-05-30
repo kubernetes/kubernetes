@@ -55,11 +55,26 @@ func newMutatingDispatcher(p *Plugin) func(cm *webhook.ClientManager) generic.Di
 
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
-func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, o admission.ObjectInterfaces, relevantHooks []*v1beta1.Webhook) error {
-	for _, hook := range relevantHooks {
+func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, relevantHooks []*generic.WebhookInvocation) error {
+	var versionedAttr *generic.VersionedAttributes
+	for _, invocation := range relevantHooks {
+		hook := invocation.Webhook
+		if versionedAttr == nil {
+			// First webhook, create versioned attributes
+			var err error
+			if versionedAttr, err = generic.NewVersionedAttributes(attr, invocation.Kind, o); err != nil {
+				return apierrors.NewInternalError(err)
+			}
+		} else {
+			// Subsequent webhook, convert existing versioned attributes to this webhook's version
+			if err := generic.ConvertVersionedAttributes(versionedAttr, invocation.Kind, o); err != nil {
+				return apierrors.NewInternalError(err)
+			}
+		}
+
 		t := time.Now()
-		err := a.callAttrMutatingHook(ctx, hook, attr, o)
-		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "admit", hook.Name)
+		err := a.callAttrMutatingHook(ctx, invocation, versionedAttr, o)
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name)
 		if err == nil {
 			continue
 		}
@@ -77,16 +92,17 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 		return err
 	}
 
-	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes
-	if attr.VersionedObject != nil {
-		return o.GetObjectConvertor().Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil)
+	// convert versionedAttr.VersionedObject to the internal version in the underlying admission.Attributes
+	if versionedAttr != nil && versionedAttr.VersionedObject != nil && versionedAttr.Dirty {
+		return o.GetObjectConvertor().Convert(versionedAttr.VersionedObject, versionedAttr.Attributes.GetObject(), nil)
 	}
 	return nil
 }
 
 // note that callAttrMutatingHook updates attr
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.Webhook, attr *generic.VersionedAttributes, o admission.ObjectInterfaces) error {
-	if attr.IsDryRun() {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes, o admission.ObjectInterfaces) error {
+	h := invocation.Webhook
+	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
 			return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
@@ -102,7 +118,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	// Make the webhook request
-	request := request.CreateAdmissionReview(attr)
+	request := request.CreateAdmissionReview(attr, invocation)
 	client, err := a.cm.HookClient(util.HookClientConfigForWebhook(h))
 	if err != nil {
 		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
@@ -122,7 +138,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 
 	for k, v := range response.Response.AuditAnnotations {
 		key := h.Name + "/" + k
-		if err := attr.AddAnnotation(key, v); err != nil {
+		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
 			klog.Warningf("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
 		}
 	}
@@ -164,16 +180,17 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		// They are represented as Unstructured.
 		newVersionedObject = &unstructured.Unstructured{}
 	} else {
-		newVersionedObject, err = o.GetObjectCreater().New(attr.GetKind())
+		newVersionedObject, err = o.GetObjectCreater().New(attr.VersionedKind)
 		if err != nil {
 			return apierrors.NewInternalError(err)
 		}
 	}
 	// TODO: if we have multiple mutating webhooks, we can remember the json
 	// instead of encoding and decoding for each one.
-	if _, _, err := jsonSerializer.Decode(patchedJS, nil, newVersionedObject); err != nil {
+	if newVersionedObject, _, err = jsonSerializer.Decode(patchedJS, nil, newVersionedObject); err != nil {
 		return apierrors.NewInternalError(err)
 	}
+	attr.Dirty = true
 	attr.VersionedObject = newVersionedObject
 	o.GetObjectDefaulter().Default(attr.VersionedObject)
 	return nil

@@ -22,8 +22,9 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 const maxNodes = 100
@@ -32,8 +33,8 @@ var _ = SIGDescribe("SSH", func() {
 
 	f := framework.NewDefaultFramework("ssh")
 
-	BeforeEach(func() {
-		// When adding more providers here, also implement their functionality in util.go's framework.GetSigner(...).
+	ginkgo.BeforeEach(func() {
+		// When adding more providers here, also implement their functionality in e2essh.GetSigner(...).
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 
 		// This test SSH's into the node for which it needs the $HOME/.ssh/id_rsa key to be present. So
@@ -41,10 +42,10 @@ var _ = SIGDescribe("SSH", func() {
 		framework.SkipUnlessSSHKeyPresent()
 	})
 
-	It("should SSH to all nodes and run commands", func() {
+	ginkgo.It("should SSH to all nodes and run commands", func() {
 		// Get all nodes' external IPs.
-		By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := framework.NodeSSHHosts(f.ClientSet)
+		ginkgo.By("Getting all nodes' SSH-able IP addresses")
+		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}
@@ -75,10 +76,10 @@ var _ = SIGDescribe("SSH", func() {
 				nodes = maxNodes
 			}
 			testhosts := hosts[:nodes]
-			By(fmt.Sprintf("SSH'ing to %d nodes and running %s", len(testhosts), testCase.cmd))
+			ginkgo.By(fmt.Sprintf("SSH'ing to %d nodes and running %s", len(testhosts), testCase.cmd))
 
 			for _, host := range testhosts {
-				result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
+				result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 				if err != testCase.expectedError {
 					framework.Failf("Ran %s on %s, got error %v, expected %v", testCase.cmd, host, err, testCase.expectedError)
@@ -103,8 +104,8 @@ var _ = SIGDescribe("SSH", func() {
 		}
 
 		// Quickly test that SSH itself errors correctly.
-		By("SSH'ing to a nonexistent host")
-		if _, err = framework.SSH(`echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
+		ginkgo.By("SSH'ing to a nonexistent host")
+		if _, err = e2essh.SSH(`echo "hello"`, "i.do.not.exist", framework.TestContext.Provider); err == nil {
 			framework.Failf("Expected error trying to SSH to nonexistent host.")
 		}
 	})

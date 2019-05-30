@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -78,7 +78,7 @@ func TestValidatePodSCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
 					errs := ValidateConditionalPod(newPod, oldPod, nil)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.object()) {
@@ -152,7 +152,7 @@ func TestValidateServiceSCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldServiceInfo.description, newServiceInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
 					errs := ValidateConditionalService(newService, oldService)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldService, oldServiceInfo.object()) {
@@ -226,7 +226,7 @@ func TestValidateEndpointsSCTP(t *testing.T) {
 				}
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old object %v, new object %v", enabled, oldEndpointsInfo.description, newEndpointsInfo.description), func(t *testing.T) {
-					defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, enabled)()
 					errs := ValidateConditionalEndpoints(newEndpoints, oldEndpoints)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldEndpoints, oldEndpointsInfo.object()) {

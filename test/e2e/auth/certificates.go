@@ -31,13 +31,13 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 var _ = SIGDescribe("Certificates API", func() {
 	f := framework.NewDefaultFramework("certificates")
 
-	It("should support building a client with a CSR", func() {
+	ginkgo.It("should support building a client with a CSR", func() {
 		const commonName = "tester-csr"
 
 		pk, err := utils.NewPrivateKey()

@@ -31,6 +31,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -50,7 +51,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.limit_in_bytes
 	command := fmt.Sprintf("expected=%v; actual=$(cat /tmp/hugetlb/%v/hugetlb.2MB.limit_in_bytes); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), cgroupFsName)
-	framework.Logf("Pod to run command: %v", command)
+	e2elog.Logf("Pod to run command: %v", command)
 	pod := &apiv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
@@ -119,7 +120,7 @@ func configureHugePages() error {
 	if err != nil {
 		return err
 	}
-	framework.Logf("HugePages_Total is set to %v", numHugePages)
+	e2elog.Logf("HugePages_Total is set to %v", numHugePages)
 	if numHugePages == 50 {
 		return nil
 	}
@@ -145,7 +146,7 @@ func pollResourceAsString(f *framework.Framework, resourceName string) string {
 	node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	amount := amountOfResourceAsString(node, resourceName)
-	framework.Logf("amount of %v: %v", resourceName, amount)
+	e2elog.Logf("amount of %v: %v", resourceName, amount)
 	return amount
 }
 

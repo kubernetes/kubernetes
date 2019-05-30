@@ -213,7 +213,7 @@ func TestRetryOnConflictError(t *testing.T) {
 	retryOnce := func(namespace *v1.Namespace) (*v1.Namespace, error) {
 		numTries++
 		if numTries <= 1 {
-			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR!"))
+			return namespace, errors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("ERROR"))
 		}
 		return namespace, nil
 	}

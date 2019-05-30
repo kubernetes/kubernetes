@@ -38,10 +38,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -244,14 +244,14 @@ func gatherMetrics(f *framework.Framework) {
 	var summary framework.TestDataSummary
 	grabber, err := metrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
 	if err != nil {
-		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+		e2elog.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
 		received, err := grabber.Grab()
 		if err != nil {
-			framework.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+			e2elog.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
 		} else {
 			summary = (*framework.MetricsForE2E)(&received)
-			framework.Logf(summary.PrintHumanReadable())
+			e2elog.Logf(summary.PrintHumanReadable())
 		}
 	}
 }
@@ -653,15 +653,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
-				framework.Logf("%d pods remaining", len(pods.Items))
+				e2elog.Logf("%d pods remaining", len(pods.Items))
 				count := 0
 				for _, pod := range pods.Items {
 					if pod.ObjectMeta.DeletionTimestamp == nil {
 						count++
 					}
 				}
-				framework.Logf("%d pods has nil DeletionTimestamp", count)
-				framework.Logf("")
+				e2elog.Logf("%d pods has nil DeletionTimestamp", count)
+				e2elog.Logf("")
 				return false, nil
 			}
 			if errors.IsNotFound(err) {
@@ -673,10 +673,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err2 != nil {
 				framework.Failf("%v", err2)
 			}
-			framework.Logf("%d remaining pods are:", len(pods.Items))
-			framework.Logf("The ObjectMeta of the remaining pods are:")
+			e2elog.Logf("%d remaining pods are:", len(pods.Items))
+			e2elog.Logf("The ObjectMeta of the remaining pods are:")
 			for _, pod := range pods.Items {
-				framework.Logf("%#v", pod.ObjectMeta)
+				e2elog.Logf("%#v", pod.ObjectMeta)
 			}
 			framework.Failf("failed to delete the rc: %v", err)
 		}
@@ -734,12 +734,12 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 		ginkgo.By(fmt.Sprintf("set half of pods created by rc %s to have rc %s as owner as well", rc1Name, rc2Name))
 		pods, err := podClient.List(metav1.ListOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to list pods in namespace: %s", f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to list pods in namespace: %s", f.Namespace.Name)
 		patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"ReplicationController","name":"%s","uid":"%s"}]}}`, rc2.ObjectMeta.Name, rc2.ObjectMeta.UID)
 		for i := 0; i < halfReplicas; i++ {
 			pod := pods.Items[i]
 			_, err := podClient.Patch(pod.Name, types.StrategicMergePatchType, []byte(patch))
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
+			framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod.Name, f.Namespace.Name, patch)
 		}
 
 		ginkgo.By(fmt.Sprintf("delete the rc %s", rc1Name))
@@ -755,15 +755,15 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := rcClient.Get(rc1.Name, metav1.GetOptions{})
 			if err == nil {
 				pods, _ := podClient.List(metav1.ListOptions{})
-				framework.Logf("%d pods remaining", len(pods.Items))
+				e2elog.Logf("%d pods remaining", len(pods.Items))
 				count := 0
 				for _, pod := range pods.Items {
 					if pod.ObjectMeta.DeletionTimestamp == nil {
 						count++
 					}
 				}
-				framework.Logf("%d pods has nil DeletionTimestamp", count)
-				framework.Logf("")
+				e2elog.Logf("%d pods has nil DeletionTimestamp", count)
+				e2elog.Logf("")
 				return false, nil
 			}
 			if errors.IsNotFound(err) {
@@ -775,10 +775,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 			if err2 != nil {
 				framework.Failf("%v", err2)
 			}
-			framework.Logf("%d remaining pods are:", len(pods.Items))
-			framework.Logf("ObjectMeta of remaining pods are:")
+			e2elog.Logf("%d remaining pods are:", len(pods.Items))
+			e2elog.Logf("ObjectMeta of remaining pods are:")
 			for _, pod := range pods.Items {
-				framework.Logf("%#v", pod.ObjectMeta)
+				e2elog.Logf("%#v", pod.ObjectMeta)
 			}
 			framework.Failf("failed to delete rc %s, err: %v", rc1Name, err)
 		}
@@ -814,36 +814,36 @@ var _ = SIGDescribe("Garbage collector", func() {
 		pod1Name := "pod1"
 		pod1 := newGCPod(pod1Name)
 		pod1, err := podClient.Create(pod1)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod1Name, f.Namespace.Name)
 		pod2Name := "pod2"
 		pod2 := newGCPod(pod2Name)
 		pod2, err = podClient.Create(pod2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod2Name, f.Namespace.Name)
 		pod3Name := "pod3"
 		pod3 := newGCPod(pod3Name)
 		pod3, err = podClient.Create(pod3)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create pod %s in namespace: %s", pod3Name, f.Namespace.Name)
 		// create circular dependency
 		addRefPatch := func(name string, uid types.UID) []byte {
 			return []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"v1","kind":"Pod","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}]}}`, name, uid))
 		}
 		patch1 := addRefPatch(pod3.Name, pod3.UID)
 		pod1, err = podClient.Patch(pod1.Name, types.StrategicMergePatchType, patch1)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
-		framework.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
+		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod1.Name, f.Namespace.Name, patch1)
+		e2elog.Logf("pod1.ObjectMeta.OwnerReferences=%#v", pod1.ObjectMeta.OwnerReferences)
 		patch2 := addRefPatch(pod1.Name, pod1.UID)
 		pod2, err = podClient.Patch(pod2.Name, types.StrategicMergePatchType, patch2)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
-		framework.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
+		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod2.Name, f.Namespace.Name, patch2)
+		e2elog.Logf("pod2.ObjectMeta.OwnerReferences=%#v", pod2.ObjectMeta.OwnerReferences)
 		patch3 := addRefPatch(pod2.Name, pod2.UID)
 		pod3, err = podClient.Patch(pod3.Name, types.StrategicMergePatchType, patch3)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
-		framework.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
+		framework.ExpectNoError(err, "failed to apply to pod %s in namespace %s, a strategic merge patch: %s", pod3.Name, f.Namespace.Name, patch3)
+		e2elog.Logf("pod3.ObjectMeta.OwnerReferences=%#v", pod3.ObjectMeta.OwnerReferences)
 		// delete one pod, should result in the deletion of all pods
 		deleteOptions := getForegroundOptions()
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod1.UID))
 		err = podClient.Delete(pod1.ObjectMeta.Name, deleteOptions)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete pod %s in namespace: %s", pod1.Name, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to delete pod %s in namespace: %s", pod1.Name, f.Namespace.Name)
 		var pods *v1.PodList
 		var err2 error
 		// TODO: shorten the timeout when we make GC's periodic API rediscovery more efficient.
@@ -858,7 +858,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 			}
 			return false, nil
 		}); err != nil {
-			framework.Logf("pods are %#v", pods.Items)
+			e2elog.Logf("pods are %#v", pods.Items)
 			framework.Failf("failed to wait for all pods to be deleted: %v", err)
 		}
 	})
@@ -909,7 +909,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
-		framework.Logf("created owner resource %q", ownerName)
+		e2elog.Logf("created owner resource %q", ownerName)
 
 		// Create a custom dependent resource.
 		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
@@ -934,7 +934,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
-		framework.Logf("created dependent resource %q", dependentName)
+		e2elog.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner.
 		background := metav1.DeletePropagationBackground
@@ -948,8 +948,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 			_, err := resourceClient.Get(dependentName, metav1.GetOptions{})
 			return errors.IsNotFound(err), nil
 		}); err != nil {
-			framework.Logf("owner: %#v", persistedOwner)
-			framework.Logf("dependent: %#v", persistedDependent)
+			e2elog.Logf("owner: %#v", persistedOwner)
+			e2elog.Logf("dependent: %#v", persistedDependent)
 			framework.Failf("failed waiting for dependent resource %q to be deleted", dependentName)
 		}
 
@@ -1010,7 +1010,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create owner resource %q: %v", ownerName, err)
 		}
-		framework.Logf("created owner resource %q", ownerName)
+		e2elog.Logf("created owner resource %q", ownerName)
 
 		// Create a custom dependent resource.
 		dependentName := names.SimpleNameGenerator.GenerateName("dependent")
@@ -1035,7 +1035,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		if err != nil {
 			framework.Failf("failed to create dependent resource %q: %v", dependentName, err)
 		}
-		framework.Logf("created dependent resource %q", dependentName)
+		e2elog.Logf("created dependent resource %q", dependentName)
 
 		// Delete the owner and orphan the dependent.
 		err = resourceClient.Delete(ownerName, getOrphanOptions())
@@ -1073,7 +1073,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
 		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(cronJob)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
+		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")
 		err = wait.PollImmediate(500*time.Millisecond, 2*time.Minute, func() (bool, error) {

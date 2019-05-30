@@ -96,7 +96,7 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 	}
 
 	// Step 2: Create the sandbox container.
-	if r.GetRuntimeHandler() != "" {
+	if r.GetRuntimeHandler() != "" && r.GetRuntimeHandler() != runtimeName {
 		return nil, fmt.Errorf("RuntimeHandler %q not supported", r.GetRuntimeHandler())
 	}
 	createConfig, err := ds.makeSandboxDockerConfig(config, image)

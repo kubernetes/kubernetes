@@ -37,11 +37,12 @@ import (
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
-// Interface to delete a namespace with all resources in it.
+// NamespacedResourcesDeleterInterface is the interface to delete a namespace with all resources in it.
 type NamespacedResourcesDeleterInterface interface {
 	Delete(nsName string) error
 }
 
+// NewNamespacedResourcesDeleter returns a new NamespacedResourcesDeleter.
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 	dynamicClient dynamic.Interface, podsGetter v1clientset.PodsGetter,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
@@ -129,6 +130,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 
 	// Delete the namespace if it is already finalized.
 	if d.deleteNamespaceWhenDone && finalized(namespace) {
+		// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
 		return d.deleteNamespace(namespace)
 	}
 
@@ -155,6 +157,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 
 	// Check if we can delete now.
 	if d.deleteNamespaceWhenDone && finalized(namespace) {
+		// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
 		return d.deleteNamespace(namespace)
 	}
 	return nil

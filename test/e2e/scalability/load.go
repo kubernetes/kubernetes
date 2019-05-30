@@ -347,7 +347,7 @@ func createClients(numberOfClients int) ([]clientset.Interface, []scaleclient.Sc
 
 	for i := 0; i < numberOfClients; i++ {
 		config, err := framework.LoadConfig()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 		config.QPS = 100
 		config.Burst = 200
 		if framework.TestContext.KubeAPIContentType != "" {

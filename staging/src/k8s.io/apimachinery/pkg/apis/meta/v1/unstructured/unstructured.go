@@ -47,6 +47,7 @@ type Unstructured struct {
 
 var _ metav1.Object = &Unstructured{}
 var _ runtime.Unstructured = &Unstructured{}
+var _ metav1.ListInterface = &Unstructured{}
 
 func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
 
@@ -317,6 +318,18 @@ func (u *Unstructured) SetContinue(c string) {
 		return
 	}
 	u.setNestedField(c, "metadata", "continue")
+}
+
+func (u *Unstructured) GetRemainingItemCount() *int64 {
+	return getNestedInt64Pointer(u.Object, "metadata", "remainingItemCount")
+}
+
+func (u *Unstructured) SetRemainingItemCount(c *int64) {
+	if c == nil {
+		RemoveNestedField(u.Object, "metadata", "remainingItemCount")
+	} else {
+		u.setNestedField(*c, "metadata", "remainingItemCount")
+	}
 }
 
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {

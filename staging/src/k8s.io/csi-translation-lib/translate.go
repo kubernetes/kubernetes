@@ -21,23 +21,26 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/csi-translation-lib/plugins"
 )
 
 var (
 	inTreePlugins = map[string]plugins.InTreePlugin{
-		plugins.GCEPDDriverName:  plugins.NewGCEPersistentDiskCSITranslator(),
-		plugins.AWSEBSDriverName: plugins.NewAWSElasticBlockStoreCSITranslator(),
-		plugins.CinderDriverName: plugins.NewOpenStackCinderCSITranslator(),
+		plugins.GCEPDDriverName:     plugins.NewGCEPersistentDiskCSITranslator(),
+		plugins.AWSEBSDriverName:    plugins.NewAWSElasticBlockStoreCSITranslator(),
+		plugins.CinderDriverName:    plugins.NewOpenStackCinderCSITranslator(),
+		plugins.AzureDiskDriverName: plugins.NewAzureDiskCSITranslator(),
 	}
 )
 
-// TranslateInTreeStorageClassParametersToCSI takes in-tree storage class
-// parameters and translates them to a set of parameters consumable by CSI plugin
-func TranslateInTreeStorageClassParametersToCSI(inTreePluginName string, scParameters map[string]string) (map[string]string, error) {
+// TranslateInTreeStorageClassToCSI takes in-tree Storage Class
+// and translates it to a set of parameters consumable by CSI plugin
+func TranslateInTreeStorageClassToCSI(inTreePluginName string, sc *storage.StorageClass) (*storage.StorageClass, error) {
+	newSC := sc.DeepCopy()
 	for _, curPlugin := range inTreePlugins {
 		if inTreePluginName == curPlugin.GetInTreePluginName() {
-			return curPlugin.TranslateInTreeStorageClassParametersToCSI(scParameters)
+			return curPlugin.TranslateInTreeStorageClassToCSI(newSC)
 		}
 	}
 	return nil, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)

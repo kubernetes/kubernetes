@@ -125,11 +125,9 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					APIServer: kubeadmapiv1beta2.APIServer{
-						CertSANs: test.in,
-					},
+			cfg := &kubeadmapiv1beta2.ClusterConfiguration{
+				APIServer: kubeadmapiv1beta2.APIServer{
+					CertSANs: test.in,
 				},
 			}
 

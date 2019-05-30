@@ -25,7 +25,8 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilpointer "k8s.io/utils/pointer"
@@ -475,11 +476,11 @@ func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 	}
 }
 
-func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...utilfeature.Feature) {
+func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...featuregate.Feature) {
 	for _, fg := range gates {
 		for _, f := range []bool{true, false} {
 			func() {
-				defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
 				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
 			}()
 		}

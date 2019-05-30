@@ -57,6 +57,8 @@ type RequestScope struct {
 	UnsafeConvertor runtime.ObjectConvertor
 	Authorizer      authorizer.Authorizer
 
+	EquivalentResourceMapper runtime.EquivalentResourceMapper
+
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
@@ -78,7 +80,7 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 
 func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind, mimeType, mimeSubType string) bool {
 	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
-	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion {
+	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion || gvk.GroupVersion() == metav1.SchemeGroupVersion {
 		switch gvk.Kind {
 		case "Table":
 			return scope.TableConvertor != nil &&
@@ -108,6 +110,9 @@ func (r *RequestScope) GetObjectCreater() runtime.ObjectCreater     { return r.C
 func (r *RequestScope) GetObjectTyper() runtime.ObjectTyper         { return r.Typer }
 func (r *RequestScope) GetObjectDefaulter() runtime.ObjectDefaulter { return r.Defaulter }
 func (r *RequestScope) GetObjectConvertor() runtime.ObjectConvertor { return r.Convertor }
+func (r *RequestScope) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
+	return r.EquivalentResourceMapper
+}
 
 // ConnectResource returns a function that handles a connect request on a rest.Storage object.
 func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admission.Interface, restPath string, isSubresource bool) http.HandlerFunc {
@@ -137,14 +142,14 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 			userInfo, _ := request.UserFrom(ctx)
 			// TODO: remove the mutating admission here as soon as we have ported all plugin that handle CONNECT
 			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
-				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), scope)
+				err = mutatingAdmission.Admit(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return
 				}
 			}
 			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
-				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, false, userInfo), scope)
+				err = validatingAdmission.Validate(admission.NewAttributesRecord(opts, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Connect, nil, false, userInfo), scope)
 				if err != nil {
 					scope.err(err, w, req)
 					return

@@ -907,6 +907,11 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 		if nodeName == UncertainAttachNode {
 			return "/dev/vdb-test", nil
 		}
+		// even if volume was previously attached to time out, we need to keep returning error
+		// so as reconciler can not confirm this volume as attached.
+		if nodeName == TimeoutAttachNode {
+			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+		}
 		if volumeNode == nodeName || volumeNode == MultiAttachNode || nodeName == MultiAttachNode {
 			return "/dev/vdb-test", nil
 		}

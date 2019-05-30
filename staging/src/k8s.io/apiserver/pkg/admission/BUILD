@@ -92,6 +92,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testing:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/util:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

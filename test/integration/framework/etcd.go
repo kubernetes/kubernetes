@@ -70,6 +70,10 @@ func getAvailablePort() (int, error) {
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
 func startEtcd() (func(), error) {
+	if runtime.GOARCH == "arm64" {
+		os.Setenv("ETCD_UNSUPPORTED_ARCH", "arm64")
+	}
+
 	etcdURL = env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 	conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
 	if err == nil {

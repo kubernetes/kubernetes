@@ -27,9 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -267,7 +267,7 @@ func TestFindAndRemoveDeletedPodsWithActualState(t *testing.T) {
 
 func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -422,7 +422,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 
 func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -471,7 +471,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 
 func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
@@ -520,7 +520,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 
 func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	// Enable BlockVolume feature gate
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, true)()
 
 	// create dswp
 	mode := v1.PersistentVolumeBlock
@@ -616,7 +616,7 @@ func TestCheckVolumeFSResize(t *testing.T) {
 	reconcileASW(fakeASW, fakeDSW, t)
 
 	// No resize request for volume, volumes in ASW shouldn't be marked as fsResizeRequired.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 	resizeRequiredVolumes := reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
 		t.Fatalf("No resize request for any volumes, but found resize required volumes in ASW: %v", resizeRequiredVolumes)
@@ -627,14 +627,14 @@ func TestCheckVolumeFSResize(t *testing.T) {
 	pvc.Spec.Resources.Requests = volumeCapacity(2)
 
 	// Disable the feature gate, so volume shouldn't be marked as fsResizeRequired.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, false)()
 	resizeRequiredVolumes = reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {
 		t.Fatalf("Feature gate disabled, but found resize required volumes in ASW: %v", resizeRequiredVolumes)
 	}
 
 	// Make volume used as ReadOnly, so volume shouldn't be marked as fsResizeRequired.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandInUsePersistentVolumes, true)()
 	pod.Spec.Containers[0].VolumeMounts[0].ReadOnly = true
 	resizeRequiredVolumes = reprocess(dswp, uniquePodName, fakeDSW, fakeASW)
 	if len(resizeRequiredVolumes) > 0 {

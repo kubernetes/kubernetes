@@ -32,6 +32,10 @@ func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
 		policy := admissionregistrationv1beta1.Ignore
 		obj.FailurePolicy = &policy
 	}
+	if obj.MatchPolicy == nil {
+		policy := admissionregistrationv1beta1.Exact
+		obj.MatchPolicy = &policy
+	}
 	if obj.NamespaceSelector == nil {
 		selector := metav1.LabelSelector{}
 		obj.NamespaceSelector = &selector

@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	"k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -203,7 +203,7 @@ func TestUnsupportedCloudProvider(t *testing.T) {
 	}{
 		{name: "nil cloudprovider", cloudProvider: nil},
 		{name: "vSphere", cloudProvider: &vsphere.VSphere{}, success: true},
-		{name: "fake cloudprovider", cloudProvider: &fake.FakeCloud{}},
+		{name: "fake cloudprovider", cloudProvider: &fake.Cloud{}},
 	}
 
 	for _, tc := range testcases {

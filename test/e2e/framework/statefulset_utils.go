@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -94,18 +95,18 @@ func (s *StatefulSetTester) CreateStatefulSet(manifestPath, ns string) *apps.Sta
 		return filepath.Join(manifestPath, file)
 	}
 
-	Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
+	e2elog.Logf("Parsing statefulset from %v", mkpath("statefulset.yaml"))
 	ss, err := manifest.StatefulSetFromManifest(mkpath("statefulset.yaml"), ns)
 	ExpectNoError(err)
-	Logf("Parsing service from %v", mkpath("service.yaml"))
+	e2elog.Logf("Parsing service from %v", mkpath("service.yaml"))
 	svc, err := manifest.SvcFromManifest(mkpath("service.yaml"))
 	ExpectNoError(err)
 
-	Logf(fmt.Sprintf("creating " + ss.Name + " service"))
+	e2elog.Logf(fmt.Sprintf("creating " + ss.Name + " service"))
 	_, err = s.c.CoreV1().Services(ns).Create(svc)
 	ExpectNoError(err)
 
-	Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
+	e2elog.Logf(fmt.Sprintf("creating statefulset %v/%v with %d replicas and selector %+v", ss.Namespace, ss.Name, *(ss.Spec.Replicas), ss.Spec.Selector))
 	_, err = s.c.AppsV1().StatefulSets(ns).Create(ss)
 	ExpectNoError(err)
 	s.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
@@ -134,7 +135,7 @@ func (s *StatefulSetTester) ExecInStatefulPods(ss *apps.StatefulSet, cmd string)
 	podList := s.GetPodList(ss)
 	for _, statefulPod := range podList.Items {
 		stdout, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
-		Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
+		e2elog.Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
 		if err != nil {
 			return err
 		}
@@ -162,9 +163,9 @@ func (s *StatefulSetTester) CheckHostname(ss *apps.StatefulSet) error {
 func (s *StatefulSetTester) Saturate(ss *apps.StatefulSet) {
 	var i int32
 	for i = 0; i < *(ss.Spec.Replicas); i++ {
-		Logf("Waiting for stateful pod at index %v to enter Running", i)
+		e2elog.Logf("Waiting for stateful pod at index %v to enter Running", i)
 		s.WaitForRunning(i+1, i, ss)
-		Logf("Resuming stateful pod at index %v", i)
+		e2elog.Logf("Resuming stateful pod at index %v", i)
 		s.ResumeNextPod(ss)
 	}
 }
@@ -200,7 +201,7 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) (*apps.Stat
 	name := ss.Name
 	ns := ss.Namespace
 
-	Logf("Scaling statefulset %s to %d", name, count)
+	e2elog.Logf("Scaling statefulset %s to %d", name, count)
 	ss = s.update(ns, name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
 
 	var statefulPodList *v1.PodList
@@ -282,12 +283,12 @@ func (s *StatefulSetTester) ConfirmStatefulPodCount(count int, ss *apps.Stateful
 			if hard {
 				Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
 			} else {
-				Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
+				e2elog.Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
 			}
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
+		e2elog.Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -300,7 +301,7 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 			podList := s.GetPodList(ss)
 			s.SortStatefulPods(podList)
 			if int32(len(podList.Items)) < numPodsRunning {
-				Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
+				e2elog.Logf("Found %d stateful pods, waiting for %d", len(podList.Items), numPodsRunning)
 				return false, nil
 			}
 			if int32(len(podList.Items)) > numPodsRunning {
@@ -310,7 +311,7 @@ func (s *StatefulSetTester) WaitForRunning(numPodsRunning, numPodsReady int32, s
 				shouldBeReady := getStatefulPodOrdinal(&p) < int(numPodsReady)
 				isReady := podutil.IsPodReady(&p)
 				desiredReadiness := shouldBeReady == isReady
-				Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
+				e2elog.Logf("Waiting for pod %v to enter %v - Ready=%v, currently %v - Ready=%v", p.Name, v1.PodRunning, shouldBeReady, p.Status.Phase, isReady)
 				if p.Status.Phase != v1.PodRunning || !desiredReadiness {
 					return false, nil
 				}
@@ -407,14 +408,14 @@ func (s *StatefulSetTester) WaitForRollingUpdate(set *apps.StatefulSet) (*apps.S
 			return false, nil
 		}
 		if set.Status.UpdateRevision != set.Status.CurrentRevision {
-			Logf("Waiting for StatefulSet %s/%s to complete update",
+			e2elog.Logf("Waiting for StatefulSet %s/%s to complete update",
 				set.Namespace,
 				set.Name,
 			)
 			s.SortStatefulPods(pods)
 			for i := range pods.Items {
 				if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
-					Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+					e2elog.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
 						pods.Items[i].Namespace,
 						pods.Items[i].Name,
 						set.Status.UpdateRevision,
@@ -453,14 +454,14 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 			return false, nil
 		}
 		if partition <= 0 && set.Status.UpdateRevision != set.Status.CurrentRevision {
-			Logf("Waiting for StatefulSet %s/%s to complete update",
+			e2elog.Logf("Waiting for StatefulSet %s/%s to complete update",
 				set.Namespace,
 				set.Name,
 			)
 			s.SortStatefulPods(pods)
 			for i := range pods.Items {
 				if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
-					Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+					e2elog.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
 						pods.Items[i].Namespace,
 						pods.Items[i].Name,
 						set.Status.UpdateRevision,
@@ -471,7 +472,7 @@ func (s *StatefulSetTester) WaitForPartitionedRollingUpdate(set *apps.StatefulSe
 		}
 		for i := int(*set.Spec.Replicas) - 1; i >= partition; i-- {
 			if pods.Items[i].Labels[apps.StatefulSetRevisionLabel] != set.Status.UpdateRevision {
-				Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
+				e2elog.Logf("Waiting for Pod %s/%s to have revision %s update revision %s",
 					pods.Items[i].Namespace,
 					pods.Items[i].Name,
 					set.Status.UpdateRevision,
@@ -528,7 +529,7 @@ func (s *StatefulSetTester) BreakPodHTTPProbe(ss *apps.StatefulSet, pod *v1.Pod)
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/ || true", path)
 	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
-	Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
+	e2elog.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
 
@@ -552,7 +553,7 @@ func (s *StatefulSetTester) RestorePodHTTPProbe(ss *apps.StatefulSet, pod *v1.Po
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/ || true", path)
 	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
-	Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
+	e2elog.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
 
@@ -598,14 +599,14 @@ func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 		}
 		_, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
 		ExpectNoError(err)
-		Logf("Resumed pod %v", pod.Name)
+		e2elog.Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name
 	}
 }
 
 // WaitForStatusReadyReplicas waits for the ss.Status.ReadyReplicas to be equal to expectedReplicas
 func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, expectedReplicas int32) {
-	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+	e2elog.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
@@ -618,7 +619,7 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, exp
 				return false, nil
 			}
 			if ssGet.Status.ReadyReplicas != expectedReplicas {
-				Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
+				e2elog.Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
 				return false, nil
 			}
 			return true, nil
@@ -630,7 +631,7 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, exp
 
 // WaitForStatusReplicas waits for the ss.Status.Replicas to be equal to expectedReplicas
 func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expectedReplicas int32) {
-	Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
+	e2elog.Logf("Waiting for statefulset status.replicas updated to %d", expectedReplicas)
 
 	ns, name := ss.Namespace, ss.Name
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout,
@@ -643,7 +644,7 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expected
 				return false, nil
 			}
 			if ssGet.Status.Replicas != expectedReplicas {
-				Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				e2elog.Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
@@ -655,7 +656,7 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expected
 
 // CheckServiceName asserts that the ServiceName for ss is equivalent to expectedServiceName.
 func (s *StatefulSetTester) CheckServiceName(ss *apps.StatefulSet, expectedServiceName string) error {
-	Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
+	e2elog.Logf("Checking if statefulset spec.serviceName is %s", expectedServiceName)
 
 	if expectedServiceName != ss.Spec.ServiceName {
 		return fmt.Errorf("Wrong service name governing statefulset. Expected %s got %s",
@@ -686,7 +687,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
 		sst.WaitForStatusReplicas(ss, 0)
-		Logf("Deleting statefulset %v", ss.Name)
+		e2elog.Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
 		if err := c.AppsV1().StatefulSets(ss.Namespace).Delete(ss.Name, &metav1.DeleteOptions{OrphanDependents: new(bool)}); err != nil {
@@ -700,13 +701,13 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	pvcPollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
 		pvcList, err := c.CoreV1().PersistentVolumeClaims(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
-			Logf("WARNING: Failed to list pvcs, retrying %v", err)
+			e2elog.Logf("WARNING: Failed to list pvcs, retrying %v", err)
 			return false, nil
 		}
 		for _, pvc := range pvcList.Items {
 			pvNames.Insert(pvc.Spec.VolumeName)
 			// TODO: Double check that there are no pods referencing the pvc
-			Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
+			e2elog.Logf("Deleting pvc: %v with volume %v", pvc.Name, pvc.Spec.VolumeName)
 			if err := c.CoreV1().PersistentVolumeClaims(ns).Delete(pvc.Name, nil); err != nil {
 				return false, nil
 			}
@@ -720,7 +721,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
 		pvList, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 		if err != nil {
-			Logf("WARNING: Failed to list pvs, retrying %v", err)
+			e2elog.Logf("WARNING: Failed to list pvs, retrying %v", err)
 			return false, nil
 		}
 		waitingFor := []string{}
@@ -732,7 +733,7 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 		if len(waitingFor) == 0 {
 			return true, nil
 		}
-		Logf("Still waiting for pvs of statefulset to disappear:\n%v", strings.Join(waitingFor, "\n"))
+		e2elog.Logf("Still waiting for pvs of statefulset to disappear:\n%v", strings.Join(waitingFor, "\n"))
 		return false, nil
 	})
 	if pollErr != nil {
@@ -879,7 +880,7 @@ func UpdateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(statefulSet)
 		if statefulSet, err = statefulSets.Update(statefulSet); err == nil {
-			Logf("Updating stateful set %s", name)
+			e2elog.Logf("Updating stateful set %s", name)
 			return true, nil
 		}
 		updateErr = err

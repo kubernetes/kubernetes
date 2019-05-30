@@ -57,7 +57,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -259,9 +259,6 @@ const MaxReadThenCreateRetries = 30
 // TODO: Remove when user/admin can configure volume types and thus we don't
 // need hardcoded defaults.
 const DefaultVolumeType = "gp2"
-
-// Used to call recognizeWellKnownRegions just once
-var once sync.Once
 
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
@@ -1204,14 +1201,8 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 		return nil, err
 	}
 
-	// Trust that if we get a region from configuration or AWS metadata that it is valid,
-	// and register ECR providers
-	recognizeRegion(regionName)
-
 	if !cfg.Global.DisableStrictZoneCheck {
-		valid := isRegionValid(regionName)
-		if !valid {
-			// This _should_ now be unreachable, given we call RecognizeRegion
+		if !isRegionValid(regionName, metadata) {
 			return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
 		}
 	} else {
@@ -1293,12 +1284,41 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 		}
 	}
 
-	// Register regions, in particular for ECR credentials
-	once.Do(func() {
-		recognizeWellKnownRegions()
-	})
-
 	return awsCloud, nil
+}
+
+// isRegionValid accepts an AWS region name and returns if the region is a
+// valid region known to the AWS SDK. Considers the region returned from the
+// EC2 metadata service to be a valid region as it's only available on a host
+// running in a valid AWS region.
+func isRegionValid(region string, metadata EC2Metadata) bool {
+	// Does the AWS SDK know about the region?
+	for _, p := range endpoints.DefaultPartitions() {
+		for r := range p.Regions() {
+			if r == region {
+				return true
+			}
+		}
+	}
+
+	// ap-northeast-3 is purposely excluded from the SDK because it
+	// requires an access request (for more details see):
+	// https://github.com/aws/aws-sdk-go/issues/1863
+	if region == "ap-northeast-3" {
+		return true
+	}
+
+	// Fallback to checking if the region matches the instance metadata region
+	// (ignoring any user overrides). This just accounts for running an old
+	// build of Kubernetes in a new region that wasn't compiled into the SDK
+	// when Kubernetes was built.
+	if az, err := getAvailabilityZone(metadata); err == nil {
+		if r, err := azToRegion(az); err == nil && region == r {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider

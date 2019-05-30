@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
@@ -54,7 +53,7 @@ func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 // Validate validates a new pod template.
 func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	template := obj.(*api.PodTemplate)
-	allErrs := validation.ValidatePodTemplate(template)
+	allErrs := corevalidation.ValidatePodTemplate(template)
 	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&template.Template, nil, field.NewPath("template"))...)
 	return allErrs
 }
@@ -80,7 +79,7 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	template := obj.(*api.PodTemplate)
 	oldTemplate := old.(*api.PodTemplate)
-	allErrs := validation.ValidatePodTemplateUpdate(template, oldTemplate)
+	allErrs := corevalidation.ValidatePodTemplateUpdate(template, oldTemplate)
 	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&template.Template, &oldTemplate.Template, field.NewPath("template"))...)
 	return allErrs
 }

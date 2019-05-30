@@ -383,7 +383,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		pod = podClient.Create(pod)
 
 		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
+		framework.ExpectError(err, "while waiting for pod to be running")
 
 		By("updating the pod")
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -392,11 +392,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 		By("waiting for pod running")
 		err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for pod to be running")
+		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		By("deleting the pod gracefully")
 		err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
 	/*
@@ -476,7 +476,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 		By("waiting for pod running")
 		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for pod to be running")
+		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		By("creating a file in subpath")
 		cmd := "touch /volume_mount/mypath/foo/test.log"
@@ -499,11 +499,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 
 		By("waiting for annotated pod running")
 		err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for annotated pod to be running")
+		framework.ExpectNoError(err, "while waiting for annotated pod to be running")
 
 		By("deleting the pod gracefully")
 		err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
 	/*
@@ -651,7 +651,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 	}()
 
 	err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
+	framework.ExpectError(err, "while waiting for pod to be running")
 }
 
 // Tests that the existing subpath mount is detected when a container restarts

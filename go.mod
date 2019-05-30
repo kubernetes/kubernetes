@@ -147,7 +147,7 @@ require (
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 // indirect
-	github.com/vmware/govmomi v0.20.0
+	github.com/vmware/govmomi v0.20.1
 	github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc
 	github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
@@ -178,7 +178,7 @@ require (
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster v1.2.0-beta.1
-	k8s.io/klog v0.3.0
+	k8s.io/klog v0.3.1
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
@@ -218,7 +218,7 @@ replace (
 	github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.16.26
 	github.com/bazelbuild/bazel-gazelle => github.com/bazelbuild/bazel-gazelle v0.0.0-20181012220611-c728ce9f663e
 	github.com/bazelbuild/buildtools => github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e
-	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1
+	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
 	github.com/blang/semver => github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
 	github.com/cespare/prettybench => github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
@@ -286,7 +286,7 @@ replace (
 	github.com/google/btree => github.com/google/btree v0.0.0-20160524151835-7d79101e329e
 	github.com/google/cadvisor => github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 	github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.0.21
-	github.com/google/go-cmp => github.com/google/go-cmp v0.2.0
+	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
 	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
@@ -355,7 +355,6 @@ replace (
 	github.com/pborman/uuid => github.com/pborman/uuid v1.2.0
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
-	github.com/philhofer/fwd => github.com/philhofer/fwd v1.0.0
 	github.com/pkg/errors => github.com/pkg/errors v0.8.0
 	github.com/pkg/sftp => github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
@@ -366,7 +365,6 @@ replace (
 	github.com/prometheus/common => github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a
 	github.com/quobyte/api => github.com/quobyte/api v0.1.2
-	github.com/rancher/go-rancher => github.com/rancher/go-rancher v0.0.0-20160922212217-09693a8743ba
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/robfig/cron => github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
 	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
@@ -389,13 +387,11 @@ replace (
 	github.com/stretchr/objx => github.com/stretchr/objx v0.1.1
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4
-	github.com/tinylib/msgp => github.com/tinylib/msgp v1.1.0
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8
-	github.com/ugorji/go => github.com/ugorji/go v0.0.0-20171019201919-bdcc60b419d1
 	github.com/urfave/negroni => github.com/urfave/negroni v1.0.0
 	github.com/vishvananda/netlink => github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
-	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.0
+	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.1
 	github.com/vmware/photon-controller-go-sdk => github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc
 	github.com/xanzy/go-cloudstack => github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
 	github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18
@@ -446,7 +442,7 @@ replace (
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
-	k8s.io/klog => k8s.io/klog v0.3.0
+	k8s.io/klog => k8s.io/klog v0.3.1
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30

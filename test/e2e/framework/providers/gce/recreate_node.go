@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -52,7 +53,7 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 		originalNodes, err = framework.CheckNodesReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		framework.ExpectNoError(err)
 
-		framework.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
+		e2elog.Logf("Got the following nodes before recreate %v", nodeNames(originalNodes))
 
 		ps, err = testutils.NewPodStore(f.ClientSet, systemNamespace, labels.Everything(), fields.Everything())
 		allPods := ps.List()
@@ -77,7 +78,7 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
-				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+				e2elog.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 			}
 		}
 		if ps != nil {
@@ -92,19 +93,19 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 
 // Recreate all the nodes in the test instance group
 func testRecreate(c clientset.Interface, ps *testutils.PodStore, systemNamespace string, nodes []v1.Node, podNames []string) {
-	err := recreateNodes(c, nodes)
+	err := RecreateNodes(c, nodes)
 	if err != nil {
 		framework.Failf("Test failed; failed to start the restart instance group command.")
 	}
 
-	err = waitForNodeBootIdsToChange(c, nodes, framework.RecreateNodeReadyAgainTimeout)
+	err = WaitForNodeBootIdsToChange(c, nodes, framework.RecreateNodeReadyAgainTimeout)
 	if err != nil {
 		framework.Failf("Test failed; failed to recreate at least one node in %v.", framework.RecreateNodeReadyAgainTimeout)
 	}
 
 	nodesAfter, err := framework.CheckNodesReady(c, len(nodes), framework.RestartNodeReadyAgainTimeout)
 	framework.ExpectNoError(err)
-	framework.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
+	e2elog.Logf("Got the following nodes after recreate: %v", nodeNames(nodesAfter))
 
 	if len(nodes) != len(nodesAfter) {
 		framework.Failf("Had %d nodes before nodes were recreated, but now only have %d",

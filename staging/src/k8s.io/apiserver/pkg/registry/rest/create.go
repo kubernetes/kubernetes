@@ -175,6 +175,7 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			staticAttributes.GetResource(),
 			staticAttributes.GetSubresource(),
 			staticAttributes.GetOperation(),
+			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
 		)

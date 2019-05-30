@@ -15,6 +15,7 @@ Discovery:
   Timeout: 5m0s
 NodeRegistration:
   CRISocket: /var/run/dockershim.sock
+  IgnorePreflightErrors: null
   KubeletExtraArgs: null
   Name: control-plane-1
   Taints:

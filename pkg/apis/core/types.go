@@ -1443,7 +1443,7 @@ type ConfigMapVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1466,7 +1466,7 @@ type ConfigMapProjection struct {
 	// relative and may not contain the '..' path or start with '..'.
 	// +optional
 	Items []KeyToPath
-	// Specify whether the ConfigMap or it's keys must be defined
+	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool
 }
@@ -1601,6 +1601,15 @@ type CSIPersistentVolumeSource struct {
 	// secret object contains more than one secret, all secrets are passed.
 	// +optional
 	NodePublishSecretRef *SecretReference
+
+	// ControllerExpandSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver to complete the CSI
+	// ControllerExpandVolume call.
+	// This is an alpha field and requires enabling ExpandCSIVolumes feature gate.
+	// This field is optional, and may be empty if no secret is required. If the
+	// secret object contains more than one secret, all secrets are passed.
+	// +optional
+	ControllerExpandSecretRef *SecretReference
 }
 
 // Represents a source location of a volume to mount, managed by an external CSI driver
@@ -1784,7 +1793,7 @@ type ConfigMapKeySelector struct {
 	LocalObjectReference
 	// The key to select.
 	Key string
-	// Specify whether the ConfigMap or it's key must be defined
+	// Specify whether the ConfigMap or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -1795,7 +1804,7 @@ type SecretKeySelector struct {
 	LocalObjectReference
 	// The key of the secret to select from.  Must be a valid secret key.
 	Key string
-	// Specify whether the Secret or it's key must be defined
+	// Specify whether the Secret or its key must be defined
 	// +optional
 	Optional *bool
 }
@@ -4730,7 +4739,17 @@ type SELinuxOptions struct {
 
 // WindowsSecurityContextOptions contain Windows-specific options and credentials.
 type WindowsSecurityContextOptions struct {
-	// intentionally left empty for now
+	// GMSACredentialSpecName is the name of the GMSA credential spec to use.
+	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
+	// +optional
+	GMSACredentialSpecName *string
+
+	// GMSACredentialSpec is where the GMSA admission webhook
+	// (https://github.com/kubernetes-sigs/windows-gmsa) inlines the contents of the
+	// GMSA credential spec named by the GMSACredentialSpecName field.
+	// This field is alpha-level and is only honored by servers that enable the WindowsGMSA feature flag.
+	// +optional
+	GMSACredentialSpec *string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

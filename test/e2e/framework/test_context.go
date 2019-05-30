@@ -33,6 +33,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 const (
@@ -421,7 +422,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if TestContext.Provider == "" {
 		// Some users of the e2e.test binary pass --provider=.
 		// We need to support that, changing it would break those usages.
-		Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
+		e2elog.Logf("The --provider flag is not set. Continuing as if --provider=skeleton had been used.")
 		TestContext.Provider = "skeleton"
 	}
 

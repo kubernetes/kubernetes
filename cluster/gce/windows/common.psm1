@@ -123,9 +123,10 @@ function Validate-SHA1 {
 }
 
 # Attempts to download the file from URLs, trying each URL until it succeeds.
-# It will loop through the URLs list forever until it has a success.
-# If successful, it will write the file to OutFile. You can optionally provide a SHA1 Hash
-# argument, in which case it will attempt to validate the downloaded file against the hash.
+# It will loop through the URLs list forever until it has a success. If
+# successful, it will write the file to OutFile. You can optionally provide a
+# SHA1 Hash argument, in which case it will attempt to validate the downloaded
+# file against the hash.
 function MustDownload-File {
   param (
     [parameter(Mandatory=$false)] [string]$Hash,

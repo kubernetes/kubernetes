@@ -48,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -328,13 +328,13 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 }
 
 func logPodEvents(f *framework.Framework) {
-	framework.Logf("Summary of pod events during the test:")
+	e2elog.Logf("Summary of pod events during the test:")
 	err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
 	framework.ExpectNoError(err)
 }
 
 func logNodeEvents(f *framework.Framework) {
-	framework.Logf("Summary of node events during the test:")
+	e2elog.Logf("Summary of node events during the test:")
 	err := framework.ListNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
 }
@@ -353,23 +353,23 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	for _, key := range metricNames {
 		metricSet.Insert(kubeletmetrics.KubeletSubsystem + "_" + key)
 	}
-	metric, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	metric, err := frameworkmetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
-		framework.Logf("Error getting kubelet metrics: %v", err)
+		e2elog.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		framework.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
+		e2elog.Logf("Kubelet Metrics: %+v", framework.GetKubeletLatencyMetrics(metric, metricSet))
 	}
 }
 
 // returns config related metrics from the local kubelet, filtered to the filterMetricNames passed in
 func getKubeletMetrics(filterMetricNames sets.String) (frameworkmetrics.KubeletMetrics, error) {
 	// grab Kubelet metrics
-	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
+	ms, err := frameworkmetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
 		return nil, err
 	}
 
-	filtered := metrics.NewKubeletMetrics()
+	filtered := frameworkmetrics.NewKubeletMetrics()
 	for name := range ms {
 		if !filterMetricNames.Has(name) {
 			continue
@@ -419,7 +419,7 @@ func restartKubelet() {
 	matches := regex.FindStringSubmatch(string(stdout))
 	Expect(len(matches)).NotTo(BeZero())
 	kube := matches[0]
-	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
+	e2elog.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }

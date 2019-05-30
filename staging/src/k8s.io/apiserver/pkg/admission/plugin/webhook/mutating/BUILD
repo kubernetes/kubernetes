@@ -33,25 +33,14 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "dispatcher_test.go",
-        "plugin_test.go",
-    ],
+    srcs = ["plugin_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testing:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/example:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/example2/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )
 

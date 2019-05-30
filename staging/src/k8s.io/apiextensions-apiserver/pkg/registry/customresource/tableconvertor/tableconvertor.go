@@ -87,6 +87,7 @@ func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tabl
 		table.ResourceVersion = m.GetResourceVersion()
 		table.SelfLink = m.GetSelfLink()
 		table.Continue = m.GetContinue()
+		table.RemainingItemCount = m.GetRemainingItemCount()
 	} else {
 		if m, err := meta.CommonAccessor(obj); err == nil {
 			table.ResourceVersion = m.GetResourceVersion()

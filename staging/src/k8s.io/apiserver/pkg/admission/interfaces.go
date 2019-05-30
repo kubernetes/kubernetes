@@ -41,6 +41,8 @@ type Attributes interface {
 	GetSubresource() string
 	// GetOperation is the operation being performed
 	GetOperation() Operation
+	// GetOperationOptions is the options for the operation being performed
+	GetOperationOptions() runtime.Object
 	// IsDryRun indicates that modifications will definitely not be persisted for this request. This is to prevent
 	// admission controllers with side effects and a method of reconciliation from being overwhelmed.
 	// However, a value of false for this does not mean that the modification will be persisted, because it
@@ -74,6 +76,8 @@ type ObjectInterfaces interface {
 	GetObjectDefaulter() runtime.ObjectDefaulter
 	// GetObjectConvertor is the ObjectConvertor appropriate for the requested object.
 	GetObjectConvertor() runtime.ObjectConvertor
+	// GetEquivalentResourceMapper is the EquivalentResourceMapper appropriate for finding equivalent resources and expected kind for the requested object.
+	GetEquivalentResourceMapper() runtime.EquivalentResourceMapper
 }
 
 // privateAnnotationsGetter is a private interface which allows users to get annotations from Attributes.

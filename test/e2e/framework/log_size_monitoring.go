@@ -26,6 +26,8 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const (
@@ -154,7 +156,7 @@ func (d *LogsSizeData) addNewData(ip, path string, timestamp time.Time, size int
 
 // NewLogsVerifier creates a new LogsSizeVerifier which will stop when stopChannel is closed
 func NewLogsVerifier(c clientset.Interface, stopChannel chan bool) *LogsSizeVerifier {
-	nodeAddresses, err := NodeSSHHosts(c)
+	nodeAddresses, err := e2essh.NodeSSHHosts(c)
 	ExpectNoError(err)
 	masterAddress := GetMasterHost() + ":22"
 
@@ -250,16 +252,16 @@ func (g *LogSizeGatherer) Work() bool {
 		return false
 	case workItem = <-g.workChannel:
 	}
-	sshResult, err := SSH(
+	sshResult, err := e2essh.SSH(
 		fmt.Sprintf("ls -l %v | awk '{print $9, $5}' | tr '\n' ' '", strings.Join(workItem.paths, " ")),
 		workItem.ip,
 		TestContext.Provider,
 	)
 	if err != nil {
-		Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
+		e2elog.Logf("Error while trying to SSH to %v, skipping probe. Error: %v", workItem.ip, err)
 		// In case of repeated error give up.
 		if workItem.backoffMultiplier >= 128 {
-			Logf("Failed to ssh to a node %v multiple times in a row. Giving up.", workItem.ip)
+			e2elog.Logf("Failed to ssh to a node %v multiple times in a row. Giving up.", workItem.ip)
 			g.wg.Done()
 			return false
 		}
@@ -275,7 +277,7 @@ func (g *LogSizeGatherer) Work() bool {
 		path := results[i]
 		size, err := strconv.Atoi(results[i+1])
 		if err != nil {
-			Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
+			e2elog.Logf("Error during conversion to int: %v, skipping data. Error: %v", results[i+1], err)
 			continue
 		}
 		g.data.addNewData(workItem.ip, path, now, size)

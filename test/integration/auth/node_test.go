@@ -36,10 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
-	externalclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -56,13 +55,13 @@ func TestNodeAuthorizer(t *testing.T) {
 	)
 
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
 
 	// Enable NodeLease feature so that nodes can create leases
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
 
 	tokenFile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
@@ -187,7 +186,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
-	getVolumeAttachment := func(client externalclientset.Interface) func() error {
+	getVolumeAttachment := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.StorageV1().VolumeAttachments().Get("myattachment", metav1.GetOptions{})
 			return err
@@ -398,13 +397,13 @@ func TestNodeAuthorizer(t *testing.T) {
 		}
 	}
 
-	getNode1CSINode := func(client externalclientset.Interface) func() error {
+	getNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
 			_, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
 			return err
 		}
 	}
-	createNode1CSINode := func(client externalclientset.Interface) func() error {
+	createNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
 			nodeInfo := &storagev1beta1.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
@@ -424,7 +423,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
-	updateNode1CSINode := func(client externalclientset.Interface) func() error {
+	updateNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
 			nodeInfo, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
 			if err != nil {
@@ -441,7 +440,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
-	patchNode1CSINode := func(client externalclientset.Interface) func() error {
+	patchNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
 			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
@@ -449,7 +448,7 @@ func TestNodeAuthorizer(t *testing.T) {
 			return err
 		}
 	}
-	deleteNode1CSINode := func(client externalclientset.Interface) func() error {
+	deleteNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
 			return client.StorageV1beta1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
 		}
@@ -562,12 +561,12 @@ func TestNodeAuthorizer(t *testing.T) {
 	expectAllowed(t, createNode2NormalPod(superuserClient))
 
 	// ExpandPersistentVolumes feature disabled
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, false)()
 	expectForbidden(t, updatePVCCapacity(node1Client))
 	expectForbidden(t, updatePVCCapacity(node2Client))
 
 	// ExpandPersistentVolumes feature enabled
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, true)()
 	expectForbidden(t, updatePVCCapacity(node1Client))
 	expectAllowed(t, updatePVCCapacity(node2Client))
 	expectForbidden(t, updatePVCPhase(node2Client))

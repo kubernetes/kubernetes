@@ -162,7 +162,7 @@ type TokensController struct {
 	maxRetries int
 }
 
-// Runs controller blocks until stopCh is closed
+// Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	// Shut down queues
 	defer utilruntime.HandleCrash()

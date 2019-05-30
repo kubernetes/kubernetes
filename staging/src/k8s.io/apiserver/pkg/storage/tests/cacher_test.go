@@ -49,7 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var (
@@ -259,7 +259,7 @@ func TestList(t *testing.T) {
 	updatePod(t, etcdStorage, podFooNS2, nil)
 
 	deleted := example.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil, storage.ValidateAllObjectFunc); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -521,7 +521,7 @@ func TestFiltering(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
 	deleted := example.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil, storage.ValidateAllObjectFunc); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -786,7 +786,7 @@ func TestCacherListerWatcherPagination(t *testing.T) {
 }
 
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
 
 	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)
@@ -848,7 +848,7 @@ func TestWatchDispatchBookmarkEvents(t *testing.T) {
 }
 
 func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
 
 	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
 	defer server.Terminate(t)

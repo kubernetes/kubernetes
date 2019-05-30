@@ -25,6 +25,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
@@ -56,6 +57,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/informers/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//third_party/forked/gonum/graph:go_default_library",
         "//third_party/forked/gonum/graph/simple:go_default_library",
         "//third_party/forked/gonum/graph/traverse:go_default_library",

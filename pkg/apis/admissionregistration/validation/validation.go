@@ -23,7 +23,6 @@ import (
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
@@ -224,13 +223,16 @@ func validateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebho
 func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
-	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
+	allErrors = append(allErrors, utilvalidation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
 
 	for i, rule := range hook.Rules {
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)
 	}
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
+	}
+	if hook.MatchPolicy != nil && !supportedMatchPolicies.Has(string(*hook.MatchPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("matchPolicy"), *hook.MatchPolicy, supportedMatchPolicies.List()))
 	}
 	if hook.SideEffects != nil && !supportedSideEffectClasses.Has(string(*hook.SideEffects)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("sideEffects"), *hook.SideEffects, supportedSideEffectClasses.List()))
@@ -258,6 +260,11 @@ func validateWebhook(hook *admissionregistration.Webhook, fldPath *field.Path) f
 var supportedFailurePolicies = sets.NewString(
 	string(admissionregistration.Ignore),
 	string(admissionregistration.Fail),
+)
+
+var supportedMatchPolicies = sets.NewString(
+	string(admissionregistration.Exact),
+	string(admissionregistration.Equivalent),
 )
 
 var supportedSideEffectClasses = sets.NewString(

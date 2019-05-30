@@ -21,8 +21,8 @@ import (
 	"strconv"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,7 +47,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		nodeInfo           *NodeInfo
 		vsp                *VSphere
 	)
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("vsphere")
 		Bootstrap(f)
 		c = f.ClientSet
@@ -59,13 +59,13 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 			nodeInfo = TestContext.NodeMapper.GetNodeInfo(node1Name)
 			vsp = nodeInfo.VSphere
 		}
-		By("creating vmdk")
+		ginkgo.By("creating vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		for _, volumePath := range volumePaths {
 			vsp.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
 		}
@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 
 	*/
 
-	It("should create and delete pod with the same volume source on the same worker node", func() {
+	ginkgo.It("should create and delete pod with the same volume source on the same worker node", func() {
 		var volumeFiles []string
 		pod := createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 
@@ -113,7 +113,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		createAndVerifyFilesOnVolume(ns, pod.Name, []string{newEmptyFileName}, volumeFiles)
 		deletePodAndWaitForVolumeToDetach(f, c, pod, node1Name, volumePaths)
 
-		By(fmt.Sprintf("Creating pod on the same node: %v", node1Name))
+		ginkgo.By(fmt.Sprintf("Creating pod on the same node: %v", node1Name))
 		pod = createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
@@ -142,7 +142,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		13. Delete pod.
 	*/
 
-	It("should create and delete pod with the same volume source attach/detach to different worker nodes", func() {
+	ginkgo.It("should create and delete pod with the same volume source attach/detach to different worker nodes", func() {
 		var volumeFiles []string
 		pod := createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
@@ -152,7 +152,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		createAndVerifyFilesOnVolume(ns, pod.Name, []string{newEmptyFileName}, volumeFiles)
 		deletePodAndWaitForVolumeToDetach(f, c, pod, node1Name, volumePaths)
 
-		By(fmt.Sprintf("Creating pod on the another node: %v", node2Name))
+		ginkgo.By(fmt.Sprintf("Creating pod on the another node: %v", node2Name))
 		pod = createPodWithVolumeAndNodeSelector(c, ns, node2Name, node2KeyValueLabel, volumePaths)
 
 		newEmptyFileName = fmt.Sprintf("/mnt/volume1/%v_2.txt", ns)
@@ -177,13 +177,13 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		10. Wait for vmdk1 and vmdk2 to be detached from node.
 	*/
 
-	It("should create and delete pod with multiple volumes from same datastore", func() {
-		By("creating another vmdk")
+	ginkgo.It("should create and delete pod with multiple volumes from same datastore", func() {
+		ginkgo.By("creating another vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 
-		By(fmt.Sprintf("Creating pod on the node: %v with volume: %v and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
+		ginkgo.By(fmt.Sprintf("Creating pod on the node: %v with volume: %v and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
 		pod := createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
 		// Verify newly and previously created files present on the volume mounted on the pod
@@ -193,7 +193,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		}
 		createAndVerifyFilesOnVolume(ns, pod.Name, volumeFiles, volumeFiles)
 		deletePodAndWaitForVolumeToDetach(f, c, pod, node1Name, volumePaths)
-		By(fmt.Sprintf("Creating pod on the node: %v with volume :%v and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
+		ginkgo.By(fmt.Sprintf("Creating pod on the node: %v with volume :%v and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
 		pod = createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
 		// Verify newly and previously created files present on the volume mounted on the pod
@@ -219,8 +219,8 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		9. Delete POD.
 		10. Wait for vmdk1 and vmdk2 to be detached from node.
 	*/
-	It("should create and delete pod with multiple volumes from different datastore", func() {
-		By("creating another vmdk on non default shared datastore")
+	ginkgo.It("should create and delete pod with multiple volumes from different datastore", func() {
+		ginkgo.By("creating another vmdk on non default shared datastore")
 		var volumeOptions *VolumeOptions
 		volumeOptions = new(VolumeOptions)
 		volumeOptions.CapacityKB = 2097152
@@ -231,7 +231,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 
-		By(fmt.Sprintf("Creating pod on the node: %v with volume :%v  and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
+		ginkgo.By(fmt.Sprintf("Creating pod on the node: %v with volume :%v  and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
 		pod := createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
@@ -243,7 +243,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		createAndVerifyFilesOnVolume(ns, pod.Name, volumeFiles, volumeFiles)
 		deletePodAndWaitForVolumeToDetach(f, c, pod, node1Name, volumePaths)
 
-		By(fmt.Sprintf("Creating pod on the node: %v with volume :%v  and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
+		ginkgo.By(fmt.Sprintf("Creating pod on the node: %v with volume :%v  and volume: %v", node1Name, volumePaths[0], volumePaths[1]))
 		pod = createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, volumePaths)
 		// Create empty files on the mounted volumes on the pod to verify volume is writable
 		// Verify newly and previously created files present on the volume mounted on the pod
@@ -271,7 +271,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		    10. Repeatedly (5 times) perform step 4 to 9 and verify associated volume's content is matching.
 		    11. Wait for vmdk1 and vmdk2 to be detached from node.
 	*/
-	It("test back to back pod creation and deletion with different volume sources on the same worker node", func() {
+	ginkgo.It("test back to back pod creation and deletion with different volume sources on the same worker node", func() {
 		var (
 			podA                *v1.Pod
 			podB                *v1.Pod
@@ -282,10 +282,10 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 		)
 
 		defer func() {
-			By("clean up undeleted pods")
+			ginkgo.By("clean up undeleted pods")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "defer: Failed to delete pod ", podA.Name)
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "defer: Failed to delete pod ", podB.Name)
-			By(fmt.Sprintf("wait for volumes to be detached from the node: %v", node1Name))
+			ginkgo.By(fmt.Sprintf("wait for volumes to be detached from the node: %v", node1Name))
 			for _, volumePath := range volumePaths {
 				framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, node1Name))
 			}
@@ -293,17 +293,17 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 
 		testvolumePathsPodA = append(testvolumePathsPodA, volumePaths[0])
 		// Create another VMDK Volume
-		By("creating another vmdk")
+		ginkgo.By("creating another vmdk")
 		volumePath, err := vsp.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 		framework.ExpectNoError(err)
 		volumePaths = append(volumePaths, volumePath)
 		testvolumePathsPodB = append(testvolumePathsPodA, volumePath)
 
 		for index := 0; index < 5; index++ {
-			By(fmt.Sprintf("Creating pod-A on the node: %v with volume: %v", node1Name, testvolumePathsPodA[0]))
+			ginkgo.By(fmt.Sprintf("Creating pod-A on the node: %v with volume: %v", node1Name, testvolumePathsPodA[0]))
 			podA = createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, testvolumePathsPodA)
 
-			By(fmt.Sprintf("Creating pod-B on the node: %v with volume: %v", node1Name, testvolumePathsPodB[0]))
+			ginkgo.By(fmt.Sprintf("Creating pod-B on the node: %v with volume: %v", node1Name, testvolumePathsPodB[0]))
 			podB = createPodWithVolumeAndNodeSelector(c, ns, node1Name, node1KeyValueLabel, testvolumePathsPodB)
 
 			podAFileName := fmt.Sprintf("/mnt/volume1/podA_%v_%v.txt", ns, index+1)
@@ -312,21 +312,21 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 			podBFiles = append(podBFiles, podBFileName)
 
 			// Create empty files on the mounted volumes on the pod to verify volume is writable
-			By("Creating empty file on volume mounted on pod-A")
+			ginkgo.By("Creating empty file on volume mounted on pod-A")
 			framework.CreateEmptyFileOnPod(ns, podA.Name, podAFileName)
 
-			By("Creating empty file volume mounted on pod-B")
+			ginkgo.By("Creating empty file volume mounted on pod-B")
 			framework.CreateEmptyFileOnPod(ns, podB.Name, podBFileName)
 
 			// Verify newly and previously created files present on the volume mounted on the pod
-			By("Verify newly Created file and previously created files present on volume mounted on pod-A")
+			ginkgo.By("Verify newly Created file and previously created files present on volume mounted on pod-A")
 			verifyFilesExistOnVSphereVolume(ns, podA.Name, podAFiles...)
-			By("Verify newly Created file and previously created files present on volume mounted on pod-B")
+			ginkgo.By("Verify newly Created file and previously created files present on volume mounted on pod-B")
 			verifyFilesExistOnVSphereVolume(ns, podB.Name, podBFiles...)
 
-			By("Deleting pod-A")
+			ginkgo.By("Deleting pod-A")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podA), "Failed to delete pod ", podA.Name)
-			By("Deleting pod-B")
+			ginkgo.By("Deleting pod-B")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, podB), "Failed to delete pod ", podB.Name)
 		}
 	})
@@ -354,38 +354,38 @@ func testSetupVolumePlacement(client clientset.Interface, namespace string) (nod
 func createPodWithVolumeAndNodeSelector(client clientset.Interface, namespace string, nodeName string, nodeKeyValueLabel map[string]string, volumePaths []string) *v1.Pod {
 	var pod *v1.Pod
 	var err error
-	By(fmt.Sprintf("Creating pod on the node: %v", nodeName))
+	ginkgo.By(fmt.Sprintf("Creating pod on the node: %v", nodeName))
 	podspec := getVSpherePodSpecWithVolumePaths(volumePaths, nodeKeyValueLabel, nil)
 
 	pod, err = client.CoreV1().Pods(namespace).Create(podspec)
 	framework.ExpectNoError(err)
-	By("Waiting for pod to be ready")
-	Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(Succeed())
+	ginkgo.By("Waiting for pod to be ready")
+	gomega.Expect(framework.WaitForPodNameRunningInNamespace(client, pod.Name, namespace)).To(gomega.Succeed())
 
-	By(fmt.Sprintf("Verify volume is attached to the node:%v", nodeName))
+	ginkgo.By(fmt.Sprintf("Verify volume is attached to the node:%v", nodeName))
 	for _, volumePath := range volumePaths {
 		isAttached, err := diskIsAttached(volumePath, nodeName)
 		framework.ExpectNoError(err)
-		Expect(isAttached).To(BeTrue(), "disk:"+volumePath+" is not attached with the node")
+		gomega.Expect(isAttached).To(gomega.BeTrue(), "disk:"+volumePath+" is not attached with the node")
 	}
 	return pod
 }
 
 func createAndVerifyFilesOnVolume(namespace string, podname string, newEmptyfilesToCreate []string, filesToCheck []string) {
 	// Create empty files on the mounted volumes on the pod to verify volume is writable
-	By(fmt.Sprintf("Creating empty file on volume mounted on: %v", podname))
+	ginkgo.By(fmt.Sprintf("Creating empty file on volume mounted on: %v", podname))
 	createEmptyFilesOnVSphereVolume(namespace, podname, newEmptyfilesToCreate)
 
 	// Verify newly and previously created files present on the volume mounted on the pod
-	By(fmt.Sprintf("Verify newly Created file and previously created files present on volume mounted on: %v", podname))
+	ginkgo.By(fmt.Sprintf("Verify newly Created file and previously created files present on volume mounted on: %v", podname))
 	verifyFilesExistOnVSphereVolume(namespace, podname, filesToCheck...)
 }
 
 func deletePodAndWaitForVolumeToDetach(f *framework.Framework, c clientset.Interface, pod *v1.Pod, nodeName string, volumePaths []string) {
-	By("Deleting pod")
+	ginkgo.By("Deleting pod")
 	framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
 
-	By("Waiting for volume to be detached from the node")
+	ginkgo.By("Waiting for volume to be detached from the node")
 	for _, volumePath := range volumePaths {
 		framework.ExpectNoError(waitForVSphereDiskToDetach(volumePath, nodeName))
 	}

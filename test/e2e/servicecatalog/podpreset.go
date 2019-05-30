@@ -113,14 +113,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pod")
+		framework.ExpectNoError(err, "failed to query for pod")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to set up watch")
+		framework.ExpectNoError(err, "failed to set up watch")
 
 		ginkgo.By("submitting the pod to kubernetes")
 		podClient.Create(pod)
@@ -129,7 +129,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pod")
+		framework.ExpectNoError(err, "failed to query for pod")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
 		ginkgo.By("verifying pod creation was observed")
@@ -149,7 +149,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		ginkgo.By("ensuring pod is modified")
 		// save the running pod
 		pod, err = podClient.Get(pod.Name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to GET scheduled pod")
+		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		// check the annotation is there
 		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/podpreset-hello"]; !ok {
@@ -233,14 +233,14 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pod")
+		framework.ExpectNoError(err, "failed to query for pod")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(0))
 		options = metav1.ListOptions{
 			LabelSelector:   selector.String(),
 			ResourceVersion: pods.ListMeta.ResourceVersion,
 		}
 		w, err := podClient.Watch(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to set up watch")
+		framework.ExpectNoError(err, "failed to set up watch")
 
 		ginkgo.By("submitting the pod to kubernetes")
 		podClient.Create(originalPod)
@@ -249,7 +249,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		selector = labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options = metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err = podClient.List(options)
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to query for pod")
+		framework.ExpectNoError(err, "failed to query for pod")
 		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
 
 		ginkgo.By("verifying pod creation was observed")
@@ -269,7 +269,7 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		ginkgo.By("ensuring pod is modified")
 		// save the running pod
 		pod, err := podClient.Get(originalPod.Name, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to GET scheduled pod")
+		framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 		// check the annotation is not there
 		if _, ok := pod.Annotations["podpreset.admission.kubernetes.io/podpreset-hello"]; ok {

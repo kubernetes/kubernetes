@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
@@ -91,7 +91,7 @@ func getTestCriticalPodAdmissionHandler(podProvider *fakePodProvider, podKiller 
 }
 
 func TestEvictPodsToFreeRequests(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	type testRun struct {
 		testName              string
 		inputPods             []*v1.Pod
@@ -159,7 +159,7 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 }
 
 func TestGetPodsToPreempt(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	type testRun struct {
 		testName              string
 		preemptor             *v1.Pod

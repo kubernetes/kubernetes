@@ -176,6 +176,8 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
 		framework.NewRegistry(),
+		cc.ComponentConfig.Plugins,
+		cc.ComponentConfig.PluginConfig,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),

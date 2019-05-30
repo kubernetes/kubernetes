@@ -129,7 +129,7 @@ func NewCachingSecretManager(kubeClient clientset.Interface, getTTL manager.GetO
 // NewWatchingSecretManager creates a manager that keeps a cache of all secrets
 // necessary for registered pods.
 // It implements the following logic:
-// - whenever a pod is created or updated, we start inidvidual watches for all
+// - whenever a pod is created or updated, we start individual watches for all
 //   referenced objects that aren't referenced from other registered pods
 // - every GetObject() returns a value from local cache propagated via watches
 func NewWatchingSecretManager(kubeClient clientset.Interface) Manager {

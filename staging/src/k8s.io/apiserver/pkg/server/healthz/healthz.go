@@ -37,15 +37,6 @@ type HealthzChecker interface {
 	Check(req *http.Request) error
 }
 
-var defaultHealthz = sync.Once{}
-
-// DefaultHealthz installs the default healthz check to the http.DefaultServeMux.
-func DefaultHealthz(checks ...HealthzChecker) {
-	defaultHealthz.Do(func() {
-		InstallHandler(http.DefaultServeMux, checks...)
-	})
-}
-
 // PingHealthz returns true automatically when checked
 var PingHealthz HealthzChecker = ping{}
 

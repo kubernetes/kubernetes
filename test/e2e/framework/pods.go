@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +33,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -149,11 +150,11 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 		updateFn(pod)
 		_, err = c.PodInterface.Update(pod)
 		if err == nil {
-			Logf("Successfully updated pod %q", name)
+			e2elog.Logf("Successfully updated pod %q", name)
 			return true, nil
 		}
 		if errors.IsConflict(err) {
-			Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
+			e2elog.Logf("Conflicting update to pod %q, re-get and re-update: %v", name, err)
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to update pod %q: %v", name, err)
@@ -246,6 +247,23 @@ func (c *PodClient) WaitForFailure(name string, timeout time.Duration) {
 			}
 		},
 	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
+}
+
+// WaitForFinish waits for pod to finish running, regardless of success or failure.
+func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
+	f := c.f
+	gomega.Expect(WaitForPodCondition(f.ClientSet, f.Namespace.Name, name, "success or failure", timeout,
+		func(pod *v1.Pod) (bool, error) {
+			switch pod.Status.Phase {
+			case v1.PodFailed:
+				return true, nil
+			case v1.PodSucceeded:
+				return true, nil
+			default:
+				return false, nil
+			}
+		},
+	)).To(gomega.Succeed(), "wait for pod %q to finish running", name)
 }
 
 // WaitForErrorEventOrSuccess waits for pod to succeed or an error event for that pod.
