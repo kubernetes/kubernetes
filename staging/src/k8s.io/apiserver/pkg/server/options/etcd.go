@@ -31,6 +31,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
@@ -204,6 +205,16 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	c.HealthzChecks = append(c.HealthzChecks, healthz.NamedCheck("etcd", func(r *http.Request) error {
 		return healthCheck()
 	}))
+
+	if s.EncryptionProviderConfigFilepath != "" {
+		kmsPluginHealthzChecks, err := encryptionconfig.GetKMSPluginHealthzCheckers(s.EncryptionProviderConfigFilepath)
+		if err != nil {
+			return err
+		}
+
+		c.HealthzChecks = append(c.HealthzChecks, kmsPluginHealthzChecks...)
+	}
+
 	return nil
 }
 
