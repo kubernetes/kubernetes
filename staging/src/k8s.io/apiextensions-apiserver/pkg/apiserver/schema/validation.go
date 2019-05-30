@@ -81,7 +81,11 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 
 	allErrs := field.ErrorList{}
 
+	if s.Type == "array" && s.Items == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("items"), "must be specified"))
+	}
 	allErrs = append(allErrs, validateStructuralInvariants(s.Items, itemLevel, fldPath.Child("items"))...)
+
 	for k, v := range s.Properties {
 		allErrs = append(allErrs, validateStructuralInvariants(&v, fieldLevel, fldPath.Child("properties").Key(k))...)
 	}
