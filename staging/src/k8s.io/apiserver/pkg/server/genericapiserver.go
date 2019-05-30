@@ -26,13 +26,13 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/go-openapi/spec"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -145,9 +146,17 @@ type GenericAPIServer struct {
 	preShutdownHooksCalled bool
 
 	// healthz checks
-	healthzLock    sync.Mutex
-	healthzChecks  []healthz.HealthzChecker
-	healthzCreated bool
+	healthzLock                sync.Mutex
+	healthzChecks              []healthz.HealthzChecker
+	healthzChecksInstalled     bool
+	readyzLock                 sync.Mutex
+	readyzChecks               []healthz.HealthzChecker
+	readyzChecksInstalled      bool
+	maxStartupSequenceDuration time.Duration
+	healthzClock               clock.Clock
+	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
+	// will cause readyz to return unhealthy.
+	readinessStopCh chan struct{}
 
 	// auditing. The backend is started after the server starts listening.
 	AuditBackend audit.Backend
@@ -259,6 +268,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	s.installHealthz()
+	s.installReadyz(s.readinessStopCh)
 
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
@@ -327,6 +337,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// ensure cleanup.
 	go func() {
 		<-stopCh
+		close(s.readinessStopCh)
 		close(internalStopCh)
 		if stoppedCh != nil {
 			<-stoppedCh

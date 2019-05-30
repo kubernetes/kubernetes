@@ -137,6 +137,22 @@ func TestServerRunOptionsValidate(t *testing.T) {
 			expectErr: "--max-resource-write-bytes can not be negative value",
 		},
 		{
+			name: "Test when MaxStartupSequenceDuration is negative value",
+			testOptions: &ServerRunOptions{
+				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+				CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
+				MaxRequestsInFlight:         400,
+				MaxMutatingRequestsInFlight: 200,
+				RequestTimeout:              time.Duration(2) * time.Minute,
+				MinRequestTimeout:           1800,
+				JSONPatchMaxCopyBytes:       10 * 1024 * 1024,
+				MaxRequestBodyBytes:         10 * 1024 * 1024,
+				TargetRAMMB:                 65536,
+				MaxStartupSequenceDuration:  -time.Second,
+			},
+			expectErr: "--maximum-startup-sequence-duration can not be a negative value",
+		},
+		{
 			name: "Test when ServerRunOptions is valid",
 			testOptions: &ServerRunOptions{
 				AdvertiseAddress:            net.ParseIP("192.168.10.10"),
