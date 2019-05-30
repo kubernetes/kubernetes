@@ -288,3 +288,45 @@ func TestGetSockets(t *testing.T) {
 		}
 	}
 }
+
+func TestIsNarrowerThan(t *testing.T) {
+	tcases := []struct {
+		name                  string
+		firstMask             []int
+		secondMask            []int
+		expectedFirstNarrower bool
+	}{
+		{
+			name:                  "Check narrowness of masks with unequal bits set 1/2",
+			firstMask:             []int{0},
+			secondMask:            []int{0, 1},
+			expectedFirstNarrower: true,
+		},
+		{
+			name:                  "Check narrowness of masks with unequal bits set 2/2",
+			firstMask:             []int{0, 1},
+			secondMask:            []int{0},
+			expectedFirstNarrower: false,
+		},
+		{
+			name:                  "Check narrowness of masks with equal bits set 1/2",
+			firstMask:             []int{0},
+			secondMask:            []int{1},
+			expectedFirstNarrower: true,
+		},
+		{
+			name:                  "Check narrowness of masks with equal bits set 2/2",
+			firstMask:             []int{1},
+			secondMask:            []int{0},
+			expectedFirstNarrower: false,
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewSocketMask(tc.firstMask...)
+		secondMask, _ := NewSocketMask(tc.secondMask...)
+		expectedFirstNarrower := firstMask.IsNarrowerThan(secondMask)
+		if expectedFirstNarrower != tc.expectedFirstNarrower {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstNarrower, expectedFirstNarrower)
+		}
+	}
+}

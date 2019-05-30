@@ -31,6 +31,7 @@ type SocketMask interface {
 	IsEqual(mask SocketMask) bool
 	IsEmpty() bool
 	IsSet(socket int) bool
+	IsNarrowerThan(mask SocketMask) bool
 	String() string
 	Count() int
 	GetSockets() []int
@@ -114,6 +115,20 @@ func (s *socketMask) IsSet(socket int) bool {
 //IsEqual checks if masks are equal
 func (s *socketMask) IsEqual(mask SocketMask) bool {
 	return *s == *mask.(*socketMask)
+}
+
+// IsNarrowerThan checks if one mask is narrower than another.
+//
+// A mask is said to be "narrower" than another if it has lets bits set. If the
+// same number of bits are set in both masks, then the mask with more
+// lower-numbered bits set wins out.
+func (s *socketMask) IsNarrowerThan(mask SocketMask) bool {
+	if s.Count() == mask.Count() {
+		if *s < *mask.(*socketMask) {
+			return true
+		}
+	}
+	return s.Count() < mask.Count()
 }
 
 //String converts mask to string
