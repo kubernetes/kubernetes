@@ -49,7 +49,7 @@ func TestAdd(t *testing.T) {
 		expectedMask string
 	}{
 		{
-			name:         "Reset bit 1 SocketMask to 0",
+			name:         "New SocketMask with sockets 0 and 1 set",
 			firstSocket:  0,
 			secondSocket: 1,
 			expectedMask: "1100000000000000000000000000000000000000000000000000000000000000",
@@ -229,7 +229,7 @@ func TestIsEqual(t *testing.T) {
 		isEqual       bool
 	}{
 		{
-			name:          "And socket masks",
+			name:          "Check if two socket masks are equal",
 			firstMaskBit:  int(0),
 			secondMaskBit: int(0),
 			isEqual:       true,
