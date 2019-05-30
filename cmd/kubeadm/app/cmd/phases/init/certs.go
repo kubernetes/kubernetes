@@ -18,6 +18,7 @@ package phases
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -109,6 +110,8 @@ func newCertSubPhases() []workflow.Phase {
 	}
 
 	subPhases = append(subPhases, saPhase)
+
+	sort.Slice(subPhases, func(i, j int) bool { return subPhases[i].Name < subPhases[j].Name })
 
 	return subPhases
 }
