@@ -423,6 +423,12 @@ const (
 	// Enables the Azure Disk in-tree driver to Azure Disk Driver migration feature.
 	CSIMigrationAzureDisk featuregate.Feature = "CSIMigrationAzureDisk"
 
+	// owner: @andyzhangx
+	// alpha: v1.15
+	//
+	// Enables the Azure File in-tree driver to Azure File Driver migration feature.
+	CSIMigrationAzureFile featuregate.Feature = "CSIMigrationAzureFile"
+
 	// owner: @RobertKrawitz
 	// beta: v1.15
 	//
@@ -503,6 +509,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationGCE:                             {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAzureDisk:                       {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureFile:                       {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                  {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:                       {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: featuregate.GA},
