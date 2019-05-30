@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/client-go/informers"
 	admissionregistrationlisters "k8s.io/client-go/listers/admissionregistration/v1beta1"
@@ -48,7 +49,7 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 	}
 
 	// Start with an empty list
-	manager.configuration.Store(&v1beta1.ValidatingWebhookConfiguration{})
+	manager.configuration.Store([]webhook.WebhookAccessor{})
 
 	// On any change, rebuild the config
 	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -61,8 +62,8 @@ func NewValidatingWebhookConfigurationManager(f informers.SharedInformerFactory)
 }
 
 // Webhooks returns the merged ValidatingWebhookConfiguration.
-func (v *validatingWebhookConfigurationManager) Webhooks() []v1beta1.Webhook {
-	return v.configuration.Load().(*v1beta1.ValidatingWebhookConfiguration).Webhooks
+func (v *validatingWebhookConfigurationManager) Webhooks() []webhook.WebhookAccessor {
+	return v.configuration.Load().([]webhook.WebhookAccessor)
 }
 
 // HasSynced returns true if the shared informers have synced.
@@ -79,15 +80,15 @@ func (v *validatingWebhookConfigurationManager) updateConfiguration() {
 	v.configuration.Store(mergeValidatingWebhookConfigurations(configurations))
 }
 
-func mergeValidatingWebhookConfigurations(
-	configurations []*v1beta1.ValidatingWebhookConfiguration,
-) *v1beta1.ValidatingWebhookConfiguration {
+func mergeValidatingWebhookConfigurations(configurations []*v1beta1.ValidatingWebhookConfiguration) []webhook.WebhookAccessor {
 	sort.SliceStable(configurations, ValidatingWebhookConfigurationSorter(configurations).ByName)
-	var ret v1beta1.ValidatingWebhookConfiguration
+	accessors := []webhook.WebhookAccessor{}
 	for _, c := range configurations {
-		ret.Webhooks = append(ret.Webhooks, c.Webhooks...)
+		for i := range c.Webhooks {
+			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(&c.Webhooks[i]))
+		}
 	}
-	return &ret
+	return accessors
 }
 
 type ValidatingWebhookConfigurationSorter []*v1beta1.ValidatingWebhookConfiguration

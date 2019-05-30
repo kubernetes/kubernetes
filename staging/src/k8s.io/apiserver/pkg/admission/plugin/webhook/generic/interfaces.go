@@ -19,15 +19,15 @@ package generic
 import (
 	"context"
 
-	"k8s.io/api/admissionregistration/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 )
 
 // Source can list dynamic webhook plugins.
 type Source interface {
-	Webhooks() []v1beta1.Webhook
+	Webhooks() []webhook.WebhookAccessor
 	HasSynced() bool
 }
 
@@ -51,8 +51,7 @@ type VersionedAttributes struct {
 // WebhookInvocation describes how to call a webhook, including the resource and subresource the webhook registered for,
 // and the kind that should be sent to the webhook.
 type WebhookInvocation struct {
-	Webhook *v1beta1.Webhook
-
+	Webhook     webhook.WebhookAccessor
 	Resource    schema.GroupVersionResource
 	Subresource string
 	Kind        schema.GroupVersionKind

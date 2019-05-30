@@ -283,6 +283,9 @@ func (h *holder) record(phase string, converted bool, request *v1beta1.Admission
 		return
 	}
 
+	if debug {
+		h.t.Logf("recording: %#v = %s %#v %v", webhookOptions{phase: phase, converted: converted}, request.Operation, request.Resource, request.SubResource)
+	}
 	h.recorded[webhookOptions{phase: phase, converted: converted}] = request
 }
 
@@ -1287,7 +1290,7 @@ func createV1beta1ValidationWebhook(client clientset.Interface, endpoint, conver
 	// Attaching Admission webhook to API server
 	_, err := client.AdmissionregistrationV1beta1().ValidatingWebhookConfigurations().Create(&admissionv1beta1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "admission.integration.test"},
-		Webhooks: []admissionv1beta1.Webhook{
+		Webhooks: []admissionv1beta1.ValidatingWebhook{
 			{
 				Name: "admission.integration.test",
 				ClientConfig: admissionv1beta1.WebhookClientConfig{
@@ -1323,7 +1326,7 @@ func createV1beta1MutationWebhook(client clientset.Interface, endpoint, converte
 	// Attaching Mutation webhook to API server
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "mutation.integration.test"},
-		Webhooks: []admissionv1beta1.Webhook{
+		Webhooks: []admissionv1beta1.MutatingWebhook{
 			{
 				Name: "mutation.integration.test",
 				ClientConfig: admissionv1beta1.WebhookClientConfig{
