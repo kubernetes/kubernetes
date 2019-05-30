@@ -120,7 +120,10 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 
 	// Check cache for existing provider.
 	if provider, ok := cache.getClient(issuer, clientID); ok {
-		return provider, nil
+		useCache := provider.updateTokenAndCheckMatch(cfg)
+		if useCache {
+			return provider, nil
+		}
 	}
 
 	if len(cfg[cfgExtraScopes]) > 0 {
@@ -183,6 +186,26 @@ func (p *oidcAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper
 
 func (p *oidcAuthProvider) Login() error {
 	return errors.New("not yet implemented")
+}
+
+// UpdateTokenAndCheckMatch takes a configuration map and updates the token of its cfg, and checks if it is match with the given config.
+func (provider *oidcAuthProvider) updateTokenAndCheckMatch(cfg map[string]string) bool {
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+	// if id-token and refresh-token in cfg, update provider.cfg
+	if cfg[cfgIDToken] != "" {
+		provider.cfg[cfgIDToken] = cfg[cfgIDToken]
+	}
+	if cfg[cfgRefreshToken] != "" {
+		provider.cfg[cfgRefreshToken] = cfg[cfgRefreshToken]
+	}
+	// only return true if all other fields in cfg are either same as its cfg or empty.
+	for _, c := range []string{cfgClientSecret, cfgCertificateAuthority, cfgCertificateAuthorityData} {
+		if cfg[c] != "" && cfg[c] != provider.cfg[c] {
+			return false
+		}
+	}
+	return true
 }
 
 type roundTripper struct {
