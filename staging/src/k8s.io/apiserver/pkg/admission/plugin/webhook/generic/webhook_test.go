@@ -17,6 +17,7 @@ limitations under the License.
 package generic
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -277,9 +278,9 @@ func TestShouldCallHook(t *testing.T) {
 		},
 	}
 
-	for _, testcase := range testcases {
+	for i, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			invocation, err := a.shouldCallHook(webhook.NewValidatingWebhookAccessor(testcase.webhook), testcase.attrs, interfaces)
+			invocation, err := a.shouldCallHook(webhook.NewValidatingWebhookAccessor(fmt.Sprintf("webhook-%d", i), testcase.webhook), testcase.attrs, interfaces)
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
