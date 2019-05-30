@@ -42,6 +42,7 @@ go_library(
         "handler.go",
         "interfaces.go",
         "plugins.go",
+        "reinvocation.go",
         "util.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/admission",

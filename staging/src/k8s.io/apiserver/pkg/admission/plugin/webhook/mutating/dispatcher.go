@@ -24,6 +24,7 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/klog"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -56,11 +57,31 @@ func newMutatingDispatcher(p *Plugin) func(cm *webhookutil.ClientManager) generi
 var _ generic.Dispatcher = &mutatingDispatcher{}
 
 func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces, relevantHooks []*generic.WebhookInvocation) error {
+	reinvokeCtx := attr.GetReinvocationContext()
+	var webhookReinvokeCtx *webhookReinvokeContext
+	if v := reinvokeCtx.Value(PluginName); v != nil {
+		webhookReinvokeCtx = v.(*webhookReinvokeContext)
+	} else {
+		webhookReinvokeCtx = &webhookReinvokeContext{}
+		reinvokeCtx.SetValue(PluginName, webhookReinvokeCtx)
+	}
+
+	if reinvokeCtx.IsReinvoke() && webhookReinvokeCtx.IsOutputChangedSinceLastWebhookInvocation(attr.GetObject()) {
+		// If the object has changed, we know the in-tree plugin re-invocations have mutated the object,
+		// and we need to reinvoke all eligible webhooks.
+		webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
+	}
+	defer func() {
+		webhookReinvokeCtx.SetLastWebhookInvocationOutput(attr.GetObject())
+	}()
 	var versionedAttr *generic.VersionedAttributes
 	for _, invocation := range relevantHooks {
 		hook, ok := invocation.Webhook.GetMutatingWebhook()
 		if !ok {
 			return fmt.Errorf("mutating webhook dispatch requires v1beta1.MutatingWebhook, but got %T", hook)
+		}
+		if reinvokeCtx.IsReinvoke() && !webhookReinvokeCtx.ShouldReinvokeWebhook(invocation.Webhook.GetUID()) {
+			continue
 		}
 		if versionedAttr == nil {
 			// First webhook, create versioned attributes
@@ -76,8 +97,17 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 
 		t := time.Now()
-		err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o)
+
+		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o)
 		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name)
+		if changed {
+			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
+			webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
+			reinvokeCtx.SetShouldReinvoke()
+		}
+		if hook.ReinvocationPolicy != nil && *hook.ReinvocationPolicy == v1beta1.IfNeededReinvocationPolicy {
+			webhookReinvokeCtx.AddReinvocableWebhookToPreviouslyInvoked(invocation.Webhook.GetUID())
+		}
 		if err == nil {
 			continue
 		}
@@ -99,32 +129,33 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 	if versionedAttr != nil && versionedAttr.VersionedObject != nil && versionedAttr.Dirty {
 		return o.GetObjectConvertor().Convert(versionedAttr.VersionedObject, versionedAttr.Attributes.GetObject(), nil)
 	}
+
 	return nil
 }
 
 // note that callAttrMutatingHook updates attr
 
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes, o admission.ObjectInterfaces) error {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes, o admission.ObjectInterfaces) (bool, error) {
 	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
-			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+			return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
 		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
-			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
+			return false, webhookerrors.NewDryRunUnsupportedErr(h.Name)
 		}
 	}
 
 	// Currently dispatcher only supports `v1beta1` AdmissionReview
 	// TODO: Make the dispatcher capable of sending multiple AdmissionReview versions
 	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, invocation.Webhook) {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReview")}
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReview")}
 	}
 
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr, invocation)
 	client, err := a.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
 	if err != nil {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
 	r := client.Post().Context(ctx).Body(&request)
@@ -132,11 +163,11 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
 	}
 	if err := r.Do().Into(response); err != nil {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Response == nil {
-		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
 	}
 
 	for k, v := range response.Response.AuditAnnotations {
@@ -147,34 +178,34 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	if !response.Response.Allowed {
-		return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+		return false, webhookerrors.ToStatusErr(h.Name, response.Response.Result)
 	}
 
 	patchJS := response.Response.Patch
 	if len(patchJS) == 0 {
-		return nil
+		return false, nil
 	}
 	patchObj, err := jsonpatch.DecodePatch(patchJS)
 	if err != nil {
-		return apierrors.NewInternalError(err)
+		return false, apierrors.NewInternalError(err)
 	}
 	if len(patchObj) == 0 {
-		return nil
+		return false, nil
 	}
 
 	// if a non-empty patch was provided, and we have no object we can apply it to (e.g. a DELETE admission operation), error
 	if attr.VersionedObject == nil {
-		return apierrors.NewInternalError(fmt.Errorf("admission webhook %q attempted to modify the object, which is not supported for this operation", h.Name))
+		return false, apierrors.NewInternalError(fmt.Errorf("admission webhook %q attempted to modify the object, which is not supported for this operation", h.Name))
 	}
 
 	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, o.GetObjectCreater(), o.GetObjectTyper(), false)
 	objJS, err := runtime.Encode(jsonSerializer, attr.VersionedObject)
 	if err != nil {
-		return apierrors.NewInternalError(err)
+		return false, apierrors.NewInternalError(err)
 	}
 	patchedJS, err := patchObj.Apply(objJS)
 	if err != nil {
-		return apierrors.NewInternalError(err)
+		return false, apierrors.NewInternalError(err)
 	}
 
 	var newVersionedObject runtime.Object
@@ -185,16 +216,20 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	} else {
 		newVersionedObject, err = o.GetObjectCreater().New(attr.VersionedKind)
 		if err != nil {
-			return apierrors.NewInternalError(err)
+			return false, apierrors.NewInternalError(err)
 		}
 	}
+
 	// TODO: if we have multiple mutating webhooks, we can remember the json
 	// instead of encoding and decoding for each one.
 	if newVersionedObject, _, err = jsonSerializer.Decode(patchedJS, nil, newVersionedObject); err != nil {
-		return apierrors.NewInternalError(err)
+		return false, apierrors.NewInternalError(err)
 	}
+
+	changed := !apiequality.Semantic.DeepEqual(attr.VersionedObject, newVersionedObject)
+
 	attr.Dirty = true
 	attr.VersionedObject = newVersionedObject
 	o.GetObjectDefaulter().Default(attr.VersionedObject)
-	return nil
+	return changed, nil
 }

@@ -77,6 +77,10 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebho
 		obj.TimeoutSeconds = new(int32)
 		*obj.TimeoutSeconds = 30
 	}
+	if obj.ReinvocationPolicy == nil {
+		never := admissionregistrationv1beta1.NeverReinvocationPolicy
+		obj.ReinvocationPolicy = &never
+	}
 
 	if len(obj.AdmissionReviewVersions) == 0 {
 		obj.AdmissionReviewVersions = []string{admissionregistrationv1beta1.SchemeGroupVersion.Version}

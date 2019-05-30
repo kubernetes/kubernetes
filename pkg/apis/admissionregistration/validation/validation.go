@@ -281,6 +281,9 @@ func validateMutatingWebhook(hook *admissionregistration.MutatingWebhook, fldPat
 	if hook.NamespaceSelector != nil {
 		allErrors = append(allErrors, metav1validation.ValidateLabelSelector(hook.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
 	}
+	if hook.ReinvocationPolicy != nil && !supportedReinvocationPolicies.Has(string(*hook.ReinvocationPolicy)) {
+		allErrors = append(allErrors, field.NotSupported(fldPath.Child("reinvocationPolicy"), *hook.ReinvocationPolicy, supportedReinvocationPolicies.List()))
+	}
 
 	cc := hook.ClientConfig
 	switch {
@@ -317,6 +320,11 @@ var supportedOperations = sets.NewString(
 	string(admissionregistration.Update),
 	string(admissionregistration.Delete),
 	string(admissionregistration.Connect),
+)
+
+var supportedReinvocationPolicies = sets.NewString(
+	string(admissionregistration.NeverReinvocationPolicy),
+	string(admissionregistration.IfNeededReinvocationPolicy),
 )
 
 func hasWildcardOperation(operations []admissionregistration.OperationType) bool {

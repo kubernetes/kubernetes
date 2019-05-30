@@ -62,6 +62,9 @@ type Attributes interface {
 	// An error is returned if the format of key is invalid. When trying to overwrite annotation with a new value, an error is returned.
 	// Both ValidationInterface and MutationInterface are allowed to add Annotations.
 	AddAnnotation(key, value string) error
+
+	// GetReinvocationContext tracks the admission request information relevant to the re-invocation policy.
+	GetReinvocationContext() ReinvocationContext
 }
 
 // ObjectInterfaces is an interface used by AdmissionController to get object interfaces
@@ -89,6 +92,22 @@ type privateAnnotationsGetter interface {
 // this interface.
 type AnnotationsGetter interface {
 	GetAnnotations() map[string]string
+}
+
+// ReinvocationContext provides access to the admission related state required to implement the re-invocation policy.
+type ReinvocationContext interface {
+	// IsReinvoke returns true if the current admission check is a re-invocation.
+	IsReinvoke() bool
+	// SetIsReinvoke sets the current admission check as a re-invocation.
+	SetIsReinvoke()
+	// ShouldReinvoke returns true if any plugin has requested a re-invocation.
+	ShouldReinvoke() bool
+	// SetShouldReinvoke signals that a re-invocation is desired.
+	SetShouldReinvoke()
+	// AddValue set a value for a plugin name, possibly overriding a previous value.
+	SetValue(plugin string, v interface{})
+	// Value reads a value for a webhook.
+	Value(plugin string) interface{}
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.

@@ -49,6 +49,9 @@ var sideEffectsNone = registrationv1beta1.SideEffectClassNone
 var sideEffectsSome = registrationv1beta1.SideEffectClassSome
 var sideEffectsNoneOnDryRun = registrationv1beta1.SideEffectClassNoneOnDryRun
 
+var reinvokeNever = registrationv1beta1.NeverReinvocationPolicy
+var reinvokeIfNeeded = registrationv1beta1.IfNeededReinvocationPolicy
+
 // NewFakeValidatingDataSource returns a mock client and informer returning the given webhooks.
 func NewFakeValidatingDataSource(name string, webhooks []registrationv1beta1.ValidatingWebhook, stopCh <-chan struct{}) (clientset kubernetes.Interface, factory informers.SharedInformerFactory) {
 	var objs = []runtime.Object{
@@ -199,39 +202,41 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1beta1.WebhookC
 
 // ValidatingTest is a validating webhook test case.
 type ValidatingTest struct {
-	Name              string
-	Webhooks          []registrationv1beta1.ValidatingWebhook
-	Path              string
-	IsCRD             bool
-	IsDryRun          bool
-	AdditionalLabels  map[string]string
-	ExpectLabels      map[string]string
-	ExpectAllow       bool
-	ErrorContains     string
-	ExpectAnnotations map[string]string
-	ExpectStatusCode  int32
+	Name                   string
+	Webhooks               []registrationv1beta1.ValidatingWebhook
+	Path                   string
+	IsCRD                  bool
+	IsDryRun               bool
+	AdditionalLabels       map[string]string
+	ExpectLabels           map[string]string
+	ExpectAllow            bool
+	ErrorContains          string
+	ExpectAnnotations      map[string]string
+	ExpectStatusCode       int32
+	ExpectReinvokeWebhooks map[string]bool
 }
 
 // MutatingTest is a mutating webhook test case.
 type MutatingTest struct {
-	Name              string
-	Webhooks          []registrationv1beta1.MutatingWebhook
-	Path              string
-	IsCRD             bool
-	IsDryRun          bool
-	AdditionalLabels  map[string]string
-	ExpectLabels      map[string]string
-	ExpectAllow       bool
-	ErrorContains     string
-	ExpectAnnotations map[string]string
-	ExpectStatusCode  int32
+	Name                   string
+	Webhooks               []registrationv1beta1.MutatingWebhook
+	Path                   string
+	IsCRD                  bool
+	IsDryRun               bool
+	AdditionalLabels       map[string]string
+	ExpectLabels           map[string]string
+	ExpectAllow            bool
+	ErrorContains          string
+	ExpectAnnotations      map[string]string
+	ExpectStatusCode       int32
+	ExpectReinvokeWebhooks map[string]bool
 }
 
 // ConvertToMutatingTestCases converts a validating test case to a mutating one for test purposes.
 func ConvertToMutatingTestCases(tests []ValidatingTest) []MutatingTest {
 	r := make([]MutatingTest, len(tests))
 	for i, t := range tests {
-		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode}
+		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
 	}
 	return r
 }
@@ -240,7 +245,7 @@ func ConvertToMutatingTestCases(tests []ValidatingTest) []MutatingTest {
 func ConvertToMutatingWebhooks(webhooks []registrationv1beta1.ValidatingWebhook) []registrationv1beta1.MutatingWebhook {
 	mutating := make([]registrationv1beta1.MutatingWebhook, len(webhooks))
 	for i, h := range webhooks {
-		mutating[i] = registrationv1beta1.MutatingWebhook{h.Name, h.ClientConfig, h.Rules, h.FailurePolicy, h.MatchPolicy, h.NamespaceSelector, h.SideEffects, h.TimeoutSeconds, h.AdmissionReviewVersions}
+		mutating[i] = registrationv1beta1.MutatingWebhook{h.Name, h.ClientConfig, h.Rules, h.FailurePolicy, h.MatchPolicy, h.NamespaceSelector, h.SideEffects, h.TimeoutSeconds, h.AdmissionReviewVersions, nil}
 	}
 	return mutating
 }
@@ -639,6 +644,63 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
+		{
+			Name: "match & reinvoke if needed policy",
+			Webhooks: []registrationv1beta1.MutatingWebhook{{
+				Name:                    "addLabel",
+				ClientConfig:            ccfgSVC("addLabel"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+				ReinvocationPolicy:      &reinvokeIfNeeded,
+			}, {
+				Name:                    "removeLabel",
+				ClientConfig:            ccfgSVC("removeLabel"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+				ReinvocationPolicy:      &reinvokeIfNeeded,
+			}},
+			AdditionalLabels:       map[string]string{"remove": "me"},
+			ExpectAllow:            true,
+			ExpectReinvokeWebhooks: map[string]bool{"addLabel": true},
+		},
+		{
+			Name: "match & never reinvoke policy",
+			Webhooks: []registrationv1beta1.MutatingWebhook{{
+				Name:                    "addLabel",
+				ClientConfig:            ccfgSVC("addLabel"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+				ReinvocationPolicy:      &reinvokeNever,
+			}},
+			ExpectAllow:            true,
+			ExpectReinvokeWebhooks: map[string]bool{"addLabel": false},
+		},
+		{
+			Name: "match & never reinvoke policy (by default)",
+			Webhooks: []registrationv1beta1.MutatingWebhook{{
+				Name:                    "addLabel",
+				ClientConfig:            ccfgSVC("addLabel"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectAllow:            true,
+			ExpectReinvokeWebhooks: map[string]bool{"addLabel": false},
+		},
+		{
+			Name: "match & no reinvoke",
+			Webhooks: []registrationv1beta1.MutatingWebhook{{
+				Name:                    "noop",
+				ClientConfig:            ccfgSVC("noop"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectAllow: true,
+		},
 	}
 }
 

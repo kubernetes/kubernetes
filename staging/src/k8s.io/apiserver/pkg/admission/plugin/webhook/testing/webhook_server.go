@@ -138,6 +138,13 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		})
+	case "/noop":
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
+			},
+		})
 	default:
 		http.NotFound(w, r)
 	}

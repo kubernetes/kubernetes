@@ -86,8 +86,14 @@ func mergeMutatingWebhookConfigurations(configurations []*v1beta1.MutatingWebhoo
 	sort.SliceStable(configurations, MutatingWebhookConfigurationSorter(configurations).ByName)
 	accessors := []webhook.WebhookAccessor{}
 	for _, c := range configurations {
+		// webhook names are not validated for uniqueness, so we check for duplicates and
+		// add a int suffix to distinguish between them
+		names := map[string]int{}
 		for i := range c.Webhooks {
-			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(&c.Webhooks[i]))
+			n := c.Webhooks[i].Name
+			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
+			names[n]++
+			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, &c.Webhooks[i]))
 		}
 	}
 	return accessors

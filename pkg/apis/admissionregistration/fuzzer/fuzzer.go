@@ -55,6 +55,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.MatchPolicy = &m
 			s := admissionregistration.SideEffectClassUnknown
 			obj.SideEffects = &s
+			n := admissionregistration.NeverReinvocationPolicy
+			obj.ReinvocationPolicy = &n
 			if obj.TimeoutSeconds == nil {
 				i := int32(30)
 				obj.TimeoutSeconds = &i

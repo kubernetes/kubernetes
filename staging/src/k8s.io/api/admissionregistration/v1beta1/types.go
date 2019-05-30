@@ -404,7 +404,38 @@ type MutatingWebhook struct {
 	// Default to `['v1beta1']`.
 	// +optional
 	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+
+	// reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
+	// Allowed values are "Never" and "IfNeeded".
+	//
+	// Never: the webhook will not be called more than once in a single admission evaluation.
+	//
+	// IfNeeded: the webhook will be called at least one additional time as part of the admission evaluation
+	// if the object being admitted is modified by other admission plugins after the initial webhook call.
+	// Webhooks that specify this option *must* be idempotent, able to process objects they previously admitted.
+	// Note:
+	// * the number of additional invocations is not guaranteed to be exactly one.
+	// * if additional invocations result in further modifications to the object, webhooks are not guaranteed to be invoked again.
+	// * webhooks that use this option may be reordered to minimize the number of additional invocations.
+	// * to validate an object after all mutations are guaranteed complete, use a validating admission webhook instead.
+	//
+	// Defaults to "Never".
+	// +optional
+	ReinvocationPolicy *ReinvocationPolicyType `json:"reinvocationPolicy,omitempty" protobuf:"bytes,10,opt,name=reinvocationPolicy,casttype=ReinvocationPolicyType"`
 }
+
+// ReinvocationPolicyType specifies what type of policy the admission hook uses.
+type ReinvocationPolicyType string
+
+const (
+	// NeverReinvocationPolicy indicates that the webhook must not be called more than once in a
+	// single admission evaluation.
+	NeverReinvocationPolicy ReinvocationPolicyType = "Never"
+	// IfNeededReinvocationPolicy indicates that the webhook may be called at least one
+	// additional time as part of the admission evaluation if the object being admitted is
+	// modified by other admission plugins after the initial webhook call.
+	IfNeededReinvocationPolicy ReinvocationPolicyType = "IfNeeded"
+)
 
 // RuleWithOperations is a tuple of Operations and Resources. It is recommended to make
 // sure that all the tuple expansions are valid.
