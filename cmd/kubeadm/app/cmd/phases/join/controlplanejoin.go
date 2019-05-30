@@ -40,6 +40,7 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
 		options.ControlPlane,
+		options.ExperimentalControlPlane,
 		options.NodeName,
 	}
 	if name != "mark-control-plane" {
