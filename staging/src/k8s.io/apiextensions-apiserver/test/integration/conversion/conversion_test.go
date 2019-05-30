@@ -95,7 +95,7 @@ func testWebhookConverter(t *testing.T, defaulting bool) {
 		{
 			group:   "empty-response",
 			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
-			checks:  checks(expectConversionFailureMessage("empty-response", "expected 1 converted objects")),
+			checks:  checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
 		},
 		{
 			group:   "failure-message",
