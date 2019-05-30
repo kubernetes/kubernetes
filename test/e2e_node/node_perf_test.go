@@ -55,7 +55,7 @@ func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfigur
 
 // Serial because the test updates kubelet configuration.
 // Slow by design.
-var _ = SIGDescribe("Node Performance Testing [Serial] [Slow]", func() {
+var _ = SIGDescribe("Node Performance Testing [Serial] [Slow] [Flaky]", func() {
 	f := framework.NewDefaultFramework("node-performance-testing")
 	var (
 		wl     workloads.NodePerfWorkload
