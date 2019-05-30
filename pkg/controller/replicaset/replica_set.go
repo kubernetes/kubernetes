@@ -580,8 +580,8 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 
-	//Do a full fetch here.
-	//The cache may be out of date via race condition #69376
+	// Do a full fetch here.
+	// The cache may be out of date via race condition #69376
 	fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(rs.Name, metav1.GetOptions{})
 	if err == nil && fresh.UID != rs.UID {
 		klog.Errorf("%v %v's UID in cache differed from server. This object was deleted.", rsc.Kind, key)

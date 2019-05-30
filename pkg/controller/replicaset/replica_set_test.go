@@ -278,7 +278,7 @@ func TestSyncReplicaSetCreateFailures(t *testing.T) {
 func TestNonMatchingUIDs(t *testing.T) {
 	// Setup a test server that doesn't store the replica sets,
 	// So the returned Replica set wont have the UID and shouldn't
-	//process the event
+	// process the event
 	fakeHandler := utiltesting.FakeHandler{
 		StatusCode:    200,
 		ResponseBody:  "{}",
