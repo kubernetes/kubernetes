@@ -1733,26 +1733,27 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 	if err != nil {
 		return "N/A"
 	}
-	// if external provisioner was used for provisioning,
-	// the volume MUST have annotation of AnnDynamicallyProvisioned, use the value
-	// as the provisioner name
-	if plugin == nil {
-		return volume.Annotations[pvutil.AnnDynamicallyProvisioned]
-	} else if plugin.IsMigratedToCSI() {
-		// in case where a plugin has been migrated to CSI,
-		// use the CSI name instead of in-tree name
-		storageClass := v1helper.GetPersistentVolumeClass(volume)
-		class, err := ctrl.classLister.Get(storageClass)
-		if err != nil {
-			return "N/A"
-		}
-		provisionerName, err := ctrl.getCSINameFromIntreeName(class.Provisioner)
-		if err != nil {
-			return "N/A"
-		}
-		return provisionerName
+	if plugin != nil && !plugin.IsMigratedToCSI() {
+		return plugin.GetPluginName()
 	}
-	return plugin.GetPluginName()
+	// If reached here, Either an external provisioner was used for provisioning
+	// or a plugin has been migrated to CSI.
+	// If an external provisioner was used, i.e., plugin == nil, instead of using
+	// the AnnDynamicallyProvisioned annotation value, use the storageClass's Provisioner
+	// field to avoid explosion of the metric in the cases like local storage provisioner
+	// tagging a volume with arbitrary provisioner names
+	storageClass := v1helper.GetPersistentVolumeClass(volume)
+	class, err := ctrl.classLister.Get(storageClass)
+	if err != nil {
+		return "N/A"
+	}
+	if plugin != nil {
+		provisionerName, err := ctrl.getCSINameFromIntreeName(class.Provisioner)
+		if err == nil {
+			return provisionerName
+		}
+	}
+	return class.Provisioner
 }
 
 // obtain plugin/external provisioner name from plugin and storage class
