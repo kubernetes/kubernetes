@@ -22,8 +22,10 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -34,6 +36,7 @@ type TesterPlugin struct {
 	numPrefilterCalled  int
 	numReserveCalled    int
 	numPrebindCalled    int
+	numBindCalled       int
 	numPostbindCalled   int
 	numUnreserveCalled  int
 	failPrefilter       bool
@@ -47,6 +50,7 @@ type TesterPlugin struct {
 	timeoutPermit       bool
 	waitAndRejectPermit bool
 	waitAndAllowPermit  bool
+	bindStatus          *framework.Status
 }
 
 type PrefilterPlugin struct {
@@ -59,6 +63,12 @@ type ReservePlugin struct {
 
 type PrebindPlugin struct {
 	TesterPlugin
+}
+
+type BindPlugin struct {
+	PluginName string
+	TesterPlugin
+	client *clientset.Clientset
 }
 
 type PostbindPlugin struct {
@@ -86,6 +96,7 @@ const (
 var _ = framework.PrefilterPlugin(&PrefilterPlugin{})
 var _ = framework.ReservePlugin(&ReservePlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
+var _ = framework.BindPlugin(&BindPlugin{})
 var _ = framework.PostbindPlugin(&PostbindPlugin{})
 var _ = framework.UnreservePlugin(&UnreservePlugin{})
 var _ = framework.PermitPlugin(&PermitPlugin{})
@@ -136,9 +147,36 @@ func (pp *PrebindPlugin) reset() {
 	pp.numPrebindCalled = 0
 }
 
+const bindPluginAnnotation = "bindPluginName"
+
 // NewPrebindPlugin is the factory for prebind plugin.
 func NewPrebindPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return pbdPlugin, nil
+}
+
+func (bp *BindPlugin) Name() string {
+	return bp.PluginName
+}
+
+func (bp *BindPlugin) Bind(pc *framework.PluginContext, p *v1.Pod, nodeName string) *framework.Status {
+	bp.numBindCalled++
+	if bp.bindStatus.IsSuccess() {
+		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(&v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: p.Namespace, Name: p.Name, UID: p.UID, Annotations: map[string]string{bindPluginAnnotation: bp.Name()}},
+			Target: v1.ObjectReference{
+				Kind: "Node",
+				Name: nodeName,
+			},
+		}); err != nil {
+			return framework.NewStatus(framework.Error, fmt.Sprintf("bind failed: %v", err))
+		}
+	}
+	return bp.bindStatus
+}
+
+// reset used to reset numBindCalled.
+func (bp *BindPlugin) reset() {
+	bp.numBindCalled = 0
 }
 
 var ptbdPlugin = &PostbindPlugin{}
@@ -595,6 +633,165 @@ func TestUnreservePlugin(t *testing.T) {
 		}
 		unresPlugin.reset()
 		pbdPlugin.reset()
+		cleanupPods(cs, t, []*v1.Pod{pod})
+	}
+}
+
+// TestBindPlugin tests invocation of bind plugins.
+func TestBindPlugin(t *testing.T) {
+	testContext := initTestMaster(t, "bind-plugin", nil)
+	bindPlugin1, bindPlugin2 := &BindPlugin{PluginName: "bind-plugin-1", client: testContext.clientSet}, &BindPlugin{PluginName: "bind-plugin-2", client: testContext.clientSet}
+	// Create a plugin registry for testing. Register an unreserve, a bind plugin and a postBind plugin.
+	registry := framework.Registry{
+		unreservePluginName: NewUnreservePlugin,
+		bindPlugin1.Name(): func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return bindPlugin1, nil
+		},
+		bindPlugin2.Name(): func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return bindPlugin2, nil
+		},
+		postbindPluginName: NewPostbindPlugin,
+	}
+
+	// Setup initial unreserve and bind plugins for testing.
+	plugins := &schedulerconfig.Plugins{
+		Unreserve: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{{Name: unreservePluginName}},
+		},
+		Bind: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}},
+		},
+		PostBind: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{{Name: postbindPluginName}},
+		},
+	}
+	// Set reserve and bind config for testing
+	pluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: unreservePluginName,
+			Args: runtime.Unknown{},
+		},
+		{
+			Name: bindPlugin1.Name(),
+			Args: runtime.Unknown{},
+		},
+		{
+			Name: bindPlugin2.Name(),
+			Args: runtime.Unknown{},
+		},
+		{
+			Name: postbindPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t, testContext,
+		false, nil, registry, plugins, pluginConfig, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add a few nodes.
+	_, err := createNodes(cs, "test-node", nil, 2)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	tests := []struct {
+		bindPluginStatuses     []*framework.Status
+		expectBoundByScheduler bool   // true means this test case expecting scheduler would bind pods
+		expectBoundByPlugin    bool   // true means this test case expecting a plugin would bind pods
+		expectBindPluginName   string // expecting plugin name to bind pods
+	}{
+		// bind plugins skiped to bind the pod and scheduler binded the pod
+		{
+			bindPluginStatuses:     []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Skip, "")},
+			expectBoundByScheduler: true,
+		},
+		// bindplugin2 succeeded to bind the pod
+		{
+			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Skip, ""), framework.NewStatus(framework.Success, "")},
+			expectBoundByPlugin:  true,
+			expectBindPluginName: bindPlugin2.Name(),
+		},
+		// bindplugin1 succeeded to bind the pod
+		{
+			bindPluginStatuses:   []*framework.Status{framework.NewStatus(framework.Success, ""), framework.NewStatus(framework.Success, "")},
+			expectBoundByPlugin:  true,
+			expectBindPluginName: bindPlugin1.Name(),
+		},
+		// bind plugin fails to bind the pod
+		{
+			bindPluginStatuses: []*framework.Status{framework.NewStatus(framework.Error, "failed to bind"), framework.NewStatus(framework.Success, "")},
+		},
+	}
+
+	for i, test := range tests {
+		bindPlugin1.bindStatus = test.bindPluginStatuses[0]
+		bindPlugin2.bindStatus = test.bindPluginStatuses[1]
+
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Errorf("Error while creating a test pod: %v", err)
+		}
+
+		if test.expectBoundByScheduler || test.expectBoundByPlugin {
+			// bind plugins skiped to bind the pod
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
+				continue
+			}
+			pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Errorf("can't get pod: %v", err)
+			}
+			if test.expectBoundByScheduler {
+				if pod.Annotations[bindPluginAnnotation] != "" {
+					t.Errorf("test #%v: Expected the pod to be binded by scheduler instead of by bindplugin %s", i, pod.Annotations[bindPluginAnnotation])
+				}
+				if bindPlugin1.numBindCalled != 1 || bindPlugin2.numBindCalled != 1 {
+					t.Errorf("test #%v: Expected each bind plugin to be called once, was called %d and %d times.", i, bindPlugin1.numBindCalled, bindPlugin2.numBindCalled)
+				}
+			} else {
+				if pod.Annotations[bindPluginAnnotation] != test.expectBindPluginName {
+					t.Errorf("test #%v: Expected the pod to be binded by bindplugin %s instead of by bindplugin %s", i, test.expectBindPluginName, pod.Annotations[bindPluginAnnotation])
+				}
+				if bindPlugin1.numBindCalled != 1 {
+					t.Errorf("test #%v: Expected %s to be called once, was called %d times.", i, bindPlugin1.Name(), bindPlugin1.numBindCalled)
+				}
+				if test.expectBindPluginName == bindPlugin1.Name() && bindPlugin2.numBindCalled > 0 {
+					// expect bindplugin1 succeeded to bind the pod and bindplugin2 should not be called.
+					t.Errorf("test #%v: Expected %s not to be called, was called %d times.", i, bindPlugin2.Name(), bindPlugin1.numBindCalled)
+				}
+			}
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+				return ptbdPlugin.numPostbindCalled == 1, nil
+			}); err != nil {
+				t.Errorf("test #%v: Expected the postbind plugin to be called once, was called %d times.", i, ptbdPlugin.numPostbindCalled)
+			}
+			if unresPlugin.numUnreserveCalled != 0 {
+				t.Errorf("test #%v: Expected the unreserve plugin not to be called, was called %d times.", i, unresPlugin.numUnreserveCalled)
+			}
+		} else {
+			// bind plugin fails to bind the pod
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err != nil {
+				t.Errorf("test #%v: Expected a scheduling error, but didn't get it. error: %v", i, err)
+			}
+			if ptbdPlugin.numPostbindCalled > 0 {
+				t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, ptbdPlugin.numPostbindCalled)
+			}
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (done bool, err error) {
+				return unresPlugin.numUnreserveCalled == 1, nil
+			}); err != nil {
+				t.Errorf("test #%v: Expected the unreserve plugin to be called once, was called %d times.", i, unresPlugin.numUnreserveCalled)
+			}
+		}
+		ptbdPlugin.reset()
+		bindPlugin1.reset()
+		bindPlugin2.reset()
+		unresPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
