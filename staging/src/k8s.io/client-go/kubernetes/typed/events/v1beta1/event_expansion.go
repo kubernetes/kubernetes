@@ -32,7 +32,7 @@ type EventExpansion interface {
 	// UpdateWithEventNamespace is the same as a Update
 	// except that it sends the request to the event.Namespace.
 	UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error)
-	// PatchWithEventNamespace is the same as a Update
+	// PatchWithEventNamespace is the same as an Update
 	// except that it sends the request to the event.Namespace.
 	PatchWithEventNamespace(event *v1beta1.Event, data []byte) (*v1beta1.Event, error)
 }
@@ -63,6 +63,9 @@ func (e *events) CreateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event,
 // created with the "" namespace.
 // Update also requires the ResourceVersion to be set in the event object.
 func (e *events) UpdateWithEventNamespace(event *v1beta1.Event) (*v1beta1.Event, error) {
+	if e.ns != "" && event.Namespace != e.ns {
+		return nil, fmt.Errorf("can't update an event with namespace '%v' in namespace '%v'", event.Namespace, e.ns)
+	}
 	result := &v1beta1.Event{}
 	err := e.client.Put().
 		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
