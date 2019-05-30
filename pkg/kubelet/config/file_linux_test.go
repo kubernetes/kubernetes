@@ -140,7 +140,6 @@ type testCase struct {
 func getTestCases(hostname types.NodeName) []*testCase {
 	grace := int64(30)
 	enableServiceLinks := v1.DefaultEnableServiceLinks
-	preempting := v1.DefaultPreempting
 	return []*testCase{
 		{
 			lock: &sync.Mutex{},
@@ -192,7 +191,6 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					SecurityContext:    &v1.PodSecurityContext{},
 					SchedulerName:      api.DefaultSchedulerName,
 					EnableServiceLinks: &enableServiceLinks,
-					Preempting:         &preempting,
 				},
 				Status: v1.PodStatus{
 					Phase: v1.PodPending,

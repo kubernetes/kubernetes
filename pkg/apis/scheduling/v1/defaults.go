@@ -17,9 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -29,9 +31,8 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 // SetDefaults_PriorityClass sets additional defaults compared to its counterpart
 // in extensions.
 func SetDefaults_PriorityClass(obj *v1.PriorityClass) {
-	if obj.Preempting == nil {
-		// Set Preempting as true by default.
-		Preempting := scheduling.DefaultPreempting
-		obj.Preempting = &Preempting
+	if utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) && obj.PreemptionPolicy == nil {
+		preemptLowerPriority := apiv1.PreemptLowerPriority
+		obj.PreemptionPolicy = &preemptLowerPriority
 	}
 }

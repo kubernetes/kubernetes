@@ -19,6 +19,7 @@ package versioned
 import (
 	"fmt"
 
+	apiv1 "k8s.io/api/core/v1"
 	scheduling "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,11 +28,11 @@ import (
 
 // PriorityClassV1Generator supports stable generation of a priorityClass.
 type PriorityClassV1Generator struct {
-	Name          string
-	Value         int32
-	GlobalDefault bool
-	Description   string
-	Preempting    bool
+	Name             string
+	Value            int32
+	GlobalDefault    bool
+	Description      string
+	PreemptionPolicy apiv1.PreemptionPolicy
 }
 
 // Ensure it supports the generator pattern that uses parameters specified during construction.
@@ -43,9 +44,10 @@ func (PriorityClassV1Generator) ParamNames() []generate.GeneratorParam {
 		{Name: "value", Required: true},
 		{Name: "global-default", Required: false},
 		{Name: "description", Required: false},
-		{Name: "preempting", Required: false},
+		{Name: "preemption-policy", Required: false},
 	}
 }
+
 func (s PriorityClassV1Generator) Generate(params map[string]interface{}) (runtime.Object, error) {
 	if err := generate.ValidateParams(s.ParamNames(), params); err != nil {
 		return nil, err
@@ -71,12 +73,9 @@ func (s PriorityClassV1Generator) Generate(params map[string]interface{}) (runti
 		return nil, fmt.Errorf("expected string, found %v", description)
 	}
 
-	Preempting, found := params["preempting"].(bool)
-	if !found {
-		return nil, fmt.Errorf("expected bool, found %v", Preempting)
-	}
+	preemptionPolicy := apiv1.PreemptionPolicy(params["preemption-policy"].(string))
 
-	delegate := &PriorityClassV1Generator{Name: name, Value: value, GlobalDefault: globalDefault, Description: description, Preempting: Preempting}
+	delegate := &PriorityClassV1Generator{Name: name, Value: value, GlobalDefault: globalDefault, Description: description, PreemptionPolicy: preemptionPolicy}
 	return delegate.StructuredGenerate()
 }
 
@@ -86,9 +85,9 @@ func (s *PriorityClassV1Generator) StructuredGenerate() (runtime.Object, error) 
 		ObjectMeta: metav1.ObjectMeta{
 			Name: s.Name,
 		},
-		Value:         s.Value,
-		GlobalDefault: s.GlobalDefault,
-		Description:   s.Description,
-		Preempting:    &s.Preempting,
+		Value:            s.Value,
+		GlobalDefault:    s.GlobalDefault,
+		Description:      s.Description,
+		PreemptionPolicy: &s.PreemptionPolicy,
 	}, nil
 }

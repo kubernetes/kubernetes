@@ -16,7 +16,10 @@ limitations under the License.
 
 package scheduling
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
+)
 
 const (
 	// DefaultPriorityWhenNoDefaultClassExists is used to set priority of pods
@@ -36,8 +39,6 @@ const (
 	SystemClusterCritical = SystemPriorityClassPrefix + "cluster-critical"
 	// SystemNodeCritical is the system priority class name that represents node-critical.
 	SystemNodeCritical = SystemPriorityClassPrefix + "node-critical"
-	// The default value for preempting attribute.
-	DefaultPreempting = true
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -67,10 +68,10 @@ type PriorityClass struct {
 	// +optional
 	Description string
 
-	// Preempting specifies whether a pod with this PriorityClass could start a preemption process.
-	// If this field is missing, the PriorityClass is considered a preempting class by default.
+	// PreemptionPolicy it the Policy for preempting pods with lower priority.
+	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
 	// +optional
-	Preempting *bool
+	PreemptionPolicy *core.PreemptionPolicy
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

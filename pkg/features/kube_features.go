@@ -459,6 +459,12 @@ const (
 	// Allow use of filesystems for ephemeral storage monitoring.
 	// Only applies if LocalStorageCapacityIsolation is set.
 	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
+
+	// owner: @denkensk
+	// alpha: v1.15
+	//
+	// Enables NonPreempting option for priorityClass and pod.
+	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
 )
 
 func init() {
@@ -536,6 +542,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResources:                         {Default: false, PreRelease: featuregate.Alpha},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
+	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

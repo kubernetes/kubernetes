@@ -1941,6 +1941,16 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// PreemptionPolicy describes a policy for if/when to preempt a pod.
+type PreemptionPolicy string
+
+const (
+	// PreemptLowerPriority means that pod can preempt other pods with lower priority.
+	PreemptLowerPriority PreemptionPolicy = "PreemptLowerPriority"
+	// PreemptNever means that pod never preempts other pods with lower priority.
+	PreemptNever PreemptionPolicy = "Never"
+)
+
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
 type TerminationMessagePolicy string
 
@@ -2662,10 +2672,12 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32
-	// Preempting specifies whether a pod with this PriorityClass could start a preemption process.
-	// If not specified, the default is true.
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
 	// +optional
-	Preempting *bool
+	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.

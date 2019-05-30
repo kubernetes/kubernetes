@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -50,10 +51,12 @@ type PriorityClass struct {
 	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
 
-	// Preempting specifies whether a pod with this PriorityClass could trigger a preemption process.
-	// If this field is unset, the PriorityClass is considered a Preempting class by default.
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
 	// +optional
-	Preempting *bool `json:"preempting,omitempty" protobuf:"bytes,5,opt,name=preempting"`
+	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,5,opt,name=preemptionPolicy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

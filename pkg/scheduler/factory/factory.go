@@ -32,21 +32,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
-	schedulinglister "k8s.io/client-go/listers/scheduling/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -187,8 +187,6 @@ type configFactory struct {
 	storageClassLister storagelisters.StorageClassLister
 	// framework has a set of plugins and the context used for running them.
 	framework framework.Framework
-	// a means to list all PriorityClass
-	priorityClassLister schedulinglister.PriorityClassLister
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
@@ -221,6 +219,8 @@ type configFactory struct {
 	bindTimeoutSeconds int64
 	// queue for pods that need scheduling
 	podQueue internalqueue.SchedulingQueue
+
+	enableNonPreempting bool
 }
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
@@ -237,7 +237,6 @@ type ConfigFactoryArgs struct {
 	ServiceInformer                coreinformers.ServiceInformer
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
 	StorageClassInformer           storageinformers.StorageClassInformer
-	PriorityClassInformer          schedulinginformers.PriorityClassInformer
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
@@ -281,7 +280,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
 		framework:                      framework,
-		priorityClassLister:            args.PriorityClassInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  args.SchedulerName,
@@ -289,6 +287,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		disablePreemption:              args.DisablePreemption,
 		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
 		bindTimeoutSeconds:             args.BindTimeoutSeconds,
+		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority),
 	}
 	// Setup volume binder
 	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
@@ -469,10 +468,10 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.volumeBinder,
 		c.pVCLister,
 		c.pdbLister,
-		c.priorityClassLister,
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
+		c.enableNonPreempting,
 	)
 
 	return &Config{
@@ -571,7 +570,6 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
-		PriorityLister:                 c.priorityClassLister,
 	}, nil
 }
 

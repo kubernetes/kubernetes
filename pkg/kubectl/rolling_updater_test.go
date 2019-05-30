@@ -1444,7 +1444,6 @@ func TestUpdateRcWithRetries(t *testing.T) {
 	one := int32(1)
 	grace := int64(30)
 	enableServiceLinks := corev1.DefaultEnableServiceLinks
-	preempting := corev1.DefaultPreempting
 	rc := &corev1.ReplicationController{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -1472,7 +1471,6 @@ func TestUpdateRcWithRetries(t *testing.T) {
 					TerminationGracePeriodSeconds: &grace,
 					SecurityContext:               &corev1.PodSecurityContext{},
 					EnableServiceLinks:            &enableServiceLinks,
-					Preempting:                    &preempting,
 				},
 			},
 		},

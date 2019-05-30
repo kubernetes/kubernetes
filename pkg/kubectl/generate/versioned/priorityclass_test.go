@@ -17,6 +17,7 @@ limitations under the License.
 package versioned
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	scheduling "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -25,8 +26,10 @@ import (
 )
 
 func TestPriorityClassV1Generator(t *testing.T) {
-	true := true
-	false := false
+	var (
+		preemptLowerPriority = apiv1.PreemptLowerPriority
+		preemptNever         = apiv1.PreemptNever
+	)
 	tests := []struct {
 		name      string
 		params    map[string]interface{}
@@ -36,70 +39,70 @@ func TestPriorityClassV1Generator(t *testing.T) {
 		{
 			name: "test valid case",
 			params: map[string]interface{}{
-				"name":           "foo",
-				"value":          int32(1000),
-				"global-default": false,
-				"description":    "high priority class",
-				"preempting":     false,
+				"name":              "foo",
+				"value":             int32(1000),
+				"global-default":    false,
+				"description":       "high priority class",
+				"preemption-policy": "PreemptLowerPriority",
 			},
 			expected: &scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Value:         int32(1000),
-				GlobalDefault: false,
-				Description:   "high priority class",
-				Preempting:    &false,
+				Value:            int32(1000),
+				GlobalDefault:    false,
+				Description:      "high priority class",
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			expectErr: false,
 		},
 		{
 			name: "test valid case that field non-preempting is set",
 			params: map[string]interface{}{
-				"name":           "foo",
-				"value":          int32(1000),
-				"global-default": false,
-				"description":    "high priority class",
-				"preempting":     true,
+				"name":              "foo",
+				"value":             int32(1000),
+				"global-default":    false,
+				"description":       "high priority class",
+				"preemption-policy": "Never",
 			},
 			expected: &scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Value:         int32(1000),
-				GlobalDefault: false,
-				Description:   "high priority class",
-				Preempting:    &true,
+				Value:            int32(1000),
+				GlobalDefault:    false,
+				Description:      "high priority class",
+				PreemptionPolicy: &preemptNever,
 			},
 			expectErr: false,
 		},
 		{
 			name: "test valid case that as default priority",
 			params: map[string]interface{}{
-				"name":           "foo",
-				"value":          int32(1000),
-				"global-default": true,
-				"description":    "high priority class",
-				"preempting":     false,
+				"name":              "foo",
+				"value":             int32(1000),
+				"global-default":    true,
+				"description":       "high priority class",
+				"preemption-policy": "PreemptLowerPriority",
 			},
 			expected: &scheduling.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
-				Value:         int32(1000),
-				GlobalDefault: true,
-				Description:   "high priority class",
-				Preempting:    &false,
+				Value:            int32(1000),
+				GlobalDefault:    true,
+				Description:      "high priority class",
+				PreemptionPolicy: &preemptLowerPriority,
 			},
 			expectErr: false,
 		},
 		{
 			name: "test missing required param",
 			params: map[string]interface{}{
-				"name":           "foo",
-				"global-default": true,
-				"description":    "high priority class",
-				"preempting":     false,
+				"name":              "foo",
+				"global-default":    true,
+				"description":       "high priority class",
+				"preemption-policy": "PreemptLowerPriority",
 			},
 			expectErr: true,
 		},

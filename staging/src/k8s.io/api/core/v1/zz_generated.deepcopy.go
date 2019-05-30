@@ -3608,11 +3608,6 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(int32)
 		**out = **in
 	}
-	if in.Preempting != nil {
-		in, out := &in.Preempting, &out.Preempting
-		*out = new(bool)
-		**out = **in
-	}
 	if in.DNSConfig != nil {
 		in, out := &in.DNSConfig, &out.DNSConfig
 		*out = new(PodDNSConfig)
@@ -3631,6 +3626,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 	if in.EnableServiceLinks != nil {
 		in, out := &in.EnableServiceLinks, &out.EnableServiceLinks
 		*out = new(bool)
+		**out = **in
+	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(PreemptionPolicy)
 		**out = **in
 	}
 	return
