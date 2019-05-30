@@ -833,16 +833,12 @@ func getContainer(pid int) (string, error) {
 //
 func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 	// Move non-kernel PIDs to the system container.
-	attemptsRemaining := 10
-	var errs []error
-	for attemptsRemaining >= 0 {
-		// Only keep errors on latest attempt.
-		errs = []error{}
-		attemptsRemaining--
-
+	// Only keep errors on latest attempt.
+	var finalErr error
+	for i := 0; i <= 10; i++ {
 		allPids, err := cmutil.GetPids(rootCgroupPath)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to list PIDs for root: %v", err))
+			finalErr = fmt.Errorf("failed to list PIDs for root: %v", err)
 			continue
 		}
 
@@ -859,23 +855,20 @@ func ensureSystemCgroups(rootCgroupPath string, manager *fs.Manager) error {
 
 		// Check if we have moved all the non-kernel PIDs.
 		if len(pids) == 0 {
-			break
+			return nil
 		}
 
 		klog.Infof("Moving non-kernel processes: %v", pids)
 		for _, pid := range pids {
 			err := manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, manager.Cgroups.Name, err))
+				finalErr = fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, manager.Cgroups.Name, err)
 			}
 		}
 
 	}
-	if attemptsRemaining < 0 {
-		errs = append(errs, fmt.Errorf("ran out of attempts to create system containers %q", manager.Cgroups.Name))
-	}
 
-	return utilerrors.NewAggregate(errs)
+	return finalErr
 }
 
 // Determines whether the specified PID is a kernel PID.
