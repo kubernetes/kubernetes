@@ -43,6 +43,9 @@ type FakeContainer struct {
 	// ContainerStatus contains the runtime information for a container.
 	runtimeapi.ContainerStatus
 
+	// LinuxResources contains the resources specific to linux containers.
+	LinuxResources *runtimeapi.LinuxContainerResources
+
 	// the sandbox id of this container
 	SandboxID string
 }
@@ -327,7 +330,8 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 			Labels:      config.Labels,
 			Annotations: config.Annotations,
 		},
-		SandboxID: podSandboxID,
+		SandboxID:      podSandboxID,
+		LinuxResources: config.GetLinux().GetResources(),
 	}
 
 	return containerID, nil
