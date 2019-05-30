@@ -22,6 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+const (
+	pvc            string = "PersistentVolumeClaim"
+	volumeSnapshot string = "VolumeSnapshot"
+)
+
 // DropDisabledFields removes disabled fields from the pvc spec.
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a pvc spec.
 func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
@@ -55,13 +60,13 @@ func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
 
 func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {
 	if pvcSpec.DataSource != nil {
-		if pvcSpec.DataSource.Kind == "PersistentVolumeClaim" &&
+		if pvcSpec.DataSource.Kind == pvc &&
 			*pvcSpec.DataSource.APIGroup == "" &&
 			utilfeature.DefaultFeatureGate.Enabled(features.VolumePVCDataSource) {
 			return true
 
 		}
-		if pvcSpec.DataSource.Kind == "VolumeSnapshot" &&
+		if pvcSpec.DataSource.Kind == volumeSnapshot &&
 			*pvcSpec.DataSource.APIGroup == "snapshot.storage.k8s.io" &&
 			utilfeature.DefaultFeatureGate.Enabled(features.VolumeSnapshotDataSource) {
 			return true
