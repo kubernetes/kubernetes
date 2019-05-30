@@ -22,8 +22,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
-
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/api/admissionregistration/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,14 +33,15 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
-	"k8s.io/apiserver/pkg/util/webhook"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/klog"
 )
 
 type validatingDispatcher struct {
-	cm *webhook.ClientManager
+	cm *webhookutil.ClientManager
 }
 
-func newValidatingDispatcher(cm *webhook.ClientManager) generic.Dispatcher {
+func newValidatingDispatcher(cm *webhookutil.ClientManager) generic.Dispatcher {
 	return &validatingDispatcher{cm}
 }
 
@@ -69,18 +68,21 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	for i := range relevantHooks {
 		go func(invocation *generic.WebhookInvocation) {
 			defer wg.Done()
-			hook := invocation.Webhook
+			hook, ok := invocation.Webhook.GetValidatingWebhook()
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch requires v1beta1.ValidatingWebhook, but got %T", hook))
+				return
+			}
 			versionedAttr := versionedAttrs[invocation.Kind]
-
 			t := time.Now()
-			err := d.callHook(ctx, invocation, versionedAttr)
+			err := d.callHook(ctx, hook, invocation, versionedAttr)
 			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}
 
 			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
-			if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
+			if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 					utilruntime.HandleError(callErr)
@@ -115,11 +117,10 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
-	h := invocation.Webhook
+func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
 	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
-			return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
+			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
 		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
 			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
@@ -128,15 +129,15 @@ func (d *validatingDispatcher) callHook(ctx context.Context, invocation *generic
 
 	// Currently dispatcher only supports `v1beta1` AdmissionReview
 	// TODO: Make the dispatcher capable of sending multiple AdmissionReview versions
-	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, h) {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReviewRequest")}
+	if !util.HasAdmissionReviewVersion(v1beta1.SchemeGroupVersion.Version, invocation.Webhook) {
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("webhook does not accept v1beta1 AdmissionReviewRequest")}
 	}
 
 	// Make the webhook request
 	request := request.CreateAdmissionReview(attr, invocation)
-	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(h))
+	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
 	if err != nil {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	response := &admissionv1beta1.AdmissionReview{}
 	r := client.Post().Context(ctx).Body(&request)
@@ -144,11 +145,11 @@ func (d *validatingDispatcher) callHook(ctx context.Context, invocation *generic
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
 	}
 	if err := r.Do().Into(response); err != nil {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
 	if response.Response == nil {
-		return &webhook.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
 	}
 	for k, v := range response.Response.AuditAnnotations {
 		key := h.Name + "/" + k

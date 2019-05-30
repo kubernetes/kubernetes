@@ -436,7 +436,7 @@ func registerWebhook(f *framework.Framework, context *certContext) func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-unwanted-pod-container-name-and-label.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -517,7 +517,7 @@ func registerWebhookForAttachingPod(f *framework.Framework, context *certContext
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-attaching-pod.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -561,7 +561,7 @@ func registerMutatingWebhookForConfigMap(f *framework.Framework, context *certCo
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "adding-configmap-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -638,7 +638,7 @@ func registerMutatingWebhookForPod(f *framework.Framework, context *certContext)
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "adding-init-container.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -841,8 +841,8 @@ func testAttachingPodWebhook(f *framework.Framework) {
 
 // failingWebhook returns a webhook with rule of create configmaps,
 // but with an invalid client config so that server cannot communicate with it
-func failingWebhook(namespace, name string) v1beta1.Webhook {
-	return v1beta1.Webhook{
+func failingWebhook(namespace, name string) v1beta1.ValidatingWebhook {
+	return v1beta1.ValidatingWebhook{
 		Name: name,
 		Rules: []v1beta1.RuleWithOperations{{
 			Operations: []v1beta1.OperationType{v1beta1.Create},
@@ -889,7 +889,7 @@ func registerFailClosedWebhook(f *framework.Framework, context *certContext) fun
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			// Server cannot talk to this webhook, so it always fails.
 			// Because this webhook is configured fail-closed, request should be rejected after the call fails.
 			hook,
@@ -945,7 +945,7 @@ func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, c
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-webhook-configuration-deletions.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -998,7 +998,7 @@ func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, con
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "add-label-to-webhook-configurations.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1050,7 +1050,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dummyValidatingWebhookConfigName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "dummy-validating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1098,7 +1098,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dummyMutatingWebhookConfigName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "dummy-mutating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1306,7 +1306,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-unwanted-custom-resource-data.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1348,7 +1348,7 @@ func registerMutatingWebhookForCustomResource(f *framework.Framework, context *c
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "mutate-custom-resource-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1543,7 +1543,7 @@ func registerValidatingWebhookForCRD(f *framework.Framework, context *certContex
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-crd-with-unwanted-label.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1649,7 +1649,7 @@ func registerSlowWebhook(f *framework.Framework, context *certContext, policy *v
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "allow-configmap-with-delay-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{

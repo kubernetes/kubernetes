@@ -46,7 +46,7 @@ func TestAdmit(t *testing.T) {
 	defer close(stopCh)
 
 	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
-		webhooktesting.NewNonMutatingTestCases(serverURL)...)
+		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL))...)
 
 	for _, tt := range testCases {
 		wh, err := NewMutatingWebhook(nil)
@@ -56,7 +56,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		ns := "webhook-test"
-		client, informer := webhooktesting.NewFakeDataSource(ns, tt.Webhooks, true, stopCh)
+		client, informer := webhooktesting.NewFakeMutatingDataSource(ns, tt.Webhooks, stopCh)
 
 		wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
 		wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
@@ -136,7 +136,7 @@ func TestAdmitCachedClient(t *testing.T) {
 
 	for _, tt := range webhooktesting.NewCachedClientTestcases(serverURL) {
 		ns := "webhook-test"
-		client, informer := webhooktesting.NewFakeDataSource(ns, tt.Webhooks, true, stopCh)
+		client, informer := webhooktesting.NewFakeMutatingDataSource(ns, webhooktesting.ConvertToMutatingWebhooks(tt.Webhooks), stopCh)
 
 		// override the webhook source. The client cache will stay the same.
 		cacheMisses := new(int32)
