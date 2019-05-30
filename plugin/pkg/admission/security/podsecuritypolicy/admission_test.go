@@ -53,7 +53,7 @@ import (
 const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.
-func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
+func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *Plugin {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Policy().V1beta1().PodSecurityPolicies().Informer().GetStore()
 	for _, psp := range psps {
@@ -63,7 +63,7 @@ func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authori
 	if authz == nil {
 		authz = &TestAuthorizer{}
 	}
-	return &PodSecurityPolicyPlugin{
+	return &Plugin{
 		Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		authz:           authz,
@@ -1963,7 +1963,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		admit := &PodSecurityPolicyPlugin{
+		admit := &Plugin{
 			Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 			strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		}

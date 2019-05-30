@@ -401,7 +401,7 @@ func NewTestAdmission(lister settingsv1alpha1listers.PodPresetLister, objects ..
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(objects...)
 
-	return &podPresetPlugin{
+	return &Plugin{
 		client:  client,
 		Handler: kadmission.NewHandler(kadmission.Create),
 		lister:  lister,
