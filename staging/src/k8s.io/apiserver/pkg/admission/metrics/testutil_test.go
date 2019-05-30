@@ -21,11 +21,109 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	ptype "github.com/prometheus/client_model/go"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/pointer"
 )
 
+func TestLabelsMatch(t *testing.T) {
+	testcases := []struct {
+		name          string
+		metric        *ptype.Metric
+		labelFilter   map[string]string
+		expectedMatch bool
+	}{
+		{
+			name: "metric's labels and labelFilter have the same labels and values",
+			metric: &ptype.Metric{
+				Label: []*ptype.LabelPair{
+					{Name: pointer.StringPtr("labelName1"), Value: pointer.StringPtr("labelValue1")},
+					{Name: pointer.StringPtr("labelName2"), Value: pointer.StringPtr("labelValue2")},
+					{Name: pointer.StringPtr("labelName3"), Value: pointer.StringPtr("labelValue3")},
+				},
+			},
+			labelFilter: map[string]string{
+				"labelName1": "labelValue1",
+				"labelName2": "labelValue2",
+				"labelName3": "labelValue3",
+			},
+			expectedMatch: true,
+		},
+		{
+			name: "metric's labels include all labelFilter labels and values",
+			metric: &ptype.Metric{
+				Label: []*ptype.LabelPair{
+					{Name: pointer.StringPtr("labelName1"), Value: pointer.StringPtr("labelValue1")},
+					{Name: pointer.StringPtr("labelName2"), Value: pointer.StringPtr("labelValue2")},
+					{Name: pointer.StringPtr("labelName3"), Value: pointer.StringPtr("labelValue3")},
+				},
+			},
+			labelFilter: map[string]string{
+				"labelName1": "labelValue1",
+				"labelName2": "labelValue2",
+			},
+			expectedMatch: true,
+		},
+		{
+			name: "metric's labels don't have one labelFilter label and value",
+			metric: &ptype.Metric{
+				Label: []*ptype.LabelPair{
+					{Name: pointer.StringPtr("labelName1"), Value: pointer.StringPtr("labelValue1")},
+					{Name: pointer.StringPtr("labelName2"), Value: pointer.StringPtr("labelValue2")},
+				},
+			},
+			labelFilter: map[string]string{
+				"labelName1": "labelValue1",
+				"labelName2": "labelValue2",
+				"labelName3": "labelValue3",
+			},
+			expectedMatch: false,
+		},
+		{
+			name: "metric's labels don't have any common label pair with labelFilter",
+			metric: &ptype.Metric{
+				Label: []*ptype.LabelPair{
+					{Name: pointer.StringPtr("labelName11"), Value: pointer.StringPtr("labelValue11")},
+					{Name: pointer.StringPtr("labelName22"), Value: pointer.StringPtr("labelValue22")},
+					{Name: pointer.StringPtr("labelName33"), Value: pointer.StringPtr("labelValue33")},
+				},
+			},
+			labelFilter: map[string]string{
+				"labelName1": "labelValue1",
+				"labelName2": "labelValue2",
+				"labelName3": "labelValue3",
+			},
+			expectedMatch: false,
+		},
+		{
+			name: "metric's labels have the same labels names but different values with labelFilter label and value",
+			metric: &ptype.Metric{
+				Label: []*ptype.LabelPair{
+					{Name: pointer.StringPtr("labelName1"), Value: pointer.StringPtr("labelValue11")},
+					{Name: pointer.StringPtr("labelName2"), Value: pointer.StringPtr("labelValue2")},
+				},
+			},
+			labelFilter: map[string]string{
+				"labelName1": "labelValue1",
+				"labelName2": "labelValue2",
+			},
+			expectedMatch: false,
+		},
+	}
+	for _, tc := range testcases {
+		assert.Equal(t, tc.expectedMatch, labelsMatch(tc.metric, tc.labelFilter), tc.name)
+	}
+}
+
 func labelsMatch(metric *ptype.Metric, labelFilter map[string]string) bool {
-	for _, lp := range metric.GetLabel() {
-		if value, ok := labelFilter[lp.GetName()]; ok && lp.GetValue() != value {
+	for labelName, labelValue := range labelFilter {
+		labelMatch := false
+		for _, labelPair := range metric.GetLabel() {
+			if labelPair.GetName() == labelName && labelPair.GetValue() == labelValue {
+				labelMatch = true
+				break
+			}
+		}
+		if !labelMatch {
 			return false
 		}
 	}
