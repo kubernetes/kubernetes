@@ -68,7 +68,6 @@ type nlbPortMapping struct {
 
 	TrafficPort     int64
 	TrafficProtocol string
-	ClientCIDR      string
 
 	HealthCheckPort     int64
 	HealthCheckPath     string
@@ -648,50 +647,6 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 	return targetGroup, nil
 }
 
-func portsForNLB(lbName string, sg *ec2.SecurityGroup, clientTraffic bool) sets.Int64 {
-	response := sets.NewInt64()
-	var annotation string
-	if clientTraffic {
-		annotation = fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
-	} else {
-		annotation = fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
-	}
-
-	for i := range sg.IpPermissions {
-		for j := range sg.IpPermissions[i].IpRanges {
-			description := aws.StringValue(sg.IpPermissions[i].IpRanges[j].Description)
-			if description == annotation {
-				// TODO  should probably check FromPort == ToPort
-				response.Insert(aws.Int64Value(sg.IpPermissions[i].FromPort))
-			}
-		}
-	}
-	return response
-}
-
-// filterForIPRangeDescription filters in security groups that have IpRange Descriptions that match a loadBalancerName
-func filterForIPRangeDescription(securityGroups []*ec2.SecurityGroup, lbName string) []*ec2.SecurityGroup {
-	response := []*ec2.SecurityGroup{}
-	clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
-	healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
-	alreadyAdded := sets.NewString()
-	for i := range securityGroups {
-		for j := range securityGroups[i].IpPermissions {
-			for k := range securityGroups[i].IpPermissions[j].IpRanges {
-				description := aws.StringValue(securityGroups[i].IpPermissions[j].IpRanges[k].Description)
-				if description == clientRule || description == healthRule {
-					sgIDString := aws.StringValue(securityGroups[i].GroupId)
-					if !alreadyAdded.Has(sgIDString) {
-						response = append(response, securityGroups[i])
-						alreadyAdded.Insert(sgIDString)
-					}
-				}
-			}
-		}
-	}
-	return response
-}
-
 func (c *Cloud) getVpcCidrBlocks() ([]string, error) {
 	vpcs, err := c.ec2.DescribeVpcs(&ec2.DescribeVpcsInput{
 		VpcIds: []*string{aws.String(c.vpcID)},
@@ -710,203 +665,76 @@ func (c *Cloud) getVpcCidrBlocks() ([]string, error) {
 	return cidrBlocks, nil
 }
 
-// abstraction for updating SG rules
-// if clientTraffic is false, then only update HealthCheck rules
-func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.SecurityGroup, desiredSgIds []string, ports []int64, lbName string, clientCidrs []string, clientTraffic bool) error {
-
-	klog.V(8).Infof("updateInstanceSecurityGroupsForNLBTraffic: actualGroups=%v, desiredSgIds=%v, ports=%v, clientTraffic=%v", actualGroups, desiredSgIds, ports, clientTraffic)
-	// Map containing the groups we want to make changes on; the ports to make
-	// changes on; and whether to add or remove it. true to add, false to remove
-	portChanges := map[string]map[int64]bool{}
-
-	for _, id := range desiredSgIds {
-		// consider everything an addition for now
-		if _, ok := portChanges[id]; !ok {
-			portChanges[id] = make(map[int64]bool)
-		}
-		for _, port := range ports {
-			portChanges[id][port] = true
-		}
+// updateInstanceSecurityGroupsForNLB will adjust securityGroup's settings to allow inbound traffic into instances from clientCIDRs and portMappings.
+// TIP: if either instances or clientCIDRs or portMappings are nil, then the securityGroup rules for lbName are cleared.
+func (c *Cloud) updateInstanceSecurityGroupsForNLB(lbName string, instances map[InstanceID]*ec2.Instance, clientCIDRs []string, portMappings []nlbPortMapping) error {
+	if c.cfg.Global.DisableSecurityGroupIngress {
+		return nil
 	}
 
-	// Compare to actual groups
-	for _, actualGroup := range actualGroups {
-		actualGroupID := aws.StringValue(actualGroup.GroupId)
-		if actualGroupID == "" {
-			klog.Warning("Ignoring group without ID: ", actualGroup)
+	clusterSGs, err := c.getTaggedSecurityGroups()
+	if err != nil {
+		return fmt.Errorf("error querying for tagged security groups: %q", err)
+	}
+	// scan instances for groups we want to open
+	desiredSGIDs := sets.String{}
+	for _, instance := range instances {
+		sg, err := findSecurityGroupForInstance(instance, clusterSGs)
+		if err != nil {
+			return err
+		}
+		if sg == nil {
+			klog.Warningf("Ignoring instance without security group: %s", aws.StringValue(instance.InstanceId))
 			continue
 		}
+		desiredSGIDs.Insert(aws.StringValue(sg.GroupId))
+	}
 
-		addingMap, ok := portChanges[actualGroupID]
-		if ok {
-			desiredSet := sets.NewInt64()
-			for port := range addingMap {
-				desiredSet.Insert(port)
+	// TODO(@M00nF1sh): do we really needs to support SG without cluster tag at current version?
+	// findSecurityGroupForInstance might return SG that are not tagged.
+	{
+		for sgID := range desiredSGIDs.Difference(sets.StringKeySet(clusterSGs)) {
+			sg, err := c.findSecurityGroup(sgID)
+			if err != nil {
+				return fmt.Errorf("error finding instance group: %q", err)
 			}
-			existingSet := portsForNLB(lbName, actualGroup, clientTraffic)
-
-			// remove from portChanges ports that are already allowed
-			if intersection := desiredSet.Intersection(existingSet); intersection.Len() > 0 {
-				for p := range intersection {
-					delete(portChanges[actualGroupID], p)
-				}
-			}
-
-			// allowed ports that need to be removed
-			if difference := existingSet.Difference(desiredSet); difference.Len() > 0 {
-				for p := range difference {
-					portChanges[actualGroupID][p] = false
-				}
-			}
+			clusterSGs[sgID] = sg
 		}
 	}
 
-	// Make changes we've planned on
-	for instanceSecurityGroupID, portMap := range portChanges {
-		adds := []*ec2.IpPermission{}
-		removes := []*ec2.IpPermission{}
-		for port, add := range portMap {
-			if add {
-				if clientTraffic {
-					klog.V(2).Infof("Adding rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
-					klog.V(2).Infof("Adding rule for client traffic from the network load balancer (%s) to instances (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
-				} else {
-					klog.V(2).Infof("Adding rule for health check traffic from the network load balancer (%s) to instances (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
-				}
-			} else {
-				if clientTraffic {
-					klog.V(2).Infof("Removing rule for client MTU discovery from the network load balancer (%s) to instances (%s)", clientCidrs, instanceSecurityGroupID)
-					klog.V(2).Infof("Removing rule for client traffic from the network load balancer (%s) to instance (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
-				}
-				klog.V(2).Infof("Removing rule for health check traffic from the network load balancer (%s) to instance (%s), port (%v)", clientCidrs, instanceSecurityGroupID, port)
-			}
-
-			if clientTraffic {
-				clientRuleAnnotation := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
-				// Client Traffic
-				permission := &ec2.IpPermission{
-					FromPort:   aws.Int64(port),
-					ToPort:     aws.Int64(port),
-					IpProtocol: aws.String("tcp"),
-				}
-				ranges := []*ec2.IpRange{}
-				for _, cidr := range clientCidrs {
-					ranges = append(ranges, &ec2.IpRange{
-						CidrIp:      aws.String(cidr),
-						Description: aws.String(clientRuleAnnotation),
-					})
-				}
-				permission.IpRanges = ranges
-				if add {
-					adds = append(adds, permission)
-				} else {
-					removes = append(removes, permission)
-				}
-			} else {
-				healthRuleAnnotation := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
-
-				// NLB HealthCheck
-				permission := &ec2.IpPermission{
-					FromPort:   aws.Int64(port),
-					ToPort:     aws.Int64(port),
-					IpProtocol: aws.String("tcp"),
-				}
-				ranges := []*ec2.IpRange{}
-				for _, cidr := range clientCidrs {
-					ranges = append(ranges, &ec2.IpRange{
-						CidrIp:      aws.String(cidr),
-						Description: aws.String(healthRuleAnnotation),
-					})
-				}
-				permission.IpRanges = ranges
-				if add {
-					adds = append(adds, permission)
-				} else {
-					removes = append(removes, permission)
-				}
-			}
+	{
+		clientPorts := sets.Int64{}
+		healthCheckPorts := sets.Int64{}
+		for _, port := range portMappings {
+			clientPorts.Insert(port.TrafficPort)
+			healthCheckPorts.Insert(port.HealthCheckPort)
 		}
-
-		if len(adds) > 0 {
-			changed, err := c.addSecurityGroupIngress(instanceSecurityGroupID, adds)
-			if err != nil {
-				return err
-			}
-			if !changed {
-				klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
-			}
+		clientRuleAnnotation := fmt.Sprintf("%s=%s", NLBClientRuleDescription, lbName)
+		healthRuleAnnotation := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, lbName)
+		vpcCIDRs, err := c.getVpcCidrBlocks()
+		if err != nil {
+			return err
 		}
-
-		if len(removes) > 0 {
-			changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, removes)
-			if err != nil {
-				return err
-			}
-			if !changed {
-				klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
-			}
-		}
-
-		if clientTraffic {
-			// MTU discovery
-			mtuRuleAnnotation := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, lbName)
-			mtuPermission := &ec2.IpPermission{
-				IpProtocol: aws.String("icmp"),
-				FromPort:   aws.Int64(3),
-				ToPort:     aws.Int64(4),
-			}
-			ranges := []*ec2.IpRange{}
-			for _, cidr := range clientCidrs {
-				ranges = append(ranges, &ec2.IpRange{
-					CidrIp:      aws.String(cidr),
-					Description: aws.String(mtuRuleAnnotation),
-				})
-			}
-			mtuPermission.IpRanges = ranges
-
-			group, err := c.findSecurityGroup(instanceSecurityGroupID)
-			if err != nil {
-				klog.Warningf("Error retrieving security group: %q", err)
-				return err
-			}
-
-			if group == nil {
-				klog.Warning("Security group not found: ", instanceSecurityGroupID)
-				return nil
-			}
-
-			icmpExists := false
-			permCount := 0
-			for _, perm := range group.IpPermissions {
-				if *perm.IpProtocol == "icmp" {
-					icmpExists = true
-					continue
-				}
-
-				if perm.FromPort != nil {
-					permCount++
-				}
-			}
-
-			if !icmpExists && permCount > 0 {
-				// the icmp permission is missing
-				changed, err := c.addSecurityGroupIngress(instanceSecurityGroupID, []*ec2.IpPermission{mtuPermission})
-				if err != nil {
-					klog.Warningf("Error adding MTU permission to security group: %q", err)
+		for sgID, sg := range clusterSGs {
+			sgPerms := NewIPPermissionSet(sg.IpPermissions...).Ungroup()
+			if desiredSGIDs.Has(sgID) {
+				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, healthRuleAnnotation, "tcp", healthCheckPorts, vpcCIDRs); err != nil {
 					return err
 				}
-				if !changed {
-					klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
-				}
-			} else if icmpExists && permCount == 0 {
-				// there is no additional permissions, remove icmp
-				changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, []*ec2.IpPermission{mtuPermission})
-				if err != nil {
-					klog.Warningf("Error removing MTU permission to security group: %q", err)
+				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, "tcp", clientPorts, clientCIDRs); err != nil {
 					return err
 				}
-				if !changed {
-					klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
+			} else {
+				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, healthRuleAnnotation, "tcp", nil, nil); err != nil {
+					return err
+				}
+				if err := c.updateInstanceSecurityGroupForNLBTraffic(sgID, sgPerms, clientRuleAnnotation, "tcp", nil, nil); err != nil {
+					return err
+				}
+			}
+			if !sgPerms.Equal(NewIPPermissionSet(sg.IpPermissions...).Ungroup()) {
+				if err := c.updateInstanceSecurityGroupForNLBMTU(sgID, sgPerms); err != nil {
+					return err
 				}
 			}
 		}
@@ -914,102 +742,105 @@ func (c *Cloud) updateInstanceSecurityGroupsForNLBTraffic(actualGroups []*ec2.Se
 	return nil
 }
 
-// Add SG rules for a given NLB
-func (c *Cloud) updateInstanceSecurityGroupsForNLB(mappings []nlbPortMapping, instances map[InstanceID]*ec2.Instance, lbName string, clientCidrs []string) error {
-	if c.cfg.Global.DisableSecurityGroupIngress {
-		return nil
-	}
-
-	vpcCidrBlocks, err := c.getVpcCidrBlocks()
-	if err != nil {
-		return err
-	}
-
-	// Unlike the classic ELB, NLB does not have a security group that we can
-	// filter against all existing groups to see if they allow access. Instead
-	// we use the IpRange.Description field to annotate NLB health check and
-	// client traffic rules
-
-	// Get the actual list of groups that allow ingress for the load-balancer
-	var actualGroups []*ec2.SecurityGroup
-	{
-		// Server side filter
-		describeRequest := &ec2.DescribeSecurityGroupsInput{}
-		describeRequest.Filters = []*ec2.Filter{
-			newEc2Filter("ip-permission.protocol", "tcp"),
-			newEc2Filter("vpc-id", c.vpcID),
+// updateInstanceSecurityGroupForNLBTraffic will manage permissions set(identified by ruleDesc) on securityGroup to match desired set(allow protocol traffic from ports/cidr).
+// Note: sgPerms will be updated to reflect the current permission set on SG after update.
+func (c *Cloud) updateInstanceSecurityGroupForNLBTraffic(sgID string, sgPerms IPPermissionSet, ruleDesc string, protocol string, ports sets.Int64, cidrs []string) error {
+	desiredPerms := NewIPPermissionSet()
+	for port := range ports {
+		for _, cidr := range cidrs {
+			desiredPerms.Insert(&ec2.IpPermission{
+				IpProtocol: aws.String(protocol),
+				FromPort:   aws.Int64(port),
+				ToPort:     aws.Int64(port),
+				IpRanges: []*ec2.IpRange{
+					{
+						CidrIp:      aws.String(cidr),
+						Description: aws.String(ruleDesc),
+					},
+				},
+			})
 		}
-		response, err := c.ec2.DescribeSecurityGroups(describeRequest)
+	}
+
+	permsToGrant := desiredPerms.Difference(sgPerms)
+	permsToRevoke := sgPerms.Difference(desiredPerms)
+	permsToRevoke.DeleteIf(IPPermissionNotMatch{IPPermissionMatchDesc{ruleDesc}})
+	if len(permsToRevoke) > 0 {
+		permsToRevokeList := permsToRevoke.List()
+		changed, err := c.removeSecurityGroupIngress(sgID, permsToRevokeList)
 		if err != nil {
-			return fmt.Errorf("Error querying security groups for NLB: %q", err)
-		}
-		for _, sg := range response {
-			if !c.tagging.hasClusterTag(sg.Tags) {
-				continue
-			}
-			actualGroups = append(actualGroups, sg)
-		}
-
-		// client-side filter
-		// Filter out groups that don't have IP Rules we've annotated for this service
-		actualGroups = filterForIPRangeDescription(actualGroups, lbName)
-	}
-
-	taggedSecurityGroups, err := c.getTaggedSecurityGroups()
-	if err != nil {
-		return fmt.Errorf("Error querying for tagged security groups: %q", err)
-	}
-
-	externalTrafficPolicyIsLocal := false
-	trafficPorts := []int64{}
-	for i := range mappings {
-		trafficPorts = append(trafficPorts, mappings[i].TrafficPort)
-		if mappings[i].TrafficPort != mappings[i].HealthCheckPort {
-			externalTrafficPolicyIsLocal = true
-		}
-	}
-
-	healthCheckPorts := trafficPorts
-	// if externalTrafficPolicy is Local, all listeners use the same health
-	// check port
-	if externalTrafficPolicyIsLocal && len(mappings) > 0 {
-		healthCheckPorts = []int64{mappings[0].HealthCheckPort}
-	}
-
-	desiredGroupIds := []string{}
-	// Scan instances for groups we want open
-	for _, instance := range instances {
-		securityGroup, err := findSecurityGroupForInstance(instance, taggedSecurityGroups)
-		if err != nil {
+			klog.Warningf("Error remove traffic permission from security group: %q", err)
 			return err
 		}
+		if !changed {
+			klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", sgID)
+		}
+		sgPerms.Delete(permsToRevokeList...)
+	}
+	if len(permsToGrant) > 0 {
+		permsToGrantList := permsToGrant.List()
+		changed, err := c.addSecurityGroupIngress(sgID, permsToGrantList)
+		if err != nil {
+			klog.Warningf("Error add traffic permission to security group: %q", err)
+			return err
+		}
+		if !changed {
+			klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", sgID)
+		}
+		sgPerms.Insert(permsToGrantList...)
+	}
+	return nil
+}
 
-		if securityGroup == nil {
-			klog.Warningf("Ignoring instance without security group: %s", aws.StringValue(instance.InstanceId))
-			continue
+// Note: sgPerms will be updated to reflect the current permission set on SG after update.
+func (c *Cloud) updateInstanceSecurityGroupForNLBMTU(sgID string, sgPerms IPPermissionSet) error {
+	desiredPerms := NewIPPermissionSet()
+	for _, perm := range sgPerms {
+		for _, ipRange := range perm.IpRanges {
+			if strings.Contains(aws.StringValue(ipRange.Description), NLBClientRuleDescription) {
+				desiredPerms.Insert(&ec2.IpPermission{
+					IpProtocol: aws.String("icmp"),
+					FromPort:   aws.Int64(3),
+					ToPort:     aws.Int64(4),
+					IpRanges: []*ec2.IpRange{
+						{
+							CidrIp:      ipRange.CidrIp,
+							Description: aws.String(NLBMtuDiscoveryRuleDescription),
+						},
+					},
+				})
+			}
+		}
+	}
+
+	permsToGrant := desiredPerms.Difference(sgPerms)
+	permsToRevoke := sgPerms.Difference(desiredPerms)
+	permsToRevoke.DeleteIf(IPPermissionNotMatch{IPPermissionMatchDesc{NLBMtuDiscoveryRuleDescription}})
+	if len(permsToRevoke) > 0 {
+		permsToRevokeList := permsToRevoke.List()
+		changed, err := c.removeSecurityGroupIngress(sgID, permsToRevokeList)
+		if err != nil {
+			klog.Warningf("Error remove MTU permission from security group: %q", err)
+			return err
+		}
+		if !changed {
+			klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", sgID)
 		}
 
-		id := aws.StringValue(securityGroup.GroupId)
-		if id == "" {
-			klog.Warningf("found security group without id: %v", securityGroup)
-			continue
+		sgPerms.Delete(permsToRevokeList...)
+	}
+	if len(permsToGrant) > 0 {
+		permsToGrantList := permsToGrant.List()
+		changed, err := c.addSecurityGroupIngress(sgID, permsToGrantList)
+		if err != nil {
+			klog.Warningf("Error add MTU permission to security group: %q", err)
+			return err
 		}
-
-		desiredGroupIds = append(desiredGroupIds, id)
+		if !changed {
+			klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", sgID)
+		}
+		sgPerms.Insert(permsToGrantList...)
 	}
-
-	// Run once for Client traffic
-	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, trafficPorts, lbName, clientCidrs, true)
-	if err != nil {
-		return err
-	}
-
-	// Run once for health check traffic
-	err = c.updateInstanceSecurityGroupsForNLBTraffic(actualGroups, desiredGroupIds, healthCheckPorts, lbName, vpcCidrBlocks, false)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 

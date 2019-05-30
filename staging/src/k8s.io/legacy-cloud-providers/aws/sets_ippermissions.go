@@ -20,11 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 // IPPermissionSet maps IP strings of strings to EC2 IpPermissions
 type IPPermissionSet map[string]*ec2.IpPermission
+
+// IPPermissionPredicate is an predicate to test whether IPPermission matches some condition.
+type IPPermissionPredicate interface {
+	// Test checks whether specified IPPermission matches condition.
+	Test(perm *ec2.IpPermission) bool
+}
 
 // NewIPPermissionSet creates a new IPPermissionSet
 func NewIPPermissionSet(items ...*ec2.IpPermission) IPPermissionSet {
@@ -90,6 +97,23 @@ func (s IPPermissionSet) Insert(items ...*ec2.IpPermission) {
 	}
 }
 
+// Delete delete permission from the set.
+func (s IPPermissionSet) Delete(items ...*ec2.IpPermission) {
+	for _, p := range items {
+		k := keyForIPPermission(p)
+		delete(s, k)
+	}
+}
+
+// DeleteIf delete permission from the set if permission matches predicate.
+func (s IPPermissionSet) DeleteIf(predicate IPPermissionPredicate) {
+	for k, p := range s {
+		if predicate.Test(p) {
+			delete(s, k)
+		}
+	}
+}
+
 // List returns the contents as a slice.  Order is not defined.
 func (s IPPermissionSet) List() []*ec2.IpPermission {
 	res := make([]*ec2.IpPermission, 0, len(s))
@@ -145,4 +169,48 @@ func keyForIPPermission(p *ec2.IpPermission) string {
 		panic(fmt.Sprintf("error building JSON representation of ec2.IpPermission: %v", err))
 	}
 	return string(v)
+}
+
+var _ IPPermissionPredicate = IPPermissionMatchDesc{}
+
+// IPPermissionMatchDesc checks whether specific IPPermission contains description.
+type IPPermissionMatchDesc struct {
+	Description string
+}
+
+// Test whether specific IPPermission contains description.
+func (p IPPermissionMatchDesc) Test(perm *ec2.IpPermission) bool {
+	for _, v4Range := range perm.IpRanges {
+		if aws.StringValue(v4Range.Description) == p.Description {
+			return true
+		}
+	}
+	for _, v6Range := range perm.Ipv6Ranges {
+		if aws.StringValue(v6Range.Description) == p.Description {
+			return true
+		}
+	}
+	for _, prefixListID := range perm.PrefixListIds {
+		if aws.StringValue(prefixListID.Description) == p.Description {
+			return true
+		}
+	}
+	for _, group := range perm.UserIdGroupPairs {
+		if aws.StringValue(group.Description) == p.Description {
+			return true
+		}
+	}
+	return false
+}
+
+var _ IPPermissionPredicate = IPPermissionNotMatch{}
+
+// IPPermissionNotMatch is the *not* operator for Predicate
+type IPPermissionNotMatch struct {
+	Predicate IPPermissionPredicate
+}
+
+// Test whether specific IPPermission not match the embed predicate.
+func (p IPPermissionNotMatch) Test(perm *ec2.IpPermission) bool {
+	return !p.Predicate.Test(perm)
 }
