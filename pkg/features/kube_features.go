@@ -336,7 +336,7 @@ const (
 	KubeletPluginsWatcher featuregate.Feature = "KubeletPluginsWatcher"
 
 	// owner: @vikaschoudhary16
-	// beta: v1.12
+	// GA: v1.15
 	//
 	//
 	// Enable resource quota scope selectors
@@ -517,7 +517,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodReadinessGates:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	VolumeSubpathEnvExpansion:                   {Default: true, PreRelease: featuregate.Beta},
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
-	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: featuregate.Beta},
+	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: featuregate.GA},
 	CSIBlockVolume:                              {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                             {Default: false, PreRelease: featuregate.Alpha},
 	RuntimeClass:                                {Default: true, PreRelease: featuregate.Beta},
