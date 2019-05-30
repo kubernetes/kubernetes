@@ -431,7 +431,7 @@ run_pod_tests() {
 
   ## Create valid-pod POD
   # Pre-condition: no POD exists
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is created
@@ -1036,7 +1036,7 @@ run_rc_tests() {
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
   kubectl delete rc frontend "${kube_flags[@]}"
   # Post-condition: no pods from frontend controller
-  kube::test::get_object_assert 'pods -l "name=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::wait_object_assert 'pods -l "name=frontend"' "{{range.items}}{{$id_field}}:{{end}}" ''
 
   ### Create replication controller frontend from JSON
   # Pre-condition: no replication controller exists
