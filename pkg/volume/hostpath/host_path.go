@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package host_path
+package hostpath
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 // The volumeConfig arg provides the ability to configure volume behavior.  It is implemented as a pointer to allow nils.
 // The hostPathPlugin is used to store the volumeConfig and give it, when needed, to the func that Recycles.
 // Tests that exercise recycling should not use this func but instead use ProbeRecyclablePlugins() to override default behavior.

@@ -89,7 +89,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 					lastRV = list.ResourceVersion
 				}
 				gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))
-				gomega.Expect(int(list.RemainingItemCount) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
+				if list.GetContinue() == "" {
+					gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+				} else {
+					gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+					gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
+				}
 				for _, item := range list.Items {
 					gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 					found++
@@ -122,7 +127,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
 		firstToken := list.Continue
 		firstRV := list.ResourceVersion
-		gomega.Expect(int(list.RemainingItemCount) + len(list.Items)).To(gomega.BeNumerically("==", numberOfTotalResources))
+		if list.GetContinue() == "" {
+			gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+		} else {
+			gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+			gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items)).To(gomega.BeNumerically("==", numberOfTotalResources))
+		}
 		e2elog.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, firstToken)
 
 		ginkgo.By("retrieving the second page until the token expires")
@@ -157,7 +167,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		gomega.Expect(list.ResourceVersion).ToNot(gomega.Equal(firstRV))
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
-		gomega.Expect(int(list.RemainingItemCount) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
+		if list.GetContinue() == "" {
+			gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+		} else {
+			gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+			gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
+		}
 		for _, item := range list.Items {
 			gomega.Expect(item.Name).To(gomega.Equal(fmt.Sprintf("template-%04d", found)))
 			found++
@@ -169,7 +184,12 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		for {
 			list, err := client.List(opts)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "failed to list pod templates in namespace: %s, given limit: %d", ns, opts.Limit)
-			gomega.Expect(int(list.RemainingItemCount) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
+			if list.GetContinue() == "" {
+				gomega.Expect(list.GetRemainingItemCount()).To(gomega.BeNil())
+			} else {
+				gomega.Expect(list.GetRemainingItemCount()).ToNot(gomega.BeNil())
+				gomega.Expect(int(*list.GetRemainingItemCount()) + len(list.Items) + found).To(gomega.BeNumerically("==", numberOfTotalResources))
+			}
 			e2elog.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
 			gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
 			gomega.Expect(list.ResourceVersion).To(gomega.Equal(lastRV))

@@ -21,7 +21,7 @@ import (
 )
 
 // Prune removes object fields in obj which are not specified in s.
-func Prune(obj map[string]interface{}, s *structuralschema.Structural) {
+func Prune(obj interface{}, s *structuralschema.Structural) {
 	prune(obj, s)
 }
 

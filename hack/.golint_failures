@@ -2,7 +2,6 @@ cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
-pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
@@ -70,7 +69,6 @@ pkg/controller/job
 pkg/controller/job/config/v1alpha1
 pkg/controller/namespace
 pkg/controller/namespace/config/v1alpha1
-pkg/controller/namespace/deletion
 pkg/controller/nodeipam/config/v1alpha1
 pkg/controller/nodelifecycle/config/v1alpha1
 pkg/controller/podautoscaler
@@ -87,7 +85,6 @@ pkg/controller/resourcequota/config/v1alpha1
 pkg/controller/route
 pkg/controller/service
 pkg/controller/service/config/v1alpha1
-pkg/controller/serviceaccount
 pkg/controller/serviceaccount/config/v1alpha1
 pkg/controller/statefulset
 pkg/controller/ttl
@@ -314,7 +311,6 @@ pkg/volume/azure_file
 pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
-pkg/volume/host_path
 pkg/volume/iscsi
 pkg/volume/photon_pd
 pkg/volume/rbd

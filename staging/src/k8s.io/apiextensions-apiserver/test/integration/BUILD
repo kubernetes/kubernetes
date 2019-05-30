@@ -12,6 +12,7 @@ go_test(
         "apply_test.go",
         "basic_test.go",
         "change_test.go",
+        "defaulting_test.go",
         "finalization_test.go",
         "objectmeta_test.go",
         "pruning_test.go",

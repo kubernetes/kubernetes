@@ -55,14 +55,9 @@ const (
 	FileSystemResizeFailed               = "FileSystemResizeFailed"
 	FileSystemResizeSuccess              = "FileSystemResizeSuccessful"
 	FailedMapVolume                      = "FailedMapVolume"
-	FailedUnmapDevice                    = "FailedUnmapDevice"
 	WarnAlreadyMountedVolume             = "AlreadyMountedVolume"
-	SuccessfulDetachVolume               = "SuccessfulDetachVolume"
 	SuccessfulAttachVolume               = "SuccessfulAttachVolume"
 	SuccessfulMountVolume                = "SuccessfulMountVolume"
-	SuccessfulUnMountVolume              = "SuccessfulUnMountVolume"
-	HostPortConflict                     = "HostPortConflict"
-	NodeSelectorMismatching              = "NodeSelectorMismatching"
 	InsufficientFreeCPU                  = "InsufficientFreeCPU"
 	InsufficientFreeMemory               = "InsufficientFreeMemory"
 	NodeRebooted                         = "Rebooted"
@@ -70,7 +65,6 @@ const (
 	ImageGCFailed                        = "ImageGCFailed"
 	FailedNodeAllocatableEnforcement     = "FailedNodeAllocatableEnforcement"
 	SuccessfulNodeAllocatableEnforcement = "NodeAllocatableEnforced"
-	UnsupportedMountOption               = "UnsupportedMountOption"
 	SandboxChanged                       = "SandboxChanged"
 	FailedCreatePodSandBox               = "FailedCreatePodSandBox"
 	FailedStatusPodSandBox               = "FailedPodSandBoxStatus"
@@ -90,7 +84,6 @@ const (
 	FailedValidation = "FailedValidation"
 
 	// Lifecycle hooks
-	FailedPostStartHook   = "FailedPostStartHook"
-	FailedPreStopHook     = "FailedPreStopHook"
-	UnfinishedPreStopHook = "UnfinishedPreStopHook"
+	FailedPostStartHook = "FailedPostStartHook"
+	FailedPreStopHook   = "FailedPreStopHook"
 )

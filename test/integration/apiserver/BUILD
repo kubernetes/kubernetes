@@ -16,6 +16,7 @@ go_test(
         "patch_test.go",
         "print_test.go",
     ],
+    rundir = ".",
     tags = [
         "etcd",
         "integration",

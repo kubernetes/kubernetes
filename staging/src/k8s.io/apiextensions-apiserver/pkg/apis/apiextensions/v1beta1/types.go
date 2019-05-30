@@ -456,7 +456,8 @@ type ConversionResponse struct {
 	UID types.UID `json:"uid" protobuf:"bytes,1,name=uid"`
 	// `convertedObjects` is the list of converted version of `request.objects` if the `result` is successful otherwise empty.
 	// The webhook is expected to set apiVersion of these objects to the ConversionRequest.desiredAPIVersion. The list
-	// must also has the same size as input list with the same objects in the same order(i.e. equal UIDs and object meta)
+	// must also have the same size as the input list with the same objects in the same order (equal kind, UID, name and namespace).
+	// The webhook is allowed to mutate labels and annotations. Any other change to the metadata is silently ignored.
 	ConvertedObjects []runtime.RawExtension `json:"convertedObjects" protobuf:"bytes,2,rep,name=convertedObjects"`
 	// `result` contains the result of conversion with extra details if the conversion failed. `result.status` determines if
 	// the conversion failed or succeeded. The `result.status` field is required and represent the success or failure of the

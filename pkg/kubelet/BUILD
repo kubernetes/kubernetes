@@ -214,7 +214,7 @@ go_test(
         "//pkg/volume/awsebs:go_default_library",
         "//pkg/volume/azure_dd:go_default_library",
         "//pkg/volume/gcepd:go_default_library",
-        "//pkg/volume/host_path:go_default_library",
+        "//pkg/volume/hostpath:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",

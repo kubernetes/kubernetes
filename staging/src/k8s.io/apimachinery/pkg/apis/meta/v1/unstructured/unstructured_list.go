@@ -166,12 +166,16 @@ func (u *UnstructuredList) SetContinue(c string) {
 	u.setNestedField(c, "metadata", "continue")
 }
 
-func (u *UnstructuredList) GetRemainingItemCount() int64 {
-	return getNestedInt64(u.Object, "metadata", "remainingItemCount")
+func (u *UnstructuredList) GetRemainingItemCount() *int64 {
+	return getNestedInt64Pointer(u.Object, "metadata", "remainingItemCount")
 }
 
-func (u *UnstructuredList) SetRemainingItemCount(c int64) {
-	u.setNestedField(c, "metadata", "remainingItemCount")
+func (u *UnstructuredList) SetRemainingItemCount(c *int64) {
+	if c == nil {
+		RemoveNestedField(u.Object, "metadata", "remainingItemCount")
+	} else {
+		u.setNestedField(*c, "metadata", "remainingItemCount")
+	}
 }
 
 func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {

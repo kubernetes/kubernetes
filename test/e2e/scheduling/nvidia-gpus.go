@@ -250,7 +250,7 @@ func StartJob(f *framework.Framework, completions int32) {
 	ns := f.Namespace.Name
 	_, err := jobutil.CreateJob(f.ClientSet, ns, testJob)
 	framework.ExpectNoError(err)
-	framework.Logf("Created job %v", testJob)
+	e2elog.Logf("Created job %v", testJob)
 }
 
 // VerifyJobNCompletions verifies that the job has completions number of successful pods
@@ -260,7 +260,7 @@ func VerifyJobNCompletions(f *framework.Framework, completions int32) {
 	framework.ExpectNoError(err)
 	createdPods := pods.Items
 	createdPodNames := podNames(createdPods)
-	framework.Logf("Got the following pods for job cuda-add: %v", createdPodNames)
+	e2elog.Logf("Got the following pods for job cuda-add: %v", createdPodNames)
 
 	successes := int32(0)
 	for _, podName := range createdPodNames {

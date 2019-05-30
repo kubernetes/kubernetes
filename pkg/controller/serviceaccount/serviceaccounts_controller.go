@@ -52,6 +52,7 @@ type ServiceAccountsControllerOptions struct {
 	NamespaceResync time.Duration
 }
 
+// DefaultServiceAccountsControllerOptions returns the default options for creating a ServiceAccountsController.
 func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions {
 	return ServiceAccountsControllerOptions{
 		ServiceAccounts: []v1.ServiceAccount{
@@ -108,6 +109,7 @@ type ServiceAccountsController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
 func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()

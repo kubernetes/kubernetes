@@ -90,7 +90,7 @@ filegroup(
         "//pkg/volume/gcepd:all-srcs",
         "//pkg/volume/git_repo:all-srcs",
         "//pkg/volume/glusterfs:all-srcs",
-        "//pkg/volume/host_path:all-srcs",
+        "//pkg/volume/hostpath:all-srcs",
         "//pkg/volume/iscsi:all-srcs",
         "//pkg/volume/local:all-srcs",
         "//pkg/volume/nfs:all-srcs",

@@ -95,6 +95,15 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 		// Also update the comment in types.go
 		return true, nil
 	}
+	// TODO: adding an LRU cache to cache the translation
+	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
+	if err != nil {
+		return false, apierrors.NewInternalError(err)
+	}
+	if selector.Empty() {
+		return true, nil
+	}
+
 	namespaceLabels, err := m.GetNamespaceLabels(attr)
 	// this means the namespace is not found, for backwards compatibility,
 	// return a 404
@@ -105,11 +114,6 @@ func (m *Matcher) MatchNamespaceSelector(h *v1beta1.Webhook, attr admission.Attr
 		}
 		return false, &apierrors.StatusError{status.Status()}
 	}
-	if err != nil {
-		return false, apierrors.NewInternalError(err)
-	}
-	// TODO: adding an LRU cache to cache the translation
-	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
 	}

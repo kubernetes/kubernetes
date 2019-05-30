@@ -62,7 +62,7 @@ func (in *MutatingWebhookConfiguration) DeepCopyObject() runtime.Object {
 func (in *MutatingWebhookConfigurationList) DeepCopyInto(out *MutatingWebhookConfigurationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]MutatingWebhookConfiguration, len(*in))
@@ -212,7 +212,7 @@ func (in *ValidatingWebhookConfiguration) DeepCopyObject() runtime.Object {
 func (in *ValidatingWebhookConfigurationList) DeepCopyInto(out *ValidatingWebhookConfigurationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ValidatingWebhookConfiguration, len(*in))
@@ -255,6 +255,11 @@ func (in *Webhook) DeepCopyInto(out *Webhook) {
 	if in.FailurePolicy != nil {
 		in, out := &in.FailurePolicy, &out.FailurePolicy
 		*out = new(FailurePolicyType)
+		**out = **in
+	}
+	if in.MatchPolicy != nil {
+		in, out := &in.MatchPolicy, &out.MatchPolicy
+		*out = new(MatchPolicyType)
 		**out = **in
 	}
 	if in.NamespaceSelector != nil {

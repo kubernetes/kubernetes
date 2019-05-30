@@ -19,6 +19,7 @@ package framework
 import (
 	"fmt"
 
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/perftype"
 )
 
@@ -100,7 +101,7 @@ func CPUUsageToPerfData(usagePerNode NodesCPUSummary) *perftype.PerfData {
 func PrintPerfData(p *perftype.PerfData) {
 	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
 	if str := PrettyPrintJSON(p); str != "" {
-		Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+		e2elog.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }
 

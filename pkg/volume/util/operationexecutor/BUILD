@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "fakegenerator.go",
         "operation_executor.go",
         "operation_generator.go",
     ],

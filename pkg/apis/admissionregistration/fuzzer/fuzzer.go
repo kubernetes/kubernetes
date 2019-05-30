@@ -37,6 +37,8 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(obj) // fuzz self without calling this function again
 			p := admissionregistration.FailurePolicyType("Fail")
 			obj.FailurePolicy = &p
+			m := admissionregistration.MatchPolicyType("Exact")
+			obj.MatchPolicy = &m
 			s := admissionregistration.SideEffectClassUnknown
 			obj.SideEffects = &s
 			if obj.TimeoutSeconds == nil {

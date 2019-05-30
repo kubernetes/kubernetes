@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"fmt"
 	"os/exec"
@@ -40,7 +41,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		podList, err := f.PodClient().List(metav1.ListOptions{})
 		if err != nil {
-			framework.Logf("Failed to list pods on node: %v", err)
+			e2elog.Logf("Failed to list pods on node: %v", err)
 			continue
 		}
 
@@ -51,7 +52,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 			}
 			runningPods = append(runningPods, &pod)
 		}
-		framework.Logf("Running pod count %d", len(runningPods))
+		e2elog.Logf("Running pod count %d", len(runningPods))
 		if len(runningPods) >= pod_count {
 			break
 		}

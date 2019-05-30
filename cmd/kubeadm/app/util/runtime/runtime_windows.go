@@ -1,5 +1,7 @@
+// +build windows
+
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +16,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package host_path contains the internal representation of hostPath
-// volumes.
-package host_path // import "k8s.io/kubernetes/pkg/volume/host_path"
+package util
+
+import (
+	winio "github.com/Microsoft/go-winio"
+)
+
+const (
+	dockerSocket     = "//./pipe/docker_engine"         // The Docker socket is not CRI compatible
+	containerdSocket = "//./pipe/containerd-containerd" // Proposed containerd named pipe for Windows
+)
+
+// isExistingSocket checks if path exists and is domain socket
+func isExistingSocket(path string) bool {
+	_, err := winio.DialPipe(path, nil)
+	if err != nil {
+		return false
+	}
+
+	return true
+}

@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
 
@@ -115,7 +118,7 @@ func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.Conv
 	listObj, isList := obj.(*unstructured.UnstructuredList)
 	var objects []runtime.RawExtension
 	if isList {
-		for i := 0; i < len(listObj.Items); i++ {
+		for i := range listObj.Items {
 			// Only sent item for conversion, if the apiVersion is different
 			if listObj.Items[i].GetAPIVersion() != apiVersion {
 				objects = append(objects, runtime.RawExtension{Object: &listObj.Items[i]})
@@ -199,34 +202,38 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	}
 
 	if isList {
+		// start a deepcopy of the input and fill in the converted objects from the response at the right spots.
+		// The response list might be sparse because objects had the right version already.
 		convertedList := listObj.DeepCopy()
-		// Collection of items sent for conversion is different than list items
-		// because only items that needed conversion has been sent.
 		convertedIndex := 0
-		for i := 0; i < len(listObj.Items); i++ {
-			if listObj.Items[i].GetAPIVersion() == toGV.String() {
-				// This item has not been sent for conversion, skip it.
+		for i := range convertedList.Items {
+			original := &convertedList.Items[i]
+			if original.GetAPIVersion() == toGV.String() {
+				// This item has not been sent for conversion, and therefore does not show up in the response.
+				// convertedList has the right item already.
 				continue
 			}
 			converted, err := getRawExtensionObject(response.Response.ConvertedObjects[convertedIndex])
-			convertedIndex++
-			original := listObj.Items[i]
 			if err != nil {
 				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
 			}
-			if e, a := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); e != a {
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid groupVersion, e=%v, a=%v", convertedIndex, e, a)
+			convertedIndex++
+			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
+				return nil, fmt.Errorf("invalid converted object at index %v: invalid groupVersion, expected=%v, got=%v", convertedIndex, expected, got)
 			}
-			if e, a := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; e != a {
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid kind, e=%v, a=%v", convertedIndex, e, a)
+			if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
+				return nil, fmt.Errorf("invalid converted object at index %v: invalid kind, expected=%v, got=%v", convertedIndex, expected, got)
 			}
 			unstructConverted, ok := converted.(*unstructured.Unstructured)
 			if !ok {
 				// this should not happened
-				return nil, fmt.Errorf("CR conversion failed")
+				return nil, fmt.Errorf("invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", convertedIndex, converted)
 			}
-			if err := validateConvertedObject(&listObj.Items[i], unstructConverted); err != nil {
+			if err := validateConvertedObject(original, unstructConverted); err != nil {
 				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
+			}
+			if err := restoreObjectMeta(original, unstructConverted); err != nil {
+				return nil, fmt.Errorf("invalid metadata in object at index %v: %v", convertedIndex, err)
 			}
 			convertedList.Items[i] = *unstructConverted
 		}
@@ -261,22 +268,100 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	if err := validateConvertedObject(unstructIn, unstructConverted); err != nil {
 		return nil, fmt.Errorf("invalid converted object: %v", err)
 	}
+	if err := restoreObjectMeta(unstructIn, unstructConverted); err != nil {
+		return nil, fmt.Errorf("invalid metadata in converted object: %v", err)
+	}
 	return converted, nil
 }
 
-func validateConvertedObject(unstructIn, unstructOut *unstructured.Unstructured) error {
-	if e, a := unstructIn.GetKind(), unstructOut.GetKind(); e != a {
+// validateConvertedObject checks that ObjectMeta fields match, with the exception of
+// labels and annotations.
+func validateConvertedObject(in, out *unstructured.Unstructured) error {
+	if e, a := in.GetKind(), out.GetKind(); e != a {
 		return fmt.Errorf("must have the same kind: %v != %v", e, a)
 	}
-	if e, a := unstructIn.GetName(), unstructOut.GetName(); e != a {
+	if e, a := in.GetName(), out.GetName(); e != a {
 		return fmt.Errorf("must have the same name: %v != %v", e, a)
 	}
-	if e, a := unstructIn.GetNamespace(), unstructOut.GetNamespace(); e != a {
+	if e, a := in.GetNamespace(), out.GetNamespace(); e != a {
 		return fmt.Errorf("must have the same namespace: %v != %v", e, a)
 	}
-	if e, a := unstructIn.GetUID(), unstructOut.GetUID(); e != a {
+	if e, a := in.GetUID(), out.GetUID(); e != a {
 		return fmt.Errorf("must have the same UID: %v != %v", e, a)
 	}
+	return nil
+}
+
+// restoreObjectMeta deep-copies metadata from original into converted, while preserving labels and annotations from converted.
+func restoreObjectMeta(original, converted *unstructured.Unstructured) error {
+	obj, found := converted.Object["metadata"]
+	if !found {
+		return fmt.Errorf("missing metadata in converted object")
+	}
+	responseMetaData, ok := obj.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid metadata of type %T in converted object", obj)
+	}
+
+	if _, ok := original.Object["metadata"]; !ok {
+		// the original will always have metadata. But just to be safe, let's clear in converted
+		// with an empty object instead of nil, to be able to add labels and annotations below.
+		converted.Object["metadata"] = map[string]interface{}{}
+	} else {
+		converted.Object["metadata"] = runtime.DeepCopyJSONValue(original.Object["metadata"])
+	}
+
+	obj = converted.Object["metadata"]
+	convertedMetaData, ok := obj.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid metadata of type %T in input object", obj)
+	}
+
+	for _, fld := range []string{"labels", "annotations"} {
+		obj, found := responseMetaData[fld]
+		if !found || obj == nil {
+			delete(convertedMetaData, fld)
+			continue
+		}
+		responseField, ok := obj.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("invalid metadata.%s of type %T in converted object", fld, obj)
+		}
+
+		originalField, ok := convertedMetaData[fld].(map[string]interface{})
+		if !ok && convertedMetaData[fld] != nil {
+			return fmt.Errorf("invalid metadata.%s of type %T in original object", fld, convertedMetaData[fld])
+		}
+
+		somethingChanged := len(originalField) != len(responseField)
+		for k, v := range responseField {
+			if _, ok := v.(string); !ok {
+				return fmt.Errorf("metadata.%s[%s] must be a string, but is %T in converted object", fld, k, v)
+			}
+			if originalField[k] != interface{}(v) {
+				somethingChanged = true
+			}
+		}
+
+		if somethingChanged {
+			stringMap := make(map[string]string, len(responseField))
+			for k, v := range responseField {
+				stringMap[k] = v.(string)
+			}
+			var errs field.ErrorList
+			if fld == "labels" {
+				errs = metav1validation.ValidateLabels(stringMap, field.NewPath("metadata", "labels"))
+			} else {
+				errs = apivalidation.ValidateAnnotations(stringMap, field.NewPath("metadata", "annotation"))
+			}
+			if len(errs) > 0 {
+				return errs.ToAggregate()
+			}
+		}
+
+		convertedMetaData[fld] = responseField
+	}
+
 	return nil
 }
 

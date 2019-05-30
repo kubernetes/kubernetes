@@ -47,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd"
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var scheme = runtime.NewScheme()
@@ -831,7 +832,7 @@ func TestList(t *testing.T) {
 		pred                       storage.SelectionPredicate
 		expectedOut                []*example.Pod
 		expectContinue             bool
-		expectedRemainingItemCount int64
+		expectedRemainingItemCount *int64
 		expectError                bool
 	}{
 		{
@@ -884,7 +885,7 @@ func TestList(t *testing.T) {
 			},
 			expectedOut:                []*example.Pod{preset[1].storedObj},
 			expectContinue:             true,
-			expectedRemainingItemCount: 1,
+			expectedRemainingItemCount: utilpointer.Int64Ptr(1),
 		},
 		{
 			name:          "test List with limit when paging disabled",
@@ -1062,8 +1063,8 @@ func TestList(t *testing.T) {
 			t.Errorf("(%s): length of list want=%d, got=%d", tt.name, len(tt.expectedOut), len(out.Items))
 			continue
 		}
-		if e, a := tt.expectedRemainingItemCount, out.ListMeta.RemainingItemCount; e != a {
-			t.Errorf("(%s): remainingItemCount want=%d, got=%d", tt.name, e, a)
+		if e, a := tt.expectedRemainingItemCount, out.ListMeta.GetRemainingItemCount(); (e == nil) != (a == nil) || (e != nil && a != nil && *e != *a) {
+			t.Errorf("(%s): remainingItemCount want=%#v, got=%#v", tt.name, e, a)
 		}
 		for j, wantPod := range tt.expectedOut {
 			getPod := &out.Items[j]

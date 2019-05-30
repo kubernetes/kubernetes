@@ -287,6 +287,9 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 		}
 		attachableVolumePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
+			if attachableVolumePlugin == nil {
+				err = fmt.Errorf("plugin do not support attachment")
+			}
 			return "", fmt.Errorf(
 				"failed to get AttachablePlugin from volumeSpec for volume %q err=%v",
 				volumeSpec.Name(),

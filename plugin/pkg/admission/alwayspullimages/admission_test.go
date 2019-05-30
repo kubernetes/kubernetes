@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -29,7 +30,7 @@ import (
 // set to Always
 func TestAdmission(t *testing.T) {
 	namespace := "test"
-	handler := &AlwaysPullImages{}
+	handler := admissiontesting.WithReinvocationTesting(t, &AlwaysPullImages{})
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
@@ -137,7 +138,7 @@ func TestOtherResources(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		handler := &AlwaysPullImages{}
+		handler := admissiontesting.WithReinvocationTesting(t, &AlwaysPullImages{})
 
 		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 

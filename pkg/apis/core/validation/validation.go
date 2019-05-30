@@ -3692,8 +3692,11 @@ func ValidateService(service *core.Service) field.ErrorList {
 		if service.Spec.ClusterIP != "" {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("clusterIP"), "must be empty for ExternalName services"))
 		}
-		if len(service.Spec.ExternalName) > 0 {
-			allErrs = append(allErrs, ValidateDNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
+
+		// The value (a CNAME) may have a trailing dot to denote it as fully qualified
+		cname := strings.TrimSuffix(service.Spec.ExternalName, ".")
+		if len(cname) > 0 {
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(cname, specPath.Child("externalName"))...)
 		} else {
 			allErrs = append(allErrs, field.Required(specPath.Child("externalName"), ""))
 		}

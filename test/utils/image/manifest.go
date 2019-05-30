@@ -162,6 +162,8 @@ const (
 	NginxNew
 	// Nonewprivs image
 	Nonewprivs
+	// NonRoot runs with a default user of 1234
+	NonRoot
 	// NoSnatTest image
 	NoSnatTest
 	// NoSnatTestProxy image
@@ -229,6 +231,7 @@ func initImageConfigs() map[int]Config {
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
+	configs[NonRoot] = Config{e2eRegistry, "nonroot", "1.0"}
 	configs[NoSnatTest] = Config{e2eRegistry, "no-snat-test", "1.0"}
 	configs[NoSnatTestProxy] = Config{e2eRegistry, "no-snat-test-proxy", "1.0"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go

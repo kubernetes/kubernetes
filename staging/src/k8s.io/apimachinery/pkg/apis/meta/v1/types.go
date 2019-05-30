@@ -88,7 +88,7 @@ type ListMeta struct {
 	// because it is unpaginated or because this is the last page), then there are no more remaining
 	// items and this field will also be unset.  Servers older than v1.15 do not set this field.
 	// +optional
-	RemainingItemCount int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
+	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
 }
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here

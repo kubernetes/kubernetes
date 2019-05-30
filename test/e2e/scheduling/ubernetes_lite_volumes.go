@@ -164,7 +164,6 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 		// Get the related PV
 		pv, err := c.CoreV1().PersistentVolumes().Get(claim.Spec.VolumeName, metav1.GetOptions{})
-		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		framework.ExpectNoError(err)
 
 		pvZone, ok := pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]

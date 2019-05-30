@@ -417,6 +417,12 @@ const (
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
 
+	// owner: @andyzhangx
+	// alpha: v1.15
+	//
+	// Enables the Azure Disk in-tree driver to Azure Disk Driver migration feature.
+	CSIMigrationAzureDisk featuregate.Feature = "CSIMigrationAzureDisk"
+
 	// owner: @RobertKrawitz
 	// beta: v1.15
 	//
@@ -496,6 +502,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigration:                                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureDisk:                       {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                  {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:                       {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: featuregate.GA},
@@ -533,6 +540,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: false, PreRelease: featuregate.Alpha},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
+	apiextensionsfeatures.CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
