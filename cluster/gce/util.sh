@@ -3017,6 +3017,11 @@ function check-cluster() {
 
   # ensures KUBECONFIG is set
   get-kubeconfig-basicauth
+
+  if [[ ${GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA:-} == "true" ]]; then
+    gcloud compute instances add-metadata "${MASTER_NAME}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
+  fi
+
   echo
   echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo
