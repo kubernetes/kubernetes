@@ -1,11 +1,8 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "scale.go",
-        "scalejob.go",
-    ],
+    srcs = ["scale.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/scale",
     visibility = ["//visibility:public"],
     deps = [
@@ -13,35 +10,14 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
         "//pkg/kubectl/util/templates:go_default_library",
-        "//staging/src/k8s.io/api/batch/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-    ],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["scalejob_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//staging/src/k8s.io/api/batch/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/batch/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

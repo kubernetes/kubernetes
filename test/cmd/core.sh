@@ -1107,15 +1107,6 @@ run_rc_tests() {
   # Clean-up
   kubectl delete rc redis-{master,slave} "${kube_flags[@]}"
 
-  ### Scale a job
-  kubectl create -f test/fixtures/doc-yaml/user-guide/job.yaml "${kube_flags[@]}"
-  # Command
-  kubectl scale --replicas=2 job/pi
-  # Post-condition: 2 replicas for pi
-  kube::test::get_object_assert 'job pi' "{{$job_parallelism_field}}" '2'
-  # Clean-up
-  kubectl delete job/pi "${kube_flags[@]}"
-
   ### Scale a deployment
   kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]}"
   # Command
