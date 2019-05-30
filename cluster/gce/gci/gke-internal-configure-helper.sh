@@ -244,10 +244,6 @@ function gke-setup-containerd {
   echo "Generating containerd config"
   local -r config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
   mkdir -p "$(dirname "${config_path}")"
-  local shim_path="$(which containerd-shim)"
-  if [[ -n "${GVISOR_CONTAINERD_SHIM_PATH:-}" ]]; then
-    shim_path="${GVISOR_CONTAINERD_SHIM_PATH}"
-  fi
   local cni_template_path="${CONTAINERD_HOME}/cni.template"
   cat > "${cni_template_path}" <<EOF
 {
@@ -297,9 +293,6 @@ oom_score = -999
 [grpc]
   gid = ${containerd_gid}
 
-[plugins.linux]
-  shim = "${shim_path}"
-
 [plugins.cri]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
@@ -312,24 +305,36 @@ oom_score = -999
 EOF
 
   if [[ -n "${CONTAINERD_SANDBOX_RUNTIME_HANDLER:-}" ]]; then
+    # Setup opt directory for containerd plugins.
+    local -r containerd_opt_path="${CONTAINERD_HOME}/opt/containerd"
+    mkdir -p "${containerd_opt_path}"
+    mkdir -p "${containerd_opt_path}/bin"
+    mkdir -p "${containerd_opt_path}/lib"
+
     cat >> "${config_path}" <<EOF
 [plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}]
   runtime_type = "${CONTAINERD_SANDBOX_RUNTIME_TYPE:-}"
-  runtime_engine = "${CONTAINERD_SANDBOX_RUNTIME_ENGINE:-}"
-  runtime_root = "${CONTAINERD_SANDBOX_RUNTIME_ROOT:-}"
+[plugins.cri.containerd.runtimes.${CONTAINERD_SANDBOX_RUNTIME_HANDLER}.options]
+  RuntimeRoot = "${CONTAINERD_SANDBOX_RUNTIME_ROOT:-}"
+
+[plugins.opt]
+  path = "${containerd_opt_path}"
 EOF
   fi
   chmod 644 "${config_path}"
 
-  # Generate gvisor-containerd-shim config
+  # Generate gvisor containerd shim config
   if [[ -n "${GVISOR_CONTAINERD_SHIM_PATH:-}" ]]; then
+    cp "${GVISOR_CONTAINERD_SHIM_PATH}" "${containerd_opt_path}/bin"
     # gvisor_platform is the platform to use for gvisor.
     local -r gvisor_platform="${GVISOR_PLATFORM:-"ptrace"}"
+    local -r sandbox_root="${CONTAINERD_SANDBOX_RUNTIME_ROOT:-"/run/containerd/runsc"}"
     # shim_config_path is the path of gvisor-containerd-shim config file.
-    local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"/etc/containerd/gvisor-containerd-shim.toml"}"
+    local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"${sandbox_root}/config.toml"}"
+    mkdir -p "${sandbox_root}"
     cat > "${shim_config_path}" <<EOF
-runc_shim = "$(which containerd-shim)"
-
+binary_name = "${CONTAINERD_SANDBOX_RUNTIME_ENGINE:-}"
+root = "${sandbox_root}"
 [runsc_config]
   platform = "${gvisor_platform}"
 EOF
