@@ -285,7 +285,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 		// providers (Okta) don't return this value.
 		//
 		// See https://github.com/kubernetes/kubernetes/issues/36847
-		return "", fmt.Errorf("token response did not contain an id_token, either the scope \"openid\" wasn't requested upon login, or the provider doesn't support id_tokens as part of the refresh response.")
+		return "", fmt.Errorf("token response did not contain an id_token, either the scope \"openid\" wasn't requested upon login, or the provider doesn't support id_token as part of the refresh response.")
 	}
 
 	// Create a new config to persist.
