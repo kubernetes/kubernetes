@@ -527,11 +527,11 @@ run_rs_tests() {
   # Pre-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command
-  kubectl create "${kube_flags[@]:?}" -f hack/testdata/frontend-replicaset.yaml 
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
   # wait for all 3 pods to be set up
   kube::test::wait_object_assert 'pods -l "tier=frontend"' "{{range.items}}{{${pod_container_name_field:?}}}:{{end}}" 'php-redis:php-redis:php-redis:'
   kube::log::status "Deleting rs"
-  kubectl delete rs frontend "${kube_flags[@]:?}" --cascade=false
+  kubectl delete rs frontend "${kube_flags[@]}" --cascade=false
   # Wait for the rs to be deleted.
   kube::test::wait_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Post-condition: All 3 pods still remain from frontend replica set
