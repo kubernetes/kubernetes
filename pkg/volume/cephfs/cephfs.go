@@ -222,12 +222,12 @@ func (cephfsVolume *cephfsMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUp(fsGroup *int64) error {
-	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), fsGroup)
+func (cephfsVolume *cephfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return cephfsVolume.SetUpAt(cephfsVolume.GetPath(), mounterArgs)
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (cephfsVolume *cephfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := cephfsVolume.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("CephFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {

@@ -825,14 +825,14 @@ func (b *rbdMounter) CanMount() error {
 	return nil
 }
 
-func (b *rbdMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *rbdMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *rbdMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *rbdMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
 	klog.V(4).Infof("rbd: attempting to setup at %s", dir)
-	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup)
 	if err != nil {
 		klog.Errorf("rbd: failed to setup at %s %v", dir, err)
 	}

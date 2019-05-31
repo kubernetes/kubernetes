@@ -371,13 +371,13 @@ func (b *fcDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *fcDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *fcDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup)
 	if err != nil {
 		klog.Errorf("fc: failed to setup")
 	}
