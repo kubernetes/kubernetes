@@ -649,21 +649,32 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	containerTopologyHint := m.topologyAffinityStore.GetAffinity(podUID, contName)
 	klog.Infof("Topology Affinities for pod %v container %v are: %v", podUID, contName, containerTopologyHint)
 
+	allocated := available.UnsortedList()[:needed]
+	availableTopologyAligned := available
+
 	sockets := make(map[int]bool)
 	socketsArray := containerTopologyHint.SocketMask.GetSockets()
 	for _, socket := range socketsArray {
 		sockets[socket] = true
 	}
 
-	allocated := available.UnsortedList()[:needed]
-	availableTopologyAligned := available
-	for availID := range available {
-		for _, device := range allDevices[resource] {
-			if availID == device.ID {
-				if !sockets[int(device.Topology.Socket)] {
-					delete(availableTopologyAligned, availID)
+	topologyAligned := false
+	for _, device := range allDevices[resource] {
+		topology := device.Topology
+		if topology != nil {
+			topologyAligned = true
+		}
+	}
+
+	if topologyAligned {
+		for availID := range available {
+			for _, device := range allDevices[resource] {
+				if availID == device.ID {
+					if !sockets[int(device.Topology.Socket)] {
+						delete(availableTopologyAligned, availID)
+					}
+					break
 				}
-				break
 			}
 		}
 	}

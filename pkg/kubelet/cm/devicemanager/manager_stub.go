@@ -65,8 +65,8 @@ func (h *ManagerStub) GetWatcherHandler() cache.PluginHandler {
 }
 
 // GetTopologyHints returns an empty TopologyHint struct
-func (h *ManagerStub) GetTopologyHints(pod v1.Pod, container v1.Container) ([]topologymanager.TopologyHint, bool) {
-	return []topologymanager.TopologyHints{}, false
+func (h *ManagerStub) GetTopologyHints(pod v1.Pod, container v1.Container) []topologymanager.TopologyHint {
+	return []topologymanager.TopologyHints{}
 }
 
 // GetDevices returns nil
