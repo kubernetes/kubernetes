@@ -350,7 +350,7 @@ func TestIgnoreUpdatingInitializedPod(t *testing.T) {
 }
 
 // newHandlerForTest returns the admission controller configured for testing.
-func newHandlerForTest(c kubernetes.Interface) (*podTolerationsPlugin, informers.SharedInformerFactory, error) {
+func newHandlerForTest(c kubernetes.Interface) (*Plugin, informers.SharedInformerFactory, error) {
 	f := informers.NewSharedInformerFactory(c, 5*time.Minute)
 	pluginConfig, err := loadConfiguration(nil)
 	// must not fail

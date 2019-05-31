@@ -275,7 +275,7 @@ func TestDeniesInvalidServiceAccount(t *testing.T) {
 }
 
 func TestAutomountsAPIToken(t *testing.T) {
-	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*Plugin) *Plugin) {
 
 		admit := applyFeatures(NewServiceAccount())
 		informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
@@ -385,7 +385,7 @@ func TestAutomountsAPIToken(t *testing.T) {
 }
 
 func TestRespectsExistingMount(t *testing.T) {
-	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*Plugin) *Plugin) {
 		ns := "myns"
 		tokenName := "token-name"
 		serviceAccountName := DefaultServiceAccountName
@@ -914,7 +914,7 @@ func newSecret(secretType corev1.SecretType, namespace, name, serviceAccountName
 }
 
 func TestGetServiceAccountTokens(t *testing.T) {
-	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*serviceAccount) *serviceAccount) {
+	testBoundServiceAccountTokenVolumePhases(t, func(t *testing.T, applyFeatures func(*Plugin) *Plugin) {
 		admit := applyFeatures(NewServiceAccount())
 		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		admit.secretLister = corev1listers.NewSecretLister(indexer)
@@ -1070,16 +1070,16 @@ func testGenerateName(n string) string {
 
 var generatedVolumeName = testGenerateName(ServiceAccountVolumeName + "-")
 
-func testBoundServiceAccountTokenVolumePhases(t *testing.T, f func(*testing.T, func(*serviceAccount) *serviceAccount)) {
+func testBoundServiceAccountTokenVolumePhases(t *testing.T, f func(*testing.T, func(*Plugin) *Plugin)) {
 	t.Run("BoundServiceAccountTokenVolume disabled", func(t *testing.T) {
-		f(t, func(s *serviceAccount) *serviceAccount {
+		f(t, func(s *Plugin) *Plugin {
 			s.featureGate = deprecationDisabledFeature
 			return s
 		})
 	})
 
 	t.Run("BoundServiceAccountTokenVolume enabled", func(t *testing.T) {
-		f(t, func(s *serviceAccount) *serviceAccount {
+		f(t, func(s *Plugin) *Plugin {
 			s.featureGate = deprecationEnabledFeature
 			return s
 		})

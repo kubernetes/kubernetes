@@ -71,7 +71,7 @@ func init() {
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
 	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
-	CustomResourceWebhookConversion: {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
 	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
 	CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
 }

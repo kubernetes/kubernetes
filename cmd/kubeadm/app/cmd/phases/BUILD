@@ -35,6 +35,7 @@ filegroup(
         "//cmd/kubeadm/app/cmd/phases/init:all-srcs",
         "//cmd/kubeadm/app/cmd/phases/join:all-srcs",
         "//cmd/kubeadm/app/cmd/phases/reset:all-srcs",
+        "//cmd/kubeadm/app/cmd/phases/upgrade/node:all-srcs",
         "//cmd/kubeadm/app/cmd/phases/workflow:all-srcs",
     ],
     tags = ["automanaged"],

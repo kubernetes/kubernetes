@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "aws_ebs.go",
         "azure_disk.go",
+        "azure_file.go",
         "gce_pd.go",
         "in_tree_volume.go",
         "openstack_cinder.go",
@@ -39,6 +40,7 @@ go_test(
     srcs = [
         "aws_ebs_test.go",
         "azure_disk_test.go",
+        "azure_file_test.go",
         "gce_pd_test.go",
     ],
     embed = [":go_default_library"],

@@ -69,7 +69,7 @@ var (
 					
 		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
 		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use 
-		"kubeadm init phase upload-certs --experimental-upload-certs" to reload certs afterward.
+		"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
 		  
 		{{else -}}
 		You can now join any number of control-plane nodes by copying certificate authorities 
@@ -263,6 +263,11 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		&initOptions.uploadCerts, options.UploadCerts, initOptions.uploadCerts,
 		"Upload control-plane certificates to the kubeadm-certs Secret.",
 	)
+	flagSet.BoolVar(
+		&initOptions.uploadCerts, options.ExperimentalUploadCerts, initOptions.uploadCerts,
+		"Upload control-plane certificates to the kubeadm-certs Secret.",
+	)
+	flagSet.MarkDeprecated(options.ExperimentalUploadCerts, fmt.Sprintf("use --%s instead", options.UploadCerts))
 	flagSet.BoolVar(
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",

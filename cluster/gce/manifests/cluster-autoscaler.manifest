@@ -34,7 +34,7 @@
                     "--write-status-configmap=true",
                     "--balance-similar-node-groups=true",
 		    "--expendable-pods-priority-cutoff=-10",
-                    "{{params}}"
+                    {{params}}
                 ],
                 "env": [
                     {

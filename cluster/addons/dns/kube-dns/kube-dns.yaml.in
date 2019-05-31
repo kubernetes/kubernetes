@@ -84,6 +84,8 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        prometheus.io/port: "10054"
+        prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-cluster-critical
       securityContext:

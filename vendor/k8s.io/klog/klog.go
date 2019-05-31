@@ -35,11 +35,11 @@
 // Log output is buffered and written periodically using Flush. Programs
 // should call Flush before exiting to guarantee all log output is written.
 //
-// By default, all log statements write to files in a temporary directory.
+// By default, all log statements write to standard error.
 // This package provides several flags that modify this behavior.
 // As a result, flag.Parse must be called before any logging is done.
 //
-//	-logtostderr=false
+//	-logtostderr=true
 //		Logs are written to standard error instead of to files.
 //	-alsologtostderr=false
 //		Logs are written to standard error as well as to files.
@@ -414,6 +414,16 @@ func InitFlags(flagset *flag.FlagSet) {
 		logging.logDir = ""
 		logging.logFile = ""
 		logging.logFileMaxSizeMB = 1800
+		// TODO: The default value of toStderr should be false.
+		// Ideally, toStderr can be deprecated.
+		// If --log-file is set, only log to the dedicated log-file.
+		// If --alsoToStderr is true, whether or not --log-file is set, we will
+		// log to stderr.
+		// Since kubernetes/kubernetes are currently using klog with
+		// default --toStderr to be true, we can't change this default value
+		// directly.
+		// As a compromise, when --log-file is set, the toStdErr is reset to
+		// be false. e.g. See function `IsSingleMode`.
 		logging.toStderr = true
 		logging.alsoToStderr = false
 		logging.skipHeaders = false
@@ -467,6 +477,8 @@ type loggingT struct {
 	mu sync.Mutex
 	// file holds writer for each of the log types.
 	file [numSeverity]flushSyncWriter
+	// file holds writer for the dedicated file when --log-file is set.
+	singleModeFile flushSyncWriter
 	// pcs is used in V to avoid an allocation when computing the caller's PC.
 	pcs [1]uintptr
 	// vmap is a cache of the V Level for each V() call site, identified by PC.
@@ -510,6 +522,16 @@ type buffer struct {
 }
 
 var logging loggingT
+
+func (l *loggingT) IsSingleMode() bool {
+	if l.logFile != "" {
+		// TODO: Remove the toStdErr reset when switching the logging.toStderr
+		// default value to be false.
+		l.toStderr = false
+		return true
+	}
+	return false
+}
 
 // setVState sets a consistent state for V logging.
 // l.mu is held.
@@ -736,24 +758,40 @@ func (rb *redirectBuffer) Write(bytes []byte) (n int, err error) {
 
 // SetOutput sets the output destination for all severities
 func SetOutput(w io.Writer) {
-	for s := fatalLog; s >= infoLog; s-- {
+	// In single-mode, all severity logs are tracked in a single dedicated file.
+	if logging.IsSingleMode() {
 		rb := &redirectBuffer{
 			w: w,
 		}
-		logging.file[s] = rb
+		logging.singleModeFile = rb
+	} else {
+		for s := fatalLog; s >= infoLog; s-- {
+			rb := &redirectBuffer{
+				w: w,
+			}
+			logging.file[s] = rb
+		}
 	}
 }
 
 // SetOutputBySeverity sets the output destination for specific severity
 func SetOutputBySeverity(name string, w io.Writer) {
-	sev, ok := severityByName(name)
-	if !ok {
-		panic(fmt.Sprintf("SetOutputBySeverity(%q): unrecognized severity name", name))
+	// In single-mode, all severity logs are tracked in a single dedicated file.
+	// Guarantee this buffer exists whatever severity output is trying to be set.
+	if logging.IsSingleMode() {
+		if logging.singleModeFile == nil {
+			logging.singleModeFile = &redirectBuffer{w: w}
+		}
+	} else {
+		sev, ok := severityByName(name)
+		if !ok {
+			panic(fmt.Sprintf("SetOutputBySeverity(%q): unrecognized severity name", name))
+		}
+		rb := &redirectBuffer{
+			w: w,
+		}
+		logging.file[sev] = rb
 	}
-	rb := &redirectBuffer{
-		w: w,
-	}
-	logging.file[sev] = rb
 }
 
 // output writes the data to the log files and releases the buffer.
@@ -765,32 +803,7 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 		}
 	}
 	data := buf.Bytes()
-	if l.toStderr {
-		os.Stderr.Write(data)
-	} else {
-		if alsoToStderr || l.alsoToStderr || s >= l.stderrThreshold.get() {
-			os.Stderr.Write(data)
-		}
-		if l.file[s] == nil {
-			if err := l.createFiles(s); err != nil {
-				os.Stderr.Write(data) // Make sure the message appears somewhere.
-				l.exit(err)
-			}
-		}
-		switch s {
-		case fatalLog:
-			l.file[fatalLog].Write(data)
-			fallthrough
-		case errorLog:
-			l.file[errorLog].Write(data)
-			fallthrough
-		case warningLog:
-			l.file[warningLog].Write(data)
-			fallthrough
-		case infoLog:
-			l.file[infoLog].Write(data)
-		}
-	}
+	l.writeLogData(s, data)
 	if s == fatalLog {
 		// If we got here via Exit rather than Fatal, print no stacks.
 		if atomic.LoadUint32(&fatalNoStacks) > 0 {
@@ -798,30 +811,62 @@ func (l *loggingT) output(s severity, buf *buffer, file string, line int, alsoTo
 			timeoutFlush(10 * time.Second)
 			os.Exit(1)
 		}
-		// Dump all goroutine stacks before exiting.
-		// First, make sure we see the trace for the current goroutine on standard error.
-		// If -logtostderr has been specified, the loop below will do that anyway
-		// as the first stack in the full dump.
-		if !l.toStderr {
-			os.Stderr.Write(stacks(false))
-		}
-		// Write the stack trace for all goroutines to the files.
-		trace := stacks(true)
 		logExitFunc = func(error) {} // If we get a write error, we'll still exit below.
-		for log := fatalLog; log >= infoLog; log-- {
-			if f := l.file[log]; f != nil { // Can be nil if -logtostderr is set.
-				f.Write(trace)
-			}
-		}
+		l.writeLogData(fatalLog, stacks(true))
 		l.mu.Unlock()
 		timeoutFlush(10 * time.Second)
 		os.Exit(255) // C++ uses -1, which is silly because it's anded with 255 anyway.
 	}
 	l.putBuffer(buf)
 	l.mu.Unlock()
+	// Note: The stats estimate logs for each severity level individually,
+	// even in the situation that log-file is specified and
+	// all severity-level logs are tracked only in the infoLog file.
 	if stats := severityStats[s]; stats != nil {
 		atomic.AddInt64(&stats.lines, 1)
 		atomic.AddInt64(&stats.bytes, int64(len(data)))
+	}
+}
+
+// writeLogData writes |data| to the `s` and lower severity files.
+// e.g. If Severity level is Error, the data will be written to all the Error,
+// Warning, and Info log file. However, if --log_file flag is provided, klog
+// no longer tracks logs separately due to their severity level, but rather
+// only write to the singleModeFile which later on will be flushed to the
+// dedicated log_file.
+func (l *loggingT) writeLogData(s severity, data []byte) {
+	shouldAlsoToStderr := l.alsoToStderr && s >= l.stderrThreshold.get()
+	if l.IsSingleMode() {
+		if shouldAlsoToStderr {
+			os.Stderr.Write(data)
+		}
+		if l.singleModeFile == nil {
+			now := time.Now()
+			sb := &syncBuffer{
+				logger:   l,
+				maxbytes: CalculateMaxSize(),
+			}
+			if err := sb.rotateFile(now, true); err != nil {
+				l.exit(err)
+			}
+			l.singleModeFile = sb
+		}
+		l.singleModeFile.Write(data)
+	} else {
+		if l.toStderr || shouldAlsoToStderr {
+			os.Stderr.Write(data)
+		}
+		for currSeverity := s; currSeverity >= infoLog; currSeverity-- {
+			if l.file[currSeverity] == nil {
+				if err := l.createFiles(currSeverity); err != nil {
+					os.Stderr.Write(data) // Make sure the message appears somewhere.
+					l.exit(err)
+				}
+			}
+			if f := l.file[currSeverity]; f != nil { // Can be nil if -logtostderr is set.
+				f.Write(data)
+			}
+		}
 	}
 }
 
@@ -1002,12 +1047,20 @@ func (l *loggingT) lockAndFlushAll() {
 // flushAll flushes all the logs and attempts to "sync" their data to disk.
 // l.mu is held.
 func (l *loggingT) flushAll() {
-	// Flush from fatal down, in case there's trouble flushing.
-	for s := fatalLog; s >= infoLog; s-- {
-		file := l.file[s]
+	if l.IsSingleMode() {
+		file := l.singleModeFile
 		if file != nil {
 			file.Flush() // ignore error
 			file.Sync()  // ignore error
+		}
+	} else {
+		// Flush from fatal down, in case there's trouble flushing.
+		for s := fatalLog; s >= infoLog; s-- {
+			file := l.file[s]
+			if file != nil {
+				file.Flush() // ignore error
+				file.Sync()  // ignore error
+			}
 		}
 	}
 }
@@ -1094,9 +1147,9 @@ type Verbose bool
 // The returned value is a boolean of type Verbose, which implements Info, Infoln
 // and Infof. These methods will write to the Info log if called.
 // Thus, one may write either
-//	if glog.V(2) { glog.Info("log this") }
+//  if glog.V(2) { glog.Info("log this") }
 // or
-//	glog.V(2).Info("log this")
+//  glog.V(2).Info("log this")
 // The second form is shorter but the first is cheaper if logging is off because it does
 // not evaluate its arguments.
 //

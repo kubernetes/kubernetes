@@ -35,6 +35,7 @@ go_library(
     srcs = [
         "admission.go",
         "config.go",
+        "doc.go",
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction",
     deps = [
