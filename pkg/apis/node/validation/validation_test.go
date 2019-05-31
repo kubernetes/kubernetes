@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/node"
 
 	"github.com/stretchr/testify/assert"
@@ -124,73 +123,6 @@ func TestValidateRuntimeUpdate(t *testing.T) {
 			} else {
 				assert.Empty(t, errs)
 			}
-		})
-	}
-}
-
-func TestValidateScheduling(t *testing.T) {
-	tests := []struct {
-		name       string
-		scheduling *node.Scheduling
-		expectErrs int
-	}{{
-		name: "valid scheduling",
-		scheduling: &node.Scheduling{
-			NodeSelector: map[string]string{"valid": "yes"},
-			Tolerations: []core.Toleration{{
-				Key:      "valid",
-				Operator: core.TolerationOpExists,
-				Effect:   core.TaintEffectNoSchedule,
-			}},
-		},
-	}, {
-		name:       "empty scheduling",
-		scheduling: &node.Scheduling{},
-	}, {
-		name: "invalid nodeSelector",
-		scheduling: &node.Scheduling{
-			NodeSelector: map[string]string{"not a valid key!!!": "nope"},
-		},
-		expectErrs: 1,
-	}, {
-		name: "invalid toleration",
-		scheduling: &node.Scheduling{
-			Tolerations: []core.Toleration{{
-				Key:      "valid",
-				Operator: core.TolerationOpExists,
-				Effect:   core.TaintEffectNoSchedule,
-			}, {
-				Key:      "not a valid key!!!",
-				Operator: core.TolerationOpExists,
-				Effect:   core.TaintEffectNoSchedule,
-			}},
-		},
-		expectErrs: 1,
-	}, {
-		name: "invalid scheduling",
-		scheduling: &node.Scheduling{
-			NodeSelector: map[string]string{"not a valid key!!!": "nope"},
-			Tolerations: []core.Toleration{{
-				Key:      "valid",
-				Operator: core.TolerationOpExists,
-				Effect:   core.TaintEffectNoSchedule,
-			}, {
-				Key:      "not a valid toleration key!!!",
-				Operator: core.TolerationOpExists,
-				Effect:   core.TaintEffectNoSchedule,
-			}},
-		},
-		expectErrs: 2,
-	}}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			rc := &node.RuntimeClass{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-				Handler:    "bar",
-				Scheduling: test.scheduling,
-			}
-			assert.Len(t, ValidateRuntimeClass(rc), test.expectErrs)
 		})
 	}
 }
