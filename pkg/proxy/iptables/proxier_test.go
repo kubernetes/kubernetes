@@ -424,6 +424,18 @@ func hasJump(rules []iptablestest.Rule, destChain, destIP string, destPort int) 
 	return match
 }
 
+func hasSrcType(rules []iptablestest.Rule, srcType string) bool {
+	for _, r := range rules {
+		if r[iptablestest.SrcType] != srcType {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
 func TestHasJump(t *testing.T) {
 	testCases := map[string]struct {
 		rules     []iptablestest.Rule
@@ -942,7 +954,6 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 }
 
 func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTables) {
-	shouldLBTOSVCRuleExist := len(fp.clusterCIDR) > 0
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -1018,12 +1029,8 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	if hasJump(lbRules, nonLocalEpChain, "", 0) {
 		errorf(fmt.Sprintf("Found jump from lb chain %v to non-local ep %v", lbChain, epStrLocal), lbRules, t)
 	}
-	if hasJump(lbRules, svcChain, "", 0) != shouldLBTOSVCRuleExist {
-		prefix := "Did not find "
-		if !shouldLBTOSVCRuleExist {
-			prefix = "Found "
-		}
-		errorf(fmt.Sprintf("%s jump from lb chain %v to svc %v", prefix, lbChain, svcChain), lbRules, t)
+	if !hasJump(lbRules, svcChain, "", 0) || !hasSrcType(lbRules, "LOCAL") {
+		errorf(fmt.Sprintf("Did not find jump from lb chain %v to svc %v with src-type LOCAL", lbChain, svcChain), lbRules, t)
 	}
 	if !hasJump(lbRules, localEpChain, "", 0) {
 		errorf(fmt.Sprintf("Didn't find jump from lb chain %v to local ep %v", lbChain, epStrLocal), lbRules, t)
