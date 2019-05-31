@@ -206,7 +206,7 @@ function gke-internal-master-start {
 #   - Sets the variable POD_SYSCTLS with the namespaced GKE fleetwide kernel
 #     parameters and the user overrides. The variable is expected to be read
 #     by the start-kubelet function.
-function configure-node-sysctls {
+function gke-configure-node-sysctls {
   local -r dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/sysctl"
   local -r sysctl_overrides="${SYSCTL_OVERRIDES:-}"
   local -r namespaced_sysctl_names="${dir}/namespaced-sysctl-names.yaml"
@@ -261,6 +261,11 @@ function configure-node-sysctls {
   else
     /lib/systemd/systemd-sysctl
   fi
+
+  # Take a snapshot of the current sysctls and store them in a file. This will
+  # be used as the base for monitoring sysctl changes by NPD custom plugin
+  # sysctl-monitor.
+  sudo sysctl -a > "${KUBE_HOME}/npd-custom-plugins/configs/init-sysctls.conf"
 }
 
 function gke-setup-containerd {
@@ -385,4 +390,61 @@ function setup-gke-addon-registry {
     find "${manifests_dir}" -name \*.manifest -or -name \*.json | \
       xargs sed -ri "s@(image\":\s+\")gke.gcr.io@\1${gke_addon_registry_override}@"
   fi
+}
+
+# Configure node-problem-detector flags.
+#
+# This function expects no arguments.
+#
+# This function
+#   - is a no-op, if NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS is already set (on
+#     instance metadata). (Note that it is not recommended to set
+#     NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS on instance metadata from google3).
+#   - sets NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS with the flags to be used by NPD
+#     in function start-node-problem-detector, otherwise.
+function gke-configure-node-problem-detector {
+  local flags="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+  if [[ ! -z "${flags}" ]]; then
+    return
+  fi
+
+  local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+  # TODO(random-liu): Handle this for alternative container runtime.
+  local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
+
+  local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
+  local -r custom_dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
+  local -r custom_sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json"
+
+  local custom_plugin_monitors="${custom_km_config},${custom_dm_config},${custom_sm_config}"
+
+  gke-configure-npd-custom-plugins
+  if [[ -n "${GKE_NPD_CUSTOM_PLUGINS_CONFIG}" ]]; then
+    custom_plugin_monitors+=",${GKE_NPD_CUSTOM_PLUGINS_CONFIG}"
+  fi
+
+  flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
+  flags+=" --logtostderr"
+  flags+=" --system-log-monitors=${km_config},${dm_config}"
+  flags+=" --custom-plugin-monitors=${custom_plugin_monitors}"
+  local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
+  flags+=" --port=${npd_port}"
+  if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
+    flags+=" ${EXTRA_NPD_ARGS}"
+  fi
+
+  NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${flags}"
+}
+
+# Configure NPD custom plugins.
+#
+# This function expects no arguments.
+#
+# This function configures NPD custom plugins and sets
+# GKE_NPD_CUSTOM_PLUGINS_CONFIG with the NPD flags needed to enable the plugins.
+function gke-configure-npd-custom-plugins {
+  local -r config_dir="${KUBE_HOME}/npd-custom-plugins/configs"
+
+  # Configure sysctl monitor.
+  GKE_NPD_CUSTOM_PLUGINS_CONFIG="${config_dir}/sysctl-monitor.json"
 }

@@ -72,7 +72,7 @@ function setup-os-params {
   # GKE.
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
     if [[ "${KUBERNETES_MASTER:-false}" == "false" ]]; then
-      configure-node-sysctls
+      gke-configure-node-sysctls
     fi
   fi
 }
@@ -3153,6 +3153,9 @@ function main() {
       start-kube-proxy
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+      if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+          gke-configure-node-problem-detector
+      fi
       start-node-problem-detector
     fi
   fi

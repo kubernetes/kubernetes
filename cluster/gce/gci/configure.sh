@@ -357,6 +357,9 @@ function install-kube-manifests {
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
+  if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure.sh" ]]; then
+    cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure.sh" "${KUBE_BIN}/"
+  fi
   if [[ -e "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" ]]; then
     cp "${dst_dir}/kubernetes/gci-trusty/gke-internal-configure-helper.sh" "${KUBE_BIN}/"
   fi
@@ -583,11 +586,6 @@ function install-kube-binary-config {
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
   fi
 
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
-     [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    install-node-problem-detector
-  fi
-
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     install-cni-binaries
@@ -610,6 +608,23 @@ function install-kube-binary-config {
 
   # TODO(awly): include the binary and license in the OS image.
   install-exec-auth-plugin
+
+  # Source GKE specific scripts.
+  #
+  # This must be done after install-kube-manifests where the
+  # gke-internal-configure.sh is downloaded.
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure.sh" ]]; then
+    echo "Running GKE internal configuration script gke-internal-configure.sh"
+    . "${KUBE_HOME}/bin/gke-internal-configure.sh"
+  fi
+
+  if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
+     [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    install-node-problem-detector
+    if [[ -e "${KUBE_HOME}/bin/gke-internal-configure.sh" ]]; then
+      install-npd-custom-plugins
+    fi
+  fi
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
