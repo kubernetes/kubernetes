@@ -1853,7 +1853,7 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 					},
 					"remainingItemCount": {
 						SchemaProps: spec.SchemaProps{
-							Description: "RemainingItemCount is the number of subsequent items in the list which are not included in this list response. If the list request contained label or field selectors, then the number of remaining items is unknown and this field will be unset. If the list is complete (either because it is unpaginated or because this is the last page), then there are no more remaining items and this field will also be unset.  Servers older than v1.15 do not set this field.",
+							Description: "remainingItemCount is the number of subsequent items in the list which are not included in this list response. If the list request contained label or field selectors, then the number of remaining items is unknown and the field will be left unset and omitted during serialization. If the list is complete (either because it is not chunking or because this is the last chunk), then there are no more remaining items and this field will be left unset and omitted during serialization. Servers older than v1.15 do not set this field. The intended use of the remainingItemCount is *estimating* the size of a collection. Clients should not rely on the remainingItemCount to be set or to be exact.\n\nThis field is alpha and can be changed or removed without notice.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
