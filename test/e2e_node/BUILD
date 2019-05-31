@@ -145,7 +145,7 @@ go_test(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/volume/util/quota:go_default_library",
+        "//pkg/volume/util/fsquota:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",

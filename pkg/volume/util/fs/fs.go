@@ -27,7 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/volume/util/quota"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 )
 
 // FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
@@ -60,7 +60,7 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
-	data, err := quota.GetConsumption(path)
+	data, err := fsquota.GetConsumption(path)
 	if data != nil {
 		return data, nil
 	} else if err != nil {
@@ -89,7 +89,7 @@ func Find(path string) (int64, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
-	inodes, err := quota.GetInodes(path)
+	inodes, err := fsquota.GetInodes(path)
 	if inodes != nil {
 		return inodes.Value(), nil
 	} else if err != nil {

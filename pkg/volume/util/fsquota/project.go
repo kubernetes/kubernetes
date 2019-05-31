@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package quota
+package fsquota
 
 import (
 	"bufio"
@@ -29,7 +29,7 @@ import (
 	"sync"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/kubernetes/pkg/volume/util/quota/common"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 )
 
 var projectsFile = "/etc/projects"

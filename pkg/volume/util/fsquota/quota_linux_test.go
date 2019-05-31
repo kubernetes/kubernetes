@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package quota
+package fsquota
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume/util/quota/common"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 	"os"
 	"strings"
 	"testing"
