@@ -246,7 +246,7 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 				klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
 			} else if hasQuotas {
 				klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterArgs.DesiredSize, dir)
-				err := fsquota.AssignQuota(ed.mounter, dir, mounterArgs.PodUID, mounterArgs.DesiredSize)
+				err := fsquota.AssignQuota(ed.mounter, dir, ed.pod.UID, mounterArgs.DesiredSize)
 				if err != nil {
 					klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
 				}

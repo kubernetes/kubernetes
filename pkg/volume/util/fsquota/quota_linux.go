@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -33,16 +34,16 @@ import (
 )
 
 // Pod -> ID
-var podQuotaMap = make(map[string]common.QuotaID)
+var podQuotaMap = make(map[types.UID]common.QuotaID)
 
 // Dir -> ID (for convenience)
 var dirQuotaMap = make(map[string]common.QuotaID)
 
 // ID -> pod
-var quotaPodMap = make(map[common.QuotaID]string)
+var quotaPodMap = make(map[common.QuotaID]types.UID)
 
 // Directory -> pod
-var dirPodMap = make(map[string]string)
+var dirPodMap = make(map[string]types.UID)
 
 // Backing device -> applier
 // This is *not* cleaned up; its size will be bounded.
@@ -53,7 +54,7 @@ var dirApplierMap = make(map[string]common.LinuxVolumeQuotaApplier)
 var dirApplierLock sync.RWMutex
 
 // Pod -> refcount
-var podDirCountMap = make(map[string]int)
+var podDirCountMap = make(map[types.UID]int)
 
 // ID -> size
 var quotaSizeMap = make(map[common.QuotaID]int64)
@@ -296,7 +297,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 // AssignQuota chooses the quota ID based on the pod UID and path.
 // If the pod UID is identical to another one known, it may (but presently
 // doesn't) choose the same quota ID as other volumes in the pod.
-func AssignQuota(m mount.Interface, path string, poduid string, bytes *resource.Quantity) error {
+func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error {
 	if bytes == nil {
 		return fmt.Errorf("Attempting to assign null quota to %s", path)
 	}
@@ -311,7 +312,7 @@ func AssignQuota(m mount.Interface, path string, poduid string, bytes *resource.
 	// volumes in a pod, we can simply remove this line of code.
 	// If and when we decide permanently that we're going to adop
 	// one quota per volume, we can rip all of the pod code out.
-	poduid = string(uuid.NewUUID())
+	poduid = types.UID(uuid.NewUUID())
 	if pod, ok := dirPodMap[path]; ok && pod != poduid {
 		return fmt.Errorf("Requesting quota on existing directory %s but different pod %s %s", path, pod, poduid)
 	}

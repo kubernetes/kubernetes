@@ -21,6 +21,7 @@ package fsquota
 import (
 	"errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -35,7 +36,7 @@ func SupportsQuotas(_ mount.Interface, _ string) (bool, error) {
 }
 
 // AssignQuota -- dummy implementation
-func AssignQuota(_ mount.Interface, _ string, _ string, _ *resource.Quantity) error {
+func AssignQuota(_ mount.Interface, _ string, _ types.UID, _ *resource.Quantity) error {
 	return errNotImplemented
 }
 
