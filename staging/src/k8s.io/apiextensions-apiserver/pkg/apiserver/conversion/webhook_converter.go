@@ -19,6 +19,7 @@ package conversion
 import (
 	"context"
 	"fmt"
+	"time"
 
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +34,7 @@ import (
 
 	internal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	utiltrace "k8s.io/utils/trace"
 )
 
 type webhookConverterFactory struct {
@@ -170,7 +172,8 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	}
 
 	request := createConversionReview(in, toGV.String())
-	if len(request.Request.Objects) == 0 {
+	objCount := len(request.Request.Objects)
+	if objCount == 0 {
 		if !isList {
 			return in, nil
 		}
@@ -178,6 +181,15 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		out.SetAPIVersion(toGV.String())
 		return out, nil
 	}
+
+	trace := utiltrace.New(fmt.Sprintf(
+		"Call conversion webhook: custom resource definition: %s, desired API version: %s, object count: %d, UID: %v",
+		c.name, request.Request.DesiredAPIVersion, objCount, request.Request.UID))
+	// Only log conversion webhook traces that exceed a 8ms per object limit plus a 50ms request overhead allowance.
+	// The per object limit uses the SLO for conversion webhooks (~4ms per object) plus time to serialize/deserialize
+	// the conversion request on the apiserver side (~4ms per object).
+	defer trace.LogIfLong(time.Duration(50+8*objCount) * time.Millisecond)
+
 	response := &v1beta1.ConversionReview{}
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
@@ -186,6 +198,7 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
 		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind(), err)
 	}
+	trace.Step("Request completed")
 
 	if response.Response == nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status

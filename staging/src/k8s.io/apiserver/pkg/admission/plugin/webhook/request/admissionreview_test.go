@@ -486,14 +486,14 @@ func TestCreateAdmissionObjects(t *testing.T) {
 		{
 			name: "no supported versions",
 			invocation: &generic.WebhookInvocation{
-				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", &admissionregistrationv1beta1.MutatingWebhook{}),
+				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", "mycfg", &admissionregistrationv1beta1.MutatingWebhook{}),
 			},
 			expectErr: "webhook does not accept known AdmissionReview versions",
 		},
 		{
 			name: "no known supported versions",
 			invocation: &generic.WebhookInvocation{
-				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", &admissionregistrationv1beta1.MutatingWebhook{
+				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", "mycfg", &admissionregistrationv1beta1.MutatingWebhook{
 					AdmissionReviewVersions: []string{"vX"},
 				}),
 			},
@@ -510,7 +510,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 				Resource:    schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
 				Subresource: "",
 				Kind:        schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"},
-				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", &admissionregistrationv1beta1.MutatingWebhook{
+				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", "mycfg", &admissionregistrationv1beta1.MutatingWebhook{
 					AdmissionReviewVersions: []string{"v1", "v1beta1"},
 				}),
 			},
@@ -553,7 +553,7 @@ func TestCreateAdmissionObjects(t *testing.T) {
 				Resource:    schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
 				Subresource: "",
 				Kind:        schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Deployment"},
-				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", &admissionregistrationv1beta1.MutatingWebhook{
+				Webhook: webhook.NewMutatingWebhookAccessor("mywebhook", "mycfg", &admissionregistrationv1beta1.MutatingWebhook{
 					AdmissionReviewVersions: []string{"v1beta1", "v1"},
 				}),
 			},

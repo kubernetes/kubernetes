@@ -42,6 +42,7 @@ import (
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
+	utiltrace "k8s.io/utils/trace"
 )
 
 type mutatingDispatcher struct {
@@ -172,6 +173,10 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	if err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
+	trace := utiltrace.New(fmt.Sprintf("Call mutating webhook: configuration: %s, webhook: %s, resource: %v, subResource: %s, operation: %v, UID: %v",
+		invocation.Webhook.GetConfigurationName(), h.Name, request.Request.Resource, request.Request.SubResource, request.Request.Operation, request.Request.UID))
+	defer trace.LogIfLong(500 * time.Millisecond)
+	response := &admissionv1beta1.AdmissionReview{}
 	r := client.Post().Context(ctx).Body(request)
 	if h.TimeoutSeconds != nil {
 		r = r.Timeout(time.Duration(*h.TimeoutSeconds) * time.Second)
@@ -179,6 +184,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	if err := r.Do().Into(response); err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
+	trace.Step("Request completed")
 
 	result, err := webhookrequest.VerifyAdmissionResponse(uid, true, response)
 	if err != nil {
@@ -248,7 +254,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	changed := !apiequality.Semantic.DeepEqual(attr.VersionedObject, newVersionedObject)
-
+	trace.Step("Patch applied")
 	attr.Dirty = true
 	attr.VersionedObject = newVersionedObject
 	o.GetObjectDefaulter().Default(attr.VersionedObject)
