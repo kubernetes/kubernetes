@@ -36,6 +36,7 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testing:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
