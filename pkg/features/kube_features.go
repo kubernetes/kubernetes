@@ -395,6 +395,7 @@ const (
 
 	// owner: @dashpole
 	// alpha: v1.13
+	// beta: v1.15
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources featuregate.Feature = "KubeletPodResources"
@@ -545,7 +546,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: featuregate.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
-	KubeletPodResources:                         {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResources:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
