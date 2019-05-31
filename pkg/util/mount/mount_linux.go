@@ -514,7 +514,7 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	args := []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", disk}
 	klog.V(4).Infof("Attempting to determine if disk %q is formatted using blkid with args: (%v)", disk, args)
 	dataOut, err := mounter.Exec.Run("blkid", args...)
-	output := string(dataOut)
+	output := strings.TrimSpace(string(dataOut))
 	klog.V(4).Infof("Output: %q, err: %v", output, err)
 
 	if err != nil {
@@ -534,6 +534,10 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 	var fstype, pttype string
 
 	lines := strings.Split(output, "\n")
+	if len(lines) == 1 {
+		// In case of Alpine, o/p will be one line. So, try to split by space
+		lines = strings.Split(output, " ")
+	}
 	for _, l := range lines {
 		if len(l) <= 0 {
 			// Ignore empty line.
@@ -541,12 +545,13 @@ func (mounter *SafeFormatAndMount) GetDiskFormat(disk string) (string, error) {
 		}
 		cs := strings.Split(l, "=")
 		if len(cs) != 2 {
-			return "", fmt.Errorf("blkid returns invalid output: %s", output)
+			// If it's not key=value pair, ignore
+			continue
 		}
 		// TYPE is filesystem type, and PTTYPE is partition table type, according
 		// to https://www.kernel.org/pub/linux/utils/util-linux/v2.21/libblkid-docs/.
 		if cs[0] == "TYPE" {
-			fstype = cs[1]
+			fstype = strings.ReplaceAll(cs[1], "\"", "")
 		} else if cs[0] == "PTTYPE" {
 			pttype = cs[1]
 		}

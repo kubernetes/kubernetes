@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func TestReadProcMountsFrom(t *testing.T) {
@@ -914,5 +915,91 @@ func TestSearchMountPoints(t *testing.T) {
 		if !reflect.DeepEqual(err, v.expectedErr) {
 			t.Errorf("test %q: expected err: %v, got %v", v.name, v.expectedErr, err)
 		}
+	}
+}
+
+func TestGetDiskFormat(t *testing.T) {
+	tests := []struct {
+		description    string
+		expectedFstype string
+		execScripts    []ExecArgs
+		expectedError  error
+	}{
+		{
+			description:    "Test GetDiskFormat when blkid o/p is multiple lines",
+			expectedFstype: "ext4",
+			execScripts: []ExecArgs{
+				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "DEVNAME=/dev/foo\nTYPE=ext4\n", nil},
+			},
+			expectedError: nil,
+		},
+		{
+			description:    "Test GetDiskFormat when blkid o/p is single line (incase of Alpine Linux)",
+			expectedFstype: "ext4",
+			execScripts: []ExecArgs{
+				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "/dev/foo: UUID=\"034b873d-4da2-4a94-b7a7-c095c69eba4f\" TYPE=\"ext4\"\n", nil},
+			},
+			expectedError: nil,
+		},
+		{
+			description:    "Test GetDiskFormat when blkid confirms unformatted disk",
+			expectedFstype: "",
+			execScripts: []ExecArgs{
+				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 2}},
+			},
+			expectedError: nil,
+		},
+
+		{
+			description:    "Test GetDiskFormat when blkid fails with other errors",
+			expectedFstype: "",
+			execScripts: []ExecArgs{
+				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &fakeexec.FakeExitError{Status: 4}},
+			},
+			expectedError: fmt.Errorf("exit 4"),
+		},
+	}
+
+	for _, test := range tests {
+		execCallback := func(cmd string, args ...string) ([]byte, error) {
+			script := test.execScripts[0]
+			if script.command != cmd {
+				t.Errorf("Unexpected command %s. Expecting %s", cmd, script.command)
+			}
+			for j := range args {
+				if args[j] != script.args[j] {
+					t.Errorf("Unexpected args %v. Expecting %v", args, script.args)
+				}
+			}
+			return []byte(script.output), script.err
+		}
+
+		fakeExec := NewFakeExec(execCallback)
+		mounter := SafeFormatAndMount{
+			Interface: &FakeMounter{},
+			Exec:      fakeExec,
+		}
+
+		device := "/dev/foo"
+		fstype, err := mounter.GetDiskFormat(device)
+		if test.expectedError == nil {
+			if err != nil {
+				t.Errorf("test \"%s\" unexpected non-error: %v", test.description, err)
+			}
+		}
+		if test.expectedError != nil {
+			if err == nil || test.expectedError.Error() != err.Error() {
+				t.Errorf("test \"%s\" unexpected error: \n          [%v]. \nExpecting [%v]", test.description, err, test.expectedError)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("test \"%s\" unexpected non-error: %v", test.description, err)
+			}
+		}
+
+		if fstype != test.expectedFstype {
+			t.Fatalf("[%s] expected %s, but got %s", test.description, test.expectedFstype, fstype)
+		}
+
 	}
 }
