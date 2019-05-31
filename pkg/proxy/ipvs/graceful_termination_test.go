@@ -243,6 +243,70 @@ func Test_GracefulDeleteRS(t *testing.T) {
 			err: nil,
 		},
 		{
+			name: "graceful delete, real server has connections, but udp connections are deleted immediately",
+			vs: &utilipvs.VirtualServer{
+				Address:  net.ParseIP("1.1.1.1"),
+				Protocol: "udp",
+				Port:     uint16(80),
+			},
+			rs: &utilipvs.RealServer{
+				Address:      net.ParseIP("10.0.0.1"),
+				Port:         uint16(80),
+				Weight:       100,
+				ActiveConn:   10,
+				InactiveConn: 10,
+			},
+			existingIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.1.1.1",
+						Port:     80,
+						Protocol: "udp",
+					}: {
+						Address:  net.ParseIP("1.1.1.1"),
+						Protocol: "udp",
+						Port:     uint16(80),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.1.1.1",
+						Port:     80,
+						Protocol: "udp",
+					}: {
+						{
+							Address:      net.ParseIP("10.0.0.1"),
+							Port:         uint16(80),
+							Weight:       100,
+							ActiveConn:   10,
+							InactiveConn: 10,
+						},
+					},
+				},
+			},
+			expectedIPVS: &utilipvstest.FakeIPVS{
+				Services: map[utilipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "1.1.1.1",
+						Port:     80,
+						Protocol: "udp",
+					}: {
+						Address:  net.ParseIP("1.1.1.1"),
+						Protocol: "udp",
+						Port:     uint16(80),
+					},
+				},
+				Destinations: map[utilipvstest.ServiceKey][]*utilipvs.RealServer{
+					{
+						IP:       "1.1.1.1",
+						Port:     80,
+						Protocol: "udp",
+					}: {}, // udp real server deleted immediately
+				},
+			},
+			err: nil,
+		},
+		{
 			name: "graceful delete, real server mismatch should be no-op",
 			vs: &utilipvs.VirtualServer{
 				Address:  net.ParseIP("1.1.1.1"),
