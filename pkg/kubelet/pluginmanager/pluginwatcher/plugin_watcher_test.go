@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
 var (
@@ -68,111 +68,198 @@ func cleanup(t *testing.T) {
 	os.MkdirAll(deprecatedSocketDir, 0755)
 }
 
+func waitForRegistration(
+	t *testing.T,
+	socketPath string,
+	dsw cache.DesiredStateOfWorld) {
+	err := retryWithExponentialBackOff(
+		time.Duration(500*time.Millisecond),
+		func() (bool, error) {
+			if dsw.PluginExists(socketPath) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Timed out waiting for plugin to be added to desired state of world cache:\n%s.", socketPath)
+	}
+}
+
+func waitForUnregistration(
+	t *testing.T,
+	socketPath string,
+	dsw cache.DesiredStateOfWorld) {
+	err := retryWithExponentialBackOff(
+		time.Duration(500*time.Millisecond),
+		func() (bool, error) {
+			if !dsw.PluginExists(socketPath) {
+				return true, nil
+			}
+			return false, nil
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("Timed out waiting for plugin to be unregistered:\n%s.", socketPath)
+	}
+}
+
+func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.ConditionFunc) error {
+	backoff := wait.Backoff{
+		Duration: initialDuration,
+		Factor:   3,
+		Jitter:   0,
+		Steps:    6,
+	}
+	return wait.ExponentialBackoff(backoff, fn)
+}
+
 func TestPluginRegistration(t *testing.T) {
 	defer cleanup(t)
 
-	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
-	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
+	dsw := cache.NewDesiredStateOfWorld()
+	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
 
 	for i := 0; i < 10; i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
 		pluginName := fmt.Sprintf("example-plugin-%d", i)
 
-		hdlr.AddPluginName(pluginName)
-
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
-		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-		require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
+		pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+		waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
-		require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+		// Check the desired state for plugins
+		dswPlugins := dsw.GetPluginsToRegister()
+		if len(dswPlugins) != 1 {
+			t.Fatalf("TestPluginRegistration: desired state of world length should be 1 but it's %d", len(dswPlugins))
+		}
 
+		// Stop the plugin; the plugin should be removed from the desired state of world cache
 		require.NoError(t, p.Stop())
-		require.True(t, waitForEvent(t, exampleEventDeRegister, hdlr.EventChan(p.pluginName)))
+		// The following doesn't work when running the unit tests locally: event.Op of plugin watcher won't pick up the delete event
+		waitForUnregistration(t, pluginInfo.SocketPath, dsw)
+		dswPlugins = dsw.GetPluginsToRegister()
+		if len(dswPlugins) != 0 {
+			t.Fatalf("TestPluginRegistration: desired state of world length should be 0 but it's %d", len(dswPlugins))
+		}
 	}
 }
 
 func TestPluginRegistrationDeprecated(t *testing.T) {
 	defer cleanup(t)
 
-	hdlr := NewExampleHandler(supportedVersions, true /* permitDeprecatedDir */)
-	w := newWatcherWithHandler(t, hdlr, true /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
+	dsw := cache.NewDesiredStateOfWorld()
+	newWatcher(t, true /* testDeprecatedDir */, dsw, wait.NeverStop)
 
 	// Test plugins in deprecated dir
 	for i := 0; i < 10; i++ {
 		endpoint := fmt.Sprintf("%s/dep-plugin-%d.sock", deprecatedSocketDir, i)
 		pluginName := fmt.Sprintf("dep-example-plugin-%d", i)
 
-		hdlr.AddPluginName(pluginName)
-
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, endpoint, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
 
-		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-		require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
+		pluginInfo := GetPluginInfo(p, true /* testDeprecatedDir */)
+		waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
-		require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+		// Check the desired state for plugins
+		dswPlugins := dsw.GetPluginsToRegister()
+		if len(dswPlugins) != i+1 {
+			t.Fatalf("TestPluginRegistrationDeprecated: desired state of world length should be %d but it's %d", i+1, len(dswPlugins))
+		}
+	}
+}
 
-		require.NoError(t, p.Stop())
-		require.True(t, waitForEvent(t, exampleEventDeRegister, hdlr.EventChan(p.pluginName)))
+func TestPluginRegistrationSameName(t *testing.T) {
+	defer cleanup(t)
+
+	dsw := cache.NewDesiredStateOfWorld()
+	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
+
+	// Make 10 plugins with the same name and same type but different socket path;
+	// all 10 should be in desired state of world cache
+	pluginName := "dep-example-plugin"
+	for i := 0; i < 10; i++ {
+		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+
+		pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+		waitForRegistration(t, pluginInfo.SocketPath, dsw)
+
+		// Check the desired state for plugins
+		dswPlugins := dsw.GetPluginsToRegister()
+		if len(dswPlugins) != i+1 {
+			t.Fatalf("TestPluginRegistrationSameName: desired state of world length should be %d but it's %d", i+1, len(dswPlugins))
+		}
 	}
 }
 
 func TestPluginReRegistration(t *testing.T) {
 	defer cleanup(t)
 
-	pluginName := fmt.Sprintf("example-plugin")
-	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
+	dsw := cache.NewDesiredStateOfWorld()
+	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
 
-	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
+	// Create a plugin first, we are then going to remove the plugin, update the plugin with a different name
+	// and recreate it.
+	socketPath := fmt.Sprintf("%s/plugin-reregistration.sock", socketDir)
+	pluginName := "reregister-plugin"
+	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+	require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+	pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+	lastTimestamp := time.Now()
+	waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
-	plugins := make([]*examplePlugin, 10)
-
+	// Remove this plugin, then recreate it again with a different name for 10 times
+	// The updated plugin should be in the desired state of world cache
 	for i := 0; i < 10; i++ {
-		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
-		hdlr.AddPluginName(pluginName)
+		// Stop the plugin; the plugin should be removed from the desired state of world cache
+		// The plugin removel doesn't work when running the unit tests locally: event.Op of plugin watcher won't pick up the delete event
+		require.NoError(t, p.Stop())
+		waitForUnregistration(t, pluginInfo.SocketPath, dsw)
 
+		// Add the plugin again
+		pluginName := fmt.Sprintf("dep-example-plugin-%d", i)
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+		waitForRegistration(t, pluginInfo.SocketPath, dsw)
 
-		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-		require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
-
-		require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-
-		plugins[i] = p
-	}
-
-	plugins[len(plugins)-1].Stop()
-	require.True(t, waitForEvent(t, exampleEventDeRegister, hdlr.EventChan(pluginName)))
-
-	close(hdlr.EventChan(pluginName))
-	for i := 0; i < len(plugins)-1; i++ {
-		plugins[i].Stop()
+		// Check the dsw cache. The updated plugin should be the only plugin in it
+		dswPlugins := dsw.GetPluginsToRegister()
+		if len(dswPlugins) != 1 {
+			t.Fatalf("TestPluginReRegistration: desired state of world length should be 1 but it's %d", len(dswPlugins))
+		}
+		if !dswPlugins[0].Timestamp.After(lastTimestamp) {
+			t.Fatalf("TestPluginReRegistration: for plugin %s timestamp of plugin is not updated", pluginName)
+		}
+		lastTimestamp = dswPlugins[0].Timestamp
 	}
 }
 
 func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	defer cleanup(t)
 
-	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
 	plugins := make([]*examplePlugin, 10)
 
 	for i := 0; i < len(plugins); i++ {
 		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
 		pluginName := fmt.Sprintf("example-plugin-%d", i)
-		hdlr.AddPluginName(pluginName)
 
 		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
-		defer func(p *examplePlugin) { require.NoError(t, p.Stop()) }(p)
+		defer func(p *examplePlugin) {
+			require.NoError(t, p.Stop())
+		}(p)
 
 		plugins[i] = p
 	}
+
+	dsw := cache.NewDesiredStateOfWorld()
+	newWatcher(t, false /* testDeprecatedDir */, dsw, wait.NeverStop)
 
 	var wg sync.WaitGroup
 	for i := 0; i < len(plugins); i++ {
@@ -180,15 +267,11 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 		go func(p *examplePlugin) {
 			defer wg.Done()
 
-			require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-			require.True(t, waitForEvent(t, exampleEventRegister, hdlr.EventChan(p.pluginName)))
-
-			require.True(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
+			pluginInfo := GetPluginInfo(p, false /* testDeprecatedDir */)
+			// Validate that the plugin is in the desired state cache
+			waitForRegistration(t, pluginInfo.SocketPath, dsw)
 		}(plugins[i])
 	}
-
-	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
 
 	c := make(chan struct{})
 	go func() {
@@ -204,64 +287,11 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 }
 
-func TestPluginRegistrationFailureWithUnsupportedVersion(t *testing.T) {
-	defer cleanup(t)
-
-	pluginName := fmt.Sprintf("example-plugin")
-	socketPath := socketDir + "/plugin.sock"
-
-	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
-	hdlr.AddPluginName(pluginName)
-
-	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
-
-	// Advertise v1beta3 but don't serve anything else than the plugin service
-	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "v1beta3")
-	require.NoError(t, p.Serve())
-	defer func() { require.NoError(t, p.Stop()) }()
-
-	require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-	require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-}
-
-func TestPlugiRegistrationFailureWithUnsupportedVersionAtKubeletStart(t *testing.T) {
-	defer cleanup(t)
-
-	pluginName := fmt.Sprintf("example-plugin")
-	socketPath := socketDir + "/plugin.sock"
-
-	// Advertise v1beta3 but don't serve anything else than the plugin service
-	p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, "v1beta3")
-	require.NoError(t, p.Serve())
-	defer func() { require.NoError(t, p.Stop()) }()
-
-	hdlr := NewExampleHandler(supportedVersions, false /* permitDeprecatedDir */)
-	hdlr.AddPluginName(pluginName)
-
-	c := make(chan struct{})
-	go func() {
-		defer close(c)
-		require.True(t, waitForEvent(t, exampleEventValidate, hdlr.EventChan(p.pluginName)))
-		require.False(t, waitForPluginRegistrationStatus(t, p.registrationStatus))
-	}()
-
-	w := newWatcherWithHandler(t, hdlr, false /* testDeprecatedDir */)
-	defer func() { require.NoError(t, w.Stop()) }()
-
-	select {
-	case <-c:
-		return
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Fatalf("Timeout while waiting for the plugin registration status")
-	}
-}
-
 func waitForPluginRegistrationStatus(t *testing.T, statusChan chan registerapi.RegistrationStatus) bool {
 	select {
 	case status := <-statusChan:
 		return status.PluginRegistered
-	case <-time.After(10 * time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Fatalf("Timed out while waiting for registration status")
 	}
 	return false
@@ -278,15 +308,13 @@ func waitForEvent(t *testing.T, expected examplePluginEvent, eventChan chan exam
 	return false
 }
 
-func newWatcherWithHandler(t *testing.T, hdlr PluginHandler, testDeprecatedDir bool) *Watcher {
+func newWatcher(t *testing.T, testDeprecatedDir bool, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {
 	depSocketDir := ""
 	if testDeprecatedDir {
 		depSocketDir = deprecatedSocketDir
 	}
-	w := NewWatcher(socketDir, depSocketDir)
-
-	w.AddHandler(registerapi.DevicePlugin, hdlr)
-	require.NoError(t, w.Start())
+	w := NewWatcher(socketDir, depSocketDir, desiredStateOfWorldCache)
+	require.NoError(t, w.Start(stopCh))
 
 	return w
 }
@@ -356,7 +384,7 @@ func TestFoundInDeprecatedDir(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir)
+		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir, cache.NewDesiredStateOfWorld())
 
 		actualFoundInDeprecatedDir := watcher.foundInDeprecatedDir(tc.socketPath)
 
@@ -480,7 +508,7 @@ func TestContainsBlacklistedDir(t *testing.T) {
 
 	for _, tc := range testCases {
 		// Arrange & Act
-		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir)
+		watcher := NewWatcher(tc.sockDir, tc.deprecatedSockDir, cache.NewDesiredStateOfWorld())
 
 		actual := watcher.containsBlacklistedDir(tc.path)
 

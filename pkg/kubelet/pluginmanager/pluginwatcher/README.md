@@ -22,14 +22,24 @@ This socket filename should not start with a '.' as it will be ignored.
 For any discovered plugin, kubelet will issue a Registration.GetInfo gRPC call
 to get plugin type, name, endpoint and supported service API versions.
 
-Kubelet will then go through a plugin initialization phase where it will issue
-Plugin specific calls (e.g: DevicePlugin::GetDevicePluginOptions).
+If any of the following steps in registration fails, on retry registration will
+start from scratch:
+- Registration.GetInfo is called against socket.
+- Validate is called against internal plugin type handler.
+- Register is called against internal plugin type handler.
+- NotifyRegistrationStatus is called against socket to indicate registration result.
+
+During plugin initialization phase, Kubelet will issue Plugin specific calls
+(e.g: DevicePlugin::GetDevicePluginOptions).
 
 Once Kubelet determines that it is ready to use your plugin it will issue a
 Registration.NotifyRegistrationStatus gRPC call.
 
 If the plugin removes its socket from the PluginDir this will be interpreted
-as a plugin Deregistration
+as a plugin Deregistration. If any of the following steps in deregistration fails,
+on retry deregistration will start from scratch:
+- Registration.GetInfo is called against socket.
+- DeRegisterPlugin is called against internal plugin type handler.
 
 
 ## gRPC Service Overview

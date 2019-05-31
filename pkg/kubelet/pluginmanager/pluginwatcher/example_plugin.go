@@ -29,8 +29,9 @@ import (
 	"k8s.io/klog"
 
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
-	v1beta1 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta1"
-	v1beta2 "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher/example_plugin_apis/v1beta2"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	v1beta1 "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta1"
+	v1beta2 "k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher/example_plugin_apis/v1beta2"
 )
 
 // examplePlugin is a sample plugin to work with plugin watcher
@@ -83,6 +84,14 @@ func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string,
 		endpoint:           endpoint,
 		versions:           advertisedVersions,
 		registrationStatus: make(chan registerapi.RegistrationStatus),
+	}
+}
+
+// GetPluginInfo returns a PluginInfo object
+func GetPluginInfo(plugin *examplePlugin, foundInDeprecatedDir bool) cache.PluginInfo {
+	return cache.PluginInfo{
+		SocketPath:           plugin.endpoint,
+		FoundInDeprecatedDir: foundInDeprecatedDir,
 	}
 }
 

@@ -27,7 +27,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -326,6 +327,11 @@ func newTestKubeletWithImageList(
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false /* keepTerminatedPodVolumes */)
 
+	kubelet.pluginManager = pluginmanager.NewPluginManager(
+		kubelet.getPluginsRegistrationDir(), /* sockDir */
+		kubelet.getPluginsDir(),             /* deprecatedSockDir */
+		kubelet.recorder,
+	)
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	// enable active deadline handler
