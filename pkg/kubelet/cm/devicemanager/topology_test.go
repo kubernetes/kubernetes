@@ -28,25 +28,40 @@ import (
 )
 
 func TestGetTopologyHints(t *testing.T) {
+	firstSocketMask, _ := socketmask.NewSocketMask(0)
+	secondSocketMask, _ := socketmask.NewSocketMask(1)
+	crossSocketMask, _ := socketmask.NewSocketMask(0, 1)
 	tcases := []struct {
-		name     string
-		amount   int64
-		expected topologymanager.TopologyHints
+		name          string
+		amount        int64
+		expectedHints []topologymanager.TopologyHint
 	}{
 		{
-			name:   "Socket Affinity includes {0, 1}, {1, 0}, {1, 1}",
+			name:   "Socket Affinity include 0, 1, 0 and 1",
 			amount: 1,
-			expected: topologymanager.TopologyHints{
-				SocketAffinity: []socketmask.SocketMask{{0, 1}, {1, 0}, {1, 1}},
-				Affinity:       true,
+			expectedHints: []topologymanager.TopologyHint{
+				topologymanager.TopologyHint{
+					SocketAffinity: firstSocketMask,
+					Preferred:      true,
+				},
+				topologymanager.TopologyHint{
+					SocketAffinity: secondSocketMask,
+					Preferred:      true,
+				},
+				topologymanager.TopologyHint{
+					SocketAffinity: crossSocketMask,
+					Preferred:      false,
+				},
 			},
 		},
 		{
-			name:   "Socket Affinity includes {1, 1}",
+			name:   "Socket Mask includes {1, 1}",
 			amount: 2,
-			expected: topologymanager.TopologyHints{
-				SocketAffinity: []socketmask.SocketMask{{1, 1}},
-				Affinity:       false,
+			expectedHints: []topologymanager.TopologyHint{
+				topologymanager.TopologyHint{
+					SocketAffinity: crossSocketMask,
+					Preferred:      false,
+				},
 			},
 		},
 	}
@@ -68,9 +83,9 @@ func TestGetTopologyHints(t *testing.T) {
 		testResourceList[name] = *resource.NewQuantity(tc.amount, "")
 
 		testContainer.Resources.Requests = testResourceList
-		actual := m.GetTopologyHints(testPod, testContainer)
-		if reflect.DeepEqual(actual, tc.expected) {
-			t.Errorf("Expected in result to be %v, got %v", tc.expected, actual)
+		hints := m.GetTopologyHints(testPod, testContainer)
+		if reflect.DeepEqual(hints, tc.expectedHints) {
+			t.Errorf("Expected in result to be %v, got %v", tc.expectedHints, hints)
 		}
 	}
 }
