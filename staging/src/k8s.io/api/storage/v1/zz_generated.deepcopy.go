@@ -187,6 +187,11 @@ func (in *VolumeAttachmentSource) DeepCopyInto(out *VolumeAttachmentSource) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.InlineVolumeSpec != nil {
+		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
+		*out = new(corev1.PersistentVolumeSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

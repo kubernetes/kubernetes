@@ -1859,19 +1859,28 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 }
 
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
+	var csiPV *v1.PersistentVolume
+	var err error
+	inlineVolume := false
 	if spec.PersistentVolume != nil {
 		// TranslateInTreePVToCSI will create a new PV
-		csiPV, err := csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
+		csiPV, err = csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
 		if err != nil {
 			return nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
 		}
-		return &volume.Spec{
-			PersistentVolume: csiPV,
-			ReadOnly:         spec.ReadOnly,
-		}, nil
 	} else if spec.Volume != nil {
-		return &volume.Spec{}, goerrors.New("translation is not supported for in-line volumes yet")
+		// TranslateInTreeInlineVolumeToCSI will create a new PV
+		csiPV, err = csilib.TranslateInTreeInlineVolumeToCSI(spec.Volume)
+		if err != nil {
+			return nil, fmt.Errorf("failed to translate in tree inline volume to CSI: %v", err)
+		}
+		inlineVolume = true
 	} else {
 		return &volume.Spec{}, goerrors.New("not a valid volume spec")
 	}
+	return &volume.Spec{
+		PersistentVolume:                csiPV,
+		ReadOnly:                        spec.ReadOnly,
+		InlineVolumeSpecForCSIMigration: inlineVolume,
+	}, nil
 }
