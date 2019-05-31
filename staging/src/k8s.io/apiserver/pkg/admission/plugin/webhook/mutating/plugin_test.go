@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
 
 // TestAdmit tests that MutatingWebhook#Admit works as expected
@@ -108,9 +109,9 @@ func TestAdmit(t *testing.T) {
 				return
 			}
 			if len(tt.ExpectAnnotations) == 0 {
-				assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+				assert.Empty(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 			} else {
-				assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+				assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 			}
 			reinvocationCtx := fakeAttr.Attributes.GetReinvocationContext()
 			reinvocationCtx.SetIsReinvoke()

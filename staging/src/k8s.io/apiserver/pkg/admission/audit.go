@@ -84,11 +84,18 @@ func ensureAnnotationGetter(a Attributes) error {
 }
 
 func (handler auditHandler) logAnnotations(a Attributes) {
+	if handler.ae == nil {
+		return
+	}
 	switch a := a.(type) {
 	case privateAnnotationsGetter:
-		audit.LogAnnotations(handler.ae, a.getAnnotations())
+		for key, value := range a.getAnnotations(handler.ae.Level) {
+			audit.LogAnnotation(handler.ae, key, value)
+		}
 	case AnnotationsGetter:
-		audit.LogAnnotations(handler.ae, a.GetAnnotations())
+		for key, value := range a.GetAnnotations(handler.ae.Level) {
+			audit.LogAnnotation(handler.ae, key, value)
+		}
 	default:
 		// this will never happen, because we have already checked it in ensureAnnotationGetter
 	}
