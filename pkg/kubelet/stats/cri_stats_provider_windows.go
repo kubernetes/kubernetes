@@ -51,7 +51,9 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 			klog.V(4).Infof("Failed to get statistics for container %q with error '%v', continue to get stats for other containers", c.ID, err)
 			continue
 		}
-
+		if err := container.Close(); err != nil {
+			return stats, err
+		}
 		if len(cstats.Network) > 0 {
 			stats[c.ID] = hcsStatsToNetworkStats(cstats.Timestamp, cstats.Network)
 		}
