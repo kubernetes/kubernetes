@@ -37,7 +37,7 @@
                     "--expander=price",
                     "--cloud-provider=gke",
                     "--expendable-pods-priority-cutoff=-10",
-                    "{{params}}"
+                    {{params}}
                 ],
                 "env": [
                     {

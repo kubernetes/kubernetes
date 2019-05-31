@@ -29,7 +29,12 @@ function start_internal_ca {
   local -r src_file="${manifests_dir}/internal-cluster-autoscaler.manifest"
   local params="${CLOUD_CONFIG_OPT} $1"
 
-  sed -i -e "s@{{params}}@${params:-}@g" "${src_file}"
+  # split the params into separate arguments passed to binary
+  local params_split
+  params_split=$(eval "for param in $params; do echo -n \\\"\$param\\\",; done")
+  params_split=${params_split%?}
+
+  sed -i -e "s@{{params}}@${params_split:-}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
   sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
   sed -i -e "s@{%.*%}@@g" "${src_file}"
