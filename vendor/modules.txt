@@ -32,7 +32,7 @@ github.com/JeffAshton/win_pdh
 github.com/MakeNowJust/heredoc
 # github.com/Microsoft/go-winio v0.4.11 => github.com/Microsoft/go-winio v0.4.11
 github.com/Microsoft/go-winio
-# github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1 => github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1
+# github.com/Microsoft/hcsshim v0.8.6 => github.com/Microsoft/hcsshim v0.8.6
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/hcn
 github.com/Microsoft/hcsshim/internal/cni
