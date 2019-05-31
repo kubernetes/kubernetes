@@ -46,15 +46,24 @@ const (
 )
 
 type fakePodKiller struct {
-	killedPods []*v1.Pod
+	killedPods  []*v1.Pod
+	failingPods []*v1.Pod
 }
 
 func newFakePodKiller() *fakePodKiller {
-	return &fakePodKiller{killedPods: []*v1.Pod{}}
+	return &fakePodKiller{
+		killedPods:  []*v1.Pod{},
+		failingPods: []*v1.Pod{},
+	}
+}
+
+func (f *fakePodKiller) setFailingPods(pods []*v1.Pod) {
+	f.failingPods = pods
 }
 
 func (f *fakePodKiller) clear() {
-	f.killedPods = []*v1.Pod{}
+	f.killedPods  = []*v1.Pod{}
+	f.failingPods = []*v1.Pod{}
 }
 
 func (f *fakePodKiller) getKilledPods() []*v1.Pod {
@@ -63,6 +72,15 @@ func (f *fakePodKiller) getKilledPods() []*v1.Pod {
 
 func (f *fakePodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
 	f.killedPods = append(f.killedPods, pod)
+
+	// Return an error if the pod to kill is in the list of
+	// mocked failing pods
+	for _, failingPod := range f.failingPods {
+		if pod == failingPod {
+			return fmt.Errorf("failed to kill pod")
+		}
+	}
+
 	return nil
 }
 
@@ -95,6 +113,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 	type testRun struct {
 		testName              string
 		inputPods             []*v1.Pod
+		failingPods           []*v1.Pod
 		insufficientResources admissionRequirementList
 		expectErr             bool
 		expectedOutput        []*v1.Pod
@@ -107,6 +126,7 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 		{
 			testName:              "critical pods cannot be preempted",
 			inputPods:             []*v1.Pod{allPods[critical]},
+			failingPods:           []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 0, 1),
 			expectErr:             true,
 			expectedOutput:        nil,
@@ -114,15 +134,25 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 		{
 			testName:              "best effort pods are not preempted when attempting to free resources",
 			inputPods:             []*v1.Pod{allPods[bestEffort]},
+			failingPods:           []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 1, 0),
 			expectErr:             true,
 			expectedOutput:        nil,
+		},
+		{
+			testName:              "do not stop evicting pods if failing to kill one",
+			inputPods:             []*v1.Pod{allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed]},
+			failingPods:           []*v1.Pod{allPods[burstable]},
+			insufficientResources: getAdmissionRequirementList(500, 500, 0),
+			expectErr:             true,
+			expectedOutput:        []*v1.Pod{allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed]},
 		},
 		{
 			testName: "multiple pods evicted",
 			inputPods: []*v1.Pod{
 				allPods[critical], allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable],
 				allPods[guaranteed], allPods[highRequestGuaranteed]},
+			failingPods:           []*v1.Pod{},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
 			expectErr:             false,
 			expectedOutput:        []*v1.Pod{allPods[highRequestBurstable], allPods[highRequestGuaranteed]},
@@ -130,13 +160,15 @@ func TestEvictPodsToFreeRequests(t *testing.T) {
 	}
 	for _, r := range runs {
 		podProvider.setPods(r.inputPods)
+		podKiller.setFailingPods(r.failingPods)
 		outErr := criticalPodAdmissionHandler.evictPodsToFreeRequests(allPods[critical], r.insufficientResources)
 		outputPods := podKiller.getKilledPods()
 		if !r.expectErr && outErr != nil {
 			t.Errorf("evictPodsToFreeRequests returned an unexpected error during the %s test.  Err: %v", r.testName, outErr)
 		} else if r.expectErr && outErr == nil {
 			t.Errorf("evictPodsToFreeRequests expected an error but returned a successful output=%v during the %s test.", outputPods, r.testName)
-		} else if !podListEqual(r.expectedOutput, outputPods) {
+		}
+		if !podListEqual(r.expectedOutput, outputPods) {
 			t.Errorf("evictPodsToFreeRequests expected %v but got %v during the %s test.", r.expectedOutput, outputPods, r.testName)
 		}
 		podKiller.clear()

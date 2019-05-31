@@ -31,6 +31,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 const message = "Preempted in order to admit critical pod"
@@ -96,6 +97,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
 	}
 	klog.Infof("preemption: attempting to evict pods %v, in order to free up resources: %s", podsToPreempt, insufficientResources.toString())
+	errors := []error{}
 	for _, pod := range podsToPreempt {
 		status := v1.PodStatus{
 			Phase:   v1.PodFailed,
@@ -107,11 +109,12 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(admitPod *v1.Pod, 
 		// this is a blocking call and should only return when the pod and its containers are killed.
 		err := c.killPodFunc(pod, status, nil)
 		if err != nil {
-			return fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err)
+			errors = append(errors, fmt.Errorf("preemption: pod %s failed to evict %v", format.Pod(pod), err))
+			continue
 		}
 		klog.Infof("preemption: pod %s evicted successfully", format.Pod(pod))
 	}
-	return nil
+	return utilerrors.NewAggregate(errors)
 }
 
 // getPodsToPreempt returns a list of pods that could be preempted to free requests >= requirements
