@@ -47,8 +47,8 @@ func TestAdmit(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
-		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL))...)
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL, "test-webhooks"),
+		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL), "test-webhooks")...)
 
 	for _, tt := range testCases {
 		t.Run(tt.Name, func(t *testing.T) {
