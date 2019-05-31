@@ -19,10 +19,12 @@ package common
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -92,6 +94,51 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		*/
 		It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(0)
+		})
+
+		/*
+			Testname: Security Context, runAsNonRoot
+			Description: Create a Pod to run container, with RunAsNonRoot SecurityContext. Pod MUST succeed only if container ran as non-root user.
+			[LinuxOnly] : This test is marked LinuxOnly since Windows does not support running as UID / GID.
+		*/
+		It("should not allow to run the container as root when RunAsNonRoot securityContext is set [LinuxOnly] [NodeConformance]", func() {
+			podName := fmt.Sprintf("non-root-busybox-%s", uuid.NewUUID())
+			runAsNonRoot := true
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   framework.BusyBoxImage,
+							Name:    podName,
+							Command: []string{"sh", "-c", "test $(id -u) -ne 0"},
+							SecurityContext: &v1.SecurityContext{
+								RunAsNonRoot: &runAsNonRoot,
+							},
+						},
+					},
+				},
+			}
+			podClient.Create(pod)
+			err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+				kubeletPod, err := f.PodClient().Get(podName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Pod must exists")
+				e2elog.Logf("Pod Phase is: %v", kubeletPod.Status.Phase)
+
+				// Pod would run only if uid is not 0. Wait till timeout.
+				switch kubeletPod.Status.Phase {
+				case v1.PodRunning, v1.PodSucceeded, v1.PodFailed:
+					return true, nil
+				default:
+					return false, nil
+				}
+			})
+			if err != wait.ErrWaitTimeout {
+				framework.ExpectNoError(err, "Pod neither failed or ran as NonRoot, nor waited till observation timeout")
+			}
 		})
 	})
 
