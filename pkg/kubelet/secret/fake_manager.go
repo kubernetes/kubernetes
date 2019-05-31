@@ -25,6 +25,7 @@ import (
 type fakeManager struct {
 }
 
+// NewFakeManager creates empty/fake secret manager
 func NewFakeManager() Manager {
 	return &fakeManager{}
 }
