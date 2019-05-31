@@ -18,7 +18,9 @@ package validation
 
 import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
 )
 
@@ -30,6 +32,10 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("handler"), rc.Handler, msg))
 	}
 
+	if rc.Scheduling != nil {
+		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...)
+	}
+
 	return allErrs
 }
 
@@ -39,5 +45,14 @@ func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...)
 
+	return allErrs
+}
+
+func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if s.NodeSelector != nil {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(s.NodeSelector, fldPath.Child("nodeSelector"))...)
+	}
+	allErrs = append(allErrs, corevalidation.ValidateTolerations(s.Tolerations, fldPath.Child("tolerations"))...)
 	return allErrs
 }

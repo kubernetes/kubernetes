@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.node.v1alpha1;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -72,5 +73,30 @@ message RuntimeClassSpec {
   // The RuntimeHandler must conform to the DNS Label (RFC 1123) requirements
   // and is immutable.
   optional string runtimeHandler = 1;
+
+  // Scheduling holds the scheduling constraints to ensure that pods running
+  // with this RuntimeClass are scheduled to nodes that support it.
+  // If scheduling is nil, this RuntimeClass is assumed to be supported by all
+  // nodes.
+  // +optional
+  optional Scheduling scheduling = 3;
+}
+
+// Scheduling specifies the scheduling constraints for nodes supporting a
+// RuntimeClass.
+message Scheduling {
+  // nodeSelector lists labels that must be present on nodes that support this
+  // RuntimeClass. Pods using this RuntimeClass can only be scheduled to a
+  // node matched by this selector. The RuntimeClass nodeSelector is merged
+  // with a pod's existing nodeSelector. Any conflicts will cause the pod to
+  // be rejected in admission.
+  // +optional
+  map<string, string> nodeSelector = 1;
+
+  // tolerations are appended (excluding duplicates) to pods running with this
+  // RuntimeClass during admission, effectively unioning the set of nodes
+  // tolerated by the pod and the RuntimeClass.
+  // +optional
+  repeated k8s.io.api.core.v1.Toleration tolerations = 2;
 }
 
