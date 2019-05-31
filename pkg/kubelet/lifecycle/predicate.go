@@ -103,12 +103,12 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		fit, reasons, err = w.admissionFailureHandler.HandleAdmissionFailure(admitPod, reasons)
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
-			klog.Warningf("Failed to admit pod %v - %s", format.Pod(admitPod), message)
-			return PodAdmitResult{
-				Admit:   fit,
-				Reason:  "UnexpectedAdmissionError",
-				Message: message,
-			}
+			klog.Warningf("Forcely admitted critical pod despite error %v - %s", format.Pod(admitPod), message)
+
+			// Failed to evict pods in order to free resources for a critical pod.
+			// We do admit the critical pod anyway, because in future syncPod loops,
+			// the kubelet will retry the pod deletion steps that it was stuck on.
+			fit = true
 		}
 	}
 	if !fit {
