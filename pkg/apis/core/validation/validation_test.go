@@ -13288,3 +13288,72 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 		})
 	}
 }
+
+func testDataSourceInSpec(name string, kind string, apiGroup string) *core.PersistentVolumeClaimSpec {
+	scName := "csi-plugin"
+	dataSourceInSpec := core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		StorageClassName: &scName,
+		DataSource: &core.TypedLocalObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     kind,
+			Name:     name,
+		},
+	}
+
+	return &dataSourceInSpec
+}
+
+func TestAlphaVolumePVCDataSource(t *testing.T) {
+
+	testCases := []struct {
+		testName     string
+		claimSpec    core.PersistentVolumeClaimSpec
+		expectedFail bool
+	}{
+		{
+			testName:  "test create from valid snapshot source",
+			claimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+		},
+		{
+			testName:  "test create from valid pvc source",
+			claimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", ""),
+		},
+		{
+			testName:     "test missing name in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			expectedFail: true,
+		},
+		{
+			testName:     "test specifying pvc with snapshot api group should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
+			expectedFail: true,
+		},
+		{
+			testName:     "test invalid group name in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+			expectedFail: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.expectedFail {
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) == 0 {
+				t.Errorf("expected failure: %v", errs)
+			}
+
+		} else {
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+
+		}
+	}
+}
