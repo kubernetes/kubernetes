@@ -68,10 +68,6 @@ const (
 
 	externalResourceGroupLabel = "kubernetes.azure.com/resource-group"
 	managedByAzureLabel        = "kubernetes.azure.com/managed"
-
-	// the prefix of secret for Azure cloud provider. The secret should include
-	// base64-encoded cloud config data with key 'cloud-config'.
-	azureSecretNamePrefix = "azure-cloud-provider"
 )
 
 var (
@@ -162,8 +158,6 @@ type Config struct {
 
 	// The cloud configure type for Azure cloud provider. Supported values are file, secret and merge.
 	CloudConfigType cloudConfigType `json:"cloudConfigType,omitempty" yaml:"cloudConfigType,omitempty"`
-	// The cloud config scope for Azure cloud provider. Supported values are all, node and control-plane.
-	CloudConfigScope cloudConfigScope `json:"cloudConfigScope,omitempty" yaml:"cloudConfigScope,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)
@@ -286,19 +280,6 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 		}
 	}
 
-	if config.CloudConfigScope == "" {
-		// The default config scope is cloudConfigScopeAll.
-		config.CloudConfigScope = cloudConfigScopeAll
-	} else {
-		supportedCloudConfigScopes := sets.NewString(
-			string(cloudConfigScopeAll),
-			string(cloudConfigScopeNode),
-			string(cloudConfigScopeControlPlane))
-		if !supportedCloudConfigScopes.Has(string(config.CloudConfigScope)) {
-			return fmt.Errorf("cloudConfigScope %v is not supported, supported values are %v", config.CloudConfigScope, supportedCloudConfigScopes.List())
-		}
-	}
-
 	env, err := auth.ParseAzureEnvironment(config.Cloud)
 	if err != nil {
 		return err
@@ -306,32 +287,18 @@ func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) erro
 
 	servicePrincipalToken, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
 	if err == auth.ErrorNoAuth {
-		runingAsKubelet, err := isRunningAsKubelet()
-		if err != nil {
+		// Only controller-manager would lazy-initialize from secret, and credentials are required for such case.
+		if fromSecret {
+			err := fmt.Errorf("No credentials provided for Azure cloud provider")
+			klog.Fatalf("%v", err)
 			return err
 		}
 
-		if runingAsKubelet {
-			// No credentials provided, useInstanceMetadata should be enabled for Kubelet.
-			if !config.UseInstanceMetadata {
-				return fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
-			}
-		} else {
-			// Credentials are required for controller-manager for lazy initialization from secret.
-			if fromSecret {
-				err := fmt.Errorf("No credentials provided for Azure cloud provider")
-				klog.Fatalf("%v", err)
-				return err
-			}
-
-			// Credentials are required if cloud config type is "file".
-			if az.Config.CloudConfigType == cloudConfigTypeFile {
-				return fmt.Errorf("no credentials provided for Azure cloud provider")
-			}
-
-			// Controller manager could be initialized from secret.
-			klog.V(2).Infof("No credentials provided, lazy initialize from secret %s", getConfigSecretName(az.Config.CloudConfigScope))
-			return nil
+		// No credentials provided, useInstanceMetadata should be enabled for Kubelet.
+		// TODO(feiskyer): print different error message for Kubelet and controller-manager, as they're
+		// requiring different credential settings.
+		if !config.UseInstanceMetadata && az.Config.CloudConfigType == cloudConfigTypeFile {
+			return fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 		}
 
 		klog.V(2).Infof("Azure cloud provider is starting without credentials")

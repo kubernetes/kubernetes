@@ -19,7 +19,6 @@ package azure
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -27,7 +26,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/kardianos/osext"
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -363,17 +361,4 @@ func isBackendPoolOnSameLB(newBackendPoolID string, existingBackendPools []strin
 	}
 
 	return true, "", nil
-}
-
-func isRunningAsKubelet() (bool, error) {
-	exe, err := osext.Executable()
-	if err != nil {
-		return false, fmt.Errorf("cloud not find the service executable: %v", err)
-	}
-
-	if strings.Contains(filepath.Base(exe), "kubelet") {
-		return true, nil
-	}
-
-	return false, nil
 }

@@ -129,38 +129,40 @@ func TestGetConfigFromSecret(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		az := &Cloud{
-			kubeClient: fakeclient.NewSimpleClientset(),
-		}
-		if test.existingConfig != nil {
-			az.Config = *test.existingConfig
-		}
-		if test.secretConfig != nil {
-			secret := &v1.Secret{
-				Type: v1.SecretTypeOpaque,
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azure-cloud-provider",
-					Namespace: "kube-system",
-				},
+		t.Run(test.name, func(t *testing.T) {
+			az := &Cloud{
+				kubeClient: fakeclient.NewSimpleClientset(),
 			}
-			if test.secretConfig != emptyConfig {
-				secretData, err := yaml.Marshal(test.secretConfig)
-				assert.NoError(t, err, test.name)
-				secret.Data = map[string][]byte{
-					"cloud-config": secretData,
+			if test.existingConfig != nil {
+				az.Config = *test.existingConfig
+			}
+			if test.secretConfig != nil {
+				secret := &v1.Secret{
+					Type: v1.SecretTypeOpaque,
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "azure-cloud-provider",
+						Namespace: "kube-system",
+					},
 				}
+				if test.secretConfig != emptyConfig {
+					secretData, err := yaml.Marshal(test.secretConfig)
+					assert.NoError(t, err, test.name)
+					secret.Data = map[string][]byte{
+						"cloud-config": secretData,
+					}
+				}
+				_, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(secret)
+				assert.NoError(t, err, test.name)
 			}
-			_, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Create(secret)
+
+			real, err := az.getConfigFromSecret()
+			if test.expectErr {
+				assert.Error(t, err, test.name)
+				return
+			}
+
 			assert.NoError(t, err, test.name)
-		}
-
-		real, err := az.getConfigFromSecret()
-		if test.expectErr {
-			assert.Error(t, err, test.name)
-			continue
-		}
-
-		assert.NoError(t, err, test.name)
-		assert.Equal(t, test.expected, real, test.name)
+			assert.Equal(t, test.expected, real, test.name)
+		})
 	}
 }

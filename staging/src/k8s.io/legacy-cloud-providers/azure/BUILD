@@ -69,7 +69,6 @@ go_library(
         "//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/to:go_default_library",
-        "//vendor/github.com/kardianos/osext:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/rubiojr/go-vhd/vhd:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

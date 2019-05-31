@@ -25,25 +25,9 @@ import (
 )
 
 const (
-	cloudConfigNamespace = "kube-system"
-	cloudConfigKey       = "cloud-config"
-)
-
-// The configure scope for Azure cloud provider secret. Supported values are:
-// * all            : configure applied for components (kubelet and controller-manager). This is the default value.
-// * node           : configure applied for nodes (kubelet).
-// * control-plane  : configure applied for control plane components (controller-manager).
-//
-// For different configure scope, the secret name would also be different:
-// * all            : secret name would be azure-cloud-provider.
-// * node           : secret name would azure-cloud-provider-node.
-// * control-plane  : secret name would be azure-cloud-provider-control-plane.
-type cloudConfigScope string
-
-const (
-	cloudConfigScopeAll          cloudConfigScope = "all"
-	cloudConfigScopeNode         cloudConfigScope = "node"
-	cloudConfigScopeControlPlane cloudConfigScope = "control-plane"
+	cloudConfigNamespace  = "kube-system"
+	cloudConfigKey        = "cloud-config"
+	cloudConfigSecretName = "azure-cloud-provider"
 )
 
 // The config type for Azure cloud provider secret. Supported values are:
@@ -82,15 +66,14 @@ func (az *Cloud) getConfigFromSecret() (*Config, error) {
 		return nil, nil
 	}
 
-	secretName := getConfigSecretName(az.Config.CloudConfigScope)
-	secret, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Get(secretName, metav1.GetOptions{})
+	secret, err := az.kubeClient.CoreV1().Secrets(cloudConfigNamespace).Get(cloudConfigSecretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get secret %s: %v", secretName, err)
+		return nil, fmt.Errorf("Failed to get secret %s: %v", cloudConfigSecretName, err)
 	}
 
 	cloudConfigData, ok := secret.Data[cloudConfigKey]
 	if !ok {
-		return nil, fmt.Errorf("cloud-config is not set in the secret (%s)", secretName)
+		return nil, fmt.Errorf("cloud-config is not set in the secret (%s)", cloudConfigSecretName)
 	}
 
 	config := Config{}
@@ -105,19 +88,4 @@ func (az *Cloud) getConfigFromSecret() (*Config, error) {
 	}
 
 	return &config, nil
-}
-
-func getConfigSecretName(scope cloudConfigScope) string {
-	switch scope {
-	case cloudConfigScopeAll:
-		return azureSecretNamePrefix
-	case cloudConfigScopeNode:
-		return fmt.Sprintf("%s-node", azureSecretNamePrefix)
-	case cloudConfigScopeControlPlane:
-		return fmt.Sprintf("%s-control-plane", azureSecretNamePrefix)
-
-	default:
-		// default secret name is azure-cloud-provider.
-		return azureSecretNamePrefix
-	}
 }

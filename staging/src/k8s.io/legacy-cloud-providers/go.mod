@@ -11,7 +11,6 @@ require (
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20181220005116-f8e995905100
 	github.com/aws/aws-sdk-go v1.16.26
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
-	github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c // indirect
 	github.com/prometheus/client_golang v0.9.2
 	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
