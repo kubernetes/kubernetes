@@ -3628,6 +3628,11 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(PreemptionPolicy)
+		**out = **in
+	}
 	return
 }
 
