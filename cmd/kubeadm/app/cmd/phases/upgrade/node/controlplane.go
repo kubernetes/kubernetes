@@ -52,6 +52,7 @@ func runControlPlane() func(c workflow.RunData) error {
 		// if this is not a control-plande node, this phase should not be executed
 		if !data.IsControlPlaneNode() {
 			fmt.Printf("[upgrade] Skipping phase. Not a control plane node")
+			return nil
 		}
 
 		// otherwise, retrieve all the info required for control plane upgrade
