@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ func NewStrictPolicy() Policy {
 }
 
 func (p *strictPolicy) Name() string {
-	return string(PolicyStrict)
+	return PolicyStrict
 }
 
 func (p *strictPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
