@@ -2806,6 +2806,7 @@ func TestCleanLegacyService(t *testing.T) {
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"}))
+	fp.gracefuldeleteManager = NewGracefulTerminationManager(ipvs)
 
 	// All ipvs services that were processed in the latest sync loop.
 	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
@@ -2862,6 +2863,27 @@ func TestCleanLegacyService(t *testing.T) {
 	}
 	for v := range currentServices {
 		fp.ipvs.AddVirtualServer(currentServices[v])
+	}
+
+	rss := []*utilipvs.RealServer{
+		{
+			Address:      net.ParseIP("10.10.10.10"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+			Weight:       0,
+		},
+		{
+			Address:      net.ParseIP("11.11.11.11"),
+			Port:         56,
+			ActiveConn:   0,
+			InactiveConn: 0,
+			Weight:       0,
+		},
+	}
+
+	for _, rs := range rss {
+		fp.ipvs.AddRealServer(currentServices["ipvs5"], rs)
 	}
 
 	fp.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
