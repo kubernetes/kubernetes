@@ -1331,6 +1331,46 @@ not:
 				"spec.validation.openAPIV3Schema.not.properties[metadata]: Forbidden: must not be specified in a nested context",
 			},
 		},
+		{
+			desc: "missing items for array",
+			globalSchema: `
+type: object
+properties:
+  slice:
+    type: array
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[slice].items: Required value: must be specified",
+			},
+		},
+		{
+			desc: "items slice",
+			globalSchema: `
+type: object
+properties:
+  slice:
+    type: array
+    items:
+    - type: string
+    - type: integer
+`,
+			expectedCreateError: true,
+		},
+		{
+			desc: "items slice in value validation",
+			globalSchema: `
+type: object
+properties:
+  slice:
+    type: array
+    items:
+      type: string
+    not:
+      items:
+      - type: string
+`,
+			expectedCreateError: true,
+		},
 	}
 
 	for i := range tests {
