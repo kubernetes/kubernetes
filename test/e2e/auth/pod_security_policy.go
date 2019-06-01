@@ -21,7 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -55,7 +55,7 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		if !framework.IsPodSecurityPolicyEnabled(f) {
 			framework.Skipf("PodSecurityPolicy not enabled")
 		}
-		if !auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
+		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			framework.Skipf("RBAC not enabled")
 		}
 		ns = f.Namespace.Name
@@ -71,8 +71,8 @@ var _ = SIGDescribe("PodSecurityPolicy", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Binding the edit role to the default SA")
-		err = auth.BindClusterRole(f.ClientSet.RbacV1beta1(), "edit", ns,
-			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns, Name: "default"})
+		err = auth.BindClusterRole(f.ClientSet.RbacV1(), "edit", ns,
+			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns, Name: "default"})
 		framework.ExpectNoError(err)
 	})
 
@@ -218,11 +218,11 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policy.PodSecurityPol
 	framework.ExpectNoError(err, "Failed to create PSP")
 
 	// Create the Role to bind it to the namespace.
-	_, err = f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
+	_, err = f.ClientSet.RbacV1().Roles(ns).Create(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Rules: []rbacv1beta1.PolicyRule{{
+		Rules: []rbacv1.PolicyRule{{
 			APIGroups:     []string{"policy"},
 			Resources:     []string{"podsecuritypolicies"},
 			ResourceNames: []string{name},
@@ -232,14 +232,14 @@ func createAndBindPSP(f *framework.Framework, pspTemplate *policy.PodSecurityPol
 	framework.ExpectNoError(err, "Failed to create PSP role")
 
 	// Bind the role to the namespace.
-	err = auth.BindRoleInNamespace(f.ClientSet.RbacV1beta1(), name, ns, rbacv1beta1.Subject{
-		Kind:      rbacv1beta1.ServiceAccountKind,
+	err = auth.BindRoleInNamespace(f.ClientSet.RbacV1(), name, ns, rbacv1.Subject{
+		Kind:      rbacv1.ServiceAccountKind,
 		Namespace: ns,
 		Name:      "default",
 	})
 	framework.ExpectNoError(err)
 
-	framework.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+	framework.ExpectNoError(auth.WaitForNamedAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns, "default"), ns, "use", name,
 		schema.GroupResource{Group: "policy", Resource: "podsecuritypolicies"}, true))
 

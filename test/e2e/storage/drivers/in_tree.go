@@ -46,7 +46,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -156,11 +156,11 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	err := auth.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
-		rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
+	err := auth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
+		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
 
-	err = auth.WaitForAuthorizationUpdate(cs.AuthorizationV1beta1(),
+	err = auth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
 		"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
@@ -175,7 +175,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		}, func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
+			cs.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
 }
 

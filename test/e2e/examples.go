@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -52,11 +52,11 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		err := auth.BindClusterRoleInNamespace(c.RbacV1beta1(), "edit", f.Namespace.Name,
-			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+		err := auth.BindClusterRoleInNamespace(c.RbacV1(), "edit", f.Namespace.Name,
+			rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 		framework.ExpectNoError(err)
 
-		err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+		err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
 			serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 			f.Namespace.Name, "create", schema.GroupResource{Resource: "pods"}, true)
 		framework.ExpectNoError(err)

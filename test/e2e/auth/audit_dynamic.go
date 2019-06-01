@@ -348,7 +348,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		if auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
+		if auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			testCases = append(testCases, annotationTestCases...)
 		}
 		expectedEvents := []utils.AuditEvent{}
