@@ -67,6 +67,18 @@ func TestExtractFileSpec(t *testing.T) {
 			expectedFile:      "/some/file",
 		},
 		{
+			spec:              "namespace/pod:",
+			expectedPod:       "pod",
+			expectedNamespace: "namespace",
+			expectedFile:      ".",
+		},
+		{
+			spec:              "namespace/pod:",
+			expectedPod:       "pod",
+			expectedNamespace: "namespace",
+			expectedFile:      ".",
+		},
+		{
 			spec:         "/::file-with-colon:",
 			expectedFile: "/::file-with-colon:",
 		},

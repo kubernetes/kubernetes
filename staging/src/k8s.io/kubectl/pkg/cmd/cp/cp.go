@@ -139,8 +139,14 @@ func extractFileSpec(arg string) (fileSpec, error) {
 	if i < 0 {
 		return fileSpec{File: arg}, nil
 	}
+
 	pod, file := arg[:i], arg[i+1:]
 	podPieces := strings.Split(pod, "/")
+
+	// Transform "pod:" into "pod:.", like scp
+	if len(file) == 0 {
+		file = "."
+	}
 
 	switch len(podPieces) {
 	case 1:
