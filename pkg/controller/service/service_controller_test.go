@@ -22,19 +22,24 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	fakecloud "k8s.io/cloud-provider/fake"
+	servicehelper "k8s.io/cloud-provider/service/helpers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const region = "us-central"
@@ -82,13 +87,22 @@ func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
 	return controller, cloud, client
 }
 
-func TestCreateExternalLoadBalancer(t *testing.T) {
-	table := []struct {
-		service             *v1.Service
-		expectErr           bool
-		expectCreateAttempt bool
+// TODO(@MrHohn): Verify the end state when below issue is resolved:
+// https://github.com/kubernetes/client-go/issues/607
+func TestSyncLoadBalancerIfNeeded(t *testing.T) {
+	testCases := []struct {
+		desc                 string
+		enableFeatureGate    bool
+		service              *v1.Service
+		lbExists             bool
+		expectOp             loadBalancerOperation
+		expectCreateAttempt  bool
+		expectDeleteAttempt  bool
+		expectPatchStatus    bool
+		expectPatchFinalizer bool
 	}{
 		{
+			desc: "service doesn't want LB",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "no-external-balancer",
@@ -98,10 +112,34 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Type: v1.ServiceTypeClusterIP,
 				},
 			},
-			expectErr:           false,
-			expectCreateAttempt: false,
+			expectOp:          deleteLoadBalancer,
+			expectPatchStatus: false,
 		},
 		{
+			desc: "service no longer wants LB",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "no-external-balancer",
+					Namespace: "default",
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeClusterIP,
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{IP: "8.8.8.8"},
+						},
+					},
+				},
+			},
+			lbExists:            true,
+			expectOp:            deleteLoadBalancer,
+			expectDeleteAttempt: true,
+			expectPatchStatus:   true,
+		},
+		{
+			desc: "udp service that wants LB",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "udp-service",
@@ -116,10 +154,12 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			expectErr:           false,
+			expectOp:            ensureLoadBalancer,
 			expectCreateAttempt: true,
+			expectPatchStatus:   true,
 		},
 		{
+			desc: "tcp service that wants LB",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "basic-service1",
@@ -134,10 +174,12 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			expectErr:           false,
+			expectOp:            ensureLoadBalancer,
 			expectCreateAttempt: true,
+			expectPatchStatus:   true,
 		},
 		{
+			desc: "sctp service that wants LB",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "sctp-service",
@@ -152,61 +194,206 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
-			expectErr:           false,
+			expectOp:            ensureLoadBalancer,
 			expectCreateAttempt: true,
+			expectPatchStatus:   true,
+		},
+		// Finalizer test cases below.
+		{
+			desc: "service with finalizer that no longer wants LB",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "no-external-balancer",
+					Namespace:  "default",
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeClusterIP,
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{IP: "8.8.8.8"},
+						},
+					},
+				},
+			},
+			lbExists:             true,
+			expectOp:             deleteLoadBalancer,
+			expectDeleteAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
+		},
+		{
+			desc: "service that needs cleanup",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "basic-service1",
+					Namespace: "default",
+					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					}},
+					Type: v1.ServiceTypeLoadBalancer,
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{IP: "8.8.8.8"},
+						},
+					},
+				},
+			},
+			lbExists:             true,
+			expectOp:             deleteLoadBalancer,
+			expectDeleteAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
+		},
+		{
+			desc:              "service without finalizer that wants LB",
+			enableFeatureGate: true,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "basic-service1",
+					Namespace: "default",
+					SelfLink:  testapi.Default.SelfLink("services", "basic-service1"),
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					}},
+					Type: v1.ServiceTypeLoadBalancer,
+				},
+			},
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: true,
+		},
+		{
+			desc:              "service with finalizer that wants LB",
+			enableFeatureGate: true,
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "basic-service1",
+					Namespace:  "default",
+					SelfLink:   testapi.Default.SelfLink("services", "basic-service1"),
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
+						Port:     80,
+						Protocol: v1.ProtocolTCP,
+					}},
+					Type: v1.ServiceTypeLoadBalancer,
+				},
+			},
+			expectOp:             ensureLoadBalancer,
+			expectCreateAttempt:  true,
+			expectPatchStatus:    true,
+			expectPatchFinalizer: false,
 		},
 	}
 
-	for _, item := range table {
-		controller, cloud, client := newController()
-		key := fmt.Sprintf("%s/%s", item.service.Namespace, item.service.Name)
-		if _, err := client.CoreV1().Services(item.service.Namespace).Create(item.service); err != nil {
-			t.Errorf("Failed to prepare service %s for testing: %v", key, err)
-			continue
-		}
-		client.ClearActions()
-		err := controller.syncLoadBalancerIfNeeded(key, item.service)
-		if !item.expectErr && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		} else if item.expectErr && err == nil {
-			t.Errorf("expected error creating %v, got nil", item.service)
-		}
-		actions := client.Actions()
-		if !item.expectCreateAttempt {
-			if len(cloud.Calls) > 0 {
-				t.Errorf("unexpected cloud provider calls: %v", cloud.Calls)
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerFinalizer, tc.enableFeatureGate)()
+
+			controller, cloud, client := newController()
+			cloud.Exists = tc.lbExists
+			key := fmt.Sprintf("%s/%s", tc.service.Namespace, tc.service.Name)
+			if _, err := client.CoreV1().Services(tc.service.Namespace).Create(tc.service); err != nil {
+				t.Fatalf("Failed to prepare service %s for testing: %v", key, err)
 			}
-			if len(actions) > 0 {
-				t.Errorf("unexpected client actions: %v", actions)
+			client.ClearActions()
+
+			op, err := controller.syncLoadBalancerIfNeeded(tc.service, key)
+			if err != nil {
+				t.Errorf("Got error: %v, want nil", err)
 			}
-		} else {
-			var balancer *fakecloud.Balancer
-			for k := range cloud.Balancers {
+			if op != tc.expectOp {
+				t.Errorf("Got operation %v, want %v", op, tc.expectOp)
+			}
+			// Capture actions from test so it won't be messed up.
+			actions := client.Actions()
+
+			if !tc.expectCreateAttempt && !tc.expectDeleteAttempt {
+				if len(cloud.Calls) > 0 {
+					t.Errorf("Unexpected cloud provider calls: %v", cloud.Calls)
+				}
+				if len(actions) > 0 {
+					t.Errorf("Unexpected client actions: %v", actions)
+				}
+				return
+			}
+
+			if tc.expectCreateAttempt {
+				createCallFound := false
+				for _, call := range cloud.Calls {
+					if call == "create" {
+						createCallFound = true
+					}
+				}
+				if !createCallFound {
+					t.Errorf("Got no create call for load balancer, expected one")
+				}
+				// TODO(@MrHohn): Clean up the awkward pattern here.
+				var balancer *fakecloud.Balancer
+				for k := range cloud.Balancers {
+					if balancer == nil {
+						b := cloud.Balancers[k]
+						balancer = &b
+					} else {
+						t.Errorf("Got load balancer %v, expected one to be created", cloud.Balancers)
+						break
+					}
+				}
 				if balancer == nil {
-					b := cloud.Balancers[k]
-					balancer = &b
-				} else {
-					t.Errorf("expected one load balancer to be created, got %v", cloud.Balancers)
-					break
+					t.Errorf("Got no load balancer, expected one to be created")
+				} else if balancer.Name != controller.loadBalancerName(tc.service) ||
+					balancer.Region != region ||
+					balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
+					t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
 				}
 			}
-			if balancer == nil {
-				t.Errorf("expected one load balancer to be created, got none")
-			} else if balancer.Name != controller.loadBalancerName(item.service) ||
-				balancer.Region != region ||
-				balancer.Ports[0].Port != item.service.Spec.Ports[0].Port {
-				t.Errorf("created load balancer has incorrect parameters: %v", balancer)
+			if tc.expectDeleteAttempt {
+				deleteCallFound := false
+				for _, call := range cloud.Calls {
+					if call == "delete" {
+						deleteCallFound = true
+					}
+				}
+				if !deleteCallFound {
+					t.Errorf("Got no delete call for load balancer, expected one")
+				}
 			}
-			actionFound := false
+
+			expectNumPatches := 0
+			if tc.expectPatchStatus {
+				expectNumPatches++
+			}
+			if tc.expectPatchFinalizer {
+				expectNumPatches++
+			}
+			numPatches := 0
 			for _, action := range actions {
-				if action.GetVerb() == "patch" && action.GetResource().Resource == "services" {
-					actionFound = true
+				if action.Matches("patch", "services") {
+					numPatches++
 				}
 			}
-			if !actionFound {
-				t.Errorf("expected patch service to be sent to client, got these actions instead: %v", actions)
+			if numPatches != expectNumPatches {
+				t.Errorf("Expected %d patches, got %d instead. Actions: %v", numPatches, expectNumPatches, actions)
 			}
-		}
+		})
 	}
 }
 
@@ -339,7 +526,7 @@ func TestGetNodeConditionPredicate(t *testing.T) {
 	}
 }
 
-func TestProcessServiceUpdate(t *testing.T) {
+func TestProcessServiceCreateOrUpdate(t *testing.T) {
 	controller, _, client := newController()
 
 	//A pair of old and new loadbalancer IP address
@@ -420,19 +607,18 @@ func TestProcessServiceUpdate(t *testing.T) {
 		if _, err := client.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
 			t.Fatalf("Failed to prepare service %s for testing: %v", tc.key, err)
 		}
-		svcCache := controller.cache.getOrCreate(tc.key)
-		obtErr := controller.processServiceUpdate(svcCache, newSvc, tc.key)
+		obtErr := controller.processServiceCreateOrUpdate(newSvc, tc.key)
 		if err := tc.expectedFn(newSvc, obtErr); err != nil {
-			t.Errorf("%v processServiceUpdate() %v", tc.testName, err)
+			t.Errorf("%v processServiceCreateOrUpdate() %v", tc.testName, err)
 		}
 	}
 
 }
 
-// TestConflictWhenProcessServiceUpdate tests if processServiceUpdate will
+// TestConflictWhenProcessServiceCreateOrUpdate tests if processServiceCreateOrUpdate will
 // retry creating the load balancer when the update operation returns a conflict
 // error.
-func TestConflictWhenProcessServiceUpdate(t *testing.T) {
+func TestConflictWhenProcessServiceCreateOrUpdate(t *testing.T) {
 	svcName := "conflict-lb"
 	svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
 	controller, _, client := newController()
@@ -441,23 +627,22 @@ func TestConflictWhenProcessServiceUpdate(t *testing.T) {
 		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), svcName, errors.New("Object changed"))
 	})
 
-	svcCache := controller.cache.getOrCreate(svcName)
-	if err := controller.processServiceUpdate(svcCache, svc, svcName); err == nil {
-		t.Fatalf("controller.processServiceUpdate() = nil, want error")
+	if err := controller.processServiceCreateOrUpdate(svc, svcName); err == nil {
+		t.Fatalf("controller.processServiceCreateOrUpdate() = nil, want error")
 	}
 
-	retryMsg := "Error creating load balancer (will retry)"
+	errMsg := "Error syncing load balancer"
 	if gotEvent := func() bool {
 		events := controller.eventRecorder.(*record.FakeRecorder).Events
 		for len(events) > 0 {
 			e := <-events
-			if strings.Contains(e, retryMsg) {
+			if strings.Contains(e, errMsg) {
 				return true
 			}
 		}
 		return false
 	}(); !gotEvent {
-		t.Errorf("controller.processServiceUpdate() = can't find retry creating lb event, want event contains %q", retryMsg)
+		t.Errorf("controller.processServiceCreateOrUpdate() = can't find sync error event, want event contains %q", errMsg)
 	}
 }
 
@@ -620,7 +805,62 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 }
 
-func TestDoesExternalLoadBalancerNeedsUpdate(t *testing.T) {
+func TestNeedsCleanup(t *testing.T) {
+	testCases := []struct {
+		desc               string
+		svc                *v1.Service
+		expectNeedsCleanup bool
+	}{
+		{
+			desc:               "service without finalizer without timestamp",
+			svc:                &v1.Service{},
+			expectNeedsCleanup: false,
+		},
+		{
+			desc: "service without finalizer with timestamp",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+				},
+			},
+			expectNeedsCleanup: false,
+		},
+		{
+			desc: "service with finalizer without timestamp",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+			},
+			expectNeedsCleanup: false,
+		},
+		{
+			desc: "service with finalizer with timestamp",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					DeletionTimestamp: &metav1.Time{
+						Time: time.Now(),
+					},
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer, "unrelated"},
+				},
+			},
+			expectNeedsCleanup: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			if gotNeedsCleanup := needsCleanup(tc.svc); gotNeedsCleanup != tc.expectNeedsCleanup {
+				t.Errorf("needsCleanup() = %t, want %t", gotNeedsCleanup, tc.expectNeedsCleanup)
+			}
+		})
+	}
+
+}
+
+func TestNeedsUpdate(t *testing.T) {
 
 	var oldSvc, newSvc *v1.Service
 
@@ -859,5 +1099,213 @@ func TestNodeSlicesEqualForLB(t *testing.T) {
 	}
 	if nodeSlicesEqualForLB(nArray, mArray) {
 		t.Errorf("nodeSlicesEqualForLB() Expected=false Obtained=true")
+	}
+}
+
+// TODO(@MrHohn): Verify the end state when below issue is resolved:
+// https://github.com/kubernetes/client-go/issues/607
+func TestAddFinalizer(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		svc         *v1.Service
+		expectPatch bool
+	}{
+		{
+			desc: "no-op add finalizer",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-patch-finalizer",
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+			},
+			expectPatch: false,
+		},
+		{
+			desc: "add finalizer",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-patch-finalizer",
+				},
+			},
+			expectPatch: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := fake.NewSimpleClientset()
+			s := &ServiceController{
+				kubeClient: c,
+			}
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
+				t.Fatalf("Failed to prepare service for testing: %v", err)
+			}
+			if err := s.addFinalizer(tc.svc); err != nil {
+				t.Fatalf("addFinalizer() = %v, want nil", err)
+			}
+			patchActionFound := false
+			for _, action := range c.Actions() {
+				if action.Matches("patch", "services") {
+					patchActionFound = true
+				}
+			}
+			if patchActionFound != tc.expectPatch {
+				t.Errorf("Got patchActionFound = %t, want %t", patchActionFound, tc.expectPatch)
+			}
+		})
+	}
+}
+
+// TODO(@MrHohn): Verify the end state when below issue is resolved:
+// https://github.com/kubernetes/client-go/issues/607
+func TestRemoveFinalizer(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		svc         *v1.Service
+		expectPatch bool
+	}{
+		{
+			desc: "no-op remove finalizer",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-patch-finalizer",
+				},
+			},
+			expectPatch: false,
+		},
+		{
+			desc: "remove finalizer",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-patch-finalizer",
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+			},
+			expectPatch: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := fake.NewSimpleClientset()
+			s := &ServiceController{
+				kubeClient: c,
+			}
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
+				t.Fatalf("Failed to prepare service for testing: %v", err)
+			}
+			if err := s.removeFinalizer(tc.svc); err != nil {
+				t.Fatalf("removeFinalizer() = %v, want nil", err)
+			}
+			patchActionFound := false
+			for _, action := range c.Actions() {
+				if action.Matches("patch", "services") {
+					patchActionFound = true
+				}
+			}
+			if patchActionFound != tc.expectPatch {
+				t.Errorf("Got patchActionFound = %t, want %t", patchActionFound, tc.expectPatch)
+			}
+		})
+	}
+}
+
+// TODO(@MrHohn): Verify the end state when below issue is resolved:
+// https://github.com/kubernetes/client-go/issues/607
+func TestPatchStatus(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		svc         *v1.Service
+		newStatus   *v1.LoadBalancerStatus
+		expectPatch bool
+	}{
+		{
+			desc: "no-op add status",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-patch-status",
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{IP: "8.8.8.8"},
+						},
+					},
+				},
+			},
+			newStatus: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "8.8.8.8"},
+				},
+			},
+			expectPatch: false,
+		},
+		{
+			desc: "add status",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-patch-status",
+				},
+				Status: v1.ServiceStatus{},
+			},
+			newStatus: &v1.LoadBalancerStatus{
+				Ingress: []v1.LoadBalancerIngress{
+					{IP: "8.8.8.8"},
+				},
+			},
+			expectPatch: true,
+		},
+		{
+			desc: "no-op clear status",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-patch-status",
+				},
+				Status: v1.ServiceStatus{},
+			},
+			newStatus:   &v1.LoadBalancerStatus{},
+			expectPatch: false,
+		},
+		{
+			desc: "clear status",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-patch-status",
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{IP: "8.8.8.8"},
+						},
+					},
+				},
+			},
+			newStatus:   &v1.LoadBalancerStatus{},
+			expectPatch: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			c := fake.NewSimpleClientset()
+			s := &ServiceController{
+				kubeClient: c,
+			}
+			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
+				t.Fatalf("Failed to prepare service for testing: %v", err)
+			}
+			if err := s.patchStatus(tc.svc, &tc.svc.Status.LoadBalancer, tc.newStatus); err != nil {
+				t.Fatalf("patchStatus() = %v, want nil", err)
+			}
+			patchActionFound := false
+			for _, action := range c.Actions() {
+				if action.Matches("patch", "services") {
+					patchActionFound = true
+				}
+			}
+			if patchActionFound != tc.expectPatch {
+				t.Errorf("Got patchActionFound = %t, want %t", patchActionFound, tc.expectPatch)
+			}
+		})
 	}
 }

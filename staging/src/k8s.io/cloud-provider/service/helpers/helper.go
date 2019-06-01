@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -31,6 +31,11 @@ in order for in-tree cloud providers to not depend on internal packages.
 
 const (
 	defaultLoadBalancerSourceRanges = "0.0.0.0/0"
+
+	// LoadBalancerCleanupFinalizer is the finalizer added to load balancer
+	// services to ensure the Service resource is not fully deleted until
+	// the correlating load balancer resources are deleted.
+	LoadBalancerCleanupFinalizer = "service.kubernetes.io/load-balancer-cleanup"
 )
 
 // IsAllowAll checks whether the utilnet.IPNet allows traffic from 0.0.0.0/0
@@ -99,4 +104,14 @@ func NeedsHealthCheck(service *v1.Service) bool {
 		return false
 	}
 	return RequestsOnlyLocalTraffic(service)
+}
+
+// HasLBFinalizer checks if service contains LoadBalancerCleanupFinalizer.
+func HasLBFinalizer(service *v1.Service) bool {
+	for _, finalizer := range service.ObjectMeta.Finalizers {
+		if finalizer == LoadBalancerCleanupFinalizer {
+			return true
+		}
+	}
+	return false
 }
