@@ -184,21 +184,20 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 	r := c.restClient.Post().Context(ctx).Body(request).Do()
 	if err := r.Into(response); err != nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
-		return nil, fmt.Errorf("calling to conversion webhook failed for %s: %v", c.name, err)
+		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind(), err)
 	}
 
 	if response.Response == nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
-		return nil, fmt.Errorf("conversion webhook response was absent for %s", c.name)
+		return nil, fmt.Errorf("conversion webhook for %v lacked response", in.GetObjectKind())
 	}
 
 	if response.Response.Result.Status != v1.StatusSuccess {
-		// TODO return status message as error
-		return nil, fmt.Errorf("conversion request failed for %v, Response: %v", in.GetObjectKind(), response)
+		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind(), response.Response.Result.Message)
 	}
 
 	if len(response.Response.ConvertedObjects) != len(request.Request.Objects) {
-		return nil, fmt.Errorf("expected %v converted objects, got %v", len(request.Request.Objects), len(response.Response.ConvertedObjects))
+		return nil, fmt.Errorf("conversion webhook for %v returned %d objects, expected %d", in.GetObjectKind(), len(response.Response.ConvertedObjects), len(request.Request.Objects))
 	}
 
 	if isList {
@@ -215,25 +214,25 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 			}
 			converted, err := getRawExtensionObject(response.Response.ConvertedObjects[convertedIndex])
 			if err != nil {
-				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind(), convertedIndex, err)
 			}
 			convertedIndex++
 			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid groupVersion, expected=%v, got=%v", convertedIndex, expected, got)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid groupVersion, expected=%v, got=%v", in.GetObjectKind(), convertedIndex, expected, got)
 			}
 			if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid kind, expected=%v, got=%v", convertedIndex, expected, got)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid kind, expected=%v, got=%v", in.GetObjectKind(), convertedIndex, expected, got)
 			}
 			unstructConverted, ok := converted.(*unstructured.Unstructured)
 			if !ok {
 				// this should not happened
-				return nil, fmt.Errorf("invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", convertedIndex, converted)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", in.GetObjectKind(), convertedIndex, converted)
 			}
 			if err := validateConvertedObject(original, unstructConverted); err != nil {
-				return nil, fmt.Errorf("invalid converted object at index %v: %v", convertedIndex, err)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind(), convertedIndex, err)
 			}
 			if err := restoreObjectMeta(original, unstructConverted); err != nil {
-				return nil, fmt.Errorf("invalid metadata in object at index %v: %v", convertedIndex, err)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata in object at index %v: %v", in.GetObjectKind(), convertedIndex, err)
 			}
 			convertedList.Items[i] = *unstructConverted
 		}
@@ -243,33 +242,33 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 
 	if len(response.Response.ConvertedObjects) != 1 {
 		// This should not happened
-		return nil, fmt.Errorf("CR conversion failed")
+		return nil, fmt.Errorf("conversion webhook for %v failed", in.GetObjectKind())
 	}
 	converted, err := getRawExtensionObject(response.Response.ConvertedObjects[0])
 	if err != nil {
 		return nil, err
 	}
 	if e, a := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); e != a {
-		return nil, fmt.Errorf("invalid converted object: invalid groupVersion, e=%v, a=%v", e, a)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: invalid groupVersion, e=%v, a=%v", in.GetObjectKind(), e, a)
 	}
 	if e, a := in.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; e != a {
-		return nil, fmt.Errorf("invalid converted object: invalid kind, e=%v, a=%v", e, a)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: invalid kind, e=%v, a=%v", in.GetObjectKind(), e, a)
 	}
 	unstructConverted, ok := converted.(*unstructured.Unstructured)
 	if !ok {
 		// this should not happened
-		return nil, fmt.Errorf("CR conversion failed")
+		return nil, fmt.Errorf("conversion webhook for %v failed", in.GetObjectKind())
 	}
 	unstructIn, ok := in.(*unstructured.Unstructured)
 	if !ok {
 		// this should not happened
-		return nil, fmt.Errorf("CR conversion failed")
+		return nil, fmt.Errorf("conversion webhook for %v failed", in.GetObjectKind())
 	}
 	if err := validateConvertedObject(unstructIn, unstructConverted); err != nil {
-		return nil, fmt.Errorf("invalid converted object: %v", err)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: %v", in.GetObjectKind(), err)
 	}
 	if err := restoreObjectMeta(unstructIn, unstructConverted); err != nil {
-		return nil, fmt.Errorf("invalid metadata in converted object: %v", err)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata: %v", in.GetObjectKind(), err)
 	}
 	return converted, nil
 }
