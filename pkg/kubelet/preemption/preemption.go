@@ -50,6 +50,7 @@ type CriticalPodAdmissionHandler struct {
 
 var _ lifecycle.AdmissionFailureHandler = &CriticalPodAdmissionHandler{}
 
+// NewCriticalPodAdmissionHandler creates and initializes a new CriticalPodAdmissionHandler object.
 func NewCriticalPodAdmissionHandler(getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, recorder record.EventRecorder) *CriticalPodAdmissionHandler {
 	return &CriticalPodAdmissionHandler{
 		getPodsFunc: getPodsFunc,

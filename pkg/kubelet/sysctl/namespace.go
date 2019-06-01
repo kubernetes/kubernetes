@@ -24,13 +24,13 @@ import (
 type Namespace string
 
 const (
-	// the Linux IPC namespace
+	// IpcNamespace represents the Linux IPC namespace
 	IpcNamespace = Namespace("ipc")
 
-	// the network namespace
+	// NetNamespace represents the network namespace
 	NetNamespace = Namespace("net")
 
-	// the zero value if no namespace is known
+	// UnknownNamespace represents the zero value if no namespace is known
 	UnknownNamespace = Namespace("")
 )
 
