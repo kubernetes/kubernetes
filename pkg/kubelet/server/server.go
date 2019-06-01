@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/logs"
+	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -321,6 +322,7 @@ func (s *Server) InstallDefaultHandlers() {
 
 	// prober metrics are exposed under a different endpoint
 	p := prometheus.NewRegistry()
+	compbasemetrics.RegisterProcessStartTime(p)
 	p.MustRegister(prober.ProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
 		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
