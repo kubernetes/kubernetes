@@ -67,17 +67,34 @@ func TestExtractFileSpec(t *testing.T) {
 			expectedFile:      "/some/file",
 		},
 		{
+			spec:         "/::file-with-colon:",
+			expectedFile: "/::file-with-colon:",
+		},
+		{
+			spec:         ":file-with-leading-colon:",
+			expectedFile: ":file-with-leading-colon:",
+		},
+		{
+			spec:         "./::file-with-colon:",
+			expectedFile: "./::file-with-colon:",
+		},
+		{
+			spec:         "pod::",
+			expectedPod:  "pod",
+			expectedFile: ":",
+		},
+		{
 			spec:         "pod:/some/file",
 			expectedPod:  "pod",
 			expectedFile: "/some/file",
 		},
 		{
-			spec:         "/some/file",
-			expectedFile: "/some/file",
+			spec:         "file",
+			expectedFile: "file",
 		},
 		{
-			spec:      ":file:not:exist:in:local:filesystem",
-			expectErr: true,
+			spec:         "/some/file",
+			expectedFile: "/some/file",
 		},
 		{
 			spec:      "namespace/pod/invalid:/some/file",
@@ -90,24 +107,24 @@ func TestExtractFileSpec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		spec, err := extractFileSpec(test.spec)
-		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error")
-			continue
-		}
-		if err != nil && !test.expectErr {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		if spec.PodName != test.expectedPod {
-			t.Errorf("expected: %s, saw: %s", test.expectedPod, spec.PodName)
-		}
-		if spec.PodNamespace != test.expectedNamespace {
-			t.Errorf("expected: %s, saw: %s", test.expectedNamespace, spec.PodNamespace)
-		}
-		if spec.File != test.expectedFile {
-			t.Errorf("expected: %s, saw: %s", test.expectedFile, spec.File)
-		}
+		t.Run(test.spec, func(t *testing.T) {
+			spec, err := extractFileSpec(test.spec)
+			if test.expectErr && err == nil {
+				t.Errorf("unexpected non-error")
+			}
+			if err != nil && !test.expectErr {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if spec.PodName != test.expectedPod {
+				t.Errorf("expected podName: %s, saw: %s", test.expectedPod, spec.PodName)
+			}
+			if spec.PodNamespace != test.expectedNamespace {
+				t.Errorf("expected podNamespace: %s, saw: %s", test.expectedNamespace, spec.PodNamespace)
+			}
+			if spec.File != test.expectedFile {
+				t.Errorf("expected fileName: %s, saw: %s", test.expectedFile, spec.File)
+			}
+		})
 	}
 }
 

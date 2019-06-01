@@ -56,8 +56,17 @@ var (
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
+		# Copy /tmp/foo local file to working directory in a remote pod
+		kubectl cp /tmp/foo <some-pod>:
+
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
-		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
+		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar
+
+		# Local file names can be made explicit using absolute or relative
+		# pathnames, by starting file names with '/' or './', to avoid 'kubectl cp'
+		# treating file names containing ':' as pod specifiers.
+		kubectl cp ./file:name.txt pod1:folder/
+		`))
 
 	cpUsageStr = dedent.Dedent(`
 		expected 'cp <file-spec-src> <file-spec-dest> [-c container]'.
@@ -118,28 +127,37 @@ var (
 )
 
 func extractFileSpec(arg string) (fileSpec, error) {
-	if i := strings.Index(arg, ":"); i == -1 {
+	if len(arg) == 0 {
+		return fileSpec{}, errFileCannotBeEmpty
+	}
+	switch arg[0] {
+	case '.', '/', ':':
 		return fileSpec{File: arg}, nil
-	} else if i > 0 {
-		file := arg[i+1:]
-		pod := arg[:i]
-		pieces := strings.Split(pod, "/")
-		if len(pieces) == 1 {
-			return fileSpec{
-				PodName: pieces[0],
-				File:    file,
-			}, nil
-		}
-		if len(pieces) == 2 {
-			return fileSpec{
-				PodNamespace: pieces[0],
-				PodName:      pieces[1],
-				File:         file,
-			}, nil
-		}
 	}
 
-	return fileSpec{}, errFileSpecDoesntMatchFormat
+	i := strings.Index(arg, ":")
+	if i < 0 {
+		return fileSpec{File: arg}, nil
+	}
+	pod, file := arg[:i], arg[i+1:]
+	podPieces := strings.Split(pod, "/")
+
+	switch len(podPieces) {
+	case 1:
+		return fileSpec{
+			PodName: podPieces[0],
+			File:    file,
+		}, nil
+	case 2:
+		return fileSpec{
+			PodNamespace: podPieces[0],
+			PodName:      podPieces[1],
+			File:         file,
+		}, nil
+	default:
+		return fileSpec{}, errFileSpecDoesntMatchFormat
+	}
+
 }
 
 // Complete completes all the required options
