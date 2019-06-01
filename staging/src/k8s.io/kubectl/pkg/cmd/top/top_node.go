@@ -214,13 +214,13 @@ func (o TopNodeOptions) RunTopNode() error {
 		nodes = append(nodes, nodeList.Items...)
 	}
 
-	allocatable := make(map[string]v1.ResourceList)
+	capacity := make(map[string]v1.ResourceList)
 
 	for _, n := range nodes {
-		allocatable[n.Name] = n.Status.Allocatable
+		capacity[n.Name] = n.Status.Capacity
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders, o.SortBy)
+	return o.Printer.PrintNodeMetrics(metrics.Items, capacity, o.NoHeaders, o.SortBy)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
