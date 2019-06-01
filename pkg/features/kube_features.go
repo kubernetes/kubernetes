@@ -364,6 +364,7 @@ const (
 
 	// owner: @mtaufen
 	// alpha: v1.12
+	// beta:  v1.14
 	//
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
