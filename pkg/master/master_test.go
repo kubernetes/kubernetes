@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/apis/networking"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -37,22 +36,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -378,7 +375,6 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 
 // This test doesn't cover the apiregistration and apiextensions group, as they are installed by other apiservers.
 func TestStorageVersionHashes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionHash, true)()
 	master, etcdserver, _, _ := newMaster(t)
 	defer etcdserver.Terminate(t)
 
@@ -423,7 +419,6 @@ func TestStorageVersionHashes(t *testing.T) {
 }
 
 func TestStorageVersionHashEqualities(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionHash, true)()
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
