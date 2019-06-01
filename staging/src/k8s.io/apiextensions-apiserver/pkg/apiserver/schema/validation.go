@@ -17,7 +17,9 @@ limitations under the License.
 package schema
 
 import (
+	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -225,6 +227,12 @@ func validateValueValidation(v *ValueValidation, skipAnyOf, skipFirstAllOfAnyOf 
 	}
 
 	allErrs = append(allErrs, validateNestedValueValidation(v.Not, false, false, lvl, fldPath.Child("not"))...)
+
+	if len(v.Pattern) > 0 {
+		if _, err := regexp.Compile(v.Pattern); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("pattern"), v.Pattern, fmt.Sprintf("must be a valid regular expression, but isn't: %v", err)))
+		}
+	}
 
 	return allErrs
 }

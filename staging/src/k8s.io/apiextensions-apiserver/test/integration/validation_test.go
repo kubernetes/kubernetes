@@ -871,6 +871,19 @@ oneOf:
 			},
 		},
 		{
+			desc: "invalid regex pattern",
+			globalSchema: `
+type: object
+properties:
+  foo:
+    type: string
+    pattern: "+"
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[foo].pattern: Invalid value: \"+\": must be a valid regular expression, but isn't: error parsing regexp: missing argument to repetition operator: `+`",
+			},
+		},
+		{
 			desc: "forbidden vendor extensions in nested value validation",
 			globalSchema: `
 type: object
