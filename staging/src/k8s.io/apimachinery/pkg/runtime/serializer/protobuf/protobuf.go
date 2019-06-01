@@ -69,8 +69,6 @@ func IsNotMarshalable(err error) bool {
 // NewSerializer creates a Protobuf serializer that handles encoding versioned objects into the proper wire form. If a typer
 // is passed, the encoded object will have group, version, and kind fields set. If typer is nil, the objects will be written
 // as-is (any type info passed with the object will be used).
-//
-// This encoding scheme is experimental, and is subject to change at any time.
 func NewSerializer(creater runtime.ObjectCreater, typer runtime.ObjectTyper) *Serializer {
 	return &Serializer{
 		prefix:  protoEncodingPrefix,

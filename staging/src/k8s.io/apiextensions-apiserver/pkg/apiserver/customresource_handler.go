@@ -53,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -628,21 +629,32 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 
+		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
+		negotiatedSerializer := unstructuredNegotiatedSerializer{
+			typer:                 typer,
+			creator:               creator,
+			converter:             safeConverter,
+			structuralSchemas:     structuralSchemas,
+			structuralSchemaGK:    kind.GroupKind(),
+			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
+		}
+		var standardSerializers []runtime.SerializerInfo
+		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
+			if s.MediaType == runtime.ContentTypeProtobuf {
+				continue
+			}
+			standardSerializers = append(standardSerializers, s)
+		}
+
 		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
 				SelfLinker:         meta.NewAccessor(),
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer: unstructuredNegotiatedSerializer{
-				typer:                 typer,
-				creator:               creator,
-				converter:             safeConverter,
-				structuralSchemas:     structuralSchemas,
-				structuralSchemaGK:    kind.GroupKind(),
-				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
-			},
-			ParameterCodec: parameterCodec,
+			Serializer:          negotiatedSerializer,
+			ParameterCodec:      parameterCodec,
+			StandardSerializers: standardSerializers,
 
 			Creater:         creator,
 			Convertor:       safeConverter,
@@ -762,6 +774,16 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 			MediaTypeSubType: "yaml",
 			EncodesAsText:    true,
 			Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
+		},
+		{
+			MediaType:        "application/vnd.kubernetes.protobuf",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "vnd.kubernetes.protobuf",
+			Serializer:       protobuf.NewSerializer(s.creator, s.typer),
+			StreamSerializer: &runtime.StreamSerializerInfo{
+				Serializer: protobuf.NewRawSerializer(s.creator, s.typer),
+				Framer:     protobuf.LengthDelimitedFramer,
+			},
 		},
 	}
 }
