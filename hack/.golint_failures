@@ -45,6 +45,9 @@ pkg/apis/rbac/v1
 pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
+pkg/apis/scheduling/v1
+pkg/apis/scheduling/v1alpha1
+pkg/apis/scheduling/v1beta1
 pkg/apis/storage
 pkg/apis/storage/v1
 pkg/apis/storage/v1beta1
@@ -167,6 +170,7 @@ pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
+pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/prober
@@ -180,7 +184,6 @@ pkg/kubelet/status
 pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
-pkg/kubelet/util/pluginwatcher
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration

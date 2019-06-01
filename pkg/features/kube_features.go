@@ -395,6 +395,7 @@ const (
 
 	// owner: @dashpole
 	// alpha: v1.13
+	// beta: v1.15
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources featuregate.Feature = "KubeletPodResources"
@@ -452,6 +453,25 @@ const (
 	//
 	// Enables the regional PD feature on GCE.
 	deprecatedGCERegionalPersistentDisk featuregate.Feature = "GCERegionalPersistentDisk"
+
+	// owner: @RobertKrawitz
+	// alpha: v1.15
+	//
+	// Allow use of filesystems for ephemeral storage monitoring.
+	// Only applies if LocalStorageCapacityIsolation is set.
+	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
+
+	// owner: @denkensk
+	// alpha: v1.15
+	//
+	// Enables NonPreempting option for priorityClass and pod.
+	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
+
+	// owner: @j-griffith
+	// alpha: v1.15
+	//
+	// Enable support for specifying an existing PVC as a DataSource
+	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
 )
 
 func init() {
@@ -526,8 +546,11 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: featuregate.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
-	KubeletPodResources:                         {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResources:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
+	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
+	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

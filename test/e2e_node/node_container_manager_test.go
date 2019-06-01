@@ -60,7 +60,7 @@ func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) 
 var _ = framework.KubeDescribe("Node Container Manager [Serial]", func() {
 	f := framework.NewDefaultFramework("node-container-manager")
 	Describe("Validate Node Allocatable [NodeFeature:NodeAllocatable]", func() {
-		It("set's up the node and runs the test", func() {
+		It("sets up the node and runs the test", func() {
 			framework.ExpectNoError(runTest(f))
 		})
 	})

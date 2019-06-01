@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pluginwatcher
+package cache
 
 // PluginHandler is an interface a client of the pluginwatcher API needs to implement in
 // order to consume plugins
@@ -44,7 +44,6 @@ package pluginwatcher
 //      registers at foo.com/foo-1.9.9
 //
 // DeRegistration: When ReRegistration happens only the deletion of the new socket will trigger a DeRegister call
-
 type PluginHandler interface {
 	// Validate returns an error if the information provided by
 	// the potential plugin is erroneous (unsupported version, ...)

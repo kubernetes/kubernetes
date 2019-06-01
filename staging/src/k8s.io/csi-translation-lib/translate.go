@@ -47,6 +47,21 @@ func TranslateInTreeStorageClassToCSI(inTreePluginName string, sc *storage.Stora
 	return nil, fmt.Errorf("could not find in-tree storage class parameter translation logic for %#v", inTreePluginName)
 }
 
+// TranslateInTreeInlineVolumeToCSI takes a inline volume and will translate
+// the in-tree volume source to a CSIPersistentVolumeSource (wrapped in a PV)
+// if the translation logic has been implemented.
+func TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+	if volume == nil {
+		return nil, fmt.Errorf("persistent volume was nil")
+	}
+	for _, curPlugin := range inTreePlugins {
+		if curPlugin.CanSupportInline(volume) {
+			return curPlugin.TranslateInTreeInlineVolumeToCSI(volume)
+		}
+	}
+	return nil, fmt.Errorf("could not find in-tree plugin translation logic for %#v", volume.Name)
+}
+
 // TranslateInTreePVToCSI takes a persistent volume and will translate
 // the in-tree source to a CSI Source if the translation logic
 // has been implemented. The input persistent volume will not
@@ -149,5 +164,10 @@ func IsPVMigratable(pv *v1.PersistentVolume) bool {
 
 // IsInlineMigratable tests whether there is Migration logic for the given Inline Volume
 func IsInlineMigratable(vol *v1.Volume) bool {
+	for _, curPlugin := range inTreePlugins {
+		if curPlugin.CanSupportInline(vol) {
+			return true
+		}
+	}
 	return false
 }

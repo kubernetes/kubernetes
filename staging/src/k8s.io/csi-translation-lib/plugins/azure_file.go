@@ -53,6 +53,34 @@ func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 	return sc, nil
 }
 
+// TranslateInTreeInlineVolumeToCSI takes a Volume with AzureFile set from in-tree
+// and converts the AzureFile source to a CSIPersistentVolumeSource
+func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+	if volume == nil || volume.AzureFile == nil {
+		return nil, fmt.Errorf("volume is nil or AWS EBS not defined on volume")
+	}
+
+	azureSource := volume.AzureFile
+
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", azureSource.SecretName, azureSource.ShareName),
+					ReadOnly:         azureSource.ReadOnly,
+					VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
+					NodePublishSecretRef: &v1.SecretReference{
+						Name:      azureSource.ShareName,
+						Namespace: "default",
+					},
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+		},
+	}
+	return pv, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with AzureFile set from in-tree
 // and converts the AzureFile source to a CSIPersistentVolumeSource
 func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
@@ -124,6 +152,13 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 // const.
 func (t *azureFileCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.AzureFile != nil
+}
+
+// CanSupportInline tests whether the plugin supports a given inline volume
+// specification from the API.  The spec pointer should be considered
+// const.
+func (t *azureFileCSITranslator) CanSupportInline(volume *v1.Volume) bool {
+	return volume != nil && volume.AzureFile != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver

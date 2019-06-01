@@ -379,6 +379,12 @@ func dropDisabledFields(
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
+		!podPriorityInUse(oldPodSpec) {
+		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
+		// does not specify any values for these fields.
+		podSpec.PreemptionPolicy = nil
+	}
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related

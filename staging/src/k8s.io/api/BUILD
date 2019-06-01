@@ -24,6 +24,8 @@ go_test(
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
+        "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",

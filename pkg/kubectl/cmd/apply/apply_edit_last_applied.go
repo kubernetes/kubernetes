@@ -55,6 +55,7 @@ var (
 		kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
+// NewCmdApplyEditLastApplied created the cobra CLI command for the `apply edit-last-applied` command.
 func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 

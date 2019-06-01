@@ -11,7 +11,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/node/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/node:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -38,7 +40,9 @@ go_test(
     srcs = ["conversion_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/node:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

@@ -58,6 +58,39 @@ func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 	return sc, nil
 }
 
+// TranslateInTreeInlineVolumeToCSI takes a Volume with AzureDisk set from in-tree
+// and converts the AzureDisk source to a CSIPersistentVolumeSource
+func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+	if volume == nil || volume.AzureDisk == nil {
+		return nil, fmt.Errorf("volume is nil or Azure Disk not defined on volume")
+	}
+
+	azureSource := volume.AzureDisk
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           AzureDiskDriverName,
+					VolumeHandle:     azureSource.DataDiskURI,
+					ReadOnly:         *azureSource.ReadOnly,
+					FSType:           *azureSource.FSType,
+					VolumeAttributes: map[string]string{},
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+	}
+
+	if *azureSource.CachingMode != "" {
+		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
+	}
+	if *azureSource.FSType != "" {
+		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
+	}
+
+	return pv, nil
+}
+
 // TranslateInTreePVToCSI takes a PV with AzureDisk set from in-tree
 // and converts the AzureDisk source to a CSIPersistentVolumeSource
 func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
@@ -135,6 +168,13 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 // const.
 func (t *azureDiskCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.AzureDisk != nil
+}
+
+// CanSupportInline tests whether the plugin supports a given inline volume
+// specification from the API.  The spec pointer should be considered
+// const.
+func (t *azureDiskCSITranslator) CanSupportInline(volume *v1.Volume) bool {
+	return volume != nil && volume.AzureDisk != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver

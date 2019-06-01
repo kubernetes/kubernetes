@@ -22,11 +22,11 @@ import (
 	"sort"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"github.com/google/gofuzz"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	roundtrip "k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -146,6 +146,10 @@ func TestDefaulting(t *testing.T) {
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSIDriverList"}:                                    {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                          {},
 		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                      {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "VolumeAttachment"}:                                      {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "VolumeAttachmentList"}:                                  {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "VolumeAttachment"}:                                 {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "VolumeAttachmentList"}:                             {},
 		{Group: "authentication.k8s.io", Version: "v1", Kind: "TokenRequest"}:                                   {},
 	}
 

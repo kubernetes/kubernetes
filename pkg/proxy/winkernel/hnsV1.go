@@ -33,7 +33,7 @@ type HostNetworkService interface {
 	getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error)
 	createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error)
 	deleteEndpoint(hnsID string) error
-	getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
+	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
 }
 
@@ -148,13 +148,13 @@ func (hns hnsV1) deleteEndpoint(hnsID string) error {
 	return err
 }
 
-func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	plists, err := hcsshim.HNSListPolicyListRequest()
 	if err != nil {
 		return nil, err
 	}
 
-	if isDSR {
+	if flags.isDSR {
 		klog.V(3).Info("DSR is not supported in V1. Using non DSR instead")
 	}
 
@@ -167,7 +167,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 		if err = json.Unmarshal(plist.Policies[0], &elbPolicy); err != nil {
 			continue
 		}
-		if elbPolicy.Protocol == protocol && elbPolicy.InternalPort == internalPort && elbPolicy.ExternalPort == externalPort && elbPolicy.ILB == isILB {
+		if elbPolicy.Protocol == protocol && elbPolicy.InternalPort == internalPort && elbPolicy.ExternalPort == externalPort && elbPolicy.ILB == flags.isILB {
 			if len(vip) > 0 {
 				if len(elbPolicy.VIPs) == 0 || elbPolicy.VIPs[0] != vip {
 					continue
@@ -190,7 +190,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 	}
 	lb, err := hcsshim.AddLoadBalancer(
 		hnsEndpoints,
-		isILB,
+		flags.isILB,
 		sourceVip,
 		vip,
 		protocol,

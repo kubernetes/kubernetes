@@ -40,6 +40,7 @@ import (
 type TopNodeOptions struct {
 	ResourceName    string
 	Selector        string
+	SortBy          string
 	NoHeaders       bool
 	NodeClient      corev1client.CoreV1Interface
 	HeapsterOptions HeapsterTopOptions
@@ -113,6 +114,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 		Aliases: []string{"nodes", "no"},
 	}
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
 
 	o.HeapsterOptions.Bind(cmd.Flags())
@@ -150,6 +152,11 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 }
 
 func (o *TopNodeOptions) Validate() error {
+	if len(o.SortBy) > 0 {
+		if o.SortBy != sortByCPU && o.SortBy != sortByMemory {
+			return errors.New("--sort-by accepts only cpu or memory")
+		}
+	}
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
 	}
@@ -213,7 +220,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		allocatable[n.Name] = n.Status.Allocatable
 	}
 
-	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders)
+	return o.Printer.PrintNodeMetrics(metrics.Items, allocatable, o.NoHeaders, o.SortBy)
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {

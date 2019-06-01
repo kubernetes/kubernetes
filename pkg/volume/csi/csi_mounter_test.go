@@ -203,8 +203,10 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			}
 
 			// Mounter.SetUp()
+			var mounterArgs volume.MounterArgs
 			fsGroup := int64(2000)
-			if err := csiMounter.SetUp(&fsGroup); err != nil {
+			mounterArgs.FsGroup = &fsGroup
+			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -344,7 +346,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(nil); err != nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -475,7 +477,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(nil); err != nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -621,12 +623,14 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		}
 
 		// Mounter.SetUp()
+		var mounterArgs volume.MounterArgs
 		var fsGroupPtr *int64
 		if tc.setFsGroup {
 			fsGroup := tc.fsGroup
 			fsGroupPtr = &fsGroup
 		}
-		if err := csiMounter.SetUp(fsGroupPtr); err != nil {
+		mounterArgs.FsGroup = fsGroupPtr
+		if err := csiMounter.SetUp(mounterArgs); err != nil {
 			t.Fatalf("mounter.Setup failed: %v", err)
 		}
 

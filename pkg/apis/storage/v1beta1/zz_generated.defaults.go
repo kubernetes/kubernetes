@@ -23,6 +23,7 @@ package v1beta1
 import (
 	v1beta1 "k8s.io/api/storage/v1beta1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -33,6 +34,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&v1beta1.CSIDriverList{}, func(obj interface{}) { SetObjectDefaults_CSIDriverList(obj.(*v1beta1.CSIDriverList)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.StorageClass{}, func(obj interface{}) { SetObjectDefaults_StorageClass(obj.(*v1beta1.StorageClass)) })
 	scheme.AddTypeDefaultingFunc(&v1beta1.StorageClassList{}, func(obj interface{}) { SetObjectDefaults_StorageClassList(obj.(*v1beta1.StorageClassList)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.VolumeAttachment{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachment(obj.(*v1beta1.VolumeAttachment)) })
+	scheme.AddTypeDefaultingFunc(&v1beta1.VolumeAttachmentList{}, func(obj interface{}) { SetObjectDefaults_VolumeAttachmentList(obj.(*v1beta1.VolumeAttachmentList)) })
 	return nil
 }
 
@@ -55,5 +58,33 @@ func SetObjectDefaults_StorageClassList(in *v1beta1.StorageClassList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_StorageClass(a)
+	}
+}
+
+func SetObjectDefaults_VolumeAttachment(in *v1beta1.VolumeAttachment) {
+	if in.Spec.Source.InlineVolumeSpec != nil {
+		v1.SetDefaults_ResourceList(&in.Spec.Source.InlineVolumeSpec.Capacity)
+		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.HostPath)
+		}
+		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD != nil {
+			v1.SetDefaults_RBDPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.RBD)
+		}
+		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI != nil {
+			v1.SetDefaults_ISCSIPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ISCSI)
+		}
+		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk != nil {
+			v1.SetDefaults_AzureDiskVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.AzureDisk)
+		}
+		if in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO != nil {
+			v1.SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.Source.InlineVolumeSpec.PersistentVolumeSource.ScaleIO)
+		}
+	}
+}
+
+func SetObjectDefaults_VolumeAttachmentList(in *v1beta1.VolumeAttachmentList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_VolumeAttachment(a)
 	}
 }
