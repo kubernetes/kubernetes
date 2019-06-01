@@ -106,24 +106,28 @@ func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
 	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
 
 	opFunc := func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil
 	}
-	return opFunc
+	return generatedOperations{
+		operationFunc: opFunc,
+	}
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnregisterPluginFunc(
 	socketPath string,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
 	opFunc := func() error {
 		startOperationAndBlock(fopg.ch, fopg.quit)
 		return nil
 	}
-	return opFunc
+	return generatedOperations{
+		operationFunc: opFunc,
+	}
 }
 
 func isOperationRunSerially(ch <-chan interface{}, quit chan<- interface{}) bool {

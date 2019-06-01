@@ -62,13 +62,13 @@ type OperationGenerator interface {
 		foundInDeprecatedDir bool,
 		timestamp time.Time,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations
 
 	// Generates the UnregisterPlugin function needed to perform the unregistration of a plugin
 	GenerateUnregisterPluginFunc(
 		socketPath string,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations
 }
 
 func (og *operationGenerator) GenerateRegisterPluginFunc(
@@ -76,7 +76,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
 
 	registerPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
@@ -127,13 +127,18 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		}
 		return nil
 	}
-	return registerPluginFunc
+
+	return generatedOperations{
+		operationName: "register_plugin",
+		operationFunc: registerPluginFunc,
+		completeFunc:  operationCompleteHook(socketPath, "register_plugin"),
+	}
 }
 
 func (og *operationGenerator) GenerateUnregisterPluginFunc(
 	socketPath string,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
 
 	unregisterPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
@@ -162,7 +167,12 @@ func (og *operationGenerator) GenerateUnregisterPluginFunc(
 		handler.DeRegisterPlugin(infoResp.Name)
 		return nil
 	}
-	return unregisterPluginFunc
+
+	return generatedOperations{
+		operationName: "unregister_plugin",
+		operationFunc: unregisterPluginFunc,
+		completeFunc:  operationCompleteHook(socketPath, "unregister_plugin"),
+	}
 }
 
 func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient, registered bool, errStr string) error {
@@ -185,7 +195,7 @@ func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient
 	return nil
 }
 
-// Dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
+// dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
 func dial(unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

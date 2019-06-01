@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
 )
 
 // OperationExecutor defines a set of operations for registering and unregistering
@@ -57,7 +56,7 @@ func NewOperationExecutor(
 	operationGenerator OperationGenerator) OperationExecutor {
 
 	return &operationExecutor{
-		pendingOperations:  goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
+		pendingOperations:  newNestedPendingOperations(true /* exponentialBackOffOnError */),
 		operationGenerator: operationGenerator,
 	}
 }
@@ -79,7 +78,7 @@ type ActualStateOfWorldUpdater interface {
 type operationExecutor struct {
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
-	pendingOperations goroutinemap.GoRoutineMap
+	pendingOperations *nestedPendingOperations
 
 	// operationGenerator is an interface that provides implementations for
 	// generating volume function
