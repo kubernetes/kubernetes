@@ -88,7 +88,7 @@ filegroup(
         "//pkg/volume/flexvolume:all-srcs",
         "//pkg/volume/flocker:all-srcs",
         "//pkg/volume/gcepd:all-srcs",
-        "//pkg/volume/git_repo:all-srcs",
+        "//pkg/volume/gitrepo:all-srcs",
         "//pkg/volume/glusterfs:all-srcs",
         "//pkg/volume/hostpath:all-srcs",
         "//pkg/volume/iscsi:all-srcs",

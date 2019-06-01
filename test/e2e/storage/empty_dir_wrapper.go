@@ -38,7 +38,7 @@ const (
 	// If you make them too low, you'll get flaky
 	// tests instead of failing ones if the race bug reappears.
 	// If you make volume counts or pod counts too high,
-	// the tests may fail because mounting configmap/git_repo
+	// the tests may fail because mounting configmap/gitrepo
 	// volumes is not very fast and the tests may time out
 	// waiting for pods to become Running.
 	// And of course the higher are the numbers, the
@@ -194,7 +194,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 	// This test uses deprecated GitRepo VolumeSource so it MUST not be promoted to Conformance.
 	// To provision a container with a git repo, mount an EmptyDir into an InitContainer that clones the repo using git, then mount the EmptyDir into the Pod’s container.
 	// This projected volume maps approach can also be tested with secrets and downwardapi VolumeSource but are less prone to the race problem.
-	ginkgo.It("should not cause race condition when used for git_repo [Serial] [Slow]", func() {
+	ginkgo.It("should not cause race condition when used for gitrepo [Serial] [Slow]", func() {
 		gitURL, gitRepo, cleanup := createGitServer(f)
 		defer cleanup()
 		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)
