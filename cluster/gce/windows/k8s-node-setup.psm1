@@ -230,11 +230,6 @@ function Set-EnvironmentVars {
 # Configures various settings and prerequisites needed for the rest of the
 # functions in this module and the Kubernetes binaries to operate properly.
 function Set-PrerequisiteOptions {
-  # The Windows firewall interferes with Kubernetes networking; GCE's firewall
-  # should be sufficient.
-  Log-Output "Disabling Windows Firewall"
-  Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
-
   # Windows updates cause the node to reboot at arbitrary times.
   Log-Output "Disabling Windows Update service"
   sc.exe config wuauserv start=disabled
