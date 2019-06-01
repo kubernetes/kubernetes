@@ -27,7 +27,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
+func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1beta1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1beta1.Ignore
 		obj.FailurePolicy = &policy
@@ -40,6 +40,10 @@ func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
 		selector := metav1.LabelSelector{}
 		obj.NamespaceSelector = &selector
 	}
+	if obj.ObjectSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.ObjectSelector = &selector
+	}
 	if obj.SideEffects == nil {
 		// TODO: revisit/remove this default and possibly make the field required when promoting to v1
 		unknown := admissionregistrationv1beta1.SideEffectClassUnknown
@@ -48,6 +52,42 @@ func SetDefaults_Webhook(obj *admissionregistrationv1beta1.Webhook) {
 	if obj.TimeoutSeconds == nil {
 		obj.TimeoutSeconds = new(int32)
 		*obj.TimeoutSeconds = 30
+	}
+
+	if len(obj.AdmissionReviewVersions) == 0 {
+		obj.AdmissionReviewVersions = []string{admissionregistrationv1beta1.SchemeGroupVersion.Version}
+	}
+}
+
+func SetDefaults_MutatingWebhook(obj *admissionregistrationv1beta1.MutatingWebhook) {
+	if obj.FailurePolicy == nil {
+		policy := admissionregistrationv1beta1.Ignore
+		obj.FailurePolicy = &policy
+	}
+	if obj.MatchPolicy == nil {
+		policy := admissionregistrationv1beta1.Exact
+		obj.MatchPolicy = &policy
+	}
+	if obj.NamespaceSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.NamespaceSelector = &selector
+	}
+	if obj.ObjectSelector == nil {
+		selector := metav1.LabelSelector{}
+		obj.ObjectSelector = &selector
+	}
+	if obj.SideEffects == nil {
+		// TODO: revisit/remove this default and possibly make the field required when promoting to v1
+		unknown := admissionregistrationv1beta1.SideEffectClassUnknown
+		obj.SideEffects = &unknown
+	}
+	if obj.TimeoutSeconds == nil {
+		obj.TimeoutSeconds = new(int32)
+		*obj.TimeoutSeconds = 30
+	}
+	if obj.ReinvocationPolicy == nil {
+		never := admissionregistrationv1beta1.NeverReinvocationPolicy
+		obj.ReinvocationPolicy = &never
 	}
 
 	if len(obj.AdmissionReviewVersions) == 0 {
