@@ -405,6 +405,9 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 	if err := proto.Unmarshal(data, pb); err != nil {
 		return nil, actual, err
 	}
+	if actual != nil {
+		obj.GetObjectKind().SetGroupVersionKind(*actual)
+	}
 	return obj, actual, nil
 }
 
