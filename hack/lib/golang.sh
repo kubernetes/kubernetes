@@ -857,3 +857,55 @@ kube::golang::build_binaries() {
     fi
   )
 }
+
+# glog flags
+readonly GLOG_FLAGS=(
+  logtostderr
+  alsologtostderr
+  stderrthreshold
+  log_dir
+  log_backtrace_at
+  v
+  vmodule
+)
+
+# Arguments: a list of flags that indicate the log level, either in glog style or shell
+# style, eg, 1) -v=3; 2) -logtostderr=false -d -log_dir=.
+# It helps the go command(eg, go test t.go) run in shell have the ability to set its glog
+# flags that pass from shell arguments.
+# It parse the input and return a set of flags that can be consumed by glog. If the
+# flag is empty, return "-v=0 -logtostderr=false -log_dir=.", if the flag is glog style,
+# append it to result, if the flag is shell style(-v for verbose and -d for debug), append
+# V value to result. No conflict check now.
+kube::golang::glog_flags() {
+  result=""
+  remains=$@
+  if [ $# -eq 0 ]; then
+    echo "-v=0 -logtostderr=false -log_dir=."
+    return
+  fi
+
+  for arg in "$@"; do
+    flag=${arg%%"="*}
+    for g in ${GLOG_FLAGS[@]}; do
+      if [ $flag == "-"$g ]; then
+        result="${result} $arg"
+        remains=${remains[@]/$arg}
+        continue
+      fi
+    done
+  done
+
+  for remain in ${remains[@]}; do
+    if [ ${remain} == "-v" ]; then
+      result="${result} -v=3"
+    fi
+    if [ ${remain} == "-d" ]; then
+      result="${result} -v=6"
+    fi
+  done
+  if [ ${result} == "" ]; then
+    result="-v=0 -logtostderr=false -log_dir=."
+  fi
+  echo $result
+}

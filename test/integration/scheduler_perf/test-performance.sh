@@ -22,6 +22,8 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../../
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
+glog_flags=$(kube::golang::glog_flags "$@")
+echo $glog_flags
 
 DIR_BASENAME=$(dirname "${BASH_SOURCE[0]}")
 pushd "${DIR_BASENAME}"
@@ -43,10 +45,10 @@ if ${RUN_BENCHMARK:-false}; then
   go test -c -o "perf.test"
 
   kube::log::status "performance test (benchmark) start"
-  "./perf.test" -test.bench=. -test.run=xxxx -test.cpuprofile=prof.out -test.short=false -v=0 -logtostderr=false
+  "./perf.test" $glog_flags -test.bench=. -test.run=xxxx -test.cpuprofile=prof.out -test.short=false
   kube::log::status "...benchmark tests finished"
 fi
 # Running density tests. It might take a long time.
 kube::log::status "performance test (density) start"
-go test -test.run=. -test.timeout=60m -test.short=false -v=0 -logtostderr=false
+go test $glog_flags -test.run=. -test.timeout=60m -test.short=false
 kube::log::status "...density tests finished"
