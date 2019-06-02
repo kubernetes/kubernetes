@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -272,4 +273,37 @@ func TestPatchWithMissingObject(t *testing.T) {
 	assert.True(t, handled)
 	assert.Nil(t, node)
 	assert.EqualError(t, err, `nodes "node-1" not found`)
+}
+
+func TestPatchUnstructuredObject(t *testing.T) {
+	testResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "Secret"}
+	testObj := getArbitraryResource(testResource, "test_name", "test_namespace")
+	accessor, err := meta.Accessor(testObj)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ns := accessor.GetNamespace()
+
+	scheme := runtime.NewScheme()
+
+	v1.SchemeBuilder.AddToScheme(scheme)
+	codecs := serializer.NewCodecFactory(scheme)
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	reaction := ObjectReaction(o)
+
+	if err = o.Create(testResource, testObj, ns); err != nil {
+		t.Errorf("test resource creation failed: %v", err)
+	}
+
+	action := NewPatchAction(testResource, ns, "test_name", types.StrategicMergePatchType, []byte(`{"data":{"key":"a2V5Cg=="}}`))
+	handled, node, err := reaction(action)
+	assert.True(t, handled)
+	assert.NotNil(t, node)
+	assert.Nil(t, err)
+
+	action = NewPatchAction(testResource, ns, "test_name", types.StrategicMergePatchType, []byte(`{"data":{"key":"dmFsdWV2YWx1ZQo="}}`))
+	handled, node, err = reaction(action)
+	assert.True(t, handled)
+	assert.NotNil(t, node)
+	assert.Nil(t, err)
 }

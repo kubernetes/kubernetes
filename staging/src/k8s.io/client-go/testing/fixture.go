@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -366,6 +367,19 @@ func (t *tracker) add(gvr schema.GroupVersionResource, obj runtime.Object, ns st
 	// after it's been added to the tracker, we always store the deep
 	// copy.
 	obj = obj.DeepCopyObject()
+
+	if unstruct, ok := obj.(*unstructured.Unstructured); ok {
+		// Make a best-effort to translate the provided Unstructured object to a concrete type. If successful, then
+		// strategic patches will work on this instance, otherwise they will fail.
+		kinds, _, err := t.scheme.ObjectKinds(obj)
+		if err == nil && len(kinds) > 0 {
+			if newObj, err := t.scheme.New(kinds[0]); err == nil {
+				if err = runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, newObj); err == nil {
+					obj = newObj
+				}
+			}
+		}
+	}
 
 	newMeta, err := meta.Accessor(obj)
 	if err != nil {
