@@ -540,16 +540,19 @@ func (p *PriorityQueue) MoveAllToActiveQueue() {
 func (p *PriorityQueue) movePodsToActiveQueue(podInfoList []*framework.PodInfo) {
 	for _, pInfo := range podInfoList {
 		pod := pInfo.Pod
+		var err error
 		if p.isPodBackingOff(pod) {
-			if err := p.podBackoffQ.Add(pInfo); err != nil {
+			if err = p.podBackoffQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
 			}
 		} else {
-			if err := p.activeQ.Add(pInfo); err != nil {
+			if err = p.activeQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
 			}
 		}
-		p.unschedulableQ.delete(pod)
+		if err == nil {
+			p.unschedulableQ.delete(pod)
+		}
 	}
 	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
