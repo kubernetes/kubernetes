@@ -211,7 +211,6 @@ func TestEnsureProxyAddon(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:10256",
 				MetricsBindAddress: "127.0.0.1:10249",
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
