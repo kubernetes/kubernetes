@@ -92,6 +92,10 @@ func getItemsPtr(list runtime.Object) (interface{}, error) {
 		return nil, err
 	}
 
+	// v.FieldByName would panic if v.Kind() is not Struct
+	if v.Kind() != reflect.Struct {
+		return nil, errExpectFieldItems
+	}
 	items := v.FieldByName("Items")
 	if !items.IsValid() {
 		return nil, errExpectFieldItems
