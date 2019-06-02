@@ -356,7 +356,7 @@ func TestUpdateAnnotations(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		options := &AnnotateOptions{
+		options := &Options{
 			overwrite:         test.overwrite,
 			newAnnotations:    test.annotations,
 			removeAnnotations: test.remove,
@@ -430,7 +430,7 @@ func TestAnnotateErrors(t *testing.T) {
 			for k, v := range testCase.flags {
 				cmd.Flags().Set(k, v)
 			}
-			options := NewAnnotateOptions(iostreams)
+			options := NewOptions(iostreams)
 			err := options.Complete(tf, cmd, testCase.args)
 			if err == nil {
 				err = options.Validate()
@@ -489,7 +489,7 @@ func TestAnnotateObject(t *testing.T) {
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(bufOut)
-	options := NewAnnotateOptions(iostreams)
+	options := NewOptions(iostreams)
 	args := []string{"pods/foo", "a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -542,7 +542,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	iostreams, _, bufOut, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(bufOut)
-	options := NewAnnotateOptions(iostreams)
+	options := NewOptions(iostreams)
 	options.Filenames = []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
@@ -572,7 +572,7 @@ func TestAnnotateLocal(t *testing.T) {
 
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
-	options := NewAnnotateOptions(iostreams)
+	options := NewOptions(iostreams)
 	options.local = true
 	options.Filenames = []string{"../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml"}
 	args := []string{"a=b"}
@@ -628,7 +628,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	iostreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdAnnotate("kubectl", tf, iostreams)
 	cmd.SetOutput(iostreams.Out)
-	options := NewAnnotateOptions(iostreams)
+	options := NewOptions(iostreams)
 	options.all = true
 	args := []string{"pods", "a=b", "c-"}
 	if err := options.Complete(tf, cmd, args); err != nil {
