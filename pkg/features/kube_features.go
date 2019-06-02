@@ -364,6 +364,7 @@ const (
 
 	// owner: @mtaufen
 	// alpha: v1.12
+	// beta:  v1.14
 	//
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
@@ -453,6 +454,12 @@ const (
 	//
 	// Enables the regional PD feature on GCE.
 	deprecatedGCERegionalPersistentDisk featuregate.Feature = "GCERegionalPersistentDisk"
+
+	// owner: @MrHohn
+	// alpha: v1.15
+	//
+	// Enables Finalizer Protection for Service LoadBalancers.
+	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
 
 	// owner: @RobertKrawitz
 	// alpha: v1.15
@@ -548,6 +555,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerFinalizer:                {Default: false, PreRelease: featuregate.Alpha},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},

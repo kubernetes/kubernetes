@@ -33,19 +33,11 @@ func addConversionFuncs(s *runtime.Scheme) error {
 func Convert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.RuntimeClass, out *node.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Handler = in.Spec.RuntimeHandler
-	if in.Spec.Scheduling != nil {
-		out.Scheduling = new(node.Scheduling)
-		autoConvert_v1alpha1_Scheduling_To_node_Scheduling(in.Spec.Scheduling, out.Scheduling, s)
-	}
 	return nil
 }
 
 func Convert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, out *v1alpha1.RuntimeClass, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	out.Spec.RuntimeHandler = in.Handler
-	if in.Scheduling != nil {
-		out.Spec.Scheduling = new(v1alpha1.Scheduling)
-		autoConvert_node_Scheduling_To_v1alpha1_Scheduling(in.Scheduling, out.Spec.Scheduling, s)
-	}
 	return nil
 }

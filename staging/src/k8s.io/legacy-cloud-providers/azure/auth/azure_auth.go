@@ -36,25 +36,25 @@ var (
 // AzureAuthConfig holds auth related part of cloud config
 type AzureAuthConfig struct {
 	// The cloud environment identifier. Takes values from https://github.com/Azure/go-autorest/blob/ec5f4903f77ed9927ac95b19ab8e44ada64c1356/autorest/azure/environments.go#L13
-	Cloud string `json:"cloud" yaml:"cloud"`
+	Cloud string `json:"cloud,omitempty" yaml:"cloud,omitempty"`
 	// The AAD Tenant ID for the Subscription that the cluster is deployed in
-	TenantID string `json:"tenantId" yaml:"tenantId"`
+	TenantID string `json:"tenantId,omitempty" yaml:"tenantId,omitempty"`
 	// The ClientID for an AAD application with RBAC access to talk to Azure RM APIs
-	AADClientID string `json:"aadClientId" yaml:"aadClientId"`
+	AADClientID string `json:"aadClientId,omitempty" yaml:"aadClientId,omitempty"`
 	// The ClientSecret for an AAD application with RBAC access to talk to Azure RM APIs
-	AADClientSecret string `json:"aadClientSecret" yaml:"aadClientSecret"`
+	AADClientSecret string `json:"aadClientSecret,omitempty" yaml:"aadClientSecret,omitempty"`
 	// The path of a client certificate for an AAD application with RBAC access to talk to Azure RM APIs
-	AADClientCertPath string `json:"aadClientCertPath" yaml:"aadClientCertPath"`
+	AADClientCertPath string `json:"aadClientCertPath,omitempty" yaml:"aadClientCertPath,omitempty"`
 	// The password of the client certificate for an AAD application with RBAC access to talk to Azure RM APIs
-	AADClientCertPassword string `json:"aadClientCertPassword" yaml:"aadClientCertPassword"`
+	AADClientCertPassword string `json:"aadClientCertPassword,omitempty" yaml:"aadClientCertPassword,omitempty"`
 	// Use managed service identity for the virtual machine to access Azure ARM APIs
-	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension" yaml:"useManagedIdentityExtension"`
+	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension,omitempty" yaml:"useManagedIdentityExtension,omitempty"`
 	// UserAssignedIdentityID contains the Client ID of the user assigned MSI which is assigned to the underlying VMs. If empty the user assigned identity is not used.
 	// More details of the user assigned identity can be found at: https://docs.microsoft.com/en-us/azure/active-directory/managed-service-identity/overview
 	// For the user assigned identity specified here to be used, the UseManagedIdentityExtension has to be set to true.
-	UserAssignedIdentityID string `json:"userAssignedIdentityID" yaml:"userAssignedIdentityID"`
+	UserAssignedIdentityID string `json:"userAssignedIdentityID,omitempty" yaml:"userAssignedIdentityID,omitempty"`
 	// The ID of the Azure Subscription that the cluster is deployed in
-	SubscriptionID string `json:"subscriptionId" yaml:"subscriptionId"`
+	SubscriptionID string `json:"subscriptionId,omitempty" yaml:"subscriptionId,omitempty"`
 }
 
 // GetServicePrincipalToken creates a new service principal token based on the configuration

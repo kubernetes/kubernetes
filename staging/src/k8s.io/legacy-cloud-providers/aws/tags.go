@@ -249,9 +249,6 @@ func (t *awsTagging) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 	}
 
 	f := newEc2Filter("tag-key", t.clusterTagKey())
-
-	// We can't pass a zero-length Filters to AWS (it's an error)
-	// So if we end up with no filters; we need to return nil
 	filters = append(filters, f)
 	return filters
 }

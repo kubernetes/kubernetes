@@ -21,6 +21,8 @@ go_library(
         "docker_stats_unsupported.go",
         "docker_stats_windows.go",
         "docker_streaming.go",
+        "docker_streaming_others.go",
+        "docker_streaming_windows.go",
         "exec.go",
         "helpers.go",
         "helpers_linux.go",

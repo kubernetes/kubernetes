@@ -1692,6 +1692,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				invalid("spec", "validation", "openAPIV3Schema", "properties[a]", "default"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[c]", "default"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[d]", "properties[bad]", "pattern"),
 				// we also expected unpruned and valid defaults under x-kubernetes-preserve-unknown-fields. We could be more
 				// strict here, but want to encourage proper specifications by forbidding other defaults.
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[preserveUnknownFields]", "default"),
@@ -2043,82 +2044,6 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 			errors: []validationMatch{
 				invalid("spec", "conversion", "conversionReviewVersions"),
 			},
-		},
-		{
-			name: "webhookconfig: should accept preserveUnknownFields=true if set before",
-			resource: &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "42"},
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group: "group.com",
-					Scope: apiextensions.ResourceScope("Cluster"),
-					Names: apiextensions.CustomResourceDefinitionNames{
-						Plural:   "plural",
-						Singular: "singular",
-						Kind:     "Plural",
-						ListKind: "PluralList",
-					},
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:    "version",
-							Served:  true,
-							Storage: true,
-						},
-						{
-							Name:    "version2",
-							Served:  true,
-							Storage: false,
-						},
-					},
-					Conversion: &apiextensions.CustomResourceConversion{
-						Strategy: apiextensions.ConversionStrategyType("Webhook"),
-						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
-						},
-						ConversionReviewVersions: []string{"v1beta1"},
-					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
-				},
-				Status: apiextensions.CustomResourceDefinitionStatus{
-					StoredVersions: []string{"version"},
-				},
-			},
-			old: &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com", ResourceVersion: "42"},
-				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group: "group.com",
-					Scope: apiextensions.ResourceScope("Cluster"),
-					Names: apiextensions.CustomResourceDefinitionNames{
-						Plural:   "plural",
-						Singular: "singular",
-						Kind:     "Plural",
-						ListKind: "PluralList",
-					},
-					Versions: []apiextensions.CustomResourceDefinitionVersion{
-						{
-							Name:    "version",
-							Served:  true,
-							Storage: true,
-						},
-						{
-							Name:    "version2",
-							Served:  true,
-							Storage: false,
-						},
-					},
-					Conversion: &apiextensions.CustomResourceConversion{
-						Strategy: apiextensions.ConversionStrategyType("Webhook"),
-						WebhookClientConfig: &apiextensions.WebhookClientConfig{
-							URL: strPtr("https://example.com/webhook"),
-						},
-						ConversionReviewVersions: []string{"v1beta1"},
-					},
-					PreserveUnknownFields: pointer.BoolPtr(true),
-				},
-				Status: apiextensions.CustomResourceDefinitionStatus{
-					StoredVersions: []string{"version"},
-				},
-			},
-			errors: []validationMatch{},
 		},
 		{
 			name: "unchanged",

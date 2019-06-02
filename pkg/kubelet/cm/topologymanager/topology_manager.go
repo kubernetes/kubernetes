@@ -39,7 +39,7 @@ type Manager interface {
 
 //HintProvider interface is to be implemented by Hint Providers
 type HintProvider interface {
-	GetTopologyHints(pod v1.Pod, container v1.Container) ([]TopologyHint, bool)
+	GetTopologyHints(pod v1.Pod, container v1.Container) []TopologyHint
 }
 
 //Store interface is to allow Hint Providers to retrieve pod affinity
@@ -47,7 +47,10 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 }
 
-// TopologyHint is a struct containing Socket Mask for a Pod
+//TopologyHint is a struct containing a SocketMask for a Container
 type TopologyHint struct {
 	SocketAffinity socketmask.SocketMask
+	// Preferred is set to true when the SocketMask encodes a preferred
+	// allocation for the Container. It is set to false otherwise.
+	Preferred bool
 }

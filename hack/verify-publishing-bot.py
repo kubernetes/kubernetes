@@ -20,7 +20,6 @@ import fnmatch
 import os
 import sys
 import json
-import yaml
 
 
 def get_gomod_dependencies(rootdir, components):
@@ -44,6 +43,7 @@ def get_gomod_dependencies(rootdir, components):
 
 
 def get_rules_dependencies(rules_file):
+    import yaml
     with open(rules_file) as f:
         data = yaml.load(f)
     return data
@@ -59,8 +59,14 @@ def main():
     components.sort()
 
     rules_file = "/staging/publishing/rules.yaml"
-    gomod_dependencies = get_gomod_dependencies(rootdir + '/staging/src/k8s.io/', components)
+    try:
+        import yaml
+    except ImportError:
+        print("Please install missing pyyaml module and re-run %s" % sys.argv[0])
+        sys.exit(1)
     rules_dependencies = get_rules_dependencies(rootdir + rules_file)
+
+    gomod_dependencies = get_gomod_dependencies(rootdir + '/staging/src/k8s.io/', components)
 
     processed_repos = []
     for rule in rules_dependencies["rules"]:

@@ -45,6 +45,11 @@ const (
 	// SSLNegotiationPolicyNameFormat is a format string used for the SSL
 	// negotiation policy tag name
 	SSLNegotiationPolicyNameFormat = "k8s-SSLNegotiationPolicy-%s"
+
+	lbAttrLoadBalancingCrossZoneEnabled = "load_balancing.cross_zone.enabled"
+	lbAttrAccessLogsS3Enabled           = "access_logs.s3.enabled"
+	lbAttrAccessLogsS3Bucket            = "access_logs.s3.bucket"
+	lbAttrAccessLogsS3Prefix            = "access_logs.s3.prefix"
 )
 
 var (
@@ -318,62 +323,8 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			}
 		}
 
-		desiredLoadBalancerAttributes := map[string]string{}
-		// Default values to ensured a remove annotation reverts back to the default
-		desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "false"
-
-		// Determine if cross zone load balancing enabled/disabled has been specified
-		crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
-		if crossZoneLoadBalancingEnabledAnnotation != "" {
-			crossZoneEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
-			if err != nil {
-				return nil, fmt.Errorf("error parsing service annotation: %s=%s",
-					ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
-					crossZoneLoadBalancingEnabledAnnotation,
-				)
-			}
-
-			if crossZoneEnabled {
-				desiredLoadBalancerAttributes["load_balancing.cross_zone.enabled"] = "true"
-			}
-		}
-
-		// Whether the ELB was new or existing, sync attributes regardless. This accounts for things
-		// that cannot be specified at the time of creation and can only be modified after the fact,
-		// e.g. idle connection timeout.
-		describeAttributesRequest := &elbv2.DescribeLoadBalancerAttributesInput{
-			LoadBalancerArn: loadBalancer.LoadBalancerArn,
-		}
-		describeAttributesOutput, err := c.elbv2.DescribeLoadBalancerAttributes(describeAttributesRequest)
-		if err != nil {
-			return nil, fmt.Errorf("Unable to retrieve load balancer attributes during attribute sync: %q", err)
-		}
-
-		changedAttributes := []*elbv2.LoadBalancerAttribute{}
-
-		// Identify to be changed attributes
-		for _, foundAttribute := range describeAttributesOutput.Attributes {
-			if targetValue, ok := desiredLoadBalancerAttributes[*foundAttribute.Key]; ok {
-				if targetValue != *foundAttribute.Value {
-					changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
-						Key:   foundAttribute.Key,
-						Value: aws.String(targetValue),
-					})
-				}
-			}
-		}
-
-		// Update attributes requiring changes
-		if len(changedAttributes) > 0 {
-			klog.V(2).Infof("Updating load-balancer attributes for %q", loadBalancerName)
-
-			_, err = c.elbv2.ModifyLoadBalancerAttributes(&elbv2.ModifyLoadBalancerAttributesInput{
-				LoadBalancerArn: loadBalancer.LoadBalancerArn,
-				Attributes:      changedAttributes,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("Unable to update load balancer attributes during attribute sync: %q", err)
-			}
+		if err := c.reconcileLBAttributes(aws.StringValue(loadBalancer.LoadBalancerArn), annotations); err != nil {
+			return nil, err
 		}
 
 		// Subnets cannot be modified on NLBs
@@ -392,6 +343,99 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 		}
 	}
 	return loadBalancer, nil
+}
+
+func (c *Cloud) reconcileLBAttributes(loadBalancerArn string, annotations map[string]string) error {
+	desiredLoadBalancerAttributes := map[string]string{}
+
+	desiredLoadBalancerAttributes[lbAttrLoadBalancingCrossZoneEnabled] = "false"
+	crossZoneLoadBalancingEnabledAnnotation := annotations[ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled]
+	if crossZoneLoadBalancingEnabledAnnotation != "" {
+		crossZoneEnabled, err := strconv.ParseBool(crossZoneLoadBalancingEnabledAnnotation)
+		if err != nil {
+			return fmt.Errorf("error parsing service annotation: %s=%s",
+				ServiceAnnotationLoadBalancerCrossZoneLoadBalancingEnabled,
+				crossZoneLoadBalancingEnabledAnnotation,
+			)
+		}
+
+		if crossZoneEnabled {
+			desiredLoadBalancerAttributes[lbAttrLoadBalancingCrossZoneEnabled] = "true"
+		}
+	}
+
+	desiredLoadBalancerAttributes[lbAttrAccessLogsS3Enabled] = "false"
+	accessLogsS3EnabledAnnotation := annotations[ServiceAnnotationLoadBalancerAccessLogEnabled]
+	if accessLogsS3EnabledAnnotation != "" {
+		accessLogsS3Enabled, err := strconv.ParseBool(accessLogsS3EnabledAnnotation)
+		if err != nil {
+			return fmt.Errorf("error parsing service annotation: %s=%s",
+				ServiceAnnotationLoadBalancerAccessLogEnabled,
+				accessLogsS3EnabledAnnotation,
+			)
+		}
+
+		if accessLogsS3Enabled {
+			desiredLoadBalancerAttributes[lbAttrAccessLogsS3Enabled] = "true"
+		}
+	}
+
+	desiredLoadBalancerAttributes[lbAttrAccessLogsS3Bucket] = annotations[ServiceAnnotationLoadBalancerAccessLogS3BucketName]
+	desiredLoadBalancerAttributes[lbAttrAccessLogsS3Prefix] = annotations[ServiceAnnotationLoadBalancerAccessLogS3BucketPrefix]
+
+	currentLoadBalancerAttributes := map[string]string{}
+	describeAttributesOutput, err := c.elbv2.DescribeLoadBalancerAttributes(&elbv2.DescribeLoadBalancerAttributesInput{
+		LoadBalancerArn: aws.String(loadBalancerArn),
+	})
+	if err != nil {
+		return fmt.Errorf("unable to retrieve load balancer attributes during attribute sync: %q", err)
+	}
+	for _, attr := range describeAttributesOutput.Attributes {
+		currentLoadBalancerAttributes[aws.StringValue(attr.Key)] = aws.StringValue(attr.Value)
+	}
+
+	var changedAttributes []*elbv2.LoadBalancerAttribute
+	if desiredLoadBalancerAttributes[lbAttrLoadBalancingCrossZoneEnabled] != currentLoadBalancerAttributes[lbAttrLoadBalancingCrossZoneEnabled] {
+		changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+			Key:   aws.String(lbAttrLoadBalancingCrossZoneEnabled),
+			Value: aws.String(desiredLoadBalancerAttributes[lbAttrLoadBalancingCrossZoneEnabled]),
+		})
+	}
+	if desiredLoadBalancerAttributes[lbAttrAccessLogsS3Enabled] != currentLoadBalancerAttributes[lbAttrAccessLogsS3Enabled] {
+		changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+			Key:   aws.String(lbAttrAccessLogsS3Enabled),
+			Value: aws.String(desiredLoadBalancerAttributes[lbAttrAccessLogsS3Enabled]),
+		})
+	}
+
+	// ELBV2 API forbids us to set bucket to an empty bucket, so we keep it unchanged if AccessLogsS3Enabled==false.
+	if desiredLoadBalancerAttributes[lbAttrAccessLogsS3Enabled] == "true" {
+		if desiredLoadBalancerAttributes[lbAttrAccessLogsS3Bucket] != currentLoadBalancerAttributes[lbAttrAccessLogsS3Bucket] {
+			changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+				Key:   aws.String(lbAttrAccessLogsS3Bucket),
+				Value: aws.String(desiredLoadBalancerAttributes[lbAttrAccessLogsS3Bucket]),
+			})
+		}
+		if desiredLoadBalancerAttributes[lbAttrAccessLogsS3Prefix] != currentLoadBalancerAttributes[lbAttrAccessLogsS3Prefix] {
+			changedAttributes = append(changedAttributes, &elbv2.LoadBalancerAttribute{
+				Key:   aws.String(lbAttrAccessLogsS3Prefix),
+				Value: aws.String(desiredLoadBalancerAttributes[lbAttrAccessLogsS3Prefix]),
+			})
+		}
+	}
+
+	if len(changedAttributes) > 0 {
+		klog.V(2).Infof("updating load-balancer attributes for %q", loadBalancerArn)
+
+		_, err = c.elbv2.ModifyLoadBalancerAttributes(&elbv2.ModifyLoadBalancerAttributesInput{
+			LoadBalancerArn: aws.String(loadBalancerArn),
+			Attributes:      changedAttributes,
+		})
+		if err != nil {
+			return fmt.Errorf("unable to update load balancer attributes during attribute sync: %q", err)
+		}
+	}
+	return nil
 }
 
 var invalidELBV2NameRegex = regexp.MustCompile("[^[:alnum:]]")

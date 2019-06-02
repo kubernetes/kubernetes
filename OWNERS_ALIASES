@@ -313,7 +313,8 @@ aliases:
   sig-windows-api-approvers:
     - smarterclayton
     - thockin
-
+    - liggitt
+  
   api-reviewers:
     - erictune
     - lavalamp
@@ -399,7 +400,8 @@ aliases:
   
   sig-windows-api-reviewers:
     - patricklang
-    - michmike
+    - ddebroy
+    - benmoss
 
   dep-approvers:
     - apelisse

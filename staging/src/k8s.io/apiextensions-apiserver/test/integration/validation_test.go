@@ -871,6 +871,19 @@ oneOf:
 			},
 		},
 		{
+			desc: "invalid regex pattern",
+			globalSchema: `
+type: object
+properties:
+  foo:
+    type: string
+    pattern: "+"
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[foo].pattern: Invalid value: \"+\": must be a valid regular expression, but isn't: error parsing regexp: missing argument to repetition operator: `+`",
+			},
+		},
+		{
 			desc: "forbidden vendor extensions in nested value validation",
 			globalSchema: `
 type: object
@@ -1317,6 +1330,46 @@ not:
 				"spec.validation.openAPIV3Schema.oneOf[0].properties[metadata]: Forbidden: must not be specified in a nested context",
 				"spec.validation.openAPIV3Schema.not.properties[metadata]: Forbidden: must not be specified in a nested context",
 			},
+		},
+		{
+			desc: "missing items for array",
+			globalSchema: `
+type: object
+properties:
+  slice:
+    type: array
+`,
+			expectedViolations: []string{
+				"spec.validation.openAPIV3Schema.properties[slice].items: Required value: must be specified",
+			},
+		},
+		{
+			desc: "items slice",
+			globalSchema: `
+type: object
+properties:
+  slice:
+    type: array
+    items:
+    - type: string
+    - type: integer
+`,
+			expectedCreateError: true,
+		},
+		{
+			desc: "items slice in value validation",
+			globalSchema: `
+type: object
+properties:
+  slice:
+    type: array
+    items:
+      type: string
+    not:
+      items:
+      - type: string
+`,
+			expectedCreateError: true,
 		},
 	}
 

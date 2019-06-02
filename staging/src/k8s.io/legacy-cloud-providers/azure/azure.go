@@ -36,13 +36,13 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	"sigs.k8s.io/yaml"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"k8s.io/klog"
-	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -83,78 +83,81 @@ type Config struct {
 	auth.AzureAuthConfig
 
 	// The name of the resource group that the cluster is deployed in
-	ResourceGroup string `json:"resourceGroup" yaml:"resourceGroup"`
+	ResourceGroup string `json:"resourceGroup,omitempty" yaml:"resourceGroup,omitempty"`
 	// The location of the resource group that the cluster is deployed in
-	Location string `json:"location" yaml:"location"`
+	Location string `json:"location,omitempty" yaml:"location,omitempty"`
 	// The name of the VNet that the cluster is deployed in
-	VnetName string `json:"vnetName" yaml:"vnetName"`
+	VnetName string `json:"vnetName,omitempty" yaml:"vnetName,omitempty"`
 	// The name of the resource group that the Vnet is deployed in
-	VnetResourceGroup string `json:"vnetResourceGroup" yaml:"vnetResourceGroup"`
+	VnetResourceGroup string `json:"vnetResourceGroup,omitempty" yaml:"vnetResourceGroup,omitempty"`
 	// The name of the subnet that the cluster is deployed in
-	SubnetName string `json:"subnetName" yaml:"subnetName"`
+	SubnetName string `json:"subnetName,omitempty" yaml:"subnetName,omitempty"`
 	// The name of the security group attached to the cluster's subnet
-	SecurityGroupName string `json:"securityGroupName" yaml:"securityGroupName"`
+	SecurityGroupName string `json:"securityGroupName,omitempty" yaml:"securityGroupName,omitempty"`
 	// (Optional in 1.6) The name of the route table attached to the subnet that the cluster is deployed in
-	RouteTableName string `json:"routeTableName" yaml:"routeTableName"`
+	RouteTableName string `json:"routeTableName,omitempty" yaml:"routeTableName,omitempty"`
 	// The name of the resource group that the RouteTable is deployed in
-	RouteTableResourceGroup string `json:"routeTableResourceGroup" yaml:"routeTableResourceGroup"`
+	RouteTableResourceGroup string `json:"routeTableResourceGroup,omitempty" yaml:"routeTableResourceGroup,omitempty"`
 	// (Optional) The name of the availability set that should be used as the load balancer backend
 	// If this is set, the Azure cloudprovider will only add nodes from that availability set to the load
 	// balancer backend pool. If this is not set, and multiple agent pools (availability sets) are used, then
 	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
 	// In other words, if you use multiple agent pools (availability sets), you MUST set this field.
-	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName" yaml:"primaryAvailabilitySetName"`
+	PrimaryAvailabilitySetName string `json:"primaryAvailabilitySetName,omitempty" yaml:"primaryAvailabilitySetName,omitempty"`
 	// The type of azure nodes. Candidate values are: vmss and standard.
 	// If not set, it will be default to standard.
-	VMType string `json:"vmType" yaml:"vmType"`
+	VMType string `json:"vmType,omitempty" yaml:"vmType,omitempty"`
 	// The name of the scale set that should be used as the load balancer backend.
 	// If this is set, the Azure cloudprovider will only add nodes from that scale set to the load
 	// balancer backend pool. If this is not set, and multiple agent pools (scale sets) are used, then
 	// the cloudprovider will try to add all nodes to a single backend pool which is forbidden.
 	// In other words, if you use multiple agent pools (scale sets), you MUST set this field.
-	PrimaryScaleSetName string `json:"primaryScaleSetName" yaml:"primaryScaleSetName"`
+	PrimaryScaleSetName string `json:"primaryScaleSetName,omitempty" yaml:"primaryScaleSetName,omitempty"`
 	// Enable exponential backoff to manage resource request retries
-	CloudProviderBackoff bool `json:"cloudProviderBackoff" yaml:"cloudProviderBackoff"`
+	CloudProviderBackoff bool `json:"cloudProviderBackoff,omitempty" yaml:"cloudProviderBackoff,omitempty"`
 	// Backoff retry limit
-	CloudProviderBackoffRetries int `json:"cloudProviderBackoffRetries" yaml:"cloudProviderBackoffRetries"`
+	CloudProviderBackoffRetries int `json:"cloudProviderBackoffRetries,omitempty" yaml:"cloudProviderBackoffRetries,omitempty"`
 	// Backoff exponent
-	CloudProviderBackoffExponent float64 `json:"cloudProviderBackoffExponent" yaml:"cloudProviderBackoffExponent"`
+	CloudProviderBackoffExponent float64 `json:"cloudProviderBackoffExponent,omitempty" yaml:"cloudProviderBackoffExponent,omitempty"`
 	// Backoff duration
-	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration" yaml:"cloudProviderBackoffDuration"`
+	CloudProviderBackoffDuration int `json:"cloudProviderBackoffDuration,omitempty" yaml:"cloudProviderBackoffDuration,omitempty"`
 	// Backoff jitter
-	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter" yaml:"cloudProviderBackoffJitter"`
+	CloudProviderBackoffJitter float64 `json:"cloudProviderBackoffJitter,omitempty" yaml:"cloudProviderBackoffJitter,omitempty"`
 	// Backoff mode, options are v2 and default.
 	// * default means two-layer backoff retrying, one in the cloud provider and the other in the Azure SDK.
 	// * v2 means only backoff in the Azure SDK is used. In such mode, CloudProviderBackoffDuration and
 	//   CloudProviderBackoffJitter are omitted.
 	// "default" will be used if not specified.
-	CloudProviderBackoffMode string `json:"cloudProviderBackoffMode" yaml:"cloudProviderBackoffMode"`
+	CloudProviderBackoffMode string `json:"cloudProviderBackoffMode,omitempty" yaml:"cloudProviderBackoffMode,omitempty"`
 	// Enable rate limiting
-	CloudProviderRateLimit bool `json:"cloudProviderRateLimit" yaml:"cloudProviderRateLimit"`
+	CloudProviderRateLimit bool `json:"cloudProviderRateLimit,omitempty" yaml:"cloudProviderRateLimit,omitempty"`
 	// Rate limit QPS (Read)
-	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS" yaml:"cloudProviderRateLimitQPS"`
+	CloudProviderRateLimitQPS float32 `json:"cloudProviderRateLimitQPS,omitempty" yaml:"cloudProviderRateLimitQPS,omitempty"`
 	// Rate limit Bucket Size
-	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket" yaml:"cloudProviderRateLimitBucket"`
+	CloudProviderRateLimitBucket int `json:"cloudProviderRateLimitBucket,omitempty" yaml:"cloudProviderRateLimitBucket,omitempty"`
 	// Rate limit QPS (Write)
-	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite" yaml:"cloudProviderRateLimitQPSWrite"`
+	CloudProviderRateLimitQPSWrite float32 `json:"cloudProviderRateLimitQPSWrite,omitempty" yaml:"cloudProviderRateLimitQPSWrite,omitempty"`
 	// Rate limit Bucket Size
-	CloudProviderRateLimitBucketWrite int `json:"cloudProviderRateLimitBucketWrite" yaml:"cloudProviderRateLimitBucketWrite"`
+	CloudProviderRateLimitBucketWrite int `json:"cloudProviderRateLimitBucketWrite,omitempty" yaml:"cloudProviderRateLimitBucketWrite,omitempty"`
 
 	// Use instance metadata service where possible
-	UseInstanceMetadata bool `json:"useInstanceMetadata" yaml:"useInstanceMetadata"`
+	UseInstanceMetadata bool `json:"useInstanceMetadata,omitempty" yaml:"useInstanceMetadata,omitempty"`
 
 	// Sku of Load Balancer and Public IP. Candidate values are: basic and standard.
 	// If not set, it will be default to basic.
-	LoadBalancerSku string `json:"loadBalancerSku" yaml:"loadBalancerSku"`
+	LoadBalancerSku string `json:"loadBalancerSku,omitempty" yaml:"loadBalancerSku,omitempty"`
 	// ExcludeMasterFromStandardLB excludes master nodes from standard load balancer.
 	// If not set, it will be default to true.
-	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB" yaml:"excludeMasterFromStandardLB"`
+	ExcludeMasterFromStandardLB *bool `json:"excludeMasterFromStandardLB,omitempty" yaml:"excludeMasterFromStandardLB,omitempty"`
 	// DisableOutboundSNAT disables the outbound SNAT for public load balancer rules.
 	// It should only be set when loadBalancerSku is standard. If not set, it will be default to false.
-	DisableOutboundSNAT *bool `json:"disableOutboundSNAT" yaml:"disableOutboundSNAT"`
+	DisableOutboundSNAT *bool `json:"disableOutboundSNAT,omitempty" yaml:"disableOutboundSNAT,omitempty"`
 
 	// Maximum allowed LoadBalancer Rule Count is the limit enforced by Azure Load balancer
-	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount" yaml:"maximumLoadBalancerRuleCount"`
+	MaximumLoadBalancerRuleCount int `json:"maximumLoadBalancerRuleCount,omitempty" yaml:"maximumLoadBalancerRuleCount,omitempty"`
+
+	// The cloud configure type for Azure cloud provider. Supported values are file, secret and merge.
+	CloudConfigType cloudConfigType `json:"cloudConfigType,omitempty" yaml:"cloudConfigType,omitempty"`
 }
 
 var _ cloudprovider.Interface = (*Cloud)(nil)
@@ -233,6 +236,28 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		return nil, err
 	}
 
+	az := &Cloud{
+		nodeZones:          map[string]sets.String{},
+		nodeResourceGroups: map[string]string{},
+		unmanagedNodes:     sets.NewString(),
+		routeCIDRs:         map[string]string{},
+	}
+	err = az.InitializeCloudFromConfig(config, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return az, nil
+}
+
+// InitializeCloudFromConfig initializes the Cloud from config.
+func (az *Cloud) InitializeCloudFromConfig(config *Config, fromSecret bool) error {
+	// cloud-config not set, return nil so that it would be initialized from secret.
+	if config == nil {
+		klog.Warning("cloud-config is not provided, Azure cloud provider would be initialized from secret")
+		return nil
+	}
+
 	if config.RouteTableResourceGroup == "" {
 		config.RouteTableResourceGroup = config.ResourceGroup
 	}
@@ -242,21 +267,43 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		config.VMType = vmTypeStandard
 	}
 
+	if config.CloudConfigType == "" {
+		// The default cloud config type is cloudConfigTypeMerge.
+		config.CloudConfigType = cloudConfigTypeMerge
+	} else {
+		supportedCloudConfigTypes := sets.NewString(
+			string(cloudConfigTypeMerge),
+			string(cloudConfigTypeFile),
+			string(cloudConfigTypeSecret))
+		if !supportedCloudConfigTypes.Has(string(config.CloudConfigType)) {
+			return fmt.Errorf("cloudConfigType %v is not supported, supported values are %v", config.CloudConfigType, supportedCloudConfigTypes.List())
+		}
+	}
+
 	env, err := auth.ParseAzureEnvironment(config.Cloud)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	servicePrincipalToken, err := auth.GetServicePrincipalToken(&config.AzureAuthConfig, env)
 	if err == auth.ErrorNoAuth {
-		if !config.UseInstanceMetadata {
-			// No credentials provided, useInstanceMetadata should be enabled.
-			return nil, fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
+		// Only controller-manager would lazy-initialize from secret, and credentials are required for such case.
+		if fromSecret {
+			err := fmt.Errorf("No credentials provided for Azure cloud provider")
+			klog.Fatalf("%v", err)
+			return err
+		}
+
+		// No credentials provided, useInstanceMetadata should be enabled for Kubelet.
+		// TODO(feiskyer): print different error message for Kubelet and controller-manager, as they're
+		// requiring different credential settings.
+		if !config.UseInstanceMetadata && az.Config.CloudConfigType == cloudConfigTypeFile {
+			return fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 		}
 
 		klog.V(2).Infof("Azure cloud provider is starting without credentials")
 	} else if err != nil {
-		return nil, err
+		return err
 	}
 
 	// operationPollRateLimiter.Accept() is a no-op if rate limits are configured off.
@@ -351,28 +398,22 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		}
 	} else {
 		if config.DisableOutboundSNAT != nil && *config.DisableOutboundSNAT {
-			return nil, fmt.Errorf("disableOutboundSNAT should only set when loadBalancerSku is standard")
+			return fmt.Errorf("disableOutboundSNAT should only set when loadBalancerSku is standard")
 		}
 	}
 
-	az := Cloud{
-		Config:                 *config,
-		Environment:            *env,
-		nodeZones:              map[string]sets.String{},
-		nodeResourceGroups:     map[string]string{},
-		unmanagedNodes:         sets.NewString(),
-		routeCIDRs:             map[string]string{},
-		resourceRequestBackoff: resourceRequestBackoff,
-	}
+	az.Config = *config
+	az.Environment = *env
+	az.resourceRequestBackoff = resourceRequestBackoff
 	az.metadata, err = NewInstanceMetadataService(metadataURL)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// No credentials provided, InstanceMetadataService would be used for getting Azure resources.
 	// Note that this only applies to Kubelet, controller-manager should configure credentials for managing Azure resources.
 	if servicePrincipalToken == nil {
-		return &az, nil
+		return nil
 	}
 
 	// Initialize Azure clients.
@@ -407,52 +448,53 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	}
 
 	if strings.EqualFold(vmTypeVMSS, az.Config.VMType) {
-		az.vmSet, err = newScaleSet(&az)
+		az.vmSet, err = newScaleSet(az)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	} else {
-		az.vmSet = newAvailabilitySet(&az)
+		az.vmSet = newAvailabilitySet(az)
 	}
 
 	az.vmCache, err = az.newVMCache()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	az.lbCache, err = az.newLBCache()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	az.nsgCache, err = az.newNSGCache()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	az.rtCache, err = az.newRouteTableCache()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if err := initDiskControllers(&az); err != nil {
-		return nil, err
+	if err := initDiskControllers(az); err != nil {
+		return err
 	}
-	return &az, nil
+
+	return nil
 }
 
 // parseConfig returns a parsed configuration for an Azure cloudprovider config file
 func parseConfig(configReader io.Reader) (*Config, error) {
 	var config Config
-
 	if configReader == nil {
-		return &config, nil
+		return nil, nil
 	}
 
 	configContents, err := ioutil.ReadAll(configReader)
 	if err != nil {
 		return nil, err
 	}
+
 	err = yaml.Unmarshal(configContents, &config)
 	if err != nil {
 		return nil, err
@@ -470,6 +512,7 @@ func (az *Cloud) Initialize(clientBuilder cloudprovider.ControllerClientBuilder,
 	az.eventBroadcaster = record.NewBroadcaster()
 	az.eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: az.kubeClient.CoreV1().Events("")})
 	az.eventRecorder = az.eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "azure-cloud-provider"})
+	az.InitializeCloudFromSecret()
 }
 
 // LoadBalancer returns a balancer interface. Also returns true if the interface is supported, false otherwise.
