@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -67,6 +67,7 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 			Annotations: map[string]string{
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
+			Labels: el.EndpointsMeta.Labels,
 		},
 	})
 	return err
@@ -82,6 +83,7 @@ func (el *EndpointsLock) Update(ler LeaderElectionRecord) error {
 		return err
 	}
 	el.e.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
+	el.e.Labels = el.EndpointsMeta.Labels
 	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Update(el.e)
 	return err
 }

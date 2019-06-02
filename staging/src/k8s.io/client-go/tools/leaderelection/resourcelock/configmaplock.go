@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 )
@@ -72,6 +72,7 @@ func (cml *ConfigMapLock) Create(ler LeaderElectionRecord) error {
 			Annotations: map[string]string{
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
+			Labels: cml.ConfigMapMeta.Labels,
 		},
 	})
 	return err
@@ -87,6 +88,7 @@ func (cml *ConfigMapLock) Update(ler LeaderElectionRecord) error {
 		return err
 	}
 	cml.cm.Annotations[LeaderElectionRecordAnnotationKey] = string(recordBytes)
+	cml.cm.Labels = cml.ConfigMapMeta.Labels
 	cml.cm, err = cml.Client.ConfigMaps(cml.ConfigMapMeta.Namespace).Update(cml.cm)
 	return err
 }
