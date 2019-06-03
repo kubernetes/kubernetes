@@ -90,7 +90,7 @@ type Interface interface {
 	Describe() string
 }
 
-// Manufacture will create a lock of a given type according to the input parameters
+// New will create a lock of a given type according to the input parameters
 func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
 	switch lockType {
 	case EndpointsResourceLock:
@@ -125,7 +125,7 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 	}
 }
 
-// Manufacture will create a lock of a given type according to the input parameters
+// NewWithLabels will create a lock with labels of a given type according to the input parameters
 func NewWithLabels(lockType string, ns string, name string, labels map[string]string, coreClient corev1.CoreV1Interface, coordinationClient coordinationv1.CoordinationV1Interface, rlc ResourceLockConfig) (Interface, error) {
 	switch lockType {
 	case EndpointsResourceLock:

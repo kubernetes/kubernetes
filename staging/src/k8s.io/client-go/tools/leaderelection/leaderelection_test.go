@@ -41,6 +41,9 @@ func createLockObject(objectType, namespace, name string, record rl.LeaderElecti
 	objectMeta := metav1.ObjectMeta{
 		Namespace: namespace,
 		Name:      name,
+		Labels: map[string]string{
+			"label-foo-key": "foo",
+		},
 	}
 	switch objectType {
 	case "endpoints":
@@ -48,18 +51,15 @@ func createLockObject(objectType, namespace, name string, record rl.LeaderElecti
 		objectMeta.Annotations = map[string]string{
 			rl.LeaderElectionRecordAnnotationKey: string(recordBytes),
 		}
-		objectMeta.Labels = map[string]string{}
 		obj = &corev1.Endpoints{ObjectMeta: objectMeta}
 	case "configmaps":
 		recordBytes, _ := json.Marshal(record)
 		objectMeta.Annotations = map[string]string{
 			rl.LeaderElectionRecordAnnotationKey: string(recordBytes),
 		}
-		objectMeta.Labels = map[string]string{}
 		obj = &corev1.ConfigMap{ObjectMeta: objectMeta}
 	case "leases":
 		spec := rl.LeaderElectionRecordToLeaseSpec(&record)
-		objectMeta.Labels = map[string]string{}
 		obj = &coordinationv1.Lease{ObjectMeta: objectMeta, Spec: spec}
 	default:
 		panic("unexpected objType:" + objectType)
@@ -120,7 +120,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				{
 					verb: "get",
 					reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
-						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), ojrl.LeaderElectionRecord{}), nil
+						return true, createLockObject(objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{}), nil
 					},
 				},
 				{
@@ -240,7 +240,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			var reportedLeader string
 			var lock rl.Interface
 
-			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar", Labels: map[string]string{"label-foo-key": "foo"}}
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
 				EventRecorder: &record.FakeRecorder{},
