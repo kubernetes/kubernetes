@@ -620,9 +620,34 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		kubeDeps.Auth = auth
 	}
 
+	var cgroupRoots []string
+
+	cgroupRoots = append(cgroupRoots, cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupDriver))
+	kubeletCgroup, err := cm.GetKubeletContainer(s.KubeletCgroups)
+	if err != nil {
+		return fmt.Errorf("failed to get the kubelet's cgroup: %v", err)
+	}
+	if kubeletCgroup != "" {
+		cgroupRoots = append(cgroupRoots, kubeletCgroup)
+	}
+
+	runtimeCgroup, err := cm.GetRuntimeContainer(s.ContainerRuntime, s.RuntimeCgroups)
+	if err != nil {
+		return fmt.Errorf("failed to get the container runtime's cgroup: %v", err)
+	}
+	if runtimeCgroup != "" {
+		// RuntimeCgroups is optional, so ignore if it isn't specified
+		cgroupRoots = append(cgroupRoots, runtimeCgroup)
+	}
+
+	if s.SystemCgroups != "" {
+		// SystemCgroups is optional, so ignore if it isn't specified
+		cgroupRoots = append(cgroupRoots, s.SystemCgroups)
+	}
+
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntime, s.RemoteRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
 		if err != nil {
 			return err
 		}
@@ -715,9 +740,10 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	}
 
 	if s.HealthzPort > 0 {
-		healthz.DefaultHealthz()
+		mux := http.NewServeMux()
+		healthz.InstallHandler(mux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), nil)
+			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), mux)
 			if err != nil {
 				klog.Errorf("Starting healthz server failed: %v", err)
 			}
@@ -1053,13 +1079,13 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		}
 		klog.Info("Started kubelet as runonce")
 	} else {
-		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableServer)
+		startKubelet(k, podCfg, &kubeServer.KubeletConfiguration, kubeDeps, kubeServer.EnableCAdvisorJSONEndpoints, kubeServer.EnableServer)
 		klog.Info("Started kubelet")
 	}
 	return nil
 }
 
-func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
+func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableCAdvisorJSONEndpoints, enableServer bool) {
 	// start the kubelet
 	go wait.Until(func() {
 		k.Run(podCfg.Updates())
@@ -1067,11 +1093,11 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
+		go k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, enableCAdvisorJSONEndpoints, kubeCfg.EnableDebuggingHandlers, kubeCfg.EnableContentionProfiling)
 
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
+		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), enableCAdvisorJSONEndpoints)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
 		go k.ListenAndServePodResources()

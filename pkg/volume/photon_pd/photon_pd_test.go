@@ -128,7 +128,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(path); err != nil {

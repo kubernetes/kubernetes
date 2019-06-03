@@ -101,7 +101,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		ginkgo.By("Expanding non-expandable pvc")
 		newSize := resource.MustParse("6Gi")
 		pvc, err = expandPVCSize(pvc, newSize, c)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "While updating non-expandable PVC")
+		framework.ExpectError(err, "While updating non-expandable PVC")
 	})
 
 	ginkgo.It("Verify if editing PVC allows resize", func() {

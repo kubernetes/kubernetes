@@ -28,10 +28,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -48,6 +44,10 @@ import (
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apiextensions-apiserver/test/integration/storage"
 )
@@ -62,11 +62,11 @@ func TestWebhookConverter(t *testing.T) {
 	testWebhookConverter(t, false)
 }
 
-func TestWebhookConverterWithPruning(t *testing.T) {
+func TestWebhookConverterWithDefaulting(t *testing.T) {
 	testWebhookConverter(t, true)
 }
 
-func testWebhookConverter(t *testing.T, pruning bool) {
+func testWebhookConverter(t *testing.T, defaulting bool) {
 	tests := []struct {
 		group   string
 		handler http.Handler
@@ -80,7 +80,7 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 		{
 			group:   "nontrivial-converter",
 			handler: NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning),
+			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
 		},
 		{
 			group:   "metadata-mutating-converter",
@@ -95,7 +95,7 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 		{
 			group:   "empty-response",
 			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
-			checks:  checks(expectConversionFailureMessage("empty-response", "expected 1 converted objects")),
+			checks:  checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
 		},
 		{
 			group:   "failure-message",
@@ -110,7 +110,11 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
 	defer etcd3watcher.TestOnlySetFatalOnDecodeError(true)
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
+	// enable necessary features
+	if defaulting {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceDefaulting, true)()
+	}
+
 	tearDown, config, options, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +134,12 @@ func testWebhookConverter(t *testing.T, pruning bool) {
 	defer tearDown()
 
 	crd := multiVersionFixture.DeepCopy()
-	crd.Spec.PreserveUnknownFields = pointer.BoolPtr(!pruning)
+
+	if !defaulting {
+		for i := range crd.Spec.Versions {
+			delete(crd.Spec.Versions[i].Schema.OpenAPIV3Schema.Properties, "defaults")
+		}
+	}
 
 	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
 	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural})
@@ -520,6 +529,91 @@ func validateUIDMutation(t *testing.T, ctc *conversionTestContext) {
 	}
 }
 
+func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
+	if _, defaulting := ctc.crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["defaults"]; !defaulting {
+		return
+	}
+
+	ns := ctc.namespace
+	storageVersion := "v1beta1"
+
+	for _, createVersion := range ctc.crd.Spec.Versions {
+		t.Run(fmt.Sprintf("getting objects created as %s", createVersion.Name), func(t *testing.T) {
+			name := "defaulting-" + createVersion.Name
+			client := ctc.versionedClient(ns, createVersion.Name)
+
+			fixture := newConversionMultiVersionFixture(ns, name, createVersion.Name)
+			if err := unstructured.SetNestedField(fixture.Object, map[string]interface{}{}, "defaults"); err != nil {
+				t.Fatal(err)
+			}
+			created, err := client.Create(fixture, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// check that defaulting happens
+			// - in the request version when doing no-op conversion when deserializing
+			// - when reading back from storage in the storage version
+			// only the first is persisted.
+			defaults, found, err := unstructured.NestedMap(created.Object, "defaults")
+			if err != nil {
+				t.Fatal(err)
+			} else if !found {
+				t.Fatalf("expected .defaults to exist")
+			}
+			expectedLen := 1
+			if !createVersion.Storage {
+				expectedLen++
+			}
+			if len(defaults) != expectedLen {
+				t.Fatalf("after %s create expected .defaults to have %d values, but got: %v", createVersion.Name, expectedLen, defaults)
+			}
+			if _, found := defaults[createVersion.Name].(bool); !found {
+				t.Errorf("after %s create expected .defaults[%s] to be true, but .defaults is: %v", createVersion.Name, createVersion.Name, defaults)
+			}
+			if _, found := defaults[storageVersion].(bool); !found {
+				t.Errorf("after %s create expected .defaults[%s] to be true because it is the storage version, but .defaults is: %v", createVersion.Name, storageVersion, defaults)
+			}
+
+			// verify that only the request version default is persisted
+			persisted, err := ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, found, err := unstructured.NestedBool(persisted.Object, "defaults", storageVersion); err != nil {
+				t.Fatal(err)
+			} else if createVersion.Name != storageVersion && found {
+				t.Errorf("after %s create .defaults[storage version %s] not to be persisted, but got in etcd: %v", createVersion.Name, storageVersion, defaults)
+			}
+
+			// check that when reading any other version, we do not default that version, but only the (non-persisted) storage version default
+			for _, v := range ctc.crd.Spec.Versions {
+				if v.Name == createVersion.Name {
+					// create version is persisted anyway, nothing to verify
+					continue
+				}
+
+				got, err := ctc.versionedClient(ns, v.Name).Get(created.GetName(), metav1.GetOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if _, found, err := unstructured.NestedBool(got.Object, "defaults", v.Name); err != nil {
+					t.Fatal(err)
+				} else if v.Name != storageVersion && found {
+					t.Errorf("after %s GET expected .defaults[%s] not to be true because only storage version %s is defaulted on read, but .defaults is: %v", v.Name, v.Name, storageVersion, defaults)
+				}
+
+				if _, found, err := unstructured.NestedBool(got.Object, "defaults", storageVersion); err != nil {
+					t.Fatal(err)
+				} else if !found {
+					t.Errorf("after non-create, non-storage %s GET expected .defaults[storage version %s] to be true, but .defaults is: %v", v.Name, storageVersion, defaults)
+				}
+			}
+		})
+	}
+}
+
 func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *conversionTestContext) {
 	return func(t *testing.T, ctc *conversionTestContext) {
 		ns := ctc.namespace
@@ -894,7 +988,8 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 			ListKind:   "MultiVersionList",
 			Categories: []string{"all"},
 		},
-		Scope: apiextensionsv1beta1.NamespaceScoped,
+		Scope:                 apiextensionsv1beta1.NamespaceScoped,
+		PreserveUnknownFields: pointer.BoolPtr(false),
 		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
 			{
 				// storage version, same schema as v1alpha1
@@ -916,6 +1011,14 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
+								},
+							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean"},
+									"v1beta1":  {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta2":  {Type: "boolean"},
 								},
 							},
 						},
@@ -944,6 +1047,14 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 									"num2": {Type: "integer"},
 								},
 							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean", Default: jsonPtr(true)},
+									"v1beta1":  {Type: "boolean"},
+									"v1beta2":  {Type: "boolean"},
+								},
+							},
 						},
 					},
 				},
@@ -968,6 +1079,14 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
+								},
+							},
+							"defaults": {
+								Type: "object",
+								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+									"v1alpha1": {Type: "boolean"},
+									"v1beta1":  {Type: "boolean"},
+									"v1beta2":  {Type: "boolean", Default: jsonPtr(true)},
 								},
 							},
 						},
@@ -1088,4 +1207,13 @@ func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
 		})
 		h.ServeHTTP(w, r)
 	})
+}
+
+func jsonPtr(x interface{}) *apiextensionsv1beta1.JSON {
+	bs, err := json.Marshal(x)
+	if err != nil {
+		panic(err)
+	}
+	ret := apiextensionsv1beta1.JSON{Raw: bs}
+	return &ret
 }

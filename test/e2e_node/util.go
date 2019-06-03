@@ -34,7 +34,9 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
@@ -62,6 +64,7 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
+var perlImage = imageutils.GetE2EImage(imageutils.Perl)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
@@ -439,4 +442,16 @@ func reduceAllocatableMemoryUsage() {
 	cmd := fmt.Sprintf("echo 0 > /sys/fs/cgroup/memory/%s/memory.force_empty", toCgroupFsName(cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup)))
 	_, err := exec.Command("sudo", "sh", "-c", cmd).CombinedOutput()
 	framework.ExpectNoError(err)
+}
+
+// Equivalent of featuregatetesting.SetFeatureGateDuringTest
+// which can't be used here because we're not in a Testing context.
+// This must be in a non-"_test" file to pass
+// make verify WHAT=test-featuregates
+func withFeatureGate(feature featuregate.Feature, desired bool) func() {
+	current := utilfeature.DefaultFeatureGate.Enabled(feature)
+	utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), desired))
+	return func() {
+		utilfeature.DefaultMutableFeatureGate.Set(fmt.Sprintf("%s=%v", string(feature), current))
+	}
 }

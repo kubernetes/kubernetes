@@ -50,6 +50,11 @@ type RequestScope struct {
 	Serializer runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
+	// StandardSerializers, if set, restricts which serializers can be used when
+	// we aren't transforming the output (into Table or PartialObjectMetadata).
+	// Used only by CRDs which do not yet support Protobuf.
+	StandardSerializers []runtime.SerializerInfo
+
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
 	Defaulter       runtime.ObjectDefaulter
@@ -78,7 +83,21 @@ func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Reque
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
 }
 
-func (scope *RequestScope) AllowsConversion(gvk schema.GroupVersionKind, mimeType, mimeSubType string) bool {
+func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {
+	// some handlers like CRDs can't serve all the mime types that PartialObjectMetadata or Table can - if
+	// gvk is nil (no conversion) allow StandardSerializers to further restrict the set of mime types.
+	if gvk == nil {
+		if len(scope.StandardSerializers) == 0 {
+			return true
+		}
+		for _, info := range scope.StandardSerializers {
+			if info.MediaTypeType == mimeType && info.MediaTypeSubType == mimeSubType {
+				return true
+			}
+		}
+		return false
+	}
+
 	// TODO: this is temporary, replace with an abstraction calculated at endpoint installation time
 	if gvk.GroupVersion() == metav1beta1.SchemeGroupVersion || gvk.GroupVersion() == metav1.SchemeGroupVersion {
 		switch gvk.Kind {

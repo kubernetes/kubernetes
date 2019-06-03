@@ -24,7 +24,6 @@ import (
 
 	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/spf13/cobra"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -32,6 +31,7 @@ import (
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
@@ -95,8 +95,6 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodExecTimeout)
-	cmd.Flags().StringVarP(&options.PodName, "pod", "p", options.PodName, "Pod name")
-	cmd.Flags().MarkDeprecated("pod", "This flag is deprecated and will be removed in future. Use exec POD_NAME instead.")
 	// TODO support UID
 	cmd.Flags().StringVarP(&options.ContainerName, "container", "c", options.ContainerName, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&options.Stdin, "stdin", "i", options.Stdin, "Pass stdin to the container")
@@ -168,18 +166,12 @@ type ExecOptions struct {
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
 	// Let kubectl exec follow rules for `--`, see #13004 issue
-	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
+	if len(argsIn) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageErrorf(cmd, execUsageStr)
 	}
-	if len(p.PodName) != 0 {
-		if len(argsIn) < 1 {
-			return cmdutil.UsageErrorf(cmd, execUsageStr)
-		}
-		p.Command = argsIn
-	} else {
-		p.ResourceName = argsIn[0]
-		p.Command = argsIn[1:]
-	}
+
+	p.ResourceName = argsIn[0]
+	p.Command = argsIn[1:]
 
 	var err error
 

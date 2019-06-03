@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/quota"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -174,6 +175,7 @@ type emptyDir struct {
 	mounter       mount.Interface
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
+	desiredSize   int64
 	volume.MetricsProvider
 }
 
@@ -193,12 +195,12 @@ func (ed *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(fsGroup *int64) error {
-	return ed.SetUpAt(ed.GetPath(), fsGroup)
+func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
+func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.
@@ -229,12 +231,28 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
 	}
 
-	volume.SetVolumeOwnership(ed, fsGroup)
+	volume.SetVolumeOwnership(ed, mounterArgs.FsGroup)
 
+	// If setting up the quota fails, just log a message but don't actually error out.
+	// We'll use the old du mechanism in this case, at least until we support
+	// enforcement.
 	if err == nil {
 		volumeutil.SetReady(ed.getMetaDir())
+		if mounterArgs.DesiredSize != nil {
+			// Deliberately shadow the outer use of err as noted
+			// above.
+			hasQuotas, err := quota.SupportsQuotas(ed.mounter, dir)
+			if err != nil {
+				klog.V(3).Infof("Unable to check for quota support on %s: %s", dir, err.Error())
+			} else if hasQuotas {
+				klog.V(4).Infof("emptydir trying to assign quota %v on %s", mounterArgs.DesiredSize, dir)
+				err := quota.AssignQuota(ed.mounter, dir, mounterArgs.PodUID, mounterArgs.DesiredSize)
+				if err != nil {
+					klog.V(3).Infof("Set quota on %s failed %s", dir, err.Error())
+				}
+			}
+		}
 	}
-
 	return err
 }
 
@@ -397,9 +415,14 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 }
 
 func (ed *emptyDir) teardownDefault(dir string) error {
+	// Remove any quota
+	err := quota.ClearQuota(ed.mounter, dir)
+	if err != nil {
+		klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
+	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err := os.RemoveAll(dir)
+	err = os.RemoveAll(dir)
 	if err != nil {
 		return err
 	}

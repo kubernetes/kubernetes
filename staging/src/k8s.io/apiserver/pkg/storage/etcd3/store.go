@@ -391,7 +391,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		}
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", 0)
+	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", nil)
 }
 
 func (s *store) Count(key string) (int64, error) {
@@ -618,17 +618,19 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		if err != nil {
 			return err
 		}
-		remainingItemCount := getResp.Count - pred.Limit
+		var remainingItemCount *int64
 		// getResp.Count counts in objects that do not match the pred.
-		// Instead of returning inaccurate count, return 0.
-		if !pred.Empty() {
-			remainingItemCount = 0
+		// Instead of returning inaccurate count for non-empty selectors, we return nil.
+		// Only set remainingItemCount if the predicate is empty.
+		if pred.Empty() {
+			c := int64(getResp.Count - pred.Limit)
+			remainingItemCount = &c
 		}
 		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", 0)
+	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
 }
 
 // growSlice takes a slice value and grows its capacity up

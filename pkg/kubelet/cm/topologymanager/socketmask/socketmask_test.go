@@ -49,7 +49,7 @@ func TestAdd(t *testing.T) {
 		expectedMask string
 	}{
 		{
-			name:         "Reset bit 1 SocketMask to 0",
+			name:         "New SocketMask with sockets 0 and 1 set",
 			firstSocket:  0,
 			secondSocket: 1,
 			expectedMask: "1100000000000000000000000000000000000000000000000000000000000000",
@@ -229,7 +229,7 @@ func TestIsEqual(t *testing.T) {
 		isEqual       bool
 	}{
 		{
-			name:          "And socket masks",
+			name:          "Check if two socket masks are equal",
 			firstMaskBit:  int(0),
 			secondMaskBit: int(0),
 			isEqual:       true,
@@ -285,6 +285,48 @@ func TestGetSockets(t *testing.T) {
 		sockets := mask.GetSockets()
 		if !reflect.DeepEqual(sockets, tc.expectedSockets) {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedSockets, sockets)
+		}
+	}
+}
+
+func TestIsNarrowerThan(t *testing.T) {
+	tcases := []struct {
+		name                  string
+		firstMask             []int
+		secondMask            []int
+		expectedFirstNarrower bool
+	}{
+		{
+			name:                  "Check narrowness of masks with unequal bits set 1/2",
+			firstMask:             []int{0},
+			secondMask:            []int{0, 1},
+			expectedFirstNarrower: true,
+		},
+		{
+			name:                  "Check narrowness of masks with unequal bits set 2/2",
+			firstMask:             []int{0, 1},
+			secondMask:            []int{0},
+			expectedFirstNarrower: false,
+		},
+		{
+			name:                  "Check narrowness of masks with equal bits set 1/2",
+			firstMask:             []int{0},
+			secondMask:            []int{1},
+			expectedFirstNarrower: true,
+		},
+		{
+			name:                  "Check narrowness of masks with equal bits set 2/2",
+			firstMask:             []int{1},
+			secondMask:            []int{0},
+			expectedFirstNarrower: false,
+		},
+	}
+	for _, tc := range tcases {
+		firstMask, _ := NewSocketMask(tc.firstMask...)
+		secondMask, _ := NewSocketMask(tc.secondMask...)
+		expectedFirstNarrower := firstMask.IsNarrowerThan(secondMask)
+		if expectedFirstNarrower != tc.expectedFirstNarrower {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstNarrower, expectedFirstNarrower)
 		}
 	}
 }

@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
-	"k8s.io/apiserver/pkg/util/webhook"
+	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -42,8 +44,9 @@ type Webhook struct {
 	sourceFactory sourceFactory
 
 	hookSource       Source
-	clientManager    *webhook.ClientManager
+	clientManager    *webhookutil.ClientManager
 	namespaceMatcher *namespace.Matcher
+	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
 }
 
@@ -53,7 +56,7 @@ var (
 )
 
 type sourceFactory func(f informers.SharedInformerFactory) Source
-type dispatcherFactory func(cm *webhook.ClientManager) Dispatcher
+type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
 func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
@@ -62,23 +65,24 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		return nil, err
 	}
 
-	cm, err := webhook.NewClientManager(admissionv1beta1.SchemeGroupVersion, admissionv1beta1.AddToScheme)
+	cm, err := webhookutil.NewClientManager(admissionv1beta1.SchemeGroupVersion, admissionv1beta1.AddToScheme)
 	if err != nil {
 		return nil, err
 	}
-	authInfoResolver, err := webhook.NewDefaultAuthenticationInfoResolver(kubeconfigFile)
+	authInfoResolver, err := webhookutil.NewDefaultAuthenticationInfoResolver(kubeconfigFile)
 	if err != nil {
 		return nil, err
 	}
 	// Set defaults which may be overridden later.
 	cm.SetAuthenticationInfoResolver(authInfoResolver)
-	cm.SetServiceResolver(webhook.NewDefaultServiceResolver())
+	cm.SetServiceResolver(webhookutil.NewDefaultServiceResolver())
 
 	return &Webhook{
 		Handler:          handler,
 		sourceFactory:    sourceFactory,
 		clientManager:    &cm,
 		namespaceMatcher: &namespace.Matcher{},
+		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
 	}, nil
 }
@@ -86,13 +90,13 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 // SetAuthenticationInfoResolverWrapper sets the
 // AuthenticationInfoResolverWrapper.
 // TODO find a better way wire this, but keep this pull small for now.
-func (a *Webhook) SetAuthenticationInfoResolverWrapper(wrapper webhook.AuthenticationInfoResolverWrapper) {
+func (a *Webhook) SetAuthenticationInfoResolverWrapper(wrapper webhookutil.AuthenticationInfoResolverWrapper) {
 	a.clientManager.SetAuthenticationInfoResolverWrapper(wrapper)
 }
 
 // SetServiceResolver sets a service resolver for the webhook admission plugin.
 // Passing a nil resolver does not have an effect, instead a default one will be used.
-func (a *Webhook) SetServiceResolver(sr webhook.ServiceResolver) {
+func (a *Webhook) SetServiceResolver(sr webhookutil.ServiceResolver) {
 	a.clientManager.SetServiceResolver(sr)
 }
 
@@ -126,12 +130,12 @@ func (a *Webhook) ValidateInitialization() error {
 	return nil
 }
 
-// shouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
+// ShouldCallHook returns invocation details if the webhook should be called, nil if the webhook should not be called,
 // or an error if an error was encountered during evaluation.
-func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
+func (a *Webhook) ShouldCallHook(h webhook.WebhookAccessor, attr admission.Attributes, o admission.ObjectInterfaces) (*WebhookInvocation, *apierrors.StatusError) {
 	var err *apierrors.StatusError
 	var invocation *WebhookInvocation
-	for _, r := range h.Rules {
+	for _, r := range h.GetRules() {
 		m := rules.Matcher{Rule: r, Attr: attr}
 		if m.Matches() {
 			invocation = &WebhookInvocation{
@@ -143,12 +147,12 @@ func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes, 
 			break
 		}
 	}
-	if invocation == nil && h.MatchPolicy != nil && *h.MatchPolicy == v1beta1.Equivalent {
+	if invocation == nil && h.GetMatchPolicy() != nil && *h.GetMatchPolicy() == v1beta1.Equivalent {
 		attrWithOverride := &attrWithResourceOverride{Attributes: attr}
 		equivalents := o.GetEquivalentResourceMapper().EquivalentResourcesFor(attr.GetResource(), attr.GetSubresource())
 		// honor earlier rules first
 	OuterLoop:
-		for _, r := range h.Rules {
+		for _, r := range h.GetRules() {
 			// see if the rule matches any of the equivalent resources
 			for _, equivalent := range equivalents {
 				if equivalent == attr.GetResource() {
@@ -183,6 +187,11 @@ func (a *Webhook) shouldCallHook(h *v1beta1.Webhook, attr admission.Attributes, 
 		return nil, err
 	}
 
+	matches, err = a.objectMatcher.MatchObjectSelector(h, attr)
+	if !matches || err != nil {
+		return nil, err
+	}
+
 	return invocation, nil
 }
 
@@ -205,21 +214,5 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 
-	var relevantHooks []*WebhookInvocation
-	for i := range hooks {
-		invocation, err := a.shouldCallHook(&hooks[i], attr, o)
-		if err != nil {
-			return err
-		}
-		if invocation != nil {
-			relevantHooks = append(relevantHooks, invocation)
-		}
-	}
-
-	if len(relevantHooks) == 0 {
-		// no matching hooks
-		return nil
-	}
-
-	return a.dispatcher.Dispatch(ctx, attr, o, relevantHooks)
+	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

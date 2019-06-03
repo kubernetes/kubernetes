@@ -656,42 +656,42 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 	for i := range testPod.Spec.Containers {
 		container := testPod.Spec.Containers[i]
 		limitMemory := container.Resources.Limits.Memory().String()
-		limitCpu := container.Resources.Limits.Cpu().String()
+		limitCPU := container.Resources.Limits.Cpu().String()
 		requestMemory := container.Resources.Requests.Memory().String()
-		requestCpu := container.Resources.Requests.Cpu().String()
+		requestCPU := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
 			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
-		if limitCpu != "75m" {
-			t.Errorf("Unexpected limit cpu value %s", limitCpu)
+		if limitCPU != "75m" {
+			t.Errorf("Unexpected limit cpu value %s", limitCPU)
 		}
 		if requestMemory != "5Mi" {
 			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
-		if requestCpu != "50m" {
-			t.Errorf("Unexpected request cpu value %s", requestCpu)
+		if requestCPU != "50m" {
+			t.Errorf("Unexpected request cpu value %s", requestCPU)
 		}
 	}
 
 	for i := range testPod.Spec.InitContainers {
 		container := testPod.Spec.InitContainers[i]
 		limitMemory := container.Resources.Limits.Memory().String()
-		limitCpu := container.Resources.Limits.Cpu().String()
+		limitCPU := container.Resources.Limits.Cpu().String()
 		requestMemory := container.Resources.Requests.Memory().String()
-		requestCpu := container.Resources.Requests.Cpu().String()
+		requestCPU := container.Resources.Requests.Cpu().String()
 
 		if limitMemory != "10Mi" {
 			t.Errorf("Unexpected limit memory value %s", limitMemory)
 		}
-		if limitCpu != "75m" {
-			t.Errorf("Unexpected limit cpu value %s", limitCpu)
+		if limitCPU != "75m" {
+			t.Errorf("Unexpected limit cpu value %s", limitCPU)
 		}
 		if requestMemory != "5Mi" {
 			t.Errorf("Unexpected request memory value %s", requestMemory)
 		}
-		if requestCpu != "50m" {
-			t.Errorf("Unexpected request cpu value %s", requestCpu)
+		if requestCPU != "50m" {
+			t.Errorf("Unexpected request cpu value %s", requestCPU)
 		}
 	}
 }

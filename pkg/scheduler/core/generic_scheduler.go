@@ -169,6 +169,7 @@ type genericScheduler struct {
 	disablePreemption        bool
 	lastIndex                int
 	percentageOfNodesToScore int32
+	enableNonPreempting      bool
 }
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
@@ -314,7 +315,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 	if !ok || fitError == nil {
 		return nil, nil, nil, nil
 	}
-	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfoMap) {
+	if !podEligibleToPreemptOthers(pod, g.nodeInfoSnapshot.NodeInfoMap, g.enableNonPreempting) {
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
@@ -1162,7 +1163,11 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 // considered for preemption.
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
-func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) bool {
+func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, enableNonPreempting bool) bool {
+	if enableNonPreempting && pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
+		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
+		return false
+	}
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
@@ -1220,6 +1225,7 @@ func NewGenericScheduler(
 	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
 	percentageOfNodesToScore int32,
+	enableNonPreempting bool,
 ) ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                    cache,
@@ -1237,5 +1243,6 @@ func NewGenericScheduler(
 		alwaysCheckAllPredicates: alwaysCheckAllPredicates,
 		disablePreemption:        disablePreemption,
 		percentageOfNodesToScore: percentageOfNodesToScore,
+		enableNonPreempting:      enableNonPreempting,
 	}
 }

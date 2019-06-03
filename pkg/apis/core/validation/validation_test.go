@@ -426,6 +426,147 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 }
 
+func TestValidatePersistentVolumeSpec(t *testing.T) {
+	fsmode := core.PersistentVolumeFilesystem
+	blockmode := core.PersistentVolumeBlock
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		isInlineSpec      bool
+		pvSpec            *core.PersistentVolumeSpec
+	}{
+		"pv-pvspec-valid": {
+			isExpectedFailure: false,
+			isInlineSpec:      false,
+			pvSpec: &core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				StorageClassName:              "testclass",
+				PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRecycle,
+				AccessModes:                   []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				VolumeMode:   &fsmode,
+				NodeAffinity: simpleVolumeNodeAffinity("foo", "bar"),
+			},
+		},
+		"inline-pvspec-with-capacity": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+				},
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			},
+		},
+		"inline-pvspec-with-sc": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes:      []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				StorageClassName: "testclass",
+			},
+		},
+		"inline-pvspec-with-non-fs-volume-mode": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				VolumeMode:  &blockmode,
+			},
+		},
+		"inline-pvspec-with-non-retain-reclaim-policy": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeReclaimPolicy: core.PersistentVolumeReclaimRecycle,
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			},
+		},
+		"inline-pvspec-with-node-affinity": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes:  []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				NodeAffinity: simpleVolumeNodeAffinity("foo", "bar"),
+			},
+		},
+		"inline-pvspec-with-non-csi-source": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					HostPath: &core.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(core.HostPathDirectory)),
+					},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			},
+		},
+		"inline-pvspec-valid-with-access-modes-and-mount-options": {
+			isExpectedFailure: false,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes:  []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+				MountOptions: []string{"soft", "read-write"},
+			},
+		},
+		"inline-pvspec-valid-with-access-modes": {
+			isExpectedFailure: false,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
+			},
+		},
+		"inline-pvspec-with-missing-acess-modes": {
+			isExpectedFailure: true,
+			isInlineSpec:      true,
+			pvSpec: &core.PersistentVolumeSpec{
+				PersistentVolumeSource: core.PersistentVolumeSource{
+					CSI: &core.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+				},
+				MountOptions: []string{"soft", "read-write"},
+			},
+		},
+	}
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeSpec(scenario.pvSpec, "", scenario.isInlineSpec, field.NewPath("field"))
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
 func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 	validVolume := testVolume("foo", "", core.PersistentVolumeSpec{
 		Capacity: core.ResourceList{
@@ -13286,5 +13427,74 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func testDataSourceInSpec(name string, kind string, apiGroup string) *core.PersistentVolumeClaimSpec {
+	scName := "csi-plugin"
+	dataSourceInSpec := core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+		StorageClassName: &scName,
+		DataSource: &core.TypedLocalObjectReference{
+			APIGroup: &apiGroup,
+			Kind:     kind,
+			Name:     name,
+		},
+	}
+
+	return &dataSourceInSpec
+}
+
+func TestAlphaVolumePVCDataSource(t *testing.T) {
+
+	testCases := []struct {
+		testName     string
+		claimSpec    core.PersistentVolumeClaimSpec
+		expectedFail bool
+	}{
+		{
+			testName:  "test create from valid snapshot source",
+			claimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+		},
+		{
+			testName:  "test create from valid pvc source",
+			claimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", ""),
+		},
+		{
+			testName:     "test missing name in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			expectedFail: true,
+		},
+		{
+			testName:     "test specifying pvc with snapshot api group should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "PersistentVolumeClaim", "snapshot.storage.k8s.io"),
+			expectedFail: true,
+		},
+		{
+			testName:     "test invalid group name in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "storage.k8s.io"),
+			expectedFail: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if tc.expectedFail {
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) == 0 {
+				t.Errorf("expected failure: %v", errs)
+			}
+
+		} else {
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec")); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+
+		}
 	}
 }

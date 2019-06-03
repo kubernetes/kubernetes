@@ -492,7 +492,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		volumeMountPath := "/etc/projected-configmap-volumes"
 		podName := "pod-projected-configmaps-" + string(uuid.NewUUID())
 		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
 	})
 
 	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
@@ -502,7 +502,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 		volumeMountPath := "/etc/configmap-volumes"
 		podName := "pod-configmaps-" + string(uuid.NewUUID())
 		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
 	})
 })
 

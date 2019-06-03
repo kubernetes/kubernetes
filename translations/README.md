@@ -41,6 +41,14 @@ file. `poedit` does this automatically on save, but you can also run
 We use the English translation as the `msgid`.
 
 ## Regenerating the bindata file
+
+With the `mo` files up to date, you can now convert the generated files
+into code using `go-bindata` command which can be installed with:
+
+```console
+go get github.com/go-bindata/go-bindata/...
+```
+
 Run `./hack/generate-bindata.sh`, this will turn the translation files
 into generated code which will in turn be packaged into the Kubernetes
 binaries.

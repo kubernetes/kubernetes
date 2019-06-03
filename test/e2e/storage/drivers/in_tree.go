@@ -859,13 +859,13 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	}
 	// h.prepPod will be reused in cleanupDriver.
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(prepPod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating hostPath init pod")
+	framework.ExpectNoError(err, "while creating hostPath init pod")
 
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for hostPath init pod to succeed")
+	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while deleting hostPath init pod")
+	framework.ExpectNoError(err, "while deleting hostPath init pod")
 	return &hostPathSymlinkVolume{
 		sourcePath: sourcePath,
 		targetPath: targetPath,
@@ -881,13 +881,13 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(v.prepPod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while creating hostPath teardown pod")
+	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
 	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while waiting for hostPath teardown pod to succeed")
+	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "while deleting hostPath teardown pod")
+	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
 // emptydir

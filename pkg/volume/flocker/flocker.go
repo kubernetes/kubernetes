@@ -235,8 +235,8 @@ func (b *flockerVolumeMounter) GetPath() string {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *flockerVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a
@@ -277,7 +277,7 @@ control service:
    need to update the Primary UUID for this volume.
 5. Wait until the Primary UUID was updated or timeout.
 */
-func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	var err error
 	if b.flockerClient == nil {
 		b.flockerClient, err = b.newFlockerClient()
@@ -365,7 +365,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
 	}
 
 	klog.V(4).Infof("successfully mounted %s", dir)

@@ -592,6 +592,9 @@ func (sched *Scheduler) scheduleOne() {
 		} else {
 			klog.V(2).Infof("pod %v/%v is bound successfully on node %v, %d nodes evaluated, %d nodes were found feasible", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
 			metrics.PodScheduleSuccesses.Inc()
+
+			// Run "postbind" plugins.
+			fwk.RunPostbindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
 }

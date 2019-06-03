@@ -40,7 +40,7 @@ var _ = SIGDescribe("Discovery", func() {
 		setupServerCert(namespaceName, serviceName)
 	})
 
-	ginkgo.It("[Feature:StorageVersionHash] Custom resource should have storage version hash", func() {
+	ginkgo.It("Custom resource should have storage version hash", func() {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return

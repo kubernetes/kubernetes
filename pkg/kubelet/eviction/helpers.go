@@ -32,6 +32,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
+	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -399,9 +400,7 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 func localEphemeralVolumeNames(pod *v1.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {
-		if volume.GitRepo != nil ||
-			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-			volume.ConfigMap != nil || volume.DownwardAPI != nil {
+		if volumeutils.IsLocalEphemeralVolume(volume) {
 			result = append(result, volume.Name)
 		}
 	}

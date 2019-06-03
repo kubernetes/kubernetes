@@ -279,7 +279,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					}
 				}
 				if test.disableAttach {
-					gomega.Expect(err).To(gomega.HaveOccurred(), "Unexpected VolumeAttachment found")
+					framework.ExpectError(err, "Unexpected VolumeAttachment found")
 				}
 			})
 
@@ -449,7 +449,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 				if test.expectFailure {
 					err = waitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
-					gomega.Expect(err).To(gomega.HaveOccurred(), "unexpected resizing condition on PVC")
+					framework.ExpectError(err, "unexpected resizing condition on PVC")
 					return
 				}
 

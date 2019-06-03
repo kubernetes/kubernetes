@@ -24,13 +24,11 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
-	batchclient "k8s.io/client-go/kubernetes/typed/batch/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -229,18 +227,8 @@ func (o *ScaleOptions) RunScale() error {
 		}
 
 		mapping := info.ResourceMapping()
-		if mapping.Resource.GroupResource() == (schema.GroupResource{Group: "batch", Resource: "jobs"}) {
-			// go down the legacy jobs path.  This can be removed in 3.14  For now, contain it.
-			fmt.Fprintf(o.ErrOut, "%s scale job is DEPRECATED and will be removed in a future version.\n", o.parent)
-
-			if err := ScaleJob(info, o.clientSet.BatchV1(), uint(o.Replicas), precondition, retry, waitForReplicas); err != nil {
-				return err
-			}
-
-		} else {
-			if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource.GroupResource()); err != nil {
-				return err
-			}
+		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource.GroupResource()); err != nil {
+			return err
 		}
 
 		// if the recorder makes a change, compute and create another patch
@@ -267,26 +255,6 @@ func (o *ScaleOptions) RunScale() error {
 		return fmt.Errorf("no objects passed to scale")
 	}
 	return nil
-}
-
-func ScaleJob(info *resource.Info, jobsClient batchclient.JobsGetter, count uint, preconditions *kubectl.ScalePrecondition, retry, waitForReplicas *kubectl.RetryParams) error {
-	scaler := JobPsuedoScaler{
-		JobsClient: jobsClient,
-	}
-	var jobPreconditions *ScalePrecondition
-	if preconditions != nil {
-		jobPreconditions = &ScalePrecondition{Size: preconditions.Size, ResourceVersion: preconditions.ResourceVersion}
-	}
-	var jobRetry *RetryParams
-	if retry != nil {
-		jobRetry = &RetryParams{Interval: retry.Interval, Timeout: retry.Timeout}
-	}
-	var jobWaitForReplicas *RetryParams
-	if waitForReplicas != nil {
-		jobWaitForReplicas = &RetryParams{Interval: waitForReplicas.Interval, Timeout: waitForReplicas.Timeout}
-	}
-
-	return scaler.Scale(info.Namespace, info.Name, count, jobPreconditions, jobRetry, jobWaitForReplicas)
 }
 
 func scaler(f cmdutil.Factory) (kubectl.Scaler, error) {

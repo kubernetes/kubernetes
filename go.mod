@@ -14,7 +14,7 @@ require (
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio v0.4.11
-	github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1
+	github.com/Microsoft/hcsshim v0.8.6
 	github.com/PuerkitoBio/purell v1.1.0
 	github.com/Rican7/retry v0.1.0 // indirect
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
@@ -178,7 +178,7 @@ require (
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster v1.2.0-beta.1
-	k8s.io/klog v0.3.1
+	k8s.io/klog v0.3.2
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
@@ -207,7 +207,7 @@ replace (
 	github.com/JeffAshton/win_pdh => github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.11
-	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1
+	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.6
 	github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
 	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
@@ -442,12 +442,13 @@ replace (
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
-	k8s.io/klog => k8s.io/klog v0.3.1
+	k8s.io/klog => k8s.io/klog v0.3.2
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
 	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
 	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
+	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
 	k8s.io/kubelet => ./staging/src/k8s.io/kubelet
 	k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
 	k8s.io/metrics => ./staging/src/k8s.io/metrics

@@ -622,3 +622,16 @@ rules:
       dir: staging/src/k8s.io/cri-api
     name: release-1.15
     go: 1.12.5
+- destination: kubectl
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/kubectl
+    name: master
+  - source:
+      branch: release-1.15
+      dir: staging/src/k8s.io/kubectl
+    name: release-1.15
+    go: 1.12.5
+

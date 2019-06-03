@@ -661,6 +661,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
+		false,
 	)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
@@ -714,6 +715,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
+		false,
 	)
 	bindingChan := make(chan *v1.Binding, 2)
 

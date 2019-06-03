@@ -58,6 +58,9 @@ const (
 
 	// NetworkTierAnnotationPremium is an annotation to indicate the Service is on the Premium network tier
 	NetworkTierAnnotationPremium = cloud.NetworkTierPremium
+
+	// NEGAnnotation is an annotation to indicate that the loadbalancer service is using NEGs instead of InstanceGroups
+	NEGAnnotation = "cloud.google.com/neg"
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.

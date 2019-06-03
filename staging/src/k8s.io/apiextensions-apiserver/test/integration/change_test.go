@@ -93,8 +93,8 @@ func TestChangeCRD(t *testing.T) {
 		}
 	}()
 
-	// Set up 100 loops creating and reading and watching custom resources
-	for i := 0; i < 100; i++ {
+	// Set up 10 loops creating and reading and watching custom resources
+	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

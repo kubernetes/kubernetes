@@ -2,7 +2,6 @@ cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
 cmd/kubeadm/app/apis/kubeadm/v1beta2
-pkg/apis/abac/latest
 pkg/apis/admission
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
@@ -46,6 +45,9 @@ pkg/apis/rbac/v1
 pkg/apis/rbac/v1alpha1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
+pkg/apis/scheduling/v1
+pkg/apis/scheduling/v1alpha1
+pkg/apis/scheduling/v1beta1
 pkg/apis/storage
 pkg/apis/storage/v1
 pkg/apis/storage/v1beta1
@@ -168,6 +170,7 @@ pkg/kubelet/dockershim/network/testing
 pkg/kubelet/events
 pkg/kubelet/lifecycle
 pkg/kubelet/metrics
+pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/prober
@@ -181,7 +184,6 @@ pkg/kubelet/status
 pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
-pkg/kubelet/util/pluginwatcher
 pkg/kubemark
 pkg/master
 pkg/master/controller/crdregistration
@@ -312,7 +314,6 @@ pkg/volume/azure_file
 pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
-pkg/volume/host_path
 pkg/volume/iscsi
 pkg/volume/photon_pd
 pkg/volume/rbd
@@ -322,20 +323,10 @@ pkg/volume/testing
 pkg/volume/util/fs
 pkg/volume/util/volumepathhandler
 pkg/volume/vsphere_volume
-plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/limitranger
-plugin/pkg/admission/noderestriction
-plugin/pkg/admission/podnodeselector
-plugin/pkg/admission/podpreset
-plugin/pkg/admission/podtolerationrestriction
-plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/v1alpha1
-plugin/pkg/admission/resourcequota
-plugin/pkg/admission/resourcequota/apis/resourcequota
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1
-plugin/pkg/admission/security/podsecuritypolicy
-plugin/pkg/admission/serviceaccount
 plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
 plugin/pkg/auth/authorizer/rbac/bootstrappolicy
@@ -435,6 +426,7 @@ staging/src/k8s.io/apimachinery/pkg/watch
 staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/initializer
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
 staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/testcerts
@@ -586,7 +578,6 @@ staging/src/k8s.io/sample-apiserver/pkg/apis/wardle
 staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-test/e2e/chaosmonkey
 test/e2e/common
 test/e2e/lifecycle/bootstrap
 test/e2e/scalability

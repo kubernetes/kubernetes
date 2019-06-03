@@ -413,11 +413,14 @@ type PersistentVolumeClaimSpec struct {
 	// This is a beta feature.
 	// +optional
 	VolumeMode *PersistentVolumeMode
-	// This field requires the VolumeSnapshotDataSource alpha feature gate to be
-	// enabled and currently VolumeSnapshot is the only supported data source.
-	// If the provisioner can support VolumeSnapshot data source, it will create
-	// a new volume and data will be restored to the volume at the same time.
-	// If the provisioner does not support VolumeSnapshot data source, volume will
+	// This field can be used to specify either:
+	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
+	// * An existing PVC (PersistentVolumeClaim)
+	// In order to use either of these DataSource types, the appropriate feature gate
+	// must be enabled (VolumeSnapshotDataSource, VolumePVCDataSource)
+	// If the provisioner can support the specified data source, it will create
+	// a new volume based on the contents of the specified PVC or Snapshot.
+	// If the provisioner does not support the specified data source, the volume will
 	// not be created and the failure will be reported as an event.
 	// In the future, we plan to support more data source types and the behavior
 	// of the provisioner may change.
@@ -1941,6 +1944,16 @@ const (
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
+// PreemptionPolicy describes a policy for if/when to preempt a pod.
+type PreemptionPolicy string
+
+const (
+	// PreemptLowerPriority means that pod can preempt other pods with lower priority.
+	PreemptLowerPriority PreemptionPolicy = "PreemptLowerPriority"
+	// PreemptNever means that pod never preempts other pods with lower priority.
+	PreemptNever PreemptionPolicy = "Never"
+)
+
 // TerminationMessagePolicy describes how termination messages are retrieved from a container.
 type TerminationMessagePolicy string
 
@@ -2662,6 +2675,12 @@ type PodSpec struct {
 	// The higher the value, the higher the priority.
 	// +optional
 	Priority *int32
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
+	// +optional
+	PreemptionPolicy *PreemptionPolicy
 	// Specifies the DNS parameters of a pod.
 	// Parameters specified here will be merged to the generated DNS
 	// configuration based on DNSPolicy.

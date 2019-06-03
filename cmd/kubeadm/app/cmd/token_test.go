@@ -32,7 +32,6 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
@@ -160,11 +159,6 @@ func TestRunCreateToken(t *testing.T) {
 			}
 
 			cfg := &kubeadmapiv1beta2.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					// KubernetesVersion is not used, but we set this explicitly to avoid
-					// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
-					KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
-				},
 				BootstrapTokens: []kubeadmapiv1beta2.BootstrapToken{
 					{
 						Token:  bts,
@@ -176,8 +170,10 @@ func TestRunCreateToken(t *testing.T) {
 			}
 
 			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
-			if (err != nil) != tc.expectedError {
-				t.Errorf("Test case %s: RunCreateToken expected error: %v, saw: %v", tc.name, tc.expectedError, (err != nil))
+			if tc.expectedError && err == nil {
+				t.Error("unexpected success")
+			} else if !tc.expectedError && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

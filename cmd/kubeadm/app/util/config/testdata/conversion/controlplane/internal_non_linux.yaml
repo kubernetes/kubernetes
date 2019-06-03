@@ -39,7 +39,6 @@ ComponentConfigs:
     ClusterCIDR: ""
     ConfigSyncPeriod: 15m0s
     Conntrack:
-      Max: null
       MaxPerCore: 32768
       Min: 131072
       TCPCloseWaitTimeout: 1h0m0s

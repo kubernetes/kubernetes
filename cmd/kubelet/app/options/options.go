@@ -194,6 +194,8 @@ type KubeletFlags struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+	// EnableCAdvisorJSONEndpoints enables some cAdvisor endpoints that will be removed in future versions
+	EnableCAdvisorJSONEndpoints bool
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -223,7 +225,8 @@ func NewKubeletFlags() *KubeletFlags {
 		RegisterNode:                        true,
 		SeccompProfileRoot:                  filepath.Join(defaultRootDir, "seccomp"),
 		// prior to the introduction of this flag, there was a hardcoded cap of 50 images
-		NodeStatusMaxImages: 50,
+		NodeStatusMaxImages:         50,
+		EnableCAdvisorJSONEndpoints: true,
 	}
 }
 
@@ -424,6 +427,8 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
+	fs.BoolVar(&f.EnableCAdvisorJSONEndpoints, "enable-cadvisor-json-endpoints", f.EnableCAdvisorJSONEndpoints, "Enable cAdvisor json /spec and /stats/* endpoints.")
+	fs.MarkDeprecated("enable-cadvisor-json-apis", "will be removed in a future version")
 
 }
 

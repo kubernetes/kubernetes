@@ -89,7 +89,7 @@ func (in *StorageClass) DeepCopyObject() runtime.Object {
 func (in *StorageClassList) DeepCopyInto(out *StorageClassList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]StorageClass, len(*in))
@@ -150,7 +150,7 @@ func (in *VolumeAttachment) DeepCopyObject() runtime.Object {
 func (in *VolumeAttachmentList) DeepCopyInto(out *VolumeAttachmentList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]VolumeAttachment, len(*in))
@@ -186,6 +186,11 @@ func (in *VolumeAttachmentSource) DeepCopyInto(out *VolumeAttachmentSource) {
 		in, out := &in.PersistentVolumeName, &out.PersistentVolumeName
 		*out = new(string)
 		**out = **in
+	}
+	if in.InlineVolumeSpec != nil {
+		in, out := &in.InlineVolumeSpec, &out.InlineVolumeSpec
+		*out = new(corev1.PersistentVolumeSpec)
+		(*in).DeepCopyInto(*out)
 	}
 	return
 }

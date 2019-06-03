@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
 	structuralpruning "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -627,25 +629,36 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 
+		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
+		negotiatedSerializer := unstructuredNegotiatedSerializer{
+			typer:                 typer,
+			creator:               creator,
+			converter:             safeConverter,
+			structuralSchemas:     structuralSchemas,
+			structuralSchemaGK:    kind.GroupKind(),
+			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
+		}
+		var standardSerializers []runtime.SerializerInfo
+		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
+			if s.MediaType == runtime.ContentTypeProtobuf {
+				continue
+			}
+			standardSerializers = append(standardSerializers, s)
+		}
+
 		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
 				SelfLinker:         meta.NewAccessor(),
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer: unstructuredNegotiatedSerializer{
-				typer:                 typer,
-				creator:               creator,
-				converter:             safeConverter,
-				structuralSchemas:     structuralSchemas,
-				structuralSchemaGK:    kind.GroupKind(),
-				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
-			},
-			ParameterCodec: parameterCodec,
+			Serializer:          negotiatedSerializer,
+			ParameterCodec:      parameterCodec,
+			StandardSerializers: standardSerializers,
 
 			Creater:         creator,
 			Convertor:       safeConverter,
-			Defaulter:       unstructuredDefaulter{parameterScheme},
+			Defaulter:       unstructuredDefaulter{parameterScheme, structuralSchemas, kind.GroupKind()},
 			Typer:           typer,
 			UnsafeConvertor: unsafeConverter,
 
@@ -762,6 +775,16 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 			EncodesAsText:    true,
 			Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
 		},
+		{
+			MediaType:        "application/vnd.kubernetes.protobuf",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "vnd.kubernetes.protobuf",
+			Serializer:       protobuf.NewSerializer(s.creator, s.typer),
+			StreamSerializer: &runtime.StreamSerializerInfo{
+				Serializer: protobuf.NewRawSerializer(s.creator, s.typer),
+				Framer:     protobuf.LengthDelimitedFramer,
+			},
+		},
 	}
 }
 
@@ -771,7 +794,11 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
-	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
+	return versioning.NewCodec(nil, d, runtime.UnsafeObjectConvertor(Scheme), Scheme, Scheme, unstructuredDefaulter{
+		delegate:           Scheme,
+		structuralSchemas:  s.structuralSchemas,
+		structuralSchemaGK: s.structuralSchemaGK,
+	}, nil, gv, "unstructuredNegotiatedSerializer")
 }
 
 type UnstructuredObjectTyper struct {
@@ -807,14 +834,20 @@ func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, 
 }
 
 type unstructuredDefaulter struct {
-	delegate runtime.ObjectDefaulter
+	delegate           runtime.ObjectDefaulter
+	structuralSchemas  map[string]*structuralschema.Structural // by version
+	structuralSchemaGK schema.GroupKind
 }
 
 func (d unstructuredDefaulter) Default(in runtime.Object) {
-	// Delegate for things other than Unstructured.
-	if _, ok := in.(runtime.Unstructured); !ok {
+	// Delegate for things other than Unstructured, and other GKs
+	u, ok := in.(runtime.Unstructured)
+	if !ok || u.GetObjectKind().GroupVersionKind().GroupKind() != d.structuralSchemaGK {
 		d.delegate.Default(in)
+		return
 	}
+
+	structuraldefaulting.Default(u.UnstructuredContent(), d.structuralSchemas[u.GetObjectKind().GroupVersionKind().Version])
 }
 
 type CRDRESTOptionsGetter struct {
@@ -888,7 +921,11 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 			c,
 			&unstructuredCreator{},
 			crdserverscheme.NewUnstructuredObjectTyper(),
-			&unstructuredDefaulter{delegate: Scheme},
+			&unstructuredDefaulter{
+				delegate:           Scheme,
+				structuralSchemaGK: t.structuralSchemaGK,
+				structuralSchemas:  t.structuralSchemas,
+			},
 			t.encoderVersion,
 			t.decoderVersion,
 			"crdRESTOptions",

@@ -354,12 +354,12 @@ func (b *gcePersistentDiskMounter) CanMount() error {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *gcePersistentDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *gcePersistentDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.
-func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)
@@ -419,7 +419,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if !b.readOnly {
-		volume.SetVolumeOwnership(b, fsGroup)
+		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
 	}
 
 	klog.V(4).Infof("Successfully mounted %s", dir)

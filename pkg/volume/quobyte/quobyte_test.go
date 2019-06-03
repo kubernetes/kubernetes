@@ -101,7 +101,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
 		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
 	}
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	unmounter, err := plug.(*quobytePlugin).newUnmounterInternal("vol", types.UID("poduid"), &mount.FakeMounter{})

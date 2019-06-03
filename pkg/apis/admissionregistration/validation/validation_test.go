@@ -28,7 +28,7 @@ func strPtr(s string) *string { return &s }
 
 func int32Ptr(i int32) *int32 { return &i }
 
-func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook, defaultAdmissionReviewVersions bool) *admissionregistration.ValidatingWebhookConfiguration {
+func newValidatingWebhookConfiguration(hooks []admissionregistration.ValidatingWebhook, defaultAdmissionReviewVersions bool) *admissionregistration.ValidatingWebhookConfiguration {
 	// If the test case did not specify an AdmissionReviewVersions, default it so the test passes as
 	// this field will be defaulted in production code.
 	for i := range hooks {
@@ -57,7 +57,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	}{
 		{
 			name: "should fail on bad AdmissionReviewVersion value",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -68,7 +68,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "should pass on valid AdmissionReviewVersion",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -79,7 +79,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "should pass on mix of accepted and unaccepted AdmissionReviewVersion",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -90,7 +90,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "should fail on invalid AdmissionReviewVersion",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -101,7 +101,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "should fail on duplicate AdmissionReviewVersion",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -112,7 +112,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "all Webhooks must have a fully qualified name",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -130,7 +130,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "Operations must not be empty or nil",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					Rules: []admissionregistration.RuleWithOperations{
@@ -157,7 +157,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "\"\" is NOT a valid operation",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					Rules: []admissionregistration.RuleWithOperations{
@@ -176,7 +176,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "operation must be either create/update/delete/connect",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					Rules: []admissionregistration.RuleWithOperations{
@@ -195,7 +195,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "wildcard operation cannot be mixed with other strings",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					Rules: []admissionregistration.RuleWithOperations{
@@ -214,7 +214,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: `resource "*" can co-exist with resources that have subresources`,
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -233,7 +233,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: `resource "*" cannot mix with resources that don't have subresources`,
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -253,7 +253,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource a/* cannot mix with a/x",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -273,7 +273,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource a/* can mix with a",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -292,7 +292,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource */a cannot mix with x/a",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -312,7 +312,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource */* cannot mix with other resources",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -332,7 +332,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -346,7 +346,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\"",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -360,7 +360,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "both service and URL missing",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{},
@@ -370,7 +370,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "both service and URL provided",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -387,7 +387,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "blank URL",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -399,7 +399,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "wrong scheme",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -411,7 +411,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "missing host",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -423,7 +423,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "fragment",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -435,7 +435,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "query",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -447,7 +447,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "user",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -459,7 +459,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "just totally wrong",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -471,7 +471,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "path must start with slash",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -488,7 +488,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "path accepts slash",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -505,7 +505,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "path accepts no trailing slash",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -522,7 +522,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "path fails //",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -539,7 +539,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "path no empty step",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -555,7 +555,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
 		}, {
 			name: "path no empty step 2",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -572,7 +572,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "path no non-subdomain",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name: "webhook.k8s.io",
 					ClientConfig: admissionregistration.WebhookClientConfig{
@@ -590,7 +590,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		{
 			name: "invalid port 0",
 			config: newValidatingWebhookConfiguration(
-				[]admissionregistration.Webhook{
+				[]admissionregistration.ValidatingWebhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
@@ -608,7 +608,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		{
 			name: "invalid port >65535",
 			config: newValidatingWebhookConfiguration(
-				[]admissionregistration.Webhook{
+				[]admissionregistration.ValidatingWebhook{
 					{
 						Name: "webhook.k8s.io",
 						ClientConfig: admissionregistration.WebhookClientConfig{
@@ -625,7 +625,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "timeout seconds cannot be greater than 30",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
@@ -636,7 +636,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "timeout seconds cannot be smaller than 1",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
@@ -647,7 +647,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "timeout seconds must be positive",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
@@ -658,7 +658,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "valid timeout seconds",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
@@ -707,14 +707,14 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 	}{
 		{
 			name: "should pass on valid new AdmissionReviewVersion",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
-			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
@@ -724,14 +724,14 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 		},
 		{
 			name: "should pass on invalid AdmissionReviewVersion with invalid previous versions",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
 					AdmissionReviewVersions: []string{"invalid-v1", "invalid-v2"},
 				},
 			}, true),
-			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -742,14 +742,14 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 		},
 		{
 			name: "should fail on invalid AdmissionReviewVersion with valid previous versions",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
-			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
@@ -760,14 +760,14 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 		},
 		{
 			name: "should fail on invalid AdmissionReviewVersion with missing previous versions",
-			config: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
-			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.Webhook{
+			oldconfig: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
