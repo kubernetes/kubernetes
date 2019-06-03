@@ -85,7 +85,7 @@ func (ResourceRule) SwaggerDoc() map[string]string {
 }
 
 var map_SelfSubjectAccessReview = map[string]string{
-	"":       "SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
+	"":       "SelfSubjectAccessReview checks whether or not the current user can perform an action.  Not filling in a spec.namespace means \"in all namespaces\".  Self is a special case, because users should always be able to check whether they can perform an action",
 	"spec":   "Spec holds information about the request being evaluated.  user and groups must be empty",
 	"status": "Status is filled in by the server and indicates whether the request is allowed or not",
 }
