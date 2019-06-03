@@ -20,11 +20,7 @@ package kubelet
 import (
 	"path/filepath"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // getPodResourcesDir returns the full path to the directory containing the pod resources socket
