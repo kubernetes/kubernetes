@@ -140,8 +140,8 @@ type OperationExecutor interface {
 	// IsOperationPending returns true if an operation for the given volumeName and podName is pending,
 	// otherwise it returns false
 	IsOperationPending(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
-	// ExpandVolumeFSWithoutUnmounting will resize volume's file system to expected size without unmounting the volume.
-	ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	// ExpandInUseVolume will resize volume's file system to expected size without unmounting the volume.
+	ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
 	// ReconstructVolumeOperation construct a new volumeSpec and returns it created by plugin
 	ReconstructVolumeOperation(volumeMode v1.PersistentVolumeMode, plugin volume.VolumePlugin, mapperPlugin volume.BlockVolumePlugin, uid types.UID, podName volumetypes.UniquePodName, volumeSpecName string, volumePath string, pluginName string) (*volume.Spec, error)
 	// CheckVolumeExistenceOperation checks volume existence
@@ -820,8 +820,8 @@ func (oe *operationExecutor) UnmountDevice(
 		deviceToDetach.VolumeName, podName, generatedOperations)
 }
 
-func (oe *operationExecutor) ExpandVolumeFSWithoutUnmounting(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-	generatedOperations, err := oe.operationGenerator.GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount, actualStateOfWorld)
+func (oe *operationExecutor) ExpandInUseVolume(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+	generatedOperations, err := oe.operationGenerator.GenerateExpandInUseVolumeFunc(volumeToMount, actualStateOfWorld)
 	if err != nil {
 		return err
 	}
