@@ -154,11 +154,6 @@ func (kl *Kubelet) getPodContainerDir(podUID types.UID, ctrName string) string {
 	return filepath.Join(kl.getPodDir(podUID), config.DefaultKubeletContainersDirName, ctrName)
 }
 
-// getPodResourcesSocket returns the full path to the directory containing the pod resources socket
-func (kl *Kubelet) getPodResourcesDir() string {
-	return filepath.Join(kl.getRootDir(), config.DefaultKubeletPodResourcesDirName)
-}
-
 // getPluginsDirSELinuxLabel returns the selinux label to be applied on plugin directories
 func (kl *Kubelet) getPluginsDirSELinuxLabel() string {
 	return config.KubeletPluginsDirSELinuxLabel

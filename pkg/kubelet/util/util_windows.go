@@ -110,7 +110,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 
 // LocalEndpoint returns the full path to a windows named pipe
 func LocalEndpoint(path, file string) string {
-	pipePath := filepath.Join("//./pipe/", path, file)
+	pipePath := filepath.Join(path, file)
 	u := url.URL{
 		Scheme: npipeProtocol,
 		Path:   strings.Replace(pipePath, "\\", "/", -1),
