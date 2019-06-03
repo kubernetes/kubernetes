@@ -98,6 +98,17 @@ func validSignal(signal evictionapi.Signal) bool {
 	return found
 }
 
+// getReclaimableThreshold finds the threshold and resource to reclaim
+func getReclaimableThreshold(thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
+	for _, thresholdToReclaim := range thresholds {
+		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
+			return thresholdToReclaim, resourceToReclaim, true
+		}
+		klog.V(3).Infof("eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", thresholdToReclaim.Signal)
+	}
+	return evictionapi.Threshold{}, "", false
+}
+
 // ParseThresholdConfig parses the flags for thresholds.
 func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}

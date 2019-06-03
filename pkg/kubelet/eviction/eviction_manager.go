@@ -324,10 +324,8 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// rank the thresholds by eviction priority
 	sort.Sort(byEvictionPriority(thresholds))
-	thresholdToReclaim := thresholds[0]
-	resourceToReclaim, found := signalToResource[thresholdToReclaim.Signal]
-	if !found {
-		klog.V(3).Infof("eviction manager: threshold %s was crossed, but reclaim is not implemented for this threshold.", thresholdToReclaim.Signal)
+	thresholdToReclaim, resourceToReclaim, foundAny := getReclaimableThreshold(thresholds)
+	if !foundAny {
 		return nil
 	}
 	klog.Warningf("eviction manager: attempting to reclaim %v", resourceToReclaim)
