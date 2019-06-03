@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -109,11 +110,12 @@ func parseEndpoint(endpoint string) (string, string, error) {
 
 // LocalEndpoint returns the full path to a windows named pipe
 func LocalEndpoint(path, file string) string {
+	pipePath := filepath.Join("//./pipe/", path, file)
 	u := url.URL{
 		Scheme: npipeProtocol,
-		Path:   path,
+		Path:   strings.Replace(pipePath, "\\", "/", -1),
 	}
-	return u.String() + "//./pipe/" + file
+	return u.String()
 }
 
 var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
