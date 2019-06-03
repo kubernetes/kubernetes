@@ -449,19 +449,17 @@ func beingDeleted(accessor metav1.Object) bool {
 }
 
 func hasDeleteDependentsFinalizer(accessor metav1.Object) bool {
-	finalizers := accessor.GetFinalizers()
-	for _, finalizer := range finalizers {
-		if finalizer == metav1.FinalizerDeleteDependents {
-			return true
-		}
-	}
-	return false
+	return hasFinalizer(accessor, metav1.FinalizerDeleteDependents)
 }
 
 func hasOrphanFinalizer(accessor metav1.Object) bool {
+	return hasFinalizer(accessor, metav1.FinalizerOrphanDependents)
+}
+
+func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 	finalizers := accessor.GetFinalizers()
 	for _, finalizer := range finalizers {
-		if finalizer == metav1.FinalizerOrphanDependents {
+		if finalizer == matchingFinalizer {
 			return true
 		}
 	}
