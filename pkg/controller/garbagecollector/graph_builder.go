@@ -134,13 +134,14 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: check if there are differences in the ownerRefs,
-			// finalizers, and DeletionTimestamp; if not, ignore the update.
 			event := &event{
 				eventType: updateEvent,
 				obj:       newObj,
 				oldObj:    oldObj,
 				gvk:       kind,
+			}
+			if haveSameObjs(event) {
+				return
 			}
 			gb.graphChanges.Add(event)
 		},
@@ -621,6 +622,102 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 			// dependents are deleted, if so, the owner will be deleted.
 			gb.attemptToDelete.Add(ownerNode)
 		}
+	}
+	return true
+}
+
+func haveSameObjs(event *event) bool {
+	if event == nil {
+		return true
+	}
+	if event.obj == nil || event.oldObj == nil {
+		return false
+	}
+	oldMeta, ok := event.obj.(*metav1.ObjectMeta)
+	if !ok {
+		return false
+	}
+	newMeta, ok := event.oldObj.(*metav1.ObjectMeta)
+	if !ok {
+		return false
+	}
+	if oldMeta == nil || newMeta == nil {
+		return false
+	}
+	// check DeletionTimestamp
+	if oldMeta.DeletionTimestamp != newMeta.DeletionTimestamp {
+		return false
+	}
+
+	//check Finalizers
+	if !checkFinalizers(oldMeta.Finalizers, newMeta.Finalizers) {
+		return false
+	}
+	//check OwnerRefs
+	if !checkRefs(oldMeta.OwnerReferences, newMeta.OwnerReferences) {
+		return false
+	}
+	return true
+}
+
+func checkFinalizers(olds, news []string) bool {
+	if len(olds) != len(news) {
+		return false
+	}
+	var oldMap, newMap map[string]bool
+
+	for _, old := range olds {
+		oldMap[old] = true
+	}
+	for _, new := range news {
+		newMap[new] = true
+	}
+	for key := range oldMap {
+		if _, ok := newMap[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func checkRefs(olds, news []metav1.OwnerReference) bool {
+	if len(olds) != len(news) {
+		return false
+	}
+	var oldMap, newMap map[string]metav1.OwnerReference
+
+	for _, old := range olds {
+		oldMap[old.Name] = old
+	}
+	for _, new := range news {
+		newMap[new.Name] = new
+	}
+	for key, oldVal := range oldMap {
+		newVal, ok := newMap[key]
+		if !ok {
+			return false
+		}
+		if oldVal.Name != newVal.Name {
+			return false
+		}
+		if oldVal.APIVersion != newVal.APIVersion {
+			return false
+		}
+		if oldVal.Kind != newVal.Kind {
+			return false
+		}
+		if oldVal.UID != newVal.UID {
+			return false
+		}
+		if oldVal.BlockOwnerDeletion != nil && newVal.BlockOwnerDeletion != nil &&
+			oldVal.BlockOwnerDeletion != newVal.BlockOwnerDeletion {
+			return false
+		}
+		if oldVal.Controller != nil && newVal.Controller != nil &&
+			oldVal.Controller != newVal.Controller {
+			return false
+		}
+
 	}
 	return true
 }
