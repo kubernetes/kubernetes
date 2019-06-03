@@ -104,7 +104,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find network %s: %v", networkName, err)
+		return nil, err
 	}
 	var flags hcn.EndpointFlags
 	if !ep.isLocal {
@@ -141,12 +141,12 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		}
 		createdEndpoint, err = hnsNetwork.CreateRemoteEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Remote endpoint creation failed: %v", err)
+			return nil, err
 		}
 	} else {
 		createdEndpoint, err = hnsNetwork.CreateEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Local endpoint creation failed: %v", err)
+			return nil, err
 		}
 	}
 	return &endpointsInfo{

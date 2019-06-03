@@ -184,6 +184,17 @@ func newEndpointInfo(ip string, port uint16, isLocal bool, hns HostNetworkServic
 	return info
 }
 
+func newSourceVIP(hns HostNetworkService, network string, ip string, mac string, providerAddress string) (*endpointsInfo, error) {
+	hnsEndpoint := &endpointsInfo{
+		ip:              ip,
+		isLocal:         true,
+		macAddress:      mac,
+		providerAddress: providerAddress,
+	}
+	ep, err := hns.createEndpoint(hnsEndpoint, network)
+	return ep, err
+}
+
 func (ep *endpointsInfo) Cleanup() {
 	Log(ep, "Endpoint Cleanup", 3)
 	ep.refCount--
@@ -544,11 +555,27 @@ func NewProxier(
 		}
 	}
 
+	klog.V(3).Infof("Cleaning up old HNS policy lists")
+	deleteAllHnsLoadBalancerPolicy()
+
+	// Get HNS network information
 	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
-	if err != nil {
-		klog.Errorf("Unable to find Hns Network specified by %s. Please check environment variable KUBE_NETWORK or network-name flag", hnsNetworkName)
-		return nil, err
+	for err != nil {
+		klog.Errorf("Unable to find HNS Network specified by %s. Please check network name and CNI deployment", hnsNetworkName)
+		time.Sleep(1 * time.Second)
+		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 	}
+
+	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
+	// Sleep and update the network to include new information
+	if hnsNetworkInfo.networkType == "Overlay" {
+		time.Sleep(10 * time.Second)
+		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
+		if err != nil {
+			return nil, fmt.Errorf("Could not find HNS network %s", hnsNetworkName)
+		}
+	}
+
 	klog.V(1).Infof("Hns Network loaded with info = %v", hnsNetworkInfo)
 	isDSR := config.EnableDSR
 	if isDSR && !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.WinDSR) {
@@ -587,20 +614,6 @@ func NewProxier(
 		}
 		if len(hostMac) == 0 {
 			return nil, fmt.Errorf("Could not find host mac address for %s", nodeIP)
-		}
-
-		existingSourceVip, _ := hns.getEndpointByIpAddress(sourceVip, hnsNetworkName)
-		if existingSourceVip == nil {
-			hnsEndpoint := &endpointsInfo{
-				ip:              sourceVip,
-				isLocal:         true,
-				macAddress:      hostMac,
-				providerAddress: nodeIP.String(),
-			}
-			_, err = hns.createEndpoint(hnsEndpoint, hnsNetworkName)
-			if err != nil {
-				return nil, fmt.Errorf("Source Vip endpoint creation failed: %v", err)
-			}
 		}
 	}
 
@@ -838,6 +851,25 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
+func (proxier *Proxier) cleanupAllPolicies() {
+	for svcName, svcInfo := range proxier.serviceMap {
+		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName])
+	}
+}
+
+func isNetworkNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if _, ok := err.(hcn.NetworkNotFoundError); ok {
+		return true
+	}
+	if _, ok := err.(hcsshim.NetworkNotFoundError); ok {
+		return true
+	}
+	return false
+}
+
 // <endpointsMap> is updated by this function (based on the given changes).
 // <changes> map is cleared after applying them.
 func (proxier *Proxier) updateEndpointsMap() (result updateEndpointMapResult) {
@@ -968,6 +1000,20 @@ func (proxier *Proxier) syncProxyRules() {
 		return
 	}
 
+	hnsNetworkName := proxier.network.name
+	hns := proxier.hns
+
+	prevNetworkID := proxier.network.id
+	updatedNetwork, err := hns.getNetworkByName(hnsNetworkName)
+	if updatedNetwork == nil || updatedNetwork.id != prevNetworkID || isNetworkNotFoundError(err) {
+		klog.Infof("The HNS network %s is not present or has changed since the last sync. Please check the CNI deployment", hnsNetworkName)
+		proxier.cleanupAllPolicies()
+		if updatedNetwork != nil {
+			proxier.network = *updatedNetwork
+		}
+		return
+	}
+
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
@@ -983,6 +1029,17 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
+	if proxier.network.networkType == "Overlay" {
+		existingSourceVip, err := hns.getEndpointByIpAddress(proxier.sourceVip, hnsNetworkName)
+		if existingSourceVip == nil {
+			_, err = newSourceVIP(hns, hnsNetworkName, proxier.sourceVip, proxier.hostMac, proxier.nodeIP.String())
+		}
+		if err != nil {
+			klog.Errorf("Source Vip endpoint creation failed: %v", err)
+			return
+		}
+	}
+
 	klog.V(3).Infof("Syncing Policies")
 
 	// Program HNS by adding corresponding policies for each service.
@@ -992,8 +1049,6 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		hnsNetworkName := proxier.network.name
-		hns := proxier.hns
 		if proxier.network.networkType == "Overlay" {
 			serviceVipEndpoint, _ := hns.getEndpointByIpAddress(svcInfo.clusterIP.String(), hnsNetworkName)
 			if serviceVipEndpoint == nil {
@@ -1055,7 +1110,9 @@ func (proxier *Proxier) syncProxyRules() {
 					networkName := proxier.network.name
 					updatedNetwork, err := hns.getNetworkByName(networkName)
 					if err != nil {
-						klog.Fatalf("Failed to get network %v: %v", networkName, err)
+						klog.Errorf("Unable to find HNS Network specified by %s. Please check network name and CNI deployment", hnsNetworkName)
+						proxier.cleanupAllPolicies()
+						return
 					}
 					proxier.network = *updatedNetwork
 					var providerAddress string
