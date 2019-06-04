@@ -107,13 +107,9 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	}
 }
 
-// LocalEndpoint returns the full path to a windows named pipe
-func LocalEndpoint(path, file string) string {
-	u := url.URL{
-		Scheme: npipeProtocol,
-		Path:   path,
-	}
-	return u.String() + "//./pipe/" + file
+// LocalEndpoint empty implementation
+func LocalEndpoint(path, file string) (string, error) {
+	return "", fmt.Errorf("LocalEndpoints are unsupported in this build")
 }
 
 var tickCount = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
