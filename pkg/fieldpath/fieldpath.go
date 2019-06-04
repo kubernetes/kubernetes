@@ -46,7 +46,7 @@ func FormatMap(m map[string]string) (fmtStr string) {
 func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	if path, subscript, ok := SplitMaybeSubscriptedPath(fieldPath); ok {
