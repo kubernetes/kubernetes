@@ -547,10 +547,8 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 					SecurityContext: GenerateSecurityContext(true),
 				},
 			},
-			SecurityContext: &v1.PodSecurityContext{
-				FSGroup: fsGroup,
-			},
-			RestartPolicy: v1.RestartPolicyNever,
+			SecurityContext: GeneratePodSecurityContext(fsGroup, nil),
+			RestartPolicy:   v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
 					Name:         volMountName,
