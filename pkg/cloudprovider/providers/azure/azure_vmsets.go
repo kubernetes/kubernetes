@@ -20,7 +20,7 @@ import (
 	"net/http"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
