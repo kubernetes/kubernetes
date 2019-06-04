@@ -534,7 +534,7 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 	var current int
 	err = wait.Poll(poll, timeout,
 		func() (bool, error) {
-			pods, err := WaitForPodsWithLabel(c, ns, label)
+			pods, err = WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				e2elog.Logf("Failed to list pods: %v", err)
 				if testutils.IsRetryableAPIError(err) {
