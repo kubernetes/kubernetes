@@ -18,8 +18,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"path/filepath"
-
 	"k8s.io/kubernetes/pkg/kubelet/config"
 )
 
