@@ -60,7 +60,7 @@ var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
 		Help:    "Storage operation end to end duration in seconds",
 		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
 	},
-	[]string{"volume_plugin", "operation_name"},
+	[]string{"plugin_name", "operation_name"},
 )
 
 func init() {
