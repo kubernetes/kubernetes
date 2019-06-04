@@ -424,7 +424,9 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 
 	// Add node-anti-affinity.
 	secondNode := node
-	framework.SetAntiAffinity(&secondNode, actualNodeName)
+	// Set anti-affinity preference: in case there are no nodes in the same AZ it may happen the second pod gets
+	// scheduled on the same node as the first one. In such a case the test needs to be skipped.
+	framework.SetAntiAffinityPreference(&secondNode, actualNodeName)
 	ginkgo.By(fmt.Sprintf("checking the created volume is readable and retains data on another node %+v", secondNode))
 	command = "grep 'hello world' /mnt/test/data"
 	if framework.NodeOSDistroIs("windows") {
@@ -434,9 +436,13 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
-	gomega.Expect(runningPod.Spec.NodeName).NotTo(gomega.Equal(actualNodeName), "second pod should have run on a different node")
 	StopPod(client, pod)
 	pod = nil
+	// The second pod got scheduled on the same node as the first one: skip the test.
+	if runningPod.Spec.NodeName == actualNodeName {
+		e2elog.Logf("Warning: The reader pod got scheduled on the same node as the writer pod: skipping test")
+		framework.Skipf("No node available for the second pod found")
+	}
 }
 
 // TestBindingWaitForFirstConsumer tests the binding with WaitForFirstConsumer mode
