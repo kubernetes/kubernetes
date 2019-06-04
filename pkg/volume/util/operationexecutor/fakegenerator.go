@@ -99,8 +99,8 @@ func (f *fakeOGCounter) GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.
 	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	return f.recordFuncCall("GenerateExpandVolumeFSWithoutUnmountingFunc"), nil
+func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	return f.recordFuncCall("GenerateExpandInUseVolumeFunc"), nil
 }
 
 func (f *fakeOGCounter) recordFuncCall(name string) volumetypes.GeneratedOperations {

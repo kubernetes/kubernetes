@@ -281,8 +281,8 @@ spec:
           failureThreshold: 5
         readinessProbe:
           httpGet:
-            path: /ready
-            port: 8181
+            path: /health
+            port: 8080
             scheme: HTTP
         securityContext:
           allowPrivilegeEscalation: false
@@ -314,7 +314,6 @@ data:
     .:53 {
         errors
         health
-        ready
         kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
            fallthrough in-addr.arpa ip6.arpa

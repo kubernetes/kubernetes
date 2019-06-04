@@ -147,9 +147,7 @@ func (dsw *desiredStateOfWorld) RemovePlugin(socketPath string) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
-	if _, ok := dsw.socketFileToInfo[socketPath]; ok {
-		delete(dsw.socketFileToInfo, socketPath)
-	}
+	delete(dsw.socketFileToInfo, socketPath)
 }
 
 func (dsw *desiredStateOfWorld) GetPluginsToRegister() []PluginInfo {

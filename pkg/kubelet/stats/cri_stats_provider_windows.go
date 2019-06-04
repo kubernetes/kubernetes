@@ -19,6 +19,7 @@ limitations under the License.
 package stats
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Microsoft/hcsshim"
@@ -40,24 +41,38 @@ func (p *criStatsProvider) listContainerNetworkStats() (map[string]*statsapi.Net
 
 	stats := make(map[string]*statsapi.NetworkStats)
 	for _, c := range containers {
-		container, err := hcsshim.OpenContainer(c.ID)
+		cstats, err := fetchContainerStats(c)
 		if err != nil {
-			klog.V(4).Infof("Failed to open container %q with error '%v', continue to get stats for other containers", c.ID, err)
+			klog.V(4).Infof("Failed to fetch statistics for container %q with error '%v', continue to get stats for other containers", c.ID, err)
 			continue
 		}
-
-		cstats, err := container.Statistics()
-		if err != nil {
-			klog.V(4).Infof("Failed to get statistics for container %q with error '%v', continue to get stats for other containers", c.ID, err)
-			continue
-		}
-
 		if len(cstats.Network) > 0 {
 			stats[c.ID] = hcsStatsToNetworkStats(cstats.Timestamp, cstats.Network)
 		}
 	}
 
 	return stats, nil
+}
+
+func fetchContainerStats(c hcsshim.ContainerProperties) (stats hcsshim.Statistics, err error) {
+	var (
+		container hcsshim.Container
+	)
+	container, err = hcsshim.OpenContainer(c.ID)
+	if err != nil {
+		return
+	}
+	defer func() {
+		if closeErr := container.Close(); closeErr != nil {
+			if err != nil {
+				err = fmt.Errorf("failed to close container after error %v; close error: %v", err, closeErr)
+			} else {
+				err = closeErr
+			}
+		}
+	}()
+
+	return container.Statistics()
 }
 
 // hcsStatsToNetworkStats converts hcsshim.Statistics.Network to statsapi.NetworkStats
