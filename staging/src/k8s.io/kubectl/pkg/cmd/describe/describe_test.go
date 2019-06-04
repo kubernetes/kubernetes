@@ -59,7 +59,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -92,7 +92,7 @@ func TestDescribeUnknownNamespacedSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -133,7 +133,7 @@ func TestDescribeObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s", d.Output) {
+	if buf.String() != d.Output {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
