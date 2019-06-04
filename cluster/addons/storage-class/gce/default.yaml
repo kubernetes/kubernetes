@@ -10,3 +10,4 @@ metadata:
 provisioner: kubernetes.io/gce-pd
 parameters:
   type: pd-standard
+allowVolumeExpansion: true
