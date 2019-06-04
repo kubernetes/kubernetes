@@ -619,13 +619,9 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 // GraphHasUID returns if the GraphBuilder has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
 // This method is used by integration tests.
-func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
-	for _, u := range UIDs {
-		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
-			return true
-		}
-	}
-	return false
+func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
+	_, ok := gc.dependencyGraphBuilder.uidToNode.Read(u)
+	return ok
 }
 
 // GetDeletableResources returns all resources from discoveryClient that the
