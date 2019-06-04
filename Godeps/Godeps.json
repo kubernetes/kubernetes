@@ -46,7 +46,7 @@
 			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
 		{
-			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-09-01/network",
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network",
 			"Comment": "v21.4.0",
 			"Rev": "32916f57ad7b421f5fdaab86b73a795632fff117"
 		},
