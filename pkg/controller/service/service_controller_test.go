@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -615,35 +616,61 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 
 }
 
-// TestConflictWhenProcessServiceCreateOrUpdate tests if processServiceCreateOrUpdate will
-// retry creating the load balancer when the update operation returns a conflict
-// error.
-func TestConflictWhenProcessServiceCreateOrUpdate(t *testing.T) {
-	svcName := "conflict-lb"
-	svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
-	controller, _, client := newController()
-	client.PrependReactor("update", "services", func(action core.Action) (bool, runtime.Object, error) {
-		update := action.(core.UpdateAction)
-		return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), svcName, errors.New("Object changed"))
-	})
+// TestProcessServiceCreateOrUpdateK8sError tests processServiceCreateOrUpdate
+// with various kubernetes errors.
+func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
+	svcName := "svc-k8s-err"
+	conflictErr := apierrors.NewConflict(schema.GroupResource{}, svcName, errors.New("Object conflict"))
+	notFoundErr := apierrors.NewNotFound(schema.GroupResource{}, svcName)
 
-	if err := controller.processServiceCreateOrUpdate(svc, svcName); err == nil {
-		t.Fatalf("controller.processServiceCreateOrUpdate() = nil, want error")
+	testCases := []struct {
+		desc      string
+		k8sErr    error
+		expectErr error
+	}{
+		{
+			desc:      "conflict error",
+			k8sErr:    conflictErr,
+			expectErr: fmt.Errorf("failed to update load balancer status: %v", conflictErr),
+		},
+		{
+			desc:      "not found error",
+			k8sErr:    notFoundErr,
+			expectErr: nil,
+		},
 	}
 
-	errMsg := "Error syncing load balancer"
-	if gotEvent := func() bool {
-		events := controller.eventRecorder.(*record.FakeRecorder).Events
-		for len(events) > 0 {
-			e := <-events
-			if strings.Contains(e, errMsg) {
-				return true
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
+			controller, _, client := newController()
+			client.PrependReactor("patch", "services", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, tc.k8sErr
+			})
+
+			if err := controller.processServiceCreateOrUpdate(svc, svcName); !reflect.DeepEqual(err, tc.expectErr) {
+				t.Fatalf("processServiceCreateOrUpdate() = %v, want %v", err, tc.expectErr)
 			}
-		}
-		return false
-	}(); !gotEvent {
-		t.Errorf("controller.processServiceCreateOrUpdate() = can't find sync error event, want event contains %q", errMsg)
+			if tc.expectErr == nil {
+				return
+			}
+
+			errMsg := "Error syncing load balancer"
+			if gotEvent := func() bool {
+				events := controller.eventRecorder.(*record.FakeRecorder).Events
+				for len(events) > 0 {
+					e := <-events
+					if strings.Contains(e, errMsg) {
+						return true
+					}
+				}
+				return false
+			}(); !gotEvent {
+				t.Errorf("processServiceCreateOrUpdate() = can't find sync error event, want event contains %q", errMsg)
+			}
+		})
 	}
+
 }
 
 func TestSyncService(t *testing.T) {
