@@ -67,7 +67,6 @@ func (t *dnsFederationsConfigMapTest) run() {
 		valid1 := map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
         health
-        ready
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
             upstream
@@ -84,7 +83,6 @@ func (t *dnsFederationsConfigMapTest) run() {
 		valid2 := map[string]string{
 			"Corefile": fmt.Sprintf(`:53 {
         health
-        ready
         kubernetes %v in-addr.arpa ip6.arpa {
             pods insecure
             upstream
@@ -235,7 +233,6 @@ func (t *dnsNameserverTest) run(isIPv6 bool) {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
         health
-        ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
@@ -335,7 +332,6 @@ func (t *dnsPtrFwdTest) run(isIPv6 bool) {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
         health
-        ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
@@ -447,7 +443,6 @@ func (t *dnsExternalNameTest) run(isIPv6 bool) {
 		t.setConfigMap(&v1.ConfigMap{Data: map[string]string{
 			"Corefile": fmt.Sprintf(`.:53 {
         health
-        ready
         kubernetes %v in-addr.arpa ip6.arpa {
            pods insecure
            upstream
