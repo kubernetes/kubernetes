@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -369,7 +369,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
 		// delete and recreate failed pods
-		if isFailed(replicas[i]) {
+		// We can count pending pods as failed pods for the purposes
+		// of a stateful set
+		if isFailed(replicas[i]) || isStatefullyStuck(set, replicas[i], currentRevision, updateRevision) {
 			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
 				"StatefulSet %s/%s is recreating failed Pod %s",
 				set.Namespace,
@@ -444,7 +446,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 	}
 
-	// At this point, all of the current Replicas are Running and Ready, we can consider termination.
+	// At this point, all of the current Replicas are Running and Ready state, we can consider termination.
 	// We will wait for all predecessors to be Running and Ready prior to attempting a deletion.
 	// We will terminate Pods in a monotonically decreasing order over [len(pods),set.Spec.Replicas).
 	// Note that we do not resurrect Pods in this interval. Also note that scaling will take precedence over

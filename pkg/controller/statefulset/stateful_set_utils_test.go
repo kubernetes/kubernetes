@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
@@ -194,6 +194,55 @@ func TestIsRunningAndReady(t *testing.T) {
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	if !isRunningAndReady(pod) {
 		t.Error("Pod should be running and ready")
+	}
+}
+func TestIsPending(t *testing.T) {
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+	pod.Status = v1.PodStatus{
+		Phase: v1.PodPending,
+	}
+	if !isPending(pod) {
+		t.Error("Pod should be in a pending state")
+	}
+}
+
+func TestIsStatefullyStuck(t *testing.T) {
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 1)
+	pod.Status = v1.PodStatus{
+		Phase: v1.PodPending,
+	}
+	setPodRevision(pod, "1")
+	pod.ObjectMeta.Generation = 1
+
+	set.ObjectMeta.Generation = 2
+	set.SetLabels(map[string]string{
+		apps.StatefulSetRevisionLabel: "2",
+	})
+
+	currentRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "1",
+			Labels: map[string]string{
+				apps.StatefulSetRevisionLabel: "1",
+			},
+		},
+		Revision: 1,
+	}
+	updateRevision := &apps.ControllerRevision{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "2",
+			Labels: map[string]string{
+				apps.StatefulSetRevisionLabel: "2",
+			},
+		},
+		Revision: 2,
+	}
+
+	set.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+	if !isStatefullyStuck(set, pod, currentRevision, updateRevision) {
+		t.Error("Pod should be in a stuck state")
 	}
 }
 

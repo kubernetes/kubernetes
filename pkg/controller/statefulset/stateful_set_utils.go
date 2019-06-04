@@ -24,7 +24,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -213,6 +213,25 @@ func isRunningAndReady(pod *v1.Pod) bool {
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
+}
+
+// isStatefullyStuck returns true if a pod in a stateful set is stuck
+// due to a previously bad roll-out. We can detect this by checking all of:
+// 1) The pod is in a pending state
+// 2) The pod is at a different revision than the update revision
+// 3) The update strategy is rolling
+// 4) The set and the pod are at different generations
+func isStatefullyStuck(set *apps.StatefulSet, pod *v1.Pod, currentRevision, updateRevision *apps.ControllerRevision) bool {
+	return isPending(pod) &&
+		getPodRevision(pod) == currentRevision.Name &&
+		currentRevision.Name != updateRevision.Name &&
+		set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
+		set.ObjectMeta.Generation != pod.ObjectMeta.Generation
+}
+
+// isPending returns true if a pod is in a Phase of PodPending
+func isPending(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodPending
 }
 
 // isFailed returns true if pod has a Phase of PodFailed
