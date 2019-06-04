@@ -37,6 +37,8 @@ func NewControlPlane() workflow.Phase {
 		InheritFlags: []string{
 			options.DryRun,
 			options.KubeconfigPath,
+			options.CertificateRenewal,
+			options.EtcdUpgrade,
 		},
 	}
 	return phase

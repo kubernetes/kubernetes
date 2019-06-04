@@ -116,6 +116,8 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 	options.AddKubeConfigFlag(flagSet, &nodeOptions.kubeConfigPath)
 	flagSet.BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
 	flagSet.StringVar(&nodeOptions.kubeletVersion, options.KubeletVersion, nodeOptions.kubeletVersion, "The *desired* version for the kubelet config after the upgrade. If not specified, the KubernetesVersion from the kubeadm-config ConfigMap will be used")
+	flagSet.BoolVar(&nodeOptions.renewCerts, options.CertificateRenewal, nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	flagSet.BoolVar(&nodeOptions.etcdUpgrade, options.EtcdUpgrade, nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
 }
 
 // newNodeData returns a new nodeData struct to be used for the execution of the kubeadm upgrade node workflow.
@@ -247,8 +249,8 @@ func NewCmdUpgradeControlPlane() *cobra.Command {
 	// adds flags to the node command
 	options.AddKubeConfigFlag(cmd.Flags(), &nodeOptions.kubeConfigPath)
 	cmd.Flags().BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
-	cmd.Flags().BoolVar(&nodeOptions.etcdUpgrade, "etcd-upgrade", nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
-	cmd.Flags().BoolVar(&nodeOptions.renewCerts, "certificate-renewal", nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	cmd.Flags().BoolVar(&nodeOptions.etcdUpgrade, options.EtcdUpgrade, nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
+	cmd.Flags().BoolVar(&nodeOptions.renewCerts, options.CertificateRenewal, nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 
 	// initialize the workflow runner with the list of phases
 	nodeRunner.AppendPhase(phases.NewControlPlane())
