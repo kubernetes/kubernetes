@@ -17,10 +17,6 @@ limitations under the License.
 
 package kubelet
 
-import (
-	"k8s.io/kubernetes/pkg/kubelet/config"
-)
-
 // getPodResourcesDir returns the full path to the directory containing the pod resources socket
 func (kl *Kubelet) getPodResourcesDir() string {
 	return ""
