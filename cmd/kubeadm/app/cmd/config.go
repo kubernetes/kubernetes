@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sort"
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
@@ -172,6 +173,7 @@ func getSupportedComponentConfigAPIObjects() []string {
 	for componentType := range componentconfigs.Known {
 		objects = append(objects, string(componentType))
 	}
+	sort.Strings(objects)
 	return objects
 }
 
