@@ -17,6 +17,7 @@ limitations under the License.
 package mutating
 
 import (
+	"fmt"
 	"net/url"
 	"reflect"
 	"strings"
@@ -114,7 +115,7 @@ func TestAdmit(t *testing.T) {
 			reinvocationCtx := fakeAttr.Attributes.GetReinvocationContext()
 			reinvocationCtx.SetIsReinvoke()
 			for webhook, expectReinvoke := range tt.ExpectReinvokeWebhooks {
-				shouldReinvoke := reinvocationCtx.Value(PluginName).(*webhookReinvokeContext).ShouldReinvokeWebhook(webhook)
+				shouldReinvoke := reinvocationCtx.Value(PluginName).(*webhookReinvokeContext).ShouldReinvokeWebhook(fmt.Sprintf("test-webhooks/%s/0", webhook))
 				if expectReinvoke != shouldReinvoke {
 					t.Errorf("expected reinvocationContext.ShouldReinvokeWebhook(%s)=%t, but got %t", webhook, expectReinvoke, shouldReinvoke)
 				}
