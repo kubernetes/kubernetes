@@ -128,11 +128,8 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 	}
 	results = append(results, softThresholds...)
 	for i := range results {
-		for signal, minReclaim := range minReclaims {
-			if results[i].Signal == signal {
-				results[i].MinReclaim = &minReclaim
-				break
-			}
+		if minReclaim, ok := minReclaims[results[i].Signal]; ok {
+			results[i].MinReclaim = &minReclaim
 		}
 	}
 	for _, key := range allocatableConfig {
