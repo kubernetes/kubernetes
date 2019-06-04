@@ -42,8 +42,9 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
+  - limitranges
   - nodes
+  - pods
   verbs:
   - get
   - list
@@ -287,9 +288,10 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - pods
   - configmaps
+  - limitranges
   - nodes
+  - pods
   verbs:
   - get
   - list
