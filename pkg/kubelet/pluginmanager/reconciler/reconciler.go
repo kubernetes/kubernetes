@@ -97,8 +97,8 @@ func (rc *reconciler) AddHandler(pluginType string, pluginHandler cache.PluginHa
 }
 
 func (rc *reconciler) getHandlers() map[string]cache.PluginHandler {
-	rc.Lock()
-	defer rc.Unlock()
+	rc.RLock()
+	defer rc.RUnlock()
 
 	return rc.handlers
 }

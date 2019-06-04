@@ -100,9 +100,7 @@ func (asw *actualStateOfWorld) RemovePlugin(socketPath string) {
 	asw.Lock()
 	defer asw.Unlock()
 
-	if _, ok := asw.socketFileToInfo[socketPath]; ok {
-		delete(asw.socketFileToInfo, socketPath)
-	}
+	delete(asw.socketFileToInfo, socketPath)
 }
 
 func (asw *actualStateOfWorld) GetRegisteredPlugins() []PluginInfo {
