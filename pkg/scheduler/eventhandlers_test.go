@@ -104,7 +104,9 @@ func TestSkipPodUpdate(t *testing.T) {
 			expected: false,
 		},
 	}
-	for _, test := range table {
+	for i := range table {
+		test := table[i]
+
 		t.Run(test.name, func(t *testing.T) {
 			c := NewFromConfig(&factory.Config{
 				SchedulerCache: &fakecache.Cache{

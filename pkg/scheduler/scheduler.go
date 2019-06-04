@@ -217,7 +217,7 @@ func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 	if err != nil {
 		return fmt.Errorf("couldn't read policy config: %v", err)
 	}
-	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	err = runtime.DecodeInto(latestschedulerapi.Codec, data, policy)
 	if err != nil {
 		return fmt.Errorf("invalid policy: %v", err)
 	}

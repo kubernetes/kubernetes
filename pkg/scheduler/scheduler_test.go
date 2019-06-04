@@ -275,7 +275,9 @@ func TestScheduler(t *testing.T) {
 	informerFactory.Start(stop)
 	informerFactory.WaitForCacheSync(stop)
 
-	for _, item := range table {
+	for i := range table {
+		item := table[i]
+
 		t.Run(item.name, func(t *testing.T) {
 			var gotError error
 			var gotPod *v1.Pod
