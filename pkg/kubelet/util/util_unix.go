@@ -128,10 +128,10 @@ func parseEndpoint(endpoint string) (string, string, error) {
 }
 
 // LocalEndpoint returns the full path to a unix socket at the given endpoint
-func LocalEndpoint(path, file string) string {
+func LocalEndpoint(path, file string) (string, error) {
 	u := url.URL{
 		Scheme: unixProtocol,
 		Path:   path,
 	}
-	return filepath.Join(u.String(), file+".sock")
+	return filepath.Join(u.String(), file+".sock"), nil
 }
