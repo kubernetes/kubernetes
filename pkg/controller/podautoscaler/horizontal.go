@@ -617,13 +617,12 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			desiredReplicas = metricDesiredReplicas
 			rescaleMetric = metricName
 		}
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, key, currentReplicas, desiredReplicas)
 		if desiredReplicas > currentReplicas {
 			rescaleReason = fmt.Sprintf("%s above target", rescaleMetric)
-		}
-		if desiredReplicas < currentReplicas {
+		} else if desiredReplicas < currentReplicas {
 			rescaleReason = "All metrics below target"
 		}
-		desiredReplicas = a.normalizeDesiredReplicas(hpa, key, currentReplicas, desiredReplicas)
 		rescale = desiredReplicas != currentReplicas
 	}
 
