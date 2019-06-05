@@ -25,7 +25,7 @@ mapfile -t all_e2e_files < <(find test/e2e -name '*.go' | grep -v 'test/e2e/fram
 errors_expect_no_error=()
 for file in "${all_e2e_files[@]}"
 do
-    if grep "Expect(.*)\.NotTo(.*HaveOccurred()" "${file}" > /dev/null
+    if grep -E "Expect\(.*\)\.(NotTo|ToNot)\(.*HaveOccurred\(\)" "${file}" > /dev/null
     then
         errors_expect_no_error+=( "${file}" )
     fi
