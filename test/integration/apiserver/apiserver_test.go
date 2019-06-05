@@ -517,6 +517,9 @@ func TestMetadataClient(t *testing.T) {
 				Plural: "foos",
 				Kind:   "Foo",
 			},
+			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
+				Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
+			},
 		},
 	}
 	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
@@ -835,6 +838,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 				Plural: "foos",
 				Kind:   "Foo",
 			},
+			Subresources: &apiextensionsv1beta1.CustomResourceSubresources{Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{}},
 		},
 	}
 	fooCRD, err = fixtures.CreateNewCustomResourceDefinition(fooCRD, apiExtensionClient, dynamicClient)
@@ -845,11 +849,12 @@ func TestAPICRDProtobuf(t *testing.T) {
 	crclient := dynamicClient.Resource(crdGVR).Namespace(testNamespace)
 
 	testcases := []struct {
-		name     string
-		accept   string
-		object   func(*testing.T) (metav1.Object, string, string)
-		wantErr  func(*testing.T, error)
-		wantBody func(*testing.T, io.Reader)
+		name        string
+		accept      string
+		subresource string
+		object      func(*testing.T) (metav1.Object, string, string)
+		wantErr     func(*testing.T, error)
+		wantBody    func(*testing.T, io.Reader)
 	}{
 		{
 			name:   "server returns 406 when asking for protobuf for CRDs, which dynamic client does not support",
@@ -908,6 +913,65 @@ func TestAPICRDProtobuf(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:        "server returns 406 when asking for protobuf for CRDs status, which dynamic client does not support",
+			accept:      "application/vnd.kubernetes.protobuf",
+			subresource: "status",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "metadata": map[string]interface{}{"name": "test-3"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-3", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"3"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantErr: func(t *testing.T, err error) {
+				if !apierrors.IsNotAcceptable(err) {
+					t.Fatal(err)
+				}
+				status := err.(apierrors.APIStatus).Status()
+				data, _ := json.MarshalIndent(status, "", "  ")
+				// because the dynamic client only has a json serializer, the client processing of the error cannot
+				// turn the response into something meaningful, so we verify that fallback handling works correctly
+				if !apierrors.IsUnexpectedServerError(err) {
+					t.Fatal(string(data))
+				}
+				if status.Message != "the server was unable to respond with a content type that the client supports (get foos.cr.bar.com test-3)" {
+					t.Fatal(string(data))
+				}
+			},
+		},
+		{
+			name:        "server returns JSON when asking for protobuf and json for CRDs status",
+			accept:      "application/vnd.kubernetes.protobuf,application/json",
+			subresource: "status",
+			object: func(t *testing.T) (metav1.Object, string, string) {
+				cr, err := crclient.Create(&unstructured.Unstructured{Object: map[string]interface{}{"apiVersion": "cr.bar.com/v1", "kind": "Foo", "spec": map[string]interface{}{"field": 1}, "metadata": map[string]interface{}{"name": "test-4"}}}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("unable to create cr: %v", err)
+				}
+				if _, err := crclient.Patch("test-4", types.MergePatchType, []byte(`{"metadata":{"annotations":{"test":"4"}}}`), metav1.PatchOptions{}); err != nil {
+					t.Fatalf("unable to patch cr: %v", err)
+				}
+				return cr, crdGVR.Group, "foos"
+			},
+			wantBody: func(t *testing.T, w io.Reader) {
+				obj := &unstructured.Unstructured{}
+				if err := json.NewDecoder(w).Decode(obj); err != nil {
+					t.Fatal(err)
+				}
+				v, ok, err := unstructured.NestedInt64(obj.UnstructuredContent(), "spec", "field")
+				if !ok || err != nil {
+					data, _ := json.MarshalIndent(obj.UnstructuredContent(), "", "  ")
+					t.Fatalf("err=%v ok=%t json=%s", err, ok, string(data))
+				}
+				if v != 1 {
+					t.Fatalf("unexpected body: %#v", obj.UnstructuredContent())
+				}
+			},
+		},
 	}
 
 	for i := range testcases {
@@ -934,7 +998,7 @@ func TestAPICRDProtobuf(t *testing.T) {
 			}
 
 			w, err := client.Get().
-				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).
+				Resource(resource).NamespaceIfScoped(obj.GetNamespace(), len(obj.GetNamespace()) > 0).Name(obj.GetName()).SubResource(tc.subresource).
 				SetHeader("Accept", tc.accept).
 				Stream()
 			if (tc.wantErr != nil) != (err != nil) {
