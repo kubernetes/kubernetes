@@ -20,9 +20,9 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 )
@@ -59,7 +59,7 @@ func (n *NamespaceController) Start() error {
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (n *NamespaceController) Start() error {
 	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
 	nc := namespacecontroller.NewNamespaceController(
 		client,
-		dynamicClient,
+		metadataClient,
 		discoverResourcesFn,
 		informerFactory.Core().V1().Namespaces(),
 		ncResyncPeriod, v1.FinalizerKubernetes,
