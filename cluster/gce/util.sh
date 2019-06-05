@@ -2134,9 +2134,11 @@ function kube-up() {
     create-master
     create-nodes-firewall
     create-nodes-template
-    # Windows nodes take longer to boot and setup so create them first.
-    create-windows-nodes
-    create-linux-nodes
+    if [[ "${KUBE_CREATE_NODES}" == "true" ]]; then
+      # Windows nodes take longer to boot and setup so create them first.
+      create-windows-nodes
+      create-linux-nodes
+    fi
     check-cluster
   fi
 }
