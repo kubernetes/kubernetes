@@ -1178,7 +1178,6 @@ var podBytes = []byte(`
 apiVersion: v1
 kind: Pod
 metadata:
-  creationTimestamp: "2019-07-08T09:31:18Z"
   labels:
     app: some-app
     plugin1: some-value
@@ -1194,8 +1193,6 @@ metadata:
     kind: ReplicaSet
     name: some-name
     uid: 0a9d2b9e-779e-11e7-b422-42010a8001be
-  selfLink: /api/v1/namespaces/pah
-  uid: 23e8f548-a163-11e9-abe4-42010a80026b
 spec:
   containers:
   - args:
@@ -1329,22 +1326,27 @@ func BenchmarkNoServerSideApply(b *testing.B) {
 }
 
 func getPodSizeWhenEnabled(b *testing.B, pod v1.Pod) int {
+	return len(getPodBytesWhenEnabled(b, pod, "application/vnd.kubernetes.protobuf"))
+}
+
+func getPodBytesWhenEnabled(b *testing.B, pod v1.Pod, format string) []byte {
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 	_, client, closeFn := setup(b)
 	defer closeFn()
 	flag.Lookup("v").Value.Set("0")
 
 	pod.Name = "size-pod"
-	podB, err := client.CoreV1().RESTClient().Post().
+	podB, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Name(pod.Name).
 		Namespace("default").
+		Param("fieldManager", "apply_test").
 		Resource("pods").
-		SetHeader("Content-Type", "application/yaml").
-		SetHeader("Accept", "application/vnd.kubernetes.protobuf").
+		SetHeader("Accept", format).
 		Body(encodePod(pod)).DoRaw()
 	if err != nil {
-		b.Fatalf("Failed to create object: %v", err)
+		b.Fatalf("Failed to create object: %#v", err)
 	}
-	return len(podB)
+	return podB
 }
 
 func BenchmarkNoServerSideApplyButSameSize(b *testing.B) {
@@ -1385,16 +1387,24 @@ func BenchmarkNoServerSideApplyButSameSize(b *testing.B) {
 }
 
 func BenchmarkServerSideApply(b *testing.B) {
+	podBytesWhenEnabled := getPodBytesWhenEnabled(b, decodePod(podBytes), "application/yaml")
+
 	defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	_, client, closeFn := setup(b)
 	defer closeFn()
 	flag.Lookup("v").Value.Set("0")
 
-	benchAll(b, client, decodePod(podBytes))
+	benchAll(b, client, decodePod(podBytesWhenEnabled))
 }
 
 func benchAll(b *testing.B, client kubernetes.Interface, pod v1.Pod) {
+	// Make sure pod is ready to post
+	pod.ObjectMeta.CreationTimestamp = metav1.Time{}
+	pod.ObjectMeta.ResourceVersion = ""
+	pod.ObjectMeta.UID = ""
+	pod.ObjectMeta.SelfLink = ""
+
 	// Create pod for repeated-updates
 	pod.Name = "repeated-pod"
 	_, err := client.CoreV1().RESTClient().Post().
