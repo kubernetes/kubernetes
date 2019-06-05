@@ -41,7 +41,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -153,7 +152,7 @@ type ScheduleResult struct {
 
 type genericScheduler struct {
 	cache                    internalcache.Cache
-	schedulingQueue          internalqueue.SchedulingQueue
+	schedulingQueue          framework.SchedulingQueue
 	predicates               map[string]predicates.FitPredicate
 	priorityMetaProducer     priorities.PriorityMetadataProducer
 	predicateMetaProducer    predicates.PredicateMetadataProducer
@@ -560,7 +559,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
 // any pod was found, 2) augmented meta data, 3) augmented nodeInfo.
 func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
-	nodeInfo *schedulernodeinfo.NodeInfo, queue internalqueue.SchedulingQueue) (bool, predicates.PredicateMetadata,
+	nodeInfo *schedulernodeinfo.NodeInfo, queue framework.SchedulingQueue) (bool, predicates.PredicateMetadata,
 	*schedulernodeinfo.NodeInfo) {
 	if queue == nil || nodeInfo == nil || nodeInfo.Node() == nil {
 		// This may happen only in tests.
@@ -601,7 +600,7 @@ func podFitsOnNode(
 	meta predicates.PredicateMetadata,
 	info *schedulernodeinfo.NodeInfo,
 	predicateFuncs map[string]predicates.FitPredicate,
-	queue internalqueue.SchedulingQueue,
+	queue framework.SchedulingQueue,
 	alwaysCheckAllPredicates bool,
 ) (bool, []predicates.PredicateFailureReason, error) {
 	var failedPredicates []predicates.PredicateFailureReason
@@ -969,7 +968,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	potentialNodes []*v1.Node,
 	fitPredicates map[string]predicates.FitPredicate,
 	metadataProducer predicates.PredicateMetadataProducer,
-	queue internalqueue.SchedulingQueue,
+	queue framework.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	nodeToVictims := map[*v1.Node]*schedulerapi.Victims{}
@@ -1057,7 +1056,7 @@ func selectVictimsOnNode(
 	meta predicates.PredicateMetadata,
 	nodeInfo *schedulernodeinfo.NodeInfo,
 	fitPredicates map[string]predicates.FitPredicate,
-	queue internalqueue.SchedulingQueue,
+	queue framework.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) ([]*v1.Pod, int, bool) {
 	if nodeInfo == nil {
@@ -1212,7 +1211,7 @@ func podPassesBasicChecks(pod *v1.Pod, pvcLister corelisters.PersistentVolumeCla
 // NewGenericScheduler creates a genericScheduler object.
 func NewGenericScheduler(
 	cache internalcache.Cache,
-	podQueue internalqueue.SchedulingQueue,
+	podQueue framework.SchedulingQueue,
 	predicates map[string]predicates.FitPredicate,
 	predicateMetaProducer predicates.PredicateMetadataProducer,
 	prioritizers []priorities.PriorityConfig,

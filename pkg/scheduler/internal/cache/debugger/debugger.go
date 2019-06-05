@@ -21,8 +21,8 @@ import (
 	"os/signal"
 
 	corelisters "k8s.io/client-go/listers/core/v1"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
 
 // CacheDebugger provides ways to check and write cache information for debugging.
@@ -36,7 +36,7 @@ func New(
 	nodeLister corelisters.NodeLister,
 	podLister corelisters.PodLister,
 	cache internalcache.Cache,
-	podQueue internalqueue.SchedulingQueue,
+	podQueue framework.SchedulingQueue,
 ) *CacheDebugger {
 	return &CacheDebugger{
 		Comparer: CacheComparer{

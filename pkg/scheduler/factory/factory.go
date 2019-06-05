@@ -124,7 +124,7 @@ type Config struct {
 	DisablePreemption bool
 
 	// SchedulingQueue holds pods to be scheduled
-	SchedulingQueue internalqueue.SchedulingQueue
+	SchedulingQueue framework.SchedulingQueue
 }
 
 // PodPreemptor has methods needed to delete a pod and to update 'NominatedPod'
@@ -218,7 +218,7 @@ type configFactory struct {
 
 	bindTimeoutSeconds int64
 	// queue for pods that need scheduling
-	podQueue internalqueue.SchedulingQueue
+	podQueue framework.SchedulingQueue
 
 	enableNonPreempting bool
 }
@@ -256,7 +256,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
-	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
+	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig, stopEverything, internalqueue.NewSchedulingQueue)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
@@ -269,7 +269,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
+		podQueue:                       framework.SchedulingQueue(),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
@@ -656,7 +656,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podQueue framework.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			klog.V(4).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)

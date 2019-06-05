@@ -51,45 +51,9 @@ var (
 // the pod will be moved from unschedulableQ to activeQ.
 const unschedulableQTimeInterval = 60 * time.Second
 
-// SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
-// The interface follows a pattern similar to cache.FIFO and cache.Heap and
-// makes it easy to use those data structures as a SchedulingQueue.
-type SchedulingQueue interface {
-	Add(pod *v1.Pod) error
-	AddIfNotPresent(pod *v1.Pod) error
-	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
-	// The podSchedulingCycle represents the current scheduling cycle number which can be
-	// returned by calling SchedulingCycle().
-	AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error
-	// SchedulingCycle returns the current number of scheduling cycle which is
-	// cached by scheduling queue. Normally, incrementing this number whenever
-	// a pod is popped (e.g. called Pop()) is enough.
-	SchedulingCycle() int64
-	// Pop removes the head of the queue and returns it. It blocks if the
-	// queue is empty and waits until a new item is added to the queue.
-	Pop() (*v1.Pod, error)
-	Update(oldPod, newPod *v1.Pod) error
-	Delete(pod *v1.Pod) error
-	MoveAllToActiveQueue()
-	AssignedPodAdded(pod *v1.Pod)
-	AssignedPodUpdated(pod *v1.Pod)
-	NominatedPodsForNode(nodeName string) []*v1.Pod
-	PendingPods() []*v1.Pod
-	// Close closes the SchedulingQueue so that the goroutine which is
-	// waiting to pop items can exit gracefully.
-	Close()
-	// UpdateNominatedPodForNode adds the given pod to the nominated pod map or
-	// updates it if it already exists.
-	UpdateNominatedPodForNode(pod *v1.Pod, nodeName string)
-	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache
-	DeleteNominatedPodIfExists(pod *v1.Pod)
-	// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
-	NumUnschedulablePods() int
-}
-
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(stop <-chan struct{}, fwk framework.Framework) SchedulingQueue {
-	return NewPriorityQueue(stop, fwk)
+func NewSchedulingQueue(stop <-chan struct{}, lessFunc framework.LessFunc) framework.SchedulingQueue {
+	return NewPriorityQueue(stop, lessFunc)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -139,7 +103,7 @@ type PriorityQueue struct {
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
-var _ = SchedulingQueue(&PriorityQueue{})
+var _ = framework.SchedulingQueue(&PriorityQueue{})
 
 // newPodInfoNoTimestamp builds a PodInfo object without timestamp.
 func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
@@ -160,21 +124,19 @@ func activeQComp(podInfo1, podInfo2 interface{}) bool {
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
-	return NewPriorityQueueWithClock(stop, util.RealClock{}, fwk)
+func NewPriorityQueue(stop <-chan struct{}, lessFunc framework.LessFunc) *PriorityQueue {
+	return NewPriorityQueueWithClock(stop, util.RealClock{}, lessFunc)
 }
 
 // NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
-func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
+func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, lessFunc framework.LessFunc) *PriorityQueue {
 	comp := activeQComp
-	if fwk != nil {
-		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
-			comp = func(podInfo1, podInfo2 interface{}) bool {
-				pInfo1 := podInfo1.(*framework.PodInfo)
-				pInfo2 := podInfo2.(*framework.PodInfo)
+	if lessFunc != nil {
+		comp = func(podInfo1, podInfo2 interface{}) bool {
+			pInfo1 := podInfo1.(*framework.PodInfo)
+			pInfo2 := podInfo2.(*framework.PodInfo)
 
-				return queueSortFunc(pInfo1, pInfo2)
-			}
+			return lessFunc(pInfo1, pInfo2)
 		}
 	}
 
@@ -808,7 +770,7 @@ func newNominatedPodMap() *nominatedPodMap {
 
 // MakeNextPodFunc returns a function to retrieve the next pod from a given
 // scheduling queue
-func MakeNextPodFunc(queue SchedulingQueue) func() *v1.Pod {
+func MakeNextPodFunc(queue framework.SchedulingQueue) func() *v1.Pod {
 	return func() *v1.Pod {
 		pod, err := queue.Pop()
 		if err == nil {

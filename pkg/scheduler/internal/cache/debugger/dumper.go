@@ -23,8 +23,8 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -32,7 +32,7 @@ import (
 // scheduler logs for debugging purposes.
 type CacheDumper struct {
 	cache    internalcache.Cache
-	podQueue queue.SchedulingQueue
+	podQueue framework.SchedulingQueue
 }
 
 // DumpAll writes cached nodes and scheduling queue information to the scheduler logs.

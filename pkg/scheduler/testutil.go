@@ -52,7 +52,7 @@ func (fc *FakeConfigurator) GetHardPodAffinitySymmetricWeight() int32 {
 }
 
 // MakeDefaultErrorFunc is not implemented yet.
-func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *internalqueue.PodBackoffMap, podQueue internalqueue.SchedulingQueue) func(pod *v1.Pod, err error) {
+func (fc *FakeConfigurator) MakeDefaultErrorFunc(backoff *internalqueue.PodBackoffMap, podQueue framework.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return nil
 }
 

@@ -114,8 +114,47 @@ type PodInfo struct {
 	Timestamp time.Time
 }
 
+// SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
+// The interface follows a pattern similar to cache.FIFO and cache.Heap and
+// makes it easy to use those data structures as a SchedulingQueue.
+type SchedulingQueue interface {
+	Add(pod *v1.Pod) error
+	AddIfNotPresent(pod *v1.Pod) error
+	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
+	// The podSchedulingCycle represents the current scheduling cycle number which can be
+	// returned by calling SchedulingCycle().
+	AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingCycle int64) error
+	// SchedulingCycle returns the current number of scheduling cycle which is
+	// cached by scheduling queue. Normally, incrementing this number whenever
+	// a pod is popped (e.g. called Pop()) is enough.
+	SchedulingCycle() int64
+	// Pop removes the head of the queue and returns it. It blocks if the
+	// queue is empty and waits until a new item is added to the queue.
+	Pop() (*v1.Pod, error)
+	Update(oldPod, newPod *v1.Pod) error
+	Delete(pod *v1.Pod) error
+	MoveAllToActiveQueue()
+	AssignedPodAdded(pod *v1.Pod)
+	AssignedPodUpdated(pod *v1.Pod)
+	NominatedPodsForNode(nodeName string) []*v1.Pod
+	PendingPods() []*v1.Pod
+	// Close closes the SchedulingQueue so that the goroutine which is
+	// waiting to pop items can exit gracefully.
+	Close()
+	// UpdateNominatedPodForNode adds the given pod to the nominated pod map or
+	// updates it if it already exists.
+	UpdateNominatedPodForNode(pod *v1.Pod, nodeName string)
+	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache
+	DeleteNominatedPodIfExists(pod *v1.Pod)
+	// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
+	NumUnschedulablePods() int
+}
+
 // LessFunc is the function to sort pod info
 type LessFunc func(podInfo1, podInfo2 *PodInfo) bool
+
+// NewSchedulingQueue creates a new scheduling queue
+type NewSchedulingQueue func(stop <-chan struct{}, lessFunc LessFunc) SchedulingQueue
 
 // QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
 // These plugins are used to sort pods in the scheduling queue. Only one queue sort
@@ -233,4 +272,7 @@ type FrameworkHandle interface {
 
 	// GetWaitingPod returns a waiting pod given its UID.
 	GetWaitingPod(uid types.UID) WaitingPod
+
+	// SchedulingQueue returns the backing scheduling queue
+	SchedulingQueue() SchedulingQueue
 }

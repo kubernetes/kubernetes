@@ -34,6 +34,7 @@ type framework struct {
 	registry         Registry
 	nodeInfoSnapshot *cache.NodeInfoSnapshot
 	waitingPods      *waitingPodsMap
+	schedulingQueue  SchedulingQueue
 	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
 	queueSortPlugins []QueueSortPlugin
 	reservePlugins   []ReservePlugin
@@ -51,7 +52,7 @@ const (
 var _ = Framework(&framework{})
 
 // NewFramework initializes plugins given the configuration and the registry.
-func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig) (Framework, error) {
+func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, stopEverything <-chan struct{}, newSchedulingQueue NewSchedulingQueue) (Framework, error) {
 	f := &framework{
 		registry:         r,
 		nodeInfoSnapshot: cache.NewNodeInfoSnapshot(),
@@ -171,6 +172,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			}
 		}
 	}
+	f.schedulingQueue = newSchedulingQueue(stopEverything, f.QueueSortFunc())
 
 	return f, nil
 }
@@ -356,4 +358,8 @@ func pluginsNeeded(plugins *config.Plugins) map[string]struct{} {
 	find(plugins.Unreserve)
 
 	return pgMap
+}
+
+func (f *framework) SchedulingQueue() SchedulingQueue {
+	return f.schedulingQueue
 }
