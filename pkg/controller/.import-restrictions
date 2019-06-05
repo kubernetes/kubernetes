@@ -149,6 +149,7 @@
         "k8s.io/client-go/listers/policy/v1beta1",
         "k8s.io/client-go/listers/rbac/v1",
         "k8s.io/client-go/listers/storage/v1",
+        "k8s.io/client-go/metadata",
         "k8s.io/client-go/pkg/version",
         "k8s.io/client-go/rest",
         "k8s.io/client-go/scale",

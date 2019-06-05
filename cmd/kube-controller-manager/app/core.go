@@ -29,12 +29,13 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
@@ -371,7 +372,7 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 
 func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
 
-	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
+	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
 		return nil, true, err
 	}
@@ -380,7 +381,7 @@ func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient
 
 	namespaceController := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
-		dynamicClient,
+		metadataClient,
 		discoverResourcesFn,
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
