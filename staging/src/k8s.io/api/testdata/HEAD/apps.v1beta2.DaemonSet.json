@@ -1045,33 +1045,36 @@
         ],
         "runtimeClassName": "347",
         "enableServiceLinks": true,
-        "preemptionPolicy": "ʕW6¯ȗŮ·俦磊ʝʅ¸Ư竱=沚ʧ"
+        "preemptionPolicy": "ʕW6¯ȗŮ·俦磊ʝʅ¸Ư竱=沚ʧ",
+        "overhead": {
+          "硑Ț匡婲#ɛ蛳j惧鷋簡SļŽɣB矗E": "667"
+        }
       }
     },
     "updateStrategy": {
-      "type": "丑ť竹ɁøCSɛĭ楿",
+      "type": "乾毛ĥu疾4姺剟ź魊塾ɖ$",
       "rollingUpdate": {
         
       }
     },
-    "minReadySeconds": 1238814605,
-    "revisionHistoryLimit": -20831990
+    "minReadySeconds": 108452964,
+    "revisionHistoryLimit": -1556813247
   },
   "status": {
-    "currentNumberScheduled": -258261674,
-    "numberMisscheduled": -555161071,
-    "desiredNumberScheduled": 574445425,
-    "numberReady": 315650291,
-    "observedGeneration": -8643620228921243425,
-    "updatedNumberScheduled": -2079336554,
-    "numberAvailable": -217444218,
-    "numberUnavailable": 165914231,
-    "collisionCount": 279165516,
+    "currentNumberScheduled": -699990187,
+    "numberMisscheduled": 1494873941,
+    "desiredNumberScheduled": -150888717,
+    "numberReady": 159036358,
+    "observedGeneration": 8572471297015927631,
+    "updatedNumberScheduled": 2017039887,
+    "numberAvailable": -1370389893,
+    "numberUnavailable": -1065451254,
+    "collisionCount": 256213209,
     "conditions": [
       {
-        "type": "疾4姺剟ź魊塾ɖ$rolȋɶuɋ",
-        "status": "7Ƕg續",
-        "lastTransitionTime": "2292-08-23T15:17:28Z",
+        "type": "ŜĂ",
+        "status": "!ń1ċƹ|慼櫁色苆试揯遐",
+        "lastTransitionTime": "2058-09-30T18:21:51Z",
         "reason": "348",
         "message": "349"
       }

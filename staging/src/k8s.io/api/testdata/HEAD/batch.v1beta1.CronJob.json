@@ -1092,14 +1092,17 @@
             ],
             "runtimeClassName": "360",
             "enableServiceLinks": false,
-            "preemptionPolicy": "l=ƈư呄"
+            "preemptionPolicy": "l=ƈư呄",
+            "overhead": {
+              "永ʕW6¯ȗŮ": "622"
+            }
           }
         },
-        "ttlSecondsAfterFinished": 2014973362
+        "ttlSecondsAfterFinished": 5128682
       }
     },
-    "successfulJobsHistoryLimit": 1886409046,
-    "failedJobsHistoryLimit": -1913967820
+    "successfulJobsHistoryLimit": 403946672,
+    "failedJobsHistoryLimit": -774980175
   },
   "status": {
     "active": [
@@ -1107,7 +1110,7 @@
         "kind": "361",
         "namespace": "362",
         "name": "363",
-        "uid": "瀔",
+        "uid": "Ư竱=沚ʧ蓒硑Ț匡婲",
         "apiVersion": "364",
         "resourceVersion": "365",
         "fieldPath": "366"

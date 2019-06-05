@@ -466,6 +466,8 @@ template:
     nodeName: "278"
     nodeSelector:
       "274": "275"
+    overhead:
+      怞荊ù灹8緔Tj: "134"
     preemptionPolicy: 'z委>,趐V曡88 '
     priority: -2137775067
     priorityClassName: "335"

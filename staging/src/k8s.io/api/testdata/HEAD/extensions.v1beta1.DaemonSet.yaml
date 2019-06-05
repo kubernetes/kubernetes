@@ -32,8 +32,8 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
-  minReadySeconds: 1238814605
-  revisionHistoryLimit: -258261674
+  minReadySeconds: 108452964
+  revisionHistoryLimit: -699990187
   selector:
     matchExpressions:
     - key: 68._bQw.-dG6c-.6--_x.--0wmZk1_8._3s_-B
@@ -479,6 +479,8 @@ spec:
       nodeName: "285"
       nodeSelector:
         "281": "282"
+      overhead:
+        硑Ț匡婲#ɛ蛳j惧鷋簡SļŽɣB矗E: "667"
       preemptionPolicy: ʕW6¯ȗŮ·俦磊ʝʅ¸Ư竱=沚ʧ
       priority: -1662855542
       priorityClassName: "342"
@@ -716,23 +718,23 @@ spec:
           storagePolicyID: "113"
           storagePolicyName: "112"
           volumePath: "110"
-  templateGeneration: 7026077266680344289
+  templateGeneration: 4068273673162289855
   updateStrategy:
     rollingUpdate: {}
-    type: 丑ť竹ɁøCSɛĭ楿
+    type: 乾毛ĥu疾4姺剟ź魊塾ɖ$
 status:
-  collisionCount: -1983059344
+  collisionCount: 906113644
   conditions:
-  - lastTransitionTime: "2333-12-17T22:44:31Z"
+  - lastTransitionTime: "2058-09-30T18:21:51Z"
     message: "349"
     reason: "348"
-    status: -ÚŜĂwǐ擨^幸$Ż料ȭz
-    type: 4姺剟ź魊塾ɖ$rolȋɶuɋ5r儉ɩ
-  currentNumberScheduled: -555161071
-  desiredNumberScheduled: 315650291
-  numberAvailable: 165914231
-  numberMisscheduled: 574445425
-  numberReady: -1715156769
-  numberUnavailable: -1146687901
-  observedGeneration: -3880303276690778218
-  updatedNumberScheduled: -217444218
+    status: '!ń1ċƹ|慼櫁色苆试揯遐'
+    type: Ă
+  currentNumberScheduled: 1494873941
+  desiredNumberScheduled: 159036358
+  numberAvailable: -1065451254
+  numberMisscheduled: -150888717
+  numberReady: -908209329
+  numberUnavailable: -1262480211
+  observedGeneration: 6772159504973403663
+  updatedNumberScheduled: -1370389893

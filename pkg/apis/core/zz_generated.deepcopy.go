@@ -3630,6 +3630,13 @@ func (in *PodSpec) DeepCopyInto(out *PodSpec) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.Overhead != nil {
+		in, out := &in.Overhead, &out.Overhead
+		*out = make(ResourceList, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
+	}
 	if in.EnableServiceLinks != nil {
 		in, out := &in.EnableServiceLinks, &out.EnableServiceLinks
 		*out = new(bool)

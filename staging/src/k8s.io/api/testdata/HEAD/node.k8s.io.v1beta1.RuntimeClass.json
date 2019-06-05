@@ -40,5 +40,10 @@
       }
     ]
   },
-  "handler": "24"
+  "handler": "24",
+  "overhead": {
+    "podFixed": {
+      "ǸƢ6/": "569"
+    }
+  }
 }

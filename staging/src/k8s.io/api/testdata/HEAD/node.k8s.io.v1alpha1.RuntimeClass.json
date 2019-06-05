@@ -41,6 +41,11 @@
     ]
   },
   "spec": {
-    "runtimeHandler": "24"
+    "runtimeHandler": "24",
+    "overhead": {
+      "podFixed": {
+        "ǸƢ6/": "569"
+      }
+    }
   }
 }

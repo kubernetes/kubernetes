@@ -1045,34 +1045,37 @@
         ],
         "runtimeClassName": "347",
         "enableServiceLinks": true,
-        "preemptionPolicy": "ʕW6¯ȗŮ·俦磊ʝʅ¸Ư竱=沚ʧ"
+        "preemptionPolicy": "ʕW6¯ȗŮ·俦磊ʝʅ¸Ư竱=沚ʧ",
+        "overhead": {
+          "硑Ț匡婲#ɛ蛳j惧鷋簡SļŽɣB矗E": "667"
+        }
       }
     },
     "updateStrategy": {
-      "type": "丑ť竹ɁøCSɛĭ楿",
+      "type": "乾毛ĥu疾4姺剟ź魊塾ɖ$",
       "rollingUpdate": {
         
       }
     },
-    "minReadySeconds": 1238814605,
-    "templateGeneration": 7026077266680344289,
-    "revisionHistoryLimit": -258261674
+    "minReadySeconds": 108452964,
+    "templateGeneration": 4068273673162289855,
+    "revisionHistoryLimit": -699990187
   },
   "status": {
-    "currentNumberScheduled": -555161071,
-    "numberMisscheduled": 574445425,
-    "desiredNumberScheduled": 315650291,
-    "numberReady": -1715156769,
-    "observedGeneration": -3880303276690778218,
-    "updatedNumberScheduled": -217444218,
-    "numberAvailable": 165914231,
-    "numberUnavailable": -1146687901,
-    "collisionCount": -1983059344,
+    "currentNumberScheduled": 1494873941,
+    "numberMisscheduled": -150888717,
+    "desiredNumberScheduled": 159036358,
+    "numberReady": -908209329,
+    "observedGeneration": 6772159504973403663,
+    "updatedNumberScheduled": -1370389893,
+    "numberAvailable": -1065451254,
+    "numberUnavailable": -1262480211,
+    "collisionCount": 906113644,
     "conditions": [
       {
-        "type": "4姺剟ź魊塾ɖ$rolȋɶuɋ5r儉ɩ",
-        "status": "-ÚŜĂwǐ擨^幸$Ż料ȭz",
-        "lastTransitionTime": "2333-12-17T22:44:31Z",
+        "type": "Ă",
+        "status": "!ń1ċƹ|慼櫁色苆试揯遐",
+        "lastTransitionTime": "2058-09-30T18:21:51Z",
         "reason": "348",
         "message": "349"
       }

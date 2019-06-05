@@ -1032,21 +1032,24 @@
         ],
         "runtimeClassName": "341",
         "enableServiceLinks": false,
-        "preemptionPolicy": "z委\u003e,趐V曡88 "
+        "preemptionPolicy": "z委\u003e,趐V曡88 ",
+        "overhead": {
+          "怞荊ù灹8緔Tj": "134"
+        }
       }
     }
   },
   "status": {
-    "replicas": 1690834256,
-    "fullyLabeledReplicas": 2001418580,
-    "readyReplicas": -2043375598,
-    "availableReplicas": -867149340,
-    "observedGeneration": 7651417573826529316,
+    "replicas": -10743562,
+    "fullyLabeledReplicas": -1479988716,
+    "readyReplicas": 1262074531,
+    "availableReplicas": -1187060809,
+    "observedGeneration": 8043349780356677523,
     "conditions": [
       {
-        "type": "緔Tj§E蓋Cȗä2 ɲ±m嵘厶s",
-        "status": "ǣ普闎Ť",
-        "lastTransitionTime": "2291-09-10T04:26:58Z",
+        "type": "ȩ愉B",
+        "status": "m嵘厶sȰÖ埡ÆɰŞ襵樞",
+        "lastTransitionTime": "2180-08-01T11:51:16Z",
         "reason": "342",
         "message": "343"
       }
