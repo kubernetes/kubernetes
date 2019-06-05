@@ -165,7 +165,7 @@
         "k8s.io/client-go/util/retry",
         "k8s.io/client-go/util/workqueue",
         "k8s.io/client-go/util/testing",
-	"k8s.io/client-go/transport"
+        "k8s.io/client-go/transport"
       ]
     },
     {

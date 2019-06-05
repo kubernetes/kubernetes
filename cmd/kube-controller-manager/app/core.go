@@ -423,7 +423,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, true, err
 	}
@@ -435,7 +435,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
-		dynamicClient,
+		metadataClient,
 		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,

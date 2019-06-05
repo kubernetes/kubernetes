@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -57,23 +56,23 @@ func (gc *GarbageCollector) deleteObject(item objectReference, policy *metav1.De
 	uid := item.UID
 	preconditions := metav1.Preconditions{UID: &uid}
 	deleteOptions := metav1.DeleteOptions{Preconditions: &preconditions, PropagationPolicy: policy}
-	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Delete(item.Name, &deleteOptions)
+	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Delete(item.Name, &deleteOptions)
 }
 
-func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstructured, error) {
+func (gc *GarbageCollector) getObject(item objectReference) (*metav1.PartialObjectMetadata, error) {
 	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
-	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(item.Name, metav1.GetOptions{})
+	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Get(item.Name, metav1.GetOptions{})
 }
 
-func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*unstructured.Unstructured, error) {
+func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt types.PatchType) (*metav1.PartialObjectMetadata, error) {
 	resource, namespaced, err := gc.apiResource(item.APIVersion, item.Kind)
 	if err != nil {
 		return nil, err
 	}
-	return gc.dynamicClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch, metav1.PatchOptions{})
+	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(item.Name, pt, patch, metav1.PatchOptions{})
 }
 
 func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string) error {
@@ -105,10 +104,10 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		}
 
 		// remove the owner from dependent's OwnerReferences
-		patch, err := json.Marshal(map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"resourceVersion": accessor.GetResourceVersion(),
-				"finalizers":      newFinalizers,
+		patch, err := json.Marshal(&objectForFinalizersPatch{
+			ObjectMetaForFinalizersPatch: ObjectMetaForFinalizersPatch{
+				ResourceVersion: accessor.GetResourceVersion(),
+				Finalizers:      newFinalizers,
 			},
 		})
 		if err != nil {
