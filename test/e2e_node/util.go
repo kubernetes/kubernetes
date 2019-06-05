@@ -104,7 +104,10 @@ func getNodeSummary() (*stats.Summary, error) {
 }
 
 func getNodeDevices() (*podresourcesapi.ListPodResourcesResponse, error) {
-	endpoint := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+	if err != nil {
+		return nil, fmt.Errorf("Error getting local endpoint: %v", err)
+	}
 	client, conn, err := podresources.GetClient(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting grpc client: %v", err)

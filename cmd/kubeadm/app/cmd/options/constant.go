@@ -141,4 +141,10 @@ const (
 
 	// ForceReset flag instruct kubeadm to reset the node without prompting for confirmation
 	ForceReset = "force"
+
+	// CertificateRenewal flag instruct kubeadm to execute certificate renewal during upgrades
+	CertificateRenewal = "certificate-renewal"
+
+	// EtcdUpgrade flag instruct kubeadm to execute etcd upgrade during upgrades
+	EtcdUpgrade = "etcd-upgrade"
 )
