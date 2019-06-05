@@ -49,11 +49,6 @@ const (
 	// CSIPluginName is the name of the in-tree CSI Plugin
 	CSIPluginName = "kubernetes.io/csi"
 
-	// TODO (vladimirvivien) implement a more dynamic way to discover
-	// the unix domain socket path for each installed csi driver.
-	// TODO (vladimirvivien) would be nice to name socket with a .sock extension
-	// for consistency.
-	csiAddrTemplate = "/var/lib/kubelet/plugins/%v/csi.sock"
 	csiTimeout      = 2 * time.Minute
 	volNameSep      = "^"
 	volDataFileName = "vol_data.json"
