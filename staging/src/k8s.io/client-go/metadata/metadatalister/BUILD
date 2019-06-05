@@ -4,35 +4,33 @@ go_library(
     name = "go_default_library",
     srcs = [
         "interface.go",
-        "metadata.go",
+        "lister.go",
+        "shim.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/metadata",
-    importpath = "k8s.io/client-go/metadata",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/metadata/metadatalister",
+    importpath = "k8s.io/client-go/metadata/metadatalister",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["metadata_test.go"],
+    srcs = ["lister_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
@@ -45,12 +43,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/client-go/metadata/fake:all-srcs",
-        "//staging/src/k8s.io/client-go/metadata/metadatainformer:all-srcs",
-        "//staging/src/k8s.io/client-go/metadata/metadatalister:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

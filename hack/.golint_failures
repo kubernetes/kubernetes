@@ -492,6 +492,7 @@ staging/src/k8s.io/client-go/kubernetes/typed/core/v1
 staging/src/k8s.io/client-go/kubernetes/typed/core/v1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake
 staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake
+staging/src/k8s.io/client-go/metadata/fake
 staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc
 staging/src/k8s.io/client-go/rest
 staging/src/k8s.io/client-go/rest/fake
