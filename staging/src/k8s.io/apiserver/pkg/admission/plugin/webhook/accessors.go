@@ -66,7 +66,7 @@ type mutatingWebhookAccessor struct {
 }
 
 func (m mutatingWebhookAccessor) GetUID() string {
-	return m.Name
+	return m.uid
 }
 func (m mutatingWebhookAccessor) GetName() string {
 	return m.Name

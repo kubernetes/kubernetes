@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"k8s.io/api/admission/v1beta1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
@@ -36,6 +37,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -194,17 +197,68 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 		}
 	}
 
+	_, err = client.CoreV1().Pods("default").Create(reinvocationMarkerFixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			recorder.Reset()
+			upCh := recorder.Reset()
 			ns := fmt.Sprintf("reinvoke-%d", i)
 			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			for i, webhook := range tt.webhooks {
-				defer registerWebhook(t, client, fmt.Sprintf("admission.integration.test%d", i), webhookServer.URL+webhook.path, webhook.policy, webhook.objectSelector)()
+			webhooks := []admissionv1beta1.MutatingWebhook{}
+			for j, webhook := range tt.webhooks {
+				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.TrimPrefix(webhook.path, "/"))
+				fail := admissionv1beta1.Fail
+				endpoint := webhookServer.URL + webhook.path
+				webhooks = append(webhooks, admissionv1beta1.MutatingWebhook{
+					Name: name,
+					ClientConfig: admissionv1beta1.WebhookClientConfig{
+						URL:      &endpoint,
+						CABundle: localhostCert,
+					},
+					Rules: []admissionv1beta1.RuleWithOperations{{
+						Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
+						Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+					}},
+					ObjectSelector:          webhook.objectSelector,
+					FailurePolicy:           &fail,
+					ReinvocationPolicy:      webhook.policy,
+					AdmissionReviewVersions: []string{"v1beta1"},
+				})
+			}
+
+			cfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
+				Webhooks:   webhooks,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(cfg.GetName(), &metav1.DeleteOptions{})
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			// wait until new webhook is called the first time
+			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+				_, err = client.CoreV1().Pods("default").Patch(reinvocationMarkerFixture.Name, types.JSONPatchType, []byte("[]"))
+				select {
+				case <-upCh:
+					return true, nil
+				default:
+					t.Logf("Waiting for webhook to become effective, getting marker object: %v", err)
+					return false, nil
+				}
+			}); err != nil {
+				t.Fatal(err)
 			}
 
 			pod := &corev1.Pod{
@@ -259,48 +313,30 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 	}
 }
 
-func registerWebhook(t *testing.T, client clientset.Interface, name, endpoint string, reinvocationPolicy *registrationv1beta1.ReinvocationPolicyType, objectSelector *metav1.LabelSelector) func() {
-	fail := admissionv1beta1.Fail
-	hook, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Webhooks: []admissionv1beta1.MutatingWebhook{{
-			Name: name,
-			ClientConfig: admissionv1beta1.WebhookClientConfig{
-				URL:      &endpoint,
-				CABundle: localhostCert,
-			},
-			Rules: []admissionv1beta1.RuleWithOperations{{
-				Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
-				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
-			}},
-			ObjectSelector:          objectSelector,
-			FailurePolicy:           &fail,
-			ReinvocationPolicy:      reinvocationPolicy,
-			AdmissionReviewVersions: []string{"v1beta1"},
-		}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tearDown := func() {
-		err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Delete(hook.GetName(), &metav1.DeleteOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	return tearDown
-}
-
 type invocationRecorder struct {
 	mu     sync.Mutex
+	upCh   chan struct{}
+	upOnce sync.Once
 	counts map[string]int
 }
 
-func (i *invocationRecorder) Reset() {
+// Reset zeros out all counts and returns a channel that is closed when the first admission of the
+// marker object is received.
+func (i *invocationRecorder) Reset() chan struct{} {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.counts = map[string]int{}
+	i.upCh = make(chan struct{})
+	i.upOnce = sync.Once{}
+	return i.upCh
+}
+
+func (i *invocationRecorder) MarkerReceived() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.upOnce.Do(func() {
+		close(i.upCh)
+	})
 }
 
 func (i *invocationRecorder) GetCount(path string) int {
@@ -359,6 +395,14 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 			http.Error(w, err.Error(), 400)
 		}
 
+		// When resetting between tests, a marker object is patched until this webhook
+		// observes it, at which point it is considered ready.
+		if pod.Namespace == reinvocationMarkerFixture.Namespace && pod.Name == reinvocationMarkerFixture.Name {
+			recorder.MarkerReceived()
+			allow(w)
+			return
+		}
+
 		recorder.IncrementCount(r.URL.Path)
 
 		switch r.URL.Path {
@@ -398,4 +442,17 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 			http.NotFound(w, r)
 		}
 	})
+}
+
+var reinvocationMarkerFixture = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Namespace: "default",
+		Name:      "marker",
+	},
+	Spec: corev1.PodSpec{
+		Containers: []v1.Container{{
+			Name:  "fake-name",
+			Image: "fakeimage",
+		}},
+	},
 }
