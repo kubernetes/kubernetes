@@ -123,6 +123,10 @@ function configure_controller_manager_component {
   create-static-auth-kubeconfig-for-component "gcp-controller-manager"
 }
 
+function configure_tpu_operator_component {
+  create-static-auth-kubeconfig-for-component "k8s-tpu-operator"
+}
+
 function generate_vertical_pod_autoscaler_admission_controller_certs {
   local certs_dir="/etc/tls-certs" #TODO: what is the best place for certs?
   echo "Generating certs for the VPA Admission Controller in ${certs_dir}."
@@ -176,6 +180,9 @@ function gke-internal-master-start {
   configure_healthcheck_component
   configure_pdcsi_component
   configure_controller_manager_component
+  if [[ -n "${ENABLE_TPU:-}" ]]; then
+    configure_tpu_operator_component
+  fi
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
   start_vertical_pod_autoscaler
