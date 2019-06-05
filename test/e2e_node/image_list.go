@@ -52,6 +52,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Nginx),
 	imageutils.GetE2EImage(imageutils.Perl),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
+	imageutils.GetE2EImage(imageutils.HugePageTester),
 	imageutils.GetPauseImageName(),
 	gpu.GetGPUDevicePluginImage(),
 	"gcr.io/kubernetes-e2e-test-images/node-perf/npb-is:1.0",

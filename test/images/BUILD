@@ -14,6 +14,7 @@ filegroup(
         "//test/images/agnhost:all-srcs",
         "//test/images/apparmor-loader:all-srcs",
         "//test/images/echoserver:all-srcs",
+        "//test/images/hugepage-tester:all-srcs",
         "//test/images/metadata-concealment:all-srcs",
         "//test/images/mounttest:all-srcs",
         "//test/images/nonewprivs:all-srcs",

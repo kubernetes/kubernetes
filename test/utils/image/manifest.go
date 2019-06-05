@@ -200,6 +200,8 @@ const (
 	VolumeRBDServer
 	// WindowsNanoServer image
 	WindowsNanoServer
+	// HugePageTester image
+	HugePageTester
 )
 
 func initImageConfigs() map[int]Config {
@@ -249,6 +251,7 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
 	configs[WindowsNanoServer] = Config{e2eGcRegistry, "windows-nanoserver", "v1"}
+	configs[HugePageTester] = Config{"docker.io", "odinuge/hugepage-tester", "1.0"}
 	return configs
 }
 
