@@ -44,6 +44,7 @@ type DeleteFlags struct {
 	Output         *string
 }
 
+// ToOptions converts the flags to DeleteOptions
 func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams genericclioptions.IOStreams) *DeleteOptions {
 	options := &DeleteOptions{
 		DynamicClient: dynamicClient,
@@ -97,6 +98,7 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 	return options
 }
 
+// AddFlags adds the required flags to the cli command
 func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 	f.FileNameFlags.AddFlags(cmd.Flags())
 	if f.LabelSelector != nil {

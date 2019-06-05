@@ -93,6 +93,7 @@ var (
 		kubectl delete pods --all`))
 )
 
+// DeleteOptions has the data required to perform the delete operation
 type DeleteOptions struct {
 	resource.FilenameOptions
 
@@ -120,6 +121,7 @@ type DeleteOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCmdDelete creates the `delete` command
 func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	deleteFlags := NewDeleteCommandFlags("containing the resource to delete.")
 
@@ -144,6 +146,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 	return cmd
 }
 
+// Complete adapts from the command line args and factory to the data required.
 func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Command) error {
 	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -201,6 +204,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	return nil
 }
 
+// Validate checks to the DeleteOptions to see if there is sufficient information run the command.
 func (o *DeleteOptions) Validate() error {
 	if o.Output != "" && o.Output != "name" {
 		return fmt.Errorf("unexpected -o output mode: %v. We only support '-o name'", o.Output)
@@ -223,10 +227,12 @@ func (o *DeleteOptions) Validate() error {
 	return nil
 }
 
+// RunDelete calls DeleteResult to do the actual deletion
 func (o *DeleteOptions) RunDelete() error {
 	return o.DeleteResult(o.Result)
 }
 
+// DeleteResult deletes the requested resource
 func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 	found := 0
 	if o.IgnoreNotFound {
