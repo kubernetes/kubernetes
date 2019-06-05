@@ -31,6 +31,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
@@ -88,6 +89,7 @@ type GraphBuilder struct {
 	// it is protected by monitorLock.
 	running bool
 
+	metadataClient metadata.Interface
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
