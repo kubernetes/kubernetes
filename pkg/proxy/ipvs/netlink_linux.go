@@ -146,21 +146,6 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 
 // If filterDev is specified, the result will discard route of specified device and cut src from other routes.
 func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, error) {
-	chosenLinkIndex, filterLinkIndex := -1, -1
-	if dev != "" {
-		link, err := h.LinkByName(dev)
-		if err != nil {
-			return nil, fmt.Errorf("error get device %s, err: %v", filterDev, err)
-		}
-		chosenLinkIndex = link.Attrs().Index
-	} else if filterDev != "" {
-		link, err := h.LinkByName(filterDev)
-		if err != nil {
-			return nil, fmt.Errorf("error get filter device %s, err: %v", filterDev, err)
-		}
-		filterLinkIndex = link.Attrs().Index
-	}
-
 	routeFilter := &netlink.Route{
 		Table:    unix.RT_TABLE_LOCAL,
 		Type:     unix.RTN_LOCAL,
@@ -169,15 +154,24 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
 
 	// find chosen device
-	if chosenLinkIndex != -1 {
+	if chosenLinkIndex, err := h.getLinkIndex(dev); err != nil {
+		return nil, err
+	} else if -1 != chosenLinkIndex {
 		routeFilter.LinkIndex = chosenLinkIndex
 		filterMask |= netlink.RT_FILTER_OIF
 	}
+
 	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
 	if err != nil {
 		return nil, fmt.Errorf("error list route table, err: %v", err)
 	}
 	res := sets.NewString()
+
+	filterLinkIndex, err := h.getLinkIndex(filterDev)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, route := range routes {
 		if route.LinkIndex == filterLinkIndex {
 			continue
@@ -191,4 +185,17 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 		}
 	}
 	return res, nil
+}
+
+func (h *netlinkHandle) getLinkIndex(dev string) (int, error) {
+	if "" == dev {
+		return -1, nil
+	}
+
+	link, err := h.LinkByName(dev)
+	if err != nil {
+		return -1, fmt.Errorf("error get device %s, err: %v", dev, err)
+	}
+	return link.Attrs().Index, nil
+
 }
