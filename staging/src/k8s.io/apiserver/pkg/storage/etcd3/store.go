@@ -685,9 +685,15 @@ func (s *store) watch(ctx context.Context, key string, rv string, pred storage.S
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
 	state := &objState{
-		obj:  reflect.New(v.Type()).Interface().(runtime.Object),
 		meta: &storage.ResponseMeta{},
 	}
+
+	if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
+		state.obj = u.NewEmptyInstance()
+	} else {
+		state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
+	}
+
 	if len(getResp.Kvs) == 0 {
 		if !ignoreNotFound {
 			return nil, storage.NewKeyNotFoundError(key, 0)

@@ -260,6 +260,9 @@ type Object interface {
 // to JSON allowed.
 type Unstructured interface {
 	Object
+	// NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
+	// This should be called instead of reflect.New() for unstructured types because the go type alone does not preserve kind/apiVersion info.
+	NewEmptyInstance() Unstructured
 	// UnstructuredContent returns a non-nil map with this object's contents. Values may be
 	// []interface{}, map[string]interface{}, or any primitive type. Contents are typically serialized to
 	// and from JSON. SetUnstructuredContent should be used to mutate the contents.

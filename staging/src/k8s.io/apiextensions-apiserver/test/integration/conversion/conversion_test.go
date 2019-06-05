@@ -58,15 +58,18 @@ func checks(checkers ...Checker) []Checker {
 	return checkers
 }
 
-func TestWebhookConverter(t *testing.T) {
-	testWebhookConverter(t, false)
+func TestWebhookConverterWithWatchCache(t *testing.T) {
+	testWebhookConverter(t, false, true)
+}
+func TestWebhookConverterWithoutWatchCache(t *testing.T) {
+	testWebhookConverter(t, false, false)
 }
 
 func TestWebhookConverterWithDefaulting(t *testing.T) {
-	testWebhookConverter(t, true)
+	testWebhookConverter(t, true, true)
 }
 
-func testWebhookConverter(t *testing.T, defaulting bool) {
+func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 	tests := []struct {
 		group   string
 		handler http.Handler
@@ -115,7 +118,7 @@ func testWebhookConverter(t *testing.T, defaulting bool) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceDefaulting, true)()
 	}
 
-	tearDown, config, options, err := fixtures.StartDefaultServer(t)
+	tearDown, config, options, err := fixtures.StartDefaultServer(t, fmt.Sprintf("--watch-cache=%v", watchCache))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,6 +323,28 @@ func validateNonTrivialConverted(t *testing.T, ctc *conversionTestContext) {
 				}
 				verifyMultiVersionObject(t, getVersion.Name, obj)
 			}
+
+			// send a non-trivial patch to the main resource to verify the oldObject is in the right version
+			if _, err := client.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"main":"true"}}}`), metav1.PatchOptions{}); err != nil {
+				t.Fatal(err)
+			}
+			// verify that the right, pruned version is in storage
+			obj, err = ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyMultiVersionObject(t, "v1beta1", obj)
+
+			// send a non-trivial patch to the status subresource to verify the oldObject is in the right version
+			if _, err := client.Patch(name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"status":"true"}}}`), metav1.PatchOptions{}, "status"); err != nil {
+				t.Fatal(err)
+			}
+			// verify that the right, pruned version is in storage
+			obj, err = ctc.etcdObjectReader.GetStoredCustomResource(ns, name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			verifyMultiVersionObject(t, "v1beta1", obj)
 		})
 	}
 }
