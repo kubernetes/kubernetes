@@ -41,6 +41,9 @@ var (
 	baseURL                                           = flag.String("url", "https://github.com/kubernetes/kubernetes/tree/master/", "location of the current source")
 	confDoc                                           = flag.Bool("conformance", false, "write a conformance document")
 	totalConfTests, totalLegacyTests, missingComments int
+
+	// If a test name contains any of these tags, it is ineligble for promotion to conformance
+	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Disruptive|Feature:[^\]]+|Flaky)\]`)
 )
 
 const regexDescribe = "Describe|KubeDescribe|SIGDescribe"
@@ -199,6 +202,12 @@ func (v *visitor) emit(arg ast.Expr) {
 			return
 		}
 
+		err := validateTestName(v.getDescription(at.Value))
+		if err != nil {
+			v.failf(at, err.Error())
+			return
+		}
+
 		at.Value = normalizeTestName(at.Value)
 		if *confDoc {
 			v.convertToConformanceData(at)
@@ -231,6 +240,14 @@ func normalizeTestName(s string) string {
 	r := regexTag.ReplaceAllString(s, "")
 	r = strings.Trim(r, "\"")
 	return strings.TrimSpace(r)
+}
+
+func validateTestName(s string) error {
+	matches := regexIneligibleTags.FindAllString(s, -1)
+	if matches != nil {
+		return fmt.Errorf("'%s' cannot have invalid tags %v", s, strings.Join(matches, ","))
+	}
+	return nil
 }
 
 // funcName converts a selectorExpr with two idents into a string,
