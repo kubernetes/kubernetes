@@ -10,6 +10,7 @@ go_library(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
 

@@ -18,9 +18,11 @@ package legacyregistry
 
 import (
 	"fmt"
+	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
-	"sync"
 )
 
 var globalRegistryFactory = metricsRegistryFactory{
@@ -51,7 +53,11 @@ func SetRegistryFactoryVersion(ver apimachineryversion.Info) []error {
 		return nil
 	}
 	registrationErrs := make([]error, 0)
-	globalRegistryFactory.globalRegistry = metrics.NewKubeRegistry(ver)
+	preloadedMetrics := []prometheus.Collector{
+		prometheus.NewGoCollector(),
+		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
+	}
+	globalRegistryFactory.globalRegistry = metrics.NewPreloadedKubeRegistry(ver, preloadedMetrics...)
 	globalRegistryFactory.kubeVersion = &ver
 	for _, c := range globalRegistryFactory.registerQueue {
 		err := globalRegistryFactory.globalRegistry.Register(c)

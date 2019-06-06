@@ -193,3 +193,33 @@ func TestDeferredMustRegister(t *testing.T) {
 		},
 		"Did not panic even though we expected it.")
 }
+
+func TestPreloadedMetrics(t *testing.T) {
+	// reset the global registry for this test.
+	globalRegistryFactory = metricsRegistryFactory{
+		registerQueue:     make([]metrics.KubeCollector, 0),
+		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+	}
+
+	SetRegistryFactoryVersion(apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "15",
+		GitVersion: "v1.15.0-alpha-1.12345",
+	})
+	// partial list of some preregistered metrics we expect
+	expectedMetricNames := []string{"go_gc_duration_seconds", "process_start_time_seconds"}
+
+	mf, err := globalRegistryFactory.globalRegistry.Gather()
+	if err != nil {
+		t.Errorf("Got unexpected error %v ", err)
+	}
+	metricNames := map[string]struct{}{}
+	for _, f := range mf {
+		metricNames[f.GetName()] = struct{}{}
+	}
+	for _, expectedMetric := range expectedMetricNames {
+		if _, ok := metricNames[expectedMetric]; !ok {
+			t.Errorf("Expected %v to be preregistered", expectedMetric)
+		}
+	}
+}
