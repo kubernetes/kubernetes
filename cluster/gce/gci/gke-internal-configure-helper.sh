@@ -129,6 +129,7 @@ function configure_controller_manager_component {
 }
 
 function configure_tpu_operator_component {
+  setup-addon-manifests "addons" "rbac/k8s-tpu-operator"
   create-static-auth-kubeconfig-for-component "k8s-tpu-operator"
 }
 

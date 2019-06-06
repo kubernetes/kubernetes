@@ -1,0 +1,15 @@
+kind: ClusterRole
+metadata:
+  name: system:k8s-tpu-operator
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "patch", "bind"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get"]
+- apiGroups: ["tpu.google.com"]
+  resources: ["tpus"]
+  verbs: ["*"]
