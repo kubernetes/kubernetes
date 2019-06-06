@@ -208,7 +208,7 @@ func (o *EnvOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if o.All && len(o.Selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
-	ok := false
+	var ok bool
 	o.resources, o.envArgs, ok = envutil.SplitEnvironmentFromResources(args)
 	if !ok {
 		return fmt.Errorf("all resources must be specified before environment changes: %s", strings.Join(args, " "))
