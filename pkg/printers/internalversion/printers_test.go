@@ -235,6 +235,8 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
+	// our decoder defaults, so we should default our expected object as well
+	legacyscheme.Scheme.Default(obj)
 	buf.Reset()
 	printer.PrintObj(obj, buf)
 	var objOut v1.Pod
