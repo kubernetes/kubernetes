@@ -127,6 +127,16 @@ func (u *Unstructured) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// NewEmptyInstance returns a new instance of the concrete type containing only kind/apiVersion and no other data.
+// This should be called instead of reflect.New() for unstructured types because the go type alone does not preserve kind/apiVersion info.
+func (in *Unstructured) NewEmptyInstance() runtime.Unstructured {
+	out := new(Unstructured)
+	if in != nil {
+		out.GetObjectKind().SetGroupVersionKind(in.GetObjectKind().GroupVersionKind())
+	}
+	return out
+}
+
 func (in *Unstructured) DeepCopy() *Unstructured {
 	if in == nil {
 		return nil
