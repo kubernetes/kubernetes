@@ -5170,7 +5170,7 @@ spec:
         - --storage.tsdb.min-block-duration=15m
         - --storage.tsdb.max-block-duration=4h
         - --config.file=/etc/prometheus/prometheus.yml
-        image: quay.io/prometheus/prometheus:v2.4.3
+        image: "gcr.io/gke-release/istio/prometheus/prometheus:v2.4.3"
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
