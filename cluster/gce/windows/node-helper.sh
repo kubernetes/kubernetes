@@ -52,7 +52,9 @@ function get-windows-node-instance-metadata {
 # $1: template name (required).
 # $2: scopes flag.
 function create-windows-node-instance-template {
-  local template_name="$1"
-  local scopes_flag="$2"
-  create-node-template "${template_name}" "${scopes_flag}" "$(get-windows-node-instance-metadata-from-file)" "$(get-windows-node-instance-metadata)" "windows"
+  if [[ "${NUM_WINDOWS_NODES}" -gt "0" ]]; then
+    local template_name="$1"
+    local scopes_flag="$2"
+    create-node-template "${template_name}" "${scopes_flag}" "$(get-windows-node-instance-metadata-from-file)" "$(get-windows-node-instance-metadata)" "windows"
+  fi
 }
