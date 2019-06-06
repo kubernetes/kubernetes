@@ -359,7 +359,7 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"all"})
@@ -367,10 +367,16 @@ func TestGetMultipleResourceTypesShowKinds(t *testing.T) {
 	expected := `NAME      AGE
 pod/foo   <unknown>
 pod/bar   <unknown>
+
 NAME          AGE
 service/baz   <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+
+	// The error out should be empty
+	if e, a := "", bufErr.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
 	}
 }
@@ -414,7 +420,7 @@ func TestGetMultipleTableResourceTypesShowKinds(t *testing.T) {
 		}),
 	}
 
-	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	streams, _, buf, bufErr := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"all"})
@@ -422,11 +428,70 @@ func TestGetMultipleTableResourceTypesShowKinds(t *testing.T) {
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
 	if e, a := expected, buf.String(); e != a {
 		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+
+	// The error out should be empty
+	if e, a := "", bufErr.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
+func TestNoBlankLinesForGetAll(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/pods" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/services" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/statefulsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/horizontalpodautoscalers" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/jobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/cronjobs" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/daemonsets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/deployments" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+			case p == "/namespaces/test/replicasets" && m == "GET":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTableObjBody(codec)}, nil
+
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"all"})
+
+	expected := ``
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+	expectedErr := `No resources found in test namespace.
+`
+	if e, a := expectedErr, errbuf.String(); e != a {
+		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
 	}
 }
 
@@ -1097,6 +1162,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	expected := `NAME      AGE
 pod/foo   <unknown>
 pod/bar   <unknown>
+
 NAME          AGE
 service/baz   <unknown>
 `
@@ -1135,6 +1201,7 @@ func TestGetMultipleTypeTableObjects(t *testing.T) {
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
@@ -1279,6 +1346,7 @@ func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	expected := `NAME      AGE
 pod/foo   <unknown>
 pod/bar   <unknown>
+
 NAME          AGE
 service/baz   <unknown>
 `
@@ -1322,6 +1390,7 @@ func TestGetMultipleTypeTableObjectsWithLabelSelector(t *testing.T) {
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
@@ -1365,6 +1434,7 @@ func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
 	expected := `NAME      AGE
 pod/foo   <unknown>
 pod/bar   <unknown>
+
 NAME          AGE
 service/baz   <unknown>
 `
@@ -1408,6 +1478,7 @@ func TestGetMultipleTypeTableObjectsWithFieldSelector(t *testing.T) {
 	expected := `NAME      READY   STATUS   RESTARTS   AGE
 pod/foo   0/0              0          <unknown>
 pod/bar   0/0              0          <unknown>
+
 NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
 `
@@ -1451,6 +1522,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 
 	expected := `NAME          AGE
 service/baz   <unknown>
+
 NAME       AGE
 node/foo   <unknown>
 `
@@ -1494,6 +1566,7 @@ func TestGetMultipleTypeTableObjectsWithDirectReference(t *testing.T) {
 
 	expected := `NAME          TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
 service/baz   ClusterIP   <none>       <none>        <none>    <unknown>
+
 NAME       STATUS    ROLES    AGE         VERSION
 node/foo   Unknown   <none>   <unknown>   
 `
@@ -2587,6 +2660,14 @@ func nodeTableObjBody(codec runtime.Codec, nodes ...corev1.Node) io.ReadCloser {
 			Object: runtime.RawExtension{Raw: b.Bytes()},
 			Cells:  []interface{}{nodes[i].Name, "Unknown", "<none>", "<unknown>", ""},
 		})
+	}
+	return cmdtesting.ObjBody(codec, table)
+}
+
+// build an empty table response
+func emptyTableObjBody(codec runtime.Codec) io.ReadCloser {
+	table := &metav1.Table{
+		ColumnDefinitions: podColumns,
 	}
 	return cmdtesting.ObjBody(codec, table)
 }
