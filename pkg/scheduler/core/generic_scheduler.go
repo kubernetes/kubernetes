@@ -167,7 +167,6 @@ type genericScheduler struct {
 	pvcLister                corelisters.PersistentVolumeClaimLister
 	pdbLister                algorithm.PDBLister
 	disablePreemption        bool
-	lastIndex                int
 	percentageOfNodesToScore int32
 	enableNonPreempting      bool
 }
@@ -462,8 +461,8 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 	if len(g.predicates) == 0 {
 		filtered = nodes
 	} else {
-		allNodes := g.cache.NodeTree().AllNodes()
-		numNodesToFind := g.numFeasibleNodesToFind(int32(len(allNodes)))
+		allNodes := int32(g.cache.NodeTree().NumNodes())
+		numNodesToFind := g.numFeasibleNodesToFind(allNodes)
 
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
@@ -479,12 +478,8 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		// We can use the same metadata producer for all nodes.
 		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
 
-		processedNodes := int32(0)
 		checkNode := func(i int) {
-			// We check the nodes starting from where we left off in the previous scheduling cycle,
-			// this is to make sure all nodes have the same chance of being examined across pods.
-			atomic.AddInt32(&processedNodes, 1)
-			nodeName := allNodes[(g.lastIndex+i)%len(allNodes)]
+			nodeName := g.cache.NodeTree().Next()
 			fits, failedPredicates, err := podFitsOnNode(
 				pod,
 				meta,
@@ -516,8 +511,7 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 
 		// Stops searching for more nodes once the configured number of feasible nodes
 		// are found.
-		workqueue.ParallelizeUntil(ctx, 16, len(allNodes), checkNode)
-		g.lastIndex = (g.lastIndex + int(processedNodes)) % len(allNodes)
+		workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)
 
 		filtered = filtered[:filteredLen]
 		if len(errs) > 0 {
