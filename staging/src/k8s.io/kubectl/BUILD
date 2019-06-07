@@ -16,6 +16,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/util/podutils:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/printers:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/rbac:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/util/storage:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/term:all-srcs",
     ],
