@@ -1,8 +1,4 @@
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -13,8 +9,9 @@ go_library(
         "umask_windows.go",
         "util.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util",
-    visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util",
+    importpath = "k8s.io/kubectl/pkg/util",
+    visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -55,24 +52,6 @@ go_library(
     }),
 )
 
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/kubectl/util/i18n:all-srcs",
-        "//pkg/kubectl/util/logs:all-srcs",
-    ],
-    tags = ["automanaged"],
-    visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
-)
-
 go_test(
     name = "go_default_test",
     srcs = [
@@ -85,4 +64,18 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
