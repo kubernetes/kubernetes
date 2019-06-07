@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -158,6 +159,12 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 			o.IgnoreNotFound = true
 		}
 	}
+
+	// If specifying to delete all namespaces, must enter a --grace-period flag
+	if (sets.NewString(args...).Has("ns") || sets.NewString(args...).Has("namespace")) && o.DeleteAll && o.GracePeriod == -1 {
+		return fmt.Errorf("--grace-period flag must be specified when you chose to delete all namespaces")
+	}
+
 	if o.DeleteNow {
 		if o.GracePeriod != -1 {
 			return fmt.Errorf("--now and --grace-period cannot be specified together")
