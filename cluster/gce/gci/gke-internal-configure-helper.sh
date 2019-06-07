@@ -370,3 +370,19 @@ EOF
   echo "Restart containerd to load the config change"
   systemctl restart containerd
 }
+
+# If we specify GKE_ADDON_REGISTRY_OVERRIDE, it will replace all occurrences
+# of 'gke.gcr.io', with the specified value in all the manifests.
+# This is useful when running in test or staging, example:
+# gke.gcr.io -> eu.gcr.io/gke-release-staging
+function setup-gke-addon-registry {
+  local -r manifests_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+  local -r gke_addon_registry_override="${GKE_ADDON_REGISTRY_OVERRIDE:-}"
+  if [[ -n $gke_addon_registry_override ]] ; then
+    # some .manifest files are in yaml format, while others are in json
+    find "${manifests_dir}" -name \*.yaml -or -name \*.yaml.in -or -name \*.manifest | \
+      xargs sed -ri "s@(image:\s.*)gke.gcr.io@\1${gke_addon_registry_override}@"
+    find "${manifests_dir}" -name \*.manifest -or -name \*.json | \
+      xargs sed -ri "s@(image\":\s+\")gke.gcr.io@\1${gke_addon_registry_override}@"
+  fi
+}

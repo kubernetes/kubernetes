@@ -3075,6 +3075,10 @@ function main() {
   ensure-local-ssds
   setup-kubelet-dir
   setup-logrotate
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    # configure GKE addons registry in manifest files.
+    setup-gke-addon-registry
+  fi
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     mount-master-pd
     create-node-pki
