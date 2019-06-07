@@ -64,7 +64,6 @@ const (
 	attachingPodWebhookConfigName          = "e2e-test-webhook-config-attaching-pod"
 	mutatingWebhookConfigName              = "e2e-test-mutating-webhook-config"
 	podMutatingWebhookConfigName           = "e2e-test-mutating-webhook-pod"
-	crMutatingWebhookConfigName            = "e2e-test-mutating-webhook-config-cr"
 	webhookFailClosedConfigName            = "e2e-test-webhook-fail-closed"
 	validatingWebhookForWebhooksConfigName = "e2e-test-validating-webhook-for-webhooks-config"
 	mutatingWebhookForWebhooksConfigName   = "e2e-test-mutating-webhook-for-webhooks-config"
@@ -231,13 +230,6 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
 		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], prune)
-	})
-
-	ginkgo.It("Should deny crd creation", func() {
-		crdWebhookCleanup := registerValidatingWebhookForCRD(f, context)
-		defer crdWebhookCleanup()
-
-		testCRDDenyWebhook(f)
 	})
 
 	ginkgo.It("Should honor timeout", func() {
@@ -1340,10 +1332,10 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 
 func registerMutatingWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *crd.TestCrd) func() {
 	client := f.ClientSet
-	ginkgo.By("Registering the mutating webhook for a custom resource via the AdmissionRegistration API")
+	ginkgo.By(fmt.Sprintf("Registering the mutating webhook for custom resource %s via the AdmissionRegistration API", testcrd.Crd.Name))
 
 	namespace := f.Namespace.Name
-	configName := crMutatingWebhookConfigName
+	configName := f.UniqueName
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,

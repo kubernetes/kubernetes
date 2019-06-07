@@ -970,6 +970,26 @@ func TestReplicaCalcToleranceCMObject(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcTolerancePerPodCMObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  4,
+		expectedReplicas: 4,
+		metric: &metricInfo{
+			metricType:              objectPerPodMetric,
+			name:                    "qps",
+			levels:                  []int64{20166},
+			perPodTargetUtilization: 5000,
+			expectedUtilization:     5042,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcToleranceCMExternal(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
