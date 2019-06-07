@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
 // RenameContextOptions contains the options for running the rename-context cli command.
