@@ -9,9 +9,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["nestedpendingoperations.go"],
-    importpath = "k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations",
+    importpath = "k8s.io/kubernetes/pkg/util/nestedpendingoperations",
     deps = [
-        "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
+        "//pkg/util/nestedpendingoperations/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -24,7 +24,7 @@ go_test(
     srcs = ["nestedpendingoperations_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
+        "//pkg/util/nestedpendingoperations/exponentialbackoff:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
@@ -40,6 +40,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/util/nestedpendingoperations/exponentialbackoff:all-srcs",
+    ],
     tags = ["automanaged"],
 )

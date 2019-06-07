@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package operationexecutor implements interfaces that enable execution of
 // register and unregister operations with a
-// goroutinemap so that more than one operation is never triggered
+// nestedpendingoperations so that more than one operation is never triggered
 // on the same plugin.
 package operationexecutor
 
@@ -24,10 +24,11 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 )
 
 // OperationExecutor defines a set of operations for registering and unregistering
-// a plugin that are executed with a NewGoRoutineMap which
+// a plugin that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same socket path.
 //
 // These operations should be idempotent (for example, RegisterPlugin should
@@ -56,7 +57,7 @@ func NewOperationExecutor(
 	operationGenerator OperationGenerator) OperationExecutor {
 
 	return &operationExecutor{
-		pendingOperations:  newNestedPendingOperations(true /* exponentialBackOffOnError */),
+		pendingOperations:  nestedpendingoperations.NewNestedPendingOperations(true /* exponentialBackOffOnError */),
 		operationGenerator: operationGenerator,
 	}
 }
@@ -78,7 +79,7 @@ type ActualStateOfWorldUpdater interface {
 type operationExecutor struct {
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
-	pendingOperations *nestedPendingOperations
+	pendingOperations nestedpendingoperations.NestedPendingOperations
 
 	// operationGenerator is an interface that provides implementations for
 	// generating volume function
@@ -88,7 +89,7 @@ type operationExecutor struct {
 var _ OperationExecutor = &operationExecutor{}
 
 func (oe *operationExecutor) IsOperationPending(socketPath string) bool {
-	return oe.pendingOperations.IsOperationPending(socketPath)
+	return oe.pendingOperations.IsOperationPending(socketPath, "" /* operationKey2 */)
 }
 
 func (oe *operationExecutor) RegisterPlugin(
@@ -101,7 +102,7 @@ func (oe *operationExecutor) RegisterPlugin(
 		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, foundInDeprecatedDir, timestamp, pluginHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
-		socketPath, generatedOperation)
+		socketPath, "" /* operationKey2 */, generatedOperation)
 }
 
 func (oe *operationExecutor) UnregisterPlugin(
@@ -112,5 +113,5 @@ func (oe *operationExecutor) UnregisterPlugin(
 		oe.operationGenerator.GenerateUnregisterPluginFunc(socketPath, pluginHandlers, actualStateOfWorld)
 
 	return oe.pendingOperations.Run(
-		socketPath, generatedOperation)
+		socketPath, "" /* operationKey2 */, generatedOperation)
 }

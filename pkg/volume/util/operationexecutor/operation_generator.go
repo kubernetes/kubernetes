@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -91,34 +92,34 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 // OperationGenerator interface that extracts out the functions from operation_executor to make it dependency injectable
 type OperationGenerator interface {
 	// Generates the MountVolume function needed to perform the mount of a volume plugin
-	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations
+	GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) nestedpendingoperations.GeneratedOperations
 
 	// Generates the UnmountVolume function needed to perform the unmount of a volume plugin
-	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error)
+	GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the AttachVolume function needed to perform attach of a volume plugin
-	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations
+	GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) nestedpendingoperations.GeneratedOperations
 
 	// Generates the DetachVolume function needed to perform the detach of a volume plugin
-	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the VolumesAreAttached function needed to verify if volume plugins are attached
-	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the UnMountDevice function needed to perform the unmount of a device
-	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter hostutil.HostUtils) (volumetypes.GeneratedOperations, error)
+	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter hostutil.HostUtils) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the function needed to check if the attach_detach controller has attached the volume plugin
-	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the MapVolume function needed to perform the map of a volume plugin
-	GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the UnmapVolume function needed to perform the unmap of a volume plugin
-	GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the UnmapDevice function needed to perform the unmap of a device
-	GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter hostutil.HostUtils) (volumetypes.GeneratedOperations, error)
+	GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter hostutil.HostUtils) (nestedpendingoperations.GeneratedOperations, error)
 
 	// GetVolumePluginMgr returns volume plugin manager
 	GetVolumePluginMgr() *volume.VolumePluginMgr
@@ -126,18 +127,18 @@ type OperationGenerator interface {
 	GenerateBulkVolumeVerifyFunc(
 		map[types.NodeName][]*volume.Spec,
 		string,
-		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
+		map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error)
 
-	GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error)
+	GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (nestedpendingoperations.GeneratedOperations, error)
 
 	// Generates the volume file system resize function, which can resize volume's file system to expected size without unmounting the volume.
-	GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 	attachedVolumes []AttachedVolume,
 	nodeName types.NodeName,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	// volumesPerPlugin maps from a volume plugin to a list of volume specs which belong
 	// to this type of plugin
 	volumesPerPlugin := make(map[string][]*volume.Spec)
@@ -238,7 +239,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "verify_volumes_are_attached_per_node",
 		OperationFunc:     volumesAreAttachedFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume("<n/a>", nil), "verify_volumes_are_attached_per_node"),
@@ -250,7 +251,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 	pluginNodeVolumes map[types.NodeName][]*volume.Spec,
 	pluginName string,
 	volumeSpecMap map[*volume.Spec]v1.UniqueVolumeName,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 
 	// Migration: All inputs already should be translated by caller for this
 	// function except volumeSpecMap which contains original volume names for
@@ -314,7 +315,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "verify_volumes_are_attached",
 		OperationFunc:     bulkVolumeVerifyFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, nil), "verify_volumes_are_attached"),
@@ -325,7 +326,7 @@ func (og *operationGenerator) GenerateBulkVolumeVerifyFunc(
 
 func (og *operationGenerator) GenerateAttachVolumeFunc(
 	volumeToAttach VolumeToAttach,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) nestedpendingoperations.GeneratedOperations {
 	originalSpec := volumeToAttach.VolumeSpec
 	attachVolumeFunc := func() (error, error) {
 		var attachableVolumePlugin volume.AttachableVolumePlugin
@@ -444,7 +445,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		attachableVolumePluginName = attachableVolumePlugin.GetPluginName()
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "volume_attach",
 		OperationFunc:     attachVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
@@ -459,7 +460,7 @@ func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 func (og *operationGenerator) GenerateDetachVolumeFunc(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	var volumeName string
 	var attachableVolumePlugin volume.AttachableVolumePlugin
 	var pluginName string
@@ -469,7 +470,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// Get attacher plugin
 		nu, err := nodeUsingCSIPlugin(og, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NodeUsingCSIPlugin failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NodeUsingCSIPlugin failed", err)
 		}
 
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
@@ -477,12 +478,12 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
+				return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
 
 			csiSpec, err := translateSpec(volumeToDetach.VolumeSpec)
 			if err != nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.TranslateSpec failed", err)
+				return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.TranslateSpec failed", err)
 			}
 
 			volumeToDetach.VolumeSpec = csiSpec
@@ -490,14 +491,14 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			attachableVolumePlugin, err =
 				og.volumePluginMgr.FindAttachablePluginBySpec(volumeToDetach.VolumeSpec)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
+				return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
 		}
 
 		volumeName, err =
 			attachableVolumePlugin.GetVolumeName(volumeToDetach.VolumeSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.GetVolumeName failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.GetVolumeName failed", err)
 		}
 	} else {
 		// Get attacher plugin and the volumeName by splitting the volume unique name in case
@@ -505,7 +506,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// when a pod has been deleted during the controller downtime
 		pluginName, volumeName, err = util.SplitUniqueName(volumeToDetach.VolumeName)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.SplitUniqueName failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.SplitUniqueName failed", err)
 		}
 
 		// TODO(dyzz): This case can't distinguish between PV and In-line which is necessary because
@@ -515,7 +516,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
+				return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("AttachVolume.FindAttachablePluginBySpec failed", err)
 			}
 			// volumeToDetach.VolumeName here is always the in-tree volume name
 			// therefore a workaround is required. volumeToDetach.DevicePath
@@ -525,7 +526,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		} else {
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(pluginName)
 			if err != nil || attachableVolumePlugin == nil {
-				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginByName failed", err)
+				return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginByName failed", err)
 			}
 		}
 
@@ -537,7 +538,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	volumeDetacher, err := attachableVolumePlugin.NewDetacher()
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NewDetacher failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NewDetacher failed", err)
 	}
 
 	getVolumePluginMgrFunc := func() (error, error) {
@@ -564,7 +565,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "volume_detach",
 		OperationFunc:     getVolumePluginMgrFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(pluginName, volumeToDetach.VolumeSpec), "volume_detach"),
@@ -576,7 +577,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	isRemount bool) volumetypes.GeneratedOperations {
+	isRemount bool) nestedpendingoperations.GeneratedOperations {
 	// Get mounter plugin
 	originalSpec := volumeToMount.VolumeSpec
 	volumePluginName := unknownVolumePlugin
@@ -781,7 +782,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "volume_mount",
 		OperationFunc:     mountVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
@@ -792,7 +793,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	volumeToUnmount MountedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	podsDir string) (volumetypes.GeneratedOperations, error) {
+	podsDir string) (nestedpendingoperations.GeneratedOperations, error) {
 
 	var pluginName string
 	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
@@ -804,12 +805,12 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	// Get mountable plugin
 	volumePlugin, err := og.volumePluginMgr.FindPluginByName(pluginName)
 	if err != nil || volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmountVolume.FindPluginByName failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmountVolume.FindPluginByName failed", err)
 	}
 	volumeUnmounter, newUnmounterErr := volumePlugin.NewUnmounter(
 		volumeToUnmount.InnerVolumeSpecName, volumeToUnmount.PodUID)
 	if newUnmounterErr != nil {
-		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmountVolume.NewUnmounter failed", newUnmounterErr)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmountVolume.NewUnmounter failed", newUnmounterErr)
 	}
 
 	unmountVolumeFunc := func() (error, error) {
@@ -849,7 +850,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "volume_unmount",
 		OperationFunc:     unmountVolumeFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "volume_unmount"),
@@ -860,14 +861,14 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
+	hostutil hostutil.HostUtils) (nestedpendingoperations.GeneratedOperations, error) {
 
 	var pluginName string
 	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
 		pluginName = csi.CSIPluginName
 		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.TranslateSpec failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.TranslateSpec failed", err)
 		}
 		deviceToDetach.VolumeSpec = csiSpec
 	} else {
@@ -878,17 +879,17 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	deviceMountableVolumePlugin, err :=
 		og.volumePluginMgr.FindDeviceMountablePluginByName(pluginName)
 	if err != nil || deviceMountableVolumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindDeviceMountablePluginByName failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.FindDeviceMountablePluginByName failed", err)
 	}
 
 	volumeDeviceUmounter, err := deviceMountableVolumePlugin.NewDeviceUnmounter()
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUmounter failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceUmounter failed", err)
 	}
 
 	volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceMounter failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceMounter failed", err)
 	}
 
 	unmountDeviceFunc := func() (error, error) {
@@ -941,7 +942,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "unmount_device",
 		OperationFunc:     unmountDeviceFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(deviceMountableVolumePlugin.GetPluginName(), deviceToDetach.VolumeSpec), "unmount_device"),
@@ -961,14 +962,14 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 func (og *operationGenerator) GenerateMapVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 
 	originalSpec := volumeToMount.VolumeSpec
 	// Translate to CSI spec if migration enabled
 	if useCSIPlugin(og.volumePluginMgr, originalSpec) {
 		csiSpec, err := translateSpec(originalSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.TranslateSpec failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.TranslateSpec failed", err)
 		}
 
 		volumeToMount.VolumeSpec = csiSpec
@@ -978,18 +979,18 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	blockVolumePlugin, err :=
 		og.volumePluginMgr.FindMapperPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed", err)
 	}
 
 	if blockVolumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
 
 	affinityErr := checkNodeAffinity(og, volumeToMount)
 	if affinityErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NodeAffinity check failed", affinityErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMountVolume, eventErr.Error())
-		return volumetypes.GeneratedOperations{}, detailedErr
+		return nestedpendingoperations.GeneratedOperations{}, detailedErr
 	}
 	blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
 		volumeToMount.VolumeSpec,
@@ -998,7 +999,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 	if newMapperErr != nil {
 		eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.NewBlockVolumeMapper initialization failed", newMapperErr)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, eventErr.Error())
-		return volumetypes.GeneratedOperations{}, detailedErr
+		return nestedpendingoperations.GeneratedOperations{}, detailedErr
 	}
 
 	// Get attacher, if possible
@@ -1133,7 +1134,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		}
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "map_volume",
 		OperationFunc:     mapVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
@@ -1147,7 +1148,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 // If all steps are completed, the volume is marked as unmounted.
 func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	volumeToUnmount MountedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 
 	var blockVolumePlugin volume.BlockVolumePlugin
 	var err error
@@ -1156,7 +1157,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
 		csiSpec, err := translateSpec(volumeToUnmount.VolumeSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.TranslateSpec failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.TranslateSpec failed", err)
 		}
 
 		volumeToUnmount.VolumeSpec = csiSpec
@@ -1164,24 +1165,24 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		blockVolumePlugin, err =
 			og.volumePluginMgr.FindMapperPluginByName(csi.CSIPluginName)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
 		}
 	} else {
 		blockVolumePlugin, err =
 			og.volumePluginMgr.FindMapperPluginByName(volumeToUnmount.PluginName)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed", err)
 		}
 	}
 
 	var blockVolumeUnmapper volume.BlockVolumeUnmapper
 	if blockVolumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
 	blockVolumeUnmapper, newUnmapperErr := blockVolumePlugin.NewBlockVolumeUnmapper(
 		volumeToUnmount.InnerVolumeSpecName, volumeToUnmount.PodUID)
 	if newUnmapperErr != nil {
-		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.NewUnmapper failed", newUnmapperErr)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.NewUnmapper failed", newUnmapperErr)
 	}
 
 	unmapVolumeFunc := func() (error, error) {
@@ -1223,7 +1224,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "unmap_volume",
 		OperationFunc:     unmapVolumeFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(blockVolumePlugin.GetPluginName(), volumeToUnmount.VolumeSpec), "unmap_volume"),
@@ -1244,7 +1245,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
+	hostutil hostutil.HostUtils) (nestedpendingoperations.GeneratedOperations, error) {
 
 	var blockVolumePlugin volume.BlockVolumePlugin
 	var err error
@@ -1252,32 +1253,32 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
 		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.TranslateSpec failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.TranslateSpec failed", err)
 		}
 
 		deviceToDetach.VolumeSpec = csiSpec
 		blockVolumePlugin, err =
 			og.volumePluginMgr.FindMapperPluginByName(csi.CSIPluginName)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
 		}
 	} else {
 		blockVolumePlugin, err =
 			og.volumePluginMgr.FindMapperPluginByName(deviceToDetach.PluginName)
 		if err != nil {
-			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
+			return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed", err)
 		}
 	}
 
 	if blockVolumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
+		return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginByName failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
 
 	blockVolumeUnmapper, newUnmapperErr := blockVolumePlugin.NewBlockVolumeUnmapper(
 		deviceToDetach.VolumeSpec.Name(),
 		"" /* podUID */)
 	if newUnmapperErr != nil {
-		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
+		return nestedpendingoperations.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
 	}
 
 	unmapDeviceFunc := func() (error, error) {
@@ -1357,7 +1358,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		return nil, nil
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "unmap_device",
 		OperationFunc:     unmapDeviceFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(blockVolumePlugin.GetPluginName(), deviceToDetach.VolumeSpec), "unmap_device"),
@@ -1368,11 +1369,11 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 	volumeToMount VolumeToMount,
 	nodeName types.NodeName,
-	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil || volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.FindPluginBySpec failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume.FindPluginBySpec failed", err)
 	}
 
 	verifyControllerAttachedVolumeFunc := func() (error, error) {
@@ -1432,7 +1433,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		return volumeToMount.GenerateError("Volume not attached according to node status", nil)
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "verify_controller_attached_volume",
 		OperationFunc:     verifyControllerAttachedVolumeFunc,
 		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePlugin.GetPluginName(), volumeToMount.VolumeSpec), "verify_controller_attached_volume"),
@@ -1477,17 +1478,17 @@ func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 
 func (og *operationGenerator) GenerateExpandVolumeFunc(
 	pvc *v1.PersistentVolumeClaim,
-	pv *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
+	pv *v1.PersistentVolume) (nestedpendingoperations.GeneratedOperations, error) {
 
 	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 
 	volumePlugin, err := og.volumePluginMgr.FindExpandablePluginBySpec(volumeSpec)
 	if err != nil {
-		return volumetypes.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+		return nestedpendingoperations.GeneratedOperations{}, fmt.Errorf("Error finding plugin for expanding volume: %q with error %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
 	}
 
 	if volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", util.GetPersistentVolumeClaimQualifiedName(pvc))
+		return nestedpendingoperations.GeneratedOperations{}, fmt.Errorf("Can not find plugin for expanding volume: %q", util.GetPersistentVolumeClaimQualifiedName(pvc))
 	}
 
 	expandVolumeFunc := func() (error, error) {
@@ -1549,7 +1550,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		}
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "expand_volume",
 		OperationFunc:     expandVolumeFunc,
 		EventRecorderFunc: eventRecorderFunc,
@@ -1559,7 +1560,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 
 func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	volumeToMount VolumeToMount,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 
 	fsResizeFunc := func() (error, error) {
 		// Need to translate the spec here if the plugin is migrated so that the metrics
@@ -1649,10 +1650,10 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	volumePlugin, err :=
 		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 	if err != nil || volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("NodeExpandVolume.FindPluginBySpec failed", err)
+		return nestedpendingoperations.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("NodeExpandVolume.FindPluginBySpec failed", err)
 	}
 
-	return volumetypes.GeneratedOperations{
+	return nestedpendingoperations.GeneratedOperations{
 		OperationName:     "volume_fs_resize",
 		OperationFunc:     fsResizeFunc,
 		EventRecorderFunc: eventRecorderFunc,

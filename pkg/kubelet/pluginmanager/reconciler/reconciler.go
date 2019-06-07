@@ -27,8 +27,8 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/operationexecutor"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
-	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations/exponentialbackoff"
 )
 
 // Reconciler runs a periodic loop to reconcile the desired state of the world
@@ -129,9 +129,9 @@ func (rc *reconciler) reconcile() {
 			klog.V(5).Infof(registeredPlugin.GenerateMsgDetailed("Starting operationExecutor.UnregisterPlugin", ""))
 			err := rc.operationExecutor.UnregisterPlugin(registeredPlugin.SocketPath, rc.getHandlers(), rc.actualStateOfWorld)
 			if err != nil &&
-				!goroutinemap.IsAlreadyExists(err) &&
+				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				// Log all other errors.
 				klog.Errorf(registeredPlugin.GenerateErrorDetailed("operationExecutor.UnregisterPlugin failed", err).Error())
 			}
@@ -147,9 +147,9 @@ func (rc *reconciler) reconcile() {
 			klog.V(5).Infof(pluginToRegister.GenerateMsgDetailed("Starting operationExecutor.RegisterPlugin", ""))
 			err := rc.operationExecutor.RegisterPlugin(pluginToRegister.SocketPath, pluginToRegister.FoundInDeprecatedDir, pluginToRegister.Timestamp, rc.getHandlers(), rc.actualStateOfWorld)
 			if err != nil &&
-				!goroutinemap.IsAlreadyExists(err) &&
+				!nestedpendingoperations.IsAlreadyExists(err) &&
 				!exponentialbackoff.IsExponentialBackoff(err) {
-				// Ignore goroutinemap.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
+				// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 				klog.Errorf(pluginToRegister.GenerateErrorDetailed("operationExecutor.RegisterPlugin failed", err).Error())
 			}
 			if err == nil {

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )

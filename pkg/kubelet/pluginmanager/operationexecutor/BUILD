@@ -4,7 +4,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "metrics.go",
-        "nestedpendingoperations.go",
         "operation_executor.go",
         "operation_generator.go",
     ],
@@ -13,27 +12,21 @@ go_library(
     deps = [
         "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/pluginmanager/cache:go_default_library",
-        "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//pkg/util/nestedpendingoperations:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "nestedpendingoperations_test.go",
-        "operation_executor_test.go",
-    ],
+    srcs = ["operation_executor_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubelet/pluginmanager/cache:go_default_library",
-        "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//pkg/util/nestedpendingoperations:go_default_library",
     ],
 )
 

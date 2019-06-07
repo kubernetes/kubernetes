@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 )
 
 const (
@@ -106,27 +107,27 @@ func (fopg *fakeOperationGenerator) GenerateRegisterPluginFunc(
 	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) nestedpendingoperations.GeneratedOperations {
 
-	opFunc := func() error {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
+		return nil, nil
 	}
-	return generatedOperations{
-		operationFunc: opFunc,
+	return nestedpendingoperations.GeneratedOperations{
+		OperationFunc: opFunc,
 	}
 }
 
 func (fopg *fakeOperationGenerator) GenerateUnregisterPluginFunc(
 	socketPath string,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
-	opFunc := func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) nestedpendingoperations.GeneratedOperations {
+	opFunc := func() (error, error) {
 		startOperationAndBlock(fopg.ch, fopg.quit)
-		return nil
+		return nil, nil
 	}
-	return generatedOperations{
-		operationFunc: opFunc,
+	return nestedpendingoperations.GeneratedOperations{
+		OperationFunc: opFunc,
 	}
 }
 

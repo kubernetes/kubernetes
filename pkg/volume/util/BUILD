@@ -94,8 +94,12 @@ filegroup(
         "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/fsquota:all-srcs",
+<<<<<<< HEAD
         "//pkg/volume/util/hostutil:all-srcs",
         "//pkg/volume/util/nestedpendingoperations:all-srcs",
+=======
+        "//pkg/volume/util/nsenter:all-srcs",
+>>>>>>> Combine nestedpendingoperations and goroutinemap
         "//pkg/volume/util/operationexecutor:all-srcs",
         "//pkg/volume/util/recyclerclient:all-srcs",
         "//pkg/volume/util/subpath:all-srcs",

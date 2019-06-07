@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package exponentialbackoff contains logic for implementing exponential
-// backoff for GoRoutineMap and NestedPendingOperations.
+// backoff for  NestedPendingOperations.
 package exponentialbackoff
 
 import (
@@ -25,7 +25,7 @@ import (
 
 const (
 	// initialDurationBeforeRetry is the amount of time after an error occurs
-	// that GoroutineMap will refuse to allow another operation to start with
+	// that NestedPendingOperations will refuse to allow another operation to start with
 	// the same target (if exponentialBackOffOnError is enabled). Each
 	// successive error results in a wait 2x times the previous.
 	initialDurationBeforeRetry time.Duration = 500 * time.Millisecond
@@ -86,7 +86,7 @@ func NewExponentialBackoffError(
 	}
 }
 
-// IsExponentialBackoff returns true if an error returned from GoroutineMap
+// IsExponentialBackoff returns true if an error returned from NestedPendingOperations
 // indicates that a new operation can not be started because
 // exponentialBackOffOnError is enabled and a previous operation with the same
 // operation failed within the durationBeforeRetry period.
@@ -99,7 +99,7 @@ func IsExponentialBackoff(err error) bool {
 	}
 }
 
-// exponentialBackoffError is the error returned returned from GoroutineMap when
+// exponentialBackoffError is the error returned returned from NestedPendingOperations when
 // a new operation can not be started because exponentialBackOffOnError is
 // enabled and a previous operation with the same operation failed within the
 // durationBeforeRetry period.

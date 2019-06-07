@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 )
 
 // fakeOGCounter is a simple OperationGenerator which counts number of times a function
@@ -44,43 +45,43 @@ func NewFakeOGCounter(opFunc func() (error, error)) OperationGenerator {
 	}
 }
 
-func (f *fakeOGCounter) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) volumetypes.GeneratedOperations {
+func (f *fakeOGCounter) GenerateMountVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater, isRemount bool) nestedpendingoperations.GeneratedOperations {
 	return f.recordFuncCall("GenerateMountVolumeFunc")
 }
 
-func (f *fakeOGCounter) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateUnmountVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, podsDir string) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateUnmountVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
+func (f *fakeOGCounter) GenerateAttachVolumeFunc(volumeToAttach VolumeToAttach, actualStateOfWorld ActualStateOfWorldAttacherUpdater) nestedpendingoperations.GeneratedOperations {
 	return f.recordFuncCall("GenerateAttachVolumeFunc")
 }
 
-func (f *fakeOGCounter) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateDetachVolumeFunc(volumeToDetach AttachedVolume, verifySafeToDetach bool, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateDetachVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateVolumesAreAttachedFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hu hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hu hostutil.HostUtils) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateUnmountDeviceFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateVerifyControllerAttachedVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateMapVolumeFunc(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorldMounterUpdater ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateMapVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateUnmapVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hu hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, hu hostutil.HostUtils) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateUnmapDeviceFunc"), nil
 }
 
@@ -91,23 +92,23 @@ func (f *fakeOGCounter) GetVolumePluginMgr() *volume.VolumePluginMgr {
 func (f *fakeOGCounter) GenerateBulkVolumeVerifyFunc(
 	map[types.NodeName][]*volume.Spec,
 	string,
-	map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error) {
+	map[*volume.Spec]v1.UniqueVolumeName, ActualStateOfWorldAttacherUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateBulkVolumeVerifyFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateExpandVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
+func (f *fakeOGCounter) GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (nestedpendingoperations.GeneratedOperations, error) {
 	return f.recordFuncCall("GenerateExpandInUseVolumeFunc"), nil
 }
 
-func (f *fakeOGCounter) recordFuncCall(name string) volumetypes.GeneratedOperations {
+func (f *fakeOGCounter) recordFuncCall(name string) nestedpendingoperations.GeneratedOperations {
 	if _, ok := f.calledFuncs[name]; ok {
 		f.calledFuncs[name]++
 	}
-	ops := volumetypes.GeneratedOperations{
+	ops := nestedpendingoperations.GeneratedOperations{
 		OperationName: name,
 		OperationFunc: f.opFunc,
 	}

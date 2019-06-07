@@ -233,11 +233,11 @@ pkg/ssh
 pkg/util/config
 pkg/util/ebtables
 pkg/util/env
-pkg/util/goroutinemap/exponentialbackoff
 pkg/util/iptables
 pkg/util/iptables/testing
 pkg/util/labels
 pkg/util/mount
+pkg/util/nestedpendingoperations/exponentialbackoff
 pkg/util/oom
 pkg/util/procfs
 pkg/util/removeall

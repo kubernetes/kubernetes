@@ -45,8 +45,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
-	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
@@ -191,7 +191,7 @@ type PersistentVolumeController struct {
 	volumeQueue *workqueue.Type
 
 	// Map of scheduled/running operations.
-	runningOperations goroutinemap.GoRoutineMap
+	runningOperations nestedpendingoperations.NestedPendingOperations
 
 	// For testing only: hook to call before an asynchronous operation starts.
 	// Not used when set to nil.
@@ -1013,9 +1013,9 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 	case v1.PersistentVolumeReclaimRecycle:
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Recycle", volume.Name)
 		opName := fmt.Sprintf("recycle-%s[%s]", volume.Name, string(volume.UID))
-		ctrl.scheduleOperation(opName, func() error {
+		ctrl.scheduleOperation(opName, func() (error, error) {
 			ctrl.recycleVolumeOperation(volume)
-			return nil
+			return nil, nil
 		})
 
 	case v1.PersistentVolumeReclaimDelete:
@@ -1024,7 +1024,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 		// create a start timestamp entry in cache for deletion operation if no one exists with
 		// key = volume.Name, pluginName = provisionerName, operation = "delete"
 		ctrl.operationTimestamps.AddIfNotExist(volume.Name, ctrl.getProvisionerNameFromVolume(volume), "delete")
-		ctrl.scheduleOperation(opName, func() error {
+		ctrl.scheduleOperation(opName, func() (error, error) {
 			_, err := ctrl.deleteVolumeOperation(volume)
 			if err != nil {
 				// only report error count to "volume_operation_total_errors"
@@ -1032,7 +1032,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 				// deleted and a volume deleted event is captured
 				metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, err)
 			}
-			return err
+			return err, err
 		})
 
 	default:
@@ -1334,7 +1334,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		// retain the original behavior of returning nil from provisionClaim call
 		return nil
 	}
-	ctrl.scheduleOperation(opName, func() error {
+	ctrl.scheduleOperation(opName, func() (error, error) {
 		// create a start timestamp entry in cache for provision operation if no one exists with
 		// key = claimKey, pluginName = provisionerName, operation = "provision"
 		claimKey := claimToClaimKey(claim)
@@ -1350,7 +1350,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		if err != nil {
 			metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, err)
 		}
-		return err
+		return err, err
 	})
 	return nil
 }
@@ -1627,7 +1627,7 @@ func (ctrl *PersistentVolumeController) getProvisionedVolumeNameForClaim(claim *
 
 // scheduleOperation starts given asynchronous operation on given volume. It
 // makes sure the operation is already not running.
-func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, operation func() error) {
+func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, operation func() (error, error)) {
 	klog.V(4).Infof("scheduleOperation[%s]", operationName)
 
 	// Poke test code that an operation is just about to get started.
@@ -1635,10 +1635,10 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 		ctrl.preOperationHook(operationName)
 	}
 
-	err := ctrl.runningOperations.Run(operationName, operation)
+	err := ctrl.runningOperations.Run(operationName, "" /* opeartionKey2 */, nestedpendingoperations.GeneratedOperations{OperationFunc: operation})
 	if err != nil {
 		switch {
-		case goroutinemap.IsAlreadyExists(err):
+		case nestedpendingoperations.IsAlreadyExists(err):
 			klog.V(4).Infof("operation %q is already running, skipping", operationName)
 		case exponentialbackoff.IsExponentialBackoff(err):
 			klog.V(4).Infof("operation %q postponed due to exponential backoff", operationName)

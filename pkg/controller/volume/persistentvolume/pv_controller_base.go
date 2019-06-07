@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 	vol "k8s.io/kubernetes/pkg/volume"
 
 	"k8s.io/klog"
@@ -83,7 +83,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 		claims:                        cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    p.KubeClient,
 		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(true /* exponentialBackOffOnError */),
+		runningOperations:             nestedpendingoperations.NewNestedPendingOperations(true /* exponentialBackOffOnError */),
 		cloud:                         p.Cloud,
 		enableDynamicProvisioning:     p.EnableDynamicProvisioning,
 		clusterName:                   p.ClusterName,

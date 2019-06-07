@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package operationexecutor implements interfaces that enable execution of
 // register and unregister operations with a
-// goroutinemap so that more than one operation is never triggered
+// nestedpendingoperations so that more than one operation is never triggered
 // on the same plugin.
 package operationexecutor
 
@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 )
 
 const (
@@ -62,13 +63,13 @@ type OperationGenerator interface {
 		foundInDeprecatedDir bool,
 		timestamp time.Time,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater) nestedpendingoperations.GeneratedOperations
 
 	// Generates the UnregisterPlugin function needed to perform the unregistration of a plugin
 	GenerateUnregisterPluginFunc(
 		socketPath string,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater) nestedpendingoperations.GeneratedOperations
 }
 
 func (og *operationGenerator) GenerateRegisterPluginFunc(
@@ -76,12 +77,13 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	foundInDeprecatedDir bool,
 	timestamp time.Time,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) nestedpendingoperations.GeneratedOperations {
 
-	registerPluginFunc := func() error {
+	registerPluginFunc := func() (error, error) {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
 		if err != nil {
-			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
+			errStr := "RegisterPlugin error -- dial failed at socket %s, err: %v"
+			return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 		}
 		defer conn.Close()
 
@@ -90,15 +92,18 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 
 		infoResp, err := client.GetInfo(ctx, &registerapi.InfoRequest{})
 		if err != nil {
-			return fmt.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
+			errStr := "RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v"
+			return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 		}
 
 		handler, ok := pluginHandlers[infoResp.Type]
 		if !ok {
 			if err := og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
-				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
+				errStr := "RegisterPlugin error -- failed to send error at socket %s, err: %v"
+				return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 			}
-			return fmt.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
+			errStr := "RegisterPlugin error -- no handler registered for plugin type: %s at socket %s"
+			return fmt.Errorf(errStr, infoResp.Type, socketPath), fmt.Errorf(errStr, infoResp.Type, socketPath)
 		}
 
 		if infoResp.Endpoint == "" {
@@ -106,9 +111,11 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		}
 		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, foundInDeprecatedDir); err != nil {
 			if err = og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
-				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
+				errStr := "RegisterPlugin error -- failed to send error at socket %s, err: %v"
+				return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 			}
-			return fmt.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
+			errStr := "RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed"
+			return fmt.Errorf(errStr), fmt.Errorf(errStr)
 		}
 		// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
 		// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
@@ -118,32 +125,35 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			Timestamp:            timestamp,
 		})
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
-			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
+			notifyErr := og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
+			return notifyErr, notifyErr
 		}
 
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
 		if err := og.notifyPlugin(client, true, ""); err != nil {
-			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
+			errStr := "RegisterPlugin error -- failed to send registration status at socket %s, err: %v"
+			return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 		}
-		return nil
+		return nil, nil
 	}
 
-	return generatedOperations{
-		operationName: "register_plugin",
-		operationFunc: registerPluginFunc,
-		completeFunc:  operationCompleteHook(socketPath, "register_plugin"),
+	return nestedpendingoperations.GeneratedOperations{
+		OperationName: "register_plugin",
+		OperationFunc: registerPluginFunc,
+		CompleteFunc:  operationCompleteHook(socketPath, "register_plugin"),
 	}
 }
 
 func (og *operationGenerator) GenerateUnregisterPluginFunc(
 	socketPath string,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) generatedOperations {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater) nestedpendingoperations.GeneratedOperations {
 
-	unregisterPluginFunc := func() error {
+	unregisterPluginFunc := func() (error, error) {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
 		if err != nil {
-			return fmt.Errorf("UnregisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
+			errStr := "UnregisterPlugin error -- dial failed at socket %s, err: %v"
+			return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 		}
 		defer conn.Close()
 
@@ -152,12 +162,14 @@ func (og *operationGenerator) GenerateUnregisterPluginFunc(
 
 		infoResp, err := client.GetInfo(ctx, &registerapi.InfoRequest{})
 		if err != nil {
-			return fmt.Errorf("UnregisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
+			errStr := "UnregisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v"
+			return fmt.Errorf(errStr, socketPath, err), fmt.Errorf(errStr, socketPath, err)
 		}
 
 		handler, ok := pluginHandlers[infoResp.Type]
 		if !ok {
-			return fmt.Errorf("UnregisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
+			errStr := "UnregisterPlugin error -- no handler registered for plugin type: %s at socket %s"
+			return fmt.Errorf(errStr, infoResp.Type, socketPath), fmt.Errorf(errStr, infoResp.Type, socketPath)
 		}
 
 		// We remove the plugin to the actual state of world cache before calling a plugin consumer's Unregister handle
@@ -165,13 +177,13 @@ func (og *operationGenerator) GenerateUnregisterPluginFunc(
 		actualStateOfWorldUpdater.RemovePlugin(socketPath)
 
 		handler.DeRegisterPlugin(infoResp.Name)
-		return nil
+		return nil, nil
 	}
 
-	return generatedOperations{
-		operationName: "unregister_plugin",
-		operationFunc: unregisterPluginFunc,
-		completeFunc:  operationCompleteHook(socketPath, "unregister_plugin"),
+	return nestedpendingoperations.GeneratedOperations{
+		OperationName: "unregister_plugin",
+		OperationFunc: unregisterPluginFunc,
+		CompleteFunc:  operationCompleteHook(socketPath, "unregister_plugin"),
 	}
 }
 
