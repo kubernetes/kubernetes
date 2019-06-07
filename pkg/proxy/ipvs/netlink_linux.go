@@ -33,6 +33,9 @@ type netlinkHandle struct {
 	isIPv6 bool
 }
 
+var getLinkIndex = getRealLinkIndex
+var routeListFiltered = realRouteListFiltered
+
 // NewNetLinkHandle will create a new NetLinkHandle
 func NewNetLinkHandle(isIPv6 bool) NetLinkHandle {
 	return &netlinkHandle{netlink.Handle{}, isIPv6}
@@ -154,20 +157,20 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	filterMask := netlink.RT_FILTER_TABLE | netlink.RT_FILTER_TYPE | netlink.RT_FILTER_PROTOCOL
 
 	// find chosen device
-	if chosenLinkIndex, err := h.getLinkIndex(dev); err != nil {
+	if chosenLinkIndex, err := getLinkIndex(h, dev); err != nil {
 		return nil, err
-	} else if -1 != chosenLinkIndex {
+	} else if chosenLinkIndex != -1 {
 		routeFilter.LinkIndex = chosenLinkIndex
 		filterMask |= netlink.RT_FILTER_OIF
 	}
 
-	routes, err := h.RouteListFiltered(netlink.FAMILY_ALL, routeFilter, filterMask)
+	routes, err := routeListFiltered(h, netlink.FAMILY_ALL, routeFilter, filterMask)
 	if err != nil {
 		return nil, fmt.Errorf("error list route table, err: %v", err)
 	}
 	res := sets.NewString()
 
-	filterLinkIndex, err := h.getLinkIndex(filterDev)
+	filterLinkIndex, err := getLinkIndex(h, filterDev)
 	if err != nil {
 		return nil, err
 	}
@@ -187,15 +190,17 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	return res, nil
 }
 
-func (h *netlinkHandle) getLinkIndex(dev string) (int, error) {
+func getRealLinkIndex(h *netlinkHandle, dev string) (int, error) {
 	if "" == dev {
 		return -1, nil
 	}
-
 	link, err := h.LinkByName(dev)
 	if err != nil {
-		return -1, fmt.Errorf("error get device %s, err: %v", dev, err)
+		return -1, fmt.Errorf("error getting device %s, err: %v", dev, err)
 	}
 	return link.Attrs().Index, nil
+}
 
+func realRouteListFiltered(h *netlinkHandle, family int, filter *netlink.Route, filterMask uint64) ([]netlink.Route, error) {
+	return h.RouteListFiltered(family, filter, filterMask)
 }
