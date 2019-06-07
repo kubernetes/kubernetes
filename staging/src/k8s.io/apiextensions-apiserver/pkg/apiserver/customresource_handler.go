@@ -605,6 +605,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				kind,
 				validator,
 				statusValidator,
+				structuralSchemas,
 				statusSpec,
 				scaleSpec,
 			),
@@ -1024,7 +1025,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	objectMeta, foundObjectMeta, err := schemaobjectmeta.GetObjectMeta(u, v.dropInvalidMetadata)
+	objectMeta, foundObjectMeta, err := schemaobjectmeta.GetObjectMeta(u.Object, v.dropInvalidMetadata)
 	if err != nil {
 		return err
 	}
@@ -1034,8 +1035,14 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	if !v.preserveUnknownFields && gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
-		structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version])
+	if gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
+		if !v.preserveUnknownFields {
+			// TODO: switch over pruning and coercing at the root to  schemaobjectmeta.Coerce too
+			structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version], false)
+		}
+		if err := schemaobjectmeta.Coerce(nil, u.Object, v.structuralSchemas[gv.Version], false, v.dropInvalidMetadata); err != nil {
+			return err
+		}
 	}
 
 	// restore meta fields, starting clean
@@ -1046,7 +1053,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 		u.SetAPIVersion(apiVersion)
 	}
 	if foundObjectMeta {
-		if err := schemaobjectmeta.SetObjectMeta(u, objectMeta); err != nil {
+		if err := schemaobjectmeta.SetObjectMeta(u.Object, objectMeta); err != nil {
 			return err
 		}
 	}

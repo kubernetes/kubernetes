@@ -113,7 +113,7 @@ func validateEmbeddedResource(pth *field.Path, x map[string]interface{}, s *stru
 					if len(meta.Name) == 0 {
 						meta.Name = "fakename" // we have to set something to avoid an error
 					}
-					allErrs = append(allErrs, metavalidation.ValidateObjectMeta(meta, len(meta.Namespace) > 0, path.ValidatePathSegmentName, field.NewPath("metadata"))...)
+					allErrs = append(allErrs, metavalidation.ValidateObjectMeta(meta, len(meta.Namespace) > 0, path.ValidatePathSegmentName, pth.Child("metadata"))...)
 				}
 			}
 		}
