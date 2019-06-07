@@ -275,10 +275,41 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	return o.execute(options)
 }
 
+// Changes the destination filename and location if they are not explicitly specified.
+// If destination is a directory, filename will be the same as the source.
+// Also, symlink destinations are converted to true paths
+func convertHostDestFilename(srcFile string, destFile string) (string, error) {
+	stat, err := os.Stat(destFile)
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+
+	if !os.IsNotExist(err) && stat.IsDir() {
+		destFile = destFile + "/" + path.Base(srcFile)
+	}
+
+	d, err := filepath.EvalSymlinks(path.Dir(destFile))
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+
+	if d != "" {
+		destFile = d + "/" + path.Base(destFile)
+	}
+	return destFile, nil
+}
+
 func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
 	}
+
+	d, err := convertHostDestFilename(src.File, dest.File)
+	if err != nil {
+		return err
+	}
+
+	dest.File = d
 
 	reader, outStream := io.Pipe()
 	options := &exec.ExecOptions{

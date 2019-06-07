@@ -580,6 +580,42 @@ func TestClean(t *testing.T) {
 	}
 }
 
+func TestConvertHostDestFilename(t *testing.T) {
+	tests := []struct {
+		srcFile           string
+		destFile          string
+		convertedFilename string
+	}{
+		{
+			"test_convert_host_file",
+			"test_convert_host_dir",
+			"test_convert_host_dir/test_convert_host_file",
+		},
+	}
+	for _, test := range tests {
+		err := os.Mkdir(test.destFile, 755)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+		defer os.RemoveAll(test.destFile)
+		err = os.Symlink(test.destFile, "symlink_convert_host")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+		defer os.RemoveAll("symlink_convert_host")
+		out, err := convertHostDestFilename(test.srcFile, "symlink_convert_host")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+			t.FailNow()
+		}
+		if out != test.convertedFilename {
+			t.Errorf("Expected: %s, saw %s", test.convertedFilename, out)
+		}
+	}
+}
+
 func TestCopyToPod(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
 	ns := scheme.Codecs
