@@ -1679,6 +1679,63 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 									},
 									XPreserveUnknownFields: pointer.BoolPtr(true),
 								},
+								// x-kubernetes-embedded-resource: true
+								"embedded-fine": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {
+											Type: "string",
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo":        "abc",
+										"apiVersion": "foo/v1",
+										"kind":       "v1",
+										"metadata": map[string]interface{}{
+											"name": "foo",
+										},
+									}),
+								},
+								"embedded-preserve": {
+									Type:                   "object",
+									XEmbeddedResource:      true,
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {
+											Type: "string",
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo":        "abc",
+										"apiVersion": "foo/v1",
+										"kind":       "v1",
+										"metadata": map[string]interface{}{
+											"name": "foo",
+										},
+										"bar": int64(42),
+									}),
+								},
+								"embedded-preserve-unpruned-objectmeta": {
+									Type:                   "object",
+									XEmbeddedResource:      true,
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {
+											Type: "string",
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo":        "abc",
+										"apiVersion": "foo/v1",
+										"kind":       "v1",
+										"metadata": map[string]interface{}{
+											"name":        "foo",
+											"unspecified": "bar",
+										},
+										"bar": int64(42),
+									}),
+								},
 							},
 						},
 					},
@@ -1697,6 +1754,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				// strict here, but want to encourage proper specifications by forbidding other defaults.
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[preserveUnknownFields]", "default"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[nestedProperties]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[embedded-preserve-unpruned-objectmeta]", "default"),
 			},
 
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},

@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	govalidate "github.com/go-openapi/validate"
+	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -747,8 +748,11 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		if v.allowDefaults {
 			if s, err := structuralschema.NewStructural(schema); err == nil {
 				// ignore errors here locally. They will show up for the root of the schema.
-				pruned := runtime.DeepCopyJSONValue(*schema.Default)
-				pruning.Prune(pruned, s)
+				pruned := runtime.DeepCopyJSONValue(interface{}(*schema.Default))
+				pruning.Prune(pruned, s, false)
+				if err := schemaobjectmeta.Coerce(fldPath, pruned, s, false, false); err != nil {
+					allErrs = append(allErrs, err)
+				}
 				if !reflect.DeepEqual(pruned, *schema.Default) {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, "must not have unspecified fields"))
 				}
