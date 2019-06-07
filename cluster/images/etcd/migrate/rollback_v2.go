@@ -172,7 +172,7 @@ func RollbackV3ToV2(migrateDatadir string, ttl time.Duration) error {
 	if err := snapshotter.SaveSnap(raftSnap); err != nil {
 		return err
 	}
-	klog.Infof("Finished successfully")
+	klog.Info("Finished successfully")
 	return nil
 }
 
