@@ -52,7 +52,7 @@ func TestValidVersion(t *testing.T) {
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
 			fileFetcher := func(url string, timeout time.Duration) (string, error) {
-				return "", errors.New("Should not make internet call")
+				return "", errors.New("should not make internet call")
 			}
 			ver, err := kubernetesReleaseVersion(s, fileFetcher)
 			t.Log("Valid: ", s, ver, err)
@@ -77,7 +77,7 @@ func TestInvalidVersion(t *testing.T) {
 	for _, s := range invalidVersions {
 		t.Run(s, func(t *testing.T) {
 			fileFetcher := func(url string, timeout time.Duration) (string, error) {
-				return "", errors.New("Should not make internet call")
+				return "should not make internet calls", errors.New("should not make internet call")
 			}
 			ver, err := kubernetesReleaseVersion(s, fileFetcher)
 			t.Log("Invalid: ", s, ver, err)
@@ -100,7 +100,7 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
 			fileFetcher := func(url string, timeout time.Duration) (string, error) {
-				return "", errors.New("Should not make internet call")
+				return "", errors.New("should not make internet call")
 			}
 			ver, err := kubernetesReleaseVersion(s, fileFetcher)
 			t.Log("Valid: ", s, ver, err)
