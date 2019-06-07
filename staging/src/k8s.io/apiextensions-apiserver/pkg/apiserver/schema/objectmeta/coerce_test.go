@@ -46,10 +46,10 @@ func TestRoundtripObjectMeta(t *testing.T) {
 		u := &unstructured.Unstructured{Object: map[string]interface{}{}}
 		original := &metav1.ObjectMeta{}
 		fuzzer.Fuzz(original)
-		if err := SetObjectMeta(u, original); err != nil {
+		if err := SetObjectMeta(u.Object, original); err != nil {
 			t.Fatalf("unexpected error setting ObjectMeta: %v", err)
 		}
-		o, _, err := GetObjectMeta(u, false)
+		o, _, err := GetObjectMeta(u.Object, false)
 		if err != nil {
 			t.Fatalf("unexpected error getting the Objectmeta: %v", err)
 		}
@@ -96,7 +96,7 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 		for _, pth := range jsonPaths(nil, goodMetaMap) {
 			for _, v := range spuriousValues() {
 				// skip values of same type, because they can only cause decoding errors further insides
-				orig, err := JsonPathValue(goodMetaMap, pth, 0)
+				orig, err := JSONPathValue(goodMetaMap, pth, 0)
 				if err != nil {
 					t.Fatalf("unexpected to not find something at %v: %v", pth, err)
 				}
@@ -109,7 +109,7 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := SetJsonPath(spuriousMetaMap, pth, 0, v); err != nil {
+				if err := SetJSONPath(spuriousMetaMap, pth, 0, v); err != nil {
 					t.Fatal(err)
 				}
 
@@ -130,7 +130,7 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 					switch {
 					default:
 						// delete complete top-level field by default
-						DeleteJsonPath(truncatedMetaMap, pth[:1], 0)
+						DeleteJSONPath(truncatedMetaMap, pth[:1], 0)
 					}
 
 					truncatedJSON, err := encodingjson.Marshal(truncatedMetaMap)
@@ -145,7 +145,7 @@ func TestMalformedObjectMetaFields(t *testing.T) {
 
 				// make sure dropInvalidTypedFields+getObjectMeta matches what we expect
 				u := &unstructured.Unstructured{Object: map[string]interface{}{"metadata": spuriousMetaMap}}
-				actualObjectMeta, _, err := GetObjectMeta(u, true)
+				actualObjectMeta, _, err := GetObjectMeta(u.Object, true)
 				if err != nil {
 					t.Errorf("got unexpected error after dropping invalid typed fields on %v=%#v: %v", pth, v, err)
 					continue
@@ -174,7 +174,7 @@ func TestGetObjectMetaNils(t *testing.T) {
 		},
 	}
 
-	o, _, err := GetObjectMeta(u, true)
+	o, _, err := GetObjectMeta(u.Object, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +223,7 @@ func TestGetObjectMeta(t *testing.T) {
 			},
 		}}
 
-		meta, _, err := GetObjectMeta(u, true)
+		meta, _, err := GetObjectMeta(u.Object, true)
 		if err != nil {
 			t.Fatal(err)
 		}

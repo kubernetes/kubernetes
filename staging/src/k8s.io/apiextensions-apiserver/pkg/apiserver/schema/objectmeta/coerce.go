@@ -27,13 +27,16 @@ import (
 
 var encodingjson = json.CaseSensitiveJsonIterator()
 
-func GetObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
-	metadata, found := u.UnstructuredContent()["metadata"]
+// GetObjectMeta does conversion of JSON to ObjectMeta. It first tries json.Unmarshal into a metav1.ObjectMeta
+// type. If that does not work and dropMalformedFields is true, it does field-by-field best-effort conversion
+// throwing away fields which lead to errors.
+func GetObjectMeta(obj map[string]interface{}, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
+	metadata, found := obj["metadata"]
 	if !found {
 		return nil, false, nil
 	}
 
-	// round-trip through JSON first, hoping that unmarshaling just works
+	// round-trip through JSON first, hoping that unmarshalling just works
 	objectMeta := &metav1.ObjectMeta{}
 	metadataBytes, err := encodingjson.Marshal(metadata)
 	if err != nil {
@@ -72,9 +75,10 @@ func GetObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*met
 	return accumulatedObjectMeta, true, nil
 }
 
-func SetObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) error {
+// SetObjectMeta writes back ObjectMeta into a JSON data structure.
+func SetObjectMeta(obj map[string]interface{}, objectMeta *metav1.ObjectMeta) error {
 	if objectMeta == nil {
-		unstructured.RemoveNestedField(u.UnstructuredContent(), "metadata")
+		unstructured.RemoveNestedField(obj, "metadata")
 		return nil
 	}
 
@@ -83,6 +87,6 @@ func SetObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) 
 		return err
 	}
 
-	u.UnstructuredContent()["metadata"] = metadata
+	obj["metadata"] = metadata
 	return nil
 }
