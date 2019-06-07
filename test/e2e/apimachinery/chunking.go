@@ -122,7 +122,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
 	})
 
-	ginkgo.It("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent", func() {
+	ginkgo.It("should support continue listing from the last key if the original version has been compacted away, though the list is inconsistent [Slow]", func() {
 		ns := f.Namespace.Name
 		c := f.ClientSet
 		client := c.CoreV1().PodTemplates(ns)
