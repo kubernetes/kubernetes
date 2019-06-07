@@ -250,8 +250,6 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		for _, v := range authInfo.Exec.Env {
 			if len(v.Name) == 0 {
 				validationErrors = append(validationErrors, fmt.Errorf("env variable name must be specified for %v to use exec authentication plugin", authInfoName))
-			} else if len(v.Value) == 0 {
-				validationErrors = append(validationErrors, fmt.Errorf("env variable %s value must be specified for %v to use exec authentication plugin", v.Name, authInfoName))
 			}
 		}
 	}
