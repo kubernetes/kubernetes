@@ -50,7 +50,10 @@ func IsPodReady(pod *corev1.Pod) bool {
 // IsPodReadyConditionTrue returns true if a pod is ready; false otherwise.
 func isPodReadyConditionTrue(status corev1.PodStatus) bool {
 	condition := getPodReadyCondition(status)
-	return condition != nil && condition.Status == corev1.ConditionTrue
+	if condition == nil || condition.Status != corev1.ConditionTrue {
+		return false
+	}
+	return true
 }
 
 // GetPodReadyCondition extracts the pod ready condition from the given status and returns that.
@@ -75,9 +78,9 @@ func getPodConditionFromList(conditions []corev1.PodCondition, conditionType cor
 	if conditions == nil {
 		return -1, nil
 	}
-	for i := range conditions {
-		if conditions[i].Type == conditionType {
-			return i, &conditions[i]
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return i, &condition
 		}
 	}
 	return -1, nil
