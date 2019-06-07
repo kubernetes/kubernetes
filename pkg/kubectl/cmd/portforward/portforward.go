@@ -18,6 +18,7 @@ package portforward
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -178,6 +179,7 @@ func translateServicePortToTargetPort(ports []string, svc corev1.Service, pod co
 				localPort = strconv.Itoa(portnum)
 			}
 		}
+
 		containerPort, err := util.LookupContainerPortNumberByServicePort(svc, pod, int32(portnum))
 		if err != nil {
 			// can't resolve a named port, or Service did not declare this port, return an error
@@ -210,6 +212,11 @@ func convertPodNamedPortToNumber(ports []string, pod corev1.Pod) ([]string, erro
 
 			containerPortStr = strconv.Itoa(int(containerPort))
 		}
+		ln, err := net.Listen("tcp", ":"+localPort)
+		if err != nil {
+			return nil, err
+		}
+		ln.Close()
 
 		if localPort != remotePort {
 			converted = append(converted, fmt.Sprintf("%s:%s", localPort, containerPortStr))
