@@ -245,8 +245,9 @@ func updateSystemdCgroupInfo(cgroupConfig *libcontainerconfigs.Cgroup, cgroupNam
 	cgroupConfig.Name = base
 }
 
-// Exists checks if all subsystem cgroups already exist
-func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
+// Validate checks if all subsystem cgroups already exist
+// returns error if there is missing path
+func (m *cgroupManagerImpl) Validate(name CgroupName) error {
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := m.buildCgroupPaths(name)
 
@@ -274,10 +275,10 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 
 	if len(missingPaths) > 0 {
 		klog.V(4).Infof("The Cgroup %v has some missing paths: %v", name, missingPaths)
-		return false
+		return fmt.Errorf("the Cgroup %v has some missing paths: %v", name, missingPaths)
 	}
 
-	return true
+	return nil
 }
 
 // Destroy destroys the specified cgroup

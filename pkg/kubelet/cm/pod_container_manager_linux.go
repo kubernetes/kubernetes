@@ -70,7 +70,10 @@ func (m *podContainerManagerImpl) applyLimits(pod *v1.Pod) error {
 // Exists checks if the pod's cgroup already exists
 func (m *podContainerManagerImpl) Exists(pod *v1.Pod) bool {
 	podContainerName, _ := m.GetPodContainerName(pod)
-	return m.cgroupManager.Exists(podContainerName)
+	if err := m.cgroupManager.Validate(podContainerName); err == nil {
+		return true
+	}
+	return false
 }
 
 // EnsureExists takes a pod as argument and makes sure that

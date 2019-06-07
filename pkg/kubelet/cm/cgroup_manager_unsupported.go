@@ -38,8 +38,8 @@ func (m *unsupportedCgroupManager) Name(_ CgroupName) string {
 	return ""
 }
 
-func (m *unsupportedCgroupManager) Exists(_ CgroupName) bool {
-	return false
+func (m *unsupportedCgroupManager) Validate(_ CgroupName) error {
+	return fmt.Errorf("Cgroup Manager is not supported in this build")
 }
 
 func (m *unsupportedCgroupManager) Destroy(_ *CgroupConfig) error {

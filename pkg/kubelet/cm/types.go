@@ -76,8 +76,8 @@ type CgroupManager interface {
 	Destroy(*CgroupConfig) error
 	// Update cgroup configuration.
 	Update(*CgroupConfig) error
-	// Exists checks if the cgroup already exists
-	Exists(name CgroupName) bool
+	// Validate checks if the cgroup already exists
+	Validate(name CgroupName) error
 	// Name returns the literal cgroupfs name on the host after any driver specific conversions.
 	// We would expect systemd implementation to make appropriate name conversion.
 	// For example, if we pass {"foo", "bar"}

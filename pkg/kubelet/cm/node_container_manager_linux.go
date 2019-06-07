@@ -43,7 +43,7 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 		// The default limits for cpu shares can be very low which can lead to CPU starvation for pods.
 		ResourceParameters: getCgroupConfig(cm.internalCapacity),
 	}
-	if cm.cgroupManager.Exists(cgroupConfig.Name) {
+	if err := cm.cgroupManager.Validate(cgroupConfig.Name); err == nil {
 		return nil
 	}
 	if err := cm.cgroupManager.Create(cgroupConfig); err != nil {
@@ -132,8 +132,8 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.
 		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
 	}
 	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares, %d bytes of memory, and %d processes", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory, cgroupConfig.ResourceParameters.PidsLimit)
-	if !cgroupManager.Exists(cgroupConfig.Name) {
-		return fmt.Errorf("%q cgroup does not exist", cgroupConfig.Name)
+	if err := cgroupManager.Validate(cgroupConfig.Name); err != nil {
+		return fmt.Errorf("%q cgroup is not valid: %v", cgroupConfig.Name, err)
 	}
 	if err := cgroupManager.Update(cgroupConfig); err != nil {
 		return err

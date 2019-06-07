@@ -112,7 +112,7 @@ const (
 )
 
 func createIfNotExists(cm cm.CgroupManager, cgroupConfig *cm.CgroupConfig) error {
-	if !cm.Exists(cgroupConfig.Name) {
+	if err := cm.Validate(cgroupConfig.Name); err != nil {
 		if err := cm.Create(cgroupConfig); err != nil {
 			return err
 		}
@@ -183,8 +183,8 @@ func runTest(f *framework.Framework) error {
 
 	expectedNAPodCgroup := cm.ParseCgroupfsToCgroupName(currentConfig.CgroupRoot)
 	expectedNAPodCgroup = cm.NewCgroupName(expectedNAPodCgroup, "kubepods")
-	if !cgroupManager.Exists(expectedNAPodCgroup) {
-		return fmt.Errorf("Expected Node Allocatable Cgroup Does not exist")
+	if err := cgroupManager.Validate(expectedNAPodCgroup); err != nil {
+		return fmt.Errorf("expected an error but got nil")
 	}
 	// TODO: Update cgroupManager to expose a Status interface to get current Cgroup Settings.
 	// The node may not have updated capacity and allocatable yet, so check that it happens eventually.
@@ -233,8 +233,8 @@ func runTest(f *framework.Framework) error {
 	}, time.Minute, 5*time.Second).Should(BeNil())
 
 	kubeReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, kubeReservedCgroup)
-	if !cgroupManager.Exists(kubeReservedCgroupName) {
-		return fmt.Errorf("Expected kube reserved cgroup Does not exist")
+	if err := cgroupManager.Validate(kubeReservedCgroupName); err != nil {
+		return fmt.Errorf("kube reserved cgroup invalid: %v", err)
 	}
 	// Expect CPU shares on kube reserved cgroup to equal it's reservation which is `100m`.
 	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
@@ -252,8 +252,8 @@ func runTest(f *framework.Framework) error {
 		return err
 	}
 	systemReservedCgroupName := cm.NewCgroupName(cm.RootCgroupName, systemReservedCgroup)
-	if !cgroupManager.Exists(systemReservedCgroupName) {
-		return fmt.Errorf("Expected system reserved cgroup Does not exist")
+	if err := cgroupManager.Validate(systemReservedCgroupName); err != nil {
+		return fmt.Errorf("system reserved cgroup invalid: %v", err)
 	}
 	// Expect CPU shares on system reserved cgroup to equal it's reservation which is `100m`.
 	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])
