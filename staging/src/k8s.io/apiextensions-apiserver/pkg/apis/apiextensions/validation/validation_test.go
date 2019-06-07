@@ -1796,6 +1796,155 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
+		{
+			name: "contradicting meta field types",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"apiVersion": {Type: "number"},
+								"kind":       {Type: "number"},
+								"metadata": {
+									Type: "number",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {
+											Type:    "string",
+											Pattern: "abc",
+										},
+										"generateName": {
+											Type:    "string",
+											Pattern: "abc",
+										},
+										"generation": {
+											Type: "integer",
+										},
+									},
+								},
+								"valid": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {Type: "string"},
+										"kind":       {Type: "string"},
+										"metadata": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generateName": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generation": {
+													Type:    "integer",
+													Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+												},
+											},
+										},
+									},
+								},
+								"invalid": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {Type: "number"},
+										"kind":       {Type: "number"},
+										"metadata": {
+											Type: "number",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generateName": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generation": {
+													Type:    "integer",
+													Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+												},
+											},
+										},
+									},
+								},
+								"nested": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"invalid": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"apiVersion": {Type: "number"},
+												"kind":       {Type: "number"},
+												"metadata": {
+													Type: "number",
+													Properties: map[string]apiextensions.JSONSchemaProps{
+														"name": {
+															Type:    "string",
+															Pattern: "abc",
+														},
+														"generateName": {
+															Type:    "string",
+															Pattern: "abc",
+														},
+														"generation": {
+															Type:    "integer",
+															Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								"noEmbeddedObject": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {Type: "number"},
+										"kind":       {Type: "number"},
+										"metadata":   {Type: "number"},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[metadata]"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[apiVersion]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[kind]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[metadata]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid]", "properties[apiVersion]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid]", "properties[kind]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid]", "properties[metadata]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[apiVersion]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[kind]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[metadata]", "type"),
+			},
+			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
 	}
 
 	for _, tc := range tests {
