@@ -95,8 +95,8 @@ func skipPrune(x interface{}, s *structuralschema.Structural) {
 			}
 			if prop, ok := s.Properties[k]; ok {
 				prune(v, &prop)
-			} else {
-				skipPrune(v, nil)
+			} else if s.AdditionalProperties != nil {
+				prune(v, s.AdditionalProperties.Structural)
 			}
 		}
 	case []interface{}:
