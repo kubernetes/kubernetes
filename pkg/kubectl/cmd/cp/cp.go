@@ -185,6 +185,9 @@ func (o *CopyOptions) Run(args []string) error {
 	}
 
 	if len(srcSpec.PodName) != 0 && len(destSpec.PodName) != 0 {
+		if err := o.checkTarExists(destSpec); err != nil {
+			return fmt.Errorf("'tar' must be present on the underlying container to use 'kubectl cp'")
+		}
 		if _, err := os.Stat(args[0]); err == nil {
 			return o.copyToPod(fileSpec{File: args[0]}, destSpec, &exec.ExecOptions{})
 		}
@@ -192,9 +195,16 @@ func (o *CopyOptions) Run(args []string) error {
 	}
 
 	if len(srcSpec.PodName) != 0 {
+		if err := o.checkTarExists(srcSpec); err != nil {
+			return fmt.Errorf("'tar' must be present on the underlying container to use 'kubectl cp'")
+		}
 		return o.copyFromPod(srcSpec, destSpec)
 	}
+
 	if len(destSpec.PodName) != 0 {
+		if err := o.checkTarExists(destSpec); err != nil {
+			return fmt.Errorf("'tar' must be present on the underlying container to use 'kubectl cp'")
+		}
 		return o.copyToPod(srcSpec, destSpec, &exec.ExecOptions{})
 	}
 	return fmt.Errorf("one of src or dest must be a remote file specification")
@@ -247,7 +257,6 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	}()
 	var cmdArr []string
 
-	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	if o.NoPreserve {
 		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xf", "-"}
 	} else {
@@ -275,6 +284,24 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	return o.execute(options)
 }
 
+func (o *CopyOptions) checkTarExists(pod fileSpec) error {
+	options := &exec.ExecOptions{
+		StreamOptions: exec.StreamOptions{
+			IOStreams: genericclioptions.IOStreams{
+				Out:    bytes.NewBuffer([]byte{}),
+				ErrOut: bytes.NewBuffer([]byte{}),
+			},
+			Namespace: pod.PodNamespace,
+			PodName:   pod.PodName,
+		},
+
+		Command:  []string{"tar", "--version"},
+		Executor: &exec.DefaultRemoteExecutor{},
+	}
+
+	return o.execute(options)
+}
+
 func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
@@ -293,7 +320,6 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 			PodName:   src.PodName,
 		},
 
-		// TODO: Improve error messages by first testing if 'tar' is present in the container?
 		Command:  []string{"tar", "cf", "-", src.File},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
