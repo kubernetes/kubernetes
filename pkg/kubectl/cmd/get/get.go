@@ -80,6 +80,8 @@ type GetOptions struct {
 	IgnoreNotFound bool
 	Export         bool
 
+	RESTClient func() (*rest.RESTClient, error)
+	builder    func() *resource.Builder
 	genericclioptions.IOStreams
 }
 
@@ -163,12 +165,13 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate(cmd))
-			cmdutil.CheckErr(o.Run(f, cmd, args))
+			cmdutil.CheckErr(o.Run(cmd, args))
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
 
 	o.PrintFlags.AddFlags(cmd)
+	o.RESTClient = f.RESTClient
 
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
@@ -285,6 +288,7 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if o.PrintWithOpenAPICols && o.ServerPrint {
 		fmt.Fprintf(o.IOStreams.ErrOut, "warning: --%s requested, --%s will be ignored\n", useOpenAPIPrintColumnFlagLabel, useServerPrintColumns)
 	}
+	o.builder = f.NewBuilder
 
 	return nil
 }
@@ -436,12 +440,12 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 
 // Run performs the get operation.
 // TODO: remove the need to pass these arguments, like other commands.
-func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *GetOptions) Run(cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
-		return o.raw(f)
+		return o.raw()
 	}
 	if o.Watch || o.WatchOnly {
-		return o.watch(f, cmd, args)
+		return o.watch(args)
 	}
 
 	chunkSize := o.ChunkSize
@@ -451,7 +455,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		chunkSize = 0
 	}
 
-	r := f.NewBuilder().
+	r := o.builder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
@@ -587,8 +591,8 @@ func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
 
 // raw makes a simple HTTP request to the provided path on the server using the default
 // credentials.
-func (o *GetOptions) raw(f cmdutil.Factory) error {
-	restClient, err := f.RESTClient()
+func (o *GetOptions) raw() error {
+	restClient, err := o.RESTClient()
 	if err != nil {
 		return err
 	}
@@ -608,8 +612,8 @@ func (o *GetOptions) raw(f cmdutil.Factory) error {
 
 // watch starts a client-side watch of one or more resources.
 // TODO: remove the need for arguments here.
-func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	r := f.NewBuilder().
+func (o *GetOptions) watch(args []string) error {
+	r := o.builder().
 		Unstructured().
 		NamespaceParam(o.Namespace).DefaultNamespace().AllNamespaces(o.AllNamespaces).
 		FilenameParam(o.ExplicitNamespace, &o.FilenameOptions).
