@@ -324,6 +324,7 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 	wg.Add(len(requests))
 	for _, request := range requests {
 		go func(request rest.ResponseWrapper) {
+			defer wg.Done()
 			if err := o.ConsumeRequestFn(request, writer); err != nil {
 				if !o.IgnoreLogErrors {
 					writer.CloseWithError(err)
@@ -335,7 +336,6 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 				fmt.Fprintf(writer, "error: %v\n", err)
 			}
 
-			wg.Done()
 		}(request)
 	}
 
