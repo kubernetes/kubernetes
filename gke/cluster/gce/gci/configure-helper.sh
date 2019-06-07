@@ -3346,6 +3346,10 @@ function main() {
   log-wrap 'EnsureLocalSSDs' ensure-local-ssds
   log-wrap 'SetupKubeletDir' setup-kubelet-dir
   log-wrap 'SetupLogrotate' setup-logrotate
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    # configure GKE addons registry in manifest files.
+    log-wrap 'SetupGKEAddonRegistry' setup-gke-addon-registry
+  fi
   if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
     log-wrap 'MountMasterPD' mount-master-pd
     log-wrap 'CreateNodePKI' create-node-pki
