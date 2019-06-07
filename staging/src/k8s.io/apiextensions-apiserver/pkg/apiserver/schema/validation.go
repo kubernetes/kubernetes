@@ -108,6 +108,8 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 
 	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, lvl, fldPath)...)
 
+	checkMetadata := (lvl == rootLevel) || s.XEmbeddedResource
+
 	if s.XEmbeddedResource && s.Type != "object" {
 		if len(s.Type) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be object if x-kubernetes-embedded-resource is true"))
@@ -130,6 +132,21 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 	}
 
 	// restrict metadata schemas to name and generateName only
+	if kind, found := s.Properties["kind"]; found && checkMetadata {
+		if kind.Type != "string" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("kind").Child("type"), kind.Type, "must be string"))
+		}
+	}
+	if apiVersion, found := s.Properties["apiVersion"]; found && checkMetadata {
+		if apiVersion.Type != "string" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("apiVersion").Child("type"), apiVersion.Type, "must be string"))
+		}
+	}
+	if metadata, found := s.Properties["metadata"]; found && checkMetadata {
+		if metadata.Type != "object" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("metadata").Child("type"), metadata.Type, "must be object"))
+		}
+	}
 	if metadata, found := s.Properties["metadata"]; found && lvl == rootLevel {
 		// metadata is a shallow copy. We can mutate it.
 		_, foundName := metadata.Properties["name"]
