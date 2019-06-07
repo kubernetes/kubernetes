@@ -33,6 +33,7 @@ type NamePrintFlags struct {
 	// took place on an object, to be included in the
 	// finalized "successful" message.
 	Operation string
+	ShowKind  *bool
 }
 
 func (f *NamePrintFlags) Complete(successTemplate string) error {
@@ -54,6 +55,7 @@ func (f *NamePrintFlags) AllowedFormats() []string {
 func (f *NamePrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrinter, error) {
 	namePrinter := &printers.NamePrinter{
 		Operation: f.Operation,
+		ShowKind:  *f.ShowKind,
 	}
 
 	outputFormat = strings.ToLower(outputFormat)

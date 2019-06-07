@@ -117,6 +117,7 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	}
 	f.HumanReadableFlags.NoHeaders = noHeaders
 	f.CustomColumnsFlags.NoHeaders = noHeaders
+	f.NamePrintFlags.ShowKind = f.HumanReadableFlags.ShowKind
 
 	// for "get.go" we want to support a --template argument given, even when no --output format is provided
 	if f.TemplateFlags.TemplateArgument != nil && len(*f.TemplateFlags.TemplateArgument) > 0 && len(outputFormat) == 0 {
