@@ -14,10 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-<<<<<<< HEAD
-=======
 from __future__ import pring_function
->>>>>>> Use print() function in both Python 2 and Python 3
 
 import argparse
 import collections
@@ -184,10 +181,7 @@ def main():
 
     if options.print_sig_prefixes:
         print(prefixes)
-<<<<<<< HEAD
-=======
         return
->>>>>>> Use print() function in both Python 2 and Python 3
 
     outdated_tests = sorted(set(owners) - set(test_names))
     new_tests = sorted(set(test_names) - set(owners))
@@ -213,19 +207,11 @@ def main():
         owners.pop(name)
 
     if not options.addonly:
-<<<<<<< HEAD
-        print('# UNEXPECTED MAINTAINERS ')
-        print('(randomly assigned, but not in kubernetes-maintainers)')
-        for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
-            if random_assignment and owner not in maintainers:
-                print('%-16s %s' % (owner,name))
-=======
         print('# UNEXPECTED MAINTAINERS ', end=' ')
         print('(randomly assigned, but not in kubernetes-maintainers)')
         for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
             if random_assignment and owner not in maintainers:
                 print('%-16s %s' % (owner, name))
->>>>>>> Use print() function in both Python 2 and Python 3
                 owners.pop(name)
 
     owner_counts = collections.Counter(
@@ -244,11 +230,7 @@ def main():
     if options.user.lower() == 'random':
         print('# Tests per maintainer:')
         for owner, count in owner_counts.most_common():
-<<<<<<< HEAD
-            print('%-20s %3d' % (owner,count))
-=======
             print('%-20s %3d' % (owner, count))
->>>>>>> Use print() function in both Python 2 and Python 3
 
     write_owners(OWNERS_PATH, owners)
 
