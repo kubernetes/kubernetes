@@ -101,14 +101,8 @@ func (s *sizeQueue) monitorSize(outFd uintptr, initialSizes ...*remotecommand.Te
 				if !ok {
 					return
 				}
+				s.resizeChan <- size
 
-				select {
-				// try to send the size to resizeChan, but don't block
-				case s.resizeChan <- size:
-					// send successful
-				default:
-					// unable to send / no-op
-				}
 			case <-s.stopResizing:
 				return
 			}

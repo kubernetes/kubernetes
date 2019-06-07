@@ -360,10 +360,12 @@ func (o *DrainCmdOptions) evictPods(pods []corev1.Pod, policyGroupVersion string
 				err := o.drainer.EvictPod(pod, policyGroupVersion)
 				if err == nil {
 					break
-				} else if apierrors.IsNotFound(err) {
+				}
+				if apierrors.IsNotFound(err) {
 					returnCh <- nil
 					return
-				} else if apierrors.IsTooManyRequests(err) {
+				}
+				if apierrors.IsTooManyRequests(err) {
 					fmt.Fprintf(o.ErrOut, "error when evicting pod %q (will retry after 5s): %v\n", pod.Name, err)
 					time.Sleep(5 * time.Second)
 				} else {
