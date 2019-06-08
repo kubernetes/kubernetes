@@ -256,6 +256,7 @@ const (
 	HyperVContainer featuregate.Feature = "HyperVContainer"
 
 	// owner: @k82cn
+	// alpha: v1.11
 	// beta: v1.12
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
