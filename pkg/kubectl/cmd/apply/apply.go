@@ -292,7 +292,7 @@ func parsePruneResources(mapper meta.RESTMapper, gvks []string) ([]pruneResource
 	for _, groupVersionKind := range gvks {
 		gvk := strings.Split(groupVersionKind, "/")
 		if len(gvk) != 3 {
-			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
+			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>; use 'core' group for the ungroupped APIs", groupVersionKind)
 		}
 
 		if gvk[0] == "core" {
