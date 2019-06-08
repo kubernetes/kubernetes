@@ -235,9 +235,9 @@ const (
 	// it has not been silently removed by AWS.
 	// On a random AWS account (shared among several developers) it took 4s on
 	// average, 8s max.
-	encryptedCheckInitialDelay = 1 * time.Second
-	encryptedCheckFactor       = 2.0
-	encryptedCheckSteps        = 8
+	volumeCreateInitialDelay  = 5 * time.Second
+	volumeCreateBackoffFactor = 1.2
+	volumeCreateBackoffSteps  = 10
 
 	// Number of node names that can be added to a filter. The AWS limit is 200
 	// but we are using a lower limit on purpose
@@ -2450,9 +2450,9 @@ func (c *Cloud) waitUntilVolumeAvailable(volumeName KubernetesVolumeID) error {
 		return err
 	}
 	backoff := wait.Backoff{
-		Duration: encryptedCheckInitialDelay,
-		Factor:   encryptedCheckFactor,
-		Steps:    encryptedCheckSteps,
+		Duration: volumeCreateInitialDelay,
+		Factor:   volumeCreateBackoffFactor,
+		Steps:    volumeCreateBackoffSteps,
 	}
 	err = wait.ExponentialBackoff(backoff, func() (done bool, err error) {
 		vol, err := disk.describeVolume()
