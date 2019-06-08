@@ -231,7 +231,7 @@ const (
 	createTagFactor       = 2.0
 	createTagSteps        = 9
 
-	// encryptedCheck* is configuration of exponential backoff for created volume to check
+	// volumeCreate* is configuration of exponential backoff for created volume to check
 	// it has not been silently removed by AWS.
 	// On a random AWS account (shared among several developers) it took 4s on
 	// average, 8s max.
