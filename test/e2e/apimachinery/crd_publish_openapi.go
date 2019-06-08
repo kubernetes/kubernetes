@@ -44,6 +44,12 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+const (
+	clientSideValidationIdentifier = `if you choose to ignore these errors, turn validation off with --validate=false`
+	serverSideValidationIdentifier = `validation failure list`
+	embeddedResourceMetaPattern    = `(?s)apiVersion.*<string>.*-required-.*kind.*<string>.*-required-.*metadata.*<Object>`
+)
+
 var (
 	crdPublishOpenAPIVersion = utilversion.MustParseSemantic("v1.14.0")
 	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
@@ -62,8 +68,21 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 			framework.Failf("%v", err)
 		}
 
+		plural := crd.Crd.Spec.Names.Plural
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
 		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side built-in validation rejects request with missing required TypeMeta")
+		// NOTE: kubectl implements this validation and doesn't rely on openapi
+		assertKubectlCreation(ns, plural, true,
+			fmt.Sprintf(`{"metadata":{"name":"missingTypeMeta"},"spec":{"bars":[{"name":"test-bar"}]}}`),
+			`apiVersion not set`,
+			`kind not set`)
+
+		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown field in ObjectMeta")
+		assertKubectlCreation(ns, plural, true,
+			fmt.Sprintf(`{"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"unknownObjectMeta","unknown":"a"},"spec":{"bars":[{"name":"test-bar"}]}}`, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo"),
+			`unknown field "unknown"`)
 
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
 		validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
@@ -333,7 +352,159 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 			framework.Failf("%v", err)
 		}
 	})
+
+	ginkgo.It("works for embedded x-kubernetes-embedded-resource property", func() {
+		crd, err := setupCRD(f, schemaEmbeddedProperty, "embedded", "v1")
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		plural := crd.Crd.Spec.Names.Plural
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows embedded resource with known and required properties")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"embedded":{"apiVersion":"v1", "kind":"Embedded", "value":"a"}}`, meta))
+
+		ginkgo.By("client-side validation (kubectl create and apply) rejects embedded resource with missing required TypeMeta")
+		assertKubectlCreation(ns, plural, true,
+			fmt.Sprintf(`{%s,"embedded":{"value":"a"}}`, meta),
+			`missing required field "kind"`,
+			`missing required field "apiVersion"`)
+
+		// NOTE: client-side validation doesn't fail because the published openapi v2 schema doesn't have regex for TypeMeta
+		ginkgo.By("server-side validation rejects embedded resource with wrong TypeMeta")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"embedded":{"apiVersion":"v2","kind":"Embedded","value":"a"}}`, meta),
+			`embedded.apiVersion in body should match 'v1'`)
+
+		// NOTE: client-side validation doesn't fail because kubectl validation doesn't support regex
+		ginkgo.By("server-side validation rejects embedded resource with wrong property")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"embedded":{"apiVersion":"v1","kind":"Embedded","value":"b"}}`, meta),
+			`embedded.value in body should match 'a'`)
+
+		ginkgo.By("kubectl explain works to explain CR embedded property")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".embedded", embeddedResourceMetaPattern); err != nil {
+			framework.Failf("%v", err)
+		}
+	})
+
+	ginkgo.It("works for embedded x-kubernetes-embedded-resource array", func() {
+		crd, err := setupCRD(f, schemaEmbeddedArray, "array", "v1")
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		plural := crd.Crd.Spec.Names.Plural
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows embedded resource array with valid meta properties")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"spec":{"embedded":[{"apiVersion":"v1", "kind":"Embedded", "value":"a"}]}}`, meta))
+
+		ginkgo.By("client-side validation (kubectl create and apply) rejects embedded resource array with missing required TypeMeta")
+		assertKubectlCreation(ns, plural, true,
+			fmt.Sprintf(`{%s,"spec":{"embedded":[{"value":"a"}]}}`, meta),
+			`missing required field "kind"`,
+			`missing required field "apiVersion"`)
+
+		// NOTE: client-side validation doesn't fail because the published openapi v2 schema doesn't have regex for TypeMeta
+		ginkgo.By("server-side validation rejects embedded resource array with wrong TypeMeta")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"spec":{"embedded":[{"apiVersion":"v2", "kind":"Embedded", "value":"a"}]}}`, meta),
+			`spec.embedded.apiVersion in body should match 'v1'`)
+
+		// NOTE: client-side validation doesn't fail because kubectl validation doesn't support regex
+		ginkgo.By("server-side validation rejects embedded resource array with wrong property")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"spec":{"embedded":[{"apiVersion":"v1", "kind":"Embedded", "value":"b"}]}}`, meta),
+			`spec.embedded.value in body should match 'a'`)
+
+		ginkgo.By("kubectl explain works to explain CR embedded properties array")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec.embedded", embeddedResourceMetaPattern); err != nil {
+			framework.Failf("%v", err)
+		}
+	})
+
+	ginkgo.It("works for embedded x-kubernetes-embedded-resource additional property", func() {
+		crd, err := setupCRD(f, schemaEmbeddedAdditional, "additional", "v1")
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		plural := crd.Crd.Spec.Names.Plural
+		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
+		ns := fmt.Sprintf("--namespace=%v", f.Namespace.Name)
+
+		ginkgo.By("client-side validation (kubectl create and apply) allows additional embedded resource with known and required properties")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"spec":{"validAdditional":{"apiVersion":"v1", "kind":"Embedded", "value":"a"}}}`, meta))
+
+		ginkgo.By("client-side validation (kubectl create and apply) rejects additional embedded resource with missing required TypeMeta")
+		assertKubectlCreation(ns, plural, true,
+			fmt.Sprintf(`{%s,"spec":{"missingTypeMeta":{"value":"a"}}}`, meta),
+			`missing required field "kind"`,
+			`missing required field "apiVersion"`)
+
+		// NOTE: client-side validation doesn't fail because the published openapi v2 schema doesn't have regex for TypeMeta
+		ginkgo.By("server-side validation rejects additional embedded resource with wrong TypeMeta")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"spec":{"invalidVersion":{"apiVersion":"v2","kind":"Embedded","value":"a"}}}`, meta),
+			`invalidVersion.apiVersion in body should match 'v1'`)
+
+		// NOTE: client-side validation doesn't fail because kubectl validation doesn't support regex
+		ginkgo.By("server-side validation rejects additional embedded resource with wrong property")
+		assertKubectlCreation(ns, plural, false,
+			fmt.Sprintf(`{%s,"spec":{"invalidValue":{"apiVersion":"v1","kind":"Embedded","value":"b"}}}`, meta),
+			`invalidValue.value in body should match 'a'`)
+
+		// TODO(1.16): `kubectl explain` unfolds the schema in additionalProperties to the parent schema
+		ginkgo.By("kubectl explain works to explain CR additional embedded properties")
+		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec", embeddedResourceMetaPattern); err != nil {
+			framework.Failf("%v", err)
+		}
+	})
 })
+
+// assertKubectlCreation asserts the expected behavior of creating a custom resource using
+// `kubectl create` and `kubectl apply`.
+// kubectl creates the given CR data in given namespace, and deletes the created CR when necessary
+// (using the given plural).
+// If validation error is expected, this method asserts the returned error from kubectl is from
+// client-side or server-side based on the input boolean, and makes sure the error message contains the
+// expectedErrors pieces.
+func assertKubectlCreation(namespace, plural string, clientSideError bool, data string, expectedErrors ...string) {
+	for _, verb := range []string{"create", "apply"} {
+		if _, err := framework.RunKubectlInput(data, namespace, verb, "-f", "-"); err != nil {
+			if len(expectedErrors) == 0 {
+				framework.Failf("failed to %s CR %s: %v", verb, data, err)
+			} else {
+				if clientSideError {
+					if !strings.Contains(err.Error(), clientSideValidationIdentifier) {
+						framework.Failf("missing client-side validation error identifier %s: %v", clientSideValidationIdentifier, err)
+					}
+				} else {
+					if !strings.Contains(err.Error(), serverSideValidationIdentifier) {
+						framework.Failf("missing server-side validation error identifier %s: %v", serverSideValidationIdentifier, err)
+					}
+				}
+				for _, expected := range expectedErrors {
+					if !strings.Contains(err.Error(), expected) {
+						framework.Failf("unexpected no error when %s CR %s: %v -- expected %s: %v", verb, data, err, expected, expectedErrors)
+					}
+				}
+			}
+		} else {
+			if len(expectedErrors) > 0 {
+				framework.Failf("unexpected no error when %s CR %s: %v -- expected: %v", verb, data, err, expectedErrors)
+			} else {
+				if _, err := framework.RunKubectl(namespace, "delete", plural, "test-foo"); err != nil {
+					framework.Failf("failed to delete valid CR %s test-foo: %v", plural, err)
+				}
+			}
+		}
+	}
+}
 
 func setupCRD(f *framework.Framework, schema []byte, groupSuffix string, versions ...string) (*crd.TestCrd, error) {
 	group := fmt.Sprintf("%s-test-%s.k8s.io", f.BaseName, groupSuffix)
@@ -425,6 +596,7 @@ func waitForDefinition(c k8sclientset.Interface, name string, schema []byte) err
 		}
 		// drop properties and extension that we added
 		dropDefaults(&d)
+		dropDefaults(&expect)
 		if !apiequality.Semantic.DeepEqual(expect, d) {
 			return false, fmt.Sprintf("spec.SwaggerProps.Definitions[\"%s\"] not match; expect: %v, actual: %v", name, expect, d)
 		}
@@ -512,10 +684,32 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 
 // dropDefaults drops properties and extension that we added to a schema
 func dropDefaults(s *spec.Schema) {
+	if s == nil {
+		return
+	}
+	for k := range s.Properties {
+		v := s.Properties[k]
+		dropDefaults(&v)
+		s.Properties[k] = v
+	}
+	if s.Items != nil {
+		dropDefaults(s.Items.Schema)
+	}
+	if s.AdditionalProperties != nil {
+		dropDefaults(s.AdditionalProperties.Schema)
+	}
 	delete(s.Properties, "metadata")
 	delete(s.Properties, "apiVersion")
 	delete(s.Properties, "kind")
 	delete(s.Extensions, "x-kubernetes-group-version-kind")
+	var req []string
+	for _, r := range s.Required {
+		if r == "apiVersion" || r == "kind" {
+			continue
+		}
+		req = append(req, r)
+	}
+	s.Required = req
 }
 
 func verifyKubectlExplain(name, pattern string) error {
@@ -601,3 +795,52 @@ properties:
         type: array
         items:
           type: object`)
+
+var schemaEmbeddedProperty = []byte(`description: CRD for Testing Embedded Resource
+type: object
+properties:
+  embedded:
+    type: object
+    properties:
+      apiVersion:
+        type: string
+        pattern: v1
+      value:
+        type: string
+        pattern: a
+    x-kubernetes-embedded-resource: true`)
+
+var schemaEmbeddedArray = []byte(`description: CRD for Testing Embedded Resource
+type: object
+properties:
+  spec:
+    type: object
+    properties:
+      embedded:
+        type: array
+        items:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+              pattern: v1
+            value:
+              type: string
+              pattern: a
+          x-kubernetes-embedded-resource: true`)
+
+var schemaEmbeddedAdditional = []byte(`description: CRD for Testing Embedded Resource
+type: object
+properties:
+  spec:
+    type: object
+    additionalProperties:
+      type: object
+      properties:
+        apiVersion:
+          type: string
+          pattern: v1
+        value:
+          type: string
+          pattern: a
+      x-kubernetes-embedded-resource: true`)
