@@ -138,7 +138,6 @@ pkg/kubectl/cmd/taint
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/top
 pkg/kubectl/cmd/util
-pkg/kubectl/cmd/wait
 pkg/kubectl/describe/versioned
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned

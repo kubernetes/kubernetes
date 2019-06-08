@@ -69,10 +69,10 @@ var (
 // errNoMatchingResources is returned when there is no resources matching a query.
 var errNoMatchingResources = errors.New("no matching resources found")
 
-// WaitFlags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
+// Flags directly reflect the information that CLI is gathering via flags.  They will be converted to Options, which
 // reflect the runtime requirements for the command.  This structure reduces the transformation to wiring and makes
 // the logic itself easy to unit test
-type WaitFlags struct {
+type Flags struct {
 	RESTClientGetter     genericclioptions.RESTClientGetter
 	PrintFlags           *genericclioptions.PrintFlags
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
@@ -84,8 +84,8 @@ type WaitFlags struct {
 }
 
 // NewWaitFlags returns a default WaitFlags
-func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *WaitFlags {
-	return &WaitFlags{
+func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams genericclioptions.IOStreams) *Flags {
+	return &Flags{
 		RESTClientGetter: restClientGetter,
 		PrintFlags:       genericclioptions.NewPrintFlags("condition met"),
 		ResourceBuilderFlags: genericclioptions.NewResourceBuilderFlags().
@@ -128,7 +128,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 }
 
 // AddFlags registers flags for a cli
-func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
+func (flags *Flags) AddFlags(cmd *cobra.Command) {
 	flags.PrintFlags.AddFlags(cmd)
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
@@ -137,7 +137,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
-func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
+func (flags *Flags) ToOptions(args []string) (*Options, error) {
 	printer, err := flags.PrintFlags.ToPrinter()
 	if err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 		effectiveTimeout = 168 * time.Hour
 	}
 
-	o := &WaitOptions{
+	o := &Options{
 		ResourceFinder: builder,
 		DynamicClient:  dynamicClient,
 		Timeout:        effectiveTimeout,
@@ -206,9 +206,9 @@ type ResourceLocation struct {
 // UIDMap maps ResourceLocation with UID
 type UIDMap map[ResourceLocation]types.UID
 
-// WaitOptions is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
+// Options is a set of options that allows you to wait.  This is the object reflects the runtime needs of a wait
 // command, making the logic itself easy to unit test with our existing mocks.
-type WaitOptions struct {
+type Options struct {
 	ResourceFinder genericclioptions.ResourceFinder
 	// UIDMap maps a resource location to a UID.  It is optional, but ConditionFuncs may choose to use it to make the result
 	// more reliable.  For instance, delete can look for UID consistency during delegated calls.
@@ -222,10 +222,10 @@ type WaitOptions struct {
 }
 
 // ConditionFunc is the interface for providing condition checks
-type ConditionFunc func(info *resource.Info, o *WaitOptions) (finalObject runtime.Object, done bool, err error)
+type ConditionFunc func(info *resource.Info, o *Options) (finalObject runtime.Object, done bool, err error)
 
 // RunWait runs the waiting logic
-func (o *WaitOptions) RunWait() error {
+func (o *Options) RunWait() error {
 	visitCount := 0
 	err := o.ResourceFinder.Do().Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -253,7 +253,7 @@ func (o *WaitOptions) RunWait() error {
 }
 
 // IsDeleted is a condition func for waiting for something to be deleted
-func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+func IsDeleted(info *resource.Info, o *Options) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		if len(info.Name) == 0 {
@@ -350,7 +350,7 @@ type ConditionalWait struct {
 }
 
 // IsConditionMet is a conditionfunc for waiting on an API condition to be met
-func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+func (w ConditionalWait) IsConditionMet(info *resource.Info, o *Options) (runtime.Object, bool, error) {
 	endTime := time.Now().Add(o.Timeout)
 	for {
 		if len(info.Name) == 0 {
