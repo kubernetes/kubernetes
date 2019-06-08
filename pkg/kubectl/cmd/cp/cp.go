@@ -280,15 +280,6 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		return errFileCannotBeEmpty
 	}
 
-	stat, err := os.Stat(dest.File)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	if stat.IsDir() && !os.IsNotExist(err) {
-		dest.File = dest.File + "/" + path.Base(src.File)
-	}
-
 	reader, outStream := io.Pipe()
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{

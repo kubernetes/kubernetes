@@ -157,7 +157,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							TargetPort: intstr.FromInt(8080),
 						},
 					},
@@ -176,8 +176,8 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			ports:      []string{"80"},
-			translated: []string{"80:8080"},
+			ports:      []string{"8040"},
+			translated: []string{"8040:8080"},
 			err:        false,
 		},
 		{
@@ -186,7 +186,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							TargetPort: intstr.FromInt(8080),
 						},
 					},
@@ -205,7 +205,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			ports:      []string{":80"},
+			ports:      []string{":8040"},
 			translated: []string{":8080"},
 			err:        false,
 		},
@@ -216,7 +216,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					ClusterIP: "None",
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							TargetPort: intstr.FromInt(8080),
 						},
 					},
@@ -235,8 +235,8 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			ports:      []string{"80"},
-			translated: []string{"80"},
+			ports:      []string{"8040"},
+			translated: []string{"8040"},
 			err:        false,
 		},
 		{
@@ -246,7 +246,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					ClusterIP: "None",
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							TargetPort: intstr.FromInt(8080),
 						},
 					},
@@ -265,8 +265,8 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			ports:      []string{":80"},
-			translated: []string{":80"},
+			ports:      []string{":8040"},
+			translated: []string{":8040"},
 			err:        false,
 		},
 		{
@@ -275,11 +275,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							TargetPort: intstr.FromString("http"),
 						},
 						{
-							Port:       443,
+							Port:       4443,
 							TargetPort: intstr.FromString("https"),
 						},
 					},
@@ -301,8 +301,8 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			ports:      []string{"80", "443"},
-			translated: []string{"80:8080", "443:8443"},
+			ports:      []string{"8040", "4443"},
+			translated: []string{"8040:8080", "4443:8443"},
 			err:        false,
 		},
 		{
@@ -311,11 +311,11 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							TargetPort: intstr.FromString("http"),
 						},
 						{
-							Port:       443,
+							Port:       4443,
 							TargetPort: intstr.FromString("https"),
 						},
 					},
@@ -337,7 +337,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 					},
 				},
 			},
-			ports:      []string{":80", ":443"},
+			ports:      []string{":8040", ":4443"},
 			translated: []string{":8080", ":8443"},
 			err:        false,
 		},
@@ -347,12 +347,12 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				Spec: corev1.ServiceSpec{
 					Ports: []corev1.ServicePort{
 						{
-							Port:       80,
+							Port:       8040,
 							Name:       "http",
 							TargetPort: intstr.FromInt(8080),
 						},
 						{
-							Port:       443,
+							Port:       4443,
 							Name:       "https",
 							TargetPort: intstr.FromInt(8443),
 						},
@@ -374,7 +374,7 @@ func TestTranslateServicePortToTargetPort(t *testing.T) {
 				},
 			},
 			ports:      []string{"http", "https"},
-			translated: []string{"80:8080", "443:8443"},
+			translated: []string{"8040:8080", "4443:8443"},
 			err:        false,
 		},
 		{
@@ -621,8 +621,8 @@ func TestConvertPodNamedPortToNumber(t *testing.T) {
 					},
 				},
 			},
-			ports:     []string{"80"},
-			converted: []string{"80"},
+			ports:     []string{"3306"},
+			converted: []string{"3306"},
 			err:       false,
 		},
 		{
@@ -652,15 +652,15 @@ func TestConvertPodNamedPortToNumber(t *testing.T) {
 						{
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
-									ContainerPort: int32(80)},
+									Name:          "mysql",
+									ContainerPort: int32(3306)},
 							},
 						},
 					},
 				},
 			},
-			ports:     []string{":80"},
-			converted: []string{":80"},
+			ports:     []string{":3306"},
+			converted: []string{":3306"},
 			err:       false,
 		},
 		{
@@ -671,15 +671,15 @@ func TestConvertPodNamedPortToNumber(t *testing.T) {
 						{
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
-									ContainerPort: int32(80)},
+									Name:          "mysql",
+									ContainerPort: int32(3306)},
 							},
 						},
 					},
 				},
 			},
-			ports:     []string{"http"},
-			converted: []string{"80"},
+			ports:     []string{"mysql"},
+			converted: []string{"3306"},
 			err:       false,
 		},
 		{
@@ -709,15 +709,15 @@ func TestConvertPodNamedPortToNumber(t *testing.T) {
 						{
 							Ports: []corev1.ContainerPort{
 								{
-									Name:          "http",
-									ContainerPort: int32(80)},
+									Name:          "mysql",
+									ContainerPort: int32(3306)},
 							},
 						},
 					},
 				},
 			},
-			ports:     []string{":http"},
-			converted: []string{":80"},
+			ports:     []string{":mysql"},
+			converted: []string{":3306"},
 			err:       false,
 		},
 		{
