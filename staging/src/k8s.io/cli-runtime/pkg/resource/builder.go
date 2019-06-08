@@ -420,8 +420,8 @@ func (b *Builder) ResourceNames(resource string, names ...string) *Builder {
 }
 
 // LabelSelectorParam defines a selector that should be applied to the object types to load.
-// This will not affect files loaded from disk or URL. If the parameter is empty it is
-// a no-op - to select all resources invoke `b.LabelSelector(labels.Everything.String)`.
+// If the parameter is empty it is a no-op - to select all
+// resources invoke `b.LabelSelector(labels.Everything.String)`.
 func (b *Builder) LabelSelectorParam(s string) *Builder {
 	selector := strings.TrimSpace(s)
 	if len(selector) == 0 {
@@ -446,8 +446,7 @@ func (b *Builder) LabelSelector(selector string) *Builder {
 }
 
 // FieldSelectorParam defines a selector that should be applied to the object types to load.
-// This will not affect files loaded from disk or URL. If the parameter is empty it is
-// a no-op - to select all resources.
+// If the parameter is empty it is a no-op.
 func (b *Builder) FieldSelectorParam(s string) *Builder {
 	s = strings.TrimSpace(s)
 	if len(s) == 0 {
