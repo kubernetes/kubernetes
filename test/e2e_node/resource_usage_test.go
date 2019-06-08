@@ -30,7 +30,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
@@ -190,7 +189,7 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	e2elog.Logf("%s", formatResourceUsageStats(usagePerContainer))
 
 	usagePerNode := make(framework.ResourceUsagePerNode)

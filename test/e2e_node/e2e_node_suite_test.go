@@ -216,7 +216,7 @@ func maskLocksmithdOnCoreos() {
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
 		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
+		framework.ExpectNoError(err, fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		klog.Infof("Locksmithd is masked successfully")
 	}
 }
@@ -229,7 +229,7 @@ func waitForNodeReady() {
 		nodeReadyPollInterval = 1 * time.Second
 	)
 	client, err := getAPIServerClient()
-	Expect(err).NotTo(HaveOccurred(), "should be able to get apiserver client.")
+	framework.ExpectNoError(err, "should be able to get apiserver client.")
 	Eventually(func() error {
 		node, err := getNode(client)
 		if err != nil {
@@ -273,7 +273,7 @@ func updateTestContext() error {
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
+	framework.ExpectNoError(err, "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")
 	}

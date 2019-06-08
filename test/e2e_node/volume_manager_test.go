@@ -28,7 +28,6 @@ import (
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
@@ -73,7 +72,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						},
 					})
 					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 				})
 				By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
@@ -121,7 +120,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						}
 						<-time.After(10 * time.Second)
 					}
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 				})
 			})
 		})
