@@ -29,6 +29,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/pointer"
 )
 
@@ -262,7 +265,7 @@ var embeddedResourceFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 			ListKind: "FooList",
 		},
 		Scope:                 apiextensionsv1beta1.ClusterScoped,
-		PreserveUnknownFields: pointer.BoolPtr(true),
+		PreserveUnknownFields: pointer.BoolPtr(false),
 		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
 			Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
 		},
@@ -276,22 +279,47 @@ properties:
   embedded:
     type: object
     x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
   noEmbeddedObject:
     type: object
+    x-kubernetes-preserve-unknown-fields: true
   embeddedNested:
     type: object
     x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
     properties:
       embedded:
         type: object
         x-kubernetes-embedded-resource: true
+        x-kubernetes-preserve-unknown-fields: true
+  defaults:
+    type: object
+    x-kubernetes-embedded-resource: true
+    x-kubernetes-preserve-unknown-fields: true
+    default:
+      apiVersion: v1
+      kind: Pod
+      labels:
+        foo: bar
+  invalidDefaults:
+    type: object
+    properties:
+      embedded:
+        type: object
+        x-kubernetes-embedded-resource: true
+        x-kubernetes-preserve-unknown-fields: true
+        default:
+          apiVersion: "foo/v1"
+          kind: "%"
+          metadata:
+            labels:
+              foo: bar
+              abc: "x y"
 `
 
 	embeddedResourceInstance = `
 kind: Foo
 apiVersion: tests.apiextensions.k8s.io/v1beta1
-metadata:
-  name: foo
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -342,13 +370,16 @@ embeddedNested:
     kind: Foo
     metadata:
       name: foo
+defaults:
+  apiVersion: v1
+  kind: Pod
+  labels:
+    foo: bar
 `
 
 	wronglyTypedEmbeddedResourceInstance = `
 kind: Foo
 apiVersion: tests.apiextensions.k8s.io/v1beta1
-metadata:
-  name: invalid
 embedded:
   apiVersion: foo/v1
   kind: Foo
@@ -360,8 +391,6 @@ embedded:
 	invalidEmbeddedResourceInstance = `
 kind: Foo
 apiVersion: tests.apiextensions.k8s.io/v1beta1
-metadata:
-  name: invalid
 embedded:
   apiVersion: foo/v1
   kind: "%"
@@ -377,10 +406,13 @@ embeddedNested:
     kind: "%"
     metadata:
       name: ..
+invalidDefaults: {}
 `
 )
 
 func TestEmbeddedResources(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CustomResourceDefaulting, true)()
+
 	tearDownFn, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -404,6 +436,7 @@ func TestEmbeddedResources(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(embeddedResourceInstance), &foo.Object); err != nil {
 		t.Fatal(err)
 	}
+	unstructured.SetNestedField(foo.Object, "foo", "metadata", "name")
 	foo, err = fooClient.Create(foo, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unable to create CR: %v", err)
@@ -421,11 +454,12 @@ func TestEmbeddedResources(t *testing.T) {
 	}
 
 	t.Logf("Trying to create wrongly typed CR")
-	invalid := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(wronglyTypedEmbeddedResourceInstance), &invalid.Object); err != nil {
+	wronglyTyped := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(wronglyTypedEmbeddedResourceInstance), &wronglyTyped.Object); err != nil {
 		t.Fatal(err)
 	}
-	_, err = fooClient.Create(invalid, metav1.CreateOptions{})
+	unstructured.SetNestedField(wronglyTyped.Object, "invalid", "metadata", "name")
+	_, err = fooClient.Create(wronglyTyped, metav1.CreateOptions{})
 	if err == nil {
 		t.Fatal("Expected creation to fail, but didn't")
 	}
@@ -440,24 +474,57 @@ func TestEmbeddedResources(t *testing.T) {
 	}
 
 	t.Logf("Trying to create invalid CR")
-	wronglyTyped := &unstructured.Unstructured{}
-	if err := yaml.Unmarshal([]byte(invalidEmbeddedResourceInstance), &wronglyTyped.Object); err != nil {
+	invalid := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(invalidEmbeddedResourceInstance), &invalid.Object); err != nil {
 		t.Fatal(err)
 	}
-	_, err = fooClient.Create(wronglyTyped, metav1.CreateOptions{})
+	unstructured.SetNestedField(invalid.Object, "invalid", "metadata", "name")
+	unstructured.SetNestedField(invalid.Object, "x y", "metadata", "labels", "foo")
+	_, err = fooClient.Create(invalid, metav1.CreateOptions{})
 	if err == nil {
 		t.Fatal("Expected creation to fail, but didn't")
 	}
 	t.Logf("Creation of invalid object failed with: %v", err)
 
-	for _, s := range []string{
-		`embedded.kind: Invalid value: "%"`,
-		`embedded.metadata.name: Invalid value: ".."`,
-		`embeddedNested.kind: Invalid value: "%"`,
-		`embeddedNested.metadata.name: Invalid value: ".."`,
-		`embeddedNested.embedded.kind: Invalid value: "%"`,
-		`embeddedNested.embedded.metadata.name: Invalid value: ".."`,
-	} {
+	invalidErrors := []string{
+		`[metadata.labels: Invalid value: "x y"`,
+		` embedded.kind: Invalid value: "%"`,
+		` embedded.metadata.name: Invalid value: ".."`,
+		` embeddedNested.kind: Invalid value: "%"`,
+		` embeddedNested.metadata.name: Invalid value: ".."`,
+		` embeddedNested.embedded.kind: Invalid value: "%"`,
+		` embeddedNested.embedded.metadata.name: Invalid value: ".."`,
+		` invalidDefaults.embedded.kind: Invalid value: "%"`,
+		` invalidDefaults.embedded.metadata.labels: Invalid value: "x y"`,
+	}
+	for _, s := range invalidErrors {
+		if !strings.Contains(err.Error(), s) {
+			t.Errorf("missing error: %s", s)
+		}
+	}
+
+	t.Logf("Creating a valid CR and then updating it with invalid values, expecting the same errors")
+	valid := &unstructured.Unstructured{}
+	if err := yaml.Unmarshal([]byte(embeddedResourceInstance), &valid.Object); err != nil {
+		t.Fatal(err)
+	}
+	unstructured.SetNestedField(valid.Object, "valid", "metadata", "name")
+	valid, err = fooClient.Create(valid, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unable to create CR: %v", err)
+	}
+	for k, v := range invalid.Object {
+		if k == "metadata" {
+			continue
+		}
+		valid.Object[k] = v
+	}
+	unstructured.SetNestedField(valid.Object, "x y", "metadata", "labels", "foo")
+	if _, err = fooClient.Update(valid, metav1.UpdateOptions{}); err == nil {
+		t.Fatal("Expected update error, but got none")
+	}
+	t.Logf("Update failed with: %v", err)
+	for _, s := range invalidErrors {
 		if !strings.Contains(err.Error(), s) {
 			t.Errorf("missing error: %s", s)
 		}

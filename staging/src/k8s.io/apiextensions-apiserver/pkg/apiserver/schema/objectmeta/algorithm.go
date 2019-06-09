@@ -55,7 +55,7 @@ func (c *coercer) coerce(pth *field.Path, x interface{}, s *structuralschema.Str
 					if _, ok := v.(string); !ok && c.dropInvalidFields {
 						delete(x, k)
 					} else if !ok {
-						return field.Invalid(pth, v, "must be a string")
+						return field.Invalid(pth.Child(k), v, "must be a string")
 					}
 				case "metadata":
 					meta, found, err := GetObjectMeta(x, c.dropInvalidFields)
