@@ -556,7 +556,7 @@ func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints)
 	}
 }
 
-// OnEndpointsDelete is called whever deletion of an existing endpoints
+// OnEndpointsDelete is called whenever deletion of an existing endpoints
 // object is observed.
 func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	proxier.OnEndpointsUpdate(endpoints, nil)
