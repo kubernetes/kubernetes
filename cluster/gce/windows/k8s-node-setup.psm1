@@ -953,7 +953,7 @@ function Configure-CniNetworking {
 #   CLUSTER_IP_RANGE
 #   SERVICE_CLUSTER_IP_RANGE
 function Configure_Dockerd_CniNetworking {
-  $CNI_RELEASE_VERSION = 'v0.8.2'
+  $CNI_RELEASE_VERSION = 'v0.8.5'
   if ((ShouldWrite-File ${env:CNI_DIR}\win-bridge.exe) -or
       (ShouldWrite-File ${env:CNI_DIR}\host-local.exe)) {
     $tmp_dir = 'C:\cni_tmp'
