@@ -21,14 +21,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/go-openapi/strfmt"
-	govalidate "github.com/go-openapi/validate"
-	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
-
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -39,7 +35,6 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
@@ -659,6 +654,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 			allowDefaults:            opts.allowDefaults,
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
+
 		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true)...)
 
 		if opts.requireStructuralSchema {
@@ -667,8 +663,13 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 				if len(allErrs) == 0 {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 				}
+			} else if validationErrors := structuralschema.ValidateStructural(fldPath.Child("openAPIV3Schema"), ss); len(validationErrors) > 0 {
+				allErrs = append(allErrs, validationErrors...)
+			} else if validationErrors, err := structuraldefaulting.ValidateDefaults(fldPath.Child("openAPIV3Schema"), ss, true); err != nil {
+				// this should never happen
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("openAPIV3Schema"), "", err.Error()))
 			} else {
-				allErrs = append(allErrs, structuralschema.ValidateStructural(ss, fldPath.Child("openAPIV3Schema"))...)
+				allErrs = append(allErrs, validationErrors...)
 			}
 		}
 	}
@@ -682,7 +683,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	return allErrs
 }
 
-var metaFields = sets.NewString("metadata", "apiVersion", "kind")
+var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
 func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool) field.ErrorList {
@@ -726,6 +727,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	if len(schema.Properties) != 0 {
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
+
 			if (isRoot || schema.XEmbeddedResource) && metaFields.Has(property) {
 				// we recurse into the schema that applies to ObjectMeta.
 				subSsv = ssv.withInsideResourceMeta()
@@ -825,43 +827,12 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), schema.Type, openapiV3Types.List()))
 	}
 
-	if schema.Default != nil {
-		if v.allowDefaults {
-			if s, err := structuralschema.NewStructural(schema); err == nil {
-				// ignore errors here locally. They will show up for the root of the schema.
-
-				clone := runtime.DeepCopyJSONValue(interface{}(*schema.Default))
-				if !v.isInsideResourceMeta {
-					// If we are under metadata, there are implicitly specified fields like kind, apiVersion, metadata, labels.
-					// We cannot prune as they are pruned as well. This allows more defaults than we would like to.
-					// TODO: be precise about pruning under metadata
-					pruning.Prune(clone, s, s.XEmbeddedResource)
-
-					// TODO: coerce correctly if we are not at the object root, but somewhere below.
-					if err := schemaobjectmeta.Coerce(fldPath, clone, s, s.XEmbeddedResource, false); err != nil {
-						allErrs = append(allErrs, err)
-					}
-
-					if !reflect.DeepEqual(clone, interface{}(*schema.Default)) {
-						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, "must not have unknown fields"))
-					} else if s.XEmbeddedResource {
-						// validate an embedded resource
-						schemaobjectmeta.Validate(fldPath, interface{}(*schema.Default), nil, true)
-					}
-				}
-
-				// validate the default value with user the provided schema.
-				validator := govalidate.NewSchemaValidator(s.ToGoOpenAPI(), nil, "", strfmt.Default)
-
-				allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(fldPath.Child("default"), interface{}(*schema.Default), validator)...)
-			}
-		} else {
-			detail := "must not be set"
-			if len(v.disallowDefaultsReason) > 0 {
-				detail += " " + v.disallowDefaultsReason
-			}
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), detail))
+	if schema.Default != nil && !v.allowDefaults {
+		detail := "must not be set"
+		if len(v.disallowDefaultsReason) > 0 {
+			detail += " " + v.disallowDefaultsReason
 		}
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), detail))
 	}
 
 	if schema.ID != "" {
@@ -1212,7 +1183,7 @@ func schemaIsNonStructural(schema *apiextensions.JSONSchemaProps) bool {
 	if err != nil {
 		return true
 	}
-	return len(structuralschema.ValidateStructural(ss, nil)) > 0
+	return len(structuralschema.ValidateStructural(nil, ss)) > 0
 }
 
 // requireValidPropertyType returns true if valid openapi v3 types should be required for the given API version

@@ -60,7 +60,7 @@ const (
 // * every specified field or array in s is also specified outside of value validation.
 // * metadata at the root can only restrict the name and generateName, and not be specified at all in nested contexts.
 // * additionalProperties at the root is not allowed.
-func ValidateStructural(s *Structural, fldPath *field.Path) field.ErrorList {
+func ValidateStructural(fldPath *field.Path, s *Structural) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateStructuralInvariants(s, rootLevel, fldPath)...)

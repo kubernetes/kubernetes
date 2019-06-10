@@ -362,7 +362,7 @@ func TestNewBuilder(t *testing.T) {
 				if err != nil {
 					t.Fatalf("structural schema error: %v", err)
 				}
-				if errs := structuralschema.ValidateStructural(schema, nil); len(errs) > 0 {
+				if errs := structuralschema.ValidateStructural(nil, schema); len(errs) > 0 {
 					t.Fatalf("structural schema validation error: %v", errs.ToAggregate())
 				}
 				schema = schema.Unfold()

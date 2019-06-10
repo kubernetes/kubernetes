@@ -248,7 +248,7 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 
 	if s.XPreserveUnknownFields != nil {
 		if !*s.XPreserveUnknownFields {
-			return nil, fmt.Errorf("'x-kubernetes-preserve-unknown-fields' must be true or undefined")
+			return nil, fmt.Errorf("internal error: 'x-kubernetes-preserve-unknown-fields' must be true or undefined")
 		}
 		ret.XPreserveUnknownFields = true
 	}
