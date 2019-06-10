@@ -784,21 +784,23 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 				// ignore errors here locally. They will show up for the root of the schema.
 
 				clone := runtime.DeepCopyJSONValue(interface{}(*schema.Default))
-				if !v.isInsideResourceMeta || s.XEmbeddedResource {
-					pruning.Prune(clone, s, s.XEmbeddedResource)
+				if !v.isInsideResourceMeta {
 					// If we are under metadata, there are implicitly specified fields like kind, apiVersion, metadata, labels.
 					// We cannot prune as they are pruned as well. This allows more defaults than we would like to.
 					// TODO: be precise about pruning under metadata
-				}
-				// TODO: coerce correctly if we are not at the object root, but somewhere below.
-				if err := schemaobjectmeta.Coerce(fldPath, clone, s, s.XEmbeddedResource, false); err != nil {
-					allErrs = append(allErrs, err)
-				}
-				if !reflect.DeepEqual(clone, interface{}(*schema.Default)) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, "must not have unknown fields"))
-				} else if s.XEmbeddedResource {
-					// validate an embedded resource
-					schemaobjectmeta.Validate(fldPath, interface{}(*schema.Default), nil, true)
+					pruning.Prune(clone, s, s.XEmbeddedResource)
+
+					// TODO: coerce correctly if we are not at the object root, but somewhere below.
+					if err := schemaobjectmeta.Coerce(fldPath, clone, s, s.XEmbeddedResource, false); err != nil {
+						allErrs = append(allErrs, err)
+					}
+
+					if !reflect.DeepEqual(clone, interface{}(*schema.Default)) {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, "must not have unknown fields"))
+					} else if s.XEmbeddedResource {
+						// validate an embedded resource
+						schemaobjectmeta.Validate(fldPath, interface{}(*schema.Default), nil, true)
+					}
 				}
 
 				// validate the default value with user the provided schema.
