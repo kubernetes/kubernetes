@@ -640,6 +640,8 @@ func ValidateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	return allErrs
 }
 
+var metaFields = sets.NewString("metadata", "apiVersion", "kind")
+
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
 func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -682,7 +684,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 	if len(schema.Properties) != 0 {
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
-			if (isRoot || schema.XEmbeddedResource) && property == "metadata" {
+			if (isRoot || schema.XEmbeddedResource) && metaFields.Has(property) {
 				// we recurse into the schema that applies to ObjectMeta.
 				subSsv = ssv.withInsideResourceMeta()
 				if isRoot {
@@ -844,6 +846,10 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 
 	if schema.Items != nil && len(schema.Items.JSONSchemas) != 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "items must be a schema object and not an array"))
+	}
+
+	if v.isInsideResourceMeta && schema.XEmbeddedResource {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-embedded-resource"), "must not be used inside of resource meta"))
 	}
 
 	return allErrs

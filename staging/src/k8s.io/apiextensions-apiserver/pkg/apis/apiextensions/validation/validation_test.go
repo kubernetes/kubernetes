@@ -1568,6 +1568,71 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 		},
 		{
+			name: "x-kubernetes-embedded-resource inside resource meta",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"embedded": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"metadata": {
+											Type:                   "object",
+											XEmbeddedResource:      true,
+											XPreserveUnknownFields: pointer.BoolPtr(true),
+										},
+										"apiVersion": {
+											Type: "string",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"foo": {
+													Type:                   "object",
+													XEmbeddedResource:      true,
+													XPreserveUnknownFields: pointer.BoolPtr(true),
+												},
+											},
+										},
+										"kind": {
+											Type: "string",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"foo": {
+													Type:                   "object",
+													XEmbeddedResource:      true,
+													XPreserveUnknownFields: pointer.BoolPtr(true),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "x-kubernetes-embedded-resource"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[apiVersion]", "properties[foo]", "x-kubernetes-embedded-resource"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[kind]", "properties[foo]", "x-kubernetes-embedded-resource"),
+			},
+		},
+		{
 			name: "defaults with enabled feature gate, unstructural schema",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
