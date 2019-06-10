@@ -85,7 +85,13 @@ func TestPrune(t *testing.T) {
      "pruning": {"unspecified": "bar"},
      "preserving": {"unspecified": "bar"}
   },
-  "preservingAdditionalProperties": {
+  "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
+     "foo": {
+        "specified": {"unspecified":"bar"},
+        "unspecified": "bar"
+     }
+  },
+  "preservingAdditionalPropertiesKeyPruneValues": {
      "foo": {
         "specified": {"unspecified":"bar"},
         "unspecified": "bar"
@@ -123,8 +129,22 @@ func TestPrune(t *testing.T) {
 						},
 					},
 				},
-				"preservingAdditionalProperties": {
+				"preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
+					// this x-kubernetes-preserve-unknown-fields is not inherited by the schema inside of additionalProperties
 					Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
+					Generic: structuralschema.Generic{
+						Type: "object",
+						AdditionalProperties: &structuralschema.StructuralOrBool{
+							Structural: &structuralschema.Structural{
+								Generic: structuralschema.Generic{Type: "object"},
+								Properties: map[string]structuralschema.Structural{
+									"specified": {Generic: structuralschema.Generic{Type: "object"}},
+								},
+							},
+						},
+					},
+				},
+				"preservingAdditionalPropertiesKeyPruneValues": {
 					Generic: structuralschema.Generic{
 						Type: "object",
 						AdditionalProperties: &structuralschema.StructuralOrBool{
@@ -154,7 +174,12 @@ func TestPrune(t *testing.T) {
      "pruning": {},
      "preserving": {"unspecified": "bar"}
   },
-  "preservingAdditionalProperties": {
+  "preservingAdditionalPropertiesNotInheritingXPreserveUnknownFields": {
+     "foo": {
+        "specified": {}
+     }
+  },
+  "preservingAdditionalPropertiesKeyPruneValues": {
      "foo": {
         "specified": {}
      }
