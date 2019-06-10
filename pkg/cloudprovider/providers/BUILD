@@ -13,10 +13,7 @@ go_library(
         "//cmd/kubelet/app:__pkg__",
     ],
     deps = [
-        "//pkg/cloudprovider/providers/cloudstack:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
-        "//pkg/cloudprovider/providers/ovirt:go_default_library",
-        "//pkg/cloudprovider/providers/photon:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
@@ -35,10 +32,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/cloudprovider/providers/cloudstack:all-srcs",
         "//pkg/cloudprovider/providers/openstack:all-srcs",
-        "//pkg/cloudprovider/providers/ovirt:all-srcs",
-        "//pkg/cloudprovider/providers/photon:all-srcs",
     ],
     tags = ["automanaged"],
 )

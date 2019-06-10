@@ -100,7 +100,6 @@ go_library(
         "//pkg/volume/iscsi:go_default_library",
         "//pkg/volume/local:go_default_library",
         "//pkg/volume/nfs:go_default_library",
-        "//pkg/volume/photon_pd:go_default_library",
         "//pkg/volume/portworx:go_default_library",
         "//pkg/volume/quobyte:go_default_library",
         "//pkg/volume/rbd:go_default_library",
