@@ -21,14 +21,17 @@ import (
 	"io"
 	"os"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/cli-runtime/pkg/resource"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -50,6 +53,7 @@ type ClusterInfoDumpOptions struct {
 	OutputDir     string
 	AllNamespaces bool
 	Namespaces    []string
+	AllResources  bool
 
 	Timeout          time.Duration
 	AppsClient       appsv1client.AppsV1Interface
@@ -75,7 +79,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 		Example: dumpExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.Run(f))
 		},
 	}
 
@@ -84,6 +88,7 @@ func NewCmdClusterInfoDump(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmd.Flags().StringVar(&o.OutputDir, "output-directory", o.OutputDir, i18n.T("Where to output the files.  If empty or '-' uses stdout, otherwise creates a directory hierarchy in that directory"))
 	cmd.Flags().StringSliceVar(&o.Namespaces, "namespaces", o.Namespaces, "A comma separated list of namespaces to dump.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If true, dump all namespaces.  If true, --namespaces is ignored.")
+	cmd.Flags().BoolVarP(&o.AllResources, "all-resources", "R", o.AllResources, "If true, dump all resources from all namespaces.  If true, --namespaces and --all-namespaces are ignored.")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	return cmd
 }
@@ -96,7 +101,10 @@ var (
     switch to a different namespace with the --namespaces flag, or specify --all-namespaces to dump all namespaces.
 
     The command also dumps the logs of all of the pods in the cluster, these logs are dumped into different directories
-    based on namespace and pod name.`))
+		based on namespace and pod name.
+
+		If --all-resources are specified, the command dumps all resources found in the cluster to a set of files in the directory specified with --output-directory.
+		if no output directory is given, resources will be dumpped in current directory`))
 
 	dumpExample = templates.Examples(i18n.T(`
     # Dump current cluster state to stdout
@@ -109,7 +117,10 @@ var (
     kubectl cluster-info dump --all-namespaces
 
     # Dump a set of namespaces to /path/to/cluster-state
-    kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`))
+		kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state
+
+		# Dump all resources to /path/to/cluster-resources
+		kubectl cluster-info dump --all-resources --output-directory=/path/to/cluster-resources`))
 )
 
 func setupOutputWriter(dir string, defaultWriter io.Writer, filename string) io.Writer {
@@ -164,7 +175,103 @@ func (o *ClusterInfoDumpOptions) Complete(f cmdutil.Factory, cmd *cobra.Command)
 	return nil
 }
 
-func (o *ClusterInfoDumpOptions) Run() error {
+func (o *ClusterInfoDumpOptions) Run(f cmdutil.Factory) error {
+
+	if o.AllResources {
+		// use current directory if --output-directory is not specified
+		dest := o.OutputDir
+		if len(dest) == 0 {
+			dest, err := os.Getwd()
+			if err != nil {
+				return err
+			}
+			o.OutputDir = dest
+		}
+
+		fmt.Printf(">> dumping resources to [%s]\n", o.OutputDir)
+
+		discoveryClient, err := f.ToDiscoveryClient()
+		if err != nil {
+			return err
+		}
+
+		apiResourceLists, err := discoveryClient.ServerPreferredResources()
+
+		// discovery can return partial success
+		if err != nil {
+			fmt.Printf(">> Error: %s\n", err.Error())
+		}
+
+		// short circuit if apiResourceLists is nil
+		if apiResourceLists == nil {
+			return nil
+		}
+
+		resources := make(map[string]interface{})
+
+		for _, list := range apiResourceLists {
+			if len(list.APIResources) == 0 {
+				continue
+			}
+			for _, r := range list.APIResources {
+				// skip if the resource hos no verb
+				if len(r.Verbs) == 0 {
+					continue
+				}
+				// skip if the resource has no list verb
+				if !sets.NewString(r.Verbs...).Has("list") {
+					continue
+				}
+				// add resource name to the resources map
+				if _, ok := resources[r.Name]; !ok {
+					resources[r.Name] = nil
+				}
+			}
+		}
+
+		var b *resource.Builder
+
+		wg := &sync.WaitGroup{}
+
+		for r := range resources {
+			wg.Add(1)
+
+			go func(r string) {
+				defer wg.Done()
+
+				b = f.NewBuilder().
+					Unstructured().
+					AllNamespaces(true).
+					ResourceTypeOrNameArgs(true, []string{r}...).
+					ContinueOnError().
+					Latest()
+
+				err = b.Do().Visit(func(info *resource.Info, err error) error {
+					if err != nil {
+						return err
+					}
+
+					if err := o.PrintObj(info.Object, setupOutputWriter(o.OutputDir, o.Out, path.Join(r+".json"))); err != nil {
+						return err
+					}
+
+					return nil
+				})
+
+				if err != nil {
+					fmt.Printf("* resource %s cannot be dumped\n", r)
+				} else {
+					fmt.Printf("* resource %s is dumped\n", r)
+				}
+
+			}(r)
+		}
+
+		wg.Wait()
+
+		return nil
+	}
+
 	nodes, err := o.CoreClient.Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return err
