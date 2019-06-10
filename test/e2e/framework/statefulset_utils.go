@@ -503,7 +503,7 @@ var httpProbe = &v1.Probe{
 	FailureThreshold: 1,
 }
 
-// SetHTTPProbe sets the pod template's ReadinessProbe for Nginx StatefulSet containers.
+// SetHTTPProbe sets the pod template's ReadinessProbe for Webserver StatefulSet containers.
 // This probe can then be controlled with BreakHTTPProbe() and RestoreHTTPProbe().
 // Note that this cannot be used together with PauseNewPods().
 func (s *StatefulSetTester) SetHTTPProbe(ss *appsv1.StatefulSet) {
@@ -517,7 +517,7 @@ func (s *StatefulSetTester) BreakHTTPProbe(ss *appsv1.StatefulSet) error {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
@@ -528,7 +528,7 @@ func (s *StatefulSetTester) BreakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Po
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/ || true", path)
+	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
 	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 	e2elog.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
@@ -541,7 +541,7 @@ func (s *StatefulSetTester) RestoreHTTPProbe(ss *appsv1.StatefulSet) error {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
@@ -552,7 +552,7 @@ func (s *StatefulSetTester) RestorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
 	// Ignore 'mv' errors to make this idempotent.
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/ || true", path)
+	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
 	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 	e2elog.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
@@ -764,7 +764,7 @@ func NewStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 	}
 }
 
-// NewStatefulSet creates a new NGINX StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
+// NewStatefulSet creates a new Webserver StatefulSet for testing. The StatefulSet is named name, is in namespace ns,
 // statefulPodsMounts are the mounts that will be backed by PVs. podsMounts are the mounts that are mounted directly
 // to the Pod. labels are the labels that will be usd for the StatefulSet selector.
 func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulPodMounts []v1.VolumeMount, podMounts []v1.VolumeMount, labels map[string]string) *appsv1.StatefulSet {
@@ -808,8 +808,8 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:            "nginx",
-							Image:           imageutils.GetE2EImage(imageutils.Nginx),
+							Name:            "webserver",
+							Image:           imageutils.GetE2EImage(imageutils.Httpd),
 							VolumeMounts:    mounts,
 							SecurityContext: &v1.SecurityContext{},
 						},

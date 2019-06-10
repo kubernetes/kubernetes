@@ -200,7 +200,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating rc %q that asks for more than the allowed pod quota", name))
-	rc := newRC(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
+	rc := newRC(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage)
 	rc, err = c.CoreV1().ReplicationControllers(namespace).Create(rc)
 	framework.ExpectNoError(err)
 
@@ -270,7 +270,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImage,
+					Image: WebserverImage,
 				},
 			},
 		},
@@ -278,7 +278,7 @@ func testRCAdoptMatchingOrphans(f *framework.Framework) {
 
 	ginkgo.By("When a replication controller with a matching selector is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	framework.ExpectNoError(err)
@@ -307,7 +307,7 @@ func testRCReleaseControlledNotMatching(f *framework.Framework) {
 	name := "pod-release"
 	ginkgo.By("Given a ReplicationController is created")
 	replicas := int32(1)
-	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, NginxImage)
+	rcSt := newRC(name, replicas, map[string]string{"name": name}, name, WebserverImage)
 	rcSt.Spec.Selector = map[string]string{"name": name}
 	rc, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rcSt)
 	framework.ExpectNoError(err)

@@ -141,6 +141,10 @@ const (
 	GBFrontend
 	// GBRedisSlave image
 	GBRedisSlave
+	// Httpd image
+	Httpd
+	// HttpdNew image
+	HttpdNew
 	// InClusterClient image
 	InClusterClient
 	// Invalid image
@@ -226,6 +230,8 @@ func initImageConfigs() map[int]Config {
 	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.10"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
 	configs[GBRedisSlave] = Config{sampleRegistry, "gb-redisslave", "v3"}
+	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
+	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
 	configs[InClusterClient] = Config{e2eRegistry, "inclusterclient", "1.0"}
 	configs[Invalid] = Config{gcRegistry, "invalid-image", "invalid-tag"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}

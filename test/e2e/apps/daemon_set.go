@@ -94,7 +94,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 	f = framework.NewDefaultFramework("daemonsets")
 
-	image := NginxImage
+	image := WebserverImage
 	dsName := "daemon-set"
 
 	var ns string

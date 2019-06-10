@@ -202,7 +202,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Creating replica set %q that asks for more than the allowed pod quota", name))
-	rs := newRS(name, 3, map[string]string{"name": name}, NginxImageName, NginxImage)
+	rs := newRS(name, 3, map[string]string{"name": name}, WebserverImageName, WebserverImage)
 	rs, err = c.AppsV1().ReplicaSets(namespace).Create(rs)
 	framework.ExpectNoError(err)
 
@@ -273,7 +273,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 			Containers: []v1.Container{
 				{
 					Name:  name,
-					Image: NginxImage,
+					Image: WebserverImage,
 				},
 			},
 		},
@@ -281,7 +281,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 
 	ginkgo.By("When a replicaset with a matching selector is created")
 	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImage)
+	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, WebserverImage)
 	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
 	rs, err := f.ClientSet.AppsV1().ReplicaSets(f.Namespace.Name).Create(rsSt)
 	framework.ExpectNoError(err)
