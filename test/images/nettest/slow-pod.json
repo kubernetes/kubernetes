@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "webserver",
-        "image": "gcr.io/kubernetes-e2e-test-images/nettest-amd64:1.0",
+        "image": "gcr.io/kubernetes-e2e-test-images/nettest-amd64:1.1",
         "args": [
           "-service=nettest",
           "-delay-shutdown=10"

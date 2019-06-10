@@ -229,7 +229,7 @@ func initImageConfigs() map[int]Config {
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
 	configs[Net] = Config{e2eRegistry, "net", "1.0"}
 	configs[Netexec] = Config{e2eRegistry, "netexec", "1.1"}
-	configs[Nettest] = Config{e2eRegistry, "nettest", "1.0"}
+	configs[Nettest] = Config{e2eRegistry, "nettest", "1.1"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
