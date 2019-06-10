@@ -126,6 +126,15 @@ type QueueSortPlugin interface {
 	Less(*PodInfo, *PodInfo) bool
 }
 
+// PrefilterPlugin is an interface that must be implemented by "prefilter" plugins.
+// These plugins are called at the beginning of the scheduling cycle.
+type PrefilterPlugin interface {
+	Plugin
+	// Prefilter is called at the beginning of the scheduling cycle. All prefilter
+	// plugins must return success or the pod will be rejected.
+	Prefilter(pc *PluginContext, p *v1.Pod) *Status
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -189,6 +198,12 @@ type Framework interface {
 	FrameworkHandle
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
+
+	// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+	// *Status and its code is set to non-success if any of the plugins returns
+	// anything but Success. If a non-success status is returned, then the scheduling
+	// cycle is aborted.
+	RunPrefilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
 
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns

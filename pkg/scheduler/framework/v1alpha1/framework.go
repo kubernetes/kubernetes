@@ -36,6 +36,7 @@ type framework struct {
 	waitingPods      *waitingPodsMap
 	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
 	queueSortPlugins []QueueSortPlugin
+	prefilterPlugins []PrefilterPlugin
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
 	postbindPlugins  []PostbindPlugin
@@ -83,6 +84,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			return nil, fmt.Errorf("error initializing plugin %v: %v", name, err)
 		}
 		f.plugins[name] = p
+	}
+
+	if plugins.PreFilter != nil {
+		for _, pf := range plugins.PreFilter.Enabled {
+			if pg, ok := f.plugins[pf.Name]; ok {
+				p, ok := pg.(PrefilterPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend prefilter plugin", pf.Name)
+				}
+				f.prefilterPlugins = append(f.prefilterPlugins, p)
+			} else {
+				return nil, fmt.Errorf("prefilter plugin %v does not exist", pf.Name)
+			}
+		}
 	}
 
 	if plugins.Reserve != nil {
@@ -183,6 +198,28 @@ func (f *framework) QueueSortFunc() LessFunc {
 
 	// Only one QueueSort plugin can be enabled.
 	return f.queueSortPlugins[0].Less
+}
+
+// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+// *Status and its code is set to non-success if any of the plugins returns
+// anything but Success. If a non-success status is returned, then the scheduling
+// cycle is aborted.
+func (f *framework) RunPrefilterPlugins(
+	pc *PluginContext, pod *v1.Pod) *Status {
+	for _, pl := range f.prefilterPlugins {
+		status := pl.Prefilter(pc, pod)
+		if !status.IsSuccess() {
+			if status.Code() == Unschedulable {
+				msg := fmt.Sprintf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
+				klog.V(4).Infof(msg)
+				return NewStatus(status.Code(), msg)
+			}
+			msg := fmt.Sprintf("error while running %v prefilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
+		}
+	}
+	return nil
 }
 
 // RunPrebindPlugins runs the set of configured prebind plugins. It returns a
