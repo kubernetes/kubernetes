@@ -337,7 +337,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister,
 		return nil, nil, nil, err
 	}
 	nodeToVictims, err := selectNodesForPreemption(pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,
-		g.predicateMetaProducer, g.schedulingQueue, pdbs)
+		g.predicateMetaProducer, g.schedulingQueue, pdbs, g.enableNonPreempting)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -971,6 +971,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	metadataProducer predicates.PredicateMetadataProducer,
 	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
+	enableNonPreempting bool,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
 	nodeToVictims := map[*v1.Node]*schedulerapi.Victims{}
 	var resultLock sync.Mutex
@@ -983,7 +984,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
+		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs, enableNonPreempting)
 		if fits {
 			resultLock.Lock()
 			victims := schedulerapi.Victims{
@@ -1059,6 +1060,7 @@ func selectVictimsOnNode(
 	fitPredicates map[string]predicates.FitPredicate,
 	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
+	enableNonPreempting bool,
 ) ([]*v1.Pod, int, bool) {
 	if nodeInfo == nil {
 		return nil, 0, false
@@ -1082,6 +1084,10 @@ func selectVictimsOnNode(
 	// check if the given pod can be scheduled.
 	podPriority := util.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
+		if enableNonPreempting && p.Spec.PreemptionPolicy != nil && (*p.Spec.PreemptionPolicy == v1.NonPreemptible || *p.Spec.PreemptionPolicy == v1.NonPreemptiblePreemptNever) {
+			klog.V(5).Infof("Pod %v/%v is not eligible to be preempted because it has a preemptionPolicy of %v", p.Namespace, p.Name, *p.Spec.PreemptionPolicy)
+			continue
+		}
 		if util.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			removePod(p)
@@ -1164,8 +1170,8 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedP
 // We look at the node that is nominated for this pod and as long as there are
 // terminating pods on the node, we don't consider this for preempting more pods.
 func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, enableNonPreempting bool) bool {
-	if enableNonPreempting && pod.Spec.PreemptionPolicy != nil && *pod.Spec.PreemptionPolicy == v1.PreemptNever {
-		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, v1.PreemptNever)
+	if enableNonPreempting && pod.Spec.PreemptionPolicy != nil && (*pod.Spec.PreemptionPolicy == v1.PreemptNever || *pod.Spec.PreemptionPolicy == v1.NonPreemptiblePreemptNever) {
+		klog.V(5).Infof("Pod %v/%v is not eligible for preemption because it has a preemptionPolicy of %v", pod.Namespace, pod.Name, *pod.Spec.PreemptionPolicy)
 		return false
 	}
 	nomNodeName := pod.Status.NominatedNodeName
