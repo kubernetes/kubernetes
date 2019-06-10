@@ -29,11 +29,11 @@ import (
 
 func TestPrune(t *testing.T) {
 	tests := []struct {
-		name                string
-		json                string
-		dontPruneMetaAtRoot bool
-		schema              *structuralschema.Structural
-		expected            string
+		name           string
+		json           string
+		isResourceRoot bool
+		schema         *structuralschema.Structural
+		expected       string
 	}{
 		{name: "empty", json: "null", expected: "null"},
 		{name: "scalar", json: "4", schema: &structuralschema.Structural{}, expected: "4"},
@@ -397,7 +397,7 @@ func TestPrune(t *testing.T) {
     }
   }
 }
-`, dontPruneMetaAtRoot: true, schema: &structuralschema.Structural{
+`, isResourceRoot: true, schema: &structuralschema.Structural{
 			Generic: structuralschema.Generic{Type: "object"},
 			Properties: map[string]structuralschema.Structural{
 				"pruned": {
@@ -508,7 +508,7 @@ func TestPrune(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			Prune(in, tt.schema, tt.dontPruneMetaAtRoot)
+			Prune(in, tt.schema, tt.isResourceRoot)
 			if !reflect.DeepEqual(in, expected) {
 				var buf bytes.Buffer
 				enc := json.NewEncoder(&buf)
