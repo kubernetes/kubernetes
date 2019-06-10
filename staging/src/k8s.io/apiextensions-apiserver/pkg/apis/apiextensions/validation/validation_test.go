@@ -1442,8 +1442,12 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					},
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{
-								"a": {Default: jsonPtr(42.0)},
+								"a": {
+									Type:    "number",
+									Default: jsonPtr(42.0),
+								},
 							},
 						},
 					},
@@ -1455,6 +1459,112 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disabled feature-gate
+			},
+		},
+		{
+			name: "x-kubernetes-int-or-string without structural",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"intorstring": {
+									XIntOrString: true,
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "type"),
+			},
+		},
+		{
+			name: "x-kubernetes-preserve-unknown-fields without structural",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"raw": {
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "type"),
+			},
+		},
+		{
+			name: "x-kubernetes-embedded-resource without structural",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"embedded": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "type"),
 			},
 		},
 		{

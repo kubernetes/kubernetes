@@ -107,8 +107,9 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 			Type: "object",
 			Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
 				"embedded": {
-					Type:              "object",
-					XEmbeddedResource: true,
+					Type:                   "object",
+					XEmbeddedResource:      true,
+					XPreserveUnknownFields: pointer.BoolPtr(true),
 				},
 			},
 		},

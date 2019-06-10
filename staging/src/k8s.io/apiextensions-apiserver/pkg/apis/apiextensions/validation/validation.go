@@ -157,6 +157,9 @@ func validateCustomResourceDefinitionSpec(spec *apiextensions.CustomResourceDefi
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("preserveUnknownFields"), true, "must be false in order to use defaults in the schema"))
 		}
 	}
+	if specHasKubernetesExtensions(spec) {
+		mustBeStructural = true
+	}
 
 	storageFlagCount := 0
 	versionsMap := map[string]bool{}
@@ -951,6 +954,89 @@ func schemaHasDefaults(s *apiextensions.JSONSchemaProps) bool {
 	}
 	for _, d := range s.Dependencies {
 		if schemaHasDefaults(d.Schema) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func specHasKubernetesExtensions(spec *apiextensions.CustomResourceDefinitionSpec) bool {
+	if spec.Validation != nil && schemaHasKubernetesExtensions(spec.Validation.OpenAPIV3Schema) {
+		return true
+	}
+	for _, v := range spec.Versions {
+		if v.Schema != nil && schemaHasKubernetesExtensions(v.Schema.OpenAPIV3Schema) {
+			return true
+		}
+	}
+	return false
+}
+
+func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
+	if s == nil {
+		return false
+	}
+
+	if s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString {
+		return true
+	}
+
+	if s.Items != nil {
+		if s.Items != nil && schemaHasKubernetesExtensions(s.Items.Schema) {
+			return true
+		}
+		for _, s := range s.Items.JSONSchemas {
+			if schemaHasKubernetesExtensions(&s) {
+				return true
+			}
+		}
+	}
+	for _, s := range s.AllOf {
+		if schemaHasKubernetesExtensions(&s) {
+			return true
+		}
+	}
+	for _, s := range s.AnyOf {
+		if schemaHasKubernetesExtensions(&s) {
+			return true
+		}
+	}
+	for _, s := range s.OneOf {
+		if schemaHasKubernetesExtensions(&s) {
+			return true
+		}
+	}
+	if schemaHasKubernetesExtensions(s.Not) {
+		return true
+	}
+	for _, s := range s.Properties {
+		if schemaHasKubernetesExtensions(&s) {
+			return true
+		}
+	}
+	if s.AdditionalProperties != nil {
+		if schemaHasKubernetesExtensions(s.AdditionalProperties.Schema) {
+			return true
+		}
+	}
+	for _, s := range s.PatternProperties {
+		if schemaHasKubernetesExtensions(&s) {
+			return true
+		}
+	}
+	if s.AdditionalItems != nil {
+		if schemaHasKubernetesExtensions(s.AdditionalItems.Schema) {
+			return true
+		}
+	}
+	for _, s := range s.Definitions {
+		if schemaHasKubernetesExtensions(&s) {
+			return true
+		}
+	}
+	for _, d := range s.Dependencies {
+		if schemaHasKubernetesExtensions(d.Schema) {
 			return true
 		}
 	}
