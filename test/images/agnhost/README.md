@@ -146,10 +146,9 @@ Tool is parametrized with the total number of number that should be generated an
 the generation process. For example, if you want to create a throughput of 100 lines per second
 for a minute, you set total number of lines to 6000 and duration to 1 minute.
 
-Parameters are passed through environment variables. There are no defaults, you should always
-set up container parameters. Total number of line is parametrized through env variable
-`LOGS_GENERATOR_LINES_TOTAL` and duration in go format is parametrized through env variable
-`LOGS_GENERATOR_DURATION`.
+Parameters are passed through CLI flags. There are no defaults, you should always pass the flags
+to the container. Total number of line is parametrized through the flag `--log-lines-total`
+and duration in go format is parametrized through the flag `--run-duration`.
 
 Inside the container all log lines are written to the stdout.
 
@@ -166,16 +165,16 @@ Examples:
 
 ```console
 docker run -i \
-  gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
-  logs-generator --log-lines-total 10 --run-duration 1
+  gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
+  logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
   --restart=Never \
-  -- logs-generator -t 10 -d 1
+  -- logs-generator -t 10 -d 1s
 ```
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/logs-generator/README.md?pixel)]()
@@ -300,7 +299,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -355,7 +354,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:1.1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
