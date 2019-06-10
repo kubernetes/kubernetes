@@ -1,0 +1,6 @@
+cri-tools ({{ .Version }}-{{ .Revision }}) {{ .DistroName }} {{ .Arch }}; urgency=optional
+
+  * https://github.com/kubernetes-incubator/cri-tools/blob/master/CHANGELOG.md
+
+ -- Kubernetes Authors <kubernetes-dev@googlegroups.com>  {{ date }}
+

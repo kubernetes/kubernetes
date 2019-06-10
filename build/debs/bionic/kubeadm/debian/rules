@@ -1,0 +1,26 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+#export DH_VERBOSE=1
+
+build:
+	echo noop
+
+binary:
+	mkdir -p usr/bin
+	curl --fail -sSL --retry 5 \
+		-o usr/bin/kubeadm \
+		"{{ .DownloadLinkBase }}/bin/linux/{{ .Arch }}/kubeadm"
+
+	chmod +x usr/bin/kubeadm
+	dh_testroot
+	dh_auto_install
+	dh_shlibdeps
+	dh_install
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+%:
+	dh $@

@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["build.go"],
+    importpath = "k8s.io/release/debian",
+    visibility = ["//visibility:private"],
+    deps = ["//debian/vendor/github.com/blang/semver:go_default_library"],
+)
+
+go_binary(
+    name = "debian",
+    embed = [":go_default_library"],
+    importpath = "k8s.io/release/debian",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["build_test.go"],
+    embed = [":go_default_library"],
+    importpath = "k8s.io/release/debian",
+)

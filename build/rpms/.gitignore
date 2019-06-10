@@ -1,0 +1,7 @@
+kubelet
+kubeadm
+kubectl
+cni-*.tar.gz
+bin/
+output/
+*.swp

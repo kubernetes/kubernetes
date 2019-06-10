@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+#export DH_VERBOSE=1
+CNI_VERSION = v0.7.5
+
+build:
+	echo noop
+
+binary:
+	mkdir -p ./bin
+	curl -sSL --fail --retry 5 \
+		"https://dl.k8s.io/network-plugins/cni-plugins-{{ .Arch }}-$(CNI_VERSION).tgz" \
+		| tar -C ./bin -xz
+	dh_testroot
+	dh_auto_install
+	dh_shlibdeps
+	dh_install
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+%:
+	dh $@

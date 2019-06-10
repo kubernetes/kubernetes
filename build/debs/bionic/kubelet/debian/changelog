@@ -1,0 +1,6 @@
+kubelet ({{ .Version }}-{{ .Revision }}) {{ .DistroName }} {{ .Arch }}; urgency=optional
+
+  * https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md
+
+ -- Kubernetes Authors <kubernetes-dev@googlegroups.com>  {{ date }}
+

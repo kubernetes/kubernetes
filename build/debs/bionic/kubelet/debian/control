@@ -1,0 +1,15 @@
+Source: kubelet
+Section: misc
+Priority: optional
+Maintainer: Kubernetes Authors <kubernetes-dev+release@googlegroups.com>
+Build-Depends: curl, ca-certificates, debhelper (>= 8.0.0), dh-systemd (>= 1.5)
+Standards-Version: 3.9.4
+Homepage: https://kubernetes.io
+Vcs-Git: https://github.com/kubernetes/kubernetes.git
+Vcs-Browser: https://github.com/kubernetes/kubernetes
+
+Package: kubelet
+Architecture: {{ .DebArch }}
+Depends: iptables (>= 1.4.21), kubernetes-cni ({{ .KubeletCNIVersion }}), iproute2, socat, util-linux, mount, ebtables, ethtool, conntrack, ${misc:Depends}
+Description: Kubernetes Node Agent
+ The node agent of Kubernetes, the container cluster manager
