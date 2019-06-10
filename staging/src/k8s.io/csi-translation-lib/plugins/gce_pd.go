@@ -141,19 +141,44 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *st
 // plugin never supported ReadWriteMany but also did not validate or enforce
 // this access mode for pre-provisioned volumes. The GCE PD CSI Driver validates
 // and enforces (fails) ReadWriteMany. Therefore we treat all in-tree
-// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes.
+// ReadWriteMany as ReadWriteOnce volumes to not break legacy volumes. It also
+// takes [ReadWriteOnce, ReadOnlyMany] and makes it ReadWriteOnce. This is
+// because the in-tree plugin does not enforce access modes and just attaches
+// the disk in ReadWriteOnce mode; however, the CSI external-attacher will fail
+// this combination because technically [ReadWriteOnce, ReadOnlyMany] is not
+// supportable on an attached volume
+// See: https://github.com/kubernetes-csi/external-attacher/issues/153
 func backwardCompatibleAccessModes(ams []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
 	if ams == nil {
 		return nil
 	}
-	newAM := []v1.PersistentVolumeAccessMode{}
+
+	s := map[v1.PersistentVolumeAccessMode]bool{}
+	var newAM []v1.PersistentVolumeAccessMode
+
 	for _, am := range ams {
 		if am == v1.ReadWriteMany {
-			newAM = append(newAM, v1.ReadWriteOnce)
+			// ReadWriteMany is unsupported in CSI, but in-tree did no
+			// validation and treated it as ReadWriteOnce
+			s[v1.ReadWriteOnce] = true
 		} else {
-			newAM = append(newAM, am)
+			s[am] = true
 		}
 	}
+
+	switch {
+	case s[v1.ReadOnlyMany] && s[v1.ReadWriteOnce]:
+		// ROX,RWO is unsupported in CSI, but in-tree did not validation and
+		// treated it as ReadWriteOnce
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	case s[v1.ReadWriteOnce]:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	case s[v1.ReadOnlyMany]:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany}
+	default:
+		newAM = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
+	}
+
 	return newAM
 }
 

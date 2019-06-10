@@ -211,18 +211,16 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 		expAccessModes []v1.PersistentVolumeAccessMode
 	}{
 		{
-			name: "multiple normals",
+			name: "ROX",
 			accessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadOnlyMany,
-				v1.ReadWriteOnce,
 			},
 			expAccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadOnlyMany,
-				v1.ReadWriteOnce,
 			},
 		},
 		{
-			name: "one normal",
+			name: "RWO",
 			accessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
@@ -231,13 +229,52 @@ func TestBackwardCompatibleAccessModes(t *testing.T) {
 			},
 		},
 		{
-			name: "some readwritemany",
+			name: "RWX",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWO, ROX",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadOnlyMany,
+				v1.ReadWriteOnce,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWO, RWX",
 			accessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 				v1.ReadWriteMany,
 			},
 			expAccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWX, ROX",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteMany,
+				v1.ReadOnlyMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+		},
+		{
+			name: "RWX, ROX, RWO",
+			accessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteMany,
+				v1.ReadWriteOnce,
+				v1.ReadOnlyMany,
+			},
+			expAccessModes: []v1.PersistentVolumeAccessMode{
 				v1.ReadWriteOnce,
 			},
 		},
