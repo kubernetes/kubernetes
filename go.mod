@@ -43,8 +43,6 @@ require (
 	github.com/coreos/rkt v1.30.0 // indirect
 	github.com/cpuguy83/go-md2man v1.0.4
 	github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 // indirect
-	github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
-	github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
 	github.com/docker/distribution v0.0.0-20170726174610-edc3ab29cdff
@@ -148,8 +146,6 @@ require (
 	github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 // indirect
 	github.com/vmware/govmomi v0.20.1
-	github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc
-	github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1

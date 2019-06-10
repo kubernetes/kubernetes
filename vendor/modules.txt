@@ -273,10 +273,6 @@ github.com/coreos/pkg/dlopen
 github.com/cpuguy83/go-md2man/md2man
 # github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 => github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299
 github.com/cyphar/filepath-securejoin
-# github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c => github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
-github.com/d2g/dhcp4
-# github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266 => github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
-github.com/d2g/dhcp4client
 # github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
@@ -812,12 +808,6 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
-# github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc => github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc
-github.com/vmware/photon-controller-go-sdk/SSPI
-github.com/vmware/photon-controller-go-sdk/photon
-github.com/vmware/photon-controller-go-sdk/photon/lightwave
-# github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57 => github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
-github.com/xanzy/go-cloudstack/cloudstack
 # github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18 => github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18
 github.com/xiang90/probing
 # go.uber.org/atomic v0.0.0-20181018215023-8dc6146f7569 => go.uber.org/atomic v0.0.0-20181018215023-8dc6146f7569
