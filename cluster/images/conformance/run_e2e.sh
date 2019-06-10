@@ -64,4 +64,5 @@ set +x
 # $! is the pid of tee, not ginkgo
 wait "$(pgrep ginkgo)" && ret=0 || ret=$?
 saveResults
+check_conformance_use_stable_apis_only.sh "${RESULTS_DIR}"/e2e.log && ret=0 || ret=$?
 exit ${ret}
