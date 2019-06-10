@@ -23,16 +23,18 @@ import (
 )
 
 // Coerce checks types of embedded ObjectMeta and TypeMeta and prunes unknown fields inside the former.
-// It does coerce ObjectMeta and TypeMeta at the root if includeRoot is true.
+// It does coerce ObjectMeta and TypeMeta at the root if isResourceRoot is true.
 // If dropInvalidFields is true, fields of wrong type will be dropped.
-func Coerce(pth *field.Path, obj interface{}, s *structuralschema.Structural, includeRoot, dropInvalidFields bool) *field.Error {
-	if includeRoot {
+func Coerce(pth *field.Path, obj interface{}, s *structuralschema.Structural, isResourceRoot, dropInvalidFields bool) *field.Error {
+	if isResourceRoot {
 		if s == nil {
 			s = &structuralschema.Structural{}
 		}
-		clone := *s
-		clone.XEmbeddedResource = true
-		s = &clone
+		if !s.XEmbeddedResource {
+			clone := *s
+			clone.XEmbeddedResource = true
+			s = &clone
+		}
 	}
 	c := coercer{dropInvalidFields: dropInvalidFields}
 	return c.coerce(pth, obj, s)
