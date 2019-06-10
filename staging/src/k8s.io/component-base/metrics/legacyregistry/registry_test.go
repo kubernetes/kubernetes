@@ -150,6 +150,7 @@ func TestDeferredRegister(t *testing.T) {
 	globalRegistryFactory = metricsRegistryFactory{
 		registerQueue:     make([]metrics.KubeCollector, 0),
 		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		globalRegistry:    noopRegistry{},
 	}
 	var err error
 	err = Register(alphaDeprecatedCounter)
@@ -179,6 +180,7 @@ func TestDeferredMustRegister(t *testing.T) {
 	globalRegistryFactory = metricsRegistryFactory{
 		registerQueue:     make([]metrics.KubeCollector, 0),
 		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		globalRegistry:    noopRegistry{},
 	}
 	MustRegister(alphaDeprecatedCounter)
 

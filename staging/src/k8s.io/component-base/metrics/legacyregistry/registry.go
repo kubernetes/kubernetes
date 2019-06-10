@@ -18,17 +18,31 @@ package legacyregistry
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	dto "github.com/prometheus/client_model/go"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/metrics"
 )
 
-var globalRegistryFactory = metricsRegistryFactory{
-	registerQueue:     make([]metrics.KubeCollector, 0),
-	mustRegisterQueue: make([]metrics.KubeCollector, 0),
-}
+var (
+	globalRegistryFactory = metricsRegistryFactory{
+		registerQueue:     make([]metrics.KubeCollector, 0),
+		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		globalRegistry:    noopRegistry{},
+	}
+)
+
+type noopRegistry struct{}
+
+func (noopRegistry) Register(metrics.KubeCollector) error  { return nil }
+func (noopRegistry) MustRegister(...metrics.KubeCollector) {}
+func (noopRegistry) Unregister(metrics.KubeCollector) bool { return true }
+func (noopRegistry) Gather() ([]*dto.MetricFamily, error)  { return nil, nil }
 
 type metricsRegistryFactory struct {
 	globalRegistry    metrics.KubeRegistry
@@ -36,6 +50,13 @@ type metricsRegistryFactory struct {
 	registrationLock  sync.Mutex
 	registerQueue     []metrics.KubeCollector
 	mustRegisterQueue []metrics.KubeCollector
+}
+
+// HandlerForGlobalRegistry returns a http handler for the global registry. This
+// allows us to return a handler for the global registry without having to expose
+// the global registry itself directly.
+func HandlerForGlobalRegistry(opts promhttp.HandlerOpts) http.Handler {
+	return promhttp.HandlerFor(globalRegistryFactory.globalRegistry, opts)
 }
 
 // SetRegistryFactoryVersion sets the kubernetes version information for all
@@ -77,11 +98,12 @@ func Register(c metrics.KubeCollector) error {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 
-	if globalRegistryFactory.kubeVersion != nil {
-		return globalRegistryFactory.globalRegistry.Register(c)
+	if globalRegistryFactory.globalRegistry == (noopRegistry{}) {
+		globalRegistryFactory.registerQueue = append(globalRegistryFactory.registerQueue, c)
+		return nil
 	}
-	globalRegistryFactory.registerQueue = append(globalRegistryFactory.registerQueue, c)
-	return nil
+
+	return globalRegistryFactory.globalRegistry.Register(c)
 }
 
 // MustRegister works like Register but registers any number of
@@ -91,11 +113,12 @@ func MustRegister(cs ...metrics.KubeCollector) {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 
-	if globalRegistryFactory.kubeVersion != nil {
-		globalRegistryFactory.globalRegistry.MustRegister(cs...)
+	if globalRegistryFactory.globalRegistry == (noopRegistry{}) {
+		for _, c := range cs {
+			globalRegistryFactory.mustRegisterQueue = append(globalRegistryFactory.mustRegisterQueue, c)
+		}
 		return
 	}
-	for _, c := range cs {
-		globalRegistryFactory.mustRegisterQueue = append(globalRegistryFactory.mustRegisterQueue, c)
-	}
+	globalRegistryFactory.globalRegistry.MustRegister(cs...)
+	return
 }
