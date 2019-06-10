@@ -92,7 +92,7 @@ go mod edit -replace "${dep}=${dep}@${rev}"
 # Propagate pinned version to staging repos that also have that dependency
 for repo in $(ls staging/src/k8s.io | sort); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
-    if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null; then
+    if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null 2>&1; then
       go mod edit -require "${dep}@${rev}"
       go mod edit -replace "${dep}=${dep}@${rev}"
     fi
