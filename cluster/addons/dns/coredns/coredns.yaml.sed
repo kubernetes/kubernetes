@@ -116,7 +116,7 @@ spec:
         beta.kubernetes.io/os: linux
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.5.0
+        image: k8s.gcr.io/coredns:$CORE_DNS_VERSION
         imagePullPolicy: IfNotPresent
         resources:
           limits:
