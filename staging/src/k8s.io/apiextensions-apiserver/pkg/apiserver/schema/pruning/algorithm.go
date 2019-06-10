@@ -20,9 +20,24 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
-// Prune removes object fields in obj which are not specified in s.
-func Prune(obj interface{}, s *structuralschema.Structural) {
+// Prune removes object fields in obj which are not specified in s. It skips TypeMeta and ObjectMeta fields
+// if XEmbeddedResource is set to true, or for the root if root=true.
+func Prune(obj interface{}, s *structuralschema.Structural, root bool) {
+	if root {
+		if s == nil {
+			s = &structuralschema.Structural{}
+		}
+		clone := *s
+		clone.XEmbeddedResource = true
+		s = &clone
+	}
 	prune(obj, s)
+}
+
+var metaFields = map[string]bool{
+	"apiVersion": true,
+	"kind":       true,
+	"metadata":   true,
 }
 
 func prune(x interface{}, s *structuralschema.Structural) {
@@ -40,6 +55,9 @@ func prune(x interface{}, s *structuralschema.Structural) {
 			return
 		}
 		for k, v := range x {
+			if s.XEmbeddedResource && metaFields[k] {
+				continue
+			}
 			prop, ok := s.Properties[k]
 			if ok {
 				prune(v, &prop)
@@ -72,10 +90,13 @@ func skipPrune(x interface{}, s *structuralschema.Structural) {
 	switch x := x.(type) {
 	case map[string]interface{}:
 		for k, v := range x {
+			if s.XEmbeddedResource && metaFields[k] {
+				continue
+			}
 			if prop, ok := s.Properties[k]; ok {
 				prune(v, &prop)
-			} else {
-				skipPrune(v, nil)
+			} else if s.AdditionalProperties != nil {
+				prune(v, s.AdditionalProperties.Structural)
 			}
 		}
 	case []interface{}:

@@ -1442,8 +1442,12 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					},
 					Validation: &apiextensions.CustomResourceValidation{
 						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
 							Properties: map[string]apiextensions.JSONSchemaProps{
-								"a": {Default: jsonPtr(42.0)},
+								"a": {
+									Type:    "number",
+									Default: jsonPtr(42.0),
+								},
 							},
 						},
 					},
@@ -1455,6 +1459,177 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disabled feature-gate
+			},
+		},
+		{
+			name: "x-kubernetes-int-or-string without structural",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"intorstring": {
+									XIntOrString: true,
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "type"),
+			},
+		},
+		{
+			name: "x-kubernetes-preserve-unknown-fields without structural",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"raw": {
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "type"),
+			},
+		},
+		{
+			name: "x-kubernetes-embedded-resource without structural",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"embedded": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "type"),
+			},
+		},
+		{
+			name: "x-kubernetes-embedded-resource inside resource meta",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"embedded": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"metadata": {
+											Type:                   "object",
+											XEmbeddedResource:      true,
+											XPreserveUnknownFields: pointer.BoolPtr(true),
+										},
+										"apiVersion": {
+											Type: "string",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"foo": {
+													Type:                   "object",
+													XEmbeddedResource:      true,
+													XPreserveUnknownFields: pointer.BoolPtr(true),
+												},
+											},
+										},
+										"kind": {
+											Type: "string",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"foo": {
+													Type:                   "object",
+													XEmbeddedResource:      true,
+													XPreserveUnknownFields: pointer.BoolPtr(true),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "x-kubernetes-embedded-resource"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[apiVersion]", "properties[foo]", "x-kubernetes-embedded-resource"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded]", "properties[kind]", "properties[foo]", "x-kubernetes-embedded-resource"),
 			},
 		},
 		{
@@ -1679,6 +1854,63 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 									},
 									XPreserveUnknownFields: pointer.BoolPtr(true),
 								},
+								// x-kubernetes-embedded-resource: true
+								"embedded-fine": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {
+											Type: "string",
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo":        "abc",
+										"apiVersion": "foo/v1",
+										"kind":       "v1",
+										"metadata": map[string]interface{}{
+											"name": "foo",
+										},
+									}),
+								},
+								"embedded-preserve": {
+									Type:                   "object",
+									XEmbeddedResource:      true,
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {
+											Type: "string",
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo":        "abc",
+										"apiVersion": "foo/v1",
+										"kind":       "v1",
+										"metadata": map[string]interface{}{
+											"name": "foo",
+										},
+										"bar": int64(42),
+									}),
+								},
+								"embedded-preserve-unpruned-objectmeta": {
+									Type:                   "object",
+									XEmbeddedResource:      true,
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {
+											Type: "string",
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo":        "abc",
+										"apiVersion": "foo/v1",
+										"kind":       "v1",
+										"metadata": map[string]interface{}{
+											"name":        "foo",
+											"unspecified": "bar",
+										},
+										"bar": int64(42),
+									}),
+								},
 							},
 						},
 					},
@@ -1697,6 +1929,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				// strict here, but want to encourage proper specifications by forbidding other defaults.
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[preserveUnknownFields]", "default"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[nestedProperties]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[embedded-preserve-unpruned-objectmeta]", "default"),
 			},
 
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
@@ -1735,6 +1968,412 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			errors: []validationMatch{
 				invalid("spec", "preserveUnknownFields"),
+			},
+			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "additionalProperties at resource root",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"embedded1": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{Type: "string"},
+									},
+								},
+								"embedded2": {
+									Type:                   "object",
+									XEmbeddedResource:      true,
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{Type: "string"},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded1]", "additionalProperties"),
+				required("spec", "validation", "openAPIV3Schema", "properties[embedded1]", "properties"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded2]", "additionalProperties"),
+			},
+			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "metadata defaults",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "v1",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1",
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"metadata": {
+											Type: "object",
+											// forbidden: no default for top-level metadata
+											Default: jsonPtr(map[string]interface{}{
+												"name": "foo",
+											}),
+										},
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"metadata": {
+													Type: "object",
+													Default: jsonPtr(map[string]interface{}{
+														"name": "foo",
+														// TODO: forbid unknown field under metadata
+														"unknown": int64(42),
+													}),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name:    "v2",
+							Served:  true,
+							Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"metadata": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type: "string",
+													// forbidden: no default in top-level metadata
+													Default: jsonPtr("foo"),
+												},
+											},
+										},
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"apiVersion": {
+													Type:    "string",
+													Default: jsonPtr("v1"),
+												},
+												"kind": {
+													Type:    "string",
+													Default: jsonPtr("Pod"),
+												},
+												"metadata": {
+													Type: "object",
+													Properties: map[string]apiextensions.JSONSchemaProps{
+														"name": {
+															Type:    "string",
+															Default: jsonPtr("foo"),
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name:    "v3",
+							Served:  true,
+							Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"apiVersion": {
+													Type:    "string",
+													Default: jsonPtr("v1"),
+												},
+												"kind": {
+													Type: "string",
+													// TODO: forbid non-validating nested values in metadata
+													Default: jsonPtr("%"),
+												},
+												"metadata": {
+													Type: "object",
+													Default: jsonPtr(map[string]interface{}{
+														"labels": map[string]interface{}{
+															// TODO: forbid non-validating nested field in meta
+															"bar": "x y",
+														},
+													}),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						{
+							Name:    "v4",
+							Served:  true,
+							Storage: false,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"metadata": {
+													Type: "object",
+													Properties: map[string]apiextensions.JSONSchemaProps{
+														"name": {
+															Type: "string",
+															// TODO: forbid wrongly typed nested fields in metadata
+															Default: jsonPtr("%"),
+														},
+														"labels": {
+															Type: "object",
+															Properties: map[string]apiextensions.JSONSchemaProps{
+																"bar": {
+																	Type: "string",
+																	// TODO: forbid non-validating nested fields in metadata
+																	Default: jsonPtr("x y"),
+																},
+															},
+														},
+														"annotations": {
+															Type: "object",
+															AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+																Schema: &apiextensions.JSONSchemaProps{
+																	Type: "string",
+																	// forbidden: no default under additionalProperties inside of metadata
+																	Default: jsonPtr("abc"),
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"v1"},
+				},
+			},
+			errors: []validationMatch{
+				// Forbidden: must not be set in top-level metadata
+				forbidden("spec", "versions[0]", "schema", "openAPIV3Schema", "properties[metadata]", "default"),
+				// Invalid value: map[string]interface {}{"name":"foo", "unknown":42}: must not have unknown fields
+				// TODO: invalid("spec", "versions[0]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "default"),
+
+				// Forbidden: must not be set in top-level metadata
+				forbidden("spec", "versions[1]", "schema", "openAPIV3Schema", "properties[metadata]", "properties[name]", "default"),
+
+				// Invalid value: "x y"
+				// TODO: invalid("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "default"),
+				// Invalid value: "%": kind: Invalid value: "%"
+				// TODO: invalid("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[kind]", "default"),
+
+				// Invalid value: "%"
+				// TODO: invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[labels]", "properties[bar]", "default"),
+				// Invalid value: "x y"
+				// TODO: invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[name]", "default"),
+				// Forbidden: must not be set inside additionalProperties applying to object metadata
+				forbidden("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[annotations]", "additionalProperties", "default"),
+			},
+			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "contradicting meta field types",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"apiVersion": {Type: "number"},
+								"kind":       {Type: "number"},
+								"metadata": {
+									Type: "number",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"name": {
+											Type:    "string",
+											Pattern: "abc",
+										},
+										"generateName": {
+											Type:    "string",
+											Pattern: "abc",
+										},
+										"generation": {
+											Type: "integer",
+										},
+									},
+								},
+								"valid": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {Type: "string"},
+										"kind":       {Type: "string"},
+										"metadata": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generateName": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generation": {
+													Type:    "integer",
+													Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+												},
+											},
+										},
+									},
+								},
+								"invalid": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {Type: "number"},
+										"kind":       {Type: "number"},
+										"metadata": {
+											Type: "number",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generateName": {
+													Type:    "string",
+													Pattern: "abc",
+												},
+												"generation": {
+													Type:    "integer",
+													Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+												},
+											},
+										},
+									},
+								},
+								"nested": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"invalid": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"apiVersion": {Type: "number"},
+												"kind":       {Type: "number"},
+												"metadata": {
+													Type: "number",
+													Properties: map[string]apiextensions.JSONSchemaProps{
+														"name": {
+															Type:    "string",
+															Pattern: "abc",
+														},
+														"generateName": {
+															Type:    "string",
+															Pattern: "abc",
+														},
+														"generation": {
+															Type:    "integer",
+															Minimum: float64Ptr(42.0), // does not make sense, but is allowed for nested ObjectMeta
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+								"noEmbeddedObject": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {Type: "number"},
+										"kind":       {Type: "number"},
+										"metadata":   {Type: "number"},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[metadata]"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[apiVersion]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[kind]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[metadata]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid]", "properties[apiVersion]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid]", "properties[kind]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid]", "properties[metadata]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[apiVersion]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[kind]", "type"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[nested]", "properties[invalid]", "properties[metadata]", "type"),
 			},
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
