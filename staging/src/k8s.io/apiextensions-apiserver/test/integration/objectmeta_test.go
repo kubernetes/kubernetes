@@ -301,20 +301,6 @@ properties:
       kind: Pod
       labels:
         foo: bar
-  invalidDefaults:
-    type: object
-    properties:
-      embedded:
-        type: object
-        x-kubernetes-embedded-resource: true
-        x-kubernetes-preserve-unknown-fields: true
-        default:
-          apiVersion: "foo/v1"
-          kind: "%"
-          metadata:
-            labels:
-              foo: bar
-              abc: "x y"
 `
 
 	embeddedResourceInstance = `
@@ -494,8 +480,6 @@ func TestEmbeddedResources(t *testing.T) {
 		` embeddedNested.metadata.name: Invalid value: ".."`,
 		` embeddedNested.embedded.kind: Invalid value: "%"`,
 		` embeddedNested.embedded.metadata.name: Invalid value: ".."`,
-		` invalidDefaults.embedded.kind: Invalid value: "%"`,
-		` invalidDefaults.embedded.metadata.labels: Invalid value: "x y"`,
 	}
 	for _, s := range invalidErrors {
 		if !strings.Contains(err.Error(), s) {

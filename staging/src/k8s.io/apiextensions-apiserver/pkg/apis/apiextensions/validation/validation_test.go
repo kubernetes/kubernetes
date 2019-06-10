@@ -1927,7 +1927,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 										"apiVersion": "foo/v1",
 										"kind":       "v1",
 										"metadata": map[string]interface{}{
-											"name":        "foo",
+											"name": "foo",
+											// allow: unknown fields under metadata are not rejected during CRD validation, but only pruned in storage creation
 											"unspecified": "bar",
 										},
 										"bar": int64(42),
@@ -1951,7 +1952,6 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				// strict here, but want to encourage proper specifications by forbidding other defaults.
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[preserveUnknownFields]", "default"),
 				invalid("spec", "validation", "openAPIV3Schema", "properties[e]", "properties[nestedProperties]", "default"),
-				invalid("spec", "validation", "openAPIV3Schema", "properties[embedded-preserve-unpruned-objectmeta]", "default"),
 			},
 
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
@@ -2044,7 +2044,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
-			name: "metadata defaults",
+			name: "old test for metadata defaults",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
 				Spec: apiextensions.CustomResourceDefinitionSpec{
@@ -2074,7 +2074,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 													Type: "object",
 													Default: jsonPtr(map[string]interface{}{
 														"name": "foo",
-														// TODO: forbid unknown field under metadata
+														// allowed because it is under ObjectMeta
 														"unknown": int64(42),
 													}),
 												},
@@ -2147,14 +2147,14 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 												},
 												"kind": {
 													Type: "string",
-													// TODO: forbid non-validating nested values in metadata
+													// invalid: non-validating value in TypeMeta
 													Default: jsonPtr("%"),
 												},
 												"metadata": {
 													Type: "object",
 													Default: jsonPtr(map[string]interface{}{
 														"labels": map[string]interface{}{
-															// TODO: forbid non-validating nested field in meta
+															// invalid: non-validating nested field in ObjectMeta
 															"bar": "x y",
 														},
 													}),
@@ -2182,16 +2182,16 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 													Properties: map[string]apiextensions.JSONSchemaProps{
 														"name": {
 															Type: "string",
-															// TODO: forbid wrongly typed nested fields in metadata
-															Default: jsonPtr("%"),
+															// invalid: wrongly typed nested fields in ObjectMeta
+															Default: jsonPtr(int64(42)),
 														},
 														"labels": {
 															Type: "object",
 															Properties: map[string]apiextensions.JSONSchemaProps{
 																"bar": {
 																	Type: "string",
-																	// TODO: forbid non-validating nested fields in metadata
-																	Default: jsonPtr("x y"),
+																	// invalid: wrong typed nested fields in ObjectMeta
+																	Default: jsonPtr(int64(42)),
 																},
 															},
 														},
@@ -2237,16 +2237,544 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 				forbidden("spec", "versions[1]", "schema", "openAPIV3Schema", "properties[metadata]", "properties[name]", "default"),
 
 				// Invalid value: "x y"
-				// TODO: invalid("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "default"),
+				invalid("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "default"),
 				// Invalid value: "%": kind: Invalid value: "%"
-				// TODO: invalid("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[kind]", "default"),
+				invalid("spec", "versions[2]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[kind]", "default"),
 
-				// Invalid value: "%"
-				// TODO: invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[labels]", "properties[bar]", "default"),
-				// Invalid value: "x y"
-				// TODO: invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[name]", "default"),
+				// Invalid value: wrongly typed
+				invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[labels]", "properties[bar]", "default"),
+				// Invalid value: wrongly typed
+				invalid("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[name]", "default"),
 				// Forbidden: must not be set inside additionalProperties applying to object metadata
 				forbidden("spec", "versions[3]", "schema", "openAPIV3Schema", "properties[embedded]", "properties[metadata]", "properties[annotations]", "additionalProperties", "default"),
+			},
+			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "metadata defaults",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "v1",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "v1",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"metadata": {
+									Type: "object",
+									// forbidden: no default for top-level metadata
+									Default: jsonPtr(map[string]interface{}{
+										"name": "foo",
+									}),
+								},
+								"embedded": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"metadata": {
+											Type: "object",
+											Default: jsonPtr(map[string]interface{}{
+												"name": "foo",
+											}),
+										},
+									},
+								},
+
+								"allowed-in-object-defaults": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {
+											Type:    "string",
+											Default: jsonPtr("v1"),
+										},
+										"kind": {
+											Type:    "string",
+											Default: jsonPtr("Pod"),
+										},
+										"metadata": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type:    "string",
+													Default: jsonPtr("foo"),
+												},
+											},
+											// allowed: unknown fields outside metadata
+											Default: jsonPtr(map[string]interface{}{
+												"unknown": int64(42),
+											}),
+										},
+									},
+								},
+								"allowed-object-defaults": {
+									Type:              "object",
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									XEmbeddedResource: true,
+									Default: jsonPtr(map[string]interface{}{
+										"apiVersion": "v1",
+										"kind":       "Pod",
+										"metadata": map[string]interface{}{
+											"name":    "foo",
+											"unknown": int64(42),
+										},
+									}),
+								},
+								"allowed-spanning-object-defaults": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"apiVersion": "v1",
+											"kind":       "Pod",
+											"metadata": map[string]interface{}{
+												"name":    "foo",
+												"unknown": int64(42),
+											},
+										},
+									}),
+								},
+
+								"unknown-field-object-defaults": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"apiVersion": "v1",
+										"kind":       "Pod",
+										"metadata": map[string]interface{}{
+											"name": "foo",
+											// allowed: unspecified field in ObjectMeta
+											"unknown": int64(42),
+										},
+										// forbidden: unspecified field
+										"unknown": int64(42),
+									}),
+								},
+								"unknown-field-spanning-object-defaults": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"apiVersion": "v1",
+											"kind":       "Pod",
+											"metadata": map[string]interface{}{
+												"name": "foo",
+												// allowed: unspecified field in ObjectMeta
+												"unknown": int64(42),
+											},
+											// forbidden: unspecified field
+											"unknown": int64(42),
+										},
+										// forbidden: unspecified field
+										"unknown": int64(42),
+									}),
+								},
+
+								"wrongly-typed-in-object-defaults": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"apiVersion": {
+											Type: "string",
+											// invalid: wrong type
+											Default: jsonPtr(int64(42)),
+										},
+										"kind": {
+											Type: "string",
+											// invalid: wrong type
+											Default: jsonPtr(int64(42)),
+										},
+										"metadata": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type: "string",
+													// invalid: wrong type
+													Default: jsonPtr(int64(42)),
+												},
+												"annotations": {
+													Type: "object",
+													AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+														Schema: &apiextensions.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+													// invalid: wrong type
+													Default: jsonPtr(int64(42)),
+												},
+											},
+										},
+									},
+								},
+								"wrongly-typed-object-defaults-apiVersion": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										// invalid: wrong type
+										"apiVersion": int64(42),
+									}),
+								},
+								"wrongly-typed-object-defaults-kind": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										// invalid: wrong type
+										"kind": int64(42),
+									}),
+								},
+								"wrongly-typed-object-defaults-name": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"metadata": map[string]interface{}{
+											// invalid: wrong type
+											"name": int64(42),
+										},
+									}),
+								},
+								"wrongly-typed-object-defaults-labels": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"metadata": map[string]interface{}{
+											"labels": map[string]interface{}{
+												// invalid: wrong type
+												"foo": int64(42),
+											},
+										},
+									}),
+								},
+								"wrongly-typed-object-defaults-annotations": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"metadata": map[string]interface{}{
+											// invalid: wrong type
+											"annotations": int64(42),
+										},
+									}),
+								},
+								"wrongly-typed-object-defaults-metadata": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										// invalid: wrong type
+										"metadata": int64(42),
+									}),
+								},
+
+								"wrongly-typed-spanning-object-defaults-apiVersion": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											// invalid: wrong type
+											"apiVersion": int64(42),
+										},
+									}),
+								},
+								"wrongly-typed-spanning-object-defaults-kind": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											// invalid: wrong type
+											"kind": int64(42),
+										},
+									}),
+								},
+								"wrongly-typed-spanning-object-defaults-name": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"metadata": map[string]interface{}{
+												"name": int64(42),
+											},
+										},
+									}),
+								},
+								"wrongly-typed-spanning-object-defaults-labels": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"metadata": map[string]interface{}{
+												"labels": map[string]interface{}{
+													// invalid: wrong type
+													"foo": int64(42),
+												},
+											},
+										},
+									}),
+								},
+								"wrongly-typed-spanning-object-defaults-annotations": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"metadata": map[string]interface{}{
+												// invalid: wrong type
+												"annotations": int64(42),
+											},
+										},
+									}),
+								},
+								"wrongly-typed-spanning-object-defaults-metadata": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"metadata": int64(42),
+										},
+									}),
+								},
+
+								"invalid-in-object-defaults": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"kind": {
+											Type: "string",
+											// invalid
+											Default: jsonPtr("%"),
+										},
+										"metadata": {
+											Type: "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{
+												"name": {
+													Type: "string",
+													// invalid
+													Default: jsonPtr("%"),
+												},
+												"labels": {
+													Type: "object",
+													AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+														Schema: &apiextensions.JSONSchemaProps{
+															Type: "string",
+														},
+													},
+													// invalid
+													Default: jsonPtr(map[string]interface{}{
+														"foo": "x y",
+													}),
+												},
+											},
+										},
+									},
+								},
+								"invalid-object-defaults-kind": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"apiVersion": "foo/v1",
+										// allowed: invalid, but coercing fine
+										"kind": "%",
+									}),
+								},
+								"invalid-object-defaults-name": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"apiVersion": "foo/v1",
+										"kind":       "Foo",
+										"metadata": map[string]interface{}{
+											// allowed: invalid, but coercing fine
+											"name": "%",
+										},
+									}),
+								},
+								"invalid-object-defaults-labels": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									Properties:        map[string]apiextensions.JSONSchemaProps{},
+									Default: jsonPtr(map[string]interface{}{
+										"apiVersion": "foo/v1",
+										"kind":       "Foo",
+										"metadata": map[string]interface{}{
+											"labels": map[string]interface{}{
+												// allowed: invalid, but coercing fine
+												"foo": "x y",
+											},
+										},
+									}),
+								},
+								"invalid-spanning-object-defaults-kind": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"apiVersion": "foo/v1",
+											// allowed: invalid, but coercing fine
+											"kind": "%",
+										},
+									}),
+								},
+								"invalid-spanning-object-defaults-name": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"apiVersion": "foo/v1",
+											"kind":       "Foo",
+											"metadata": map[string]interface{}{
+												// allowed: invalid, but coercing fine
+												"name": "%",
+											},
+										},
+									}),
+								},
+								"invalid-spanning-object-defaults-labels": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"embedded": {
+											Type:              "object",
+											XEmbeddedResource: true,
+											Properties:        map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"embedded": map[string]interface{}{
+											"apiVersion": "foo/v1",
+											"kind":       "Foo",
+											"metadata": map[string]interface{}{
+												"labels": map[string]interface{}{
+													// allowed: invalid, but coercing fine
+													"foo": "x y",
+												},
+											},
+										},
+									}),
+								},
+							},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"v1"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[metadata]", "default"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[unknown-field-object-defaults]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[unknown-field-spanning-object-defaults]", "default"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-in-object-defaults]", "properties[kind]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-in-object-defaults]", "properties[apiVersion]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-in-object-defaults]", "properties[metadata]", "properties[name]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-in-object-defaults]", "properties[metadata]", "properties[annotations]", "default"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-object-defaults-metadata]", "default", "metadata"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-object-defaults-apiVersion]", "default", "apiVersion"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-object-defaults-kind]", "default", "kind"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-object-defaults-name]", "default", "metadata"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-object-defaults-labels]", "default", "metadata"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-object-defaults-annotations]", "default", "metadata"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-spanning-object-defaults-metadata]", "default", "embedded", "metadata"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-spanning-object-defaults-apiVersion]", "default", "embedded", "apiVersion"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-spanning-object-defaults-kind]", "default", "embedded", "kind"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-spanning-object-defaults-name]", "default", "embedded", "metadata"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-spanning-object-defaults-labels]", "default", "embedded", "metadata"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[wrongly-typed-spanning-object-defaults-annotations]", "default", "embedded", "metadata"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-in-object-defaults]", "properties[metadata]", "properties[name]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-in-object-defaults]", "properties[metadata]", "properties[labels]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-in-object-defaults]", "properties[kind]", "default"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-object-defaults-kind]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-object-defaults-name]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-object-defaults-labels]", "default"),
+
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-spanning-object-defaults-kind]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-spanning-object-defaults-name]", "default"),
+				invalid("spec", "validation", "openAPIV3Schema", "properties[invalid-spanning-object-defaults-labels]", "default"),
 			},
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},

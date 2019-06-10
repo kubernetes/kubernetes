@@ -581,7 +581,7 @@ func ValidateCustomResourceColumnDefinition(col *apiextensions.CustomResourceCol
 
 // specStandardValidator applies validations for different OpenAPI specification versions.
 type specStandardValidator interface {
-	validate(spec *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList
+	validate(spec *apiextensions.JSONSchemaProps, fldPath *field.Path, defaultTester defaultTestObjectFunc) field.ErrorList
 	withForbiddenDefaults(reason string) specStandardValidator
 
 	// insideResourceMeta returns true when validating either TypeMeta or ObjectMeta, from an embedded resource or on the top-level.
@@ -633,7 +633,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 		openAPIV3Schema := &specStandardValidatorV3{
 			allowDefaults: opts.allowDefaults,
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema, fldPath.Child("openAPIV3Schema"), openAPIV3Schema, true, newObjectRootTestObject())...)
 
 		if mustBeStructural {
 			if ss, err := structuralschema.NewStructural(schema); err != nil {
@@ -656,17 +656,58 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 	return allErrs
 }
 
-var metaFields = sets.NewString("metadata", "apiVersion", "kind")
+// defaultTestObjectFunc is a closure returning a test object JSON blob, with the defaultValue plugged
+// in at the leaf. The passed object might be mutated.
+type defaultTestObjectFunc func(defaultValue interface{}) (map[string]interface{}, error)
+
+// newObjectRootTestObject returns a root closure of an object. The passed default value must be an object.
+func newObjectRootTestObject() defaultTestObjectFunc {
+	return func(defaultValue interface{}) (map[string]interface{}, error) {
+		obj, ok := defaultValue.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("object root default value must be of object type")
+		}
+
+		obj = runtime.DeepCopyJSON(obj)
+
+		if _, ok := obj["apiVersion"]; !ok {
+			obj["apiVersion"] = "validation/v1"
+		}
+		if _, ok := obj["kind"]; !ok {
+			obj["kind"] = "Validation"
+		}
+
+		return obj, nil
+	}
+}
+
+func (dtf defaultTestObjectFunc) Child(k string) defaultTestObjectFunc {
+	return func(defaultValue interface{}) (map[string]interface{}, error) {
+		return dtf(map[string]interface{}{
+			k: defaultValue,
+		})
+	}
+}
+
+func (dtf defaultTestObjectFunc) Index() defaultTestObjectFunc {
+	return func(defaultValue interface{}) (map[string]interface{}, error) {
+		return dtf([]interface{}{
+			defaultValue,
+		})
+	}
+}
+
+var metaFields = sets.NewString("metadata", "kind", "apiVersion")
 
 // ValidateCustomResourceDefinitionOpenAPISchema statically validates
-func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool) field.ErrorList {
+func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, ssv specStandardValidator, isRoot bool, defaultTester defaultTestObjectFunc) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
 		return allErrs
 	}
 
-	allErrs = append(allErrs, ssv.validate(schema, fldPath)...)
+	allErrs = append(allErrs, ssv.validate(schema, fldPath, defaultTester)...)
 
 	if schema.UniqueItems == true {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("uniqueItems"), "uniqueItems cannot be set to true since the runtime complexity becomes quadratic"))
@@ -694,61 +735,63 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			// we have to forbid defaults inside additionalProperties because pruning without actual value is ambiguous
 			subSsv = ssv.withForbiddenDefaults("inside additionalProperties applying to object metadata")
 		}
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.AdditionalProperties.Schema, fldPath.Child("additionalProperties"), subSsv, false, defaultTester.Child("*"))...)
 	}
 
 	if len(schema.Properties) != 0 {
 		for property, jsonSchema := range schema.Properties {
 			subSsv := ssv
+			subDefaultTester := defaultTester
 			if (isRoot || schema.XEmbeddedResource) && metaFields.Has(property) {
 				// we recurse into the schema that applies to ObjectMeta.
 				subSsv = ssv.withInsideResourceMeta()
+				subDefaultTester = newObjectRootTestObject()
 				if isRoot {
 					subSsv = subSsv.withForbiddenDefaults(fmt.Sprintf("in top-level %s", property))
 				}
 			}
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("properties").Key(property), subSsv, false, subDefaultTester.Child(property))...)
 		}
 	}
 
-	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false)...)
+	allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Not, fldPath.Child("not"), ssv, false, defaultTester)...)
 
 	if len(schema.AllOf) != 0 {
 		for i, jsonSchema := range schema.AllOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("allOf").Index(i), ssv, false, defaultTester)...)
 		}
 	}
 
 	if len(schema.OneOf) != 0 {
 		for i, jsonSchema := range schema.OneOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("oneOf").Index(i), ssv, false, defaultTester)...)
 		}
 	}
 
 	if len(schema.AnyOf) != 0 {
 		for i, jsonSchema := range schema.AnyOf {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("anyOf").Index(i), ssv, false, defaultTester)...)
 		}
 	}
 
 	if len(schema.Definitions) != 0 {
 		for definition, jsonSchema := range schema.Definitions {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("definitions").Key(definition), ssv, false, defaultTester)...)
 		}
 	}
 
 	if schema.Items != nil {
-		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv, false)...)
+		allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(schema.Items.Schema, fldPath.Child("items"), ssv, false, defaultTester.Index())...)
 		if len(schema.Items.JSONSchemas) != 0 {
 			for i, jsonSchema := range schema.Items.JSONSchemas {
-				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv, false)...)
+				allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(&jsonSchema, fldPath.Child("items").Index(i), ssv, false, defaultTester.Index())...)
 			}
 		}
 	}
 
 	if schema.Dependencies != nil {
 		for dependency, jsonSchemaPropsOrStringArray := range schema.Dependencies {
-			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false)...)
+			allErrs = append(allErrs, ValidateCustomResourceDefinitionOpenAPISchema(jsonSchemaPropsOrStringArray.Schema, fldPath.Child("dependencies").Key(dependency), ssv, false, defaultTester)...)
 		}
 	}
 
@@ -783,7 +826,7 @@ func (v *specStandardValidatorV3) insideResourceMeta() bool {
 }
 
 // validate validates against OpenAPI Schema v3.
-func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps, fldPath *field.Path) field.ErrorList {
+func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps, fldPath *field.Path, defaultTester defaultTestObjectFunc) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if schema == nil {
@@ -799,30 +842,43 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 			if s, err := structuralschema.NewStructural(schema); err == nil {
 				// ignore errors here locally. They will show up for the root of the schema.
 
-				clone := runtime.DeepCopyJSONValue(interface{}(*schema.Default))
-				if !v.isInsideResourceMeta {
-					// If we are under metadata, there are implicitly specified fields like kind, apiVersion, metadata, labels.
-					// We cannot prune as they are pruned as well. This allows more defaults than we would like to.
-					// TODO: be precise about pruning under metadata
-					pruning.Prune(clone, s, s.XEmbeddedResource)
-
-					// TODO: coerce correctly if we are not at the object root, but somewhere below.
-					if err := schemaobjectmeta.Coerce(fldPath, clone, s, s.XEmbeddedResource, false); err != nil {
-						allErrs = append(allErrs, err)
-					}
-
-					if !reflect.DeepEqual(clone, interface{}(*schema.Default)) {
-						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, "must not have unknown fields"))
-					} else if s.XEmbeddedResource {
-						// validate an embedded resource
-						schemaobjectmeta.Validate(fldPath, interface{}(*schema.Default), nil, true)
-					}
-				}
-
-				// validate the default value with user the provided schema.
 				validator := govalidate.NewSchemaValidator(s.ToGoOpenAPI(), nil, "", strfmt.Default)
 
-				allErrs = append(allErrs, apiservervalidation.ValidateCustomResource(fldPath.Child("default"), interface{}(*schema.Default), validator)...)
+				if v.isInsideResourceMeta && defaultTester == nil {
+					// this should never happen. But if it does, it's better to fail gracefully than panic
+					allErrs = append(allErrs, field.Forbidden(fldPath.Child("default"), "internal validation error"))
+				} else if v.isInsideResourceMeta {
+					// we are inside metadata. We have to construct a test object and plug in the default value to call the
+					// ObjectMeta coercion on it.
+					tester, err := defaultTester(runtime.DeepCopyJSONValue(interface{}(*schema.Default)))
+					if err != nil {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), interface{}(*schema.Default), err.Error()))
+					} else if err := schemaobjectmeta.Coerce(nil, tester, nil, true, false); err != nil {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), interface{}(*schema.Default), err.Error()))
+					} else if errs := schemaobjectmeta.Validate(nil, tester, nil, true); len(errs) > 0 {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), interface{}(*schema.Default), errs.ToAggregate().Error()))
+					} else if errs := apiservervalidation.ValidateCustomResource(fldPath.Child("default"), interface{}(*schema.Default), validator); len(errs) > 0 {
+						allErrs = append(allErrs, errs...)
+					}
+				} else {
+					// prune everything other than TypeMeta and ObjectMeta. ObjectMeta will be pruned during storage creation,
+					// but we have to ignore unpruned ObjectMeta values here for API backwards/forward compatibility.
+					pruned := runtime.DeepCopyJSONValue(interface{}(*schema.Default))
+					pruning.Prune(pruned, s, s.XEmbeddedResource)
+					if !reflect.DeepEqual(pruned, interface{}(*schema.Default)) {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), schema.Default, "must not have unknown fields"))
+					}
+
+					// check embedded ObjectMetas for correct types, but don't touch "pruned", i.e. don't prune ObjectMeta in "pruned"
+					coerced := runtime.DeepCopyJSONValue(pruned)
+					if err := schemaobjectmeta.Coerce(fldPath.Child("default"), coerced, s, s.XEmbeddedResource, false); err != nil {
+						allErrs = append(allErrs, err)
+					} else if errs := schemaobjectmeta.Validate(nil, interface{}(*schema.Default), s, s.XEmbeddedResource); len(errs) > 0 {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("default"), interface{}(*schema.Default), errs.ToAggregate().Error()))
+					} else if errs := apiservervalidation.ValidateCustomResource(fldPath.Child("default"), interface{}(*schema.Default), validator); len(errs) > 0 {
+						allErrs = append(allErrs, errs...)
+					}
+				}
 			}
 		} else {
 			detail := "must not be set"
