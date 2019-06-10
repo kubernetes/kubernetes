@@ -1797,6 +1797,56 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
+			name: "additionalProperties at resource root",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:    "group.com",
+					Version:  "version",
+					Versions: singleVersionList,
+					Scope:    apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"embedded1": {
+									Type:              "object",
+									XEmbeddedResource: true,
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{Type: "string"},
+									},
+								},
+								"embedded2": {
+									Type:                   "object",
+									XEmbeddedResource:      true,
+									XPreserveUnknownFields: pointer.BoolPtr(true),
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{Type: "string"},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded1]", "additionalProperties"),
+				required("spec", "validation", "openAPIV3Schema", "properties[embedded1]", "properties"),
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[embedded2]", "additionalProperties"),
+			},
+			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
 			name: "contradicting meta field types",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
