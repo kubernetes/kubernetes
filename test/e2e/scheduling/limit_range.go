@@ -41,7 +41,12 @@ const (
 var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
 
-	ginkgo.It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
+	/*
+		Release : v1.16
+		Testname: LimitRange: CRUD
+		Description: Ensure that LimitRange values are able to be applied, updated, deleted, and that this is observed by Pods.
+	*/
+	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {
 		ginkgo.By("Creating a LimitRange")
 
 		min := getResourceList("50m", "100Mi", "100Gi")
