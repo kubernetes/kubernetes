@@ -51,9 +51,6 @@ func (t *PersistentVolumeUpgradeTest) deleteGCEVolume(pvSource *v1.PersistentVol
 func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 
 	var err error
-	// TODO: generalize this to other providers
-	framework.SkipUnlessProviderIs("gce", "gke")
-
 	ns := f.Namespace.Name
 
 	ginkgo.By("Initializing PV source")
@@ -92,6 +89,12 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 	if len(errs) > 0 {
 		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
 	}
+}
+
+// Skip skips the test if running on a provider the test doesn't support.
+func (t *PersistentVolumeUpgradeTest) Skip(upgCtx upgrades.UpgradeContext) bool {
+	// TODO: generalize this to other providers
+	return !framework.ProviderIs("gce", "gke")
 }
 
 // testPod creates a pod that consumes a pv and prints it out. The output is then verified.
