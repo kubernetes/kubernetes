@@ -66,9 +66,10 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 					},
 					Containers: []v1.Container{
 						{
-							Name:  daemonSetName,
-							Image: image,
-							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
+							Name:            daemonSetName,
+							Image:           image,
+							Ports:           []v1.ContainerPort{{ContainerPort: 9376}},
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},
