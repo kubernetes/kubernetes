@@ -313,13 +313,12 @@ func checkForNetDev(options []string) bool {
 // Plan to work on better approach to solve this issue.
 
 func HasMountRefs(mountPath string, mountRefs []string) bool {
-	count := 0
 	for _, ref := range mountRefs {
 		if !strings.Contains(ref, mountPath) {
-			count = count + 1
+			return true
 		}
 	}
-	return count > 0
+	return false
 }
 
 // PathWithinBase checks if give path is within given base directory.
