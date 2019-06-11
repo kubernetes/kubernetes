@@ -72,4 +72,7 @@ type VMSet interface {
 
 	// GetPowerStatusByNodeName returns the power state of the specified node.
 	GetPowerStatusByNodeName(name string) (string, error)
+
+	// GetPrivateIPsByNodeName returns a slice of all private ips assigned to node (ipv6 and ipv4)
+	GetPrivateIPsByNodeName(name string) ([]string, error)
 }

@@ -335,6 +335,30 @@ func (ss *scaleSet) GetIPByNodeName(nodeName string) (string, string, error) {
 	return internalIP, publicIP, nil
 }
 
+// returns a list of private ips assigned to node
+// TODO (khenidak): This should read all nics, not just the primary
+// allowing users to split ipv4/v6 on multiple nics
+func (ss *scaleSet) GetPrivateIPsByNodeName(nodeName string) ([]string, error) {
+	ips := make([]string, 0)
+	nic, err := ss.GetPrimaryInterface(nodeName)
+	if err != nil {
+		klog.Errorf("error: ss.GetIPByNodeName(%s), GetPrimaryInterface(%q), err=%v", nodeName, nodeName, err)
+		return ips, err
+	}
+
+	if nic.IPConfigurations == nil {
+		return ips, fmt.Errorf("nic.IPConfigurations for nic (nicname=%q) is nil", *nic.Name)
+	}
+
+	for _, ipConfig := range *(nic.IPConfigurations) {
+		if ipConfig.PrivateIPAddress != nil {
+			ips = append(ips, *(ipConfig.PrivateIPAddress))
+		}
+	}
+
+	return ips, nil
+}
+
 // This returns the full identifier of the primary NIC for the given VM.
 func (ss *scaleSet) getPrimaryInterfaceID(machine compute.VirtualMachineScaleSetVM) (string, error) {
 	if len(*machine.NetworkProfile.NetworkInterfaces) == 1 {

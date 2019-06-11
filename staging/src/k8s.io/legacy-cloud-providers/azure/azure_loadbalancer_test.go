@@ -175,7 +175,7 @@ func TestFindRule(t *testing.T) {
 				{
 					Name: to.StringPtr("probe1"),
 					LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
-						LoadDistribution: network.Default,
+						LoadDistribution: network.SourceIP,
 					},
 				},
 			},
