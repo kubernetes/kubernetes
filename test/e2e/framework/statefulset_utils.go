@@ -807,9 +807,10 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:         "nginx",
-							Image:        imageutils.GetE2EImage(imageutils.Nginx),
-							VolumeMounts: mounts,
+							Name:            "nginx",
+							Image:           imageutils.GetE2EImage(imageutils.Nginx),
+							VolumeMounts:    mounts,
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 					Volumes: vols,

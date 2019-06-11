@@ -148,8 +148,9 @@ func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  imageName,
-							Image: image,
+							Name:            imageName,
+							Image:           image,
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},
