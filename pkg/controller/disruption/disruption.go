@@ -136,9 +136,9 @@ func NewDisruptionController(
 
 	pdbInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    dc.addDb,
-			UpdateFunc: dc.updateDb,
-			DeleteFunc: dc.removeDb,
+			AddFunc:    dc.addPdb,
+			UpdateFunc: dc.updatePdb,
+			DeleteFunc: dc.removePdb,
 		},
 		30*time.Second,
 	)
@@ -302,20 +302,20 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (dc *DisruptionController) addDb(obj interface{}) {
+func (dc *DisruptionController) addPdb(obj interface{}) {
 	pdb := obj.(*policy.PodDisruptionBudget)
 	klog.V(4).Infof("add DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
 
-func (dc *DisruptionController) updateDb(old, cur interface{}) {
+func (dc *DisruptionController) updatePdb(old, cur interface{}) {
 	// TODO(mml) ignore updates where 'old' is equivalent to 'cur'.
 	pdb := cur.(*policy.PodDisruptionBudget)
 	klog.V(4).Infof("update DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
 
-func (dc *DisruptionController) removeDb(obj interface{}) {
+func (dc *DisruptionController) removePdb(obj interface{}) {
 	pdb := obj.(*policy.PodDisruptionBudget)
 	klog.V(4).Infof("remove DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
