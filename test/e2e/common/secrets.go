@@ -25,10 +25,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
-var _ = Describe("[sig-api-machinery] Secrets", func() {
+var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	/*
@@ -40,7 +40,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
-		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
+		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
@@ -88,7 +88,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
-		By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
+		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
@@ -161,6 +161,6 @@ func createEmptyKeySecretForTest(f *framework.Framework) (*v1.Secret, error) {
 			"": []byte("value-1\n"),
 		},
 	}
-	By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
+	ginkgo.By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
 	return f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
 }

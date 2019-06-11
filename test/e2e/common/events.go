@@ -30,8 +30,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 type Action func() error
@@ -64,7 +64,7 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				n, ok := newObj.(*v1.Node)
-				Expect(ok).To(Equal(true))
+				gomega.Expect(ok).To(gomega.Equal(true))
 				if nodePredicate(n) {
 					observedMatchingNode = true
 				}
@@ -120,8 +120,8 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				e, ok := obj.(*v1.Event)
-				By(fmt.Sprintf("Considering event: \nType = [%s], Name = [%s], Reason = [%s], Message = [%s]", e.Type, e.Name, e.Reason, e.Message))
-				Expect(ok).To(Equal(true))
+				ginkgo.By(fmt.Sprintf("Considering event: \nType = [%s], Name = [%s], Reason = [%s], Message = [%s]", e.Type, e.Name, e.Reason, e.Message))
+				gomega.Expect(ok).To(gomega.Equal(true))
 				if ok && eventPredicate(e) {
 					observedMatchingEvent = true
 				}

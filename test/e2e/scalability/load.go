@@ -54,8 +54,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -102,7 +102,7 @@ var _ = SIGDescribe("Load capacity", func() {
 
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
@@ -118,7 +118,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			summaries = append(summaries, metrics)
 			summaries = append(summaries, testPhaseDurations)
 			framework.PrintSummaries(summaries, testCaseBaseName)
-			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+			gomega.Expect(highLatencyRequests).NotTo(gomega.BeNumerically(">", 0), "There should be no high-latency requests")
 		}
 	})
 
@@ -141,14 +141,14 @@ var _ = SIGDescribe("Load capacity", func() {
 	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		testPhaseDurations = timer.NewTestPhaseTimer()
 		clientset = f.ClientSet
 
 		ns = f.Namespace.Name
 		nodes := framework.GetReadySchedulableNodesOrDie(clientset)
 		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
+		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
@@ -219,7 +219,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		itArg := testArg
 		itArg.services = os.Getenv("CREATE_SERVICES") != "false"
 
-		It(name, func() {
+		ginkgo.It(name, func() {
 			// Create a number of namespaces.
 			namespaceCount := (nodeCount + nodeCountPerNamespace - 1) / nodeCountPerNamespace
 			namespaces, err := CreateNamespaces(f, namespaceCount, fmt.Sprintf("load-%v-nodepods", itArg.podsPerNode), testPhaseDurations.StartPhase(110, "namespace creation"))
@@ -240,7 +240,7 @@ var _ = SIGDescribe("Load capacity", func() {
 				e2elog.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
-					defer GinkgoRecover()
+					defer ginkgo.GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
 				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
@@ -250,7 +250,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					defer serviceCleanupPhase.End()
 					e2elog.Logf("Starting to delete services...")
 					deleteService := func(i int) {
-						defer GinkgoRecover()
+						defer ginkgo.GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
 					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
@@ -318,7 +318,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
 
 			createAllResources(configs, creatingTime, testPhaseDurations.StartPhase(200, "load pods creation"))
-			By("============================================================================")
+			ginkgo.By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
 			// to make it possible to create/schedule & delete them in the meantime.
@@ -329,7 +329,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
 			e2elog.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
-			By("============================================================================")
+			ginkgo.By("============================================================================")
 
 			// Cleanup all created replication controllers.
 			// Currently we assume <throughput> pods/second average deletion throughput.
@@ -643,7 +643,7 @@ func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.D
 }
 
 func createResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, creatingTime time.Duration) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(creatingTime)
@@ -663,7 +663,7 @@ func scaleAllResources(configs []testutils.RunObjectConfig, scalingTime time.Dur
 // Scales RC to a random size within [0.5*size, 1.5*size] and lists all the pods afterwards.
 // Scaling happens always based on original size, not the current size.
 func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scalingTime time.Duration) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(scalingTime)
@@ -711,7 +711,7 @@ func deleteAllResources(configs []testutils.RunObjectConfig, deletingTime time.D
 }
 
 func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deletingTime time.Duration) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)

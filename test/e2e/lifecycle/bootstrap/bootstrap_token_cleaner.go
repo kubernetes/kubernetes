@@ -19,7 +19,7 @@ package bootstrap
 import (
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,20 +35,20 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 	f := framework.NewDefaultFramework("bootstrap-token-cleaner")
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 	})
 
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		if len(secretNeedClean) > 0 {
-			By("delete the bootstrap token secret")
+			ginkgo.By("delete the bootstrap token secret")
 			err := c.CoreV1().Secrets(metav1.NamespaceSystem).Delete(secretNeedClean, &metav1.DeleteOptions{})
 			secretNeedClean = ""
 			framework.ExpectNoError(err)
 		}
 	})
-	It("should delete the token secret when the secret expired", func() {
-		By("create a new expired bootstrap token secret")
+	ginkgo.It("should delete the token secret when the secret expired", func() {
+		ginkgo.By("create a new expired bootstrap token secret")
 		tokenId, err := GenerateTokenId()
 		framework.ExpectNoError(err)
 		tokenSecret, err := GenerateTokenSecret()
@@ -60,13 +60,13 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 
 		framework.ExpectNoError(err)
 
-		By("wait for the bootstrap token secret be deleted")
+		ginkgo.By("wait for the bootstrap token secret be deleted")
 		err = WaitForBootstrapTokenSecretToDisappear(c, tokenId)
 		framework.ExpectNoError(err)
 	})
 
-	It("should not delete the token secret when the secret is not expired", func() {
-		By("create a new expired bootstrap token secret")
+	ginkgo.It("should not delete the token secret when the secret is not expired", func() {
+		ginkgo.By("create a new expired bootstrap token secret")
 		tokenId, err := GenerateTokenId()
 		framework.ExpectNoError(err)
 		tokenSecret, err := GenerateTokenSecret()
@@ -77,7 +77,7 @@ var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {
 		secretNeedClean = bootstrapapi.BootstrapTokenSecretPrefix + tokenId
 		framework.ExpectNoError(err)
 
-		By("wait for the bootstrap token secret not be deleted")
+		ginkgo.By("wait for the bootstrap token secret not be deleted")
 		err = WaitForBootstrapTokenSecretNotDisappear(c, tokenId, 20*time.Second)
 		framework.ExpectNoError(err)
 	})

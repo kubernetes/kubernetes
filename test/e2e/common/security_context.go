@@ -30,18 +30,18 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	var podClient *framework.PodClient
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
 
-	Context("When creating a container with runAsUser", func() {
+	ginkgo.Context("When creating a container with runAsUser", func() {
 		makeUserPod := func(podName, image string, command []string, userid int64) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -90,12 +90,12 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			This e2e can not be promoted to Conformance because a Conformant platform may not allow to run containers with 'uid 0' or running privileged operations.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(0)
 		})
 	})
 
-	Context("When creating a container with runAsNonRoot", func() {
+	ginkgo.Context("When creating a container with runAsNonRoot", func() {
 		rootImage := imageutils.GetE2EImage(imageutils.BusyBox)
 		nonRootImage := imageutils.GetE2EImage(imageutils.NonRoot)
 		makeNonRootPod := func(podName, image string, userid *int64) *v1.Pod {
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			}
 		}
 
-		It("should run with an explicit non-root user ID", func() {
+		ginkgo.It("should run with an explicit non-root user ID", func() {
 			name := "explicit-nonroot-uid"
 			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(1234))
 			pod = podClient.Create(pod)
@@ -128,17 +128,17 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
 		})
-		It("should not run with an explicit root user ID", func() {
+		ginkgo.It("should not run with an explicit root user ID", func() {
 			name := "explicit-root-uid"
 			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
 			pod = podClient.Create(pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
 			framework.ExpectNoError(err)
-			Expect(ev).NotTo(BeNil())
-			Expect(ev.Reason).To(Equal(events.FailedToCreateContainer))
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
-		It("should run with an image specified user ID", func() {
+		ginkgo.It("should run with an image specified user ID", func() {
 			name := "implicit-nonroot-uid"
 			pod := makeNonRootPod(name, nonRootImage, nil)
 			pod = podClient.Create(pod)
@@ -146,19 +146,19 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podClient.WaitForSuccess(name, framework.PodStartTimeout)
 			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
 		})
-		It("should not run without a specified user ID", func() {
+		ginkgo.It("should not run without a specified user ID", func() {
 			name := "implicit-root-uid"
 			pod := makeNonRootPod(name, rootImage, nil)
 			pod = podClient.Create(pod)
 
 			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
 			framework.ExpectNoError(err)
-			Expect(ev).NotTo(BeNil())
-			Expect(ev.Reason).To(Equal(events.FailedToCreateContainer))
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
 		})
 	})
 
-	Context("When creating a pod with readOnlyRootFilesystem", func() {
+	ginkgo.Context("When creating a pod with readOnlyRootFilesystem", func() {
 		makeUserPod := func(podName, image string, command []string, readOnlyRootFilesystem bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			At this moment we are not considering this test for Conformance due to use of SecurityContext.
 			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(true)
 		})
 
@@ -219,7 +219,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
-	Context("When creating a pod with privileged", func() {
+	ginkgo.Context("When creating a pod with privileged", func() {
 		makeUserPod := func(podName, image string, command []string, privileged bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -270,7 +270,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		})
 	})
 
-	Context("when creating containers with AllowPrivilegeEscalation", func() {
+	ginkgo.Context("when creating containers with AllowPrivilegeEscalation", func() {
 		makeAllowPrivilegeEscalationPod := func(podName string, allowPrivilegeEscalation *bool, uid int64) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -309,7 +309,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and not all conformant platforms will require this behavior.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
@@ -341,7 +341,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and runtime may not allow to run.
 			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {

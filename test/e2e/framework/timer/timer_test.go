@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 )
 
 var currentTime time.Time
@@ -40,7 +40,7 @@ func testUsageWithDefer(timer *TestPhaseTimer) {
 }
 
 func TestTimer(t *testing.T) {
-	RegisterTestingT(t)
+	gomega.RegisterTestingT(t)
 
 	timer := NewTestPhaseTimer()
 	setCurrentTimeSinceEpoch(1 * time.Second)
@@ -48,7 +48,7 @@ func TestTimer(t *testing.T) {
 	setCurrentTimeSinceEpoch(3 * time.Second)
 	testUsageWithDefer(timer)
 
-	Expect(timer.PrintJSON()).To(MatchJSON(`{
+	gomega.Expect(timer.PrintJSON()).To(gomega.MatchJSON(`{
 		"version": "v1",
 		"dataItems": [
 			{
@@ -64,14 +64,14 @@ func TestTimer(t *testing.T) {
 			}
 		]
 	}`))
-	Expect(timer.PrintHumanReadable()).To(Equal(`Phase 001-one: 5.5s so far
+	gomega.Expect(timer.PrintHumanReadable()).To(gomega.Equal(`Phase 001-one: 5.5s so far
 Phase 033-two: 3.5s
 `))
 
 	setCurrentTimeSinceEpoch(7*time.Second + 500*time.Millisecond)
 	phaseOne.End()
 
-	Expect(timer.PrintJSON()).To(MatchJSON(`{
+	gomega.Expect(timer.PrintJSON()).To(gomega.MatchJSON(`{
 		"version": "v1",
 		"dataItems": [
 			{
@@ -86,7 +86,7 @@ Phase 033-two: 3.5s
 			}
 		]
 	}`))
-	Expect(timer.PrintHumanReadable()).To(Equal(`Phase 001-one: 6.5s
+	gomega.Expect(timer.PrintHumanReadable()).To(gomega.Equal(`Phase 001-one: 6.5s
 Phase 033-two: 3.5s
 `))
 }
