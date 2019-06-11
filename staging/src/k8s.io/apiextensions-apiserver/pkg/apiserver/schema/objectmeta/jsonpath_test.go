@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package objectmeta
 
 import (
 	"bytes"
@@ -28,10 +28,10 @@ type (
 		index *int
 		field string
 	}
-	JsonPath []jsonPathNode
+	JSONPath []jsonPathNode
 )
 
-func (p JsonPath) String() string {
+func (p JSONPath) String() string {
 	var buf bytes.Buffer
 	for _, n := range p {
 		if n.index == nil {
@@ -43,8 +43,8 @@ func (p JsonPath) String() string {
 	return buf.String()
 }
 
-func jsonPaths(base JsonPath, j map[string]interface{}) []JsonPath {
-	res := make([]JsonPath, 0, len(j))
+func jsonPaths(base JSONPath, j map[string]interface{}) []JSONPath {
+	res := make([]JSONPath, 0, len(j))
 	for k, old := range j {
 		kPth := append(append([]jsonPathNode(nil), base...), jsonPathNode{field: k})
 		res = append(res, kPth)
@@ -59,8 +59,8 @@ func jsonPaths(base JsonPath, j map[string]interface{}) []JsonPath {
 	return res
 }
 
-func jsonIterSlice(base JsonPath, j []interface{}) []JsonPath {
-	res := make([]JsonPath, 0, len(j))
+func jsonIterSlice(base JSONPath, j []interface{}) []JSONPath {
+	res := make([]JSONPath, 0, len(j))
 	for i, old := range j {
 		index := i
 		iPth := append(append([]jsonPathNode(nil), base...), jsonPathNode{index: &index})
@@ -76,7 +76,7 @@ func jsonIterSlice(base JsonPath, j []interface{}) []JsonPath {
 	return res
 }
 
-func JsonPathValue(j map[string]interface{}, pth JsonPath, base int) (interface{}, error) {
+func JSONPathValue(j map[string]interface{}, pth JSONPath, base int) (interface{}, error) {
 	if len(pth) == base {
 		return nil, fmt.Errorf("empty json path is invalid for object")
 	}
@@ -92,7 +92,7 @@ func JsonPathValue(j map[string]interface{}, pth JsonPath, base int) (interface{
 	}
 	switch field := field.(type) {
 	case map[string]interface{}:
-		return JsonPathValue(field, pth, base+1)
+		return JSONPathValue(field, pth, base+1)
 	case []interface{}:
 		return jsonPathValueSlice(field, pth, base+1)
 	default:
@@ -100,7 +100,7 @@ func JsonPathValue(j map[string]interface{}, pth JsonPath, base int) (interface{
 	}
 }
 
-func jsonPathValueSlice(j []interface{}, pth JsonPath, base int) (interface{}, error) {
+func jsonPathValueSlice(j []interface{}, pth JSONPath, base int) (interface{}, error) {
 	if len(pth) == base {
 		return nil, fmt.Errorf("empty json path %q is invalid for object", pth)
 	}
@@ -115,7 +115,7 @@ func jsonPathValueSlice(j []interface{}, pth JsonPath, base int) (interface{}, e
 	}
 	switch item := j[*pth[base].index].(type) {
 	case map[string]interface{}:
-		return JsonPathValue(item, pth, base+1)
+		return JSONPathValue(item, pth, base+1)
 	case []interface{}:
 		return jsonPathValueSlice(item, pth, base+1)
 	default:
@@ -123,7 +123,7 @@ func jsonPathValueSlice(j []interface{}, pth JsonPath, base int) (interface{}, e
 	}
 }
 
-func SetJsonPath(j map[string]interface{}, pth JsonPath, base int, value interface{}) error {
+func SetJSONPath(j map[string]interface{}, pth JSONPath, base int, value interface{}) error {
 	if len(pth) == base {
 		return fmt.Errorf("empty json path is invalid for object")
 	}
@@ -140,15 +140,15 @@ func SetJsonPath(j map[string]interface{}, pth JsonPath, base int, value interfa
 	}
 	switch field := field.(type) {
 	case map[string]interface{}:
-		return SetJsonPath(field, pth, base+1, value)
+		return SetJSONPath(field, pth, base+1, value)
 	case []interface{}:
-		return setJsonPathSlice(field, pth, base+1, value)
+		return setJSONPathSlice(field, pth, base+1, value)
 	default:
 		return fmt.Errorf("invalid non-terminal json path %q for field", pth[:base+1])
 	}
 }
 
-func setJsonPathSlice(j []interface{}, pth JsonPath, base int, value interface{}) error {
+func setJSONPathSlice(j []interface{}, pth JSONPath, base int, value interface{}) error {
 	if len(pth) == base {
 		return fmt.Errorf("empty json path %q is invalid for object", pth)
 	}
@@ -164,15 +164,15 @@ func setJsonPathSlice(j []interface{}, pth JsonPath, base int, value interface{}
 	}
 	switch item := j[*pth[base].index].(type) {
 	case map[string]interface{}:
-		return SetJsonPath(item, pth, base+1, value)
+		return SetJSONPath(item, pth, base+1, value)
 	case []interface{}:
-		return setJsonPathSlice(item, pth, base+1, value)
+		return setJSONPathSlice(item, pth, base+1, value)
 	default:
 		return fmt.Errorf("invalid non-terminal json path %q for index", pth[:base+1])
 	}
 }
 
-func DeleteJsonPath(j map[string]interface{}, pth JsonPath, base int) error {
+func DeleteJSONPath(j map[string]interface{}, pth JSONPath, base int) error {
 	if len(pth) == base {
 		return fmt.Errorf("empty json path is invalid for object")
 	}
@@ -189,7 +189,7 @@ func DeleteJsonPath(j map[string]interface{}, pth JsonPath, base int) error {
 	}
 	switch field := field.(type) {
 	case map[string]interface{}:
-		return DeleteJsonPath(field, pth, base+1)
+		return DeleteJSONPath(field, pth, base+1)
 	case []interface{}:
 		if len(pth) == base+2 {
 			if pth[base+1].index == nil {
@@ -198,13 +198,13 @@ func DeleteJsonPath(j map[string]interface{}, pth JsonPath, base int) error {
 			j[pth[base].field] = append(field[:*pth[base+1].index], field[*pth[base+1].index+1:]...)
 			return nil
 		}
-		return deleteJsonPathSlice(field, pth, base+1)
+		return deleteJSONPathSlice(field, pth, base+1)
 	default:
 		return fmt.Errorf("invalid non-terminal json path %q for field", pth[:base+1])
 	}
 }
 
-func deleteJsonPathSlice(j []interface{}, pth JsonPath, base int) error {
+func deleteJSONPathSlice(j []interface{}, pth JSONPath, base int) error {
 	if len(pth) == base {
 		return fmt.Errorf("empty json path %q is invalid for object", pth)
 	}
@@ -219,7 +219,7 @@ func deleteJsonPathSlice(j []interface{}, pth JsonPath, base int) error {
 	}
 	switch item := j[*pth[base].index].(type) {
 	case map[string]interface{}:
-		return DeleteJsonPath(item, pth, base+1)
+		return DeleteJSONPath(item, pth, base+1)
 	case []interface{}:
 		if len(pth) == base+2 {
 			if pth[base+1].index == nil {
@@ -228,7 +228,7 @@ func deleteJsonPathSlice(j []interface{}, pth JsonPath, base int) error {
 			j[*pth[base].index] = append(item[:*pth[base+1].index], item[*pth[base+1].index+1:])
 			return nil
 		}
-		return deleteJsonPathSlice(item, pth, base+1)
+		return deleteJSONPathSlice(item, pth, base+1)
 	default:
 		return fmt.Errorf("invalid non-terminal json path %q for index", pth[:base+1])
 	}

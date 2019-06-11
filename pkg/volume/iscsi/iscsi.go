@@ -235,6 +235,14 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 	if err != nil {
 		return nil, err
 	}
+	arr := strings.Split(device, "-lun-")
+	if len(arr) < 2 {
+		return nil, fmt.Errorf("failed to retrieve lun from globalPDPath: %v", globalPDPath)
+	}
+	lun, err := strconv.Atoi(arr[1])
+	if err != nil {
+		return nil, err
+	}
 	iface, _ := extractIface(globalPDPath)
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,
@@ -242,6 +250,7 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 			ISCSI: &v1.ISCSIVolumeSource{
 				TargetPortal:   bkpPortal,
 				IQN:            iqn,
+				Lun:            int32(lun),
 				ISCSIInterface: iface,
 			},
 		},

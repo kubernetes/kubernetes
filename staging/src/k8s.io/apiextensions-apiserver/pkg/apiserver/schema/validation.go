@@ -108,6 +108,8 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 
 	allErrs = append(allErrs, validateValueValidation(s.ValueValidation, skipAnyOf, skipFirstAllOfAnyOf, lvl, fldPath)...)
 
+	checkMetadata := (lvl == rootLevel) || s.XEmbeddedResource
+
 	if s.XEmbeddedResource && s.Type != "object" {
 		if len(s.Type) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be object if x-kubernetes-embedded-resource is true"))
@@ -124,12 +126,30 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty for specified object fields"))
 		}
 	}
+	if s.XEmbeddedResource && s.AdditionalProperties != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("additionalProperties"), "must not be used if x-kubernetes-embedded-resource is set"))
+	}
 
 	if lvl == rootLevel && len(s.Type) > 0 && s.Type != "object" {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), s.Type, "must be object at the root"))
 	}
 
 	// restrict metadata schemas to name and generateName only
+	if kind, found := s.Properties["kind"]; found && checkMetadata {
+		if kind.Type != "string" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("kind").Child("type"), kind.Type, "must be string"))
+		}
+	}
+	if apiVersion, found := s.Properties["apiVersion"]; found && checkMetadata {
+		if apiVersion.Type != "string" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("apiVersion").Child("type"), apiVersion.Type, "must be string"))
+		}
+	}
+	if metadata, found := s.Properties["metadata"]; found && checkMetadata {
+		if metadata.Type != "object" {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("metadata").Child("type"), metadata.Type, "must be object"))
+		}
+	}
 	if metadata, found := s.Properties["metadata"]; found && lvl == rootLevel {
 		// metadata is a shallow copy. We can mutate it.
 		_, foundName := metadata.Properties["name"]
@@ -140,6 +160,7 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 			metadata.Properties = nil
 		}
 		metadata.Type = ""
+		metadata.Default.Object = nil // this is checked in API validation (and also tested)
 		if metadata.ValueValidation == nil {
 			metadata.ValueValidation = &ValueValidation{}
 		}
