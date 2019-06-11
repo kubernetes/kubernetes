@@ -185,17 +185,17 @@ func (o *CopyOptions) Run(args []string) error {
 	}
 
 	if len(srcSpec.PodName) != 0 && len(destSpec.PodName) != 0 {
-		if _, err := os.Stat(args[0]); err == nil {
-			return o.copyToPod(fileSpec{File: args[0]}, destSpec, &exec.ExecOptions{})
-		}
-		return fmt.Errorf("src doesn't exist in local filesystem")
+		return fmt.Errorf("one of src or dest must be a local file, cannot copy from pod to pod")
 	}
 
 	if len(srcSpec.PodName) != 0 {
 		return o.copyFromPod(srcSpec, destSpec)
 	}
 	if len(destSpec.PodName) != 0 {
-		return o.copyToPod(srcSpec, destSpec, &exec.ExecOptions{})
+		if _, err := os.Stat(args[0]); err == nil {
+			return o.copyToPod(fileSpec{File: args[0]}, destSpec, &exec.ExecOptions{})
+		}
+		return fmt.Errorf("src doesn't exist in local filesystem")
 	}
 	return fmt.Errorf("one of src or dest must be a remote file specification")
 }
