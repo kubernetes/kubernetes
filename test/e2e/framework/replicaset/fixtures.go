@@ -18,7 +18,7 @@ package replicaset
 
 import (
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,8 +45,9 @@ func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  imageName,
-							Image: image,
+							Name:            imageName,
+							Image:           image,
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},
