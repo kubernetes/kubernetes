@@ -64,6 +64,9 @@ var (
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
+		# Copy /tmp/foo* files from a remote pod to /tmp/bar locally
+		kubectl cp <some-namespace>/<some-pod>:/tmp/foo* /tmp/bar
+
 		# Copy /tmp/foo from a remote pod to /tmp/bar locally
 		kubectl cp <some-namespace>/<some-pod>:/tmp/foo /tmp/bar`))
 
@@ -307,7 +310,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		},
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
+		Command:  []string{"sh", "-c", fmt.Sprintf("tar cf - %s", src.File)},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
@@ -321,6 +324,10 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
 	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix = stripPathShortcuts(prefix)
+	prefix = filepath.Dir(prefix)
+	if prefix == "." {
+		prefix = ""
+	}
 	return o.untarAll(src, reader, dest.File, prefix)
 }
 
