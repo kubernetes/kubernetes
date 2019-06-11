@@ -174,6 +174,8 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 				return false, nil
 			}
 
+			someReconciliationFailed := false
+
 			// ensure bootstrap roles are created or reconciled
 			for _, clusterRole := range p.ClusterRoles {
 				opts := reconciliation.ReconcileRoleOptions{
@@ -199,6 +201,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 				if err != nil {
 					// don't fail on failures, try to create as many as you can
 					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrole.%s/%s: %v", rbac.GroupName, clusterRole.Name, err))
+					someReconciliationFailed = true
 				}
 			}
 
@@ -229,6 +232,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 				if err != nil {
 					// don't fail on failures, try to create as many as you can
 					utilruntime.HandleError(fmt.Errorf("unable to reconcile clusterrolebinding.%s/%s: %v", rbac.GroupName, clusterRoleBinding.Name, err))
+					someReconciliationFailed = true
 				}
 			}
 
@@ -258,6 +262,7 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					if err != nil {
 						// don't fail on failures, try to create as many as you can
 						utilruntime.HandleError(fmt.Errorf("unable to reconcile role.%s/%s in %v: %v", rbac.GroupName, role.Name, namespace, err))
+						someReconciliationFailed = true
 					}
 				}
 			}
@@ -290,11 +295,12 @@ func (p *PolicyData) EnsureRBACPolicy() genericapiserver.PostStartHookFunc {
 					if err != nil {
 						// don't fail on failures, try to create as many as you can
 						utilruntime.HandleError(fmt.Errorf("unable to reconcile rolebinding.%s/%s in %v: %v", rbac.GroupName, roleBinding.Name, namespace, err))
+						someReconciliationFailed = true
 					}
 				}
 			}
 
-			return true, nil
+			return !someReconciliationFailed, nil
 		})
 		// if we're never able to make it through initialization, kill the API server
 		if err != nil {
