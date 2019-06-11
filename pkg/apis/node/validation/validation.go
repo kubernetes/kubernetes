@@ -18,6 +18,7 @@ package validation
 
 import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -37,6 +38,9 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	if rc.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
 		allErrs = append(allErrs, validateOverhead(rc.Overhead, field.NewPath("overhead"))...)
 	}
+	if rc.Scheduling != nil {
+		allErrs = append(allErrs, validateScheduling(rc.Scheduling, field.NewPath("scheduling"))...)
+	}
 
 	return allErrs
 }
@@ -53,4 +57,13 @@ func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 func validateOverhead(overhead *node.Overhead, fldPath *field.Path) field.ErrorList {
 	// reuse the ResourceRequirements validation logic
 	return corevalidation.ValidateResourceRequirements(&core.ResourceRequirements{Limits: overhead.PodFixed}, fldPath)
+}
+
+func validateScheduling(s *node.Scheduling, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if s.NodeSelector != nil {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(s.NodeSelector, fldPath.Child("nodeSelector"))...)
+	}
+	allErrs = append(allErrs, corevalidation.ValidateTolerations(s.Tolerations, fldPath.Child("tolerations"))...)
+	return allErrs
 }
