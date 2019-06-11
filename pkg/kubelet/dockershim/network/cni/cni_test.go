@@ -194,6 +194,7 @@ func TestCNIPlugin(t *testing.T) {
 	testConfDir := path.Join(tmpDir, "etc", "cni", "net.d")
 	testBinDir := path.Join(tmpDir, "opt", "cni", "bin")
 	testDataDir := path.Join(tmpDir, "output")
+	testCacheDir := path.Join(tmpDir, "var", "lib", "cni", "cache")
 	defer tearDownPlugin(tmpDir)
 	inputFile, outputFile, outputEnv := installPluginUnderTest(t, testBinDir, testConfDir, testDataDir, binName, netName, podIP)
 
@@ -207,7 +208,7 @@ func TestCNIPlugin(t *testing.T) {
 		NetnsPath: "/proc/12345/ns/net",
 	}}
 
-	plugins := ProbeNetworkPlugins(testConfDir, []string{testBinDir})
+	plugins := ProbeNetworkPlugins(testConfDir, testCacheDir, []string{testBinDir})
 	if len(plugins) != 1 {
 		t.Fatalf("Expected only one network plugin, got %d", len(plugins))
 	}

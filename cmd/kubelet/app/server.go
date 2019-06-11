@@ -1251,6 +1251,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 		PluginName:         r.NetworkPluginName,
 		PluginConfDir:      r.CNIConfDir,
 		PluginBinDirString: r.CNIBinDir,
+		PluginCacheDir:     r.CNICacheDir,
 		MTU:                int(r.NetworkPluginMTU),
 	}
 

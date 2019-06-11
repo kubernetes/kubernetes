@@ -289,10 +289,16 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 
+	cniCacheDir, err := getCNICacheDirectory()
+	if err != nil {
+		return nil, err
+	}
+
 	cmdArgs = append(cmdArgs,
 		"--network-plugin=kubenet",
 		"--cni-bin-dir", cniBinDir,
-		"--cni-conf-dir", cniConfDir)
+		"--cni-conf-dir", cniConfDir,
+		"--cni-cache-dir", cniCacheDir)
 
 	// Keep hostname override for convenience.
 	if framework.TestContext.NodeName != "" { // If node name is specified, set hostname override.
@@ -465,6 +471,15 @@ func getCNIConfDirectory() (string, error) {
 		return "", err
 	}
 	return filepath.Join(cwd, "cni", "net.d"), nil
+}
+
+// getCNICacheDirectory returns CNI Cache directory.
+func getCNICacheDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(cwd, "cni", "cache"), nil
 }
 
 // getDynamicConfigDir returns the directory for dynamic Kubelet configuration

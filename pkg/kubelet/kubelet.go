@@ -607,6 +607,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		PluginName:         crOptions.NetworkPluginName,
 		PluginConfDir:      crOptions.CNIConfDir,
 		PluginBinDirString: crOptions.CNIBinDir,
+		PluginCacheDir:     crOptions.CNICacheDir,
 		MTU:                int(crOptions.NetworkPluginMTU),
 	}
 

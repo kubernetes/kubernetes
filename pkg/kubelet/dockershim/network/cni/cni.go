@@ -60,6 +60,7 @@ type cniNetworkPlugin struct {
 	nsenterPath string
 	confDir     string
 	binDirs     []string
+	cacheDir    string
 	podCidr     string
 }
 
@@ -116,7 +117,7 @@ func SplitDirs(dirs string) []string {
 	return strings.Split(dirs, ",")
 }
 
-func ProbeNetworkPlugins(confDir string, binDirs []string) []network.NetworkPlugin {
+func ProbeNetworkPlugins(confDir, cacheDir string, binDirs []string) []network.NetworkPlugin {
 	old := binDirs
 	binDirs = make([]string, 0, len(binDirs))
 	for _, dir := range old {
@@ -131,6 +132,7 @@ func ProbeNetworkPlugins(confDir string, binDirs []string) []network.NetworkPlug
 		execer:         utilexec.New(),
 		confDir:        confDir,
 		binDirs:        binDirs,
+		cacheDir:       cacheDir,
 	}
 
 	// sync NetworkConfig in best effort during probing.
@@ -362,6 +364,7 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 		ContainerID: podSandboxID.ID,
 		NetNS:       podNetnsPath,
 		IfName:      network.DefaultInterfaceName,
+		CacheDir:    plugin.cacheDir,
 		Args: [][2]string{
 			{"IgnoreUnknown", "1"},
 			{"K8S_POD_NAMESPACE", podNs},

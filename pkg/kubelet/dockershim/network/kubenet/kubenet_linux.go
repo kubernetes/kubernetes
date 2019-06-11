@@ -96,9 +96,10 @@ type kubenetNetworkPlugin struct {
 	nonMasqueradeCIDR string
 	podCidr           string
 	gateway           net.IP
+	cacheDir          string
 }
 
-func NewPlugin(networkPluginDirs []string) network.NetworkPlugin {
+func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	protocol := utiliptables.ProtocolIpv4
 	execer := utilexec.New()
 	dbus := utildbus.New()
@@ -113,6 +114,7 @@ func NewPlugin(networkPluginDirs []string) network.NetworkPlugin {
 		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
 		nonMasqueradeCIDR: "10.0.0.0/8",
+		cacheDir:          cacheDir,
 	}
 }
 
@@ -558,6 +560,7 @@ func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubeco
 		ContainerID: id.ID,
 		NetNS:       netnsPath,
 		IfName:      ifName,
+		CacheDir:    plugin.cacheDir,
 	}, nil
 }
 
