@@ -31,6 +31,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "container_map_test.go",
         "cpu_assignment_test.go",
         "cpu_manager_test.go",
         "policy_none_test.go",
