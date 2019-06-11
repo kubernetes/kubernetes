@@ -31,6 +31,7 @@ filegroup(
         "//pkg/util/iptables:all-srcs",
         "//pkg/util/ipvs:all-srcs",
         "//pkg/util/labels:all-srcs",
+        "//pkg/util/log:all-srcs",
         "//pkg/util/maps:all-srcs",
         "//pkg/util/metrics:all-srcs",
         "//pkg/util/mount:all-srcs",

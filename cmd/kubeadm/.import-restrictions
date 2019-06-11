@@ -81,6 +81,7 @@
 				"k8s.io/kubernetes/pkg/util/ipset",
 				"k8s.io/kubernetes/pkg/util/iptables",
 				"k8s.io/kubernetes/pkg/util/ipvs",
+				"k8s.io/kubernetes/pkg/util/log",
 				"k8s.io/kubernetes/pkg/util/metrics",
 				"k8s.io/kubernetes/pkg/util/node",
 				"k8s.io/kubernetes/pkg/util/normalizer",

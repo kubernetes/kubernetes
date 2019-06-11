@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 )
 
 var nodeHealthzRetryInterval = 60 * time.Second
@@ -232,7 +233,7 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 
 	for nsn, count := range newEndpoints {
 		if hcs.services[nsn] == nil {
-			klog.V(3).Infof("Not saving endpoints for unknown healthcheck %q", nsn.String())
+			freqlog.V(3).InfoInfreqf("Not saving endpoints for unknown healthcheck %q", nsn.String())
 			continue
 		}
 		klog.V(3).Infof("Reporting %d endpoints for healthcheck %q", count, nsn.String())

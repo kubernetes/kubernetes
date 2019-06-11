@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 
 	"k8s.io/klog"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 )
 
 // BoundedFrequencyRunner manages runs of a user-provided function.
@@ -218,7 +219,7 @@ func (bfr *BoundedFrequencyRunner) tryRun() {
 		bfr.lastRun = bfr.timer.Now()
 		bfr.timer.Stop()
 		bfr.timer.Reset(bfr.maxInterval)
-		klog.V(3).Infof("%s: ran, next possible in %v, periodic in %v", bfr.name, bfr.minInterval, bfr.maxInterval)
+		freqlog.V(3).InfoInfreqf("%s: ran, next possible in %v, periodic in %v", bfr.name, bfr.minInterval, bfr.maxInterval)
 		return
 	}
 

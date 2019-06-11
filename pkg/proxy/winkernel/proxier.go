@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/util/async"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -1040,7 +1041,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	klog.V(3).Infof("Syncing Policies")
+	freqlog.V(3).InfoInfreqf("Syncing Policies")
 
 	// Program HNS by adding corresponding policies for each service.
 	for svcName, svcInfo := range proxier.serviceMap {
