@@ -118,6 +118,7 @@ type PodInfo struct {
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
+	SchedulingQueueHandle
 	Add(pod *v1.Pod) error
 	AddIfNotPresent(pod *v1.Pod) error
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
@@ -133,10 +134,8 @@ type SchedulingQueue interface {
 	Pop() (*v1.Pod, error)
 	Update(oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
-	MoveAllToActiveQueue()
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
-	NominatedPodsForNode(nodeName string) []*v1.Pod
 	PendingPods() []*v1.Pod
 	// Close closes the SchedulingQueue so that the goroutine which is
 	// waiting to pop items can exit gracefully.
@@ -148,6 +147,11 @@ type SchedulingQueue interface {
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// NumUnschedulablePods returns the number of unschedulable pods exist in the SchedulingQueue.
 	NumUnschedulablePods() int
+}
+
+type SchedulingQueueHandle interface {
+	MoveAllToActiveQueue()
+	NominatedPodsForNode(nodeName string) []*v1.Pod
 }
 
 // LessFunc is the function to sort pod info
@@ -255,6 +259,8 @@ type Framework interface {
 	// Note that if multiple plugins asked to wait, then we wait for the minimum
 	// timeout duration.
 	RunPermitPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	SchedulingQueue() SchedulingQueue
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is
@@ -274,5 +280,5 @@ type FrameworkHandle interface {
 	GetWaitingPod(uid types.UID) WaitingPod
 
 	// SchedulingQueue returns the backing scheduling queue
-	SchedulingQueue() SchedulingQueue
+	SchedulingQueueHandle() SchedulingQueueHandle
 }

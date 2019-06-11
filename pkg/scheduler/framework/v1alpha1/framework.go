@@ -363,3 +363,7 @@ func pluginsNeeded(plugins *config.Plugins) map[string]struct{} {
 func (f *framework) SchedulingQueue() SchedulingQueue {
 	return f.schedulingQueue
 }
+
+func (f *framework) SchedulingQueueHandle() SchedulingQueueHandle {
+	return f.schedulingQueue
+}
