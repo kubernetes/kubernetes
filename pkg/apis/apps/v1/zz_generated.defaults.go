@@ -136,9 +136,6 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -180,9 +177,6 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
-		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -289,9 +283,6 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -333,9 +324,6 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
-		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -442,9 +430,6 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -486,9 +471,6 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
-		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -595,9 +577,6 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -639,9 +618,6 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 					corev1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
-		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 	for i := range in.Spec.VolumeClaimTemplates {
