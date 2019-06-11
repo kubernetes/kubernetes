@@ -24,26 +24,25 @@ import (
 )
 
 // Indexer is a storage interface that lets you list objects using multiple indexing functions.
-// There are three sorts of strings here.
+// There are three kinds of strings here.
 // One is a storage key, as defined in the Store interface.
-// Another sort is a name of an IndexFunc.
-// The third sort of string is an "indexed value", produced by an IndexFunc.
+// Another kind is a name of an index.
+// The third kind of string is an "indexed value", which is produced by an
+// IndexFunc and can be a field value or any other string computed from the object.
 type Indexer interface {
 	Store
 	// Index returns the stored objects whose set of indexed values
-	// intersects the set of indexed values of the given object, where
-	// the indexed value sets are produced by the named IndexFunc
+	// intersects the set of indexed values of the given object, for
+	// the named index
 	Index(indexName string, obj interface{}) ([]interface{}, error)
 	// IndexKeys returns the storage keys of the stored objects whose
-	// set of indexed values from the named IndexFunc includes the
-	// given indexed value
+	// set of indexed values for the named index includes the given
+	// indexed value
 	IndexKeys(indexName, indexedValue string) ([]string, error)
-	// ListIndexFuncValues returns the union of the indexed value
-	// sets, produced by the named IndexFunc, of the objects in this
-	// Store
+	// ListIndexFuncValues returns all the indexed values of the given index
 	ListIndexFuncValues(indexName string) []string
 	// ByIndex returns the stored objects whose set of indexed values
-	// from the named IndexFunc includes the given indexed value
+	// for the named index includes the given indexed value
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 	// GetIndexer return the indexers
 	GetIndexers() Indexers
@@ -53,7 +52,7 @@ type Indexer interface {
 	AddIndexers(newIndexers Indexers) error
 }
 
-// IndexFunc knows how to extract the set of indexed values for an object.
+// IndexFunc knows how to compute the set of indexed values for an object.
 type IndexFunc func(obj interface{}) ([]string, error)
 
 // IndexFuncToKeyFuncAdapter adapts an indexFunc to a keyFunc.  This is only useful if your index function returns
