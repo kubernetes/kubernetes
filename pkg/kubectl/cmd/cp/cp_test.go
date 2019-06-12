@@ -355,7 +355,9 @@ func TestTarUntar(t *testing.T) {
 	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
 
 	writer := &bytes.Buffer{}
-	if err := makeTar(dir, dir, writer); err != nil {
+	tarWriter := tar.NewWriter(writer)
+	defer tarWriter.Close()
+	if err := makeTar(dir, dir, tarWriter); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -416,7 +418,9 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
 
 	writer := &bytes.Buffer{}
-	if err := makeTar(dir, dir, writer); err != nil {
+	tarWriter := tar.NewWriter(writer)
+	defer tarWriter.Close()
+	if err := makeTar(dir, dir, tarWriter); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -477,7 +481,9 @@ func TestTarDestinationName(t *testing.T) {
 
 	reader, writer := io.Pipe()
 	go func() {
-		if err := makeTar(dir, dir2, writer); err != nil {
+		tarWriter := tar.NewWriter(writer)
+		defer tarWriter.Close()
+		if err := makeTar(dir, dir2, tarWriter); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 	}()

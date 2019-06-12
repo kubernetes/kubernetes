@@ -61,6 +61,10 @@ var (
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in a specific container
 		kubectl cp /tmp/foo <some-pod>:/tmp/bar -c <specific-container>
 
+		# Copy /tmp/foo* local files to /tmp/bar in a remote pod in a specific container
+		# Attentions Please: note the single quotation marks, which is important to avoid bash glob expansions
+		kubectl cp '/tmp/foo*' <some-pod>:/tmp/bar -c <specific-container>
+
 		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
 		kubectl cp /tmp/foo <some-namespace>/<some-pod>:/tmp/bar
 
@@ -250,17 +254,34 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 		dest.File = dest.File[:len(dest.File)-1]
 	}
 
+	var destIsDir bool
 	if err := o.checkDestinationIsDir(dest); err == nil {
 		// If no error, dest.File was found to be a directory.
-		// Copy specified src into it
-		dest.File = dest.File + "/" + path.Base(src.File)
+		destIsDir = true
 	}
 
 	go func() {
 		defer writer.Close()
-		err := makeTar(src.File, dest.File, writer)
-		cmdutil.CheckErr(err)
+
+		tarWriter := tar.NewWriter(writer)
+		defer tarWriter.Close()
+
+		// TODO: use compression here?
+		matchedPaths, err := filepath.Glob(src.File)
+		if err != nil {
+			cmdutil.CheckErr(err)
+		}
+
+		for _, mPath := range matchedPaths {
+			destFile := dest.File
+			if destIsDir {
+				destFile = destFile + "/" + mPath
+			}
+			err := makeTar(mPath, destFile, tarWriter)
+			cmdutil.CheckErr(err)
+		}
 	}()
+
 	var cmdArr []string
 
 	// TODO: Improve error messages by first testing if 'tar' is present in the container?
@@ -269,7 +290,11 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	} else {
 		cmdArr = []string{"tar", "-xmf", "-"}
 	}
-	destDir := path.Dir(dest.File)
+
+	destDir := dest.File
+	if !destIsDir {
+		destDir = path.Dir(dest.File)
+	}
 	if len(destDir) > 0 {
 		cmdArr = append(cmdArr, "-C", destDir)
 	}
@@ -353,82 +378,75 @@ func stripPathShortcuts(p string) string {
 	return newPath
 }
 
-func makeTar(srcPath, destPath string, writer io.Writer) error {
-	// TODO: use compression here?
-	tarWriter := tar.NewWriter(writer)
-	defer tarWriter.Close()
-
-	srcPath = path.Clean(srcPath)
+func makeTar(srcPath, destPath string, writer *tar.Writer) error {
 	destPath = path.Clean(destPath)
-	return recursiveTar(path.Dir(srcPath), path.Base(srcPath), path.Dir(destPath), path.Base(destPath), tarWriter)
+	srcPath = path.Clean(srcPath)
+	if err := recursiveTar(path.Dir(srcPath), path.Base(srcPath), path.Dir(destPath), path.Base(destPath), writer); err != nil {
+		return err
+	}
+	return nil
 }
 
 func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) error {
-	srcPath := path.Join(srcBase, srcFile)
-	matchedPaths, err := filepath.Glob(srcPath)
+	fpath := path.Join(srcBase, srcFile)
+	stat, err := os.Lstat(fpath)
 	if err != nil {
 		return err
 	}
-	for _, fpath := range matchedPaths {
-		stat, err := os.Lstat(fpath)
+	if stat.IsDir() {
+		files, err := ioutil.ReadDir(fpath)
 		if err != nil {
 			return err
 		}
-		if stat.IsDir() {
-			files, err := ioutil.ReadDir(fpath)
-			if err != nil {
-				return err
-			}
-			if len(files) == 0 {
-				//case empty directory
-				hdr, _ := tar.FileInfoHeader(stat, fpath)
-				hdr.Name = destFile
-				if err := tw.WriteHeader(hdr); err != nil {
-					return err
-				}
-			}
-			for _, f := range files {
-				if err := recursiveTar(srcBase, path.Join(srcFile, f.Name()), destBase, path.Join(destFile, f.Name()), tw); err != nil {
-					return err
-				}
-			}
-			return nil
-		} else if stat.Mode()&os.ModeSymlink != 0 {
-			//case soft link
+		if len(files) == 0 {
+			//case empty directory
 			hdr, _ := tar.FileInfoHeader(stat, fpath)
-			target, err := os.Readlink(fpath)
-			if err != nil {
-				return err
-			}
-
-			hdr.Linkname = target
 			hdr.Name = destFile
 			if err := tw.WriteHeader(hdr); err != nil {
 				return err
 			}
-		} else {
-			//case regular file or other file type like pipe
-			hdr, err := tar.FileInfoHeader(stat, fpath)
-			if err != nil {
-				return err
-			}
-			hdr.Name = destFile
-
-			if err := tw.WriteHeader(hdr); err != nil {
-				return err
-			}
-
-			f, err := os.Open(fpath)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			if _, err := io.Copy(tw, f); err != nil {
-				return err
-			}
-			return f.Close()
 		}
+		for _, f := range files {
+			if err := recursiveTar(srcBase, path.Join(srcFile, f.Name()), destBase, path.Join(destFile, f.Name()), tw); err != nil {
+				return err
+			}
+		}
+		return nil
+	} else if stat.Mode()&os.ModeSymlink != 0 {
+		//case soft link
+		hdr, _ := tar.FileInfoHeader(stat, fpath)
+		target, err := os.Readlink(fpath)
+		if err != nil {
+			return err
+		}
+
+		hdr.Linkname = target
+		hdr.Name = destFile
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+	} else {
+		//case regular file or other file type like pipe
+		hdr, err := tar.FileInfoHeader(stat, fpath)
+		if err != nil {
+			return err
+		}
+		hdr.Name = destFile
+
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+
+		f, err := os.Open(fpath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		if _, err := io.Copy(tw, f); err != nil {
+			return err
+		}
+		return f.Close()
 	}
 	return nil
 }
