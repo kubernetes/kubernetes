@@ -134,7 +134,7 @@ func copyExtensions(field string, from, to map[string]interface{}) error {
 	for key, val := range from {
 		if curr, found := to[key]; found {
 			// Don't allow the same extension to be defined both on the field and on the type
-			return fmt.Errorf("Cannot override value for extension %s on field %s from %v to %v",
+			return fmt.Errorf("cannot override value for extension %s on field %s from %v to %v",
 				key, field, curr, val)
 		}
 		to[key] = val
@@ -181,7 +181,7 @@ func copySubElementPatchStrategy(field string, from, to map[string]interface{}) 
 	if ext, found := from["x-kubernetes-patch-strategy"]; found {
 		strategy, ok := ext.(string)
 		if !ok {
-			return fmt.Errorf("Expected string value for x-kubernetes-patch-strategy on %s, was %T",
+			return fmt.Errorf("expected string value for x-kubernetes-patch-strategy on %s, was %T",
 				field, ext)
 		}
 		// Check of the parent patch strategy has a sub patch strategy, and if so copy to the sub type
@@ -190,7 +190,7 @@ func copySubElementPatchStrategy(field string, from, to map[string]interface{}) 
 			if len(strategies) != 2 {
 				// Only 1 sub strategy is supported
 				return fmt.Errorf(
-					"Expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v",
+					"expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v",
 					strategies)
 			}
 			to["x-kubernetes-patch-strategy"] = strategies[1]

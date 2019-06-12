@@ -36,7 +36,7 @@ func (v ElementBuildingVisitor) mergeListElement(meta apply.FieldMetaImpl, item 
 	case "map", "kind", "reference":
 		return v.doMapList(meta, item)
 	default:
-		return nil, fmt.Errorf("Cannot merge lists with subtype %s", subtype)
+		return nil, fmt.Errorf("cannot merge lists with subtype %s", subtype)
 	}
 }
 
