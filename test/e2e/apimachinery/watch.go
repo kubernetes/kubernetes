@@ -216,7 +216,7 @@ var _ = SIGDescribe("Watchers", func() {
 		expectEvent(testWatchBroken, watch.Added, testConfigMap)
 		lastEvent, ok := waitForEvent(testWatchBroken, watch.Modified, nil, 1*time.Minute)
 		if !ok {
-			framework.Failf("Timed out waiting for second watch notification")
+			e2elog.Failf("Timed out waiting for second watch notification")
 		}
 		testWatchBroken.Stop()
 
@@ -229,7 +229,7 @@ var _ = SIGDescribe("Watchers", func() {
 		ginkgo.By("creating a new watch on configmaps from the last resource version observed by the first watch")
 		lastEventConfigMap, ok := lastEvent.Object.(*v1.ConfigMap)
 		if !ok {
-			framework.Failf("Expected last notification to refer to a configmap but got: %v", lastEvent)
+			e2elog.Failf("Expected last notification to refer to a configmap but got: %v", lastEvent)
 		}
 		testWatchRestarted, err := watchConfigMaps(f, lastEventConfigMap.ObjectMeta.ResourceVersion, watchRestartedLabelValue)
 		framework.ExpectNoError(err, "failed to create a new watch on configmaps from the last resource version %s observed by the first watch", lastEventConfigMap.ObjectMeta.ResourceVersion)
@@ -352,7 +352,7 @@ var _ = SIGDescribe("Watchers", func() {
 			for _, wc := range wcs[1:] {
 				e := waitForNextConfigMapEvent(wc)
 				if resourceVersion != e.ResourceVersion {
-					framework.Failf("resource version mismatch, expected %s but got %s", resourceVersion, e.ResourceVersion)
+					e2elog.Failf("resource version mismatch, expected %s but got %s", resourceVersion, e.ResourceVersion)
 				}
 			}
 		}
@@ -396,13 +396,13 @@ func setConfigMapData(cm *v1.ConfigMap, key, value string) {
 
 func expectEvent(w watch.Interface, eventType watch.EventType, object runtime.Object) {
 	if event, ok := waitForEvent(w, eventType, object, 1*time.Minute); !ok {
-		framework.Failf("Timed out waiting for expected watch notification: %v", event)
+		e2elog.Failf("Timed out waiting for expected watch notification: %v", event)
 	}
 }
 
 func expectNoEvent(w watch.Interface, eventType watch.EventType, object runtime.Object) {
 	if event, ok := waitForEvent(w, eventType, object, 10*time.Second); ok {
-		framework.Failf("Unexpected watch notification observed: %v", event)
+		e2elog.Failf("Unexpected watch notification observed: %v", event)
 	}
 }
 
@@ -415,7 +415,7 @@ func waitForEvent(w watch.Interface, expectType watch.EventType, expectObject ru
 			if ok {
 				e2elog.Logf("Got : %v %v", actual.Type, actual.Object)
 			} else {
-				framework.Failf("Watch closed unexpectedly")
+				e2elog.Failf("Watch closed unexpectedly")
 			}
 			if expectType == actual.Type && (expectObject == nil || apiequality.Semantic.DeepEqual(expectObject, actual.Object)) {
 				return actual, true
@@ -436,9 +436,9 @@ func waitForNextConfigMapEvent(watch watch.Interface) *v1.ConfigMap {
 		if configMap, ok := event.Object.(*v1.ConfigMap); ok {
 			return configMap
 		}
-		framework.Failf("expected config map")
+		e2elog.Failf("expected config map")
 	case <-time.After(10 * time.Second):
-		framework.Failf("timed out waiting for watch event")
+		e2elog.Failf("timed out waiting for watch event")
 	}
 	return nil // should never happen
 }
@@ -486,7 +486,7 @@ func produceConfigMapEvents(f *framework.Framework, stopc <-chan struct{}, minWa
 			framework.ExpectNoError(err, "Failed to delete configmap %s in namespace %s", name(existing[idx]), ns)
 			existing = append(existing[:idx], existing[idx+1:]...)
 		default:
-			framework.Failf("Unsupported event operation: %d", op)
+			e2elog.Failf("Unsupported event operation: %d", op)
 		}
 		select {
 		case <-stopc:

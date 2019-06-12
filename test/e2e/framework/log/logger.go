@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+
+	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 )
 
 func nowStamp() string {
@@ -34,4 +36,17 @@ func log(level string, format string, args ...interface{}) {
 // Logf logs the info.
 func Logf(format string, args ...interface{}) {
 	log("INFO", format, args...)
+}
+
+// Failf logs the fail info.
+func Failf(format string, args ...interface{}) {
+	FailfWithOffset(1, format, args...)
+}
+
+// FailfWithOffset calls "Fail" and logs the error at "offset" levels above its caller
+// (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
+func FailfWithOffset(offset int, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	log("INFO", msg)
+	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }

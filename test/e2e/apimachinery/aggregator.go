@@ -80,11 +80,11 @@ var _ = SIGDescribe("Aggregator", func() {
 		if aggrclient == nil {
 			config, err := framework.LoadConfig()
 			if err != nil {
-				framework.Failf("could not load config: %v", err)
+				e2elog.Failf("could not load config: %v", err)
 			}
 			aggrclient, err = aggregatorclient.NewForConfig(config)
 			if err != nil {
-				framework.Failf("could not create aggregator client: %v", err)
+				e2elog.Failf("could not create aggregator client: %v", err)
 			}
 		}
 	})
@@ -401,7 +401,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	var statusCode int
 	result.StatusCode(&statusCode)
 	if statusCode != 201 {
-		framework.Failf("Flunders client creation response was status %d, not 201", statusCode)
+		e2elog.Failf("Flunders client creation response was status %d, not 201", statusCode)
 	}
 
 	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
@@ -415,7 +415,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	err = json.Unmarshal(contents, &flundersList)
 	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 1 {
-		framework.Failf("failed to get back the correct flunders list %v", flundersList)
+		e2elog.Failf("failed to get back the correct flunders list %v", flundersList)
 	}
 
 	// kubectl delete flunder test-flunder -v 9
@@ -430,7 +430,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	err = json.Unmarshal(contents, &flundersList)
 	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 0 {
-		framework.Failf("failed to get back the correct deleted flunders list %v", flundersList)
+		e2elog.Failf("failed to get back the correct deleted flunders list %v", flundersList)
 	}
 
 	flunderName = generateFlunderName("dynamic-flunder")
@@ -442,7 +442,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	gvr := schema.GroupVersionResource{Group: "wardle.k8s.io", Version: "v1alpha1", Resource: "flunders"}
 	_, ok := groupVersionResources[gvr]
 	if !ok {
-		framework.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
+		e2elog.Failf("could not find group version resource for dynamic client and wardle/flunders (discovery error: %v, discovery results: %#v)", discoveryErr, groupVersionResources)
 	}
 	dynamicClient := f.DynamicClient.Resource(gvr).Namespace(namespace)
 
@@ -468,7 +468,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 1 {
-		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
+		e2elog.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
@@ -479,7 +479,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 	unstructuredList, err = dynamicClient.List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	if len(unstructuredList.Items) != 0 {
-		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
+		e2elog.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	cleanTest(client, aggrclient, namespace)
@@ -512,7 +512,7 @@ func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodL
 			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
-		framework.Failf(msg)
+		e2elog.Failf(msg)
 	}
 }
 
