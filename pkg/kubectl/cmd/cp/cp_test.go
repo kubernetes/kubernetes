@@ -258,11 +258,11 @@ func checkErr(t *testing.T, err error) {
 }
 
 func TestTarUntar(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
+	dir, err := ioutil.TempDir(tmpDir(t), "input")
 	checkErr(t, err)
-	dir2, err := ioutil.TempDir("", "output")
+	dir2, err := ioutil.TempDir(tmpDir(t), "output")
 	checkErr(t, err)
-	dir3, err := ioutil.TempDir("", "dir")
+	dir3, err := ioutil.TempDir(tmpDir(t), "dir")
 	checkErr(t, err)
 
 	dir = dir + "/"
@@ -367,7 +367,7 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	for _, file := range files {
-		absPath := filepath.Join(dir2, strings.TrimPrefix(dir, os.TempDir()))
+		absPath := filepath.Join(dir2, strings.TrimPrefix(dir, tmpDir(t)))
 		filePath := filepath.Join(absPath, file.name)
 
 		if file.fileType == RegularFile {
@@ -398,9 +398,9 @@ func TestTarUntar(t *testing.T) {
 }
 
 func TestTarUntarWrongPrefix(t *testing.T) {
-	dir, err := ioutil.TempDir("", "input")
+	dir, err := ioutil.TempDir(tmpDir(t), "input")
 	checkErr(t, err)
-	dir2, err := ioutil.TempDir("", "output")
+	dir2, err := ioutil.TempDir(tmpDir(t), "output")
 	checkErr(t, err)
 
 	dir = dir + "/"
@@ -432,8 +432,8 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 }
 
 func TestTarDestinationName(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "input")
-	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
+	dir, err := ioutil.TempDir(tmpDir(t), "input")
+	dir2, err2 := ioutil.TempDir(tmpDir(t), "output")
 	if err != nil || err2 != nil {
 		t.Errorf("unexpected error: %v | %v", err, err2)
 		t.FailNow()
@@ -505,7 +505,7 @@ func TestTarDestinationName(t *testing.T) {
 }
 
 func TestBadTar(t *testing.T) {
-	dir, err := ioutil.TempDir(os.TempDir(), "dest")
+	dir, err := ioutil.TempDir(tmpDir(t), "dest")
 	if err != nil {
 		t.Errorf("unexpected error: %v ", err)
 		t.FailNow()
@@ -574,7 +574,7 @@ func TestCopyToPod(t *testing.T) {
 
 	cmd := NewCmdCp(tf, ioStreams)
 
-	srcFile, err := ioutil.TempDir("", "test")
+	srcFile, err := ioutil.TempDir(tmpDir(t), "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -644,7 +644,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 
 	cmd := NewCmdCp(tf, ioStreams)
 
-	srcFile, err := ioutil.TempDir("", "test")
+	srcFile, err := ioutil.TempDir(tmpDir(t), "test")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		t.FailNow()
@@ -720,7 +720,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestUntar(t *testing.T) {
-	testdir, err := ioutil.TempDir("", "test-untar")
+	testdir, err := ioutil.TempDir(tmpDir(t), "test-untar")
 	require.NoError(t, err)
 	defer os.RemoveAll(testdir)
 	t.Logf("Test base: %s", testdir)
@@ -936,4 +936,13 @@ type testWriter testing.T
 func (t *testWriter) Write(p []byte) (n int, err error) {
 	t.Logf(string(p))
 	return len(p), nil
+}
+
+func tmpDir(t *testing.T) string {
+	evaledTmpDir, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		t.Errorf("unexpected error: %v ", err)
+		t.FailNow()
+	}
+	return evaledTmpDir
 }
