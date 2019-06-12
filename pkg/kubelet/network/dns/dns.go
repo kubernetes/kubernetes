@@ -27,9 +27,11 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
@@ -313,9 +315,15 @@ func mergeDNSOptions(existingDNSConfigOptions []string, dnsConfigOptions []v1.Po
 // appendDNSConfig appends DNS servers, search paths and options given by
 // PodDNSConfig to the existing DNS config. Duplicated entries will be merged.
 // This assumes existingDNSConfig and dnsConfig are not nil.
+// DNS config in pod will be used first if feature gate PodDNSConfigFirst is true.
 func appendDNSConfig(existingDNSConfig *runtimeapi.DNSConfig, dnsConfig *v1.PodDNSConfig) *runtimeapi.DNSConfig {
-	existingDNSConfig.Servers = omitDuplicates(append(existingDNSConfig.Servers, dnsConfig.Nameservers...))
-	existingDNSConfig.Searches = omitDuplicates(append(existingDNSConfig.Searches, dnsConfig.Searches...))
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodDNSConfigFirst) {
+		existingDNSConfig.Servers = omitDuplicates(append(dnsConfig.Nameservers, existingDNSConfig.Servers...))
+		existingDNSConfig.Searches = omitDuplicates(append(dnsConfig.Searches, existingDNSConfig.Searches...))
+	} else {
+		existingDNSConfig.Servers = omitDuplicates(append(existingDNSConfig.Servers, dnsConfig.Nameservers...))
+		existingDNSConfig.Searches = omitDuplicates(append(existingDNSConfig.Searches, dnsConfig.Searches...))
+	}
 	existingDNSConfig.Options = mergeDNSOptions(existingDNSConfig.Options, dnsConfig.Options)
 	return existingDNSConfig
 }
