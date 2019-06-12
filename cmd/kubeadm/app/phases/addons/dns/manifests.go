@@ -316,6 +316,7 @@ data:
         health
         kubernetes {{ .DNSDomain }} in-addr.arpa ip6.arpa {
            pods insecure
+           upstream
            fallthrough in-addr.arpa ip6.arpa
            ttl 30
         }{{ .Federation }}
