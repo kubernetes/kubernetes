@@ -36,6 +36,7 @@ import (
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
@@ -60,7 +61,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, w io.Writer, 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
 func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get config map")
 	}
@@ -211,7 +212,7 @@ func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubea
 
 // GetClusterStatus returns the kubeadm cluster status read from the kubeadm-config ConfigMap
 func GetClusterStatus(client clientset.Interface) (*kubeadmapi.ClusterStatus, error) {
-	configMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(constants.KubeadmConfigConfigMap, metav1.GetOptions{})
+	configMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if apierrors.IsNotFound(err) {
 		return &kubeadmapi.ClusterStatus{}, nil
 	}
