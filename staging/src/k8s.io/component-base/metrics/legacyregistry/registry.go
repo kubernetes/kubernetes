@@ -19,6 +19,7 @@ package legacyregistry
 import (
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -98,7 +99,7 @@ func Register(c metrics.KubeCollector) error {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 
-	if globalRegistryFactory.globalRegistry == (noopRegistry{}) {
+	if reflect.DeepEqual(globalRegistryFactory.globalRegistry, noopRegistry{}) {
 		globalRegistryFactory.registerQueue = append(globalRegistryFactory.registerQueue, c)
 		return nil
 	}
@@ -113,7 +114,7 @@ func MustRegister(cs ...metrics.KubeCollector) {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 
-	if globalRegistryFactory.globalRegistry == (noopRegistry{}) {
+	if reflect.DeepEqual(globalRegistryFactory.globalRegistry, noopRegistry{}) {
 		for _, c := range cs {
 			globalRegistryFactory.mustRegisterQueue = append(globalRegistryFactory.mustRegisterQueue, c)
 		}
