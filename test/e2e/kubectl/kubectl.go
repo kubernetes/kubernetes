@@ -40,6 +40,7 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/api/core/v1"
@@ -821,6 +822,56 @@ metadata:
 		})
 	})
 
+	// definitionMatchesGVK returns true if the specified GVK is listed as an x-kubernetes-group-version-kind extension
+	definitionMatchesGVK := func(extensions []*openapi_v2.NamedAny, desiredGVK schema.GroupVersionKind) bool {
+		for _, extension := range extensions {
+			if extension.GetValue().GetYaml() == "" ||
+				extension.GetName() != "x-kubernetes-group-version-kind" {
+				continue
+			}
+			var values []map[string]string
+			err := yaml.Unmarshal([]byte(extension.GetValue().GetYaml()), &values)
+			if err != nil {
+				framework.Logf("%v\n%s", err, string(extension.GetValue().GetYaml()))
+				continue
+			}
+			for _, value := range values {
+				if value["group"] != desiredGVK.Group {
+					continue
+				}
+				if value["version"] != desiredGVK.Version {
+					continue
+				}
+				if value["kind"] != desiredGVK.Kind {
+					continue
+				}
+				return true
+			}
+		}
+		return false
+	}
+
+	// schemaForGVK returns a schema (if defined) for the specified GVK
+	schemaForGVK := func(desiredGVK schema.GroupVersionKind) *openapi_v2.Schema {
+		d, err := f.ClientSet.Discovery().OpenAPISchema()
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		if d == nil || d.Definitions == nil {
+			return nil
+		}
+		for _, p := range d.Definitions.AdditionalProperties {
+			if p == nil || p.Value == nil {
+				continue
+			}
+			if !definitionMatchesGVK(p.Value.VendorExtension, desiredGVK) {
+				continue
+			}
+			return p.Value
+		}
+		return nil
+	}
+
 	framework.KubeDescribe("Kubectl client-side validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
@@ -875,10 +926,28 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
+			publishedSchema := schemaForGVK(schema.GroupVersionKind{Group: crd.APIGroup, Version: crd.Versions[0].Name, Kind: crd.Kind})
+			expectSuccess := false
+			if publishedSchema == nil || publishedSchema.Properties == nil || publishedSchema.Properties.AdditionalProperties == nil || len(publishedSchema.Properties.AdditionalProperties) == 0 {
+				// expect success in the following cases:
+				// - no schema was published
+				// - a schema was published with no properties
+				expectSuccess = true
+				framework.Logf("no schema with properties found, expect apply with extra properties to succeed")
+			} else {
+				framework.Logf("schema with properties found, expect apply with extra properties to fail")
+			}
+
 			meta := fmt.Sprintf(metaPattern, crd.Kind, crd.APIGroup, crd.Versions[0].Name, "test-cr")
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
-				framework.Failf("%v", err)
+				if expectSuccess {
+					framework.Failf("%v", err)
+				}
+			} else {
+				if !expectSuccess {
+					framework.Failf("expected error, got none")
+				}
 			}
 		})
 
