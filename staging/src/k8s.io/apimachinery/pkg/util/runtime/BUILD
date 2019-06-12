@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["runtime_test.go"],
     embed = [":go_default_library"],
-    deps = ["//vendor/k8s.io/klog:go_default_library"],
 )
 
 go_library(
