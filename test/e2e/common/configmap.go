@@ -25,10 +25,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
-var _ = Describe("[sig-node] ConfigMap", func() {
+var _ = ginkgo.Describe("[sig-node] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	/*
@@ -39,7 +39,7 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 	framework.ConformanceIt("should be consumable via environment variable [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
-		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
@@ -87,7 +87,7 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newEnvFromConfigMap(f, name)
-		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
@@ -133,6 +133,26 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 		configMap, err := newConfigMapWithEmptyKey(f)
 		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
+
+	/*
+	   Release : v1.16
+	   Testname: Update ConfigMap
+	   Description: Attempt to update a ConfigMap after create one.
+	*/
+	framework.ConformanceIt("should patch ConfigMap successfully", func() {
+		name := "configmap-test-" + string(uuid.NewUUID())
+		configMap := newConfigMap(f, name)
+		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
+		framework.ExpectNoError(err)
+
+		configMap.Data = map[string]string{
+			"data": "value",
+		}
+		ginkgo.By(fmt.Sprintf("Updating configMap %v/%v", f.Namespace.Name, configMap.Name))
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(configMap)
+		framework.ExpectNoError(err)
+	})
 })
 
 func newEnvFromConfigMap(f *framework.Framework, name string) *v1.ConfigMap {
@@ -161,6 +181,6 @@ func newConfigMapWithEmptyKey(f *framework.Framework) (*v1.ConfigMap, error) {
 		},
 	}
 
-	By(fmt.Sprintf("Creating configMap that has name %s", configMap.Name))
+	ginkgo.By(fmt.Sprintf("Creating configMap that has name %s", configMap.Name))
 	return f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap)
 }
