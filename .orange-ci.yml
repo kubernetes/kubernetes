@@ -1,0 +1,28 @@
+.test_pipeline: &test_pipeline
+  network: devnet
+  envFrom: https://git.code.oa.com/timxbxu/kubernetes/blob/master/env.sh
+  docker:
+    image: ccr.ccs.tencentyun.com/ccs-dev/k8s-base
+  services:
+    - docker  
+  stages:
+    - name: unit test
+      script: make test; result=$?; cos --region ${COS_REGION} --bucket ${COS_BUCKET} --remote-dir ${KUBE_JUNIT_REPORT_DIR}/${ORANGE_COMMIT} --local-dir ${KUBE_JUNIT_REPORT_DIR}; exit $result
+    #- name: build 
+    #  script: make all
+    #- name: build image
+    #  script: docker build . -t ${IMAGE_REPO}/${CI_IMAGE_NAME}:${ORANGE_COMMIT} -f ./tke-test-infra/tke_ci/k8s_test_dockerfile --build-arg IMAGE_REPO=${IMAGE_REPO} --build-arg K8S_BASE=${K8S_BASE}
+    #- name: docker login
+    #  script: docker login ${IMAGE_REPO} -u ${CCR_USER} -p ${CCR_PWD}
+    #- name: push image
+    #  script: docker push ${IMAGE_REPO}/${CI_IMAGE_NAME}:${ORANGE_COMMIT}
+    #- name: e2e
+    #  script: chmod +x tke_ci/run_e2e.sh && ./tke_ci/run_e2e.sh
+
+master:
+  push:
+  - <<: *test_pipeline
+
+"tke/*":
+  push:
+  - <<: *test_pipeline
