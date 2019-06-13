@@ -626,9 +626,9 @@ function kube::build::start_rsyncd_container() {
   kube::build::stop_rsyncd_container
   V=3 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
-    "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:"${KUBE_RSYNC_PORT}":"${KUBE_CONTAINER_RSYNC_PORT}" -d \
-    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')" \
-    -- /rsyncd.sh >/dev/null
+    "${KUBE_RSYNC_CONTAINER_NAME}" "-p 127.0.0.1:${KUBE_RSYNC_PORT}:${KUBE_CONTAINER_RSYNC_PORT}" "-d" \
+    "-e ALLOW_HOST=$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*'| grep -Eo '([0-9]*\.){3}[0-9]*'| grep -v '127.0.0.1')" \
+     "--" "/rsyncd.sh"
 
   local mapped_port
   if ! mapped_port=$("${DOCKER[@]}" port "${KUBE_RSYNC_CONTAINER_NAME}" ${KUBE_CONTAINER_RSYNC_PORT} 2> /dev/null | cut -d: -f 2) ; then
