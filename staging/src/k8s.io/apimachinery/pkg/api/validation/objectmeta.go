@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -58,7 +59,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 	return allErrs
 }
 
-func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
+func validateOwnerReference(ownerReference metav1.OwnerReference, dependentNamespace string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	gvk := schema.FromAPIVersionAndKind(ownerReference.APIVersion, ownerReference.Kind)
 	// gvk.Group is empty for the legacy group.
@@ -77,14 +78,24 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 	if _, ok := BannedOwners[gvk]; ok {
 		allErrs = append(allErrs, field.Invalid(fldPath, ownerReference, fmt.Sprintf("%s is disallowed from being an owner", gvk)))
 	}
+	if len(ownerReference.Resource) > 0 {
+		if errs := utilvalidation.IsDNS1035Label(ownerReference.Resource); len(errs) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), ownerReference.Resource, strings.Join(errs, ",")))
+		}
+	}
+	if ownerReference.Namespace != nil {
+		if len(*ownerReference.Namespace) > 0 && *ownerReference.Namespace != dependentNamespace {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), *ownerReference.Namespace, fmt.Sprintf("must be nil, empty, or the current namespace: %q", dependentNamespace)))
+		}
+	}
 	return allErrs
 }
 
-func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
+func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, dependentNamespace string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	controllerName := ""
 	for _, ref := range ownerReferences {
-		allErrs = append(allErrs, validateOwnerReference(ref, fldPath)...)
+		allErrs = append(allErrs, validateOwnerReference(ref, dependentNamespace, fldPath)...)
 		if ref.Controller != nil && *ref.Controller {
 			if controllerName != "" {
 				allErrs = append(allErrs, field.Invalid(fldPath, ownerReferences,
@@ -182,7 +193,7 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
+	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), meta.GetNamespace(), fldPath.Child("ownerReferences"))...)
 	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
 	return allErrs
 }
@@ -255,7 +266,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
+	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), newMeta.GetNamespace(), fldPath.Child("ownerReferences"))...)
 
 	return allErrs
 }

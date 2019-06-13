@@ -112,6 +112,20 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			expectedErrorMessage: "",
 		},
 		{
+			description: "simple success - with resource",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Resource:   "someresources",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          false,
+			expectedErrorMessage: "",
+		},
+		{
 			description: "simple failures - event shouldn't be set as an owner",
 			ownerReferences: []metav1.OwnerReference{
 				{
@@ -123,6 +137,20 @@ func TestValidateObjectMetaOwnerReferences(t *testing.T) {
 			},
 			expectError:          true,
 			expectedErrorMessage: "is disallowed from being an owner",
+		},
+		{
+			description: "simple failures - illegal resource",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "v1",
+					Kind:       "Pod",
+					Resource:   "tricky/resource",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expectError:          true,
+			expectedErrorMessage: "a DNS-1035 label must consist of lower case alphanumeric",
 		},
 		{
 			description: "simple controller ref success - one reference with Controller set",
