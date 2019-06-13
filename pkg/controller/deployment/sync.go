@@ -23,7 +23,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
@@ -196,7 +196,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			// Make the name deterministic, to ensure idempotence
 			Name:            d.Name + "-" + podTemplateSpecHash,
 			Namespace:       d.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(d, controllerResource, controllerKind)},
 			Labels:          newRSTemplate.Labels,
 		},
 		Spec: apps.ReplicaSetSpec{

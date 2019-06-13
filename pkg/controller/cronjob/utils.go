@@ -25,7 +25,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -160,7 +160,7 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 			Labels:          labels,
 			Annotations:     annotations,
 			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(sj, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(sj, controllerResource, controllerKind)},
 		},
 	}
 	if err := legacyscheme.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {

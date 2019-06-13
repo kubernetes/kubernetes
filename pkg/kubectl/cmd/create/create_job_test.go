@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -165,7 +165,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            jobName,
 					Annotations:     map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
-					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(cronJob, apps.SchemeGroupVersion.WithKind("CronJob"))},
+					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(cronJob, appsv1.SchemeGroupVersion.WithResource("cronjobs"), "CronJob")},
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{

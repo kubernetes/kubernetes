@@ -26,7 +26,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -205,7 +205,7 @@ func newPod(podName string, nodeName string, label map[string]string, ds *apps.D
 	}
 	pod.Name = names.SimpleNameGenerator.GenerateName(podName)
 	if ds != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerResourceRef(ds, controllerResource, controllerKind)}
 	}
 	return pod
 }
@@ -2876,7 +2876,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 			pod := newPod("pod1-", "node-0", simpleDaemonSetLabel, ds1)
 			prev := *pod
-			prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(ds2, controllerKind)}
+			prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerResourceRef(ds2, controllerResource, controllerKind)}
 			bumpResourceVersion(pod)
 			manager.updatePod(&prev, pod)
 			if got, want := manager.queue.Len(), 2; got != want {

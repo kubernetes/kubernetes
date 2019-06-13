@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -129,7 +129,7 @@ func (ssc *defaultStatefulSetControl) AdoptOrphanRevisions(
 	set *apps.StatefulSet,
 	revisions []*apps.ControllerRevision) error {
 	for i := range revisions {
-		adopted, err := ssc.controllerHistory.AdoptControllerRevision(set, controllerKind, revisions[i])
+		adopted, err := ssc.controllerHistory.AdoptControllerRevision(set, controllerResource, controllerKind, revisions[i])
 		if err != nil {
 			return err
 		}

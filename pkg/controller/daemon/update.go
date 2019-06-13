@@ -25,7 +25,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -271,7 +271,7 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 		return fresh, nil
 	})
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm := controller.NewControllerRevisionControllerRefManager(dsc.crControl, ds, selector, controllerKind, canAdoptFunc)
+	cm := controller.NewControllerRevisionControllerRefManager(dsc.crControl, ds, selector, controllerResource, controllerKind, canAdoptFunc)
 	return cm.ClaimControllerRevisions(histories)
 }
 
@@ -324,7 +324,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 			Namespace:       ds.Namespace,
 			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, apps.DefaultDaemonSetUniqueLabelKey, hash),
 			Annotations:     ds.Annotations,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(ds, controllerResource, controllerKind)},
 		},
 		Data:     runtime.RawExtension{Raw: patch},
 		Revision: revision,

@@ -240,7 +240,7 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1beta1.CronJob) *
 			Annotations: annotations,
 			Labels:      cronJob.Spec.JobTemplate.Labels,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(cronJob, appsv1.SchemeGroupVersion.WithKind("CronJob")),
+				*metav1.NewControllerResourceRef(cronJob, appsv1.SchemeGroupVersion.WithResource("cronjobs"), "CronJob"),
 			},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,

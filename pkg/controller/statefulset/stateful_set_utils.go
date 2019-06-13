@@ -24,7 +24,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -254,7 +254,7 @@ func getPodRevision(pod *v1.Pod) string {
 
 // newStatefulSetPod returns a new Pod conforming to the set's Spec with an identity generated from ordinal.
 func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
-	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, metav1.NewControllerRef(set, controllerKind))
+	pod, _ := controller.GetPodFromTemplate(&set.Spec.Template, set, metav1.NewControllerResourceRef(set, controllerResource, controllerKind))
 	pod.Name = getPodName(set, ordinal)
 	initIdentity(set, pod)
 	updateStorage(set, pod)
@@ -319,6 +319,7 @@ func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (
 		return nil, err
 	}
 	cr, err := history.NewControllerRevision(set,
+		controllerResource,
 		controllerKind,
 		set.Spec.Template.Labels,
 		runtime.RawExtension{Raw: patch},

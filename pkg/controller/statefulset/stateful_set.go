@@ -22,7 +22,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,8 +44,11 @@ import (
 	"k8s.io/klog"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+// controllerKind contains the kind for this controller type.
+var controllerKind = "StatefulSet"
+
+// controllerResource contains the schema.GroupVersionResource for this controller type.
+var controllerResource = apps.SchemeGroupVersion.WithResource("statefulsets")
 
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
@@ -301,7 +304,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(set *apps.StatefulSet, s
 		return fresh, nil
 	})
 
-	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, canAdoptFunc)
+	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerResource, controllerKind, canAdoptFunc)
 	return cm.ClaimPods(pods, filter)
 }
 
@@ -356,7 +359,8 @@ func (ssc *StatefulSetController) getStatefulSetsForPod(pod *v1.Pod) []*apps.Sta
 func (ssc *StatefulSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.StatefulSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
-	if controllerRef.Kind != controllerKind.Kind {
+	// continue using kind for backward compatibility
+	if controllerRef.Kind != controllerKind {
 		return nil
 	}
 	set, err := ssc.setLister.StatefulSets(namespace).Get(controllerRef.Name)

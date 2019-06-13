@@ -26,7 +26,7 @@ limitations under the License.
 package replication
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -55,7 +55,8 @@ func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer cor
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	return &ReplicationManager{
 		*replicaset.NewBaseController(informerAdapter{rcInformer}, podInformer, clientsetAdapter{kubeClient}, burstReplicas,
-			v1.SchemeGroupVersion.WithKind("ReplicationController"),
+			v1.SchemeGroupVersion.WithResource("replicationcontrollers"),
+			"ReplicationController",
 			"replication_controller",
 			"replicationmanager",
 			podControlAdapter{controller.RealPodControl{

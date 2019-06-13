@@ -61,7 +61,8 @@ func ControllerRevisionName(prefix string, hash string) string {
 // so the name is likely unique. If the returned error is nil, the returned ControllerRevision is valid. If the
 // returned error is not nil, the returned ControllerRevision is invalid for use.
 func NewControllerRevision(parent metav1.Object,
-	parentKind schema.GroupVersionKind,
+	parentResource schema.GroupVersionResource,
+	parentKind string,
 	templateLabels map[string]string,
 	data runtime.RawExtension,
 	revision int64,
@@ -73,7 +74,7 @@ func NewControllerRevision(parent metav1.Object,
 	cr := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labelMap,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(parent, parentKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(parent, parentResource, parentKind)},
 		},
 		Data:     data,
 		Revision: revision,
@@ -192,7 +193,7 @@ type Interface interface {
 	// Object of parentKind is the owner of revision. If revision is already owned, an error is returned. If the
 	// resource patch fails, an error is returned. If no error is returned, the returned ControllerRevision is
 	// valid.
-	AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error)
+	AdoptControllerRevision(parent metav1.Object, parentResource schema.GroupVersionResource, parentKind string, revision *apps.ControllerRevision) (*apps.ControllerRevision, error)
 	// ReleaseControllerRevision attempts to release parent's ownership of revision by removing parent from the
 	// OwnerReferences of revision. If an error is returned, parent remains the owner of revision. If no error is
 	// returned, the returned ControllerRevision is valid.
@@ -290,7 +291,7 @@ func (rh *realHistory) DeleteControllerRevision(revision *apps.ControllerRevisio
 	return rh.client.AppsV1().ControllerRevisions(revision.Namespace).Delete(revision.Name, nil)
 }
 
-func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentResource schema.GroupVersionResource, parentKind string, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	// Return an error if the parent does not own the revision
 	if owner := metav1.GetControllerOf(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
@@ -298,8 +299,8 @@ func (rh *realHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 	// Use strategic merge patch to add an owner reference indicating a controller ref
 	return rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Patch(revision.GetName(),
 		types.StrategicMergePatchType, []byte(fmt.Sprintf(
-			`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-			parentKind.GroupVersion().String(), parentKind.Kind,
+			`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","resource":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
+			parentResource.GroupVersion().String(), parentKind, parentResource.Resource,
 			parent.GetName(), parent.GetUID(), revision.UID)))
 }
 
@@ -405,7 +406,7 @@ func (fh *fakeHistory) UpdateControllerRevision(revision *apps.ControllerRevisio
 	return clone, fh.indexer.Update(clone)
 }
 
-func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentKind schema.GroupVersionKind, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentResource schema.GroupVersionResource, parentKind string, revision *apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	if owner := metav1.GetControllerOf(revision); owner != nil {
 		return nil, fmt.Errorf("attempt to adopt revision owned by %v", owner)
 	}
@@ -421,7 +422,7 @@ func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentKind 
 		return nil, errors.NewNotFound(apps.Resource("controllerrevisions"), revision.Name)
 	}
 	clone := revision.DeepCopy()
-	clone.OwnerReferences = append(clone.OwnerReferences, *metav1.NewControllerRef(parent, parentKind))
+	clone.OwnerReferences = append(clone.OwnerReferences, *metav1.NewControllerResourceRef(parent, parentResource, parentKind))
 	return clone, fh.indexer.Update(clone)
 }
 

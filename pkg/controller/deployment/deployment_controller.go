@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,8 +59,11 @@ const (
 	maxRetries = 15
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
+// controllerKind contains the kind for this controller type.
+var controllerKind = "Deployment"
+
+// controllerResource contains the schema.GroupVersionResource for this controller type.
+var controllerResource = apps.SchemeGroupVersion.WithResource("deployments")
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
 // in the system with actual running replica sets and pods.
@@ -439,7 +442,8 @@ func (dc *DeploymentController) getDeploymentForPod(pod *v1.Pod) *apps.Deploymen
 func (dc *DeploymentController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.Deployment {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
-	if controllerRef.Kind != controllerKind.Kind {
+	// this has to remain a Kind for compatibility with upgrade/downgrade scenarios
+	if controllerRef.Kind != controllerKind {
 		return nil
 	}
 	d, err := dc.dLister.Deployments(namespace).Get(controllerRef.Name)
@@ -517,7 +521,7 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 		}
 		return fresh, nil
 	})
-	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerKind, canAdoptFunc)
+	cm := controller.NewReplicaSetControllerRefManager(dc.rsControl, d, deploymentSelector, controllerResource, controllerKind, canAdoptFunc)
 	return cm.ClaimReplicaSets(rsList)
 }
 

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -379,10 +379,10 @@ func TestAdoption(t *testing.T) {
 		{
 			"pod refers rs as an owner, not a controller",
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets"}}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
 			},
 		},
 		{
@@ -391,30 +391,30 @@ func TestAdoption(t *testing.T) {
 				return []metav1.OwnerReference{}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets", Controller: boolPtr(true), BlockOwnerDeletion: boolPtr(true)}}
 			},
 		},
 		{
 			"pod refers rs as a controller",
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets", Controller: boolPtr(true)}}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
-				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)}}
+				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets", Controller: boolPtr(true)}}
 			},
 		},
 		{
 			"pod refers other rs as the controller, refers the rs as an owner",
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)},
-					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"},
+					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets", Controller: boolPtr(true)},
+					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets"},
 				}
 			},
 			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
-					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: boolPtr(true)},
-					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"},
+					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets", Controller: boolPtr(true)},
+					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Resource: "replicasets"},
 				}
 			},
 		},

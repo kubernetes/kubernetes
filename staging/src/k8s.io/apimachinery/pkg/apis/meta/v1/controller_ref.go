@@ -52,3 +52,19 @@ func NewControllerRef(owner Object, gvk schema.GroupVersionKind) *OwnerReference
 		Controller:         &isController,
 	}
 }
+
+// NewControllerResourceRef creates an OwnerReference pointing to the given owner, with the resource in addition to the kind.
+// The resource must be in the same group as the kind.
+func NewControllerResourceRef(owner Object, gvr schema.GroupVersionResource, kind string) *OwnerReference {
+	blockOwnerDeletion := true
+	isController := true
+	return &OwnerReference{
+		APIVersion:         gvr.GroupVersion().String(),
+		Kind:               kind,
+		Resource:           gvr.Resource,
+		Name:               owner.GetName(),
+		UID:                owner.GetUID(),
+		BlockOwnerDeletion: &blockOwnerDeletion,
+		Controller:         &isController,
+	}
+}

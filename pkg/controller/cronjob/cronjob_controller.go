@@ -38,7 +38,7 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -55,8 +55,11 @@ import (
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = batchv1beta1.SchemeGroupVersion.WithKind("CronJob")
+// controllerKind contains the kind for this controller type.
+var controllerKind = "CronJob"
+
+// controllerResource contains the schema.GroupVersionResource for this controller type.
+var controllerResource = batchv1beta1.SchemeGroupVersion.WithResource("cronjobs")
 
 // Controller is a controller for CronJobs.
 type Controller struct {

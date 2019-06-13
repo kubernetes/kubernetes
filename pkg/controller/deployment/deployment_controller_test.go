@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -127,7 +127,7 @@ func newReplicaSet(d *apps.Deployment, name string, replicas int) *apps.ReplicaS
 			UID:             uuid.NewUUID(),
 			Namespace:       metav1.NamespaceDefault,
 			Labels:          d.Spec.Selector.MatchLabels,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(d, controllerResource, controllerKind)},
 		},
 		Spec: apps.ReplicaSetSpec{
 			Selector: d.Spec.Selector,
@@ -843,7 +843,7 @@ func TestUpdateReplicaSetChangeControllerRef(t *testing.T) {
 
 	// Change ControllerRef and expect both old and new to queue.
 	prev := *rs
-	prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(d2, controllerKind)}
+	prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerResourceRef(d2, controllerResource, controllerKind)}
 	next := *rs
 	bumpResourceVersion(&next)
 	dc.updateReplicaSet(&prev, &next)

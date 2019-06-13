@@ -26,7 +26,7 @@ import (
 	"k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,8 +81,11 @@ const (
 	FailedDaemonPodReason = "FailedDaemonPod"
 )
 
-// controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
+// controllerKind contains the Kind for this controller type.
+var controllerKind = "DaemonSet"
+
+// controllerResource contains the schema.GroupVersionResource for this controller type.
+var controllerResource = apps.SchemeGroupVersion.WithResource("daemonsets")
 
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
@@ -809,7 +812,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *apps.DaemonSet) ([]*v1.Pod, e
 	})
 
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, dsNotDeleted)
+	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerResource, controllerKind, dsNotDeleted)
 	return cm.ClaimPods(pods)
 }
 
@@ -844,7 +847,8 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *apps.DaemonSet) (map[s
 func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.DaemonSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
-	if controllerRef.Kind != controllerKind.Kind {
+	// This needs to remain a kind for backwards compatibility.
+	if controllerRef.Kind != controllerKind {
 		return nil
 	}
 	ds, err := dsc.dsLister.DaemonSets(namespace).Get(controllerRef.Name)
@@ -1047,13 +1051,13 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
 
 					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
-						ds, metav1.NewControllerRef(ds, controllerKind))
+						ds, metav1.NewControllerResourceRef(ds, controllerResource, controllerKind))
 				} else {
 					// If pod is scheduled by DaemonSetController, set its '.spec.scheduleName'.
 					podTemplate.Spec.SchedulerName = "kubernetes.io/daemonset-controller"
 
 					err = dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, podTemplate,
-						ds, metav1.NewControllerRef(ds, controllerKind))
+						ds, metav1.NewControllerResourceRef(ds, controllerResource, controllerKind))
 				}
 
 				if err != nil && errors.IsTimeout(err) {

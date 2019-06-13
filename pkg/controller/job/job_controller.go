@@ -25,7 +25,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,7 +51,10 @@ import (
 const statusUpdateRetries = 3
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
-var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
+var controllerKind = "Job"
+
+// controllerResource contains the schema.GroupVersionResource for this controller type.
+var controllerResource = batch.SchemeGroupVersion.WithResource("jobs")
 
 var (
 	// DefaultJobBackOff is the max backoff period, exported for the e2e test
@@ -178,7 +181,8 @@ func (jm *JobController) getPodJobs(pod *v1.Pod) []*batch.Job {
 func (jm *JobController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batch.Job {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
-	if controllerRef.Kind != controllerKind.Kind {
+	// continue using kind for backward compatibility
+	if controllerRef.Kind != controllerKind {
 		return nil
 	}
 	job, err := jm.jobLister.Jobs(namespace).Get(controllerRef.Name)
@@ -426,7 +430,7 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 		}
 		return fresh, nil
 	})
-	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, controllerKind, canAdoptFunc)
+	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, controllerResource, controllerKind, canAdoptFunc)
 	return cm.ClaimPods(pods)
 }
 
@@ -767,7 +771,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			for i := int32(0); i < batchSize; i++ {
 				go func() {
 					defer wait.Done()
-					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerRef(job, controllerKind))
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerResourceRef(job, controllerResource, controllerKind))
 					if err != nil && errors.IsTimeout(err) {
 						// Pod is created but its initialization has timed out.
 						// If the initialization is successful eventually, the

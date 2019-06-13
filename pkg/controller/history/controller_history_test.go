@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -39,8 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
-	core "k8s.io/client-go/testing"
 	"time"
+
+	core "k8s.io/client-go/testing"
 )
 
 func TestRealHistory_ListControllerRevisions(t *testing.T) {
@@ -83,22 +84,22 @@ func TestRealHistory_ListControllerRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, nil)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, nil)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss2Rev1.Namespace = ss2.Namespace
-	ss1Orphan, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, nil)
+	ss1Orphan, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,22 +181,22 @@ func TestFakeHistory_ListControllerRevisions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, nil)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, nil)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss2Rev1.Namespace = ss2.Namespace
-	ss1Orphan, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, nil)
+	ss1Orphan, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +299,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,14 +311,14 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 	// an existing revision.
 	modTemplate := ss1.Spec.Template.DeepCopy()
 	modTemplate.Labels["foo"] = "not_bar"
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(modTemplate), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(modTemplate), 2, ss1.Status.CollisionCount)
 	ss1Rev2.Name = ss1Rev1.Name
 	ss1Rev2.Labels[ControllerRevisionHashLabel] = ss1Rev1.Labels[ControllerRevisionHashLabel]
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -430,17 +431,17 @@ func TestFakeHistory_CreateControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,12 +563,12 @@ func TestRealHistory_UpdateControllerRevision(t *testing.T) {
 	}
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -687,12 +688,12 @@ func TestFakeHistory_UpdateControllerRevision(t *testing.T) {
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
 
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -773,22 +774,22 @@ func TestRealHistory_DeleteControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss2Rev1.Namespace = ss2.Namespace
-	ss2Rev2, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 2, ss2.Status.CollisionCount)
+	ss2Rev2, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 2, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -876,22 +877,22 @@ func TestFakeHistory_DeleteControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss2Rev1.Namespace = ss2.Namespace
-	ss2Rev2, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 2, ss2.Status.CollisionCount)
+	ss2Rev2, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 2, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1002,7 +1003,7 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		adopted, err := history.AdoptControllerRevision(test.parent, parentKind, test.revision)
+		adopted, err := history.AdoptControllerRevision(test.parent, parentResource, parentKind, test.revision)
 		if !test.err && err != nil {
 			t.Errorf("%s: %s", test.name, err)
 		}
@@ -1018,18 +1019,18 @@ func TestRealHistory_AdoptControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1108,7 +1109,7 @@ func TestFakeHistory_AdoptControllerRevision(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		adopted, err := history.AdoptControllerRevision(test.parent, parentKind, test.revision)
+		adopted, err := history.AdoptControllerRevision(test.parent, parentResource, parentKind, test.revision)
 		if !test.err && err != nil {
 			t.Errorf("%s: %s", test.name, err)
 		}
@@ -1124,18 +1125,18 @@ func TestFakeHistory_AdoptControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1272,18 +1273,18 @@ func TestRealHistory_ReleaseControllerRevision(t *testing.T) {
 
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, nil)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, nil)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1395,18 +1396,18 @@ func TestFakeHistory_ReleaseControllerRevision(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1493,23 +1494,23 @@ func TestFindEqualRevisions(t *testing.T) {
 	ss1.Status.CollisionCount = new(int32)
 	ss2 := newStatefulSet(3, "ss2", types.UID("ss2"), map[string]string{"goo": "car"})
 	ss2.Status.CollisionCount = new(int32)
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev2.Namespace = ss1.Namespace
 	ss1Rev2.OwnerReferences = []metav1.OwnerReference{}
-	ss2Rev1, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
+	ss2Rev1, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 1, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss2Rev1.Namespace = ss2.Namespace
-	ss2Rev2, err := NewControllerRevision(ss2, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 2, ss2.Status.CollisionCount)
+	ss2Rev2, err := NewControllerRevision(ss2, parentResource, parentKind, ss2.Spec.Template.Labels, rawTemplate(&ss2.Spec.Template), 2, ss2.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1558,31 +1559,31 @@ func TestSortControllerRevisions(t *testing.T) {
 	ss1 := newStatefulSet(3, "ss1", types.UID("ss1"), map[string]string{"foo": "bar"})
 	ss1.Status.CollisionCount = new(int32)
 
-	ss1Rev1, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
+	ss1Rev1, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 1, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ss1Rev1.Namespace = ss1.Namespace
-	ss1Rev2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
+	ss1Rev2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 2, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	ss1Rev2.Namespace = ss1.Namespace
-	ss1Rev3, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	ss1Rev3, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ss1Rev3Time2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	ss1Rev3Time2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ss1Rev3Time2.Namespace = ss1.Namespace
 	ss1Rev3Time2.CreationTimestamp = metav1.Time{Time: ss1Rev3.CreationTimestamp.Add(time.Second)}
 
-	ss1Rev3Time2Name2, err := NewControllerRevision(ss1, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
+	ss1Rev3Time2Name2, err := NewControllerRevision(ss1, parentResource, parentKind, ss1.Spec.Template.Labels, rawTemplate(&ss1.Spec.Template), 3, ss1.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1691,7 +1692,10 @@ func newStatefulSet(replicas int, name string, uid types.UID, labels map[string]
 	}
 }
 
-var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
+var (
+	parentKind     = "StatefulSet"
+	parentResource = apps.SchemeGroupVersion.WithResource("statefulsets")
+)
 
 func rawTemplate(template *v1.PodTemplateSpec) runtime.RawExtension {
 	buf := new(bytes.Buffer)

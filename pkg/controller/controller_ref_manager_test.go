@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,13 +51,14 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 		},
 	}
 	if owner != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, apps.SchemeGroupVersion.WithKind("Fake"))}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerResourceRef(owner, apps.SchemeGroupVersion.WithResource("fakes"), "Fake")}
 	}
 	return pod
 }
 
 func TestClaimPods(t *testing.T) {
-	controllerKind := schema.GroupVersionKind{}
+	controllerKind := ""
+	controllerResource := schema.GroupVersionResource{}
 	type test struct {
 		name    string
 		manager *PodControllerRefManager
@@ -70,6 +71,7 @@ func TestClaimPods(t *testing.T) {
 			manager: NewPodControllerRefManager(&FakePodControl{},
 				&v1.ReplicationController{},
 				productionLabelSelector,
+				controllerResource,
 				controllerKind,
 				func() error { return nil }),
 			pods:    []*v1.Pod{newPod("pod1", productionLabel, nil), newPod("pod2", testLabel, nil)},
@@ -85,6 +87,7 @@ func TestClaimPods(t *testing.T) {
 				manager: NewPodControllerRefManager(&FakePodControl{},
 					&controller,
 					productionLabelSelector,
+					controllerResource,
 					controllerKind,
 					func() error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, nil), newPod("pod2", productionLabel, nil)},
@@ -101,6 +104,7 @@ func TestClaimPods(t *testing.T) {
 				manager: NewPodControllerRefManager(&FakePodControl{},
 					&controller,
 					productionLabelSelector,
+					controllerResource,
 					controllerKind,
 					func() error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", productionLabel, nil)},
@@ -117,6 +121,7 @@ func TestClaimPods(t *testing.T) {
 				manager: NewPodControllerRefManager(&FakePodControl{},
 					&controller,
 					productionLabelSelector,
+					controllerResource,
 					controllerKind,
 					func() error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", productionLabel, &controller2)},
@@ -131,6 +136,7 @@ func TestClaimPods(t *testing.T) {
 				manager: NewPodControllerRefManager(&FakePodControl{},
 					&controller,
 					productionLabelSelector,
+					controllerResource,
 					controllerKind,
 					func() error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller)},
@@ -151,6 +157,7 @@ func TestClaimPods(t *testing.T) {
 				manager: NewPodControllerRefManager(&FakePodControl{},
 					&controller,
 					productionLabelSelector,
+					controllerResource,
 					controllerKind,
 					func() error { return nil }),
 				pods:    []*v1.Pod{podToDelete1, podToDelete2},

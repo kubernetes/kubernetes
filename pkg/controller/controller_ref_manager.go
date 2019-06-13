@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -120,8 +120,9 @@ func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(met
 
 type PodControllerRefManager struct {
 	BaseControllerRefManager
-	controllerKind schema.GroupVersionKind
-	podControl     PodControlInterface
+	controllerKind     string
+	controllerResource schema.GroupVersionResource
+	podControl         PodControlInterface
 }
 
 // NewPodControllerRefManager returns a PodControllerRefManager that exposes
@@ -139,7 +140,8 @@ func NewPodControllerRefManager(
 	podControl PodControlInterface,
 	controller metav1.Object,
 	selector labels.Selector,
-	controllerKind schema.GroupVersionKind,
+	controllerResource schema.GroupVersionResource,
+	controllerKind string,
 	canAdopt func() error,
 ) *PodControllerRefManager {
 	return &PodControllerRefManager{
@@ -148,8 +150,9 @@ func NewPodControllerRefManager(
 			Selector:     selector,
 			CanAdoptFunc: canAdopt,
 		},
-		controllerKind: controllerKind,
-		podControl:     podControl,
+		controllerKind:     controllerKind,
+		controllerResource: controllerResource,
+		podControl:         podControl,
 	}
 }
 
@@ -214,8 +217,8 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","resource":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
+		m.controllerResource.GroupVersion(), m.controllerKind, m.controllerResource.Resource,
 		m.Controller.GetName(), m.Controller.GetUID(), pod.UID)
 	return m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(addControllerPatch))
 }
@@ -224,7 +227,7 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
-		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
+		pod.Namespace, pod.Name, m.controllerResource.GroupVersion(), m.controllerResource.Resource, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), pod.UID)
 	err := m.podControl.PatchPod(pod.Namespace, pod.Name, []byte(deleteOwnerRefPatch))
 	if err != nil {
@@ -254,8 +257,9 @@ func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 // for more details.
 type ReplicaSetControllerRefManager struct {
 	BaseControllerRefManager
-	controllerKind schema.GroupVersionKind
-	rsControl      RSControlInterface
+	controllerKind     string
+	controllerResource schema.GroupVersionResource
+	rsControl          RSControlInterface
 }
 
 // NewReplicaSetControllerRefManager returns a ReplicaSetControllerRefManager that exposes
@@ -273,7 +277,8 @@ func NewReplicaSetControllerRefManager(
 	rsControl RSControlInterface,
 	controller metav1.Object,
 	selector labels.Selector,
-	controllerKind schema.GroupVersionKind,
+	controllerResource schema.GroupVersionResource,
+	controllerKind string,
 	canAdopt func() error,
 ) *ReplicaSetControllerRefManager {
 	return &ReplicaSetControllerRefManager{
@@ -282,8 +287,9 @@ func NewReplicaSetControllerRefManager(
 			Selector:     selector,
 			CanAdoptFunc: canAdopt,
 		},
-		controllerKind: controllerKind,
-		rsControl:      rsControl,
+		controllerKind:     controllerKind,
+		controllerResource: controllerResource,
+		rsControl:          rsControl,
 	}
 }
 
@@ -336,8 +342,8 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) er
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","resource":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
+		m.controllerResource.GroupVersion(), m.controllerKind, m.controllerResource.Resource,
 		m.Controller.GetName(), m.Controller.GetUID(), rs.UID)
 	return m.rsControl.PatchReplicaSet(rs.Namespace, rs.Name, []byte(addControllerPatch))
 }
@@ -346,7 +352,7 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) er
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
 	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
-		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
+		replicaSet.Namespace, replicaSet.Name, m.controllerResource.GroupVersion(), m.controllerResource.Resource, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), replicaSet.UID)
 	err := m.rsControl.PatchReplicaSet(replicaSet.Namespace, replicaSet.Name, []byte(deleteOwnerRefPatch))
 	if err != nil {
@@ -389,8 +395,9 @@ func RecheckDeletionTimestamp(getObject func() (metav1.Object, error)) func() er
 // for more details.
 type ControllerRevisionControllerRefManager struct {
 	BaseControllerRefManager
-	controllerKind schema.GroupVersionKind
-	crControl      ControllerRevisionControlInterface
+	controllerKind     string
+	controllerResource schema.GroupVersionResource
+	crControl          ControllerRevisionControlInterface
 }
 
 // NewControllerRevisionControllerRefManager returns a ControllerRevisionControllerRefManager that exposes
@@ -408,7 +415,8 @@ func NewControllerRevisionControllerRefManager(
 	crControl ControllerRevisionControlInterface,
 	controller metav1.Object,
 	selector labels.Selector,
-	controllerKind schema.GroupVersionKind,
+	controllerResource schema.GroupVersionResource,
+	controllerKind string,
 	canAdopt func() error,
 ) *ControllerRevisionControllerRefManager {
 	return &ControllerRevisionControllerRefManager{
@@ -417,8 +425,9 @@ func NewControllerRevisionControllerRefManager(
 			Selector:     selector,
 			CanAdoptFunc: canAdopt,
 		},
-		controllerKind: controllerKind,
-		crControl:      crControl,
+		controllerKind:     controllerKind,
+		controllerResource: controllerResource,
+		crControl:          crControl,
 	}
 }
 
@@ -471,8 +480,8 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 	// Note that ValidateOwnerReferences() will reject this patch if another
 	// OwnerReference exists with controller=true.
 	addControllerPatch := fmt.Sprintf(
-		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
-		m.controllerKind.GroupVersion(), m.controllerKind.Kind,
+		`{"metadata":{"ownerReferences":[{"apiVersion":"%s","kind":"%s","resource":"%s","name":"%s","uid":"%s","controller":true,"blockOwnerDeletion":true}],"uid":"%s"}}`,
+		m.controllerResource.GroupVersion(), m.controllerKind, m.controllerResource.Resource,
 		m.Controller.GetName(), m.Controller.GetUID(), history.UID)
 	return m.crControl.PatchControllerRevision(history.Namespace, history.Name, []byte(addControllerPatch))
 }
@@ -481,7 +490,7 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
 	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
-		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
+		history.Namespace, history.Name, m.controllerResource.GroupVersion(), m.controllerResource.Resource, m.Controller.GetName())
 	deleteOwnerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[{"$patch":"delete","uid":"%s"}],"uid":"%s"}}`, m.Controller.GetUID(), history.UID)
 	err := m.crControl.PatchControllerRevision(history.Namespace, history.Name, []byte(deleteOwnerRefPatch))
 	if err != nil {

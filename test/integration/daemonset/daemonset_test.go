@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -881,7 +881,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 			Namespace:       ds.Namespace,
 			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, apps.DefaultDaemonSetUniqueLabelKey, newHash),
 			Annotations:     ds.Annotations,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, apps.SchemeGroupVersion.WithKind("DaemonSet"))},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(ds, apps.SchemeGroupVersion.WithResource("daemonsets"), "DaemonSet")},
 		},
 		Data:     revision.Data,
 		Revision: revision.Revision + 1,
