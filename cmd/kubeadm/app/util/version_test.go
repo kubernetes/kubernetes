@@ -19,7 +19,6 @@ package util
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"path"
 	"strings"
 	"testing"
@@ -117,19 +116,18 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 func TestVersionFromNetwork(t *testing.T) {
 	type T struct {
 		Content       string
-		Status        int
 		Expected      string
 		ErrorExpected bool
 	}
 	cases := map[string]T{
-		"stable":     {"stable-1", http.StatusOK, "v1.4.6", false}, // recursive pointer to stable-1
-		"stable-1":   {"v1.4.6", http.StatusOK, "v1.4.6", false},
-		"stable-1.3": {"v1.3.10", http.StatusOK, "v1.3.10", false},
-		"latest":     {"v1.6.0-alpha.0", http.StatusOK, "v1.6.0-alpha.0", false},
-		"latest-1.3": {"v1.3.11-beta.0", http.StatusOK, "v1.3.11-beta.0", false},
-		"empty":      {"", http.StatusOK, "", true},
-		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", http.StatusOK, "", true},
-		"unknown":    {"The requested URL was not found on this server.", http.StatusNotFound, "", true},
+		"stable":     {"stable-1", "v1.4.6", false}, // recursive pointer to stable-1
+		"stable-1":   {"v1.4.6", "v1.4.6", false},
+		"stable-1.3": {"v1.3.10", "v1.3.10", false},
+		"latest":     {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false},
+		"latest-1.3": {"v1.3.11-beta.0", "v1.3.11-beta.0", false},
+		"empty":      {"", "", true},
+		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", "", true},
+		"unknown":    {"The requested URL was not found on this server.", "", true},
 	}
 
 	fileFetcher := func(url string, timeout time.Duration) (string, error) {
