@@ -805,6 +805,7 @@ items:
   - apiGroups:
     - storage.k8s.io
     resources:
+    - csidrivers
     - csinodes
     verbs:
     - get

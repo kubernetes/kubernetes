@@ -173,6 +173,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		cc.InformerFactory.Storage().V1().StorageClasses(),
 		cc.InformerFactory.Storage().V1beta1().CSINodes(),
+		cc.InformerFactory.Storage().V1beta1().CSIDrivers(),
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,

@@ -23,6 +23,7 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	storagev1beta1listers "k8s.io/client-go/listers/storage/v1beta1"
 	csilib "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -30,22 +31,39 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
+// CSIDriverInfo interface represents anything that can get a CSI driver object by its name
+type CSIDriverInfo interface {
+	GetCSIDriverInfo(name string) (*storagev1beta1.CSIDriver, error)
+}
+
+// CachedCSIDriverInfo implements CSIDriverInfo
+type CachedCSIDriverInfo struct {
+	storagev1beta1listers.CSIDriverLister
+}
+
+// GetCSIDriverInfo get CSIDriver by name
+func (c *CachedCSIDriverInfo) GetCSIDriverInfo(name string) (*storagev1beta1.CSIDriver, error) {
+	return c.Get(name)
+}
+
 // CSIMaxVolumeLimitChecker defines predicate needed for counting CSI volumes
 type CSIMaxVolumeLimitChecker struct {
-	pvInfo  PersistentVolumeInfo
-	pvcInfo PersistentVolumeClaimInfo
-	scInfo  StorageClassInfo
+	pvInfo        PersistentVolumeInfo
+	pvcInfo       PersistentVolumeClaimInfo
+	scInfo        StorageClassInfo
+	csiDriverInfo CSIDriverInfo
 
 	randomVolumeIDPrefix string
 }
 
 // NewCSIMaxVolumeLimitPredicate returns a predicate for counting CSI volumes
 func NewCSIMaxVolumeLimitPredicate(
-	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, scInfo StorageClassInfo) FitPredicate {
+	driverInfo CSIDriverInfo, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, scInfo StorageClassInfo) FitPredicate {
 	c := &CSIMaxVolumeLimitChecker{
 		pvInfo:               pvInfo,
 		pvcInfo:              pvcInfo,
 		scInfo:               scInfo,
+		csiDriverInfo:        driverInfo,
 		randomVolumeIDPrefix: rand.String(32),
 	}
 	return c.attachableLimitPredicate
@@ -236,13 +254,20 @@ func (c *CSIMaxVolumeLimitChecker) getCSIDriverInfoFromSC(csiNode *storagev1beta
 			return "", ""
 		}
 
-		driverName, err := csilib.GetCSINameFromInTreeName(provisioner)
+		name, err := csilib.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
 			klog.V(5).Infof("Unable to look up driver name from plugin name: %v", err)
 			return "", ""
 		}
-		return driverName, volumeHandle
+
+		return name, volumeHandle
 	}
 
-	return provisioner, volumeHandle
+	csiDriver, err := c.csiDriverInfo.GetCSIDriverInfo(provisioner)
+	if err != nil {
+		klog.V(5).Infof("Could not find CSI driver for PVC %s/%s: %v", namespace, pvcName, err)
+		return "", ""
+	}
+
+	return csiDriver.Name, volumeHandle
 }

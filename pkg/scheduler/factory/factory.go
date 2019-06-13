@@ -189,6 +189,8 @@ type configFactory struct {
 	storageClassLister storagelistersv1.StorageClassLister
 	// a means to list all CSINodes
 	csiNodeLister storagelistersv1beta1.CSINodeLister
+	// a means to list all CSIDrivers
+	csiDriverLister storagelistersv1beta1.CSIDriverLister
 	// framework has a set of plugins and the context used for running them.
 	framework framework.Framework
 
@@ -242,6 +244,7 @@ type ConfigFactoryArgs struct {
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
 	StorageClassInformer           storageinformersv1.StorageClassInformer
 	CSINodeInformer                storageinformersv1beta1.CSINodeInformer
+	CSIDriverInformer              storageinformersv1beta1.CSIDriverInformer
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
@@ -277,6 +280,11 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		csiNodeLister = args.CSINodeInformer.Lister()
 	}
 
+	var csiDriverLister storagelistersv1beta1.CSIDriverLister
+	if args.CSIDriverInformer != nil {
+		csiDriverLister = args.CSIDriverInformer.Lister()
+	}
+
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
@@ -291,6 +299,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
 		csiNodeLister:                  csiNodeLister,
+		csiDriverLister:                csiDriverLister,
 		framework:                      framework,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
@@ -580,6 +589,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
+		CSIDriverInfo:                  &predicates.CachedCSIDriverInfo{CSIDriverLister: c.csiDriverLister},
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
 	}, nil

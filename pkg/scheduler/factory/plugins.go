@@ -46,6 +46,7 @@ type PluginFactoryArgs struct {
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
 	StorageClassInfo               predicates.StorageClassInfo
+	CSIDriverInfo                  predicates.CSIDriverInfo
 	VolumeBinder                   *volumebinder.VolumeBinder
 	HardPodAffinitySymmetricWeight int32
 }

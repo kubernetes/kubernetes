@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -452,7 +453,8 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				expectedFailureReasons = []PredicateFailureReason{test.expectedFailureReason}
 			}
 
-			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIPVInfo(test.filterName, test.driverNames...),
+			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIDriverInfo(test.driverNames...),
+				getFakeCSIPVInfo(test.filterName, test.driverNames...),
 				getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...),
 				getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0]))
 
@@ -542,6 +544,18 @@ func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) FakePer
 		Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName, VolumeName: "missing-in-action"},
 	})
 	return pvcInfos
+}
+
+func getFakeCSIDriverInfo(driverNames ...string) FakeCSIDriverInfo {
+	csiDriverInfos := FakeCSIDriverInfo{}
+	for _, name := range driverNames {
+		csiDriver := storagev1beta1.CSIDriver{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec:       storagev1beta1.CSIDriverSpec{},
+		}
+		csiDriverInfos = append(csiDriverInfos, csiDriver)
+	}
+	return csiDriverInfos
 }
 
 func enableMigrationOnNode(nodeInfo *schedulernodeinfo.NodeInfo, pluginName string) {

@@ -201,6 +201,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
 		informerFactory.Storage().V1beta1().CSINodes(),
+		informerFactory.Storage().V1beta1().CSIDrivers(),
 		eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,

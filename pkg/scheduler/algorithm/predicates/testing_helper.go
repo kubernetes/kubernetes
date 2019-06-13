@@ -19,8 +19,9 @@ package predicates
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 )
 
 // FakePersistentVolumeClaimInfo declares a []v1.PersistentVolumeClaim type for testing.
@@ -82,4 +83,17 @@ func (classes FakeStorageClassInfo) GetStorageClassInfo(name string) (*storagev1
 		}
 	}
 	return nil, fmt.Errorf("Unable to find storage class: %s", name)
+}
+
+// FakeCSIDriverInfo declares a []storagev1beta1.CSIDriver type for testing.
+type FakeCSIDriverInfo []storagev1beta1.CSIDriver
+
+// GetCSIDriverInfo returns a fake CSIDriver object in the fake drivers.
+func (drivers FakeCSIDriverInfo) GetCSIDriverInfo(name string) (*storagev1beta1.CSIDriver, error) {
+	for _, d := range drivers {
+		if d.Name == name {
+			return &d, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find CSI driver: %s", name)
 }
