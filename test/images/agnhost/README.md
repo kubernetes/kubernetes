@@ -385,6 +385,6 @@ Usage:
 
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:1.1` for Linux
-containers, and `e2eteam/agnhost:1.1` for Windows containers. In the future, the same
+The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.1` for Linux
+containers, and `e2eteam/agnhost:2.1` for Windows containers. In the future, the same
 repository can be used for both OSes.
