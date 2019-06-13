@@ -18,6 +18,7 @@ package ipvs
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -167,7 +168,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 			// For UDP traffic, no graceful termination, we immediately delete the RS
 			//     (existing connections will be deleted on the next packet because sysctlExpireNoDestConn=1)
 			// For other protocols, don't delete until all connections have expired)
-			if rsToDelete.VirtualServer.Protocol != "udp" && rs.ActiveConn+rs.InactiveConn != 0 {
+			if strings.ToUpper(rsToDelete.VirtualServer.Protocol) != "UDP" && rs.ActiveConn+rs.InactiveConn != 0 {
 				klog.Infof("Not deleting, RS %v: %v ActiveConn, %v InactiveConn", rsToDelete.String(), rs.ActiveConn, rs.InactiveConn)
 				return false, nil
 			}
