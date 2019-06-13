@@ -307,6 +307,7 @@ func (s *Server) InstallDefaultHandlers() {
 		cadvisormetrics.NetworkUsageMetrics:     struct{}{},
 		cadvisormetrics.AcceleratorUsageMetrics: struct{}{},
 		cadvisormetrics.AppMetrics:              struct{}{},
+		cadvisormetrics.ProcessMetrics:          struct{}{},
 	}
 	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabelsFunc(s.host), includedMetrics))
 	s.restfulCont.Handle(cadvisorMetricsPath,
