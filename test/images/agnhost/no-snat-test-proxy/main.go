@@ -31,7 +31,7 @@ var CmdNoSnatTestProxy = &cobra.Command{
 	Use:   "no-snat-test-proxy",
 	Short: "Creates a proxy for the /checknosnat endpoint",
 	Long:  `Creates the /checknosnat endpoint which proxies the request to the given target (/checknosnat?target=target_ip&ips=ip1,ip2) and returns its response, or a 500 response on error.`,
-	Args:  cobra.MaximumNArgs(1),
+	Args:  cobra.MaximumNArgs(0),
 	Run:   main,
 }
 

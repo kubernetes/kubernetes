@@ -44,7 +44,7 @@ var CmdLogsGenerator = &cobra.Command{
 	Use:   "logs-generator",
 	Short: "Outputs lines of logs to stdout uniformly",
 	Long:  "Outputs <linesTotal> lines of logs to stdout uniformly for <duration>",
-	Args:  cobra.MaximumNArgs(2),
+	Args:  cobra.MaximumNArgs(0),
 	Run:   generateLogs,
 }
 

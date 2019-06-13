@@ -37,7 +37,7 @@ var CmdNoSnatTest = &cobra.Command{
 - /whoami - returns the request's IP address.
 - /checknosnat - queries  "ip/whoami" for each provided IP ("/checknosnat?ips=ip1,ip2"),
   and if all the response bodies match the "POD_IP" environment variable, it will return a 200 response, 500 otherwise.`,
-	Args: cobra.MaximumNArgs(1),
+	Args: cobra.MaximumNArgs(0),
 	Run:  main,
 }
 
