@@ -2233,6 +2233,20 @@ func schema_pkg_apis_meta_v1_OwnerReference(ref common.ReferenceCallback) common
 							Format:      "",
 						},
 					},
+					"resource": {
+						SchemaProps: spec.SchemaProps{
+							Description: "resource of the referent.  If specified, it takes priority over `kind`. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"namespace": {
+						SchemaProps: spec.SchemaProps{
+							Description: "namespace of the referent.  If specified, it must be empty for cluster scoped resources or in the same namespace as the dependent. More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"apiVersion", "kind", "name", "uid"},
 			},

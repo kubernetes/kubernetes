@@ -744,6 +744,16 @@ message OwnerReference {
   // otherwise 422 (Unprocessable Entity) will be returned.
   // +optional
   optional bool blockOwnerDeletion = 7;
+
+  // resource of the referent.  If specified, it takes priority over `kind`.
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#resources
+  // +optional
+  optional string resource = 8;
+
+  // namespace of the referent.  If specified, it must be empty for cluster scoped resources or in the same namespace as the dependent.
+  // More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional string namespace = 9;
 }
 
 // PartialObjectMetadata is a generic representation of any object with ObjectMeta. It allows clients
