@@ -771,7 +771,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 			for i := int32(0); i < batchSize; i++ {
 				go func() {
 					defer wait.Done()
-					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewControllerResourceRef(job, controllerResource, controllerKind))
+					err := jm.podControl.CreatePodsWithControllerRef(job.Namespace, &job.Spec.Template, job, metav1.NewNamespacedControllerRef(job, controllerResource, controllerKind))
 					if err != nil && errors.IsTimeout(err) {
 						// Pod is created but its initialization has timed out.
 						// If the initialization is successful eventually, the

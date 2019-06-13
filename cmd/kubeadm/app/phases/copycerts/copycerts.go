@@ -161,7 +161,7 @@ func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.Own
 	}
 
 	gvr := schema.GroupVersionResource{Version: "v1", Resource: "secrets"}
-	ref := metav1.NewControllerResourceRef(secret, gvr, "Secret")
+	ref := metav1.NewNamespacedControllerRef(secret, gvr, "Secret")
 	return []metav1.OwnerReference{*ref}, nil
 }
 

@@ -160,7 +160,7 @@ func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*bat
 			Labels:          labels,
 			Annotations:     annotations,
 			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(sj, controllerResource, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(sj, controllerResource, controllerKind)},
 		},
 	}
 	if err := legacyscheme.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {

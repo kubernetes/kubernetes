@@ -1051,13 +1051,13 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 						podTemplate.Spec.Affinity, nodesNeedingDaemonPods[ix])
 
 					err = dsc.podControl.CreatePodsWithControllerRef(ds.Namespace, podTemplate,
-						ds, metav1.NewControllerResourceRef(ds, controllerResource, controllerKind))
+						ds, metav1.NewNamespacedControllerRef(ds, controllerResource, controllerKind))
 				} else {
 					// If pod is scheduled by DaemonSetController, set its '.spec.scheduleName'.
 					podTemplate.Spec.SchedulerName = "kubernetes.io/daemonset-controller"
 
 					err = dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, podTemplate,
-						ds, metav1.NewControllerResourceRef(ds, controllerResource, controllerKind))
+						ds, metav1.NewNamespacedControllerRef(ds, controllerResource, controllerKind))
 				}
 
 				if err != nil && errors.IsTimeout(err) {

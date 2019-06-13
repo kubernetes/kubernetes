@@ -51,7 +51,7 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 		},
 	}
 	if owner != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerResourceRef(owner, apps.SchemeGroupVersion.WithResource("fakes"), "Fake")}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(owner, apps.SchemeGroupVersion.WithResource("fakes"), "Fake")}
 	}
 	return pod
 }

@@ -165,7 +165,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            jobName,
 					Annotations:     map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
-					OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(cronJob, appsv1.SchemeGroupVersion.WithResource("cronjobs"), "CronJob")},
+					OwnerReferences: []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(cronJob, appsv1.SchemeGroupVersion.WithResource("cronjobs"), "CronJob")},
 				},
 				Spec: batchv1.JobSpec{
 					Template: corev1.PodTemplateSpec{

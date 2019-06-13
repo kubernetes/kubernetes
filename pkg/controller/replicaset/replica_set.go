@@ -492,7 +492,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
-			err := rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerResourceRef(rs, rsc.controllerResource, rsc.controllerKind))
+			err := rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, metav1.NewNamespacedControllerRef(rs, rsc.controllerResource, rsc.controllerKind))
 			if err != nil && errors.IsTimeout(err) {
 				// Pod is created but its initialization has timed out.
 				// If the initialization is successful eventually, the

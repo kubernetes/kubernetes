@@ -102,7 +102,7 @@ func newPod(name string, job *batch.Job) *v1.Pod {
 			Name:            name,
 			Labels:          job.Spec.Selector.MatchLabels,
 			Namespace:       job.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(job, controllerResource, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(job, controllerResource, controllerKind)},
 		},
 	}
 }
@@ -1011,7 +1011,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 
 	// Changed ControllerRef. Expect both old and new to queue.
 	prev := *pod1
-	prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerResourceRef(job2, controllerResource, controllerKind)}
+	prev.OwnerReferences = []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(job2, controllerResource, controllerKind)}
 	bumpResourceVersion(pod1)
 	jm.updatePod(&prev, pod1)
 	if got, want := jm.queue.Len(), 2; got != want {

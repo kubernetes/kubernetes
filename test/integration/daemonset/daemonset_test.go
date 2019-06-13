@@ -881,7 +881,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 			Namespace:       ds.Namespace,
 			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, apps.DefaultDaemonSetUniqueLabelKey, newHash),
 			Annotations:     ds.Annotations,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(ds, apps.SchemeGroupVersion.WithResource("daemonsets"), "DaemonSet")},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(ds, apps.SchemeGroupVersion.WithResource("daemonsets"), "DaemonSet")},
 		},
 		Data:     revision.Data,
 		Revision: revision.Revision + 1,

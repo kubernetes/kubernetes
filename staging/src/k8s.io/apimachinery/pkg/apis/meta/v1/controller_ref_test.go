@@ -28,18 +28,19 @@ type metaObj struct {
 }
 
 func TestNewControllerRef(t *testing.T) {
-	gvk := schema.GroupVersionKind{
-		Group:   "group",
-		Version: "v1",
-		Kind:    "Kind",
+	gvr := schema.GroupVersionResource{
+		Group:    "group",
+		Version:  "v1",
+		Resource: "resource",
 	}
+	kind := "Kind"
 	obj1 := &metaObj{
 		ObjectMeta: ObjectMeta{
 			Name: "name",
 			UID:  "uid1",
 		},
 	}
-	controllerRef := NewControllerRef(obj1, gvk)
+	controllerRef := NewControllerRef(obj1, gvr, kind)
 	if controllerRef.UID != obj1.UID {
 		t.Errorf("Incorrect UID: %s", controllerRef.UID)
 	}
@@ -49,26 +50,28 @@ func TestNewControllerRef(t *testing.T) {
 	if controllerRef.BlockOwnerDeletion == nil || *controllerRef.BlockOwnerDeletion != true {
 		t.Error("BlockOwnerDeletion must be set to true")
 	}
-	if controllerRef.APIVersion == "" ||
-		controllerRef.Kind == "" ||
-		controllerRef.Name == "" {
+	if controllerRef.APIVersion != "group/v1" ||
+		controllerRef.Kind != "Kind" ||
+		controllerRef.Resource != "resource" ||
+		controllerRef.Name != "name" {
 		t.Errorf("All controllerRef fields must be set: %v", controllerRef)
 	}
 }
 
 func TestGetControllerOf(t *testing.T) {
-	gvk := schema.GroupVersionKind{
-		Group:   "group",
-		Version: "v1",
-		Kind:    "Kind",
+	gvr := schema.GroupVersionResource{
+		Group:    "group",
+		Version:  "v1",
+		Resource: "resource",
 	}
+	kind := "Kind"
 	obj1 := &metaObj{
 		ObjectMeta: ObjectMeta{
 			UID:  "uid1",
 			Name: "name1",
 		},
 	}
-	controllerRef := NewControllerRef(obj1, gvk)
+	controllerRef := NewControllerRef(obj1, gvr, kind)
 	var falseRef = false
 	obj2 := &metaObj{
 		ObjectMeta: ObjectMeta{
@@ -98,11 +101,12 @@ func TestGetControllerOf(t *testing.T) {
 }
 
 func TestIsControlledBy(t *testing.T) {
-	gvk := schema.GroupVersionKind{
-		Group:   "group",
-		Version: "v1",
-		Kind:    "Kind",
+	gvr := schema.GroupVersionResource{
+		Group:    "group",
+		Version:  "v1",
+		Resource: "resource",
 	}
+	kind := "Kind"
 	obj1 := &metaObj{
 		ObjectMeta: ObjectMeta{
 			UID: "uid1",
@@ -112,7 +116,7 @@ func TestIsControlledBy(t *testing.T) {
 		ObjectMeta: ObjectMeta{
 			UID: "uid2",
 			OwnerReferences: []OwnerReference{
-				*NewControllerRef(obj1, gvk),
+				*NewControllerRef(obj1, gvr, kind),
 			},
 		},
 	}
@@ -120,7 +124,7 @@ func TestIsControlledBy(t *testing.T) {
 		ObjectMeta: ObjectMeta{
 			UID: "uid3",
 			OwnerReferences: []OwnerReference{
-				*NewControllerRef(obj2, gvk),
+				*NewControllerRef(obj2, gvr, kind),
 			},
 		},
 	}

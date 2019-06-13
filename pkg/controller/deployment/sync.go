@@ -196,7 +196,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 			// Make the name deterministic, to ensure idempotence
 			Name:            d.Name + "-" + podTemplateSpecHash,
 			Namespace:       d.Namespace,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(d, controllerResource, controllerKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(d, controllerResource, controllerKind)},
 			Labels:          newRSTemplate.Labels,
 		},
 		Spec: apps.ReplicaSetSpec{

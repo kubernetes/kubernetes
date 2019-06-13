@@ -74,7 +74,7 @@ func NewControllerRevision(parent metav1.Object,
 	cr := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          labelMap,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerResourceRef(parent, parentResource, parentKind)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewNamespacedControllerRef(parent, parentResource, parentKind)},
 		},
 		Data:     data,
 		Revision: revision,
@@ -422,7 +422,7 @@ func (fh *fakeHistory) AdoptControllerRevision(parent metav1.Object, parentResou
 		return nil, errors.NewNotFound(apps.Resource("controllerrevisions"), revision.Name)
 	}
 	clone := revision.DeepCopy()
-	clone.OwnerReferences = append(clone.OwnerReferences, *metav1.NewControllerResourceRef(parent, parentResource, parentKind))
+	clone.OwnerReferences = append(clone.OwnerReferences, *metav1.NewNamespacedControllerRef(parent, parentResource, parentKind))
 	return clone, fh.indexer.Update(clone)
 }
 
