@@ -23,7 +23,7 @@ import (
 )
 
 // Histogram is our internal representation for our wrapping struct around prometheus
-// histograms. Summary implements both KubeCollector and ObserverMetric
+// histograms. Summary implements both kubeCollector and ObserverMetric
 type Histogram struct {
 	ObserverMetric
 	*HistogramOpts
@@ -82,7 +82,7 @@ type HistogramVec struct {
 	originalLabels []string
 }
 
-// NewHistogramVec returns an object which satisfies KubeCollector and wraps the
+// NewHistogramVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.HistogramVec object. However, the object returned will not measure
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {

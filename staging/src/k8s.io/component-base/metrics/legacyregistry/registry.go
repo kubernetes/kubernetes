@@ -32,25 +32,25 @@ import (
 
 var (
 	globalRegistryFactory = metricsRegistryFactory{
-		registerQueue:     make([]metrics.KubeCollector, 0),
-		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		registerQueue:     make([]metrics.Registerable, 0),
+		mustRegisterQueue: make([]metrics.Registerable, 0),
 		globalRegistry:    noopRegistry{},
 	}
 )
 
 type noopRegistry struct{}
 
-func (noopRegistry) Register(metrics.KubeCollector) error  { return nil }
-func (noopRegistry) MustRegister(...metrics.KubeCollector) {}
-func (noopRegistry) Unregister(metrics.KubeCollector) bool { return true }
-func (noopRegistry) Gather() ([]*dto.MetricFamily, error)  { return nil, nil }
+func (noopRegistry) Register(metrics.Registerable) error  { return nil }
+func (noopRegistry) MustRegister(...metrics.Registerable) {}
+func (noopRegistry) Unregister(metrics.Registerable) bool { return true }
+func (noopRegistry) Gather() ([]*dto.MetricFamily, error) { return nil, nil }
 
 type metricsRegistryFactory struct {
 	globalRegistry    metrics.KubeRegistry
 	kubeVersion       *apimachineryversion.Info
 	registrationLock  sync.Mutex
-	registerQueue     []metrics.KubeCollector
-	mustRegisterQueue []metrics.KubeCollector
+	registerQueue     []metrics.Registerable
+	mustRegisterQueue []metrics.Registerable
 }
 
 // HandlerForGlobalRegistry returns a http handler for the global registry. This
@@ -95,7 +95,7 @@ func SetRegistryFactoryVersion(ver apimachineryversion.Info) []error {
 
 // Register registers a collectable metric, but it uses a global registry. Registration is deferred
 // until the global registry has a version to use.
-func Register(c metrics.KubeCollector) error {
+func Register(c metrics.Registerable) error {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 
@@ -110,7 +110,7 @@ func Register(c metrics.KubeCollector) error {
 // MustRegister works like Register but registers any number of
 // Collectors and panics upon the first registration that causes an
 // error. Registration is deferred  until the global registry has a version to use.
-func MustRegister(cs ...metrics.KubeCollector) {
+func MustRegister(cs ...metrics.Registerable) {
 	globalRegistryFactory.registrationLock.Lock()
 	defer globalRegistryFactory.registrationLock.Unlock()
 

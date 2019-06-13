@@ -23,12 +23,19 @@ import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
+// Registerable is an interface for a collector metric which we
+// will register with KubeRegistry.
+type Registerable interface {
+	prometheus.Collector
+	Create(version *semver.Version) bool
+}
+
 // KubeRegistry is an interface which implements a subset of prometheus.Registerer and
 // prometheus.Gatherer interfaces
 type KubeRegistry interface {
-	Register(KubeCollector) error
-	MustRegister(...KubeCollector)
-	Unregister(KubeCollector) bool
+	Register(Registerable) error
+	MustRegister(...Registerable)
+	Unregister(Registerable) bool
 	Gather() ([]*dto.MetricFamily, error)
 }
 
@@ -45,7 +52,7 @@ type kubeRegistry struct {
 // Collector are invalid or if they — in combination with descriptors of
 // already registered Collectors — do not fulfill the consistency and
 // uniqueness criteria described in the documentation of metric.Desc.
-func (kr *kubeRegistry) Register(c KubeCollector) error {
+func (kr *kubeRegistry) Register(c Registerable) error {
 	if c.Create(&kr.version) {
 		return kr.PromRegistry.Register(c)
 	}
@@ -55,7 +62,7 @@ func (kr *kubeRegistry) Register(c KubeCollector) error {
 // MustRegister works like Register but registers any number of
 // Collectors and panics upon the first registration that causes an
 // error.
-func (kr *kubeRegistry) MustRegister(cs ...KubeCollector) {
+func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 	metrics := make([]prometheus.Collector, 0, len(cs))
 	for _, c := range cs {
 		if c.Create(&kr.version) {
@@ -71,7 +78,7 @@ func (kr *kubeRegistry) MustRegister(cs ...KubeCollector) {
 // returns whether a Collector was unregistered. Note that an unchecked
 // Collector cannot be unregistered (as its Describe method does not
 // yield any descriptor).
-func (kr *kubeRegistry) Unregister(collector KubeCollector) bool {
+func (kr *kubeRegistry) Unregister(collector Registerable) bool {
 	return kr.PromRegistry.Unregister(collector)
 }
 

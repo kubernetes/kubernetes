@@ -25,12 +25,12 @@ import (
 )
 
 /*
-KubeCollector extends the prometheus.Collector interface to allow customization of the metric
+kubeCollector extends the prometheus.Collector interface to allow customization of the metric
 registration process. Defer metric initialization until Create() is called, which then
 delegates to the underlying metric's initializeMetric or initializeDeprecatedMetric
 method call depending on whether the metric is deprecated or not.
 */
-type KubeCollector interface {
+type kubeCollector interface {
 	Collector
 	lazyKubeMetric
 	DeprecatedVersion() *semver.Version
@@ -57,8 +57,8 @@ type lazyKubeMetric interface {
 /*
 lazyMetric implements lazyKubeMetric. A lazy metric is lazy because it waits until metric
 registration time before instantiation. Add it as an anonymous field to a struct that
-implements KubeCollector to get deferred registration behavior. You must call lazyInit
-with the KubeCollector itself as an argument.
+implements kubeCollector to get deferred registration behavior. You must call lazyInit
+with the kubeCollector itself as an argument.
 */
 type lazyMetric struct {
 	isDeprecated        bool
@@ -66,17 +66,17 @@ type lazyMetric struct {
 	isCreated           bool
 	markDeprecationOnce sync.Once
 	createOnce          sync.Once
-	self                KubeCollector
+	self                kubeCollector
 }
 
 func (r *lazyMetric) IsCreated() bool {
 	return r.isCreated
 }
 
-// lazyInit provides the lazyMetric with a reference to the KubeCollector it is supposed
+// lazyInit provides the lazyMetric with a reference to the kubeCollector it is supposed
 // to allow lazy initialization for. It should be invoked in the factory function which creates new
-// KubeCollector type objects.
-func (r *lazyMetric) lazyInit(self KubeCollector) {
+// kubeCollector type objects.
+func (r *lazyMetric) lazyInit(self kubeCollector) {
 	r.self = self
 }
 

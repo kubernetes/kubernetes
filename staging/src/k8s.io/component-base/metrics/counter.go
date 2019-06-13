@@ -22,7 +22,7 @@ import (
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus
-// counters. Counter implements both KubeCollector and CounterMetric.
+// counters. Counter implements both kubeCollector and CounterMetric.
 type Counter struct {
 	CounterMetric
 	*CounterOpts
@@ -30,7 +30,7 @@ type Counter struct {
 	selfCollector
 }
 
-// NewCounter returns an object which satisfies the KubeCollector and CounterMetric interfaces.
+// NewCounter returns an object which satisfies the kubeCollector and CounterMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounter(opts *CounterOpts) *Counter {
@@ -74,7 +74,7 @@ func (c *Counter) initializeDeprecatedMetric() {
 }
 
 // CounterVec is the internal representation of our wrapping struct around prometheus
-// counterVecs. CounterVec implements both KubeCollector and CounterVecMetric.
+// counterVecs. CounterVec implements both kubeCollector and CounterVecMetric.
 type CounterVec struct {
 	*prometheus.CounterVec
 	*CounterOpts
@@ -82,7 +82,7 @@ type CounterVec struct {
 	originalLabels []string
 }
 
-// NewCounterVec returns an object which satisfies the KubeCollector and CounterVecMetric interfaces.
+// NewCounterVec returns an object which satisfies the kubeCollector and CounterVecMetric interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
