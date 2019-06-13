@@ -398,7 +398,7 @@ func (o *ApplyOptions) Run() error {
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
-			
+
 			options := metav1.PatchOptions{
 				Force:        &o.ForceConflicts,
 				FieldManager: o.FieldManager,
@@ -416,7 +416,7 @@ func (o *ApplyOptions) Run() error {
 			)
 			if err != nil {
 				if isIncompatibleServerError(err) {
-					klog.Warningf("serverside-apply incompatible server: %v", err)
+					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
 				}
 
 				return err
