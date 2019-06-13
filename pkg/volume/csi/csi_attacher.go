@@ -197,8 +197,7 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 				return "", errors.New("volume attachment has been deleted")
 
 			case watch.Error:
-				// start another cycle
-				c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
+				klog.Warningf("waitForVolumeAttachmentInternal received watch error: %v", event)
 			}
 
 		case <-timer.C:
