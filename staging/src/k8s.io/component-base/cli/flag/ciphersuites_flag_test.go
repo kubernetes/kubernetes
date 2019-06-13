@@ -18,9 +18,9 @@ package flag
 
 import (
 	"crypto/tls"
-	"fmt"
 	"go/importer"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -77,8 +77,23 @@ func TestStrToUInt16(t *testing.T) {
 func TestConstantMaps(t *testing.T) {
 	pkg, err := importer.Default().Import("crypto/tls")
 	if err != nil {
-		fmt.Printf("error: %s\n", err.Error())
-		return
+		t.Logf("Cannot parse go source to verify TLS constants (this is expected in bazel environments): %v", err)
+		// if we can't parse the go source (like in bazel envs),
+		// at least verify we're on a go version we've manually tested
+		manuallyVerifiedVersion := "go1.12"
+		currentVersion := runtime.Version()
+		if strings.HasPrefix(currentVersion, "go1.") {
+			currentMajorMinor := strings.Join(strings.Split(currentVersion, ".")[0:2], ".")
+			if currentMajorMinor != manuallyVerifiedVersion {
+				t.Errorf("Manually verified version (%q) does not match current environment (%q)", manuallyVerifiedVersion, currentMajorMinor)
+				t.Errorf("Run `go test ./vendor/k8s.io/component-base/cli/flag` with %s, fix any issues found, then update manuallyVerifiedVersion to %s", currentMajorMinor, currentMajorMinor)
+			} else {
+				t.Logf("current version of go (%q) matches manually verified version (%q)", currentMajorMinor, manuallyVerifiedVersion)
+			}
+		} else {
+			t.Logf("current version of go (%q) does not contain major/minor version", currentVersion)
+		}
+		t.SkipNow()
 	}
 	discoveredVersions := map[string]bool{}
 	discoveredCiphers := map[string]bool{}
