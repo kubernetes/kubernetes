@@ -26,7 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -382,13 +382,13 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 // Mapping function for gstruct.MatchAllElements
 func summaryObjectID(element interface{}) string {
 	switch el := element.(type) {
-	case stats.PodStats:
+	case kubeletstatsv1alpha1.PodStats:
 		return fmt.Sprintf("%s::%s", el.PodRef.Namespace, el.PodRef.Name)
-	case stats.ContainerStats:
+	case kubeletstatsv1alpha1.ContainerStats:
 		return el.Name
-	case stats.VolumeStats:
+	case kubeletstatsv1alpha1.VolumeStats:
 		return el.Name
-	case stats.UserDefinedMetric:
+	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
 		framework.Failf("Unknown type: %T", el)

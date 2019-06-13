@@ -1,2 +1,3 @@
 {
+	"k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1": "kubeletstatsv1alpha1"
 }
