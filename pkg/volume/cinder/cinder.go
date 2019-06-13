@@ -503,7 +503,7 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	c.pdName = path.Base(refs[0])
 	klog.V(4).Infof("Found volume %s mounted to %s", c.pdName, dir)
 
-	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
+	// lock the volume (and thus wait for any concurrent SetUpAt to finish)
 	c.plugin.volumeLocks.LockKey(c.pdName)
 	defer c.plugin.volumeLocks.UnlockKey(c.pdName)
 
