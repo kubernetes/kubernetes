@@ -106,7 +106,7 @@ const (
 	ExpandPersistentVolumes featuregate.Feature = "ExpandPersistentVolumes"
 
 	// owner: @mlmhl
-	// alpha: v1.11
+	// beta: v1.15
 	// Ability to expand persistent volumes' file system without unmounting volumes.
 	ExpandInUsePersistentVolumes featuregate.Feature = "ExpandInUsePersistentVolumes"
 
@@ -364,6 +364,7 @@ const (
 
 	// owner: @mtaufen
 	// alpha: v1.12
+	// beta:  v1.14
 	//
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
@@ -395,6 +396,7 @@ const (
 
 	// owner: @dashpole
 	// alpha: v1.13
+	// beta: v1.15
 	//
 	// Enables the kubelet's pod resources grpc endpoint
 	KubeletPodResources featuregate.Feature = "KubeletPodResources"
@@ -416,6 +418,18 @@ const (
 	//
 	// Enables the AWS EBS in-tree driver to AWS EBS CSI Driver migration feature.
 	CSIMigrationAWS featuregate.Feature = "CSIMigrationAWS"
+
+	// owner: @andyzhangx
+	// alpha: v1.15
+	//
+	// Enables the Azure Disk in-tree driver to Azure Disk Driver migration feature.
+	CSIMigrationAzureDisk featuregate.Feature = "CSIMigrationAzureDisk"
+
+	// owner: @andyzhangx
+	// alpha: v1.15
+	//
+	// Enables the Azure File in-tree driver to Azure File Driver migration feature.
+	CSIMigrationAzureFile featuregate.Feature = "CSIMigrationAzureFile"
 
 	// owner: @RobertKrawitz
 	// beta: v1.15
@@ -440,6 +454,31 @@ const (
 	//
 	// Enables the regional PD feature on GCE.
 	deprecatedGCERegionalPersistentDisk featuregate.Feature = "GCERegionalPersistentDisk"
+
+	// owner: @MrHohn
+	// alpha: v1.15
+	//
+	// Enables Finalizer Protection for Service LoadBalancers.
+	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
+
+	// owner: @RobertKrawitz
+	// alpha: v1.15
+	//
+	// Allow use of filesystems for ephemeral storage monitoring.
+	// Only applies if LocalStorageCapacityIsolation is set.
+	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
+
+	// owner: @denkensk
+	// alpha: v1.15
+	//
+	// Enables NonPreempting option for priorityClass and pod.
+	NonPreemptingPriority featuregate.Feature = "NonPreemptingPriority"
+
+	// owner: @j-griffith
+	// alpha: v1.15
+	//
+	// Enable support for specifying an existing PVC as a DataSource
+	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
 )
 
 func init() {
@@ -468,7 +507,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TaintNodesByCondition:                       {Default: true, PreRelease: featuregate.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: featuregate.Beta},
-	ExpandInUsePersistentVolumes:                {Default: false, PreRelease: featuregate.Alpha},
+	ExpandInUsePersistentVolumes:                {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:                            {Default: false, PreRelease: featuregate.Alpha},
 	AttachVolumeLimit:                           {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                  {Default: true, PreRelease: featuregate.Beta},
@@ -496,6 +535,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigration:                                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationGCE:                             {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationAWS:                             {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureDisk:                       {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureFile:                       {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                  {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationOpenStack:                       {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: featuregate.GA},
@@ -512,8 +553,12 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSnapshotDataSource:                    {Default: false, PreRelease: featuregate.Alpha},
 	ProcMountType:                               {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
-	KubeletPodResources:                         {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResources:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerFinalizer:                {Default: false, PreRelease: featuregate.Alpha},
+	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
+	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
+	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -531,8 +576,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	// unintentionally on either side:
 	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: false, PreRelease: featuregate.Alpha},
+	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
+	apiextensionsfeatures.CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

@@ -26,11 +26,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
-var _ = Describe("[sig-storage] Projected configMap", func() {
+var _ = ginkgo.Describe("[sig-storage] Projected configMap", func() {
 	f := framework.NewDefaultFramework("projected")
 
 	/*
@@ -53,7 +53,7 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [NodeFeature:FSGroup]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
@@ -68,7 +68,7 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume as non-root with FSGroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume as non-root with FSGroup [NodeFeature:FSGroup]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
@@ -102,7 +102,7 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root with FSGroup [NodeFeature:FSGroup]", func() {
+	ginkgo.It("should be consumable from pods in volume with mappings as non-root with FSGroup [NodeFeature:FSGroup]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
@@ -129,7 +129,7 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 			},
 		}
 
-		By(fmt.Sprintf("Creating projection with configMap that has name %s", configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating projection with configMap that has name %s", configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
@@ -175,23 +175,23 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
-		By("Creating the pod")
+		ginkgo.By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		}
 
-		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
-		By(fmt.Sprintf("Updating configmap %v", configMap.Name))
+		ginkgo.By(fmt.Sprintf("Updating configmap %v", configMap.Name))
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
 		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(configMap)
 		framework.ExpectNoError(err, "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
-		By("waiting to observe update in volume")
-		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
+		ginkgo.By("waiting to observe update in volume")
+		gomega.Eventually(pollLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-2"))
 	})
 
 	/*
@@ -244,13 +244,13 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 			},
 		}
 
-		By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
 		var err error
 		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(deleteConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", deleteConfigMap.Name, err)
 		}
 
-		By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
 		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(updateConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", updateConfigMap.Name, err)
 		}
@@ -354,45 +354,45 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 				RestartPolicy: v1.RestartPolicyNever,
 			},
 		}
-		By("Creating the pod")
+		ginkgo.By("Creating the pod")
 		f.PodClient().CreateSync(pod)
 
 		pollCreateLogs := func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, createContainerName)
 		}
-		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/create/data-1"))
+		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/create/data-1"))
 
 		pollUpdateLogs := func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, updateContainerName)
 		}
-		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/update/data-3"))
+		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/update/data-3"))
 
 		pollDeleteLogs := func() (string, error) {
 			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, deleteContainerName)
 		}
-		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
+		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
 
-		By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
+		ginkgo.By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
 		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(deleteConfigMap.Name, &metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
 
-		By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
+		ginkgo.By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
 		updateConfigMap.ResourceVersion = "" // to force update
 		delete(updateConfigMap.Data, "data-1")
 		updateConfigMap.Data["data-3"] = "value-3"
 		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
 		framework.ExpectNoError(err, "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
 
-		By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
 		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
 		}
 
-		By("waiting to observe update in volume")
+		ginkgo.By("waiting to observe update in volume")
 
-		Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
-		Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-3"))
-		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/delete/data-1"))
+		gomega.Eventually(pollCreateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-1"))
+		gomega.Eventually(pollUpdateLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("value-3"))
+		gomega.Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("Error reading file /etc/projected-configmap-volumes/delete/data-1"))
 	})
 
 	/*
@@ -410,7 +410,7 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 			configMap        = newConfigMap(f, name)
 		)
 
-		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+		ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
 		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
@@ -488,21 +488,21 @@ var _ = Describe("[sig-storage] Projected configMap", func() {
 	//The pod is in pending during volume creation until the configMap objects are available
 	//or until mount the configMap volume times out. There is no configMap object defined for the pod, so it should return timout exception unless it is marked optional.
 	//Slow (~5 mins)
-	It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
+	ginkgo.It("Should fail non-optional pod creation due to configMap object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/projected-configmap-volumes"
 		podName := "pod-projected-configmaps-" + string(uuid.NewUUID())
 		err := createNonOptionalConfigMapPod(f, volumeMountPath, podName)
-		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
 	})
 
 	//ConfigMap object defined for the pod, If a key is specified which is not present in the ConfigMap,
 	// the volume setup will error unless it is marked optional, during the pod creation.
 	//Slow (~5 mins)
-	It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
+	ginkgo.It("Should fail non-optional pod creation due to the key in the configMap object does not exist [Slow]", func() {
 		volumeMountPath := "/etc/configmap-volumes"
 		podName := "pod-configmaps-" + string(uuid.NewUUID())
 		err := createNonOptionalConfigMapPodWithConfig(f, volumeMountPath, podName)
-		Expect(err).To(HaveOccurred(), "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
+		framework.ExpectError(err, "created pod %q with non-optional configMap in namespace %q", podName, f.Namespace.Name)
 	})
 })
 
@@ -517,7 +517,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 		configMap       = newConfigMap(f, name)
 	)
 
-	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
 	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
@@ -598,7 +598,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 		configMap       = newConfigMap(f, name)
 	)
 
-	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+	ginkgo.By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 
 	var err error
 	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {

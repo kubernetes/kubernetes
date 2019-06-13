@@ -26,6 +26,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
+// PluginName is a string with the name of the plugin
 const PluginName = "LimitPodHardAntiAffinityTopology"
 
 // Register registers a plugin

@@ -41,3 +41,72 @@ func ConvertToGVK(obj runtime.Object, gvk schema.GroupVersionKind, o admission.O
 	out.GetObjectKind().SetGroupVersionKind(gvk)
 	return out, nil
 }
+
+// NewVersionedAttributes returns versioned attributes with the old and new object (if non-nil) converted to the requested kind
+func NewVersionedAttributes(attr admission.Attributes, gvk schema.GroupVersionKind, o admission.ObjectInterfaces) (*VersionedAttributes, error) {
+	// convert the old and new objects to the requested version
+	versionedAttr := &VersionedAttributes{
+		Attributes:    attr,
+		VersionedKind: gvk,
+	}
+	if oldObj := attr.GetOldObject(); oldObj != nil {
+		out, err := ConvertToGVK(oldObj, gvk, o)
+		if err != nil {
+			return nil, err
+		}
+		versionedAttr.VersionedOldObject = out
+	}
+	if obj := attr.GetObject(); obj != nil {
+		out, err := ConvertToGVK(obj, gvk, o)
+		if err != nil {
+			return nil, err
+		}
+		versionedAttr.VersionedObject = out
+	}
+	return versionedAttr, nil
+}
+
+// ConvertVersionedAttributes converts VersionedObject and VersionedOldObject to the specified kind, if needed.
+// If attr.VersionedKind already matches the requested kind, no conversion is performed.
+// If conversion is required:
+// * attr.VersionedObject is used as the source for the new object if Dirty=true (and is round-tripped through attr.Attributes.Object, clearing Dirty in the process)
+// * attr.Attributes.Object is used as the source for the new object if Dirty=false
+// * attr.Attributes.OldObject is used as the source for the old object
+func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersionKind, o admission.ObjectInterfaces) error {
+	// we already have the desired kind, we're done
+	if attr.VersionedKind == gvk {
+		return nil
+	}
+
+	// convert the original old object to the desired GVK
+	if oldObj := attr.Attributes.GetOldObject(); oldObj != nil {
+		out, err := ConvertToGVK(oldObj, gvk, o)
+		if err != nil {
+			return err
+		}
+		attr.VersionedOldObject = out
+	}
+
+	if attr.VersionedObject != nil {
+		// convert the existing versioned object to internal
+		if attr.Dirty {
+			err := o.GetObjectConvertor().Convert(attr.VersionedObject, attr.Attributes.GetObject(), nil)
+			if err != nil {
+				return err
+			}
+		}
+
+		// and back to external
+		out, err := ConvertToGVK(attr.Attributes.GetObject(), gvk, o)
+		if err != nil {
+			return err
+		}
+		attr.VersionedObject = out
+	}
+
+	// Remember we converted to this version
+	attr.VersionedKind = gvk
+	attr.Dirty = false
+
+	return nil
+}

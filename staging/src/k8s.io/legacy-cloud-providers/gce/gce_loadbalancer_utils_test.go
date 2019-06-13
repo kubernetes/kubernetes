@@ -62,6 +62,12 @@ func fakeLoadbalancerService(lbType string) *v1.Service {
 	}
 }
 
+func fakeLoadbalancerServiceWithNEGs(lbType string) *v1.Service {
+	svc := fakeLoadbalancerService(lbType)
+	svc.Annotations[NEGAnnotation] = "{\"ilb\": true}"
+	return svc
+}
+
 var (
 	FilewallChangeMsg = fmt.Sprintf("%s %s %s", v1.EventTypeNormal, eventReasonManualChange, eventMsgFirewallChange)
 )

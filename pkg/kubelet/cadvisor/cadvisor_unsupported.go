@@ -31,7 +31,7 @@ type cadvisorUnsupported struct {
 
 var _ Interface = new(cadvisorUnsupported)
 
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats bool) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 

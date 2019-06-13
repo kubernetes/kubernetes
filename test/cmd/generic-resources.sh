@@ -276,8 +276,8 @@ run_recursive_resources_tests() {
   kubectl delete deployment nginx "${kube_flags[@]}"
 
   ## Convert multiple busybox PODs recursively from directory of YAML files
-  # Pre-condition: busybox0 & busybox1 PODs exist
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
+  # Pre-condition: only busybox0 & busybox1 PODs exist
+  kube::test::wait_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl convert -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 PODs are converted, and since busybox2 is malformed, it should error

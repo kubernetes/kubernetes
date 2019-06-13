@@ -32,7 +32,7 @@ github.com/JeffAshton/win_pdh
 github.com/MakeNowJust/heredoc
 # github.com/Microsoft/go-winio v0.4.11 => github.com/Microsoft/go-winio v0.4.11
 github.com/Microsoft/go-winio
-# github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1 => github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1
+# github.com/Microsoft/hcsshim v0.8.6 => github.com/Microsoft/hcsshim v0.8.6
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/hcn
 github.com/Microsoft/hcsshim/internal/cni
@@ -778,7 +778,7 @@ github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 => github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
 github.com/vishvananda/netns
-# github.com/vmware/govmomi v0.20.0 => github.com/vmware/govmomi v0.20.0
+# github.com/vmware/govmomi v0.20.1 => github.com/vmware/govmomi v0.20.1
 github.com/vmware/govmomi
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/list
@@ -878,6 +878,7 @@ golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
+golang.org/x/sys/windows/svc/mgr
 # golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -1073,6 +1074,8 @@ k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation
 k8s.io/apiextensions-apiserver/pkg/apiserver
 k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema
+k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting
+k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning
 k8s.io/apiextensions-apiserver/pkg/apiserver/validation
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
@@ -1183,6 +1186,7 @@ k8s.io/apiserver/pkg/admission/configuration
 k8s.io/apiserver/pkg/admission/initializer
 k8s.io/apiserver/pkg/admission/metrics
 k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
+k8s.io/apiserver/pkg/admission/plugin/webhook
 k8s.io/apiserver/pkg/admission/plugin/webhook/config
 k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
 k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
@@ -1191,10 +1195,12 @@ k8s.io/apiserver/pkg/admission/plugin/webhook/generic
 k8s.io/apiserver/pkg/admission/plugin/webhook/initializer
 k8s.io/apiserver/pkg/admission/plugin/webhook/mutating
 k8s.io/apiserver/pkg/admission/plugin/webhook/namespace
+k8s.io/apiserver/pkg/admission/plugin/webhook/object
 k8s.io/apiserver/pkg/admission/plugin/webhook/request
 k8s.io/apiserver/pkg/admission/plugin/webhook/rules
 k8s.io/apiserver/pkg/admission/plugin/webhook/util
 k8s.io/apiserver/pkg/admission/plugin/webhook/validating
+k8s.io/apiserver/pkg/admission/testing
 k8s.io/apiserver/pkg/apis/apiserver
 k8s.io/apiserver/pkg/apis/apiserver/install
 k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
@@ -1511,6 +1517,7 @@ k8s.io/client-go/tools/clientcmd
 k8s.io/client-go/tools/clientcmd/api
 k8s.io/client-go/tools/clientcmd/api/latest
 k8s.io/client-go/tools/clientcmd/api/v1
+k8s.io/client-go/tools/events
 k8s.io/client-go/tools/leaderelection
 k8s.io/client-go/tools/leaderelection/resourcelock
 k8s.io/client-go/tools/metrics
@@ -1561,6 +1568,7 @@ k8s.io/component-base/config/validation
 k8s.io/component-base/featuregate
 k8s.io/component-base/featuregate/testing
 k8s.io/component-base/logs
+k8s.io/component-base/metrics
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2

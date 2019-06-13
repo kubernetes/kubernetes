@@ -233,6 +233,28 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 
 	allErrs = append(allErrs, s.strategies.SysctlsStrategy.Validate(pod)...)
 
+	allErrs = append(allErrs, s.validatePodVolumes(pod)...)
+
+	if s.psp.Spec.RuntimeClass != nil {
+		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
+	}
+
+	fldPath := field.NewPath("spec", "initContainers")
+	for i := range pod.Spec.InitContainers {
+		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.InitContainers[i], fldPath.Index(i))...)
+	}
+
+	fldPath = field.NewPath("spec", "containers")
+	for i := range pod.Spec.Containers {
+		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.Containers[i], fldPath.Index(i))...)
+	}
+
+	return allErrs
+}
+
+func (s *simpleProvider) validatePodVolumes(pod *api.Pod) field.ErrorList {
+	allErrs := field.ErrorList{}
+
 	if len(pod.Spec.Volumes) > 0 {
 		allowsAllVolumeTypes := psputil.PSPAllowsAllVolumes(s.psp)
 		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
@@ -250,7 +272,8 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 				continue
 			}
 
-			if fsType == policy.HostPath {
+			switch fsType {
+			case policy.HostPath:
 				allows, mustBeReadOnly := psputil.AllowsHostVolumePath(s.psp, v.HostPath.Path)
 				if !allows {
 					allErrs = append(allErrs, field.Invalid(
@@ -279,38 +302,44 @@ func (s *simpleProvider) ValidatePod(pod *api.Pod) field.ErrorList {
 						}
 					}
 				}
-			}
 
-			if fsType == policy.FlexVolume && len(s.psp.Spec.AllowedFlexVolumes) > 0 {
-				found := false
-				driver := v.FlexVolume.Driver
-				for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
-					if driver == allowedFlexVolume.Driver {
-						found = true
-						break
+			case policy.FlexVolume:
+				if len(s.psp.Spec.AllowedFlexVolumes) > 0 {
+					found := false
+					driver := v.FlexVolume.Driver
+					for _, allowedFlexVolume := range s.psp.Spec.AllowedFlexVolumes {
+						if driver == allowedFlexVolume.Driver {
+							found = true
+							break
+						}
+					}
+					if !found {
+						allErrs = append(allErrs,
+							field.Invalid(field.NewPath("spec", "volumes").Index(i).Child("driver"), driver,
+								"Flexvolume driver is not allowed to be used"))
 					}
 				}
-				if !found {
-					allErrs = append(allErrs,
-						field.Invalid(field.NewPath("spec", "volumes").Index(i).Child("driver"), driver,
-							"Flexvolume driver is not allowed to be used"))
+
+			case policy.CSI:
+				if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
+					if len(s.psp.Spec.AllowedCSIDrivers) > 0 {
+						found := false
+						driver := v.CSI.Driver
+						for _, allowedCSIDriver := range s.psp.Spec.AllowedCSIDrivers {
+							if driver == allowedCSIDriver.Name {
+								found = true
+								break
+							}
+						}
+						if !found {
+							allErrs = append(allErrs,
+								field.Invalid(field.NewPath("spec", "volumes").Index(i).Child("csi", "driver"), driver,
+									"Inline CSI driver is not allowed to be used"))
+						}
+					}
 				}
 			}
 		}
-	}
-
-	if s.psp.Spec.RuntimeClass != nil {
-		allErrs = append(allErrs, validateRuntimeClassName(pod.Spec.RuntimeClassName, s.psp.Spec.RuntimeClass.AllowedRuntimeClassNames)...)
-	}
-
-	fldPath := field.NewPath("spec", "initContainers")
-	for i := range pod.Spec.InitContainers {
-		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.InitContainers[i], fldPath.Index(i))...)
-	}
-
-	fldPath = field.NewPath("spec", "containers")
-	for i := range pod.Spec.Containers {
-		allErrs = append(allErrs, s.validateContainer(pod, &pod.Spec.Containers[i], fldPath.Index(i))...)
 	}
 
 	return allErrs

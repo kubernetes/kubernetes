@@ -36,10 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd"
 	"k8s.io/apiserver/pkg/storage/etcd/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -391,7 +393,7 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		}
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", 0)
+	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "", nil)
 }
 
 func (s *store) Count(key string) (int64, error) {
@@ -618,17 +620,21 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 		if err != nil {
 			return err
 		}
-		remainingItemCount := getResp.Count - pred.Limit
+		var remainingItemCount *int64
 		// getResp.Count counts in objects that do not match the pred.
-		// Instead of returning inaccurate count, return 0.
-		if !pred.Empty() {
-			remainingItemCount = 0
+		// Instead of returning inaccurate count for non-empty selectors, we return nil.
+		// Only set remainingItemCount if the predicate is empty.
+		if utilfeature.DefaultFeatureGate.Enabled(features.RemainingItemCount) {
+			if pred.Empty() {
+				c := int64(getResp.Count - pred.Limit)
+				remainingItemCount = &c
+			}
 		}
 		return s.versioner.UpdateList(listObj, uint64(returnedRV), next, remainingItemCount)
 	}
 
 	// no continuation
-	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", 0)
+	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
 }
 
 // growSlice takes a slice value and grows its capacity up
@@ -683,9 +689,15 @@ func (s *store) watch(ctx context.Context, key string, rv string, pred storage.S
 
 func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Value, ignoreNotFound bool) (*objState, error) {
 	state := &objState{
-		obj:  reflect.New(v.Type()).Interface().(runtime.Object),
 		meta: &storage.ResponseMeta{},
 	}
+
+	if u, ok := v.Addr().Interface().(runtime.Unstructured); ok {
+		state.obj = u.NewEmptyInstance()
+	} else {
+		state.obj = reflect.New(v.Type()).Interface().(runtime.Object)
+	}
+
 	if len(getResp.Kvs) == 0 {
 		if !ignoreNotFound {
 			return nil, storage.NewKeyNotFoundError(key, 0)

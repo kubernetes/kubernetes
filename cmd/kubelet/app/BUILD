@@ -95,7 +95,7 @@ go_library(
         "//pkg/volume/gcepd:go_default_library",
         "//pkg/volume/git_repo:go_default_library",
         "//pkg/volume/glusterfs:go_default_library",
-        "//pkg/volume/host_path:go_default_library",
+        "//pkg/volume/hostpath:go_default_library",
         "//pkg/volume/iscsi:go_default_library",
         "//pkg/volume/local:go_default_library",
         "//pkg/volume/nfs:go_default_library",

@@ -34,6 +34,7 @@ import (
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -370,7 +371,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 				By("Get node problem detector log")
 				log, err := framework.GetPodLogs(c, ns, name, name)
 				Expect(err).ShouldNot(HaveOccurred())
-				framework.Logf("Node Problem Detector logs:\n %s", log)
+				e2elog.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			By("Delete the node problem detector")
 			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))

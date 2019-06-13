@@ -38,6 +38,7 @@ type framework struct {
 	queueSortPlugins []QueueSortPlugin
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
+	postbindPlugins  []PostbindPlugin
 	unreservePlugins []UnreservePlugin
 	permitPlugins    []PermitPlugin
 }
@@ -108,6 +109,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				f.prebindPlugins = append(f.prebindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
+			}
+		}
+	}
+
+	if plugins.PostBind != nil {
+		for _, pb := range plugins.PostBind.Enabled {
+			if pg, ok := f.plugins[pb.Name]; ok {
+				p, ok := pg.(PostbindPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend postbind plugin", pb.Name)
+				}
+				f.postbindPlugins = append(f.postbindPlugins, p)
+			} else {
+				return nil, fmt.Errorf("postbind plugin %v does not exist", pb.Name)
 			}
 		}
 	}
@@ -189,6 +204,14 @@ func (f *framework) RunPrebindPlugins(
 		}
 	}
 	return nil
+}
+
+// RunPostbindPlugins runs the set of configured postbind plugins.
+func (f *framework) RunPostbindPlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) {
+	for _, pl := range f.postbindPlugins {
+		pl.Postbind(pc, pod, nodeName)
+	}
 }
 
 // RunReservePlugins runs the set of configured reserve plugins. If any of these

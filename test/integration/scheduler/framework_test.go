@@ -33,6 +33,7 @@ import (
 type TesterPlugin struct {
 	numReserveCalled    int
 	numPrebindCalled    int
+	numPostbindCalled   int
 	numUnreserveCalled  int
 	failReserve         bool
 	failPrebind         bool
@@ -53,6 +54,10 @@ type PrebindPlugin struct {
 	TesterPlugin
 }
 
+type PostbindPlugin struct {
+	TesterPlugin
+}
+
 type UnreservePlugin struct {
 	TesterPlugin
 }
@@ -66,11 +71,13 @@ const (
 	reservePluginName   = "reserve-plugin"
 	prebindPluginName   = "prebind-plugin"
 	unreservePluginName = "unreserve-plugin"
+	postbindPluginName  = "postbind-plugin"
 	permitPluginName    = "permit-plugin"
 )
 
 var _ = framework.ReservePlugin(&ReservePlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
+var _ = framework.PostbindPlugin(&PostbindPlugin{})
 var _ = framework.UnreservePlugin(&UnreservePlugin{})
 var _ = framework.PermitPlugin(&PermitPlugin{})
 
@@ -123,6 +130,28 @@ func (pp *PrebindPlugin) reset() {
 // NewPrebindPlugin is the factory for prebind plugin.
 func NewPrebindPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return pbdPlugin, nil
+}
+
+var ptbdPlugin = &PostbindPlugin{}
+
+// Name returns name of the plugin.
+func (pp *PostbindPlugin) Name() string {
+	return postbindPluginName
+}
+
+// Postbind is a test function, which counts the number of times called.
+func (pp *PostbindPlugin) Postbind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {
+	pp.numPostbindCalled++
+}
+
+// reset used to reset numPostbindCalled.
+func (pp *PostbindPlugin) reset() {
+	pp.numPostbindCalled = 0
+}
+
+// NewPostbindPlugin is the factory for postbind plugin.
+func NewPostbindPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return ptbdPlugin, nil
 }
 
 var unresPlugin = &UnreservePlugin{}
@@ -454,6 +483,120 @@ func TestUnreservePlugin(t *testing.T) {
 			}
 		}
 		unresPlugin.reset()
+		pbdPlugin.reset()
+		cleanupPods(cs, t, []*v1.Pod{pod})
+	}
+}
+
+// TestPostbindPlugin tests invocation of postbind plugins.
+func TestPostbindPlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register a prebind and a postbind plugin.
+	registry := framework.Registry{
+		prebindPluginName:  NewPrebindPlugin,
+		postbindPluginName: NewPostbindPlugin,
+	}
+
+	// Setup initial prebind and postbind plugin for testing.
+	plugins := &schedulerconfig.Plugins{
+		PreBind: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: prebindPluginName,
+				},
+			},
+		},
+		PostBind: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: postbindPluginName,
+				},
+			},
+		},
+	}
+	// Set reserve prebind and postbind config for testing
+	pluginConfig := []schedulerconfig.PluginConfig{
+		{
+			Name: prebindPluginName,
+			Args: runtime.Unknown{},
+		},
+		{
+			Name: postbindPluginName,
+			Args: runtime.Unknown{},
+		},
+	}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "postbind-plugin", nil),
+		false, nil, registry, plugins, pluginConfig, false, time.Second)
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add a few nodes.
+	_, err := createNodes(cs, "test-node", nil, 2)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	tests := []struct {
+		prebindFail   bool
+		prebindReject bool
+	}{
+		{
+			prebindFail:   false,
+			prebindReject: false,
+		},
+		{
+			prebindFail:   true,
+			prebindReject: false,
+		},
+		{
+			prebindFail:   false,
+			prebindReject: true,
+		},
+		{
+			prebindFail:   true,
+			prebindReject: true,
+		},
+	}
+
+	for i, test := range tests {
+		pbdPlugin.failPrebind = test.prebindFail
+		pbdPlugin.rejectPrebind = test.prebindReject
+
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Errorf("Error while creating a test pod: %v", err)
+		}
+
+		if test.prebindFail {
+			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err != nil {
+				t.Errorf("test #%v: Expected a scheduling error, but didn't get it. error: %v", i, err)
+			}
+			if ptbdPlugin.numPostbindCalled > 0 {
+				t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, ptbdPlugin.numPostbindCalled)
+			}
+		} else {
+			if test.prebindReject {
+				if err = waitForPodUnschedulable(cs, pod); err != nil {
+					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
+				}
+				if ptbdPlugin.numPostbindCalled > 0 {
+					t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, ptbdPlugin.numPostbindCalled)
+				}
+			} else {
+				if err = waitForPodToSchedule(cs, pod); err != nil {
+					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
+				}
+				if ptbdPlugin.numPostbindCalled == 0 {
+					t.Errorf("test #%v: Expected the postbind plugin to be called, was called %d times.", i, ptbdPlugin.numPostbindCalled)
+				}
+			}
+		}
+
+		ptbdPlugin.reset()
 		pbdPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}

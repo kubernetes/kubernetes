@@ -44,7 +44,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uin
 }
 
 // UpdateList implements Versioner
-func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, nextKey string, count int64) error {
+func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, nextKey string, count *int64) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err

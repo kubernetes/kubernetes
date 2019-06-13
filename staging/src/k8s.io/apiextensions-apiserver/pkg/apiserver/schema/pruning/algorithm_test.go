@@ -23,31 +23,33 @@ import (
 
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestPrune(t *testing.T) {
 	tests := []struct {
-		name     string
-		json     string
-		schema   *structuralschema.Structural
-		expected string
+		name                string
+		json                string
+		dontPruneMetaAtRoot bool
+		schema              *structuralschema.Structural
+		expected            string
 	}{
-		{"empty", "null", nil, "null"},
-		{"scalar", "4", &structuralschema.Structural{}, "4"},
-		{"scalar array", "[1,2]", &structuralschema.Structural{
+		{name: "empty", json: "null", expected: "null"},
+		{name: "scalar", json: "4", schema: &structuralschema.Structural{}, expected: "4"},
+		{name: "scalar array", json: "[1,2]", schema: &structuralschema.Structural{
 			Items: &structuralschema.Structural{},
-		}, "[1,2]"},
-		{"object array", `[{"a":1},{"b":1},{"a":1,"b":2,"c":3}]`, &structuralschema.Structural{
+		}, expected: "[1,2]"},
+		{name: "object array", json: `[{"a":1},{"b":1},{"a":1,"b":2,"c":3}]`, schema: &structuralschema.Structural{
 			Items: &structuralschema.Structural{
 				Properties: map[string]structuralschema.Structural{
 					"a": {},
 					"c": {},
 				},
 			},
-		}, `[{"a":1},{},{"a":1,"c":3}]`},
-		{"object array with nil schema", `[{"a":1},{"b":1},{"a":1,"b":2,"c":3}]`, nil, `[{},{},{}]`},
-		{"object array object", `{"array":[{"a":1},{"b":1},{"a":1,"b":2,"c":3}],"unspecified":{"a":1},"specified":{"a":1,"b":2,"c":3}}`, &structuralschema.Structural{
+		}, expected: `[{"a":1},{},{"a":1,"c":3}]`},
+		{name: "object array with nil schema", json: `[{"a":1},{"b":1},{"a":1,"b":2,"c":3}]`, expected: `[{},{},{}]`},
+		{name: "object array object", json: `{"array":[{"a":1},{"b":1},{"a":1,"b":2,"c":3}],"unspecified":{"a":1},"specified":{"a":1,"b":2,"c":3}}`, schema: &structuralschema.Structural{
 			Properties: map[string]structuralschema.Structural{
 				"array": {
 					Items: &structuralschema.Structural{
@@ -64,8 +66,8 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
-		}, `{"array":[{"a":1},{},{"a":1,"c":3}],"specified":{"a":1,"c":3}}`},
-		{"nested x-kubernetes-preserve-unknown-fields", `
+		}, expected: `{"array":[{"a":1},{},{"a":1,"c":3}],"specified":{"a":1,"c":3}}`},
+		{name: "nested x-kubernetes-preserve-unknown-fields", json: `
 {
   "unspecified":"bar",
   "alpha": "abc",
@@ -82,9 +84,15 @@ func TestPrune(t *testing.T) {
      "unspecifiedObject": {"unspecified": "bar"},
      "pruning": {"unspecified": "bar"},
      "preserving": {"unspecified": "bar"}
+  },
+  "preservingAdditionalProperties": {
+     "foo": {
+        "specified": {"unspecified":"bar"},
+        "unspecified": "bar"
+     }
   }
 }
-`, &structuralschema.Structural{
+`, schema: &structuralschema.Structural{
 			Generic:    structuralschema.Generic{Type: "object"},
 			Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
 			Properties: map[string]structuralschema.Structural{
@@ -115,8 +123,22 @@ func TestPrune(t *testing.T) {
 						},
 					},
 				},
+				"preservingAdditionalProperties": {
+					Extensions: structuralschema.Extensions{XPreserveUnknownFields: true},
+					Generic: structuralschema.Generic{
+						Type: "object",
+						AdditionalProperties: &structuralschema.StructuralOrBool{
+							Structural: &structuralschema.Structural{
+								Generic: structuralschema.Generic{Type: "object"},
+								Properties: map[string]structuralschema.Structural{
+									"specified": {Generic: structuralschema.Generic{Type: "object"}},
+								},
+							},
+						},
+					},
+				},
 			},
-		}, `
+		}, expected: `
 {
   "unspecified":"bar",
   "alpha": "abc",
@@ -131,10 +153,15 @@ func TestPrune(t *testing.T) {
      "unspecifiedObject": {"unspecified": "bar"},
      "pruning": {},
      "preserving": {"unspecified": "bar"}
+  },
+  "preservingAdditionalProperties": {
+     "foo": {
+        "specified": {}
+     }
   }
 }
 `},
-		{"additionalProperties with schema", `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1}}}`, &structuralschema.Structural{
+		{name: "additionalProperties with schema", json: `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1}}}`, schema: &structuralschema.Structural{
 			Properties: map[string]structuralschema.Structural{
 				"a": {},
 				"c": {
@@ -149,8 +176,8 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
-		}, `{"a":1,"c":{"a":1,"b":2,"c":{}}}`},
-		{"additionalProperties with bool", `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1}}}`, &structuralschema.Structural{
+		}, expected: `{"a":1,"c":{"a":1,"b":2,"c":{}}}`},
+		{name: "additionalProperties with bool", json: `{"a":1,"b":1,"c":{"a":1,"b":2,"c":{"a":1}}}`, schema: &structuralschema.Structural{
 			Properties: map[string]structuralschema.Structural{
 				"a": {},
 				"c": {
@@ -161,7 +188,313 @@ func TestPrune(t *testing.T) {
 					},
 				},
 			},
-		}, `{"a":1,"c":{"a":1,"b":2,"c":{}}}`},
+		}, expected: `{"a":1,"c":{"a":1,"b":2,"c":{}}}`},
+		{name: "x-kubernetes-embedded-resource", json: `
+{
+  "apiVersion": "foo/v1",
+  "kind": "Foo",
+  "metadata": {
+    "name": "instance",
+    "unspecified": "bar"
+  },
+  "unspecified":"bar",
+  "pruned": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar"
+    }
+  },
+  "preserving": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar"
+    }
+  },
+  "nested": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar",
+      "embedded": {
+        "apiVersion": "foo/v1",
+        "kind": "Foo",
+        "unspecified": "bar",
+        "metadata": {
+          "name": "instance",
+          "unspecified": "bar"
+        },
+        "spec": {
+          "unspecified": "bar"
+        }
+      }
+    }
+  }
+}
+`, schema: &structuralschema.Structural{
+			Generic: structuralschema.Generic{Type: "object"},
+			Properties: map[string]structuralschema.Structural{
+				"pruned": {
+					Generic: structuralschema.Generic{Type: "object"},
+					Extensions: structuralschema.Extensions{
+						XEmbeddedResource: true,
+					},
+					Properties: map[string]structuralschema.Structural{
+						"spec": {
+							Generic: structuralschema.Generic{Type: "object"},
+						},
+					},
+				},
+				"preserving": {
+					Generic: structuralschema.Generic{Type: "object"},
+					Extensions: structuralschema.Extensions{
+						XEmbeddedResource:      true,
+						XPreserveUnknownFields: true,
+					},
+				},
+				"nested": {
+					Generic: structuralschema.Generic{Type: "object"},
+					Extensions: structuralschema.Extensions{
+						XEmbeddedResource: true,
+					},
+					Properties: map[string]structuralschema.Structural{
+						"spec": {
+							Generic: structuralschema.Generic{Type: "object"},
+							Properties: map[string]structuralschema.Structural{
+								"embedded": {
+									Generic: structuralschema.Generic{Type: "object"},
+									Extensions: structuralschema.Extensions{
+										XEmbeddedResource: true,
+									},
+									Properties: map[string]structuralschema.Structural{
+										"spec": {
+											Generic: structuralschema.Generic{Type: "object"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, expected: `
+{
+  "pruned": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+    }
+  },
+  "preserving": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar"
+    }
+  },
+  "nested": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "embedded": {
+        "apiVersion": "foo/v1",
+        "kind": "Foo",
+        "metadata": {
+          "name": "instance",
+          "unspecified": "bar"
+        },
+        "spec": {
+        }
+      }
+    }
+  }
+}
+`},
+		{name: "x-kubernetes-embedded-resource, with root=true", json: `
+{
+  "apiVersion": "foo/v1",
+  "kind": "Foo",
+  "metadata": {
+    "name": "instance",
+    "unspecified": "bar"
+  },
+  "unspecified":"bar",
+  "pruned": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar"
+    }
+  },
+  "preserving": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar"
+    }
+  },
+  "nested": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar",
+      "embedded": {
+        "apiVersion": "foo/v1",
+        "kind": "Foo",
+        "unspecified": "bar",
+        "metadata": {
+          "name": "instance",
+          "unspecified": "bar"
+        },
+        "spec": {
+          "unspecified": "bar"
+        }
+      }
+    }
+  }
+}
+`, dontPruneMetaAtRoot: true, schema: &structuralschema.Structural{
+			Generic: structuralschema.Generic{Type: "object"},
+			Properties: map[string]structuralschema.Structural{
+				"pruned": {
+					Generic: structuralschema.Generic{Type: "object"},
+					Extensions: structuralschema.Extensions{
+						XEmbeddedResource: true,
+					},
+					Properties: map[string]structuralschema.Structural{
+						"spec": {
+							Generic: structuralschema.Generic{Type: "object"},
+						},
+					},
+				},
+				"preserving": {
+					Generic: structuralschema.Generic{Type: "object"},
+					Extensions: structuralschema.Extensions{
+						XEmbeddedResource:      true,
+						XPreserveUnknownFields: true,
+					},
+				},
+				"nested": {
+					Generic: structuralschema.Generic{Type: "object"},
+					Extensions: structuralschema.Extensions{
+						XEmbeddedResource: true,
+					},
+					Properties: map[string]structuralschema.Structural{
+						"spec": {
+							Generic: structuralschema.Generic{Type: "object"},
+							Properties: map[string]structuralschema.Structural{
+								"embedded": {
+									Generic: structuralschema.Generic{Type: "object"},
+									Extensions: structuralschema.Extensions{
+										XEmbeddedResource: true,
+									},
+									Properties: map[string]structuralschema.Structural{
+										"spec": {
+											Generic: structuralschema.Generic{Type: "object"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}, expected: `
+{
+  "apiVersion": "foo/v1",
+  "kind": "Foo",
+  "metadata": {
+    "name": "instance",
+    "unspecified": "bar"
+  },
+  "pruned": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+    }
+  },
+  "preserving": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "unspecified": "bar",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "unspecified": "bar"
+    }
+  },
+  "nested": {
+    "apiVersion": "foo/v1",
+    "kind": "Foo",
+    "metadata": {
+      "name": "instance",
+      "unspecified": "bar"
+    },
+    "spec": {
+      "embedded": {
+        "apiVersion": "foo/v1",
+        "kind": "Foo",
+        "metadata": {
+          "name": "instance",
+          "unspecified": "bar"
+        },
+        "spec": {
+        }
+      }
+    }
+  }
+}
+`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -175,7 +508,7 @@ func TestPrune(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			prune(in, tt.schema)
+			Prune(in, tt.schema, tt.dontPruneMetaAtRoot)
 			if !reflect.DeepEqual(in, expected) {
 				var buf bytes.Buffer
 				enc := json.NewEncoder(&buf)
@@ -184,7 +517,7 @@ func TestPrune(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unexpected result mashalling error: %v", err)
 				}
-				t.Errorf("expected: %s\ngot: %s", tt.expected, buf.String())
+				t.Errorf("expected: %s\ngot: %s\ndiff: %s", tt.expected, buf.String(), diff.ObjectDiff(expected, in))
 			}
 		})
 	}
@@ -260,7 +593,7 @@ func BenchmarkPrune(b *testing.B) {
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		Prune(instances[i], schema)
+		Prune(instances[i], schema, true)
 	}
 }
 

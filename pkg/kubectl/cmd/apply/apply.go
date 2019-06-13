@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
+// ApplyOptions defines flags and other configuration parameters for the `apply` command
 type ApplyOptions struct {
 	RecordFlags *genericclioptions.RecordFlags
 	Recorder    genericclioptions.Recorder
@@ -132,6 +133,7 @@ var (
 	warningNoLastAppliedConfigAnnotation = "Warning: %[1]s apply should be used on resource created by either %[1]s create --save-config or %[1]s apply\n"
 )
 
+// NewApplyOptions creates new ApplyOptions for the `apply` command
 func NewApplyOptions(ioStreams genericclioptions.IOStreams) *ApplyOptions {
 	return &ApplyOptions{
 		RecordFlags: genericclioptions.NewRecordFlags(),
@@ -194,6 +196,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	return cmd
 }
 
+// Complete verifies if ApplyOptions are valid and without conflicts.
 func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.ServerSideApply = cmdutil.GetServerSideApplyFlag(cmd)
 	o.ForceConflicts = cmdutil.GetForceConflictsFlag(cmd)
@@ -325,6 +328,7 @@ func isIncompatibleServerError(err error) bool {
 	return err.(*errors.StatusError).Status().Code == http.StatusUnsupportedMediaType
 }
 
+// Run executes the `apply` command.
 func (o *ApplyOptions) Run() error {
 	var openapiSchema openapi.Resources
 	if o.OpenAPIPatch {
@@ -761,6 +765,7 @@ func (p *Patcher) delete(namespace, name string) error {
 	return runDelete(namespace, name, p.Mapping, p.DynamicClient, p.Cascade, p.GracePeriod, p.ServerDryRun)
 }
 
+// Patcher defines options to patch OpenAPI objects.
 type Patcher struct {
 	Mapping       *meta.RESTMapping
 	Helper        *resource.Helper
@@ -926,6 +931,8 @@ func (p *Patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 	return patch, patchedObj, err
 }
 
+// Patch tries to patch an OpenAPI resource. On success, returns the merge patch as well
+// the final patched object. On failure, returns an error.
 func (p *Patcher) Patch(current runtime.Object, modified []byte, source, namespace, name string, errOut io.Writer) ([]byte, runtime.Object, error) {
 	var getErr error
 	patchBytes, patchObject, err := p.patchSimple(current, modified, source, namespace, name, errOut)

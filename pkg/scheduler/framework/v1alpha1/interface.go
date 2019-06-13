@@ -34,14 +34,14 @@ type Code int
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
 	// NOTE: A nil status is also considered as "Success".
-	Success Code = 0
+	Success Code = iota
 	// Error is used for internal plugin errors, unexpected input, etc.
-	Error Code = 1
+	Error
 	// Unschedulable is used when a plugin finds a pod unschedulable.
 	// The accompanying status message should explain why the pod is unschedulable.
-	Unschedulable Code = 2
+	Unschedulable
 	// Wait is used when a permit plugin finds a pod scheduling should wait.
-	Wait Code = 3
+	Wait
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
@@ -148,6 +148,17 @@ type PrebindPlugin interface {
 	Prebind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
 }
 
+// PostbindPlugin is an interface that must be implemented by "postbind" plugins.
+// These plugins are called after a pod is successfully bound to a node.
+type PostbindPlugin interface {
+	Plugin
+	// Postbind is called after a pod is successfully bound. These plugins are
+	// informational. A common application of this extension point is for cleaning
+	// up. If a plugin needs to clean-up its state after a pod is scheduled and
+	// bound, Postbind is the extension point that it should register.
+	Postbind(pc *PluginContext, p *v1.Pod, nodeName string)
+}
+
 // UnreservePlugin is an interface for Unreserve plugins. This is an informational
 // extension point. If a pod was reserved and then rejected in a later phase, then
 // un-reserve plugins will be notified. Un-reserve plugins should clean up state
@@ -185,6 +196,9 @@ type Framework interface {
 	// considered as a scheduling check failure, otherwise, it is considered as an
 	// internal error. In either case the pod is not going to be bound.
 	RunPrebindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	// RunPostbindPlugins runs the set of configured postbind plugins.
+	RunPostbindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string)
 
 	// RunReservePlugins runs the set of configured reserve plugins. If any of these
 	// plugins returns an error, it does not continue running the remaining ones and

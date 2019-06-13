@@ -71,8 +71,26 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	}
 
 	node := string(nodeName)
-	pvName := spec.PersistentVolume.GetName()
 	attachID := getAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
+
+	var vaSrc storage.VolumeAttachmentSource
+	if spec.InlineVolumeSpecForCSIMigration {
+		// inline PV scenario - use PV spec to populate VA source.
+		// The volume spec will be populated by CSI translation API
+		// for inline volumes. This allows fields required by the CSI
+		// attacher such as AccessMode and MountOptions (in addition to
+		// fields in the CSI persistent volume source) to be populated
+		// as part of CSI translation for inline volumes.
+		vaSrc = storage.VolumeAttachmentSource{
+			InlineVolumeSpec: &spec.PersistentVolume.Spec,
+		}
+	} else {
+		// regular PV scenario - use PV name to populate VA source
+		pvName := spec.PersistentVolume.GetName()
+		vaSrc = storage.VolumeAttachmentSource{
+			PersistentVolumeName: &pvName,
+		}
+	}
 
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
@@ -81,9 +99,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: node,
 			Attacher: pvSrc.Driver,
-			Source: storage.VolumeAttachmentSource{
-				PersistentVolumeName: &pvName,
-			},
+			Source:   vaSrc,
 		},
 	}
 

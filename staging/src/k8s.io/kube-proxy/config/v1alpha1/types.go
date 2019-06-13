@@ -59,9 +59,6 @@ type KubeProxyIPVSConfiguration struct {
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
-	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over maxPerCore and min.
-	Max *int32 `json:"max"`
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
 	MaxPerCore *int32 `json:"maxPerCore"`

@@ -28,6 +28,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +48,7 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *apiv1.Po
 
 	// this command takes the expected value and compares it against the actual value for the pod cgroup pids.max
 	command := fmt.Sprintf("expected=%v; actual=$(cat /tmp/pids/%v/pids.max); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", pidsLimit.Value(), cgroupFsName)
-	framework.Logf("Pod to run command: %v", command)
+	e2elog.Logf("Pod to run command: %v", command)
 	pod := &apiv1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),

@@ -35,14 +35,15 @@ type CRConverterFactory struct {
 	// webhookConverterFactory is the factory for webhook converters.
 	// This field should not be used if CustomResourceWebhookConversion feature is disabled.
 	webhookConverterFactory *webhookConverterFactory
-	converterMetricFactory  *converterMetricFactory
 }
+
+// converterMetricFactorySingleton protects us from reregistration of metrics on repeated
+// apiextensions-apiserver runs.
+var converterMetricFactorySingleton = newConverterMertricFactory()
 
 // NewCRConverterFactory creates a new CRConverterFactory
 func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*CRConverterFactory, error) {
-	converterFactory := &CRConverterFactory{
-		converterMetricFactory: newConverterMertricFactory(),
-	}
+	converterFactory := &CRConverterFactory{}
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceWebhookConversion) {
 		webhookConverterFactory, err := newWebhookConverterFactory(serviceResolver, authResolverWrapper)
 		if err != nil {
@@ -72,7 +73,7 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensions.CustomResourceDefin
 		if err != nil {
 			return nil, nil, err
 		}
-		converter, err = m.converterMetricFactory.addMetrics("webhook", crd.Name, converter)
+		converter, err = converterMetricFactorySingleton.addMetrics("webhook", crd.Name, converter)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -27,6 +27,11 @@ import (
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 )
 
+const (
+	sortByCPU    = "cpu"
+	sortByMemory = "memory"
+)
+
 var (
 	supportedMetricsAPIVersions = []string{
 		"v1beta1",

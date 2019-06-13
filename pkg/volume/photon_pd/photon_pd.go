@@ -200,12 +200,12 @@ func (b *photonPersistentDiskMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *photonPersistentDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *photonPersistentDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *photonPersistentDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *photonPersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(4).Infof("Photon Persistent Disk setup %s to %s", b.pdID, dir)
 
 	// TODO: handle failed mounts here.

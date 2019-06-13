@@ -59,6 +59,9 @@ const (
 	// KubernetesVersion flag sets the Kubernetes version for the control plane.
 	KubernetesVersion = "kubernetes-version"
 
+	// KubeletVersion flag sets the version for the kubelet config.
+	KubeletVersion = "kubelet-version"
+
 	// NetworkingDNSDomain flag sets the domain for services, e.g. "myorg.internal".
 	NetworkingDNSDomain = "service-dns-domain"
 
@@ -117,10 +120,18 @@ const (
 	FileDiscovery = "discovery-file"
 
 	// ControlPlane flag instruct kubeadm to create a new control plane instance on this node
-	ControlPlane = "experimental-control-plane"
+	ControlPlane = "control-plane"
 
 	// UploadCerts flag instruct kubeadm to upload certificates
-	UploadCerts = "experimental-upload-certs"
+	UploadCerts = "upload-certs"
+
+	// ExperimentalControlPlane flag instruct kubeadm to create a new control plane instance on this node
+	// TODO: this flag should be removed in 1.16 cycle
+	ExperimentalControlPlane = "experimental-control-plane"
+
+	// ExperimentalUploadCerts flag instruct kubeadm to upload certificates
+	// TODO: this flag should be removed in 1.16 cycle
+	ExperimentalUploadCerts = "experimental-upload-certs"
 
 	// CertificateKey flag sets the key used to encrypt and decrypt certificate secrets
 	CertificateKey = "certificate-key"
@@ -130,4 +141,10 @@ const (
 
 	// ForceReset flag instruct kubeadm to reset the node without prompting for confirmation
 	ForceReset = "force"
+
+	// CertificateRenewal flag instruct kubeadm to execute certificate renewal during upgrades
+	CertificateRenewal = "certificate-renewal"
+
+	// EtcdUpgrade flag instruct kubeadm to execute etcd upgrade during upgrades
+	EtcdUpgrade = "etcd-upgrade"
 )

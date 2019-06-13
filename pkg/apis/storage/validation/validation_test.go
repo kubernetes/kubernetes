@@ -21,9 +21,13 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var (
@@ -32,6 +36,15 @@ var (
 	immediateMode2      = storage.VolumeBindingImmediate
 	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
 	invalidMode         = storage.VolumeBindingMode("foo")
+	inlineSpec          = api.PersistentVolumeSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		PersistentVolumeSource: api.PersistentVolumeSource{
+			CSI: &api.CSIPersistentVolumeSource{
+				Driver:       "com.test.foo",
+				VolumeHandle: "foobar",
+			},
+		},
+	}
 )
 
 func TestValidateStorageClass(t *testing.T) {
@@ -138,15 +151,26 @@ func TestValidateStorageClass(t *testing.T) {
 }
 
 func TestVolumeAttachmentValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "pv-name"
 	empty := ""
-	successCases := []storage.VolumeAttachment{
+	migrationEnabledSuccessCases := []storage.VolumeAttachment{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
 				Source: storage.VolumeAttachmentSource{
 					PersistentVolumeName: &volumeName,
+				},
+				NodeName: "mynode",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inlinespec"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
 				},
 				NodeName: "mynode",
 			},
@@ -175,14 +199,38 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo-with-inlinespec-and-status"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
+				},
+				NodeName: "mynode",
+			},
+			Status: storage.VolumeAttachmentStatus{
+				Attached: true,
+				AttachmentMetadata: map[string]string{
+					"foo": "bar",
+				},
+				AttachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+				DetachError: &storage.VolumeError{
+					Time:    metav1.Time{},
+					Message: "hello world",
+				},
+			},
+		},
 	}
 
-	for _, volumeAttachment := range successCases {
+	for _, volumeAttachment := range migrationEnabledSuccessCases {
 		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
-			t.Errorf("expected success: %v", errs)
+			t.Errorf("expected success: %v %v", volumeAttachment, errs)
 		}
 	}
-	errorCases := []storage.VolumeAttachment{
+	migrationEnabledErrorCases := []storage.VolumeAttachment{
 		{
 			// Empty attacher name
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -277,16 +325,105 @@ func TestVolumeAttachmentValidation(t *testing.T) {
 				},
 			},
 		},
+		{
+			// VolumeAttachmentSource with no PersistentVolumeName nor InlineSpec
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source:   storage.VolumeAttachmentSource{},
+			},
+		},
+		{
+			// VolumeAttachmentSource with PersistentVolumeName and InlineSpec
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+					InlineVolumeSpec:     &inlineSpec,
+				},
+			},
+		},
+		{
+			// VolumeAttachmentSource with InlineSpec without CSI PV Source
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+					InlineVolumeSpec: &api.PersistentVolumeSpec{
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+						},
+						AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+						PersistentVolumeSource: api.PersistentVolumeSource{
+							FlexVolume: &api.FlexPersistentVolumeSource{
+								Driver: "kubernetes.io/blue",
+								FSType: "ext4",
+							},
+						},
+						StorageClassName: "test-storage-class",
+					},
+				},
+			},
+		},
 	}
 
-	for _, volumeAttachment := range errorCases {
+	for _, volumeAttachment := range migrationEnabledErrorCases {
 		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
-			t.Errorf("Expected failure for test: %v", volumeAttachment)
+			t.Errorf("expected failure for test: %v", volumeAttachment)
 		}
 	}
+
+	// validate with CSIMigration disabled
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
+
+	migrationDisabledSuccessCases := []storage.VolumeAttachment{
+		{
+			// PVName specified with migration disabled
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					PersistentVolumeName: &volumeName,
+				},
+			},
+		},
+	}
+	for _, volumeAttachment := range migrationDisabledSuccessCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) != 0 {
+			t.Errorf("expected success: %v %v", volumeAttachment, errs)
+		}
+	}
+
+	migrationDisabledErrorCases := []storage.VolumeAttachment{
+		{
+			// InlineSpec specified with migration disabled
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				NodeName: "node",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
+				},
+			},
+		},
+	}
+
+	for _, volumeAttachment := range migrationDisabledErrorCases {
+		if errs := ValidateVolumeAttachment(&volumeAttachment); len(errs) == 0 {
+			t.Errorf("expected failure: %v %v", volumeAttachment, errs)
+		}
+	}
+
 }
 
 func TestVolumeAttachmentUpdateValidation(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 	volumeName := "foo"
 	newVolumeName := "bar"
 
@@ -294,21 +431,18 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 		Spec: storage.VolumeAttachmentSpec{
 			Attacher: "myattacher",
-			Source: storage.VolumeAttachmentSource{
-				PersistentVolumeName: &volumeName,
-			},
+			Source:   storage.VolumeAttachmentSource{},
 			NodeName: "mynode",
 		},
 	}
+
 	successCases := []storage.VolumeAttachment{
 		{
 			// no change
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
-				Source: storage.VolumeAttachmentSource{
-					PersistentVolumeName: &volumeName,
-				},
+				Source:   storage.VolumeAttachmentSource{},
 				NodeName: "mynode",
 			},
 		},
@@ -317,9 +451,7 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
-				Source: storage.VolumeAttachmentSource{
-					PersistentVolumeName: &volumeName,
-				},
+				Source:   storage.VolumeAttachmentSource{},
 				NodeName: "mynode",
 			},
 			Status: storage.VolumeAttachmentStatus{
@@ -340,10 +472,28 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 	}
 
 	for _, volumeAttachment := range successCases {
+		volumeAttachment.Spec.Source = storage.VolumeAttachmentSource{}
+		old.Spec.Source = storage.VolumeAttachmentSource{}
+		// test scenarios with PersistentVolumeName set
+		volumeAttachment.Spec.Source.PersistentVolumeName = &volumeName
+		old.Spec.Source.PersistentVolumeName = &volumeName
+		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
+			t.Errorf("expected success: %+v", errs)
+		}
+
+		volumeAttachment.Spec.Source = storage.VolumeAttachmentSource{}
+		old.Spec.Source = storage.VolumeAttachmentSource{}
+		// test scenarios with InlineVolumeSpec set
+		volumeAttachment.Spec.Source.InlineVolumeSpec = &inlineSpec
+		old.Spec.Source.InlineVolumeSpec = &inlineSpec
 		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) != 0 {
 			t.Errorf("expected success: %+v", errs)
 		}
 	}
+
+	// reset old's source with volumeName in case it was left with something else by earlier tests
+	old.Spec.Source = storage.VolumeAttachmentSource{}
+	old.Spec.Source.PersistentVolumeName = &volumeName
 
 	errorCases := []storage.VolumeAttachment{
 		{
@@ -358,7 +508,7 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 			},
 		},
 		{
-			// change volume
+			// change source volume name
 			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			Spec: storage.VolumeAttachmentSpec{
 				Attacher: "myattacher",
@@ -377,6 +527,17 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 					PersistentVolumeName: &volumeName,
 				},
 				NodeName: "anothernode",
+			},
+		},
+		{
+			// change source
+			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+			Spec: storage.VolumeAttachmentSpec{
+				Attacher: "myattacher",
+				Source: storage.VolumeAttachmentSource{
+					InlineVolumeSpec: &inlineSpec,
+				},
+				NodeName: "mynode",
 			},
 		},
 		{

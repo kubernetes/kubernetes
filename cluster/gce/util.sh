@@ -745,6 +745,7 @@ function construct-linux-kubelet-flags {
       #TODO(mikedanese): allow static pods to start before creating a client
       #flags+=" --bootstrap-kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       #flags+=" --kubeconfig=/var/lib/kubelet/kubeconfig"
+      flags+=" --register-with-taints=node-role.kubernetes.io/master=:NoSchedule"
       flags+=" --kubeconfig=/var/lib/kubelet/bootstrap-kubeconfig"
       flags+=" --register-schedulable=false"
     fi
@@ -867,6 +868,10 @@ function construct-windows-kubelet-flags {
 
   # Turn off kernel memory cgroup notification.
   flags+=" --experimental-kernel-memcg-notification=false"
+
+  # TODO(#78628): Re-enable KubeletPodResources when the issue is fixed.
+  # Force disable KubeletPodResources feature on Windows until #78628 is fixed.
+  flags+=" --feature-gates=KubeletPodResources=false"
 
   KUBELET_ARGS="${flags}"
 }
@@ -3016,6 +3021,11 @@ function check-cluster() {
 
   # ensures KUBECONFIG is set
   get-kubeconfig-basicauth
+
+  if [[ ${GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA:-} == "true" ]]; then
+    gcloud compute instances add-metadata "${MASTER_NAME}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
+  fi
+
   echo
   echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo

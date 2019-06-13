@@ -28,7 +28,11 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	storagevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -168,8 +172,26 @@ func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
 // validateSource tests if the source is valid for VolumeAttachment.
 func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if source.PersistentVolumeName == nil || len(*source.PersistentVolumeName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
+	switch {
+	case source.InlineVolumeSpec == nil && source.PersistentVolumeName == nil:
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+			allErrs = append(allErrs, field.Required(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath, "must specify persistentVolumeName when CSIMigration feature is disabled"))
+		}
+	case source.InlineVolumeSpec != nil && source.PersistentVolumeName != nil:
+		allErrs = append(allErrs, field.Forbidden(fldPath, "must specify exactly one of inlineVolumeSpec and persistentVolumeName"))
+	case source.PersistentVolumeName != nil:
+		if len(*source.PersistentVolumeName) == 0 {
+			// Invalid err
+			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
+		}
+	case source.InlineVolumeSpec != nil:
+		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+			allErrs = append(allErrs, storagevalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
+		} else {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify inlineVolumeSpec when CSIMigration feature is disabled"))
+		}
 	}
 	return allErrs
 }

@@ -64,7 +64,6 @@ const (
 	attachingPodWebhookConfigName          = "e2e-test-webhook-config-attaching-pod"
 	mutatingWebhookConfigName              = "e2e-test-mutating-webhook-config"
 	podMutatingWebhookConfigName           = "e2e-test-mutating-webhook-pod"
-	crMutatingWebhookConfigName            = "e2e-test-mutating-webhook-config-cr"
 	webhookFailClosedConfigName            = "e2e-test-webhook-fail-closed"
 	validatingWebhookForWebhooksConfigName = "e2e-test-validating-webhook-for-webhooks-config"
 	mutatingWebhookForWebhooksConfigName   = "e2e-test-mutating-webhook-for-webhooks-config"
@@ -231,13 +230,6 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerMutatingWebhookForCustomResource(f, context, testcrd)
 		defer webhookCleanup()
 		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], prune)
-	})
-
-	ginkgo.It("Should deny crd creation", func() {
-		crdWebhookCleanup := registerValidatingWebhookForCRD(f, context)
-		defer crdWebhookCleanup()
-
-		testCRDDenyWebhook(f)
 	})
 
 	ginkgo.It("Should honor timeout", func() {
@@ -436,7 +428,7 @@ func registerWebhook(f *framework.Framework, context *certContext) func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-unwanted-pod-container-name-and-label.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -517,7 +509,7 @@ func registerWebhookForAttachingPod(f *framework.Framework, context *certContext
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-attaching-pod.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -561,7 +553,7 @@ func registerMutatingWebhookForConfigMap(f *framework.Framework, context *certCo
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "adding-configmap-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -638,7 +630,7 @@ func registerMutatingWebhookForPod(f *framework.Framework, context *certContext)
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "adding-init-container.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -708,7 +700,7 @@ func testWebhook(f *framework.Framework) {
 	// Creating the pod, the request should be rejected
 	pod := nonCompliantPod(f)
 	_, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create pod %s in namespace %s should have been denied by webhook", pod.Name, f.Namespace.Name)
+	framework.ExpectError(err, "create pod %s in namespace %s should have been denied by webhook", pod.Name, f.Namespace.Name)
 	expectedErrMsg1 := "the pod contains unwanted container name"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
@@ -723,7 +715,7 @@ func testWebhook(f *framework.Framework) {
 	// Creating the pod, the request should be rejected
 	pod = hangingPod(f)
 	_, err = client.CoreV1().Pods(f.Namespace.Name).Create(pod)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create pod %s in namespace %s should have caused webhook to hang", pod.Name, f.Namespace.Name)
+	framework.ExpectError(err, "create pod %s in namespace %s should have caused webhook to hang", pod.Name, f.Namespace.Name)
 	expectedTimeoutErr := "request did not complete within"
 	if !strings.Contains(err.Error(), expectedTimeoutErr) {
 		framework.Failf("expect timeout error %q, got %q", expectedTimeoutErr, err.Error())
@@ -733,7 +725,7 @@ func testWebhook(f *framework.Framework) {
 	// Creating the configmap, the request should be rejected
 	configmap := nonCompliantConfigMap(f)
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create configmap %s in namespace %s should have been denied by the webhook", configmap.Name, f.Namespace.Name)
+	framework.ExpectError(err, "create configmap %s in namespace %s should have been denied by the webhook", configmap.Name, f.Namespace.Name)
 	expectedErrMsg := "the configmap contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -760,7 +752,7 @@ func testWebhook(f *framework.Framework) {
 		cm.Data["webhook-e2e-test"] = "webhook-disallow"
 	}
 	_, err = updateConfigMap(client, f.Namespace.Name, allowedConfigMapName, toNonCompliantFn)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "update (PUT) admitted configmap %s in namespace %s to a non-compliant one should be rejected by webhook", allowedConfigMapName, f.Namespace.Name)
+	framework.ExpectError(err, "update (PUT) admitted configmap %s in namespace %s to a non-compliant one should be rejected by webhook", allowedConfigMapName, f.Namespace.Name)
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
@@ -768,7 +760,7 @@ func testWebhook(f *framework.Framework) {
 	ginkgo.By("update (PATCH) the admitted configmap to a non-compliant one should be rejected by the webhook")
 	patch := nonCompliantConfigMapPatch()
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Patch(allowedConfigMapName, types.StrategicMergePatchType, []byte(patch))
-	gomega.Expect(err).To(gomega.HaveOccurred(), "update admitted configmap %s in namespace %s by strategic merge patch to a non-compliant one should be rejected by webhook. Patch: %+v", allowedConfigMapName, f.Namespace.Name, patch)
+	framework.ExpectError(err, "update admitted configmap %s in namespace %s by strategic merge patch to a non-compliant one should be rejected by webhook. Patch: %+v", allowedConfigMapName, f.Namespace.Name, patch)
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
@@ -795,11 +787,11 @@ func testBlockingConfigmapDeletion(f *framework.Framework) {
 	client := f.ClientSet
 	configmap := nonDeletableConfigmap(f)
 	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(configmap)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("deleting the configmap should be denied by the webhook")
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	gomega.Expect(err).To(gomega.HaveOccurred(), "deleting configmap %s in namespace: %s should be denied", configmap.Name, f.Namespace.Name)
+	framework.ExpectError(err, "deleting configmap %s in namespace: %s should be denied", configmap.Name, f.Namespace.Name)
 	expectedErrMsg1 := "the configmap cannot be deleted because it contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
@@ -813,11 +805,11 @@ func testBlockingConfigmapDeletion(f *framework.Framework) {
 		cm.Data["webhook-e2e-test"] = "webhook-allow"
 	}
 	_, err = updateConfigMap(client, f.Namespace.Name, configmap.Name, toCompliantFn)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to update configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to update configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 
 	ginkgo.By("deleting the updated configmap should be successful")
 	err = client.CoreV1().ConfigMaps(f.Namespace.Name).Delete(configmap.Name, &metav1.DeleteOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to delete configmap %s in namespace: %s", configmap.Name, f.Namespace.Name)
 }
 
 func testAttachingPodWebhook(f *framework.Framework) {
@@ -833,7 +825,7 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	timer := time.NewTimer(30 * time.Second)
 	defer timer.Stop()
 	_, err = framework.NewKubectlCommand("attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
-	gomega.Expect(err).To(gomega.HaveOccurred(), "'kubectl attach' the pod, should be denied by the webhook")
+	framework.ExpectError(err, "'kubectl attach' the pod, should be denied by the webhook")
 	if e, a := "attaching to pod 'to-be-attached-pod' is not allowed", err.Error(); !strings.Contains(a, e) {
 		framework.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
 	}
@@ -841,8 +833,8 @@ func testAttachingPodWebhook(f *framework.Framework) {
 
 // failingWebhook returns a webhook with rule of create configmaps,
 // but with an invalid client config so that server cannot communicate with it
-func failingWebhook(namespace, name string) v1beta1.Webhook {
-	return v1beta1.Webhook{
+func failingWebhook(namespace, name string) v1beta1.ValidatingWebhook {
+	return v1beta1.ValidatingWebhook{
 		Name: name,
 		Rules: []v1beta1.RuleWithOperations{{
 			Operations: []v1beta1.OperationType{v1beta1.Create},
@@ -889,7 +881,7 @@ func registerFailClosedWebhook(f *framework.Framework, context *certContext) fun
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			// Server cannot talk to this webhook, so it always fails.
 			// Because this webhook is configured fail-closed, request should be rejected after the call fails.
 			hook,
@@ -923,7 +915,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 		},
 	}
 	_, err = client.CoreV1().ConfigMaps(failNamespaceName).Create(configmap)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create configmap in namespace: %s should be unconditionally rejected by the webhook", failNamespaceName)
+	framework.ExpectError(err, "create configmap in namespace: %s should be unconditionally rejected by the webhook", failNamespaceName)
 	if !errors.IsInternalError(err) {
 		framework.Failf("expect an internal error, got %#v", err)
 	}
@@ -945,7 +937,7 @@ func registerValidatingWebhookForWebhookConfigurations(f *framework.Framework, c
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-webhook-configuration-deletions.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -998,7 +990,7 @@ func registerMutatingWebhookForWebhookConfigurations(f *framework.Framework, con
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "add-label-to-webhook-configurations.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1050,7 +1042,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dummyValidatingWebhookConfigName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "dummy-validating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1098,7 +1090,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dummyMutatingWebhookConfigName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "dummy-mutating-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1306,7 +1298,7 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-unwanted-custom-resource-data.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1340,15 +1332,15 @@ func registerWebhookForCustomResource(f *framework.Framework, context *certConte
 
 func registerMutatingWebhookForCustomResource(f *framework.Framework, context *certContext, testcrd *crd.TestCrd) func() {
 	client := f.ClientSet
-	ginkgo.By("Registering the mutating webhook for a custom resource via the AdmissionRegistration API")
+	ginkgo.By(fmt.Sprintf("Registering the mutating webhook for custom resource %s via the AdmissionRegistration API", testcrd.Crd.Name))
 
 	namespace := f.Namespace.Name
-	configName := crMutatingWebhookConfigName
+	configName := f.UniqueName
 	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&v1beta1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.MutatingWebhook{
 			{
 				Name: "mutate-custom-resource-data-stage-1.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1416,7 +1408,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1beta1
 		},
 	}
 	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create custom resource %s in namespace %s should be denied by webhook", crInstanceName, f.Namespace.Name)
+	framework.ExpectError(err, "create custom resource %s in namespace %s should be denied by webhook", crInstanceName, f.Namespace.Name)
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -1440,11 +1432,11 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 		},
 	}
 	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the custom resource should be denied")
 	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
-	gomega.Expect(err).To(gomega.HaveOccurred(), "deleting custom resource %s in namespace: %s should be denied", crInstanceName, f.Namespace.Name)
+	framework.ExpectError(err, "deleting custom resource %s in namespace: %s should be denied", crInstanceName, f.Namespace.Name)
 	expectedErrMsg1 := "the custom resource cannot be deleted because it contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
@@ -1459,11 +1451,11 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 		data["webhook-e2e-test"] = "webhook-allow"
 	}
 	_, err = updateCustomResource(customResourceClient, f.Namespace.Name, crInstanceName, toCompliantFn)
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to update custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 	ginkgo.By("Deleting the updated custom resource should be successful")
 	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
-	gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+	framework.ExpectNoError(err, "failed to delete custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
 
 }
 
@@ -1543,7 +1535,7 @@ func registerValidatingWebhookForCRD(f *framework.Framework, context *certContex
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "deny-crd-with-unwanted-label.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1621,7 +1613,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 
 	// create CRD
 	_, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create custom resource definition %s should be denied by webhook", crd.Name)
+	framework.ExpectError(err, "create custom resource definition %s should be denied by webhook", crd.Name)
 	expectedErrMsg := "the crd contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
@@ -1649,7 +1641,7 @@ func registerSlowWebhook(f *framework.Framework, context *certContext, policy *v
 		ObjectMeta: metav1.ObjectMeta{
 			Name: configName,
 		},
-		Webhooks: []v1beta1.Webhook{
+		Webhooks: []v1beta1.ValidatingWebhook{
 			{
 				Name: "allow-configmap-with-delay-webhook.k8s.io",
 				Rules: []v1beta1.RuleWithOperations{{
@@ -1693,7 +1685,7 @@ func testSlowWebhookTimeoutFailEarly(f *framework.Framework) {
 	client := f.ClientSet
 	name := "e2e-test-slow-webhook-configmap"
 	_, err := client.CoreV1().ConfigMaps(f.Namespace.Name).Create(&v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name}})
-	gomega.Expect(err).To(gomega.HaveOccurred(), "create configmap in namespace %s should have timed-out reaching slow webhook", f.Namespace.Name)
+	framework.ExpectError(err, "create configmap in namespace %s should have timed-out reaching slow webhook", f.Namespace.Name)
 	expectedErrMsg := `/always-allow-delay-5s?timeout=1s: context deadline exceeded`
 	if !strings.Contains(err.Error(), expectedErrMsg) {
 		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())

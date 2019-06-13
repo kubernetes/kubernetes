@@ -178,11 +178,11 @@ func (b *secretVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *secretVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -219,7 +219,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
 	}
 	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
@@ -254,9 +254,9 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, fsGroup)
+	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
 	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
 	}
 	setupSuccess = true

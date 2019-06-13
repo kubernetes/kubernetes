@@ -28,9 +28,12 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
+
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	structuraldefaulting "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting"
+	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	structuralpruning "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
 	apiservervalidation "k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
@@ -52,6 +55,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -493,6 +497,25 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 	statusScopes := map[string]*handlers.RequestScope{}
 	scaleScopes := map[string]*handlers.RequestScope{}
 
+	equivalentResourceRegistry := runtime.NewEquivalentResourceRegistry()
+
+	structuralSchemas := map[string]*structuralschema.Structural{}
+	for _, v := range crd.Spec.Versions {
+		val, err := apiextensions.GetSchemaForVersion(crd, v.Name)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema")
+		}
+		if val == nil {
+			continue
+		}
+		structuralSchemas[v.Name], err = structuralschema.NewStructural(val.OpenAPIV3Schema)
+		if *crd.Spec.PreserveUnknownFields == false && err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema") // validation should avoid this
+		}
+	}
+
 	for _, v := range crd.Spec.Versions {
 		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
 		if err != nil {
@@ -509,7 +532,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		)
 		parameterCodec := runtime.NewParameterCodec(parameterScheme)
 
+		resource := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Plural}
 		kind := schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind}
+		equivalentResourceRegistry.RegisterKindFor(resource, "", kind)
+
 		typer := newUnstructuredObjectTyper(parameterScheme)
 		creator := unstructuredCreator{}
 
@@ -529,14 +555,6 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			return nil, fmt.Errorf("unexpected nil spec.preserveUnknownFields in the CustomResourceDefinition")
 		}
 
-		var structuralSchema *structuralschema.Structural
-		if validationSchema != nil {
-			structuralSchema, err = structuralschema.NewStructural(validationSchema.OpenAPIV3Schema)
-			if *crd.Spec.PreserveUnknownFields == false && err != nil {
-				return nil, err // validation should avoid this
-			}
-		}
-
 		var statusSpec *apiextensions.CustomResourceSubresourceStatus
 		var statusValidator *validate.SchemaValidator
 		subresources, err := apiextensions.GetSubresourcesForVersion(crd, v.Name)
@@ -545,6 +563,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && subresources != nil && subresources.Status != nil {
+			equivalentResourceRegistry.RegisterKindFor(resource, "status", kind)
+
 			statusSpec = subresources.Status
 			// for the status subresource, validate only against the status schema
 			if validationSchema != nil && validationSchema.OpenAPIV3Schema != nil && validationSchema.OpenAPIV3Schema.Properties != nil {
@@ -560,6 +580,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		var scaleSpec *apiextensions.CustomResourceSubresourceScale
 		if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) && subresources != nil && subresources.Scale != nil {
+			equivalentResourceRegistry.RegisterKindFor(resource, "scale", autoscalingv1.SchemeGroupVersion.WithKind("Scale"))
+
 			scaleSpec = subresources.Scale
 		}
 
@@ -574,8 +596,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		}
 
 		storages[v.Name] = customresource.NewStorage(
-			schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Status.AcceptedNames.Plural},
-			schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.Kind},
+			resource.GroupResource(),
+			kind,
 			schema.GroupVersionKind{Group: crd.Spec.Group, Version: v.Name, Kind: crd.Status.AcceptedNames.ListKind},
 			customresource.NewStrategy(
 				typer,
@@ -583,6 +605,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				kind,
 				validator,
 				statusValidator,
+				structuralSchemas,
 				statusSpec,
 				scaleSpec,
 			),
@@ -591,7 +614,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 				converter:             safeConverter,
 				decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
 				encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
-				structuralSchema:      structuralSchema,
+				structuralSchemas:     structuralSchemas,
 				structuralSchemaGK:    kind.GroupKind(),
 				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
 			},
@@ -609,27 +632,40 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 
 		clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
 
+		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
+		negotiatedSerializer := unstructuredNegotiatedSerializer{
+			typer:                 typer,
+			creator:               creator,
+			converter:             safeConverter,
+			structuralSchemas:     structuralSchemas,
+			structuralSchemaGK:    kind.GroupKind(),
+			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
+		}
+		var standardSerializers []runtime.SerializerInfo
+		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
+			if s.MediaType == runtime.ContentTypeProtobuf {
+				continue
+			}
+			standardSerializers = append(standardSerializers, s)
+		}
+
 		requestScopes[v.Name] = &handlers.RequestScope{
 			Namer: handlers.ContextBasedNaming{
 				SelfLinker:         meta.NewAccessor(),
 				ClusterScoped:      clusterScoped,
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
-			Serializer: unstructuredNegotiatedSerializer{
-				typer:                 typer,
-				creator:               creator,
-				converter:             safeConverter,
-				structuralSchema:      structuralSchema,
-				structuralSchemaGK:    kind.GroupKind(),
-				preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
-			},
-			ParameterCodec: parameterCodec,
+			Serializer:          negotiatedSerializer,
+			ParameterCodec:      parameterCodec,
+			StandardSerializers: standardSerializers,
 
 			Creater:         creator,
 			Convertor:       safeConverter,
-			Defaulter:       unstructuredDefaulter{parameterScheme},
+			Defaulter:       unstructuredDefaulter{parameterScheme, structuralSchemas, kind.GroupKind()},
 			Typer:           typer,
 			UnsafeConvertor: unsafeConverter,
+
+			EquivalentResourceMapper: equivalentResourceRegistry,
 
 			Resource: schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Status.AcceptedNames.Plural},
 			Kind:     kind,
@@ -676,7 +712,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 		statusScope.Serializer = unstructuredNegotiatedSerializer{
 			typer: typer, creator: creator,
 			converter:             safeConverter,
-			structuralSchema:      structuralSchema,
+			structuralSchemas:     structuralSchemas,
 			structuralSchemaGK:    kind.GroupKind(),
 			preserveUnknownFields: *crd.Spec.PreserveUnknownFields,
 		}
@@ -715,7 +751,7 @@ type unstructuredNegotiatedSerializer struct {
 	creator   runtime.ObjectCreater
 	converter runtime.ObjectConvertor
 
-	structuralSchema      *structuralschema.Structural
+	structuralSchemas     map[string]*structuralschema.Structural // by version
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
@@ -742,6 +778,16 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 			EncodesAsText:    true,
 			Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
 		},
+		{
+			MediaType:        "application/vnd.kubernetes.protobuf",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "vnd.kubernetes.protobuf",
+			Serializer:       protobuf.NewSerializer(s.creator, s.typer),
+			StreamSerializer: &runtime.StreamSerializerInfo{
+				Serializer: protobuf.NewRawSerializer(s.creator, s.typer),
+				Framer:     protobuf.LengthDelimitedFramer,
+			},
+		},
 	}
 }
 
@@ -750,8 +796,12 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchema: s.structuralSchema, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
-	return versioning.NewDefaultingCodecForScheme(Scheme, nil, d, nil, gv)
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
+	return versioning.NewCodec(nil, d, runtime.UnsafeObjectConvertor(Scheme), Scheme, Scheme, unstructuredDefaulter{
+		delegate:           Scheme,
+		structuralSchemas:  s.structuralSchemas,
+		structuralSchemaGK: s.structuralSchemaGK,
+	}, nil, gv, "unstructuredNegotiatedSerializer")
 }
 
 type UnstructuredObjectTyper struct {
@@ -787,14 +837,20 @@ func (c unstructuredCreator) New(kind schema.GroupVersionKind) (runtime.Object, 
 }
 
 type unstructuredDefaulter struct {
-	delegate runtime.ObjectDefaulter
+	delegate           runtime.ObjectDefaulter
+	structuralSchemas  map[string]*structuralschema.Structural // by version
+	structuralSchemaGK schema.GroupKind
 }
 
 func (d unstructuredDefaulter) Default(in runtime.Object) {
-	// Delegate for things other than Unstructured.
-	if _, ok := in.(runtime.Unstructured); !ok {
+	// Delegate for things other than Unstructured, and other GKs
+	u, ok := in.(runtime.Unstructured)
+	if !ok || u.GetObjectKind().GroupVersionKind().GroupKind() != d.structuralSchemaGK {
 		d.delegate.Default(in)
+		return
 	}
+
+	structuraldefaulting.Default(u.UnstructuredContent(), d.structuralSchemas[u.GetObjectKind().GroupVersionKind().Version])
 }
 
 type CRDRESTOptionsGetter struct {
@@ -842,7 +898,7 @@ type crdConversionRESTOptionsGetter struct {
 	converter             runtime.ObjectConvertor
 	encoderVersion        schema.GroupVersion
 	decoderVersion        schema.GroupVersion
-	structuralSchema      *structuralschema.Structural
+	structuralSchemas     map[string]*structuralschema.Structural // by version
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
@@ -853,12 +909,12 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
 			dropInvalidMetadata:   true,
-			structuralSchema:      t.structuralSchema,
+			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
 		}}
 		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{
-			structuralSchema:      t.structuralSchema,
+			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
 		}}
@@ -868,7 +924,11 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 			c,
 			&unstructuredCreator{},
 			crdserverscheme.NewUnstructuredObjectTyper(),
-			&unstructuredDefaulter{delegate: Scheme},
+			&unstructuredDefaulter{
+				delegate:           Scheme,
+				structuralSchemaGK: t.structuralSchemaGK,
+				structuralSchemas:  t.structuralSchemas,
+			},
 			t.encoderVersion,
 			t.decoderVersion,
 			"crdRESTOptions",
@@ -950,7 +1010,7 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 type unstructuredSchemaCoercer struct {
 	dropInvalidMetadata bool
 
-	structuralSchema      *structuralschema.Structural
+	structuralSchemas     map[string]*structuralschema.Structural
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
 }
@@ -965,7 +1025,7 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	objectMeta, foundObjectMeta, err := getObjectMeta(u, v.dropInvalidMetadata)
+	objectMeta, foundObjectMeta, err := schemaobjectmeta.GetObjectMeta(u.Object, v.dropInvalidMetadata)
 	if err != nil {
 		return err
 	}
@@ -975,8 +1035,14 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	if !v.preserveUnknownFields && gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
-		structuralpruning.Prune(u.Object, v.structuralSchema)
+	if gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
+		if !v.preserveUnknownFields {
+			// TODO: switch over pruning and coercing at the root to  schemaobjectmeta.Coerce too
+			structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version], false)
+		}
+		if err := schemaobjectmeta.Coerce(nil, u.Object, v.structuralSchemas[gv.Version], false, v.dropInvalidMetadata); err != nil {
+			return err
+		}
 	}
 
 	// restore meta fields, starting clean
@@ -987,72 +1053,10 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 		u.SetAPIVersion(apiVersion)
 	}
 	if foundObjectMeta {
-		if err := setObjectMeta(u, objectMeta); err != nil {
+		if err := schemaobjectmeta.SetObjectMeta(u.Object, objectMeta); err != nil {
 			return err
 		}
 	}
 
-	return nil
-}
-
-var encodingjson = json.CaseSensitiveJsonIterator()
-
-func getObjectMeta(u *unstructured.Unstructured, dropMalformedFields bool) (*metav1.ObjectMeta, bool, error) {
-	metadata, found := u.UnstructuredContent()["metadata"]
-	if !found {
-		return nil, false, nil
-	}
-
-	// round-trip through JSON first, hoping that unmarshaling just works
-	objectMeta := &metav1.ObjectMeta{}
-	metadataBytes, err := encodingjson.Marshal(metadata)
-	if err != nil {
-		return nil, false, err
-	}
-	if err = encodingjson.Unmarshal(metadataBytes, objectMeta); err == nil {
-		// if successful, return
-		return objectMeta, true, nil
-	}
-	if !dropMalformedFields {
-		// if we're not trying to drop malformed fields, return the error
-		return nil, true, err
-	}
-
-	metadataMap, ok := metadata.(map[string]interface{})
-	if !ok {
-		return nil, false, fmt.Errorf("invalid metadata: expected object, got %T", metadata)
-	}
-
-	// Go field by field accumulating into the metadata object.
-	// This takes advantage of the fact that you can repeatedly unmarshal individual fields into a single struct,
-	// each iteration preserving the old key-values.
-	accumulatedObjectMeta := &metav1.ObjectMeta{}
-	testObjectMeta := &metav1.ObjectMeta{}
-	for k, v := range metadataMap {
-		// serialize a single field
-		if singleFieldBytes, err := encodingjson.Marshal(map[string]interface{}{k: v}); err == nil {
-			// do a test unmarshal
-			if encodingjson.Unmarshal(singleFieldBytes, testObjectMeta) == nil {
-				// if that succeeds, unmarshal for real
-				encodingjson.Unmarshal(singleFieldBytes, accumulatedObjectMeta)
-			}
-		}
-	}
-
-	return accumulatedObjectMeta, true, nil
-}
-
-func setObjectMeta(u *unstructured.Unstructured, objectMeta *metav1.ObjectMeta) error {
-	if objectMeta == nil {
-		unstructured.RemoveNestedField(u.UnstructuredContent(), "metadata")
-		return nil
-	}
-
-	metadata, err := runtime.DefaultUnstructuredConverter.ToUnstructured(objectMeta)
-	if err != nil {
-		return err
-	}
-
-	u.UnstructuredContent()["metadata"] = metadata
 	return nil
 }

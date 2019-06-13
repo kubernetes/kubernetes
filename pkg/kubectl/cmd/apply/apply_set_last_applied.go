@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
+// SetLastAppliedOptions defines options for the `apply set-last-applied` command.`
 type SetLastAppliedOptions struct {
 	CreateAnnotation bool
 
@@ -58,6 +59,7 @@ type SetLastAppliedOptions struct {
 	genericclioptions.IOStreams
 }
 
+// PatchBuffer caches changes that are to be applied.
 type PatchBuffer struct {
 	Patch     []byte
 	PatchType types.PatchType
@@ -81,6 +83,7 @@ var (
 		`))
 )
 
+// NewSetLastAppliedOptions takes option arguments from a CLI stream and returns it at SetLastAppliedOptions type.
 func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastAppliedOptions {
 	return &SetLastAppliedOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("configured").WithTypeSetter(scheme.Scheme),
@@ -88,6 +91,7 @@ func NewSetLastAppliedOptions(ioStreams genericclioptions.IOStreams) *SetLastApp
 	}
 }
 
+// NewCmdApplySetLastApplied creates the cobra CLI `apply` subcommand `set-last-applied`.`
 func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewSetLastAppliedOptions(ioStreams)
 	cmd := &cobra.Command{
@@ -112,6 +116,7 @@ func NewCmdApplySetLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IO
 	return cmd
 }
 
+// Complete populates dry-run and output flag options.
 func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.dryRun = cmdutil.GetDryRunFlag(cmd)
 	o.output = cmdutil.GetFlagString(cmd, "output")
@@ -141,6 +146,7 @@ func (o *SetLastAppliedOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) 
 	return nil
 }
 
+// Validate checks SetLastAppliedOptions for validity.
 func (o *SetLastAppliedOptions) Validate() error {
 	r := o.builder.
 		Unstructured().
@@ -187,6 +193,7 @@ func (o *SetLastAppliedOptions) Validate() error {
 	return err
 }
 
+// RunSetLastApplied executes the `set-last-applied` command according to SetLastAppliedOptions.
 func (o *SetLastAppliedOptions) RunSetLastApplied() error {
 	for i, patch := range o.patchBufferList {
 		info := o.infoList[i]

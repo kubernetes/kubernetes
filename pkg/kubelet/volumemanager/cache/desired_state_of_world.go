@@ -25,6 +25,8 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -160,6 +162,10 @@ type volumeToMount struct {
 	// reportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	reportedInUse bool
+
+	// desiredSizeLimit indicates the desired upper bound on the size of the volume
+	// (if so implemented)
+	desiredSizeLimit *resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -226,6 +232,20 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	}
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
+		var sizeLimit *resource.Quantity
+		if volumeSpec.Volume != nil {
+			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
+				_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
+				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
+				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
+				if volumeSpec.Volume.EmptyDir != nil &&
+					volumeSpec.Volume.EmptyDir.SizeLimit != nil &&
+					volumeSpec.Volume.EmptyDir.SizeLimit.Value() > 0 &&
+					volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value() {
+					sizeLimit = resource.NewQuantity(volumeSpec.Volume.EmptyDir.SizeLimit.Value(), resource.BinarySI)
+				}
+			}
+		}
 		dsw.volumesToMount[volumeName] = volumeToMount{
 			volumeName:              volumeName,
 			podsToMount:             make(map[types.UniquePodName]podToMount),
@@ -233,6 +253,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			pluginIsDeviceMountable: deviceMountable,
 			volumeGidValue:          volumeGidValue,
 			reportedInUse:           false,
+			desiredSizeLimit:        sizeLimit,
 		}
 	}
 
@@ -360,7 +381,8 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 						PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
 						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
 						VolumeGidValue:          volumeObj.volumeGidValue,
-						ReportedInUse:           volumeObj.reportedInUse}})
+						ReportedInUse:           volumeObj.reportedInUse,
+						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
 		}
 	}
 	return volumesToMount

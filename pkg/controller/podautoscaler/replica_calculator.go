@@ -265,6 +265,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(currentReplicas int32,
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v on %s %s/%s", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
+	replicaCount = currentReplicas
 	usageRatio := float64(utilization) / (float64(targetAverageUtilization) * float64(replicaCount))
 	if math.Abs(1.0-usageRatio) > c.tolerance {
 		// update number of replicas if change is large enough

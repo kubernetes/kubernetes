@@ -111,6 +111,7 @@ func (connection *VSphereConnection) Signer(ctx context.Context, client *vim25.C
 
 	req := sts.TokenRequest{
 		Certificate: &cert,
+		Delegatable: true,
 	}
 
 	signer, err := tokens.Issue(ctx, req)

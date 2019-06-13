@@ -422,7 +422,7 @@ func doTestSetUp(scenario struct {
 	g := mounter.(*gitRepoVolumeMounter)
 	g.exec = &fake
 
-	g.SetUp(nil)
+	g.SetUp(volume.MounterArgs{})
 
 	if fake.CommandCalls != len(expecteds) {
 		allErrs = append(allErrs,

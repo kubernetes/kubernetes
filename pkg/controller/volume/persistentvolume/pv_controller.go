@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -203,6 +203,28 @@ type PersistentVolumeController struct {
 	// For testing only: hook to intercept CSI driver name <=> Intree plugin name mapping
 	// Not used when set to nil
 	csiNameFromIntreeNameHook func(pluginName string) (string, error)
+
+	// operationTimestamps caches start timestamp of operations
+	// (currently provision + binding/deletion) for metric recording.
+	// Detailed lifecyle/key for each operation
+	// 1. provision + binding
+	//     key:        claimKey
+	//     start time: user has NOT provide any volume ref in the claim AND
+	//                 there is no existing volume found for the claim,
+	//                 "provisionClaim" is called with a valid plugin/external provisioner
+	//                 to provision a volume
+	//     end time:   after a volume has been provisioned and bound to the claim successfully
+	//                 the corresponding timestamp entry will be deleted from cache
+	//     abort:      claim has not been bound to a volume yet but a claim deleted event
+	//                 has been received from API server
+	// 2. deletion
+	//     key:        volumeName
+	//     start time: when "reclaimVolume" process a volume with reclaim policy
+	//                 set to be "PersistentVolumeReclaimDelete"
+	//     end time:   after a volume deleted event has been received from API server
+	//                 the corresponding timestamp entry will be deleted from cache
+	//     abort:      N.A.
+	operationTimestamps metrics.OperationStartTimeCache
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -323,13 +345,21 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 		} else /* pv != nil */ {
 			// Found a PV for this claim
 			// OBSERVATION: pvc is "Pending", pv is "Available"
-			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), volume.Name, getVolumeStatusForLogging(volume))
+			claimKey := claimToClaimKey(claim)
+			klog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q found: %s", claimKey, volume.Name, getVolumeStatusForLogging(volume))
 			if err = ctrl.bind(volume, claim); err != nil {
 				// On any error saving the volume or the claim, subsequent
 				// syncClaim will finish the binding.
+				// record count error for provision if exists
+				// timestamp entry will remain in cache until a success binding has happened
+				metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, err)
 				return err
 			}
 			// OBSERVATION: claim is "Bound", pv is "Bound"
+			// if exists a timestamp entry in cache, record end to end provision latency and clean up cache
+			// End of the provision + binding operation lifecycle, cache will be cleaned by "RecordMetric"
+			// [Unit test 12-1, 12-2, 12-4]
+			metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, nil)
 			return nil
 		}
 	} else /* pvc.Spec.VolumeName != nil */ {
@@ -1011,11 +1041,17 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *v1.PersistentVolum
 	case v1.PersistentVolumeReclaimDelete:
 		klog.V(4).Infof("reclaimVolume[%s]: policy is Delete", volume.Name)
 		opName := fmt.Sprintf("delete-%s[%s]", volume.Name, string(volume.UID))
-		startTime := time.Now()
+		// create a start timestamp entry in cache for deletion operation if no one exists with
+		// key = volume.Name, pluginName = provisionerName, operation = "delete"
+		ctrl.operationTimestamps.AddIfNotExist(volume.Name, ctrl.getProvisionerNameFromVolume(volume), "delete")
 		ctrl.scheduleOperation(opName, func() error {
-			pluginName, err := ctrl.deleteVolumeOperation(volume)
-			timeTaken := time.Since(startTime).Seconds()
-			metrics.RecordVolumeOperationMetric(pluginName, "delete", timeTaken, err)
+			_, err := ctrl.deleteVolumeOperation(volume)
+			if err != nil {
+				// only report error count to "volume_operation_total_errors"
+				// latency reporting will happen when the volume get finally
+				// deleted and a volume deleted event is captured
+				metrics.RecordMetric(volume.Name, &ctrl.operationTimestamps, err)
+			}
 			return err
 		})
 
@@ -1309,11 +1345,31 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 	}
 	klog.V(4).Infof("provisionClaim[%s]: started", claimToClaimKey(claim))
 	opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
-	startTime := time.Now()
+	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
+	if err != nil {
+		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, err.Error())
+		klog.Errorf("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
+		// failed to find the requested provisioning plugin, directly return err for now.
+		// controller will retry the provisioning in every syncUnboundClaim() call
+		// retain the original behavior of returning nil from provisionClaim call
+		return nil
+	}
 	ctrl.scheduleOperation(opName, func() error {
-		pluginName, err := ctrl.provisionClaimOperation(claim)
-		timeTaken := time.Since(startTime).Seconds()
-		metrics.RecordVolumeOperationMetric(pluginName, "provision", timeTaken, err)
+		// create a start timestamp entry in cache for provision operation if no one exists with
+		// key = claimKey, pluginName = provisionerName, operation = "provision"
+		claimKey := claimToClaimKey(claim)
+		ctrl.operationTimestamps.AddIfNotExist(claimKey, ctrl.getProvisionerName(plugin, storageClass), "provision")
+		var err error
+		if plugin == nil || plugin.IsMigratedToCSI() {
+			_, err = ctrl.provisionClaimOperationExternal(claim, plugin, storageClass)
+		} else {
+			_, err = ctrl.provisionClaimOperation(claim, plugin, storageClass)
+		}
+		// if error happened, record an error count metric
+		// timestamp entry will remain in cache until a success binding has happened
+		if err != nil {
+			metrics.RecordMetric(claimKey, &ctrl.operationTimestamps, err)
+		}
 		return err
 	})
 	return nil
@@ -1328,39 +1384,20 @@ func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName stri
 
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
-func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.PersistentVolumeClaim) (string, error) {
+func (ctrl *PersistentVolumeController) provisionClaimOperation(
+	claim *v1.PersistentVolumeClaim,
+	plugin vol.ProvisionableVolumePlugin,
+	storageClass *storage.StorageClass) (string, error) {
 	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
 	klog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
-	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
-	if err != nil {
-		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, err.Error())
-		klog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
-		// The controller will retry provisioning the volume in every
-		// syncVolume() call.
-		return "", err
-	}
-
-	var pluginName string
+	// called from provisionClaim(), in this case, plugin MUST NOT be nil and
+	// plugin.IsMigratedToCSI() MUST return FALSE
+	// NOTE: checks on plugin/storageClass has been saved
+	pluginName := plugin.GetPluginName()
 	provisionerName := storageClass.Provisioner
-	if plugin != nil {
-		if plugin.IsMigratedToCSI() {
-			// pluginName is not set here to align with existing behavior
-			// of not setting pluginName for external provisioners (including CSI)
-			// Set provisionerName to CSI plugin name for setClaimProvisioner
-			provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
-			if err != nil {
-				strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
-				klog.V(2).Infof("%s", strerr)
-				ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
-				return "", err
-			}
-		} else {
-			pluginName = plugin.GetPluginName()
-		}
-	}
 
-	// Add provisioner annotation so external provisioners know when to start
+	// Add provisioner annotation to be consistent with external provisioner workflow
 	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
 	if err != nil {
 		// Save failed, the controller will retry in the next sync
@@ -1369,19 +1406,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	}
 	claim = newClaim
 
-	if plugin == nil || plugin.IsMigratedToCSI() {
-		// findProvisionablePlugin returned no error nor plugin.
-		// This means that an unknown provisioner is requested. Report an event
-		// and wait for the external provisioner
-		msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", storageClass.Provisioner)
-		ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
-		klog.V(3).Infof("provisioning claim %q: %s", claimToClaimKey(claim), msg)
-		return pluginName, nil
-	}
-
 	// internal provisioning
 
-	//  A previous doProvisionClaim may just have finished while we were waiting for
+	//  A previous provisionClaimOperation may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
 	//  yet.
 
@@ -1547,6 +1574,44 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claim *v1.Persis
 	return pluginName, nil
 }
 
+// provisionClaimOperationExternal provisions a volume using external provisioner async-ly
+// This method will be running in a standalone go-routine scheduled in "provisionClaim"
+func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
+	claim *v1.PersistentVolumeClaim,
+	plugin vol.ProvisionableVolumePlugin,
+	storageClass *storage.StorageClass) (string, error) {
+	claimClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	klog.V(4).Infof("provisionClaimOperationExternal [%s] started, class: %q", claimToClaimKey(claim), claimClass)
+	// Set provisionerName to external provisioner name by setClaimProvisioner
+	var err error
+	provisionerName := storageClass.Provisioner
+	if plugin != nil {
+		// update the provisioner name to use the CSI in-tree name
+		provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
+		if err != nil {
+			strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
+			klog.V(2).Infof("%s", strerr)
+			ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
+			return provisionerName, err
+		}
+	}
+	// Add provisioner annotation so external provisioners know when to start
+	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
+	if err != nil {
+		// Save failed, the controller will retry in the next sync
+		klog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)
+		return provisionerName, err
+	}
+	claim = newClaim
+	msg := fmt.Sprintf("waiting for a volume to be created, either by external provisioner %q or manually created by system administrator", provisionerName)
+	// External provisioner has been requested for provisioning the volume
+	// Report an event and wait for external provisioner to finish
+	ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.ExternalProvisioning, msg)
+	klog.V(3).Infof("provisionClaimOperationExternal provisioning claim %q: %s", claimToClaimKey(claim), msg)
+	// return provisioner name here for metric reporting
+	return provisionerName, nil
+}
+
 // rescheduleProvisioning signal back to the scheduler to retry dynamic provisioning
 // by removing the AnnSelectedNode annotation
 func (ctrl *PersistentVolumeController) rescheduleProvisioning(claim *v1.PersistentVolumeClaim) {
@@ -1660,4 +1725,49 @@ func (ctrl *PersistentVolumeController) findDeletablePlugin(volume *v1.Persisten
 		return nil, fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
 	}
 	return plugin, nil
+}
+
+// obtain provisioner/deleter name for a volume
+func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.PersistentVolume) string {
+	plugin, err := ctrl.findDeletablePlugin(volume)
+	if err != nil {
+		return "N/A"
+	}
+	if plugin != nil && !plugin.IsMigratedToCSI() {
+		return plugin.GetPluginName()
+	}
+	// If reached here, Either an external provisioner was used for provisioning
+	// or a plugin has been migrated to CSI.
+	// If an external provisioner was used, i.e., plugin == nil, instead of using
+	// the AnnDynamicallyProvisioned annotation value, use the storageClass's Provisioner
+	// field to avoid explosion of the metric in the cases like local storage provisioner
+	// tagging a volume with arbitrary provisioner names
+	storageClass := v1helper.GetPersistentVolumeClass(volume)
+	class, err := ctrl.classLister.Get(storageClass)
+	if err != nil {
+		return "N/A"
+	}
+	if plugin != nil {
+		provisionerName, err := ctrl.getCSINameFromIntreeName(class.Provisioner)
+		if err == nil {
+			return provisionerName
+		}
+	}
+	return class.Provisioner
+}
+
+// obtain plugin/external provisioner name from plugin and storage class
+func (ctrl *PersistentVolumeController) getProvisionerName(plugin vol.ProvisionableVolumePlugin, storageClass *storage.StorageClass) string {
+	// intree plugin, returns the plugin's name
+	if plugin != nil && !plugin.IsMigratedToCSI() {
+		return plugin.GetPluginName()
+	} else if plugin != nil {
+		// get the CSI in-tree name from storage class provisioner name
+		provisionerName, err := ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
+		if err != nil {
+			return "N/A"
+		}
+		return provisionerName
+	}
+	return storageClass.Provisioner
 }

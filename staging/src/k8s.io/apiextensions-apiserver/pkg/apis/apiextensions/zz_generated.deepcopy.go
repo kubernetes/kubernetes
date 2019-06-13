@@ -115,7 +115,7 @@ func (in *CustomResourceDefinitionCondition) DeepCopy() *CustomResourceDefinitio
 func (in *CustomResourceDefinitionList) DeepCopyInto(out *CustomResourceDefinitionList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]CustomResourceDefinition, len(*in))

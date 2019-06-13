@@ -131,16 +131,23 @@ function MustDownload-File {
   param (
     [parameter(Mandatory=$false)] [string]$Hash,
     [parameter(Mandatory=$true)] [string]$OutFile,
-    [parameter(Mandatory=$true)] [System.Collections.Generic.List[String]]$URLs
+    [parameter(Mandatory=$true)] [System.Collections.Generic.List[String]]$URLs,
+    [parameter(Mandatory=$false)] [System.Collections.IDictionary]$Headers = @{}
   )
 
   While($true) {
     ForEach($url in $URLs) {
+      # If the URL is for GCS and the node has dev storage scope, add the
+      # service account token to the request headers.
+      if (($url -match "^https://storage`.googleapis`.com.*") -and $(Check-StorageScope)) {
+        $Headers["Authorization"] = "Bearer $(Get-Credentials)"
+      }
+
       # Attempt to download the file
       Try {
         # TODO(mtaufen): When we finally get a Windows version that has Powershell 6
         # installed we can set `-MaximumRetryCount 6 -RetryIntervalSec 10` to make this even more robust.
-        Invoke-WebRequest $url -OutFile $OutFile -TimeoutSec 300
+        $result = Invoke-WebRequest $url -Headers $Headers -OutFile $OutFile -TimeoutSec 300
       } Catch {
         $message = $_.Exception.ToString()
         Log-Output "Failed to download file from $url. Will retry. Error: $message"
@@ -161,6 +168,29 @@ function MustDownload-File {
       Log-Output "Downloaded $url"
       return
     }
+  }
+}
+
+# Returns the default service account token for the VM, retrieved from
+# the instance metadata.
+function Get-Credentials {
+  While($true) {
+    $data = Get-InstanceMetadata -Key "service-accounts/default/token"
+    if ($data) {
+      return ($data | ConvertFrom-Json).access_token
+    }
+    Start-Sleep -Seconds 1
+  }
+}
+
+# Returns True if the VM has the dev storage scope, False otherwise.
+function Check-StorageScope {
+  While($true) {
+    $data = Get-InstanceMetadata -Key "service-accounts/default/scopes"
+    if ($data) {
+      return ($data -match "auth/devstorage")
+    }
+    Start-Sleep -Seconds 1
   }
 }
 

@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -217,7 +217,8 @@ type PodSecurityPolicySpec struct {
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
-	// An empty value means no CSI drivers can run inline within a pod spec.
+	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
+	// This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.

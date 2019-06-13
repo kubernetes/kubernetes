@@ -532,6 +532,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		UnsafeConvertor: a.group.UnsafeConvertor,
 		Authorizer:      a.group.Authorizer,
 
+		EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
+
 		// TODO: Check for the interface on storage
 		TableConvertor: tableProvider,
 
@@ -924,6 +926,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Version = gvk.Version
 		apiResource.Kind = gvk.Kind
 	}
+
+	// Record the existence of the GVR and the corresponding GVK
+	a.group.EquivalentResourceRegistry.RegisterKindFor(reqScope.Resource, reqScope.Subresource, fqKindToRegister)
 
 	return &apiResource, nil
 }

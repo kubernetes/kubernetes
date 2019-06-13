@@ -52,10 +52,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -620,7 +620,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	return nil
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {
 	return cm.deviceManager.GetWatcherHandler()
 }
 

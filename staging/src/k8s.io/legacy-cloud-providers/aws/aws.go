@@ -3579,7 +3579,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			sourceRangeCidrs = append(sourceRangeCidrs, "0.0.0.0/0")
 		}
 
-		err = c.updateInstanceSecurityGroupsForNLB(v2Mappings, instances, loadBalancerName, sourceRangeCidrs)
+		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, sourceRangeCidrs, v2Mappings)
 		if err != nil {
 			klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
 			return nil, err
@@ -4158,99 +4158,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			}
 		}
 
-		{
-			var matchingGroups []*ec2.SecurityGroup
-			{
-				// Server side filter
-				describeRequest := &ec2.DescribeSecurityGroupsInput{}
-				describeRequest.Filters = []*ec2.Filter{
-					newEc2Filter("ip-permission.protocol", "tcp"),
-				}
-				response, err := c.ec2.DescribeSecurityGroups(describeRequest)
-				if err != nil {
-					return fmt.Errorf("Error querying security groups for NLB: %q", err)
-				}
-				for _, sg := range response {
-					if !c.tagging.hasClusterTag(sg.Tags) {
-						continue
-					}
-					matchingGroups = append(matchingGroups, sg)
-				}
-
-				// client-side filter out groups that don't have IP Rules we've
-				// annotated for this service
-				matchingGroups = filterForIPRangeDescription(matchingGroups, loadBalancerName)
-			}
-
-			{
-				clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, loadBalancerName)
-				mtuRule := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, loadBalancerName)
-				healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, loadBalancerName)
-
-				for i := range matchingGroups {
-					removes := []*ec2.IpPermission{}
-					for j := range matchingGroups[i].IpPermissions {
-
-						v4rangesToRemove := []*ec2.IpRange{}
-						v6rangesToRemove := []*ec2.Ipv6Range{}
-
-						// Find IpPermission that contains k8s description
-						// If we removed the whole IpPermission, it could contain other non-k8s specified ranges
-						for k := range matchingGroups[i].IpPermissions[j].IpRanges {
-							description := aws.StringValue(matchingGroups[i].IpPermissions[j].IpRanges[k].Description)
-							if description == clientRule || description == mtuRule || description == healthRule {
-								v4rangesToRemove = append(v4rangesToRemove, matchingGroups[i].IpPermissions[j].IpRanges[k])
-							}
-						}
-
-						// Find IpPermission that contains k8s description
-						// If we removed the whole IpPermission, it could contain other non-k8s specified rangesk
-						for k := range matchingGroups[i].IpPermissions[j].Ipv6Ranges {
-							description := aws.StringValue(matchingGroups[i].IpPermissions[j].Ipv6Ranges[k].Description)
-							if description == clientRule || description == mtuRule || description == healthRule {
-								v6rangesToRemove = append(v6rangesToRemove, matchingGroups[i].IpPermissions[j].Ipv6Ranges[k])
-							}
-						}
-
-						// ipv4 and ipv6 removals cannot be included in the same permission
-						if len(v4rangesToRemove) > 0 {
-							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
-							removedPermission := &ec2.IpPermission{
-								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
-								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
-								IpRanges:   v4rangesToRemove,
-								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
-							}
-							removes = append(removes, removedPermission)
-						}
-						if len(v6rangesToRemove) > 0 {
-							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
-							removedPermission := &ec2.IpPermission{
-								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
-								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
-								Ipv6Ranges: v6rangesToRemove,
-								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
-							}
-							removes = append(removes, removedPermission)
-						}
-
-					}
-					if len(removes) > 0 {
-						changed, err := c.removeSecurityGroupIngress(aws.StringValue(matchingGroups[i].GroupId), removes)
-						if err != nil {
-							return err
-						}
-						if !changed {
-							klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", *matchingGroups[i].GroupId)
-						}
-					}
-
-				}
-
-			}
-
-		}
-		return nil
+		return c.updateInstanceSecurityGroupsForNLB(loadBalancerName, nil, nil, nil)
 	}
 
 	lb, err := c.describeLoadBalancer(loadBalancerName)

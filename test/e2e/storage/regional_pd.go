@@ -221,13 +221,13 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	pod := getPod(c, ns, regionalPDLabels)
 	nodeName := pod.Spec.NodeName
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	podZone := node.Labels[v1.LabelZoneFailureDomain]
 
 	ginkgo.By("tainting nodes in the zone the pod is scheduled in")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{v1.LabelZoneFailureDomain: podZone}))
 	nodesInZone, err := c.CoreV1().Nodes().List(metav1.ListOptions{LabelSelector: selector.String()})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	removeTaintFunc := addTaint(c, ns, nodesInZone.Items, podZone)
 
 	defer func() {
@@ -305,13 +305,13 @@ func addTaint(c clientset.Interface, ns string, nodes []v1.Node, podZone string)
 		reversePatches[node.Name] = reversePatchBytes
 
 		_, err = c.CoreV1().Nodes().Patch(node.Name, types.StrategicMergePatchType, patchBytes)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 
 	return func() {
 		for nodeName, reversePatch := range reversePatches {
 			_, err := c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, reversePatch)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 		}
 	}
 }
@@ -534,7 +534,7 @@ func newPodTemplate(labels map[string]string) *v1.PodTemplateSpec {
 
 func getTwoRandomZones(c clientset.Interface) []string {
 	zones, err := framework.GetClusterZones(c)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(zones.Len()).To(gomega.BeNumerically(">=", 2),
 		"The test should only be run in multizone clusters.")
 

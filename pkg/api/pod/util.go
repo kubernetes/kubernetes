@@ -379,6 +379,12 @@ func dropDisabledFields(
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
+		!podPriorityInUse(oldPodSpec) {
+		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
+		// does not specify any values for these fields.
+		podSpec.PreemptionPolicy = nil
+	}
 }
 
 // dropDisabledRunAsGroupField removes disabled fields from PodSpec related
@@ -441,12 +447,22 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 		defaultProcMount := api.DefaultProcMount
 		for i := range podSpec.Containers {
 			if podSpec.Containers[i].SecurityContext != nil {
-				podSpec.Containers[i].SecurityContext.ProcMount = &defaultProcMount
+				if podSpec.Containers[i].SecurityContext.ProcMount != nil {
+					// The ProcMount field was improperly forced to non-nil in 1.12.
+					// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
+					// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
+					podSpec.Containers[i].SecurityContext.ProcMount = &defaultProcMount
+				}
 			}
 		}
 		for i := range podSpec.InitContainers {
 			if podSpec.InitContainers[i].SecurityContext != nil {
-				podSpec.InitContainers[i].SecurityContext.ProcMount = &defaultProcMount
+				if podSpec.InitContainers[i].SecurityContext.ProcMount != nil {
+					// The ProcMount field was improperly forced to non-nil in 1.12.
+					// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
+					// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
+					podSpec.InitContainers[i].SecurityContext.ProcMount = &defaultProcMount
+				}
 			}
 		}
 	}
@@ -508,7 +524,7 @@ func runtimeClassInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set
+// procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
 func procMountInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false

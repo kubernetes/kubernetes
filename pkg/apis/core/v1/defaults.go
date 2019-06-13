@@ -421,10 +421,3 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 		obj.Type = &typeVol
 	}
 }
-
-func SetDefaults_SecurityContext(obj *v1.SecurityContext) {
-	if obj.ProcMount == nil {
-		defProcMount := v1.DefaultProcMount
-		obj.ProcMount = &defProcMount
-	}
-}

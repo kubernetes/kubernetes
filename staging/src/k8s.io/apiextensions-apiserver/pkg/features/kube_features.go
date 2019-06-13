@@ -53,6 +53,12 @@ const (
 	//
 	// CustomResourceWebhookConversion defines the webhook conversion for Custom Resources.
 	CustomResourceWebhookConversion featuregate.Feature = "CustomResourceWebhookConversion"
+
+	// owner: @sttts
+	// alpha: v1.15
+	//
+	// CustomResourceDefaulting enables OpenAPI defaulting in CustomResources.
+	CustomResourceDefaulting featuregate.Feature = "CustomResourceDefaulting"
 )
 
 func init() {
@@ -65,6 +71,7 @@ func init() {
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
 	CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
 	CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
-	CustomResourceWebhookConversion: {Default: false, PreRelease: featuregate.Alpha},
+	CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
 	CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
+	CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
 }

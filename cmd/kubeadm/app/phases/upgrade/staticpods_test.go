@@ -909,3 +909,89 @@ func getEmbeddedCerts(tmpDir, kubeConfig string) ([]*x509.Certificate, error) {
 
 	return certutil.ParseCertsPEM(authInfo.ClientCertificateData)
 }
+
+func TestGetPathManagerForUpgrade(t *testing.T) {
+
+	haEtcd := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			Etcd: kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379", "10.100.0.3:2379"},
+				},
+			},
+		},
+	}
+
+	noHAEtcd := &kubeadmapi.InitConfiguration{}
+
+	tests := []struct {
+		name             string
+		cfg              *kubeadmapi.InitConfiguration
+		etcdUpgrade      bool
+		shouldDeleteEtcd bool
+	}{
+		{
+			name:             "ha etcd but no etcd upgrade",
+			cfg:              haEtcd,
+			etcdUpgrade:      false,
+			shouldDeleteEtcd: true,
+		},
+		{
+			name:             "non-ha etcd with etcd upgrade",
+			cfg:              noHAEtcd,
+			etcdUpgrade:      true,
+			shouldDeleteEtcd: false,
+		},
+		{
+			name:             "ha etcd and etcd upgrade",
+			cfg:              haEtcd,
+			etcdUpgrade:      true,
+			shouldDeleteEtcd: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Use a temporary directory
+			tmpdir, err := ioutil.TempDir("", "TestGetPathManagerForUpgrade")
+			if err != nil {
+				t.Fatalf("unexpected error making temporary directory: %v", err)
+			}
+			defer func() {
+				os.RemoveAll(tmpdir)
+			}()
+
+			pathmgr, err := GetPathManagerForUpgrade(tmpdir, test.cfg, test.etcdUpgrade)
+			if err != nil {
+				t.Fatalf("unexpected error creating path manager: %v", err)
+			}
+
+			if _, err := os.Stat(pathmgr.BackupManifestDir()); os.IsNotExist(err) {
+				t.Errorf("expected manifest dir %s to exist, but it did not (%v)", pathmgr.BackupManifestDir(), err)
+			}
+
+			if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
+				t.Errorf("expected etcd dir %s to exist, but it did not (%v)", pathmgr.BackupEtcdDir(), err)
+			}
+
+			if err := pathmgr.CleanupDirs(); err != nil {
+				t.Fatalf("unexpected error cleaning up directories: %v", err)
+			}
+
+			if _, err := os.Stat(pathmgr.BackupManifestDir()); os.IsNotExist(err) {
+				t.Errorf("expected manifest dir %s to exist, but it did not (%v)", pathmgr.BackupManifestDir(), err)
+			}
+
+			if test.shouldDeleteEtcd {
+				if _, err := os.Stat(pathmgr.BackupEtcdDir()); !os.IsNotExist(err) {
+					t.Errorf("expected etcd dir %s not to exist, but it did (%v)", pathmgr.BackupEtcdDir(), err)
+				}
+			} else {
+				if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
+					t.Errorf("expected etcd dir %s to exist, but it did not", pathmgr.BackupEtcdDir())
+				}
+			}
+		})
+	}
+
+}
