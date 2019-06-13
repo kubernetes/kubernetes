@@ -330,15 +330,18 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		}
 	}
 
+	getStringPtr := func(in string) *string {
+		return &in
+	}
 	getTrueVar := func() *bool {
 		ret := true
 		return &ret
 	}
-
 	getFalseVar := func() *bool {
 		ret := false
 		return &ret
 	}
+
 	blockRC1 := metav1.OwnerReference{
 		APIVersion:         "v1",
 		Kind:               "ReplicationController",
@@ -372,6 +375,21 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		APIVersion: "v1",
 		Kind:       "ReplicationController",
 		Name:       "rc2",
+	}
+	// Deployments aren't in our fake mapping.  They only work when used with resources.
+	blockDeployment1 := metav1.OwnerReference{
+		APIVersion:         "apps/v1",
+		Kind:               "Deployment",
+		Resource:           "deployments",
+		Name:               "ds1",
+		Namespace:          getStringPtr("foo"),
+		BlockOwnerDeletion: getTrueVar(),
+	}
+	blockDeployment1NoMapping := metav1.OwnerReference{
+		APIVersion:         "apps/v1",
+		Kind:               "Deployment",
+		Name:               "ds1",
+		BlockOwnerDeletion: getTrueVar(),
 	}
 	blockDS1 := metav1.OwnerReference{
 		APIVersion:         "apps/v1",
@@ -412,6 +430,12 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		}
 		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on")
 	}
+	expectNoMappingError := func(err error) bool {
+		if err == nil {
+			return false
+		}
+		return strings.Contains(err.Error(), "cannot set blockOwnerDeletion in this case because cannot find RESTMapping for")
+	}
 	tests := []struct {
 		name        string
 		username    string
@@ -443,6 +467,20 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			resource:   api.SchemeGroupVersion.WithResource("pods"),
 			newObj:     podWithOwnerRefs(blockRC1, blockRC2, blockNode),
 			checkError: expectNoError,
+		},
+		{
+			name:       "super-user, create, some ownerReferences have blockOwnerDeletion=true, no mapping needed",
+			username:   "super",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			newObj:     podWithOwnerRefs(blockDeployment1),
+			checkError: expectNoError,
+		},
+		{
+			name:       "super-user, create, some ownerReferences have blockOwnerDeletion=true, no mapping available",
+			username:   "super",
+			resource:   api.SchemeGroupVersion.WithResource("pods"),
+			newObj:     podWithOwnerRefs(blockDeployment1NoMapping),
+			checkError: expectNoMappingError,
 		},
 		{
 			name:       "non-rc-deleter, create, no ownerReferences",

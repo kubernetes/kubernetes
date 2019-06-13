@@ -67,6 +67,7 @@ type gcPermissionsEnforcement struct {
 }
 
 var _ admission.ValidationInterface = &gcPermissionsEnforcement{}
+var _ admission.MutationInterface = &gcPermissionsEnforcement{}
 
 // whiteListItem describes an entry in a whitelist ignored by gc permission enforcement.
 type whiteListItem struct {
@@ -82,6 +83,50 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 		}
 	}
 	return false
+}
+
+// Admit restores ownerref.resource and .namespace if it was stripped by a client without the serialization code.
+func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes, o admission.ObjectInterfaces) error {
+	if attributes.GetOldObject() == nil {
+		return nil
+	}
+
+	newMeta, err := meta.Accessor(attributes.GetObject())
+	if err != nil {
+		return err
+	}
+	oldMeta, err := meta.Accessor(attributes.GetOldObject())
+	if err != nil {
+		return err
+	}
+	indexedOldRefs := indexByUID(oldMeta.GetOwnerReferences())
+
+	mutated := false
+	newOwnerRefs := newMeta.GetOwnerReferences()
+	for i := range newOwnerRefs {
+		currOwnerRef := newOwnerRefs[i]
+		oldRef, ok := indexedOldRefs[currOwnerRef.UID]
+		if !ok {
+			// just means it's new
+			continue
+		}
+
+		if len(currOwnerRef.Resource) == 0 && len(oldRef.Resource) > 0 {
+			currOwnerRef.Resource = oldRef.Resource
+			mutated = true
+		}
+		if currOwnerRef.Namespace == nil && oldRef.Namespace != nil {
+			t := *oldRef.Namespace
+			currOwnerRef.Namespace = &t
+			mutated = true
+		}
+	}
+
+	if mutated {
+		newMeta.SetOwnerReferences(newOwnerRefs)
+	}
+
+	return nil
 }
 
 func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o admission.ObjectInterfaces) (err error) {
@@ -120,7 +165,7 @@ func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes, o a
 	// Further check if the user is setting ownerReference.blockOwnerDeletion to
 	// true. If so, only allows the change if the user has delete permission of
 	// the _OWNER_
-	newBlockingRefs := newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
+	newBlockingRefs := a.newBlockingOwnerDeletionRefs(attributes.GetObject(), attributes.GetOldObject())
 	for _, ref := range newBlockingRefs {
 		records, err := a.ownerRefToDeleteAttributeRecords(ref, attributes)
 		if err != nil {
@@ -176,33 +221,59 @@ func isChangingOwnerReference(newObj, oldObj runtime.Object) bool {
 // OwnerReference only records the object kind, which might map to multiple
 // resources, so multiple DeleteAttribute might be returned.
 func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.OwnerReference, attributes admission.Attributes) ([]authorizer.AttributesRecord, error) {
+	gvrForOwners, err := a.getGVRsForOwnerRef(ref)
+	if err != nil {
+		return nil, err
+	}
+
 	var ret []authorizer.AttributesRecord
-	groupVersion, err := schema.ParseGroupVersion(ref.APIVersion)
-	if err != nil {
-		return ret, err
-	}
-	mappings, err := a.restMapper.RESTMappings(schema.GroupKind{Group: groupVersion.Group, Kind: ref.Kind}, groupVersion.Version)
-	if err != nil {
-		return ret, err
-	}
-	for _, mapping := range mappings {
+	for _, gvrAttributes := range gvrForOwners {
 		ar := authorizer.AttributesRecord{
 			User:            attributes.GetUserInfo(),
 			Verb:            "update",
-			APIGroup:        mapping.Resource.Group,
-			APIVersion:      mapping.Resource.Version,
-			Resource:        mapping.Resource.Resource,
+			APIGroup:        gvrAttributes.gvr.Group,
+			APIVersion:      gvrAttributes.gvr.Version,
+			Resource:        gvrAttributes.gvr.Resource,
 			Subresource:     "finalizers",
 			Name:            ref.Name,
 			ResourceRequest: true,
 			Path:            "",
 		}
-		if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
+		if gvrAttributes.namespaced {
 			// if the owner is namespaced, it must be in the same namespace as the dependent is.
 			ar.Namespace = attributes.GetNamespace()
 		}
 		ret = append(ret, ar)
 	}
+	return ret, nil
+}
+
+type gvrAttribute struct {
+	gvr        schema.GroupVersionResource
+	namespaced bool
+}
+
+// getGVRsForOwnerRef returns the groupversionresource of the referent,  and an error
+func (a *gcPermissionsEnforcement) getGVRsForOwnerRef(ref metav1.OwnerReference) ([]gvrAttribute, error) {
+	groupVersion, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		return nil, err
+	}
+	if len(ref.Resource) > 0 && ref.Namespace != nil {
+		return []gvrAttribute{
+			{gvr: groupVersion.WithResource(ref.Resource), namespaced: len(*ref.Namespace) > 0},
+		}, nil
+	}
+
+	var ret []gvrAttribute
+	mappings, err := a.restMapper.RESTMappings(schema.GroupKind{Group: groupVersion.Group, Kind: ref.Kind}, groupVersion.Version)
+	if err != nil {
+		return ret, err
+	}
+	for _, mapping := range mappings {
+		ret = append(ret, gvrAttribute{gvr: mapping.Resource, namespaced: mapping.Scope.Name() == meta.RESTScopeNameNamespace})
+	}
+
 	return ret, nil
 }
 
@@ -227,7 +298,7 @@ func indexByUID(refs []metav1.OwnerReference) map[types.UID]metav1.OwnerReferenc
 
 // Returns new blocking ownerReferences, and references whose blockOwnerDeletion
 // field is changed from nil or false to true.
-func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerReference {
+func (a *gcPermissionsEnforcement) newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerReference {
 	newMeta, err := meta.Accessor(newObj)
 	if err != nil {
 		// if we don't have objectmeta, we don't have the object reference
@@ -260,6 +331,24 @@ func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerR
 		wasNotBlocking := oldRef.BlockOwnerDeletion == nil || *oldRef.BlockOwnerDeletion == false
 		if wasNotBlocking {
 			ret = append(ret, ref)
+			continue
+		}
+
+		// If the resource has changed, recheck it.
+		if oldRef.Resource != ref.Resource {
+			ret = append(ret, ref)
+			continue
+		}
+
+		// If the namespace has changed, recheck it
+		switch {
+		case (oldRef.Namespace == nil) != (ref.Namespace == nil):
+			ret = append(ret, ref)
+			continue
+		case oldRef.Namespace == nil: // this is fine, do nothing
+		case *oldRef.Namespace != *ref.Namespace:
+			ret = append(ret, ref)
+			continue
 		}
 	}
 	return ret
