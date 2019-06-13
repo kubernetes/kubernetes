@@ -19,7 +19,7 @@ package predicates
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
@@ -57,6 +57,8 @@ var (
 	ErrServiceAffinityViolated = newPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
 	// ErrMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
 	ErrMaxVolumeCountExceeded = newPredicateFailureError("MaxVolumeCount", "node(s) exceed max volume count")
+	// ErrNodeMissingCSIDriverInstalled is used for MaxVolumeCount predicate error.
+	ErrNodeMissingCSIDriverInstalled = newPredicateFailureError("CSIDriverNotInstalled", "node(s) missing CSI driver")
 	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
 	ErrNodeUnderMemoryPressure = newPredicateFailureError("NodeUnderMemoryPressure", "node(s) had memory pressure")
 	// ErrNodeUnderDiskPressure is used for NodeUnderDiskPressure predicate error.

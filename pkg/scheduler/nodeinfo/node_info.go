@@ -492,10 +492,12 @@ func (n *NodeInfo) VolumeLimits() map[v1.ResourceName]int64 {
 	if n.csiNode != nil {
 		for i := range n.csiNode.Spec.Drivers {
 			d := n.csiNode.Spec.Drivers[i]
+			// TODO (bertinatto): drop GetCSIAttachLimitKey once we don't get values from Node object
+			k := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(d.Name))
 			if d.Allocatable != nil && d.Allocatable.Count != nil {
-				// TODO: drop GetCSIAttachLimitKey once we don't get values from Node object
-				k := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(d.Name))
 				volumeLimits[k] = int64(*d.Allocatable.Count)
+			} else {
+				volumeLimits[k] = 0
 			}
 		}
 	}

@@ -72,12 +72,6 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 		return true, nil, nil
 	}
 
-	// If the node doesn't have volume limits, the predicate will always be true
-	nodeVolumeLimits := nodeInfo.VolumeLimits()
-	if len(nodeVolumeLimits) == 0 {
-		return true, nil, nil
-	}
-
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.Pods() {
 		if err := c.filterAttachableVolumes(nodeInfo, existingPod.Spec.Volumes, existingPod.Namespace, attachedVolumes); err != nil {
@@ -99,9 +93,16 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 		newVolumeCount[volumeLimitKey]++
 	}
 
+	// We don't return early if the node has no limits because we want to
+	// report an error if a CSI driver is not installed in the node
+	nodeVolumeLimits := nodeInfo.VolumeLimits()
+
 	for volumeLimitKey, count := range newVolumeCount {
 		maxVolumeLimit, ok := nodeVolumeLimits[v1.ResourceName(volumeLimitKey)]
-		if ok {
+		if !ok {
+			return false, []PredicateFailureReason{ErrNodeMissingCSIDriverInstalled}, nil
+		}
+		if maxVolumeLimit > 0 {
 			currentVolumeCount := attachedVolumeCount[volumeLimitKey]
 			if currentVolumeCount+count > int(maxVolumeLimit) {
 				return false, []PredicateFailureReason{ErrMaxVolumeCountExceeded}, nil
