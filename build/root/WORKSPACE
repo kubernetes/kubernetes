@@ -44,8 +44,8 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "87a089eabf919de29eb4711daa52ffbc4b22b2c045949c20503357a3cadf1037",
-    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.17.5/rules_go-0.17.5.tar.gz"),
+    sha256 = "ce1afed0075e01bd883cfbafbbcc26bfab392eb24854e07a20be78ab13f9e15e",
+    urls = mirror("https://github.com/bazelbuild/rules_go/releases/download/0.17.7/rules_go-0.17.7.tar.gz"),
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
@@ -53,7 +53,7 @@ load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_depe
 go_rules_dependencies()
 
 go_register_toolchains(
-    go_version = "1.12.5",
+    go_version = "1.12.6",
 )
 
 http_archive(
