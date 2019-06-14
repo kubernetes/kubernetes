@@ -37,7 +37,7 @@ require (
 	github.com/containerd/typeurl v0.0.0-20190228175220-2a93cfde8c20 // indirect
 	github.com/containernetworking/cni v0.6.0
 	github.com/coreos/etcd v3.3.13+incompatible
-	github.com/coreos/go-semver v0.0.0-20180108230905-e214231b295a
+	github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/coreos/rkt v1.30.0 // indirect
@@ -232,7 +232,7 @@ replace (
 	github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.1-coreos.6
 	github.com/coreos/etcd => github.com/coreos/etcd v3.3.13+incompatible
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v0.0.0-20180117170138-065b426bd416
-	github.com/coreos/go-semver => github.com/coreos/go-semver v0.0.0-20180108230905-e214231b295a
+	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/coreos/rkt => github.com/coreos/rkt v1.30.0

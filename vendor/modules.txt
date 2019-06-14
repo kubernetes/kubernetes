@@ -259,7 +259,7 @@ github.com/coreos/etcd/wal
 github.com/coreos/etcd/wal/walpb
 # github.com/coreos/go-oidc v0.0.0-20180117170138-065b426bd416 => github.com/coreos/go-oidc v0.0.0-20180117170138-065b426bd416
 github.com/coreos/go-oidc
-# github.com/coreos/go-semver v0.0.0-20180108230905-e214231b295a => github.com/coreos/go-semver v0.0.0-20180108230905-e214231b295a
+# github.com/coreos/go-semver v0.3.0 => github.com/coreos/go-semver v0.3.0
 github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7 => github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 github.com/coreos/go-systemd/daemon
