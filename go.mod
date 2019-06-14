@@ -440,7 +440,7 @@ replace (
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v1 => gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0
-	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.1
+	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.2
 	gotest.tools => gotest.tools v2.2.0+incompatible
 	k8s.io/api => ./staging/src/k8s.io/api
 	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
