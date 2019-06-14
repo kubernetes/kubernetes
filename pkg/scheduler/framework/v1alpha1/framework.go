@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
@@ -340,6 +340,12 @@ func (f *framework) appendPlugins(plugins *config.Plugins) error {
 					return extendErr
 				}
 				f.prebindPlugins = append(f.prebindPlugins, p)
+			case "postbind":
+				p, ok := pg.(PostbindPlugin)
+				if !ok {
+					return extendErr
+				}
+				f.postbindPlugins = append(f.postbindPlugins, p)
 			case "unreserve":
 				p, ok := pg.(UnreservePlugin)
 				if !ok {
@@ -364,6 +370,12 @@ func (f *framework) appendPlugins(plugins *config.Plugins) error {
 					return extendErr
 				}
 				f.bindPlugins = append(f.bindPlugins, p)
+			case "prefilter":
+				p, ok := pg.(PrefilterPlugin)
+				if !ok {
+					return extendErr
+				}
+				f.prefilterPlugins = append(f.prefilterPlugins, p)
 			}
 		} else {
 			return fmt.Errorf("%q plugin %q does not exist", ext, name)
@@ -383,6 +395,10 @@ func (f *framework) appendPlugins(plugins *config.Plugins) error {
 			plugins: plugins.PreBind,
 		},
 		{
+			name:    "postbind",
+			plugins: plugins.PostBind,
+		},
+		{
 			name:    "unreserve",
 			plugins: plugins.Unreserve,
 		},
@@ -397,6 +413,10 @@ func (f *framework) appendPlugins(plugins *config.Plugins) error {
 		{
 			name:    "bind",
 			plugins: plugins.Bind,
+		},
+		{
+			name:    "prefilter",
+			plugins: plugins.PreFilter,
 		},
 	}
 
