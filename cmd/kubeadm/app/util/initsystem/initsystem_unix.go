@@ -24,23 +24,28 @@ import (
 	"strings"
 )
 
+// OpenRCInitSystem defines openrc
 type OpenRCInitSystem struct{}
 
+// ServiceStart tries to start a specific service
 func (openrc OpenRCInitSystem) ServiceStart(service string) error {
 	args := []string{service, "start"}
 	return exec.Command("rc-service", args...).Run()
 }
 
+// ServiceStop tries to stop a specific service
 func (openrc OpenRCInitSystem) ServiceStop(service string) error {
 	args := []string{service, "stop"}
 	return exec.Command("rc-service", args...).Run()
 }
 
+// ServiceRestart tries to reload the environment and restart the specific service
 func (openrc OpenRCInitSystem) ServiceRestart(service string) error {
 	args := []string{service, "restart"}
 	return exec.Command("rc-service", args...).Run()
 }
 
+// ServiceExists ensures the service is defined for this init system.
 // openrc writes to stderr if a service is not found or not enabled
 // this is in contrast to systemd which only writes to stdout.
 // Hence, we use the Combinedoutput, and ignore the error.
@@ -53,6 +58,7 @@ func (openrc OpenRCInitSystem) ServiceExists(service string) bool {
 	return true
 }
 
+// ServiceIsEnabled ensures the service is enabled to start on each boot.
 func (openrc OpenRCInitSystem) ServiceIsEnabled(service string) bool {
 	args := []string{"show", "default"}
 	outBytes, _ := exec.Command("rc-update", args...).Output()
@@ -62,6 +68,7 @@ func (openrc OpenRCInitSystem) ServiceIsEnabled(service string) bool {
 	return false
 }
 
+// ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)
 func (openrc OpenRCInitSystem) ServiceIsActive(service string) bool {
 	args := []string{service, "status"}
 	outBytes, _ := exec.Command("rc-service", args...).Output()
@@ -71,16 +78,20 @@ func (openrc OpenRCInitSystem) ServiceIsActive(service string) bool {
 	return true
 }
 
+// EnableCommand return a string describing how to enable a service
 func (openrc OpenRCInitSystem) EnableCommand(service string) string {
 	return fmt.Sprintf("rc-update add %s default", service)
 }
 
+// SystemdInitSystem defines systemd
 type SystemdInitSystem struct{}
 
+// EnableCommand return a string describing how to enable a service
 func (sysd SystemdInitSystem) EnableCommand(service string) string {
 	return fmt.Sprintf("systemctl enable %s.service", service)
 }
 
+// reloadSystemd reloeads the systemd daemon
 func (sysd SystemdInitSystem) reloadSystemd() error {
 	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
 		return fmt.Errorf("failed to reload systemd: %v", err)
@@ -88,6 +99,7 @@ func (sysd SystemdInitSystem) reloadSystemd() error {
 	return nil
 }
 
+// ServiceStart tries to start a specific service
 func (sysd SystemdInitSystem) ServiceStart(service string) error {
 	// Before we try to start any service, make sure that systemd is ready
 	if err := sysd.reloadSystemd(); err != nil {
@@ -97,6 +109,7 @@ func (sysd SystemdInitSystem) ServiceStart(service string) error {
 	return exec.Command("systemctl", args...).Run()
 }
 
+// ServiceRestart tries to reload the environment and restart the specific service
 func (sysd SystemdInitSystem) ServiceRestart(service string) error {
 	// Before we try to restart any service, make sure that systemd is ready
 	if err := sysd.reloadSystemd(); err != nil {
@@ -106,11 +119,13 @@ func (sysd SystemdInitSystem) ServiceRestart(service string) error {
 	return exec.Command("systemctl", args...).Run()
 }
 
+// ServiceStop tries to stop a specific service
 func (sysd SystemdInitSystem) ServiceStop(service string) error {
 	args := []string{"stop", service}
 	return exec.Command("systemctl", args...).Run()
 }
 
+// ServiceExists ensures the service is defined for this init system.
 func (sysd SystemdInitSystem) ServiceExists(service string) bool {
 	args := []string{"status", service}
 	outBytes, _ := exec.Command("systemctl", args...).Output()
@@ -121,6 +136,7 @@ func (sysd SystemdInitSystem) ServiceExists(service string) bool {
 	return true
 }
 
+// ServiceIsEnabled ensures the service is enabled to start on each boot.
 func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
 	args := []string{"is-enabled", service}
 	err := exec.Command("systemctl", args...).Run()

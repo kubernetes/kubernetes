@@ -16,6 +16,7 @@ limitations under the License.
 
 package initsystem
 
+// InitSystem is the interface that describe behaviors of an init system
 type InitSystem interface {
 	// return a string describing how to enable a service
 	EnableCommand(service string) string

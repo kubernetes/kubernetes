@@ -284,7 +284,6 @@ pkg/util/config
 pkg/util/ebtables
 pkg/util/env
 pkg/util/goroutinemap/exponentialbackoff
-pkg/util/initsystem
 pkg/util/iptables
 pkg/util/iptables/testing
 pkg/util/labels

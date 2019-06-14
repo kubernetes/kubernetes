@@ -19,7 +19,7 @@ package kubelet
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/util/initsystem"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 )
 
 // TryStartKubelet attempts to bring up kubelet service

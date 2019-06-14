@@ -29,10 +29,12 @@ import (
 // WindowsInitSystem is the windows implementation of InitSystem
 type WindowsInitSystem struct{}
 
+// EnableCommand return a string describing how to enable a service
 func (sysd WindowsInitSystem) EnableCommand(service string) string {
 	return fmt.Sprintf("Set-Service '%s' -StartupType Automatic", service)
 }
 
+// ServiceStart tries to start a specific service
 // Following Windows documentation: https://docs.microsoft.com/en-us/windows/desktop/Services/starting-a-service
 func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	m, err := mgr.Connect()
@@ -94,6 +96,7 @@ func (sysd WindowsInitSystem) ServiceStart(service string) error {
 	return nil
 }
 
+// ServiceRestart tries to reload the environment and restart the specific service
 func (sysd WindowsInitSystem) ServiceRestart(service string) error {
 	if err := sysd.ServiceStop(service); err != nil {
 		return fmt.Errorf("couldn't stop service %s: %v", service, err)
@@ -105,6 +108,7 @@ func (sysd WindowsInitSystem) ServiceRestart(service string) error {
 	return nil
 }
 
+// ServiceStop tries to stop a specific service
 // Following Windows documentation: https://docs.microsoft.com/en-us/windows/desktop/Services/stopping-a-service
 func (sysd WindowsInitSystem) ServiceStop(service string) error {
 	m, err := mgr.Connect()
@@ -170,6 +174,7 @@ func (sysd WindowsInitSystem) ServiceStop(service string) error {
 	return nil
 }
 
+// ServiceExists ensures the service is defined for this init system.
 func (sysd WindowsInitSystem) ServiceExists(service string) bool {
 	m, err := mgr.Connect()
 	if err != nil {
@@ -185,6 +190,7 @@ func (sysd WindowsInitSystem) ServiceExists(service string) bool {
 	return true
 }
 
+// ServiceIsEnabled ensures the service is enabled to start on each boot.
 func (sysd WindowsInitSystem) ServiceIsEnabled(service string) bool {
 	m, err := mgr.Connect()
 	if err != nil {
@@ -206,6 +212,7 @@ func (sysd WindowsInitSystem) ServiceIsEnabled(service string) bool {
 	return c.StartType != mgr.StartDisabled
 }
 
+// ServiceIsActive ensures the service is running, or attempting to run. (crash looping in the case of kubelet)
 func (sysd WindowsInitSystem) ServiceIsActive(service string) bool {
 	m, err := mgr.Connect()
 	if err != nil {
