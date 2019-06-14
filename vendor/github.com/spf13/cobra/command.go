@@ -27,6 +27,9 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
+// FParseErrWhitelist configures Flag parse errors to be ignored
+type FParseErrWhitelist flag.ParseErrorsWhitelist
+
 // Command is just that, a command for your application.
 // E.g.  'go run ...' - 'run' is the command. Cobra requires
 // you to define the usage and description as part of your command
@@ -136,6 +139,9 @@ type Command struct {
 
 	// TraverseChildren parses flags on all parents before executing child command.
 	TraverseChildren bool
+
+	//FParseErrWhitelist flag parse errors to be ignored
+	FParseErrWhitelist FParseErrWhitelist
 
 	// commands is the list of commands supported by this program.
 	commands []*Command
@@ -811,13 +817,11 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	// overriding
 	c.InitDefaultHelpCmd()
 
-	var args []string
+	args := c.args
 
 	// Workaround FAIL with "go test -v" or "cobra.test -test.v", see #155
 	if c.args == nil && filepath.Base(os.Args[0]) != "cobra.test" {
 		args = os.Args[1:]
-	} else {
-		args = c.args
 	}
 
 	var flags []string
@@ -1329,7 +1333,7 @@ func (c *Command) LocalFlags() *flag.FlagSet {
 	return c.lflags
 }
 
-// InheritedFlags returns all flags which were inherited from parents commands.
+// InheritedFlags returns all flags which were inherited from parent commands.
 func (c *Command) InheritedFlags() *flag.FlagSet {
 	c.mergePersistentFlags()
 
@@ -1463,6 +1467,10 @@ func (c *Command) ParseFlags(args []string) error {
 	}
 	beforeErrorBufLen := c.flagErrorBuf.Len()
 	c.mergePersistentFlags()
+
+	//do it here after merging all flags and just before parse
+	c.Flags().ParseErrorsWhitelist = flag.ParseErrorsWhitelist(c.FParseErrWhitelist)
+
 	err := c.Flags().Parse(args)
 	// Print warnings if they occurred (e.g. deprecated flag messages).
 	if c.flagErrorBuf.Len()-beforeErrorBufLen > 0 && err == nil {
