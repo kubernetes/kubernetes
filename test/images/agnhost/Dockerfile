@@ -31,3 +31,4 @@ RUN mkdir /uploads
 
 ADD agnhost agnhost
 ENTRYPOINT ["/agnhost"]
+CMD ["pause"]

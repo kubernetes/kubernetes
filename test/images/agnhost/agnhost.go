@@ -22,54 +22,35 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/klog"
+	"k8s.io/kubernetes/test/images/agnhost/dns"
+	"k8s.io/kubernetes/test/images/agnhost/fakegitserver"
+	"k8s.io/kubernetes/test/images/agnhost/liveness"
+	"k8s.io/kubernetes/test/images/agnhost/logs-generator"
 	"k8s.io/kubernetes/test/images/agnhost/net"
 	"k8s.io/kubernetes/test/images/agnhost/netexec"
 	"k8s.io/kubernetes/test/images/agnhost/nettest"
+	"k8s.io/kubernetes/test/images/agnhost/no-snat-test"
+	"k8s.io/kubernetes/test/images/agnhost/no-snat-test-proxy"
+	"k8s.io/kubernetes/test/images/agnhost/pause"
+	"k8s.io/kubernetes/test/images/agnhost/port-forward-tester"
 	"k8s.io/kubernetes/test/images/agnhost/webhook"
 )
 
 func main() {
-	cmdDNSSuffix := &cobra.Command{
-		Use:   "dns-suffix",
-		Short: "Prints the host's DNS suffix list",
-		Long:  `Prints the DNS suffixes of this host.`,
-		Args:  cobra.MaximumNArgs(0),
-		Run:   printDNSSuffixList,
-	}
-
-	cmdDNSServerList := &cobra.Command{
-		Use:   "dns-server-list",
-		Short: "Prints the host's DNS Server list",
-		Long:  `Prints the DNS Server list of this host.`,
-		Args:  cobra.MaximumNArgs(0),
-		Run:   printDNSServerList,
-	}
-
-	cmdEtcHosts := &cobra.Command{
-		Use:   "etc-hosts",
-		Short: "Prints the host's /etc/hosts file",
-		Long:  `Prints the "hosts" file of this host."`,
-		Args:  cobra.MaximumNArgs(0),
-		Run:   printHostsFile,
-	}
-
-	cmdPause := &cobra.Command{
-		Use:   "pause",
-		Short: "Pauses",
-		Long:  `Pauses the execution. Useful for keeping the containers running, so other commands can be executed.`,
-		Args:  cobra.MaximumNArgs(0),
-		Run:   pause,
-	}
-
 	rootCmd := &cobra.Command{Use: "app"}
-	rootCmd.AddCommand(cmdDNSSuffix)
-	rootCmd.AddCommand(cmdDNSServerList)
-	rootCmd.AddCommand(cmdEtcHosts)
-	rootCmd.AddCommand(cmdPause)
-
+	rootCmd.AddCommand(dns.CmdDNSSuffix)
+	rootCmd.AddCommand(dns.CmdDNSServerList)
+	rootCmd.AddCommand(dns.CmdEtcHosts)
+	rootCmd.AddCommand(fakegitserver.CmdFakeGitServer)
+	rootCmd.AddCommand(liveness.CmdLiveness)
+	rootCmd.AddCommand(logsgen.CmdLogsGenerator)
 	rootCmd.AddCommand(net.CmdNet)
 	rootCmd.AddCommand(netexec.CmdNetexec)
 	rootCmd.AddCommand(nettest.CmdNettest)
+	rootCmd.AddCommand(nosnat.CmdNoSnatTest)
+	rootCmd.AddCommand(nosnatproxy.CmdNoSnatTestProxy)
+	rootCmd.AddCommand(pause.CmdPause)
+	rootCmd.AddCommand(portforwardtester.CmdPortForwardTester)
 	rootCmd.AddCommand(webhook.CmdWebhook)
 
 	// NOTE(claudiub): Some tests are passing logging related flags, so we need to be able to
