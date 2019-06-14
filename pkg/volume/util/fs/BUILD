@@ -14,6 +14,7 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
+            "//pkg/volume/util/fsquota:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
@@ -24,6 +25,7 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/volume/util/fsquota:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

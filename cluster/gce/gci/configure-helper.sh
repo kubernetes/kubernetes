@@ -611,6 +611,15 @@ function create-master-auth {
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"   "system:addon-manager,uid:system:addon-manager,system:masters"
   fi
+  if [[ -n "${EXTRA_STATIC_AUTH_COMPONENTS:-}" ]]; then
+    # Create a static Bearer token and kubeconfig for extra, comma-separated components.
+    IFS="," read -r -a extra_components <<< "${EXTRA_STATIC_AUTH_COMPONENTS:-}"
+    for extra_component in "${extra_components[@]}"; do
+      local token="$(secure_random 32)"
+      append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}"
+      create-kubeconfig "${extra_component}" "${token}"
+    done
+  fi
   local use_cloud_config="false"
   cat <<EOF >/etc/gce.conf
 [global]
@@ -1405,6 +1414,7 @@ function prepare-etcd-manifest {
   sed -i -e "s@{{ *host_ip *}}@$host_ip@g" "${temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@${ETCD_LIVENESS_PROBE_INITIAL_DELAY_SEC:-15}@g" "${temp_file}"
+  sed -i -e "s@{{ *listen_client_ip *}}@${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}@g" "${temp_file}"
   # Get default storage backend from manifest file.
   local -r default_storage_backend=$(cat "${temp_file}" | \
     grep -o "{{ *pillar\.get('storage_backend', '\(.*\)') *}}" | \
@@ -2154,7 +2164,13 @@ function start-cluster-autoscaler {
 
     local params="${AUTOSCALER_MIG_CONFIG} ${CLOUD_CONFIG_OPT} ${AUTOSCALER_EXPANDER_CONFIG:---expander=price}"
     params+=" --kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig"
-    sed -i -e "s@{{params}}@${params}@g" "${src_file}"
+
+    # split the params into separate arguments passed to binary
+    local params_split
+    params_split=$(eval "for param in $params; do echo -n \\\"\$param\\\",; done")
+    params_split=${params_split%?}
+
+    sed -i -e "s@{{params}}@${params_split}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_mount}}@${CLOUD_CONFIG_MOUNT}@g" "${src_file}"
     sed -i -e "s@{{cloud_config_volume}}@${CLOUD_CONFIG_VOLUME}@g" "${src_file}"
     sed -i -e "s@{%.*%}@@g" "${src_file}"
@@ -2899,6 +2915,7 @@ EOF
   cat > "${config_path}" <<EOF
 # Kubernetes doesn't use containerd restart manager.
 disabled_plugins = ["restart"]
+oom_score = -999
 
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"

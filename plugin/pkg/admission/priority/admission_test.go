@@ -24,6 +24,7 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -48,6 +49,11 @@ func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.Prio
 	}
 	return nil
 }
+
+var (
+	preemptNever         = api.PreemptNever
+	preemptLowerPriority = api.PreemptLowerPriority
+)
 
 var defaultClass1 = &scheduling.PriorityClass{
 	TypeMeta: metav1.TypeMeta{
@@ -91,6 +97,32 @@ var systemClusterCritical = &scheduling.PriorityClass{
 	},
 	Value:         scheduling.SystemCriticalPriority,
 	GlobalDefault: true,
+}
+
+var neverPreemptionPolicyClass = &scheduling.PriorityClass{
+	TypeMeta: metav1.TypeMeta{
+		Kind: "PriorityClass",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "nopreemptionpolicy",
+	},
+	Value:            2000,
+	Description:      "Just a test priority class",
+	GlobalDefault:    true,
+	PreemptionPolicy: &preemptNever,
+}
+
+var preemptionPolicyClass = &scheduling.PriorityClass{
+	TypeMeta: metav1.TypeMeta{
+		Kind: "PriorityClass",
+	},
+	ObjectMeta: metav1.ObjectMeta{
+		Name: "nopreemptionpolicy",
+	},
+	Value:            2000,
+	Description:      "Just a test priority class",
+	GlobalDefault:    true,
+	PreemptionPolicy: &preemptLowerPriority,
 }
 
 func TestPriorityClassAdmission(t *testing.T) {
@@ -245,7 +277,7 @@ func TestDefaultPriority(t *testing.T) {
 		if err := addPriorityClasses(ctrl, test.classesBefore); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
 		}
-		pcName, defaultPriority, err := ctrl.getDefaultPriority()
+		pcName, defaultPriority, _, err := ctrl.getDefaultPriority()
 		if err != nil {
 			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
 		}
@@ -263,7 +295,7 @@ func TestDefaultPriority(t *testing.T) {
 		if err := addPriorityClasses(ctrl, test.classesAfter); err != nil {
 			t.Errorf("Test %q: unable to add object to informer: %v", test.name, err)
 		}
-		pcName, defaultPriority, err = ctrl.getDefaultPriority()
+		pcName, defaultPriority, _, err = ctrl.getDefaultPriority()
 		if err != nil {
 			t.Errorf("Test %q: unexpected error while getting default priority: %v", test.name, err)
 		}
@@ -467,19 +499,73 @@ func TestPodAdmission(t *testing.T) {
 				Priority:          &systemClusterCritical.Value,
 			},
 		},
+		// pod[12]: Pod without a preemption policy that matches the resolved preemption policy
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-never-preemption-policy-matching-resolved-preemption-policy",
+				Namespace: metav1.NamespaceSystem,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: neverPreemptionPolicyClass.Name,
+				Priority:          &neverPreemptionPolicyClass.Value,
+				PreemptionPolicy:  nil,
+			},
+		},
+		// pod[13]: Pod with a preemption policy that matches the resolved preemption policy
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-preemption-policy-matching-resolved-preemption-policy",
+				Namespace: metav1.NamespaceSystem,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: preemptionPolicyClass.Name,
+				Priority:          &preemptionPolicyClass.Value,
+				PreemptionPolicy:  &preemptLowerPriority,
+			},
+		},
+		// pod[14]: Pod with a preemption policy that does't match the resolved preemption policy
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pod-preemption-policy-not-matching-resolved-preemption-policy",
+				Namespace: metav1.NamespaceSystem,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: containerName,
+					},
+				},
+				PriorityClassName: preemptionPolicyClass.Name,
+				Priority:          &preemptionPolicyClass.Value,
+				PreemptionPolicy:  &preemptNever,
+			},
+		},
 	}
 	// Enable PodPriority feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Enable ExperimentalCriticalPodAnnotation feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
+	// Enable NonPreemptingPriority feature gate.
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NonPreemptingPriority, true)()
 	tests := []struct {
 		name            string
 		existingClasses []*scheduling.PriorityClass
 		// Admission controller changes pod spec. So, we take an api.Pod instead of
 		// *api.Pod to avoid interfering with other tests.
-		pod              api.Pod
-		expectedPriority int32
-		expectError      bool
+		pod                    api.Pod
+		expectedPriority       int32
+		expectError            bool
+		expectPreemptionPolicy *api.PreemptionPolicy
 	}{
 		{
 			"Pod with priority class",
@@ -487,6 +573,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[0],
 			1000,
 			false,
+			nil,
 		},
 
 		{
@@ -495,6 +582,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[1],
 			1000,
 			false,
+			nil,
 		},
 		{
 			"pod without priority class and no existing priority class",
@@ -502,6 +590,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[1],
 			scheduling.DefaultPriorityWhenNoDefaultClassExists,
 			false,
+			nil,
 		},
 		{
 			"pod without priority class and no default class",
@@ -509,6 +598,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[1],
 			scheduling.DefaultPriorityWhenNoDefaultClassExists,
 			false,
+			nil,
 		},
 		{
 			"pod with a system priority class",
@@ -516,6 +606,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[4],
 			scheduling.SystemCriticalPriority,
 			false,
+			nil,
 		},
 		{
 			"Pod with non-existing priority class",
@@ -523,6 +614,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[2],
 			0,
 			true,
+			nil,
 		},
 		{
 			"pod with integer priority",
@@ -530,6 +622,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[3],
 			0,
 			true,
+			nil,
 		},
 		{
 			"mirror pod with system priority class",
@@ -537,6 +630,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[5],
 			scheduling.SystemCriticalPriority,
 			false,
+			nil,
 		},
 		{
 			"mirror pod with integer priority",
@@ -544,6 +638,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[6],
 			0,
 			true,
+			nil,
 		},
 		{
 			"pod with critical pod annotation",
@@ -551,6 +646,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[7],
 			scheduling.SystemCriticalPriority,
 			false,
+			nil,
 		},
 		{
 			"pod with system critical priority in non-system namespace",
@@ -558,6 +654,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[8],
 			scheduling.SystemCriticalPriority,
 			true,
+			nil,
 		},
 		{
 			"pod with priority that matches computed priority",
@@ -565,6 +662,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[9],
 			0,
 			false,
+			nil,
 		},
 		{
 			"pod with priority that matches default priority",
@@ -572,6 +670,7 @@ func TestPodAdmission(t *testing.T) {
 			*pods[10],
 			defaultClass2.Value,
 			false,
+			nil,
 		},
 		{
 			"pod with priority that matches resolved priority",
@@ -579,6 +678,31 @@ func TestPodAdmission(t *testing.T) {
 			*pods[11],
 			systemClusterCritical.Value,
 			false,
+			nil,
+		},
+		{
+			"pod with nil preemtpion policy",
+			[]*scheduling.PriorityClass{preemptionPolicyClass},
+			*pods[12],
+			preemptionPolicyClass.Value,
+			false,
+			nil,
+		},
+		{
+			"pod with preemtpion policy that matches resolved preemtpion policy",
+			[]*scheduling.PriorityClass{preemptionPolicyClass},
+			*pods[13],
+			preemptionPolicyClass.Value,
+			false,
+			&preemptLowerPriority,
+		},
+		{
+			"pod with preemtpion policy that does't matches resolved preemtpion policy",
+			[]*scheduling.PriorityClass{preemptionPolicyClass},
+			*pods[14],
+			preemptionPolicyClass.Value,
+			true,
+			&preemptLowerPriority,
 		},
 	}
 
@@ -605,13 +729,15 @@ func TestPodAdmission(t *testing.T) {
 			false,
 			nil,
 		)
-		err := ctrl.Admit(attrs, nil)
+		err := admissiontesting.WithReinvocationTesting(t, ctrl).Admit(attrs, nil)
 		klog.Infof("Got %v", err)
 		if !test.expectError {
 			if err != nil {
 				t.Errorf("Test %q: unexpected error received: %v", test.name, err)
 			} else if *test.pod.Spec.Priority != test.expectedPriority {
 				t.Errorf("Test %q: expected priority is %d, but got %d.", test.name, test.expectedPriority, *test.pod.Spec.Priority)
+			} else if test.pod.Spec.PreemptionPolicy != nil && test.expectPreemptionPolicy != nil && *test.pod.Spec.PreemptionPolicy != *test.expectPreemptionPolicy {
+				t.Errorf("Test %q: expected preemption policy is %s, but got %s.", test.name, *test.expectPreemptionPolicy, *test.pod.Spec.PreemptionPolicy)
 			}
 		}
 		if err == nil && test.expectError {

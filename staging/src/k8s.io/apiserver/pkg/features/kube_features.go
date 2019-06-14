@@ -86,6 +86,13 @@ const (
 	// committing.
 	DryRun featuregate.Feature = "DryRun"
 
+	// owner: @caesarxuchao
+	// alpha: v1.15
+	//
+	// Allow apiservers to show a count of remaining items in the response
+	// to a chunking list request.
+	RemainingItemCount featuregate.Feature = "RemainingItemCount"
+
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
 	//
@@ -94,6 +101,7 @@ const (
 
 	// owner: @caesarxuchao
 	// alpha: v1.14
+	// beta: v1.15
 	//
 	// Allow apiservers to expose the storage version hash in the discovery
 	// document.
@@ -140,8 +148,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIResponseCompression:  {Default: false, PreRelease: featuregate.Alpha},
 	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	DryRun:                  {Default: true, PreRelease: featuregate.Beta},
+	RemainingItemCount:      {Default: false, PreRelease: featuregate.Alpha},
 	ServerSideApply:         {Default: false, PreRelease: featuregate.Alpha},
-	StorageVersionHash:      {Default: false, PreRelease: featuregate.Alpha},
+	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
 	WinDSR:                  {Default: false, PreRelease: featuregate.Alpha},
 	WatchBookmark:           {Default: false, PreRelease: featuregate.Alpha},

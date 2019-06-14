@@ -53,7 +53,7 @@ type Interface interface {
 	// is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	// IsLikelyNotMountPoint does NOT properly detect all mountpoint types
-	// most notably linux bind mounts.
+	// most notably linux bind mounts and symbolic link.
 	IsLikelyNotMountPoint(file string) (bool, error)
 	// DeviceOpened determines if the device is in use elsewhere
 	// on the system, i.e. still mounted.

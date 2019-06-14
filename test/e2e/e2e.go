@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -118,7 +119,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	// #41007. To avoid those pods preventing the whole test runs (and just
 	// wasting the whole run), we allow for some not-ready pods (with the
 	// number equal to the number of allowed not-ready nodes).
-	if err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
+	if err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, int32(framework.TestContext.MinStartupPods), int32(framework.TestContext.AllowedNotReadyNodes), podStartupTimeout, map[string]string{}); err != nil {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
@@ -264,11 +265,11 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		}
 	}()
 	timeout := 5 * time.Minute
-	if err := framework.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
+	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
 		e2elog.Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
 		return
 	}
-	logs, err := framework.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
+	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
 	if err != nil {
 		e2elog.Logf("Failed to retrieve logs from %v: %v", p.Name, err)
 	} else {

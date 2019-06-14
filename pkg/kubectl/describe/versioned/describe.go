@@ -3856,6 +3856,11 @@ func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, er
 		if len(psp.Spec.AllowedFlexVolumes) > 0 {
 			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
 		}
+
+		if len(psp.Spec.AllowedCSIDrivers) > 0 {
+			w.Write(LEVEL_1, "Allowed CSI Drivers:\t%s\n", csiDriversToString(psp.Spec.AllowedCSIDrivers))
+		}
+
 		if len(psp.Spec.AllowedUnsafeSysctls) > 0 {
 			w.Write(LEVEL_1, "Allowed Unsafe Sysctls:\t%s\n", sysctlsToString(psp.Spec.AllowedUnsafeSysctls))
 		}
@@ -3919,6 +3924,14 @@ func flexVolumesToString(flexVolumes []policyv1beta1.AllowedFlexVolume) string {
 		volumes = append(volumes, "driver="+flexVolume.Driver)
 	}
 	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
+}
+
+func csiDriversToString(csiDrivers []policyv1beta1.AllowedCSIDriver) string {
+	drivers := []string{}
+	for _, csiDriver := range csiDrivers {
+		drivers = append(drivers, "driver="+csiDriver.Name)
+	}
+	return stringOrDefaultValue(strings.Join(drivers, ","), "<all>")
 }
 
 func sysctlsToString(sysctls []string) string {

@@ -19,10 +19,6 @@ package scheduling
 import (
 	"time"
 
-	"github.com/onsi/ginkgo"
-	// ensure libs have a chance to initialize
-	_ "github.com/stretchr/testify/assert"
-
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +29,15 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+
+	"github.com/onsi/ginkgo"
+	// ensure libs have a chance to initialize
+	_ "github.com/stretchr/testify/assert"
+)
+
+var (
+	pauseImage = imageutils.GetE2EImage(imageutils.Pause)
 )
 
 func getTestTaint() v1.Taint {
@@ -61,7 +66,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: "k8s.gcr.io/pause:3.1",
+						Image: pauseImage,
 					},
 				},
 			},
@@ -80,7 +85,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 				Containers: []v1.Container{
 					{
 						Name:  "pause",
-						Image: "k8s.gcr.io/pause:3.1",
+						Image: pauseImage,
 					},
 				},
 				Tolerations: []v1.Toleration{{Key: "kubernetes.io/e2e-evict-taint-key", Value: "evictTaintVal", Effect: v1.TaintEffectNoExecute}},
@@ -99,7 +104,7 @@ func createPodForTaintsTest(hasToleration bool, tolerationSeconds int, podName, 
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
-					Image: "k8s.gcr.io/pause:3.1",
+					Image: pauseImage,
 				},
 			},
 			// default - tolerate forever

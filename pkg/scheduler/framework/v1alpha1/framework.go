@@ -36,8 +36,10 @@ type framework struct {
 	waitingPods      *waitingPodsMap
 	plugins          map[string]Plugin // a map of initialized plugins. Plugin name:plugin instance.
 	queueSortPlugins []QueueSortPlugin
+	prefilterPlugins []PrefilterPlugin
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
+	postbindPlugins  []PostbindPlugin
 	unreservePlugins []UnreservePlugin
 	permitPlugins    []PermitPlugin
 }
@@ -84,6 +86,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		f.plugins[name] = p
 	}
 
+	if plugins.PreFilter != nil {
+		for _, pf := range plugins.PreFilter.Enabled {
+			if pg, ok := f.plugins[pf.Name]; ok {
+				p, ok := pg.(PrefilterPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend prefilter plugin", pf.Name)
+				}
+				f.prefilterPlugins = append(f.prefilterPlugins, p)
+			} else {
+				return nil, fmt.Errorf("prefilter plugin %v does not exist", pf.Name)
+			}
+		}
+	}
+
 	if plugins.Reserve != nil {
 		for _, r := range plugins.Reserve.Enabled {
 			if pg, ok := f.plugins[r.Name]; ok {
@@ -108,6 +124,20 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				f.prebindPlugins = append(f.prebindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
+			}
+		}
+	}
+
+	if plugins.PostBind != nil {
+		for _, pb := range plugins.PostBind.Enabled {
+			if pg, ok := f.plugins[pb.Name]; ok {
+				p, ok := pg.(PostbindPlugin)
+				if !ok {
+					return nil, fmt.Errorf("plugin %v does not extend postbind plugin", pb.Name)
+				}
+				f.postbindPlugins = append(f.postbindPlugins, p)
+			} else {
+				return nil, fmt.Errorf("postbind plugin %v does not exist", pb.Name)
 			}
 		}
 	}
@@ -170,6 +200,28 @@ func (f *framework) QueueSortFunc() LessFunc {
 	return f.queueSortPlugins[0].Less
 }
 
+// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+// *Status and its code is set to non-success if any of the plugins returns
+// anything but Success. If a non-success status is returned, then the scheduling
+// cycle is aborted.
+func (f *framework) RunPrefilterPlugins(
+	pc *PluginContext, pod *v1.Pod) *Status {
+	for _, pl := range f.prefilterPlugins {
+		status := pl.Prefilter(pc, pod)
+		if !status.IsSuccess() {
+			if status.Code() == Unschedulable {
+				msg := fmt.Sprintf("rejected by %v at prefilter: %v", pl.Name(), status.Message())
+				klog.V(4).Infof(msg)
+				return NewStatus(status.Code(), msg)
+			}
+			msg := fmt.Sprintf("error while running %v prefilter plugin for pod %v: %v", pl.Name(), pod.Name, status.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
+		}
+	}
+	return nil
+}
+
 // RunPrebindPlugins runs the set of configured prebind plugins. It returns a
 // failure (bool) if any of the plugins returns an error. It also returns an
 // error containing the rejection message or the error occurred in the plugin.
@@ -189,6 +241,14 @@ func (f *framework) RunPrebindPlugins(
 		}
 	}
 	return nil
+}
+
+// RunPostbindPlugins runs the set of configured postbind plugins.
+func (f *framework) RunPostbindPlugins(
+	pc *PluginContext, pod *v1.Pod, nodeName string) {
+	for _, pl := range f.postbindPlugins {
+		pl.Postbind(pc, pod, nodeName)
+	}
 }
 
 // RunReservePlugins runs the set of configured reserve plugins. If any of these

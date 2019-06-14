@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"fmt"
 
@@ -71,7 +72,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 							},
 						},
 					})
-					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
+					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
 					Expect(err).NotTo(HaveOccurred())
 				})
 				By("Verifying the memory backed volume was removed from node", func() {
@@ -112,7 +113,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 								},
 							},
 						})
-						err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+						err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 						gp := int64(1)
 						f.PodClient().Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
 						if err == nil {

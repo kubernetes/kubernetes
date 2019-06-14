@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -217,6 +219,8 @@ type configFactory struct {
 	bindTimeoutSeconds int64
 	// queue for pods that need scheduling
 	podQueue internalqueue.SchedulingQueue
+
+	enableNonPreempting bool
 }
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
@@ -283,6 +287,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		disablePreemption:              args.DisablePreemption,
 		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
 		bindTimeoutSeconds:             args.BindTimeoutSeconds,
+		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority),
 	}
 	// Setup volume binder
 	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
@@ -387,19 +392,26 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	var extenders []algorithm.SchedulerExtender
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
+		var ignorableExtenders []algorithm.SchedulerExtender
 		for ii := range policy.ExtenderConfigs {
 			klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
 			if err != nil {
 				return nil, err
 			}
-			extenders = append(extenders, extender)
+			if !extender.IsIgnorable() {
+				extenders = append(extenders, extender)
+			} else {
+				ignorableExtenders = append(ignorableExtenders, extender)
+			}
 			for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
 				if r.IgnoredByScheduler {
 					ignoredExtendedResources.Insert(string(r.Name))
 				}
 			}
 		}
+		// place ignorable extenders to the tail of extenders
+		extenders = append(extenders, ignorableExtenders...)
 		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
@@ -459,6 +471,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
+		c.enableNonPreempting,
 	)
 
 	return &Config{

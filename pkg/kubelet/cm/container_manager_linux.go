@@ -34,7 +34,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -52,10 +52,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -360,8 +360,8 @@ const (
 // depending upon the specified option, it will either warn, error, or modify the kernel tunable flags
 func setupKernelTunables(option KernelTunableBehavior) error {
 	desiredState := map[string]int{
-		utilsysctl.VmOvercommitMemory: utilsysctl.VmOvercommitMemoryAlways,
-		utilsysctl.VmPanicOnOOM:       utilsysctl.VmPanicOnOOMInvokeOOMKiller,
+		utilsysctl.VMOvercommitMemory: utilsysctl.VMOvercommitMemoryAlways,
+		utilsysctl.VMPanicOnOOM:       utilsysctl.VMPanicOnOOMInvokeOOMKiller,
 		utilsysctl.KernelPanic:        utilsysctl.KernelPanicRebootTimeout,
 		utilsysctl.KernelPanicOnOops:  utilsysctl.KernelPanicOnOopsAlways,
 		utilsysctl.RootMaxKeys:        utilsysctl.RootMaxKeysSetting,
@@ -620,7 +620,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	return nil
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {
 	return cm.deviceManager.GetWatcherHandler()
 }
 
@@ -896,4 +896,8 @@ func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceLi
 
 func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
 	return cm.deviceManager.GetDevices(podUID, containerName)
+}
+
+func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }

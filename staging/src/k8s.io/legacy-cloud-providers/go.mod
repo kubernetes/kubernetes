@@ -17,7 +17,7 @@ require (
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/stretchr/testify v1.2.2
-	github.com/vmware/govmomi v0.20.0
+	github.com/vmware/govmomi v0.20.1
 	golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	google.golang.org/api v0.0.0-20181220000619-583d854617af
@@ -28,7 +28,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/cloud-provider v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
-	k8s.io/klog v0.3.0
+	k8s.io/klog v0.3.1
 	k8s.io/utils v0.0.0-20190221042446-c2654d5206da
 	sigs.k8s.io/yaml v1.1.0
 )

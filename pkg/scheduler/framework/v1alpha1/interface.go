@@ -34,14 +34,14 @@ type Code int
 const (
 	// Success means that plugin ran correctly and found pod schedulable.
 	// NOTE: A nil status is also considered as "Success".
-	Success Code = 0
+	Success Code = iota
 	// Error is used for internal plugin errors, unexpected input, etc.
-	Error Code = 1
+	Error
 	// Unschedulable is used when a plugin finds a pod unschedulable.
 	// The accompanying status message should explain why the pod is unschedulable.
-	Unschedulable Code = 2
+	Unschedulable
 	// Wait is used when a permit plugin finds a pod scheduling should wait.
-	Wait Code = 3
+	Wait
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a
@@ -126,6 +126,15 @@ type QueueSortPlugin interface {
 	Less(*PodInfo, *PodInfo) bool
 }
 
+// PrefilterPlugin is an interface that must be implemented by "prefilter" plugins.
+// These plugins are called at the beginning of the scheduling cycle.
+type PrefilterPlugin interface {
+	Plugin
+	// Prefilter is called at the beginning of the scheduling cycle. All prefilter
+	// plugins must return success or the pod will be rejected.
+	Prefilter(pc *PluginContext, p *v1.Pod) *Status
+}
+
 // ReservePlugin is an interface for Reserve plugins. These plugins are called
 // at the reservation point. These are meant to update the state of the plugin.
 // This concept used to be called 'assume' in the original scheduler.
@@ -146,6 +155,17 @@ type PrebindPlugin interface {
 	// Prebind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
 	Prebind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
+}
+
+// PostbindPlugin is an interface that must be implemented by "postbind" plugins.
+// These plugins are called after a pod is successfully bound to a node.
+type PostbindPlugin interface {
+	Plugin
+	// Postbind is called after a pod is successfully bound. These plugins are
+	// informational. A common application of this extension point is for cleaning
+	// up. If a plugin needs to clean-up its state after a pod is scheduled and
+	// bound, Postbind is the extension point that it should register.
+	Postbind(pc *PluginContext, p *v1.Pod, nodeName string)
 }
 
 // UnreservePlugin is an interface for Unreserve plugins. This is an informational
@@ -179,12 +199,21 @@ type Framework interface {
 	// QueueSortFunc returns the function to sort pods in scheduling queue
 	QueueSortFunc() LessFunc
 
+	// RunPrefilterPlugins runs the set of configured prefilter plugins. It returns
+	// *Status and its code is set to non-success if any of the plugins returns
+	// anything but Success. If a non-success status is returned, then the scheduling
+	// cycle is aborted.
+	RunPrefilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
+
 	// RunPrebindPlugins runs the set of configured prebind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If the Status code is "Unschedulable", it is
 	// considered as a scheduling check failure, otherwise, it is considered as an
 	// internal error. In either case the pod is not going to be bound.
 	RunPrebindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+
+	// RunPostbindPlugins runs the set of configured postbind plugins.
+	RunPostbindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string)
 
 	// RunReservePlugins runs the set of configured reserve plugins. If any of these
 	// plugins returns an error, it does not continue running the remaining ones and

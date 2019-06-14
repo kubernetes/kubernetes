@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -258,7 +259,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			"involvedObject.namespace": f.Namespace.Name,
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
-		framework.ExpectNoError(framework.WaitTimeoutForPodEvent(
+		framework.ExpectNoError(e2epod.WaitTimeoutForPodEvent(
 			f.ClientSet, pod.Name, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
 })
@@ -419,7 +420,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// Wait until the pod is not pending. (Here we need to check for something other than
 	// 'Pending' other than checking for 'Running', since when failures occur, we go to
 	// 'Terminated' which can cause indefinite blocking.)
-	framework.ExpectNoError(framework.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
+	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
 	e2elog.Logf("Started pod %s in namespace %s", pod.Name, ns)
 

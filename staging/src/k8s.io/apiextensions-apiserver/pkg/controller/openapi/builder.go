@@ -26,9 +26,11 @@ import (
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
@@ -58,22 +60,24 @@ var namer *openapi.DefinitionNamer
 
 // BuildSwagger builds swagger for the given crd in the given version
 func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (*spec.Swagger, error) {
-	var schema *spec.Schema
+	var schema *structuralschema.Structural
 	s, err := apiextensions.GetSchemaForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
 	if s != nil && s.OpenAPIV3Schema != nil {
-		schema, err = ConvertJSONSchemaPropsToOpenAPIv2Schema(s.OpenAPIV3Schema)
-		if err != nil {
-			return nil, err
+		ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema)
+		if err == nil && len(structuralschema.ValidateStructural(ss, nil)) == 0 {
+			// skip non-structural schemas
+			schema = ss.Unfold()
 		}
 	}
+
 	// TODO(roycaihw): remove the WebService templating below. The following logic
 	// comes from function registerResourceHandlers() in k8s.io/apiserver.
 	// Alternatives are either (ideally) refactoring registerResourceHandlers() to
 	// reuse the code, or faking an APIInstaller for CR to feed to registerResourceHandlers().
-	b := newBuilder(crd, version, schema)
+	b := newBuilder(crd, version, schema, true)
 
 	// Sample response types for building web service
 	sample := &CRDCanonicalTypeNamer{
@@ -288,23 +292,28 @@ func (b *builder) buildRoute(root, path, action, verb string, sample interface{}
 
 // buildKubeNative builds input schema with Kubernetes' native object meta, type meta and
 // extensions
-func (b *builder) buildKubeNative(schema *spec.Schema) *spec.Schema {
+func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) (ret *spec.Schema) {
 	// only add properties if we have a schema. Otherwise, kubectl would (wrongly) assume additionalProperties=false
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
 	if schema == nil {
-		schema = &spec.Schema{
+		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
 		// no, we cannot add more properties here, not even TypeMeta/ObjectMeta because kubectl will complain about
 		// unknown fields for anything else.
 	} else {
-		schema.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).
+		if v2 {
+			schema = ToStructuralOpenAPIV2(schema)
+		}
+		ret = schema.ToGoOpenAPI()
+		ret.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).
 			WithDescription(swaggerPartialObjectMetadataDescriptions["metadata"]))
-		addTypeMetaProperties(schema)
+		addTypeMetaProperties(ret)
+		addEmbeddedProperties(ret)
 	}
-	schema.AddExtension(endpoints.ROUTE_META_GVK, []interface{}{
+	ret.AddExtension(endpoints.ROUTE_META_GVK, []interface{}{
 		map[string]interface{}{
 			"group":   b.group,
 			"version": b.version,
@@ -312,7 +321,43 @@ func (b *builder) buildKubeNative(schema *spec.Schema) *spec.Schema {
 		},
 	})
 
-	return schema
+	return ret
+}
+
+func addEmbeddedProperties(s *spec.Schema) {
+	if s == nil {
+		return
+	}
+
+	for k := range s.Properties {
+		v := s.Properties[k]
+		addEmbeddedProperties(&v)
+		s.Properties[k] = v
+	}
+	if s.Items != nil {
+		addEmbeddedProperties(s.Items.Schema)
+	}
+	if s.AdditionalProperties != nil {
+		addEmbeddedProperties(s.AdditionalProperties.Schema)
+	}
+
+	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-embedded-resource"); ok && isTrue {
+		s.SetProperty("apiVersion", withDescription(getDefinition(typeMetaType).SchemaProps.Properties["apiVersion"],
+			"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+		))
+		s.SetProperty("kind", withDescription(getDefinition(typeMetaType).SchemaProps.Properties["kind"],
+			"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+		))
+		s.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).WithDescription(swaggerPartialObjectMetadataDescriptions["metadata"]))
+
+		req := sets.NewString(s.Required...)
+		if !req.Has("kind") {
+			s.Required = append(s.Required, "kind")
+		}
+		if !req.Has("apiVersion") {
+			s.Required = append(s.Required, "apiVersion")
+		}
+	}
 }
 
 // getDefinition gets definition for given Kubernetes type. This function is extracted from
@@ -320,6 +365,10 @@ func (b *builder) buildKubeNative(schema *spec.Schema) *spec.Schema {
 func getDefinition(name string) spec.Schema {
 	buildDefinitions.Do(buildDefinitionsFunc)
 	return definitions[name].Schema
+}
+
+func withDescription(s spec.Schema, desc string) spec.Schema {
+	return *s.WithDescription(desc)
 }
 
 func buildDefinitionsFunc() {
@@ -391,7 +440,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 	}
 }
 
-func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, schema *spec.Schema) *builder {
+func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, schema *structuralschema.Structural, v2 bool) *builder {
 	b := &builder{
 		schema: &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
@@ -410,7 +459,7 @@ func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, sch
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	b.schema = b.buildKubeNative(schema)
+	b.schema = b.buildKubeNative(schema, v2)
 	b.listSchema = b.buildListSchema()
 
 	return b

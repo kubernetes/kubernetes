@@ -28,18 +28,17 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storage "k8s.io/api/storage/v1"
 	storagebeta "k8s.io/api/storage/v1beta1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
@@ -48,6 +47,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -706,21 +706,21 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// external dynamic provisioner pods need additional permissions provided by the
 			// persistent-volume-provisioner clusterrole and a leader-locking role
 			serviceAccountName := "default"
-			subject := rbacv1beta1.Subject{
-				Kind:      rbacv1beta1.ServiceAccountKind,
+			subject := rbacv1.Subject{
+				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: ns,
 				Name:      serviceAccountName,
 			}
 
-			err := auth.BindClusterRole(c.RbacV1beta1(), "system:persistent-volume-provisioner", ns, subject)
+			err := auth.BindClusterRole(c.RbacV1(), "system:persistent-volume-provisioner", ns, subject)
 			framework.ExpectNoError(err)
 
 			roleName := "leader-locking-nfs-provisioner"
-			_, err = f.ClientSet.RbacV1beta1().Roles(ns).Create(&rbacv1beta1.Role{
+			_, err = f.ClientSet.RbacV1().Roles(ns).Create(&rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: roleName,
 				},
-				Rules: []rbacv1beta1.PolicyRule{{
+				Rules: []rbacv1.PolicyRule{{
 					APIGroups: []string{""},
 					Resources: []string{"endpoints"},
 					Verbs:     []string{"get", "list", "watch", "create", "update", "patch"},
@@ -728,17 +728,17 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			})
 			framework.ExpectNoError(err, "Failed to create leader-locking role")
 
-			err = auth.BindRoleInNamespace(c.RbacV1beta1(), roleName, ns, subject)
+			err = auth.BindRoleInNamespace(c.RbacV1(), roleName, ns, subject)
 			framework.ExpectNoError(err)
 
-			err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
+			err = auth.WaitForAuthorizationUpdate(c.AuthorizationV1(),
 				serviceaccount.MakeUsername(ns, serviceAccountName),
 				"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 			framework.ExpectNoError(err, "Failed to update authorization")
 
 			ginkgo.By("creating an external dynamic provisioner pod")
 			pod := utils.StartExternalProvisioner(c, ns, externalPluginName)
-			defer framework.DeletePodOrFail(c, ns, pod.Name)
+			defer e2epod.DeletePodOrFail(c, ns, pod.Name)
 
 			ginkgo.By("creating a StorageClass")
 			test := testsuites.StorageClassTest{
@@ -1179,7 +1179,7 @@ func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
 	provisionerPod, err := podClient.Create(provisionerPod)
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
 
 	ginkgo.By("locating the provisioner pod")
 	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})
@@ -1230,7 +1230,7 @@ func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.Persisten
 
 func getRandomClusterZone(c clientset.Interface) string {
 	zones, err := framework.GetClusterZones(c)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	framework.ExpectNoError(err)
 	gomega.Expect(len(zones)).ToNot(gomega.Equal(0))
 
 	zonesList := zones.UnsortedList()

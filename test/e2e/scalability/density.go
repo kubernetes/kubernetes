@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -1035,6 +1036,6 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 		},
 	}
 	framework.ExpectNoError(testutils.CreateRCWithRetries(c, ns, rc))
-	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
+	framework.ExpectNoError(e2epod.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
 	e2elog.Logf("Found pod '%s' running", name)
 }

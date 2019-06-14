@@ -40,7 +40,8 @@ import (
 
 const (
 	annotationPrefix = "podpreset.admission.kubernetes.io"
-	PluginName       = "PodPreset"
+	// PluginName is a string with the name of the plugin
+	PluginName = "PodPreset"
 )
 
 // Register registers a plugin
@@ -50,47 +51,50 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// podPresetPlugin is an implementation of admission.Interface.
-type podPresetPlugin struct {
+// Plugin is an implementation of admission.Interface.
+type Plugin struct {
 	*admission.Handler
 	client kubernetes.Interface
 
 	lister settingsv1alpha1listers.PodPresetLister
 }
 
-var _ admission.MutationInterface = &podPresetPlugin{}
-var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&podPresetPlugin{})
-var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&podPresetPlugin{})
+var _ admission.MutationInterface = &Plugin{}
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
 
 // NewPlugin creates a new pod preset admission plugin.
-func NewPlugin() *podPresetPlugin {
-	return &podPresetPlugin{
+func NewPlugin() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
-func (plugin *podPresetPlugin) ValidateInitialization() error {
-	if plugin.client == nil {
+// ValidateInitialization validates the Plugin was initialized properly
+func (p *Plugin) ValidateInitialization() error {
+	if p.client == nil {
 		return fmt.Errorf("%s requires a client", PluginName)
 	}
-	if plugin.lister == nil {
+	if p.lister == nil {
 		return fmt.Errorf("%s requires a lister", PluginName)
 	}
 	return nil
 }
 
-func (a *podPresetPlugin) SetExternalKubeClientSet(client kubernetes.Interface) {
-	a.client = client
+// SetExternalKubeClientSet registers the client into Plugin
+func (p *Plugin) SetExternalKubeClientSet(client kubernetes.Interface) {
+	p.client = client
 }
 
-func (a *podPresetPlugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetExternalKubeInformerFactory registers an informer factory into Plugin
+func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	podPresetInformer := f.Settings().V1alpha1().PodPresets()
-	a.lister = podPresetInformer.Lister()
-	a.SetReadyFunc(podPresetInformer.Informer().HasSynced)
+	p.lister = podPresetInformer.Lister()
+	p.SetReadyFunc(podPresetInformer.Informer().HasSynced)
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
-func (c *podPresetPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than CREATE.
 	if len(a.GetSubresource()) != 0 || a.GetResource().GroupResource() != api.Resource("pods") || a.GetOperation() != admission.Create {
@@ -114,7 +118,7 @@ func (c *podPresetPlugin) Admit(a admission.Attributes, o admission.ObjectInterf
 		}
 	}
 
-	list, err := c.lister.PodPresets(a.GetNamespace()).List(labels.Everything())
+	list, err := p.lister.PodPresets(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("listing pod presets failed: %v", err)
 	}
@@ -252,19 +256,54 @@ func mergeEnv(envVars []api.EnvVar, podPresets []*settingsv1alpha1.PodPreset) ([
 	return mergedEnv, err
 }
 
+type envFromMergeKey struct {
+	prefix           string
+	configMapRefName string
+	secretRefName    string
+}
+
+func newEnvFromMergeKey(e api.EnvFromSource) envFromMergeKey {
+	k := envFromMergeKey{prefix: e.Prefix}
+	if e.ConfigMapRef != nil {
+		k.configMapRefName = e.ConfigMapRef.Name
+	}
+	if e.SecretRef != nil {
+		k.secretRefName = e.SecretRef.Name
+	}
+	return k
+}
+
 func mergeEnvFrom(envSources []api.EnvFromSource, podPresets []*settingsv1alpha1.PodPreset) ([]api.EnvFromSource, error) {
 	var mergedEnvFrom []api.EnvFromSource
 
+	// merge envFrom using a identify key to ensure Admit reinvocations are idempotent
+	origEnvSources := map[envFromMergeKey]api.EnvFromSource{}
+	for _, envSource := range envSources {
+		origEnvSources[newEnvFromMergeKey(envSource)] = envSource
+	}
 	mergedEnvFrom = append(mergedEnvFrom, envSources...)
+	var errs []error
 	for _, pp := range podPresets {
 		for _, envFromSource := range pp.Spec.EnvFrom {
 			internalEnvFrom := api.EnvFromSource{}
 			if err := apiscorev1.Convert_v1_EnvFromSource_To_core_EnvFromSource(&envFromSource, &internalEnvFrom, nil); err != nil {
 				return nil, err
 			}
-			mergedEnvFrom = append(mergedEnvFrom, internalEnvFrom)
+			found, ok := origEnvSources[newEnvFromMergeKey(internalEnvFrom)]
+			if !ok {
+				mergedEnvFrom = append(mergedEnvFrom, internalEnvFrom)
+				continue
+			}
+			if !reflect.DeepEqual(found, internalEnvFrom) {
+				errs = append(errs, fmt.Errorf("merging envFrom for %s has a conflict: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), internalEnvFrom, found))
+			}
 		}
 
+	}
+
+	err := utilerrors.NewAggregate(errs)
+	if err != nil {
+		return nil, err
 	}
 
 	return mergedEnvFrom, nil

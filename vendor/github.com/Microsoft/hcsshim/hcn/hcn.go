@@ -143,6 +143,15 @@ func RemoteSubnetSupported() error {
 	return platformDoesNotSupportError("Remote Subnet")
 }
 
+// HostRouteSupported returns an error if the HCN version does not support Host Route policies.
+func HostRouteSupported() error {
+	supported := GetSupportedFeatures()
+	if supported.HostRoute {
+		return nil
+	}
+	return platformDoesNotSupportError("Host Route")
+}
+
 // DSRSupported returns an error if the HCN version does not support Direct Server Return.
 func DSRSupported() error {
 	supported := GetSupportedFeatures()

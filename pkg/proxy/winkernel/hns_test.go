@@ -354,8 +354,8 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 	Endpoints := []hcn.HostComputeEndpoint{*Endpoint}
 	LoadBalancer, err := hcn.AddLoadBalancer(
 		Endpoints,
-		false,
-		false,
+		hcn.LoadBalancerFlagsNone,
+		hcn.LoadBalancerPortMappingFlagsNone,
 		sourceVip,
 		[]string{serviceVip},
 		protocol,
@@ -371,7 +371,7 @@ func testGetLoadBalancerExisting(t *testing.T, hns HostNetworkService) {
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, false, false, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
 	if err != nil {
 		t.Error(err)
 	}
@@ -419,7 +419,7 @@ func testGetLoadBalancerNew(t *testing.T, hns HostNetworkService) {
 		hnsID: Endpoint.Id,
 	}
 	endpoints := []endpointsInfo{*endpoint}
-	lb, err := hns.getLoadBalancer(endpoints, false, false, sourceVip, serviceVip, protocol, internalPort, externalPort)
+	lb, err := hns.getLoadBalancer(endpoints, loadBalancerFlags{}, sourceVip, serviceVip, protocol, internalPort, externalPort)
 	if err != nil {
 		t.Error(err)
 	}
@@ -469,8 +469,8 @@ func testDeleteLoadBalancer(t *testing.T, hns HostNetworkService) {
 	Endpoints := []hcn.HostComputeEndpoint{*Endpoint}
 	LoadBalancer, err := hcn.AddLoadBalancer(
 		Endpoints,
-		false,
-		false,
+		hcn.LoadBalancerFlagsNone,
+		hcn.LoadBalancerPortMappingFlagsNone,
 		sourceVip,
 		[]string{serviceVip},
 		protocol,

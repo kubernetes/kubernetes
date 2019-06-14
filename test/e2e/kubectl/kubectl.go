@@ -40,10 +40,10 @@ import (
 	"time"
 
 	"github.com/elazarl/goproxy"
-	"sigs.k8s.io/yaml"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
 	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -60,13 +60,16 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	uexec "k8s.io/utils/exec"
+	"sigs.k8s.io/yaml"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -366,7 +369,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			gomega.Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -514,7 +517,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				WithStdinData("abcd1234").
 				Exec()
 			framework.ExpectNoError(err)
-			framework.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
+			e2epod.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 
 			ginkgo.By("running a failing command with --leave-stdin-open")
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
@@ -537,7 +540,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
 			// to loop test.
 			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
+				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
 					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test")
 				}
 				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
@@ -565,14 +568,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 			g = func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err = polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			gomega.Expect(err).To(gomega.BeNil())
-			if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
+			if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
 				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 			}
 
 			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
 			// to loop test.
 			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
+				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
 					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 				}
 				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
@@ -591,7 +594,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("executing a command with run")
 			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
 
-			if !framework.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
 				framework.Failf("Pod for run-log-test was not ready")
 			}
 
@@ -619,11 +622,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		ginkgo.It("should handle in-cluster config", func() {
 			ginkgo.By("adding rbac permissions")
 			// grant the view permission widely to allow inspection of the `invalid` namespace and the default namespace
-			err := auth.BindClusterRole(f.ClientSet.RbacV1beta1(), "view", f.Namespace.Name,
-				rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
+			err := auth.BindClusterRole(f.ClientSet.RbacV1(), "view", f.Namespace.Name,
+				rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 			framework.ExpectNoError(err)
 
-			err = auth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1beta1(),
+			err = auth.WaitForAuthorizationUpdate(f.ClientSet.AuthorizationV1(),
 				serviceaccount.MakeUsername(f.Namespace.Name, "default"),
 				f.Namespace.Name, "list", schema.GroupResource{Resource: "pods"}, true)
 			framework.ExpectNoError(err)
@@ -851,6 +854,56 @@ metadata:
 		})
 	})
 
+	// definitionMatchesGVK returns true if the specified GVK is listed as an x-kubernetes-group-version-kind extension
+	definitionMatchesGVK := func(extensions []*openapi_v2.NamedAny, desiredGVK schema.GroupVersionKind) bool {
+		for _, extension := range extensions {
+			if extension.GetValue().GetYaml() == "" ||
+				extension.GetName() != "x-kubernetes-group-version-kind" {
+				continue
+			}
+			var values []map[string]string
+			err := yaml.Unmarshal([]byte(extension.GetValue().GetYaml()), &values)
+			if err != nil {
+				e2elog.Logf("%v\n%s", err, string(extension.GetValue().GetYaml()))
+				continue
+			}
+			for _, value := range values {
+				if value["group"] != desiredGVK.Group {
+					continue
+				}
+				if value["version"] != desiredGVK.Version {
+					continue
+				}
+				if value["kind"] != desiredGVK.Kind {
+					continue
+				}
+				return true
+			}
+		}
+		return false
+	}
+
+	// schemaForGVK returns a schema (if defined) for the specified GVK
+	schemaForGVK := func(desiredGVK schema.GroupVersionKind) *openapi_v2.Schema {
+		d, err := f.ClientSet.Discovery().OpenAPISchema()
+		if err != nil {
+			framework.Failf("%v", err)
+		}
+		if d == nil || d.Definitions == nil {
+			return nil
+		}
+		for _, p := range d.Definitions.AdditionalProperties {
+			if p == nil || p.Value == nil {
+				continue
+			}
+			if !definitionMatchesGVK(p.Value.VendorExtension, desiredGVK) {
+				continue
+			}
+			return p.Value
+		}
+		return nil
+	}
+
 	framework.KubeDescribe("Kubectl client-side validation", func() {
 		ginkgo.It("should create/apply a CR with unknown fields for CRD with no validation schema", func() {
 			ginkgo.By("create CRD with no validation schema")
@@ -877,6 +930,7 @@ metadata:
 				if err := yaml.Unmarshal(schemaFoo, props); err != nil {
 					framework.Failf("failed to unmarshal schema: %v", err)
 				}
+				crd.Spec.Validation = &v1beta1.CustomResourceValidation{OpenAPIV3Schema: props}
 			})
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
@@ -900,6 +954,7 @@ metadata:
 				if err := yaml.Unmarshal(schemaFoo, props); err != nil {
 					framework.Failf("failed to unmarshal schema: %v", err)
 				}
+				crd.Spec.Validation = &v1beta1.CustomResourceValidation{OpenAPIV3Schema: props}
 			})
 			if err != nil {
 				framework.Failf("failed to create test CRD: %v", err)
@@ -909,10 +964,28 @@ metadata:
 			ginkgo.By("sleep for 10s to wait for potential crd openapi publishing alpha feature")
 			time.Sleep(10 * time.Second)
 
+			publishedSchema := schemaForGVK(schema.GroupVersionKind{Group: crd.Crd.Spec.Group, Version: crd.Crd.Spec.Version, Kind: crd.Crd.Spec.Names.Kind})
+			expectSuccess := false
+			if publishedSchema == nil || publishedSchema.Properties == nil || publishedSchema.Properties.AdditionalProperties == nil || len(publishedSchema.Properties.AdditionalProperties) == 0 {
+				// expect success in the following cases:
+				// - no schema was published
+				// - a schema was published with no properties
+				expectSuccess = true
+				e2elog.Logf("no schema with properties found, expect apply with extra properties to succeed")
+			} else {
+				e2elog.Logf("schema with properties found, expect apply with extra properties to fail")
+			}
+
 			meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
 			validArbitraryCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}],"extraProperty":"arbitrary-value"}}`, meta)
 			if err := createApplyCustomResource(validArbitraryCR, f.Namespace.Name, "test-cr", crd); err != nil {
-				framework.Failf("%v", err)
+				if expectSuccess {
+					framework.Failf("%v", err)
+				}
+			} else {
+				if !expectSuccess {
+					framework.Failf("expected error, got none")
+				}
 			}
 		})
 
@@ -1075,7 +1148,7 @@ metadata:
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-					endpoints, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+					ep, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 					if err != nil {
 						// log the real error
 						e2elog.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
@@ -1089,7 +1162,7 @@ metadata:
 						return false, err
 					}
 
-					uidToPort := framework.GetContainerPortsByPodUID(endpoints)
+					uidToPort := e2eendpoints.GetContainerPortsByPodUID(ep)
 					if len(uidToPort) == 0 {
 						e2elog.Logf("No endpoint found, retrying")
 						return false, nil
@@ -1141,7 +1214,7 @@ metadata:
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			gomega.Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1182,7 +1255,7 @@ metadata:
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			gomega.Expect(framework.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -1366,7 +1439,7 @@ metadata:
 			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, nsFlag)
 			ginkgo.By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
-			podlist, err := framework.WaitForPodsWithLabel(c, ns, label)
+			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod controlled by %s: %v", name, err)
 			}
@@ -1411,7 +1484,7 @@ metadata:
 
 			ginkgo.By("verifying the pod controlled by rc " + rcName + " was created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": rcName}))
-			podlist, err := framework.WaitForPodsWithLabel(c, ns, label)
+			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
 			}
@@ -1426,7 +1499,7 @@ metadata:
 			for _, pod := range pods {
 				podNames = append(podNames, pod.Name)
 			}
-			if !framework.CheckPodsRunningReady(c, ns, podNames, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReady(c, ns, podNames, framework.PodStartTimeout) {
 				framework.Failf("Pods for rc %s were not ready", rcName)
 			}
 			_, err = framework.RunKubectl("logs", "rc/"+rcName, nsFlag)
@@ -1522,7 +1595,7 @@ metadata:
 
 			ginkgo.By("verifying the pod controlled by deployment " + dName + " was created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": dName}))
-			podlist, err := framework.WaitForPodsWithLabel(c, ns, label)
+			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod controlled by deployment %s: %v", dName, err)
 			}

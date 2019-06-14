@@ -43,6 +43,8 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
 	. "github.com/onsi/ginkgo"
@@ -143,9 +145,9 @@ func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
 func (r *ResourceCollector) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
-		framework.Logf("%v", err)
+		e2elog.Logf("%v", err)
 	}
-	framework.Logf("%s", formatResourceUsageStats(summary))
+	e2elog.Logf("%s", formatResourceUsageStats(summary))
 }
 
 // collectStats collects resource usage from Cadvisor.
@@ -153,12 +155,12 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 	for _, name := range systemContainers {
 		ret, err := r.client.Stats(name, r.request)
 		if err != nil {
-			framework.Logf("Error getting container stats, err: %v", err)
+			e2elog.Logf("Error getting container stats, err: %v", err)
 			return
 		}
 		cStats, ok := ret[name]
 		if !ok {
-			framework.Logf("Missing info/stats for container %q", name)
+			e2elog.Logf("Missing info/stats for container %q", name)
 			return
 		}
 
@@ -374,7 +376,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+			Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
 		}(pod)
 	}

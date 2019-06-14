@@ -38,6 +38,7 @@ import (
 	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/prometheus/common/model"
@@ -183,7 +184,7 @@ func (m *RuntimeOperationMonitor) GetRuntimeOperationErrorRate() map[string]Node
 	for node := range m.nodesRuntimeOps {
 		nodeResult, err := getNodeRuntimeOperationErrorRate(m.client, node)
 		if err != nil {
-			Logf("GetRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
+			e2elog.Logf("GetRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
 			continue
 		}
 		m.nodesRuntimeOps[node] = nodeResult
@@ -199,7 +200,7 @@ func (m *RuntimeOperationMonitor) GetLatestRuntimeOperationErrorRate() map[strin
 		oldNodeResult := m.nodesRuntimeOps[node]
 		curNodeResult, err := getNodeRuntimeOperationErrorRate(m.client, node)
 		if err != nil {
-			Logf("GetLatestRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
+			e2elog.Logf("GetLatestRuntimeOperationErrorRate: unable to get kubelet metrics from node %q: %v", node, err)
 			continue
 		}
 		for op, cur := range curNodeResult {
@@ -276,7 +277,7 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 	for _, m := range latencyMetrics {
 		if m.Latency > threshold {
 			badMetrics = append(badMetrics, m)
-			Logf("%+v", m)
+			e2elog.Logf("%+v", m)
 		}
 	}
 	return badMetrics, nil
@@ -517,13 +518,13 @@ func GetKubeletHeapStats(c clientset.Interface, nodeName string) (string, error)
 func PrintAllKubeletPods(c clientset.Interface, nodeName string) {
 	podList, err := GetKubeletPods(c, nodeName)
 	if err != nil {
-		Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
+		e2elog.Logf("Unable to retrieve kubelet pods for node %v: %v", nodeName, err)
 		return
 	}
 	for _, p := range podList.Items {
-		Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
+		e2elog.Logf("%v from %v started at %v (%d container statuses recorded)", p.Name, p.Namespace, p.Status.StartTime, len(p.Status.ContainerStatuses))
 		for _, c := range p.Status.ContainerStatuses {
-			Logf("\tContainer %v ready: %v, restart count %v",
+			e2elog.Logf("\tContainer %v ready: %v, restart count %v",
 				c.Name, c.Ready, c.RestartCount)
 		}
 	}
@@ -583,7 +584,7 @@ func (r *resourceCollector) Stop() {
 func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.ContainerStats) {
 	summary, err := getNodeStatsSummary(r.client, r.node)
 	if err != nil {
-		Logf("Error getting node stats summary on %q, err: %v", r.node, err)
+		e2elog.Logf("Error getting node stats summary on %q, err: %v", r.node, err)
 		return
 	}
 	cStatsMap := getSystemContainerStats(summary)
@@ -592,7 +593,7 @@ func (r *resourceCollector) collectStats(oldStatsMap map[string]*stats.Container
 	for _, name := range r.containers {
 		cStats, ok := cStatsMap[name]
 		if !ok {
-			Logf("Missing info/stats for container %q on node %q", name, r.node)
+			e2elog.Logf("Missing info/stats for container %q on node %q", name, r.node)
 			return
 		}
 
@@ -710,9 +711,9 @@ func (r *ResourceMonitor) Reset() {
 func (r *ResourceMonitor) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
-		Logf("%v", err)
+		e2elog.Logf("%v", err)
 	}
-	Logf("%s", r.FormatResourceUsage(summary))
+	e2elog.Logf("%s", r.FormatResourceUsage(summary))
 }
 
 // FormatResourceUsage returns the formatted string for LogLatest().
@@ -824,7 +825,7 @@ func (r *ResourceMonitor) FormatCPUSummary(summary NodesCPUSummary) string {
 // LogCPUSummary outputs summary of CPU into log.
 func (r *ResourceMonitor) LogCPUSummary() {
 	summary := r.GetCPUSummary()
-	Logf("%s", r.FormatCPUSummary(summary))
+	e2elog.Logf("%s", r.FormatCPUSummary(summary))
 }
 
 // GetCPUSummary returns summary of CPU.

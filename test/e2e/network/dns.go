@@ -221,7 +221,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	ginkgo.It("should provide DNS for pods for Hostname [LinuxOnly]", func() {
+	/*
+		Release: v1.15
+		Testname: DNS, resolve the hostname
+		Description: Create a headless service with label. Create a Pod with label to match service's label, with hostname and a subdomain same as service name.
+		Pod MUST be able to resolve its fully qualified domain name as well as hostname by serving an A record at that name.
+	*/
+	framework.ConformanceIt("should provide DNS for pods for Hostname [LinuxOnly]", func() {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
@@ -256,7 +262,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	ginkgo.It("should provide DNS for pods for Subdomain", func() {
+	/*
+		Release: v1.15
+		Testname: DNS, resolve the subdomain
+		Description: Create a headless service with label. Create a Pod with label to match service's label, with hostname and a subdomain same as service name.
+		Pod MUST be able to resolve its fully qualified domain name as well as subdomain by serving an A record at that name.
+	*/
+	framework.ConformanceIt("should provide DNS for pods for Subdomain", func() {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
@@ -376,9 +388,9 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testAgnhostPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testAgnhostPod)
 		framework.ExpectNoError(err, "failed to create pod: %s", testAgnhostPod.Name)
-		framework.Logf("Created pod %v", testAgnhostPod)
+		e2elog.Logf("Created pod %v", testAgnhostPod)
 		defer func() {
-			framework.Logf("Deleting pod %s...", testAgnhostPod.Name)
+			e2elog.Logf("Deleting pod %s...", testAgnhostPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testAgnhostPod.Name, metav1.NewDeleteOptions(0)); err != nil {
 				framework.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
 			}

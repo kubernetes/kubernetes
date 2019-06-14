@@ -131,7 +131,7 @@ type OperationGenerator interface {
 	GenerateExpandVolumeFunc(*v1.PersistentVolumeClaim, *v1.PersistentVolume) (volumetypes.GeneratedOperations, error)
 
 	// Generates the volume file system resize function, which can resize volume's file system to expected size without unmounting the volume.
-	GenerateExpandVolumeFSWithoutUnmountingFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
+	GenerateExpandInUseVolumeFunc(volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
 }
 
 func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
@@ -334,24 +334,18 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 			volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 
 		if attachErr != nil {
+			uncertainNode := volumeToAttach.NodeName
 			if derr, ok := attachErr.(*volerr.DanglingAttachError); ok {
-				addErr := actualStateOfWorld.MarkVolumeAsAttached(
-					v1.UniqueVolumeName(""),
-					originalSpec,
-					derr.CurrentNode,
-					derr.DevicePath)
-
-				if addErr != nil {
-					klog.Errorf("AttachVolume.MarkVolumeAsAttached failed to fix dangling volume error for volume %q with %s", volumeToAttach.VolumeName, addErr)
-				}
-
-			} else {
-				addErr := actualStateOfWorld.MarkVolumeAsUncertain(
-					v1.UniqueVolumeName(""), originalSpec, volumeToAttach.NodeName)
-				if addErr != nil {
-					klog.Errorf("AttachVolume.MarkVolumeAsUncertain fail to add the volume %q to actual state with %s", volumeToAttach.VolumeName, addErr)
-				}
+				uncertainNode = derr.CurrentNode
 			}
+			addErr := actualStateOfWorld.MarkVolumeAsUncertain(
+				v1.UniqueVolumeName(""),
+				originalSpec,
+				uncertainNode)
+			if addErr != nil {
+				klog.Errorf("AttachVolume.MarkVolumeAsUncertain fail to add the volume %q to actual state with %s", volumeToAttach.VolumeName, addErr)
+			}
+
 			// On failure, return error. Caller will log and retry.
 			return volumeToAttach.GenerateError("AttachVolume.Attach failed", attachErr)
 		}
@@ -683,7 +677,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// resizeFileSystem will resize the file system if user has requested a resize of
 			// underlying persistent volume and is allowed to do so.
-			resizeDone, resizeError = og.resizeFileSystem(volumeToMount, resizeOptions, volumePluginName)
+			resizeDone, resizeError = og.resizeFileSystem(volumeToMount, resizeOptions)
 
 			if resizeError != nil {
 				klog.Errorf("MountVolume.resizeFileSystem failed with %v", resizeError)
@@ -701,7 +695,10 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Execute mount
-		mountErr := volumeMounter.SetUp(fsGroup)
+		mountErr := volumeMounter.SetUp(volume.MounterArgs{
+			FsGroup:     fsGroup,
+			DesiredSize: volumeToMount.DesiredSizeLimit,
+		})
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)
@@ -721,7 +718,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		//	- Volume does not support DeviceMounter interface.
 		//	- In case of CSI the volume does not have node stage_unstage capability.
 		if !resizeDone {
-			resizeDone, resizeError = og.resizeFileSystem(volumeToMount, resizeOptions, volumePluginName)
+			resizeDone, resizeError = og.resizeFileSystem(volumeToMount, resizeOptions)
 			if resizeError != nil {
 				klog.Errorf("MountVolume.resizeFileSystem failed with %v", resizeError)
 				return volumeToMount.GenerateError("MountVolume.Setup failed while expanding volume", resizeError)
@@ -760,7 +757,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	}
 }
 
-func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOpts volume.NodeResizeOptions, pluginName string) (bool, error) {
+func (og *operationGenerator) resizeFileSystem(volumeToMount VolumeToMount, rsOpts volume.NodeResizeOptions) (bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		klog.V(4).Infof("Resizing is not enabled for this volume %s", volumeToMount.VolumeName)
 		return true, nil
@@ -1574,16 +1571,26 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 	}, nil
 }
 
-func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
+func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error) {
-	volumePlugin, err :=
-		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
-	if err != nil || volumePlugin == nil {
-		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.FindPluginBySpec failed", err)
-	}
 
 	fsResizeFunc := func() (error, error) {
+		// Need to translate the spec here if the plugin is migrated so that the metrics
+		// emitted show the correct (migrated) plugin
+		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+			if err != nil {
+				return volumeToMount.GenerateError("VolumeFSResize.translateSpec failed", err)
+			}
+			volumeToMount.VolumeSpec = csiSpec
+		}
+		volumePlugin, err :=
+			og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+		if err != nil || volumePlugin == nil {
+			return volumeToMount.GenerateError("VolumeFSResize.FindPluginBySpec failed", err)
+		}
+
 		var resizeDone bool
 		var simpleErr, detailedErr error
 		resizeOptions := volume.NodeResizeOptions{
@@ -1603,7 +1610,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 					return volumeToMount.GenerateError("VolumeFSResize.GetDeviceMountPath failed", err)
 				}
 				resizeOptions.DeviceMountPath = dmp
-				resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions, volumePlugin.GetPluginName())
+				resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
 				if simpleErr != nil || detailedErr != nil {
 					return simpleErr, detailedErr
 				}
@@ -1623,7 +1630,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 		resizeOptions.DeviceMountPath = volumeMounter.GetPath()
 		resizeOptions.CSIVolumePhase = volume.CSIVolumePublished
-		resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions, volumePlugin.GetPluginName())
+		resizeDone, simpleErr, detailedErr = og.doOnlineExpansion(volumeToMount, actualStateOfWorld, resizeOptions)
 		if simpleErr != nil || detailedErr != nil {
 			return simpleErr, detailedErr
 		}
@@ -1631,7 +1638,7 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 			return nil, nil
 		}
 		// This is a placeholder error - we should NEVER reach here.
-		err := fmt.Errorf("volume resizing failed for unknown reason")
+		err = fmt.Errorf("volume resizing failed for unknown reason")
 		return volumeToMount.GenerateError("VolumeFSResize.resizeFileSystem failed to resize volume", err)
 	}
 
@@ -1639,6 +1646,24 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 		if *err != nil {
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.VolumeResizeFailed, (*err).Error())
 		}
+	}
+
+	// Need to translate the spec here if the plugin is migrated so that the metrics
+	// emitted show the correct (migrated) plugin
+	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+		if err == nil {
+			volumeToMount.VolumeSpec = csiSpec
+		}
+		// If we have an error here we ignore it, the metric emitted will then be for the
+		// in-tree plugin. This error case(skipped one) will also trigger an error
+		// while the generated function is executed. And those errors will be handled during the execution of the generated
+		// function with a back off policy.
+	}
+	volumePlugin, err :=
+		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+	if err != nil || volumePlugin == nil {
+		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("VolumeFSResize.FindPluginBySpec failed", err)
 	}
 
 	return volumetypes.GeneratedOperations{
@@ -1651,9 +1676,8 @@ func (og *operationGenerator) GenerateExpandVolumeFSWithoutUnmountingFunc(
 
 func (og *operationGenerator) doOnlineExpansion(volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	resizeOptions volume.NodeResizeOptions,
-	pluginName string) (bool, error, error) {
-	resizeDone, err := og.resizeFileSystem(volumeToMount, resizeOptions, pluginName)
+	resizeOptions volume.NodeResizeOptions) (bool, error, error) {
+	resizeDone, err := og.resizeFileSystem(volumeToMount, resizeOptions)
 	if err != nil {
 		klog.Errorf("VolumeFSResize.resizeFileSystem failed : %v", err)
 		e1, e2 := volumeToMount.GenerateError("VolumeFSResize.resizeFileSystem failed", err)
@@ -1828,19 +1852,28 @@ func nodeUsingCSIPlugin(og *operationGenerator, spec *volume.Spec, nodeName type
 }
 
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
+	var csiPV *v1.PersistentVolume
+	var err error
+	inlineVolume := false
 	if spec.PersistentVolume != nil {
 		// TranslateInTreePVToCSI will create a new PV
-		csiPV, err := csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
+		csiPV, err = csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
 		if err != nil {
 			return nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
 		}
-		return &volume.Spec{
-			PersistentVolume: csiPV,
-			ReadOnly:         spec.ReadOnly,
-		}, nil
 	} else if spec.Volume != nil {
-		return &volume.Spec{}, goerrors.New("translation is not supported for in-line volumes yet")
+		// TranslateInTreeInlineVolumeToCSI will create a new PV
+		csiPV, err = csilib.TranslateInTreeInlineVolumeToCSI(spec.Volume)
+		if err != nil {
+			return nil, fmt.Errorf("failed to translate in tree inline volume to CSI: %v", err)
+		}
+		inlineVolume = true
 	} else {
 		return &volume.Spec{}, goerrors.New("not a valid volume spec")
 	}
+	return &volume.Spec{
+		PersistentVolume:                csiPV,
+		ReadOnly:                        spec.ReadOnly,
+		InlineVolumeSpecForCSIMigration: inlineVolume,
+	}, nil
 }

@@ -35,6 +35,7 @@ import (
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -198,7 +199,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				// Here we set API QPS limit from default 5 to 60 in order to test real Kubelet performance.
 				// Note that it will cause higher resource usage.
 				tempSetCurrentKubeletConfig(f, func(cfg *kubeletconfig.KubeletConfiguration) {
-					framework.Logf("Old QPS limit is: %d", cfg.KubeAPIQPS)
+					e2elog.Logf("Old QPS limit is: %d", cfg.KubeAPIQPS)
 					// Set new API QPS limit
 					cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
 				})
@@ -539,7 +540,7 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyD
 
 	// TODO(coufon): do not trust 'kubelet' metrics since they are not reset!
 	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
-	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
+	e2elog.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
 
 	podStartupLatency := framework.ExtractLatencyMetrics(e2eLags)
 

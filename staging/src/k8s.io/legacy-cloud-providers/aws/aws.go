@@ -206,16 +206,6 @@ const volumeAttachmentStuck = "VolumeAttachmentStuck"
 const nodeWithImpairedVolumes = "NodeWithImpairedVolumes"
 
 const (
-	// These constants help to identify if a node is a master or a minion
-	labelKeyNodeRole    = "kubernetes.io/role"
-	nodeMasterRole      = "master"
-	nodeMinionRole      = "node"
-	labelKeyNodeMaster  = "node-role.kubernetes.io/master"
-	labelKeyNodeCompute = "node-role.kubernetes.io/compute"
-	labelKeyNodeMinion  = "node-role.kubernetes.io/node"
-)
-
-const (
 	// volumeAttachmentConsecutiveErrorLimit is the number of consecutive errors we will ignore when waiting for a volume to attach/detach
 	volumeAttachmentStatusConsecutiveErrorLimit = 10
 	// most attach/detach operations on AWS finish within 1-4 seconds
@@ -1628,77 +1618,69 @@ func (c *Cloud) InstanceType(ctx context.Context, nodeName types.NodeName) (stri
 // GetCandidateZonesForDynamicVolume retrieves  a list of all the zones in which nodes are running
 // It currently involves querying all instances
 func (c *Cloud) GetCandidateZonesForDynamicVolume() (sets.String, error) {
-	zones := sets.NewString()
+	// We don't currently cache this; it is currently used only in volume
+	// creation which is expected to be a comparatively rare occurrence.
 
-	// TODO: list from cache?
-	nodes, err := c.kubeClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	// TODO: Caching / expose v1.Nodes to the cloud provider?
+	// TODO: We could also query for subnets, I think
+
+	// Note: It is more efficient to call the EC2 API twice with different tag
+	// filters than to call it once with a tag filter that results in a logical
+	// OR. For really large clusters the logical OR will result in EC2 API rate
+	// limiting.
+	instances := []*ec2.Instance{}
+
+	baseFilters := []*ec2.Filter{newEc2Filter("instance-state-name", "running")}
+
+	filters := c.tagging.addFilters(baseFilters)
+	di, err := c.describeInstances(filters)
 	if err != nil {
-		klog.Errorf("Failed to get nodes from api server: %#v", err)
 		return nil, err
 	}
 
-	for _, n := range nodes.Items {
-		if !c.isNodeReady(&n) {
-			klog.V(4).Infof("Ignoring not ready node %q in zone discovery", n.Name)
+	instances = append(instances, di...)
+
+	if c.tagging.usesLegacyTags {
+		filters = c.tagging.addLegacyFilters(baseFilters)
+		di, err = c.describeInstances(filters)
+		if err != nil {
+			return nil, err
+		}
+
+		instances = append(instances, di...)
+	}
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no instances returned")
+	}
+
+	zones := sets.NewString()
+
+	for _, instance := range instances {
+		// We skip over master nodes, if the installation tool labels them with one of the well-known master labels
+		// This avoids creating a volume in a zone where only the master is running - e.g. #34583
+		// This is a short-term workaround until the scheduler takes care of zone selection
+		master := false
+		for _, tag := range instance.Tags {
+			tagKey := aws.StringValue(tag.Key)
+			if awsTagNameMasterRoles.Has(tagKey) {
+				master = true
+			}
+		}
+
+		if master {
+			klog.V(4).Infof("Ignoring master instance %q in zone discovery", aws.StringValue(instance.InstanceId))
 			continue
 		}
-		// In some cluster provisioning software, a node can be both a minion and a master. Therefore we white-list
-		// here, and only filter out node that is not minion AND is labeled as master explicitly
-		if c.isMinionNode(&n) || !c.isMasterNode(&n) {
-			if zone, ok := n.Labels[v1.LabelZoneFailureDomain]; ok {
-				zones.Insert(zone)
-			} else {
-				klog.Warningf("Node %s does not have zone label, ignore for zone discovery.", n.Name)
-			}
-		} else {
-			klog.V(4).Infof("Ignoring master node %q in zone discovery", n.Name)
+
+		if instance.Placement != nil {
+			zone := aws.StringValue(instance.Placement.AvailabilityZone)
+			zones.Insert(zone)
 		}
 	}
 
 	klog.V(2).Infof("Found instances in zones %s", zones)
 	return zones, nil
-}
-
-// isNodeReady checks node condition and return true if NodeReady is marked as true
-func (c *Cloud) isNodeReady(node *v1.Node) bool {
-	for _, c := range node.Status.Conditions {
-		if c.Type == v1.NodeReady {
-			return c.Status == v1.ConditionTrue
-		}
-	}
-	return false
-}
-
-// isMasterNode checks if the node is labeled as master
-func (c *Cloud) isMasterNode(node *v1.Node) bool {
-	// Master node has one or more of the following labels:
-	//
-	// 	kubernetes.io/role: master
-	//	node-role.kubernetes.io/master: ""
-	//	node-role.kubernetes.io/master: "true"
-	if val, ok := node.Labels[labelKeyNodeMaster]; ok && val != "false" {
-		return true
-	} else if role, ok := node.Labels[labelKeyNodeRole]; ok && role == nodeMasterRole {
-		return true
-	}
-	return false
-}
-
-// isMinionNode checks if the node is labeled as minion
-func (c *Cloud) isMinionNode(node *v1.Node) bool {
-	// Minion node has one or more oof the following labels:
-	//
-	// 	kubernetes.io/role: "node"
-	//	node-role.kubernetes.io/compute: "true"
-	//	node-role.kubernetes.io/node: ""
-	if val, ok := node.Labels[labelKeyNodeMinion]; ok && val != "false" {
-		return true
-	} else if val, ok := node.Labels[labelKeyNodeCompute]; ok && val != "false" {
-		return true
-	} else if role, ok := node.Labels[labelKeyNodeRole]; ok && role == nodeMinionRole {
-		return true
-	}
-	return false
 }
 
 // GetZone implements Zones.GetZone
@@ -3597,7 +3579,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 			sourceRangeCidrs = append(sourceRangeCidrs, "0.0.0.0/0")
 		}
 
-		err = c.updateInstanceSecurityGroupsForNLB(v2Mappings, instances, loadBalancerName, sourceRangeCidrs)
+		err = c.updateInstanceSecurityGroupsForNLB(loadBalancerName, instances, sourceRangeCidrs, v2Mappings)
 		if err != nil {
 			klog.Warningf("Error opening ingress rules for the load balancer to the instances: %q", err)
 			return nil, err
@@ -4176,99 +4158,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 			}
 		}
 
-		{
-			var matchingGroups []*ec2.SecurityGroup
-			{
-				// Server side filter
-				describeRequest := &ec2.DescribeSecurityGroupsInput{}
-				describeRequest.Filters = []*ec2.Filter{
-					newEc2Filter("ip-permission.protocol", "tcp"),
-				}
-				response, err := c.ec2.DescribeSecurityGroups(describeRequest)
-				if err != nil {
-					return fmt.Errorf("Error querying security groups for NLB: %q", err)
-				}
-				for _, sg := range response {
-					if !c.tagging.hasClusterTag(sg.Tags) {
-						continue
-					}
-					matchingGroups = append(matchingGroups, sg)
-				}
-
-				// client-side filter out groups that don't have IP Rules we've
-				// annotated for this service
-				matchingGroups = filterForIPRangeDescription(matchingGroups, loadBalancerName)
-			}
-
-			{
-				clientRule := fmt.Sprintf("%s=%s", NLBClientRuleDescription, loadBalancerName)
-				mtuRule := fmt.Sprintf("%s=%s", NLBMtuDiscoveryRuleDescription, loadBalancerName)
-				healthRule := fmt.Sprintf("%s=%s", NLBHealthCheckRuleDescription, loadBalancerName)
-
-				for i := range matchingGroups {
-					removes := []*ec2.IpPermission{}
-					for j := range matchingGroups[i].IpPermissions {
-
-						v4rangesToRemove := []*ec2.IpRange{}
-						v6rangesToRemove := []*ec2.Ipv6Range{}
-
-						// Find IpPermission that contains k8s description
-						// If we removed the whole IpPermission, it could contain other non-k8s specified ranges
-						for k := range matchingGroups[i].IpPermissions[j].IpRanges {
-							description := aws.StringValue(matchingGroups[i].IpPermissions[j].IpRanges[k].Description)
-							if description == clientRule || description == mtuRule || description == healthRule {
-								v4rangesToRemove = append(v4rangesToRemove, matchingGroups[i].IpPermissions[j].IpRanges[k])
-							}
-						}
-
-						// Find IpPermission that contains k8s description
-						// If we removed the whole IpPermission, it could contain other non-k8s specified rangesk
-						for k := range matchingGroups[i].IpPermissions[j].Ipv6Ranges {
-							description := aws.StringValue(matchingGroups[i].IpPermissions[j].Ipv6Ranges[k].Description)
-							if description == clientRule || description == mtuRule || description == healthRule {
-								v6rangesToRemove = append(v6rangesToRemove, matchingGroups[i].IpPermissions[j].Ipv6Ranges[k])
-							}
-						}
-
-						// ipv4 and ipv6 removals cannot be included in the same permission
-						if len(v4rangesToRemove) > 0 {
-							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
-							removedPermission := &ec2.IpPermission{
-								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
-								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
-								IpRanges:   v4rangesToRemove,
-								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
-							}
-							removes = append(removes, removedPermission)
-						}
-						if len(v6rangesToRemove) > 0 {
-							// create a new *IpPermission to not accidentally remove UserIdGroupPairs
-							removedPermission := &ec2.IpPermission{
-								FromPort:   matchingGroups[i].IpPermissions[j].FromPort,
-								IpProtocol: matchingGroups[i].IpPermissions[j].IpProtocol,
-								Ipv6Ranges: v6rangesToRemove,
-								ToPort:     matchingGroups[i].IpPermissions[j].ToPort,
-							}
-							removes = append(removes, removedPermission)
-						}
-
-					}
-					if len(removes) > 0 {
-						changed, err := c.removeSecurityGroupIngress(aws.StringValue(matchingGroups[i].GroupId), removes)
-						if err != nil {
-							return err
-						}
-						if !changed {
-							klog.Warning("Revoking ingress was not needed; concurrent change? groupId=", *matchingGroups[i].GroupId)
-						}
-					}
-
-				}
-
-			}
-
-		}
-		return nil
+		return c.updateInstanceSecurityGroupsForNLB(loadBalancerName, nil, nil, nil)
 	}
 
 	lb, err := c.describeLoadBalancer(loadBalancerName)

@@ -765,11 +765,11 @@ func (fv *FakeVolume) CanMount() error {
 	return nil
 }
 
-func (fv *FakeVolume) SetUp(fsGroup *int64) error {
+func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.SetUpCallCount++
-	return fv.SetUpAt(fv.getPath(), fsGroup)
+	return fv.SetUpAt(fv.getPath(), mounterArgs)
 }
 
 func (fv *FakeVolume) GetSetUpCallCount() int {
@@ -778,7 +778,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 	return fv.SetUpCallCount
 }
 
-func (fv *FakeVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (fv *FakeVolume) SetUpAt(dir string, mounterArgs MounterArgs) error {
 	return os.MkdirAll(dir, 0750)
 }
 
@@ -906,6 +906,11 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 	if exist {
 		if nodeName == UncertainAttachNode {
 			return "/dev/vdb-test", nil
+		}
+		// even if volume was previously attached to time out, we need to keep returning error
+		// so as reconciler can not confirm this volume as attached.
+		if nodeName == TimeoutAttachNode {
+			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
 		}
 		if volumeNode == nodeName || volumeNode == MultiAttachNode || nodeName == MultiAttachNode {
 			return "/dev/vdb-test", nil

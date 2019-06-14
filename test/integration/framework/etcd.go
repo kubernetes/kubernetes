@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/coreos/etcd/clientv3"
 	"google.golang.org/grpc/grpclog"
@@ -94,6 +95,7 @@ func startEtcd() (func(), error) {
 		return nil, fmt.Errorf("could not get a port: %v", err)
 	}
 	etcdURL = fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
+
 	klog.Infof("starting etcd on %s", etcdURL)
 
 	etcdDataDir, err := ioutil.TempDir(os.TempDir(), "integration_test_etcd_data")
@@ -136,6 +138,28 @@ func startEtcd() (func(), error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to run etcd: %v", err)
 	}
+
+	var i int32 = 1
+	const pollCount = int32(300)
+
+	for i <= pollCount {
+		conn, err = net.DialTimeout("tcp", strings.TrimPrefix(etcdURL, "http://"), 1*time.Second)
+		if err == nil {
+			conn.Close()
+			break
+		}
+
+		if i == pollCount {
+			stop()
+			return nil, fmt.Errorf("could not start etcd")
+		}
+
+		time.Sleep(100 * time.Millisecond)
+		i = i + 1
+	}
+
+	os.Setenv("KUBE_INTEGRATION_ETCD_URL", etcdURL)
+
 	return stop, nil
 }
 

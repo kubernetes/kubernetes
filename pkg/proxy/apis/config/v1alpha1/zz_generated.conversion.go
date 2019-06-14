@@ -168,7 +168,6 @@ func Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in
 }
 
 func autoConvert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntrackConfiguration(in *v1alpha1.KubeProxyConntrackConfiguration, out *config.KubeProxyConntrackConfiguration, s conversion.Scope) error {
-	out.Max = (*int32)(unsafe.Pointer(in.Max))
 	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
 	out.Min = (*int32)(unsafe.Pointer(in.Min))
 	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))
@@ -182,7 +181,6 @@ func Convert_v1alpha1_KubeProxyConntrackConfiguration_To_config_KubeProxyConntra
 }
 
 func autoConvert_config_KubeProxyConntrackConfiguration_To_v1alpha1_KubeProxyConntrackConfiguration(in *config.KubeProxyConntrackConfiguration, out *v1alpha1.KubeProxyConntrackConfiguration, s conversion.Scope) error {
-	out.Max = (*int32)(unsafe.Pointer(in.Max))
 	out.MaxPerCore = (*int32)(unsafe.Pointer(in.MaxPerCore))
 	out.Min = (*int32)(unsafe.Pointer(in.Min))
 	out.TCPEstablishedTimeout = (*v1.Duration)(unsafe.Pointer(in.TCPEstablishedTimeout))

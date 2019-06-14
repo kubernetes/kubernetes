@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	"github.com/onsi/ginkgo"
@@ -76,7 +77,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	pods, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).List(options)
 	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.ClientSet, &pod)
+		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, &pod)
 		framework.ExpectNoError(err)
 	}
 

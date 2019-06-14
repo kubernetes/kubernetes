@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/gomega"
@@ -126,7 +127,7 @@ done`, testCmd)
 
 	if runOnce {
 		pod = f.PodClient().Create(pod)
-		framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(
+		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 			f.ClientSet, pod.Name, f.Namespace.Name))
 		var err error
 		pod, err = f.PodClient().Get(pod.Name, metav1.GetOptions{})
@@ -242,9 +243,9 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 
 func getRunningLoaderPod(f *framework.Framework) *api.Pod {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{loaderLabelKey: loaderLabelValue}))
-	pods, err := framework.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
+	pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
 	framework.ExpectNoError(err, "Failed to schedule apparmor-loader Pod")
 	pod := &pods.Items[0]
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod), "Failed to run apparmor-loader Pod")
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod), "Failed to run apparmor-loader Pod")
 	return pod
 }

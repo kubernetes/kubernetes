@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -158,7 +159,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 
 		// check that we are receiving logs in the proxy
 		err = wait.Poll(100*time.Millisecond, 10*time.Second, func() (done bool, err error) {
-			logs, err := framework.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
+			logs, err := e2epod.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
 			if err != nil {
 				e2elog.Logf("waiting for audit-proxy pod logs to be available")
 				return false, nil
@@ -348,7 +349,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			},
 		}
 
-		if auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
+		if auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			testCases = append(testCases, annotationTestCases...)
 		}
 		expectedEvents := []utils.AuditEvent{}
@@ -363,7 +364,7 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		pollingTimeout := 5 * time.Minute
 		err = wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
 			// Fetch the logs
-			logs, err := framework.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
+			logs, err := e2epod.GetPodLogs(f.ClientSet, namespace, "audit-proxy", "proxy")
 			if err != nil {
 				return false, err
 			}

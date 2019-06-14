@@ -268,7 +268,9 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 			csiMounter := mounter.(*csiMountMgr)
 			csiMounter.csiClient = csiClient
-			if err := csiMounter.SetUp(fsGroup); err != nil {
+			var mounterArgs volume.MounterArgs
+			mounterArgs.FsGroup = fsGroup
+			if err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("csiTest.VolumeAll mounter.Setup(fsGroup) failed: %s", err)
 			}
 			t.Log("csiTest.VolumeAll mounter.Setup(fsGroup) done OK")

@@ -40,6 +40,65 @@ func quantityMustParse(value string) *resource.Quantity {
 	return &q
 }
 
+func TestGetReclaimableThreshold(t *testing.T) {
+	testCases := map[string]struct {
+		thresholds []evictionapi.Threshold
+	}{
+		"": {
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("2Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalNodeFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+	for testName, testCase := range testCases {
+		sort.Sort(byEvictionPriority(testCase.thresholds))
+		_, resource, ok := getReclaimableThreshold(testCase.thresholds)
+		print(resource)
+		if !ok {
+			t.Errorf("Didn't find reclaimable threshold, test: %v", testName)
+		}
+	}
+}
+
 func TestParseThresholdConfig(t *testing.T) {
 	gracePeriod, _ := time.ParseDuration("30s")
 	testCases := map[string]struct {

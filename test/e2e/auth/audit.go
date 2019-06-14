@@ -655,7 +655,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	// test authorizer annotations, RBAC is required.
 	ginkgo.It("should audit API calls to get a pod with unauthorized user.", func() {
-		if !auth.IsRBACEnabled(f.ClientSet.RbacV1beta1()) {
+		if !auth.IsRBACEnabled(f.ClientSet.RbacV1()) {
 			framework.Skipf("RBAC not enabled.")
 		}
 

@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "graceful_termination_test.go",
         "ipset_test.go",
         "proxier_test.go",
     ],

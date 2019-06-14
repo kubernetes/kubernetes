@@ -40,7 +40,6 @@ import (
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
@@ -209,10 +208,14 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, cfg *kubeadmapiv1beta2.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
-	// KubernetesVersion is not used, but we set it explicitly to avoid the lookup
-	// of the version from the internet when executing LoadOrDefaultInitConfiguration
-	phaseutil.SetKubernetesVersion(&cfg.ClusterConfiguration)
+func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1beta2.InitConfiguration, printJoinCommand bool, kubeConfigFile string) error {
+	// ClusterConfiguration is needed just for the call to LoadOrDefaultInitConfiguration
+	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
+		// KubernetesVersion is not used, but we set this explicitly to avoid
+		// the lookup of the version from the internet when executing LoadOrDefaultInitConfiguration
+		KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
+	}
+	kubeadmscheme.Scheme.Default(clusterCfg)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
@@ -220,9 +223,9 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, c
 	// In fact, we don't do any CRI ops at all.
 	// This is just to force skipping the CRI detection.
 	// Ref: https://github.com/kubernetes/kubeadm/issues/1559
-	cfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultDockerCRISocket
+	initCfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultDockerCRISocket
 
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cfg)
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 	if err != nil {
 		return err
 	}

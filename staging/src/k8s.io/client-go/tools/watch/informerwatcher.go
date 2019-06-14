@@ -18,42 +18,86 @@ package watch
 
 import (
 	"sync"
-	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
 
-func newTicketer() *ticketer {
-	return &ticketer{
+func newEventProcessor(out chan<- watch.Event) *eventProcessor {
+	return &eventProcessor{
+		out:  out,
 		cond: sync.NewCond(&sync.Mutex{}),
+		done: make(chan struct{}),
 	}
 }
 
-type ticketer struct {
-	counter uint64
+// eventProcessor buffers events and writes them to an out chan when a reader
+// is waiting. Because of the requirement to buffer events, it synchronizes
+// input with a condition, and synchronizes output with a channels. It needs to
+// be able to yield while both waiting on an input condition and while blocked
+// on writing to the output channel.
+type eventProcessor struct {
+	out chan<- watch.Event
 
-	cond    *sync.Cond
-	current uint64
+	cond *sync.Cond
+	buff []watch.Event
+
+	done chan struct{}
 }
 
-func (t *ticketer) GetTicket() uint64 {
-	// -1 to start from 0
-	return atomic.AddUint64(&t.counter, 1) - 1
+func (e *eventProcessor) run() {
+	for {
+		batch := e.takeBatch()
+		e.writeBatch(batch)
+		if e.stopped() {
+			return
+		}
+	}
 }
 
-func (t *ticketer) WaitForTicket(ticket uint64, f func()) {
-	t.cond.L.Lock()
-	defer t.cond.L.Unlock()
-	for ticket != t.current {
-		t.cond.Wait()
+func (e *eventProcessor) takeBatch() []watch.Event {
+	e.cond.L.Lock()
+	defer e.cond.L.Unlock()
+
+	for len(e.buff) == 0 && !e.stopped() {
+		e.cond.Wait()
 	}
 
-	f()
+	batch := e.buff
+	e.buff = nil
+	return batch
+}
 
-	t.current++
-	t.cond.Broadcast()
+func (e *eventProcessor) writeBatch(events []watch.Event) {
+	for _, event := range events {
+		select {
+		case e.out <- event:
+		case <-e.done:
+			return
+		}
+	}
+}
+
+func (e *eventProcessor) push(event watch.Event) {
+	e.cond.L.Lock()
+	defer e.cond.L.Unlock()
+	defer e.cond.Signal()
+	e.buff = append(e.buff, event)
+}
+
+func (e *eventProcessor) stopped() bool {
+	select {
+	case <-e.done:
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *eventProcessor) stop() {
+	close(e.done)
+	e.cond.Signal()
 }
 
 // NewIndexerInformerWatcher will create an IndexerInformer and wrap it into watch.Interface
@@ -61,55 +105,44 @@ func (t *ticketer) WaitForTicket(ticket uint64, f func()) {
 // it also returns a channel you can use to wait for the informers to fully shutdown.
 func NewIndexerInformerWatcher(lw cache.ListerWatcher, objType runtime.Object) (cache.Indexer, cache.Controller, watch.Interface, <-chan struct{}) {
 	ch := make(chan watch.Event)
-	doneCh := make(chan struct{})
 	w := watch.NewProxyWatcher(ch)
-	t := newTicketer()
+	e := newEventProcessor(ch)
 
 	indexer, informer := cache.NewIndexerInformer(lw, objType, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			go t.WaitForTicket(t.GetTicket(), func() {
-				select {
-				case ch <- watch.Event{
-					Type:   watch.Added,
-					Object: obj.(runtime.Object),
-				}:
-				case <-w.StopChan():
-				}
+			e.push(watch.Event{
+				Type:   watch.Added,
+				Object: obj.(runtime.Object),
 			})
 		},
 		UpdateFunc: func(old, new interface{}) {
-			go t.WaitForTicket(t.GetTicket(), func() {
-				select {
-				case ch <- watch.Event{
-					Type:   watch.Modified,
-					Object: new.(runtime.Object),
-				}:
-				case <-w.StopChan():
-				}
+			e.push(watch.Event{
+				Type:   watch.Modified,
+				Object: new.(runtime.Object),
 			})
 		},
 		DeleteFunc: func(obj interface{}) {
-			go t.WaitForTicket(t.GetTicket(), func() {
-				staleObj, stale := obj.(cache.DeletedFinalStateUnknown)
-				if stale {
-					// We have no means of passing the additional information down using watch API based on watch.Event
-					// but the caller can filter such objects by checking if metadata.deletionTimestamp is set
-					obj = staleObj
-				}
+			staleObj, stale := obj.(cache.DeletedFinalStateUnknown)
+			if stale {
+				// We have no means of passing the additional information down using
+				// watch API based on watch.Event but the caller can filter such
+				// objects by checking if metadata.deletionTimestamp is set
+				obj = staleObj
+			}
 
-				select {
-				case ch <- watch.Event{
-					Type:   watch.Deleted,
-					Object: obj.(runtime.Object),
-				}:
-				case <-w.StopChan():
-				}
+			e.push(watch.Event{
+				Type:   watch.Deleted,
+				Object: obj.(runtime.Object),
 			})
 		},
 	}, cache.Indexers{})
 
+	go e.run()
+
+	doneCh := make(chan struct{})
 	go func() {
 		defer close(doneCh)
+		defer e.stop()
 		informer.Run(w.StopChan())
 	}()
 

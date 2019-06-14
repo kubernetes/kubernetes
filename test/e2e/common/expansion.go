@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -382,8 +383,8 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		podClient = f.PodClient()
 		pod = podClient.Create(pod)
 
-		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		framework.ExpectError(err, "while waiting for pod to be running")
 
 		By("updating the pod")
 		podClient.Update(podName, func(pod *v1.Pod) {
@@ -391,12 +392,12 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		})
 
 		By("waiting for pod running")
-		err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for pod to be running")
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		By("deleting the pod gracefully")
 		err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
 	/*
@@ -475,8 +476,8 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		pod = podClient.Create(pod)
 
 		By("waiting for pod running")
-		err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for pod to be running")
+		err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		By("creating a file in subpath")
 		cmd := "touch /volume_mount/mypath/foo/test.log"
@@ -498,12 +499,12 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		})
 
 		By("waiting for annotated pod running")
-		err = framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-		Expect(err).NotTo(HaveOccurred(), "while waiting for annotated pod to be running")
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		framework.ExpectNoError(err, "while waiting for annotated pod to be running")
 
 		By("deleting the pod gracefully")
 		err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-		Expect(err).NotTo(HaveOccurred(), "failed to delete pod")
+		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
 	/*
@@ -614,7 +615,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		defer func() {
 			framework.DeletePodWithWait(f, f.ClientSet, pod)
 		}()
-		err := framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
+		err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 		Expect(err).ToNot(HaveOccurred(), "while waiting for pod to be running")
 
 		By("updating the pod")
@@ -650,8 +651,8 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
 
-	err := framework.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
-	Expect(err).To(HaveOccurred(), "while waiting for pod to be running")
+	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+	framework.ExpectError(err, "while waiting for pod to be running")
 }
 
 // Tests that the existing subpath mount is detected when a container restarts

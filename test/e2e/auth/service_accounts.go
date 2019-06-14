@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -224,7 +225,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.ClientSet, pod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod))
 
 		mountedToken, err := f.ReadFileViaContainer(pod.Name, pod.Spec.Containers[0].Name, path.Join(serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey))
 		framework.ExpectNoError(err)
@@ -490,19 +491,19 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		framework.ExpectNoError(err)
 
-		framework.Logf("created pod")
-		if !framework.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
+		e2elog.Logf("created pod")
+		if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
 			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
 		}
 
-		framework.Logf("pod is ready")
+		e2elog.Logf("pod is ready")
 
 		var logs string
 		if err := wait.Poll(1*time.Minute, 20*time.Minute, func() (done bool, err error) {
-			framework.Logf("polling logs")
-			logs, err = framework.GetPodLogs(f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
+			e2elog.Logf("polling logs")
+			logs, err = e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, "inclusterclient", "inclusterclient")
 			if err != nil {
-				framework.Logf("Error pulling logs: %v", err)
+				e2elog.Logf("Error pulling logs: %v", err)
 				return false, nil
 			}
 			tokenCount, err := parseInClusterClientLogs(logs)
@@ -510,7 +511,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				return false, fmt.Errorf("inclusterclient reported an error: %v", err)
 			}
 			if tokenCount < 2 {
-				framework.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
+				e2elog.Logf("Retrying. Still waiting to see more unique tokens: got=%d, want=2", tokenCount)
 				return false, nil
 			}
 			return true, nil

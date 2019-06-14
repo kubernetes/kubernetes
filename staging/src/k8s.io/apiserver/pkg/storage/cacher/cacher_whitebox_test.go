@@ -217,7 +217,7 @@ type testVersioner struct{}
 func (testVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
 	return meta.NewAccessor().SetResourceVersion(obj, strconv.FormatUint(resourceVersion, 10))
 }
-func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count int64) error {
+func (testVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, continueValue string, count *int64) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err

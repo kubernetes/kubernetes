@@ -95,12 +95,9 @@
 				"k8s.io/kubernetes/pkg/cloudprovider/providers",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
 				"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 			]

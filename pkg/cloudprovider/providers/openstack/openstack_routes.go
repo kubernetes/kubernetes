@@ -111,12 +111,12 @@ func updateRoutes(network *gophercloud.ServiceClient, router *routers.Router, ne
 	}
 
 	unwinder := func() {
-		klog.V(4).Info("Reverting routes change to router ", router.ID)
+		klog.V(4).Infof("Reverting routes change to router %v", router.ID)
 		_, err := routers.Update(network, router.ID, routers.UpdateOpts{
 			Routes: origRoutes,
 		}).Extract()
 		if err != nil {
-			klog.Warning("Unable to reset routes during error unwind: ", err)
+			klog.Warningf("Unable to reset routes during error unwind: %v", err)
 		}
 	}
 
@@ -134,12 +134,12 @@ func updateAllowedAddressPairs(network *gophercloud.ServiceClient, port *neutron
 	}
 
 	unwinder := func() {
-		klog.V(4).Info("Reverting allowed-address-pairs change to port ", port.ID)
+		klog.V(4).Infof("Reverting allowed-address-pairs change to port %v", port.ID)
 		_, err := neutronports.Update(network, port.ID, neutronports.UpdateOpts{
 			AllowedAddressPairs: &origPairs,
 		}).Extract()
 		if err != nil {
-			klog.Warning("Unable to reset allowed-address-pairs during error unwind: ", err)
+			klog.Warningf("Unable to reset allowed-address-pairs during error unwind: %v", err)
 		}
 	}
 
@@ -200,7 +200,7 @@ func (r *Routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 	found := false
 	for _, item := range port.AllowedAddressPairs {
 		if item.IPAddress == route.DestinationCIDR {
-			klog.V(4).Info("Found existing allowed-address-pair: ", item)
+			klog.V(4).Infof("Found existing allowed-address-pair: %v", item)
 			found = true
 			break
 		}

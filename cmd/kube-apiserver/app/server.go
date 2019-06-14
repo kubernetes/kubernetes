@@ -84,8 +84,10 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
 
-const etcdRetryLimit = 60
-const etcdRetryInterval = 1 * time.Second
+const (
+	etcdRetryLimit    = 60
+	etcdRetryInterval = 1 * time.Second
+)
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {

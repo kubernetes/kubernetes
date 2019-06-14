@@ -230,11 +230,6 @@ function Set-EnvironmentVars {
 # Configures various settings and prerequisites needed for the rest of the
 # functions in this module and the Kubernetes binaries to operate properly.
 function Set-PrerequisiteOptions {
-  # The Windows firewall interferes with Kubernetes networking; GCE's firewall
-  # should be sufficient.
-  Log-Output "Disabling Windows Firewall"
-  Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
-
   # Windows updates cause the node to reboot at arbitrary times.
   Log-Output "Disabling Windows Update service"
   sc.exe config wuauserv start=disabled
@@ -249,18 +244,16 @@ function Set-PrerequisiteOptions {
   Install-Module -Name powershell-yaml -Force
 }
 
-# Disables Windows Defender realtime scanning if this Windows node is part of a
-# test cluster.
-#
-# ${kube_env} must have already been set.
+# Disables Windows Defender realtime scanning.
+# TODO: remove this workaround once the fix is rolled out the Windows image
+# https://github.com/kubernetes/kubernetes/issues/75148
 function Disable-WindowsDefender {
   # Windows Defender periodically consumes 100% of the CPU, so disable realtime
   # scanning. Uninstalling the Windows Feature will prevent the service from
   # starting after a reboot.
   # TODO(pjh): move this step to image preparation, since we don't want to do a
   # full reboot here.
-  if ((Test-IsTestCluster ${kube_env}) -and
-      ((Get-WindowsFeature -Name 'Windows-Defender').Installed)) {
+  if ((Get-WindowsFeature -Name 'Windows-Defender').Installed) {
     Log-Output "Disabling Windows Defender service"
     Set-MpPreference -DisableRealtimeMonitoring $true
     Uninstall-WindowsFeature -Name 'Windows-Defender'

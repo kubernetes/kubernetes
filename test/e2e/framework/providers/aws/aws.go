@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
@@ -114,7 +115,7 @@ func (p *Provider) DeletePD(pdName string) error {
 	_, err := client.DeleteVolume(request)
 	if err != nil {
 		if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-			framework.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			e2elog.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 		} else {
 			return fmt.Errorf("error deleting EBS volumes: %v", err)
 		}
@@ -144,7 +145,7 @@ func newAWSClient(zone string) *ec2.EC2 {
 		zone = framework.TestContext.CloudConfig.Zone
 	}
 	if zone == "" {
-		framework.Logf("Warning: No AWS zone configured!")
+		e2elog.Logf("Warning: No AWS zone configured!")
 		cfg = nil
 	} else {
 		region := zone[:len(zone)-1]

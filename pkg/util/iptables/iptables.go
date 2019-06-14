@@ -326,14 +326,15 @@ func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
 	args := []string{"-t", string(table)}
 	klog.V(4).Infof("running %s %v", iptablesSaveCmd, args)
 	cmd := runner.exec.Command(iptablesSaveCmd, args...)
-	// Since CombinedOutput() doesn't support redirecting it to a buffer,
-	// we need to workaround it by redirecting stdout and stderr to buffer
-	// and explicitly calling Run() [CombinedOutput() underneath itself
-	// creates a new buffer, redirects stdout and stderr to it and also
-	// calls Run()].
 	cmd.SetStdout(buffer)
-	cmd.SetStderr(buffer)
-	return cmd.Run()
+	stderrBuffer := bytes.NewBuffer(nil)
+	cmd.SetStderr(stderrBuffer)
+
+	err := cmd.Run()
+	if err != nil {
+		stderrBuffer.WriteTo(buffer) // ignore error, since we need to return the original error
+	}
+	return err
 }
 
 // Restore is part of Interface.

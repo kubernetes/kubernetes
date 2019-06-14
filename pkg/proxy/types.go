@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"fmt"
+	"net"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -52,18 +53,28 @@ func (spn ServicePortName) String() string {
 type ServicePort interface {
 	// String returns service string.  An example format can be: `IP:Port/Protocol`.
 	String() string
-	// ClusterIPString returns service cluster IP in string format.
-	ClusterIPString() string
+	// GetClusterIP returns service cluster IP in net.IP format.
+	ClusterIP() net.IP
+	// GetPort returns service port if present. If return 0 means not present.
+	Port() int
+	// GetSessionAffinityType returns service session affinity type
+	SessionAffinityType() v1.ServiceAffinity
+	// GetStickyMaxAgeSeconds returns service max connection age
+	StickyMaxAgeSeconds() int
 	// ExternalIPStrings returns service ExternalIPs as a string array.
 	ExternalIPStrings() []string
 	// LoadBalancerIPStrings returns service LoadBalancerIPs as a string array.
 	LoadBalancerIPStrings() []string
 	// GetProtocol returns service protocol.
-	GetProtocol() v1.Protocol
+	Protocol() v1.Protocol
+	// LoadBalancerSourceRanges returns service LoadBalancerSourceRanges if present empty array if not
+	LoadBalancerSourceRanges() []string
 	// GetHealthCheckNodePort returns service health check node port if present.  If return 0, it means not present.
-	GetHealthCheckNodePort() int
+	HealthCheckNodePort() int
 	// GetNodePort returns a service Node port if present. If return 0, it means not present.
-	GetNodePort() int
+	NodePort() int
+	// GetOnlyNodeLocalEndpoints returns if a service has only node local endpoints
+	OnlyNodeLocalEndpoints() bool
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.

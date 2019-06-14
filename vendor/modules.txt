@@ -32,7 +32,7 @@ github.com/JeffAshton/win_pdh
 github.com/MakeNowJust/heredoc
 # github.com/Microsoft/go-winio v0.4.11 => github.com/Microsoft/go-winio v0.4.11
 github.com/Microsoft/go-winio
-# github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1 => github.com/Microsoft/hcsshim v0.0.0-20190110205307-69ac8d3f7fc1
+# github.com/Microsoft/hcsshim v0.8.6 => github.com/Microsoft/hcsshim v0.8.6
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/hcn
 github.com/Microsoft/hcsshim/internal/cni
@@ -273,10 +273,6 @@ github.com/coreos/pkg/dlopen
 github.com/cpuguy83/go-md2man/md2man
 # github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 => github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299
 github.com/cyphar/filepath-securejoin
-# github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c => github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
-github.com/d2g/dhcp4
-# github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266 => github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
-github.com/d2g/dhcp4client
 # github.com/davecgh/go-spew v1.1.1 => github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
 # github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd => github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
@@ -778,7 +774,7 @@ github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 => github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
 github.com/vishvananda/netns
-# github.com/vmware/govmomi v0.20.0 => github.com/vmware/govmomi v0.20.0
+# github.com/vmware/govmomi v0.20.1 => github.com/vmware/govmomi v0.20.1
 github.com/vmware/govmomi
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/list
@@ -812,12 +808,6 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
-# github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc => github.com/vmware/photon-controller-go-sdk v0.0.0-20170310013346-4a435daef6cc
-github.com/vmware/photon-controller-go-sdk/SSPI
-github.com/vmware/photon-controller-go-sdk/photon
-github.com/vmware/photon-controller-go-sdk/photon/lightwave
-# github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57 => github.com/xanzy/go-cloudstack v0.0.0-20160728180336-1e2cbf647e57
-github.com/xanzy/go-cloudstack/cloudstack
 # github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18 => github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18
 github.com/xiang90/probing
 # go.uber.org/atomic v0.0.0-20181018215023-8dc6146f7569 => go.uber.org/atomic v0.0.0-20181018215023-8dc6146f7569
@@ -878,6 +868,7 @@ golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
+golang.org/x/sys/windows/svc/mgr
 # golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -1073,6 +1064,8 @@ k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation
 k8s.io/apiextensions-apiserver/pkg/apiserver
 k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema
+k8s.io/apiextensions-apiserver/pkg/apiserver/schema/defaulting
+k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta
 k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning
 k8s.io/apiextensions-apiserver/pkg/apiserver/validation
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
@@ -1183,6 +1176,7 @@ k8s.io/apiserver/pkg/admission/configuration
 k8s.io/apiserver/pkg/admission/initializer
 k8s.io/apiserver/pkg/admission/metrics
 k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
+k8s.io/apiserver/pkg/admission/plugin/webhook
 k8s.io/apiserver/pkg/admission/plugin/webhook/config
 k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission
 k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission/v1alpha1
@@ -1191,10 +1185,12 @@ k8s.io/apiserver/pkg/admission/plugin/webhook/generic
 k8s.io/apiserver/pkg/admission/plugin/webhook/initializer
 k8s.io/apiserver/pkg/admission/plugin/webhook/mutating
 k8s.io/apiserver/pkg/admission/plugin/webhook/namespace
+k8s.io/apiserver/pkg/admission/plugin/webhook/object
 k8s.io/apiserver/pkg/admission/plugin/webhook/request
 k8s.io/apiserver/pkg/admission/plugin/webhook/rules
 k8s.io/apiserver/pkg/admission/plugin/webhook/util
 k8s.io/apiserver/pkg/admission/plugin/webhook/validating
+k8s.io/apiserver/pkg/admission/testing
 k8s.io/apiserver/pkg/apis/apiserver
 k8s.io/apiserver/pkg/apis/apiserver/install
 k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
@@ -1511,6 +1507,7 @@ k8s.io/client-go/tools/clientcmd
 k8s.io/client-go/tools/clientcmd/api
 k8s.io/client-go/tools/clientcmd/api/latest
 k8s.io/client-go/tools/clientcmd/api/v1
+k8s.io/client-go/tools/events
 k8s.io/client-go/tools/leaderelection
 k8s.io/client-go/tools/leaderelection/resourcelock
 k8s.io/client-go/tools/metrics
@@ -1561,6 +1558,7 @@ k8s.io/component-base/config/validation
 k8s.io/component-base/featuregate
 k8s.io/component-base/featuregate/testing
 k8s.io/component-base/logs
+k8s.io/component-base/metrics
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
@@ -1581,7 +1579,7 @@ k8s.io/gengo/parser
 k8s.io/gengo/types
 # k8s.io/heapster v1.2.0-beta.1 => k8s.io/heapster v1.2.0-beta.1
 k8s.io/heapster/metrics/api/v1/types
-# k8s.io/klog v0.3.0 => k8s.io/klog v0.3.0
+# k8s.io/klog v0.3.1 => k8s.io/klog v0.3.1
 k8s.io/klog
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration

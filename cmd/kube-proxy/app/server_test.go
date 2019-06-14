@@ -110,23 +110,12 @@ func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
 	testCases := []struct {
 		min        int32
-		max        int32
 		maxPerCore int32
 		expected   int
 		err        string
 	}{
 		{
 			expected: 0,
-		},
-		{
-			max:      12345,
-			expected: 12345,
-		},
-		{
-			max:        12345,
-			maxPerCore: 67890,
-			expected:   -1,
-			err:        "mutually exclusive",
 		},
 		{
 			maxPerCore: 67890, // use this if Max is 0
@@ -148,7 +137,6 @@ func TestGetConntrackMax(t *testing.T) {
 	for i, tc := range testCases {
 		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
 			Min:        utilpointer.Int32Ptr(tc.min),
-			Max:        utilpointer.Int32Ptr(tc.max),
 			MaxPerCore: utilpointer.Int32Ptr(tc.maxPerCore),
 		}
 		x, e := getConntrackMax(cfg)
@@ -178,7 +166,6 @@ clientConnection:
 clusterCIDR: "%s"
 configSyncPeriod: 15s
 conntrack:
-  max: 4
   maxPerCore: 2
   min: 1
   tcpCloseWaitTimeout: 10s
@@ -293,7 +280,6 @@ nodePortAddresses:
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
 			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-				Max:                   utilpointer.Int32Ptr(4),
 				MaxPerCore:            utilpointer.Int32Ptr(2),
 				Min:                   utilpointer.Int32Ptr(1),
 				TCPCloseWaitTimeout:   &metav1.Duration{Duration: 10 * time.Second},
@@ -428,7 +414,6 @@ clientConnection:
 clusterCIDR: 10.244.0.0/16
 configSyncPeriod: 15m0s
 conntrack:
-  max: null
   maxPerCore: 32768
   min: 131072
   tcpCloseWaitTimeout: 1h0m0s

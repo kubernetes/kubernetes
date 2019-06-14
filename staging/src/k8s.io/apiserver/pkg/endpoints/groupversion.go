@@ -72,6 +72,8 @@ type APIGroupVersion struct {
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
 
+	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
+
 	// Authorizer determines whether a user is allowed to make a certain request. The Handler does a preliminary
 	// authorization check using the request URI but it may be necessary to make additional checks, such as in
 	// the create-on-update case

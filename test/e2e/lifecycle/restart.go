@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -65,13 +66,13 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 
 		ginkgo.By("ensuring all pods are running and ready")
 		allPods := ps.List()
-		pods := framework.FilterNonRestartablePods(allPods)
+		pods := e2epod.FilterNonRestartablePods(allPods)
 
 		originalPodNames = make([]string, len(pods))
 		for i, p := range pods {
 			originalPodNames[i] = p.ObjectMeta.Name
 		}
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
+		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
 			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, originalPodNames, pods)
 			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
@@ -106,10 +107,10 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		// across node restarts.
 		ginkgo.By("ensuring the same number of pods are running and ready after restart")
 		podCheckStart := time.Now()
-		podNamesAfter, err := framework.WaitForNRestartablePods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
+		podNamesAfter, err := e2epod.WaitForNRestartablePods(ps, len(originalPodNames), framework.RestartPodReadyAgainTimeout)
 		framework.ExpectNoError(err)
 		remaining := framework.RestartPodReadyAgainTimeout - time.Since(podCheckStart)
-		if !framework.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
+		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()
 			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, podNamesAfter, pods)
 			framework.Failf("At least one pod wasn't running and ready after the restart.")

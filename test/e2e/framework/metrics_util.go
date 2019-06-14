@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/system"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
@@ -325,7 +326,7 @@ func NewEtcdMetricsCollector() *EtcdMetricsCollector {
 func getEtcdMetrics() ([]*model.Sample, error) {
 	// Etcd is only exposed on localhost level. We are using ssh method
 	if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
-		Logf("Not grabbing etcd metrics through master SSH: unsupported for %s", TestContext.Provider)
+		e2elog.Logf("Not grabbing etcd metrics through master SSH: unsupported for %s", TestContext.Provider)
 		return nil, nil
 	}
 
@@ -363,7 +364,7 @@ func (mc *EtcdMetricsCollector) StartCollecting(interval time.Duration) {
 			case <-time.After(interval):
 				dbSize, err := getEtcdDatabaseSize()
 				if err != nil {
-					Logf("Failed to collect etcd database size")
+					e2elog.Logf("Failed to collect etcd database size")
 					continue
 				}
 				mc.metrics.MaxDatabaseSize = math.Max(mc.metrics.MaxDatabaseSize, dbSize)
@@ -573,7 +574,7 @@ func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIRespons
 			if isBad {
 				prefix = "WARNING "
 			}
-			Logf("%vTop latency metric: %+v", prefix, metrics.APICalls[i])
+			e2elog.Logf("%vTop latency metric: %+v", prefix, metrics.APICalls[i])
 		}
 	}
 	return badMetrics, metrics, nil
@@ -596,7 +597,7 @@ func VerifyLatencyWithinThreshold(threshold, actual LatencyMetric, metricName st
 
 // ResetMetrics resets latency metrics in apiserver.
 func ResetMetrics(c clientset.Interface) error {
-	Logf("Resetting latency metrics in apiserver...")
+	e2elog.Logf("Resetting latency metrics in apiserver...")
 	body, err := c.CoreV1().RESTClient().Delete().AbsPath("/metrics").DoRaw()
 	if err != nil {
 		return err
@@ -652,7 +653,7 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 	} else {
 		// If master is not registered fall back to old method of using SSH.
 		if TestContext.Provider == "gke" || TestContext.Provider == "eks" {
-			Logf("Not grabbing scheduler metrics through master SSH: unsupported for %s", TestContext.Provider)
+			e2elog.Logf("Not grabbing scheduler metrics through master SSH: unsupported for %s", TestContext.Provider)
 			return "", nil
 		}
 
@@ -751,12 +752,12 @@ func convertSampleToBucket(sample *model.Sample, h *HistogramVec) {
 func PrettyPrintJSON(metrics interface{}) string {
 	output := &bytes.Buffer{}
 	if err := json.NewEncoder(output).Encode(metrics); err != nil {
-		Logf("Error building encoder: %v", err)
+		e2elog.Logf("Error building encoder: %v", err)
 		return ""
 	}
 	formatted := &bytes.Buffer{}
 	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
-		Logf("Error indenting: %v", err)
+		e2elog.Logf("Error indenting: %v", err)
 		return ""
 	}
 	return string(formatted.Bytes())
@@ -819,18 +820,18 @@ func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLate
 	}
 	for _, l := range latencyData {
 		if l.Latency > NodeStartupThreshold {
-			HighLatencyKubeletOperations(c, 1*time.Second, l.Node, Logf)
+			HighLatencyKubeletOperations(c, 1*time.Second, l.Node, e2elog.Logf)
 		}
 	}
-	Logf("Approx throughput: %v pods/min",
+	e2elog.Logf("Approx throughput: %v pods/min",
 		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
 }
 
 // PrintLatencies outputs latencies to log with readable format.
 func PrintLatencies(latencies []PodLatencyData, header string) {
 	metrics := ExtractLatencyMetrics(latencies)
-	Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
-	Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
+	e2elog.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
+	e2elog.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
 }
 
 func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.Collection) {

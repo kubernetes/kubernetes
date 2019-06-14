@@ -28,28 +28,32 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 const (
 	// PreconfiguredRuntimeHandler is the name of the runtime handler that is expected to be
 	// preconfigured in the test environment.
 	PreconfiguredRuntimeHandler = "test-handler"
+	// DockerRuntimeHandler is a hardcoded runtime handler that is accepted by dockershim, and
+	// treated equivalently to a nil runtime handler.
+	DockerRuntimeHandler = "docker"
 )
 
-var _ = Describe("[sig-node] RuntimeClass", func() {
+var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	It("should reject a Pod requesting a non-existent RuntimeClass", func() {
+	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
 		pod := createRuntimeClassPod(f, rcName)
 		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
 	})
 
-	It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
 		pod := createRuntimeClassPod(f, rcName)
@@ -57,24 +61,27 @@ var _ = Describe("[sig-node] RuntimeClass", func() {
 	})
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
-	It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
 		// The built-in docker runtime does not support configuring runtime handlers.
-		framework.SkipIfContainerRuntimeIs("docker")
+		handler := PreconfiguredRuntimeHandler
+		if framework.TestContext.ContainerRuntime == "docker" {
+			handler = DockerRuntimeHandler
+		}
 
-		rcName := createRuntimeClass(f, "preconfigured-handler", PreconfiguredRuntimeHandler)
+		rcName := createRuntimeClass(f, "preconfigured-handler", handler)
 		pod := createRuntimeClassPod(f, rcName)
 		expectPodSuccess(f, pod)
 	})
 
-	It("should reject a Pod requesting a deleted RuntimeClass", func() {
+	ginkgo.It("should reject a Pod requesting a deleted RuntimeClass", func() {
 		rcName := createRuntimeClass(f, "delete-me", "runc")
 		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
 
-		By("Deleting RuntimeClass "+rcName, func() {
+		ginkgo.By("Deleting RuntimeClass "+rcName, func() {
 			err := rcClient.Delete(rcName, nil)
 			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
 
-			By("Waiting for the RuntimeClass to disappear")
+			ginkgo.By("Waiting for the RuntimeClass to disappear")
 			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
 				_, err := rcClient.Get(rcName, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
@@ -124,7 +131,7 @@ func createRuntimeClassPod(f *framework.Framework, runtimeClassName string) *v1.
 
 // expectPodSuccess waits for the given pod to terminate successfully.
 func expectPodSuccess(f *framework.Framework, pod *v1.Pod) {
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 		f.ClientSet, pod.Name, f.Namespace.Name))
 }
 
@@ -137,6 +144,6 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(framework.WaitTimeoutForPodEvent(
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodEvent(
 		f.ClientSet, pod.Name, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }

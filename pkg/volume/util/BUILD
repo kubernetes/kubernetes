@@ -88,6 +88,7 @@ filegroup(
         ":package-srcs",
         "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
+        "//pkg/volume/util/fsquota:all-srcs",
         "//pkg/volume/util/nestedpendingoperations:all-srcs",
         "//pkg/volume/util/nsenter:all-srcs",
         "//pkg/volume/util/operationexecutor:all-srcs",

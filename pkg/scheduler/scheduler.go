@@ -579,8 +579,8 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 
 // schedule implements the scheduling algorithm and returns the suggested result(host,
 // evaluated nodes number,feasible nodes number).
-func (sched *Scheduler) schedule(pod *v1.Pod) (core.ScheduleResult, error) {
-	result, err := sched.Algorithm.Schedule(pod, sched.NodeLister)
+func (sched *Scheduler) schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (core.ScheduleResult, error) {
+	result, err := sched.Algorithm.Schedule(pod, sched.NodeLister, pluginContext)
 	if err != nil {
 		pod = pod.DeepCopy()
 		sched.recordSchedulingFailure(pod, err, v1.PodReasonUnschedulable, err.Error())
@@ -757,7 +757,7 @@ func (sched *Scheduler) scheduleOne() {
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
 	pluginContext := framework.NewPluginContext()
-	scheduleResult, err := sched.schedule(pod)
+	scheduleResult, err := sched.schedule(pod, pluginContext)
 	if err != nil {
 		// schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
@@ -891,6 +891,9 @@ func (sched *Scheduler) scheduleOne() {
 		} else {
 			klog.V(2).Infof("pod %v/%v is bound successfully on node %v, %d nodes evaluated, %d nodes were found feasible", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
 			metrics.PodScheduleSuccesses.Inc()
+
+			// Run "postbind" plugins.
+			fwk.RunPostbindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
 }

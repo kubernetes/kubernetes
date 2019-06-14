@@ -26,7 +26,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[sig-node] ConfigMap", func() {
@@ -132,7 +131,7 @@ var _ = Describe("[sig-node] ConfigMap", func() {
 	*/
 	framework.ConformanceIt("should fail to create ConfigMap with empty key", func() {
 		configMap, err := newConfigMapWithEmptyKey(f)
-		Expect(err).To(HaveOccurred(), "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
+		framework.ExpectError(err, "created configMap %q with empty key in namespace %q", configMap.Name, f.Namespace.Name)
 	})
 })
 

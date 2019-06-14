@@ -179,13 +179,13 @@ func TestEnsureProxyAddon(t *testing.T) {
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         1234,
 				},
-				ClusterConfiguration: kubeadmapiv1beta2.ClusterConfiguration{
-					Networking: kubeadmapiv1beta2.Networking{
-						PodSubnet: "5.6.7.8/24",
-					},
-					ImageRepository:   "someRepo",
-					KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
+			}
+			controlPlaneClusterConfig := &kubeadmapiv1beta2.ClusterConfiguration{
+				Networking: kubeadmapiv1beta2.Networking{
+					PodSubnet: "5.6.7.8/24",
 				},
+				ImageRepository:   "someRepo",
+				KubernetesVersion: constants.MinimumControlPlaneVersion.String(),
 			}
 
 			// Simulate an error if necessary
@@ -198,10 +198,10 @@ func TestEnsureProxyAddon(t *testing.T) {
 				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1.2.3"
 			case IPv6SetBindAddress:
 				controlPlaneConfig.LocalAPIEndpoint.AdvertiseAddress = "1:2::3:4"
-				controlPlaneConfig.Networking.PodSubnet = "2001:101::/96"
+				controlPlaneClusterConfig.Networking.PodSubnet = "2001:101::/96"
 			}
 
-			intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig)
+			intControlPlane, err := configutil.DefaultedInitConfiguration(controlPlaneConfig, controlPlaneClusterConfig)
 			if err != nil {
 				t.Errorf("test failed to convert external to internal version")
 				return
@@ -211,7 +211,6 @@ func TestEnsureProxyAddon(t *testing.T) {
 				HealthzBindAddress: "0.0.0.0:10256",
 				MetricsBindAddress: "127.0.0.1:10249",
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
-					Max:                   pointer.Int32Ptr(2),
 					MaxPerCore:            pointer.Int32Ptr(1),
 					Min:                   pointer.Int32Ptr(1),
 					TCPEstablishedTimeout: &metav1.Duration{Duration: 5 * time.Second},
