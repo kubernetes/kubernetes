@@ -389,7 +389,7 @@ replace (
 	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.3
 	github.com/spf13/afero => github.com/spf13/afero v1.2.2
-	github.com/spf13/cast => github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a
+	github.com/spf13/cast => github.com/spf13/cast v1.3.0
 	github.com/spf13/cobra => github.com/spf13/cobra v0.0.4
 	github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/pflag => github.com/spf13/pflag v1.0.3

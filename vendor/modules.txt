@@ -738,7 +738,7 @@ github.com/soheilhy/cmux
 # github.com/spf13/afero v1.2.2 => github.com/spf13/afero v1.2.2
 github.com/spf13/afero
 github.com/spf13/afero/mem
-# github.com/spf13/cast v1.3.0 => github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a
+# github.com/spf13/cast v1.3.0 => github.com/spf13/cast v1.3.0
 github.com/spf13/cast
 # github.com/spf13/cobra v0.0.4 => github.com/spf13/cobra v0.0.4
 github.com/spf13/cobra
