@@ -196,7 +196,8 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.MarkDeprecated("kubelet-port", "kubelet-port is deprecated and will be removed.")
 
 	fs.UintVar(&s.KubeletConfig.ReadOnlyPort, "kubelet-read-only-port", s.KubeletConfig.ReadOnlyPort,
-		"DEPRECATED: kubelet port.")
+		"DEPRECATED: kubelet read only port.")
+	fs.MarkDeprecated("kubelet-read-only-port", "kubelet-read-only-port is deprecated and will be removed.")
 
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
 		"Timeout for kubelet operations.")
