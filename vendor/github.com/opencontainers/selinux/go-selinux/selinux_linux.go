@@ -1,13 +1,16 @@
-// +build linux
+// +build selinux,linux
 
 package selinux
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -23,14 +26,16 @@ const (
 	// Permissive constant to indicate SELinux is in permissive mode
 	Permissive = 0
 	// Disabled constant to indicate SELinux is disabled
-	Disabled         = -1
+	Disabled = -1
+
 	selinuxDir       = "/etc/selinux/"
 	selinuxConfig    = selinuxDir + "config"
+	selinuxfsMount   = "/sys/fs/selinux"
 	selinuxTypeTag   = "SELINUXTYPE"
 	selinuxTag       = "SELINUX"
-	selinuxPath      = "/sys/fs/selinux"
 	xattrNameSelinux = "security.selinux"
 	stRdOnly         = 0x01
+	selinuxfsMagic   = 0xf97cff8c
 )
 
 type selinuxState struct {
@@ -43,7 +48,15 @@ type selinuxState struct {
 }
 
 var (
+	// ErrMCSAlreadyExists is returned when trying to allocate a duplicate MCS.
+	ErrMCSAlreadyExists = errors.New("MCS label already exists")
+	// ErrEmptyPath is returned when an empty path has been specified.
+	ErrEmptyPath = errors.New("empty path")
+	// InvalidLabel is returned when an invalid label is specified.
+	InvalidLabel = errors.New("Invalid Label")
+
 	assignRegex = regexp.MustCompile(`^([^=]+)=(.*)$`)
+	roFileLabel string
 	state       = selinuxState{
 		mcsList: make(map[string]bool),
 	}
@@ -91,6 +104,83 @@ func (s *selinuxState) setSELinuxfs(selinuxfs string) string {
 	return s.selinuxfs
 }
 
+func verifySELinuxfsMount(mnt string) bool {
+	var buf syscall.Statfs_t
+	for {
+		err := syscall.Statfs(mnt, &buf)
+		if err == nil {
+			break
+		}
+		if err == syscall.EAGAIN {
+			continue
+		}
+		return false
+	}
+	if uint32(buf.Type) != uint32(selinuxfsMagic) {
+		return false
+	}
+	if (buf.Flags & stRdOnly) != 0 {
+		return false
+	}
+
+	return true
+}
+
+func findSELinuxfs() string {
+	// fast path: check the default mount first
+	if verifySELinuxfsMount(selinuxfsMount) {
+		return selinuxfsMount
+	}
+
+	// check if selinuxfs is available before going the slow path
+	fs, err := ioutil.ReadFile("/proc/filesystems")
+	if err != nil {
+		return ""
+	}
+	if !bytes.Contains(fs, []byte("\tselinuxfs\n")) {
+		return ""
+	}
+
+	// slow path: try to find among the mounts
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for {
+		mnt := findSELinuxfsMount(scanner)
+		if mnt == "" { // error or not found
+			return ""
+		}
+		if verifySELinuxfsMount(mnt) {
+			return mnt
+		}
+	}
+}
+
+// findSELinuxfsMount returns a next selinuxfs mount point found,
+// if there is one, or an empty string in case of EOF or error.
+func findSELinuxfsMount(s *bufio.Scanner) string {
+	for s.Scan() {
+		txt := s.Text()
+		// The first field after - is fs type.
+		// Safe as spaces in mountpoints are encoded as \040
+		if !strings.Contains(txt, " - selinuxfs ") {
+			continue
+		}
+		const mPos = 5 // mount point is 5th field
+		fields := strings.SplitN(txt, " ", mPos+1)
+		if len(fields) < mPos+1 {
+			continue
+		}
+		return fields[mPos-1]
+	}
+
+	return ""
+}
+
 func (s *selinuxState) getSELinuxfs() string {
 	s.Lock()
 	selinuxfs := s.selinuxfs
@@ -100,40 +190,7 @@ func (s *selinuxState) getSELinuxfs() string {
 		return selinuxfs
 	}
 
-	selinuxfs = ""
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		return selinuxfs
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		// Safe as mountinfo encodes mountpoints with spaces as \040.
-		sepIdx := strings.Index(txt, " - ")
-		if sepIdx == -1 {
-			continue
-		}
-		if !strings.Contains(txt[sepIdx:], "selinuxfs") {
-			continue
-		}
-		fields := strings.Split(txt, " ")
-		if len(fields) < 5 {
-			continue
-		}
-		selinuxfs = fields[4]
-		break
-	}
-
-	if selinuxfs != "" {
-		var buf syscall.Statfs_t
-		syscall.Statfs(selinuxfs, &buf)
-		if (buf.Flags & stRdOnly) == 1 {
-			selinuxfs = ""
-		}
-	}
-	return s.setSELinuxfs(selinuxfs)
+	return s.setSELinuxfs(findSELinuxfs())
 }
 
 // getSelinuxMountPoint returns the path to the mountpoint of an selinuxfs
@@ -150,7 +207,7 @@ func GetEnabled() bool {
 	return state.getEnabled()
 }
 
-func readConfig(target string) (value string) {
+func readConfig(target string) string {
 	var (
 		val, key string
 		bufin    *bufio.Reader
@@ -192,30 +249,42 @@ func readConfig(target string) (value string) {
 }
 
 func getSELinuxPolicyRoot() string {
-	return selinuxDir + readConfig(selinuxTypeTag)
+	return filepath.Join(selinuxDir, readConfig(selinuxTypeTag))
 }
 
-func readCon(name string) (string, error) {
-	var val string
+func readCon(fpath string) (string, error) {
+	if fpath == "" {
+		return "", ErrEmptyPath
+	}
 
-	in, err := os.Open(name)
+	in, err := os.Open(fpath)
 	if err != nil {
 		return "", err
 	}
 	defer in.Close()
 
-	_, err = fmt.Fscanf(in, "%s", &val)
-	return val, err
+	var retval string
+	if _, err := fmt.Fscanf(in, "%s", &retval); err != nil {
+		return "", err
+	}
+	return strings.Trim(retval, "\x00"), nil
 }
 
 // SetFileLabel sets the SELinux label for this path or returns an error.
-func SetFileLabel(path string, label string) error {
-	return lsetxattr(path, xattrNameSelinux, []byte(label), 0)
+func SetFileLabel(fpath string, label string) error {
+	if fpath == "" {
+		return ErrEmptyPath
+	}
+	return lsetxattr(fpath, xattrNameSelinux, []byte(label), 0)
 }
 
 // FileLabel returns the SELinux label for this path or returns an error.
-func FileLabel(path string) (string, error) {
-	label, err := lgetxattr(path, xattrNameSelinux)
+func FileLabel(fpath string) (string, error) {
+	if fpath == "" {
+		return "", ErrEmptyPath
+	}
+
+	label, err := lgetxattr(fpath, xattrNameSelinux)
 	if err != nil {
 		return "", err
 	}
@@ -260,8 +329,17 @@ func ExecLabel() (string, error) {
 	return readCon(fmt.Sprintf("/proc/self/task/%d/attr/exec", syscall.Gettid()))
 }
 
-func writeCon(name string, val string) error {
-	out, err := os.OpenFile(name, os.O_WRONLY, 0)
+func writeCon(fpath string, val string) error {
+	if fpath == "" {
+		return ErrEmptyPath
+	}
+	if val == "" {
+		if !GetEnabled() {
+			return nil
+		}
+	}
+
+	out, err := os.OpenFile(fpath, os.O_WRONLY, 0)
 	if err != nil {
 		return err
 	}
@@ -276,6 +354,37 @@ func writeCon(name string, val string) error {
 }
 
 /*
+CanonicalizeContext takes a context string and writes it to the kernel
+the function then returns the context that the kernel will use.  This function
+can be used to see if two contexts are equivalent
+*/
+func CanonicalizeContext(val string) (string, error) {
+	return readWriteCon(filepath.Join(getSelinuxMountPoint(), "context"), val)
+}
+
+func readWriteCon(fpath string, val string) (string, error) {
+	if fpath == "" {
+		return "", ErrEmptyPath
+	}
+	f, err := os.OpenFile(fpath, os.O_RDWR, 0)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	_, err = f.Write([]byte(val))
+	if err != nil {
+		return "", err
+	}
+
+	var retval string
+	if _, err := fmt.Fscanf(f, "%s", &retval); err != nil {
+		return "", err
+	}
+	return strings.Trim(retval, "\x00"), nil
+}
+
+/*
 SetExecLabel sets the SELinux label that the kernel will use for any programs
 that are executed by the current process thread, or an error.
 */
@@ -283,35 +392,81 @@ func SetExecLabel(label string) error {
 	return writeCon(fmt.Sprintf("/proc/self/task/%d/attr/exec", syscall.Gettid()), label)
 }
 
+// SetSocketLabel takes a process label and tells the kernel to assign the
+// label to the next socket that gets created
+func SetSocketLabel(label string) error {
+	return writeCon(fmt.Sprintf("/proc/self/task/%d/attr/sockcreate", syscall.Gettid()), label)
+}
+
+// SocketLabel retrieves the current socket label setting
+func SocketLabel() (string, error) {
+	return readCon(fmt.Sprintf("/proc/self/task/%d/attr/sockcreate", syscall.Gettid()))
+}
+
+// SetKeyLabel takes a process label and tells the kernel to assign the
+// label to the next kernel keyring that gets created
+func SetKeyLabel(label string) error {
+	err := writeCon("/proc/self/attr/keycreate", label)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if label == "" && os.IsPermission(err) && !GetEnabled() {
+		return nil
+	}
+	return err
+}
+
+// KeyLabel retrieves the current kernel keyring label setting
+func KeyLabel() (string, error) {
+	return readCon("/proc/self/attr/keycreate")
+}
+
 // Get returns the Context as a string
 func (c Context) Get() string {
-	return fmt.Sprintf("%s:%s:%s:%s", c["user"], c["role"], c["type"], c["level"])
+	if c["level"] != "" {
+		return fmt.Sprintf("%s:%s:%s:%s", c["user"], c["role"], c["type"], c["level"])
+	}
+	return fmt.Sprintf("%s:%s:%s", c["user"], c["role"], c["type"])
 }
 
 // NewContext creates a new Context struct from the specified label
-func NewContext(label string) Context {
+func NewContext(label string) (Context, error) {
 	c := make(Context)
 
 	if len(label) != 0 {
 		con := strings.SplitN(label, ":", 4)
+		if len(con) < 3 {
+			return c, InvalidLabel
+		}
 		c["user"] = con[0]
 		c["role"] = con[1]
 		c["type"] = con[2]
-		c["level"] = con[3]
+		if len(con) > 3 {
+			c["level"] = con[3]
+		}
 	}
-	return c
+	return c, nil
+}
+
+// ClearLabels clears all reserved labels
+func ClearLabels() {
+	state.Lock()
+	state.mcsList = make(map[string]bool)
+	state.Unlock()
 }
 
 // ReserveLabel reserves the MLS/MCS level component of the specified label
 func ReserveLabel(label string) {
 	if len(label) != 0 {
 		con := strings.SplitN(label, ":", 4)
-		mcsAdd(con[3])
+		if len(con) > 3 {
+			mcsAdd(con[3])
+		}
 	}
 }
 
 func selinuxEnforcePath() string {
-	return fmt.Sprintf("%s/enforce", selinuxPath)
+	return fmt.Sprintf("%s/enforce", getSelinuxMountPoint())
 }
 
 // EnforceMode returns the current SELinux mode Enforcing, Permissive, Disabled
@@ -354,16 +509,22 @@ func DefaultEnforceMode() int {
 }
 
 func mcsAdd(mcs string) error {
+	if mcs == "" {
+		return nil
+	}
 	state.Lock()
 	defer state.Unlock()
 	if state.mcsList[mcs] {
-		return fmt.Errorf("MCS Label already exists")
+		return ErrMCSAlreadyExists
 	}
 	state.mcsList[mcs] = true
 	return nil
 }
 
 func mcsDelete(mcs string) {
+	if mcs == "" {
+		return
+	}
 	state.Lock()
 	defer state.Unlock()
 	state.mcsList[mcs] = false
@@ -424,14 +585,14 @@ Allowing it to be used by another process.
 func ReleaseLabel(label string) {
 	if len(label) != 0 {
 		con := strings.SplitN(label, ":", 4)
-		mcsDelete(con[3])
+		if len(con) > 3 {
+			mcsDelete(con[3])
+		}
 	}
 }
 
-var roFileLabel string
-
 // ROFileLabel returns the specified SELinux readonly file label
-func ROFileLabel() (fileLabel string) {
+func ROFileLabel() string {
 	return roFileLabel
 }
 
@@ -497,23 +658,25 @@ func ContainerLabels() (processLabel string, fileLabel string) {
 		roFileLabel = fileLabel
 	}
 exit:
-	mcs := uniqMcs(1024)
-	scon := NewContext(processLabel)
-	scon["level"] = mcs
-	processLabel = scon.Get()
-	scon = NewContext(fileLabel)
-	scon["level"] = mcs
-	fileLabel = scon.Get()
+	scon, _ := NewContext(processLabel)
+	if scon["level"] != "" {
+		mcs := uniqMcs(1024)
+		scon["level"] = mcs
+		processLabel = scon.Get()
+		scon, _ = NewContext(fileLabel)
+		scon["level"] = mcs
+		fileLabel = scon.Get()
+	}
 	return processLabel, fileLabel
 }
 
 // SecurityCheckContext validates that the SELinux label is understood by the kernel
 func SecurityCheckContext(val string) error {
-	return writeCon(fmt.Sprintf("%s.context", selinuxPath), val)
+	return writeCon(fmt.Sprintf("%s/context", getSelinuxMountPoint()), val)
 }
 
 /*
-CopyLevel returns a label with the MLS/MCS level from src label replaces on
+CopyLevel returns a label with the MLS/MCS level from src label replaced on
 the dest label.
 */
 func CopyLevel(src, dest string) (string, error) {
@@ -526,8 +689,14 @@ func CopyLevel(src, dest string) (string, error) {
 	if err := SecurityCheckContext(dest); err != nil {
 		return "", err
 	}
-	scon := NewContext(src)
-	tcon := NewContext(dest)
+	scon, err := NewContext(src)
+	if err != nil {
+		return "", err
+	}
+	tcon, err := NewContext(dest)
+	if err != nil {
+		return "", err
+	}
 	mcsDelete(tcon["level"])
 	mcsAdd(scon["level"])
 	tcon["level"] = scon["level"]
@@ -536,20 +705,26 @@ func CopyLevel(src, dest string) (string, error) {
 
 // Prevent users from relabing system files
 func badPrefix(fpath string) error {
-	var badprefixes = []string{"/usr"}
+	if fpath == "" {
+		return ErrEmptyPath
+	}
 
-	for _, prefix := range badprefixes {
-		if fpath == prefix || strings.HasPrefix(fpath, fmt.Sprintf("%s/", prefix)) {
+	badPrefixes := []string{"/usr"}
+	for _, prefix := range badPrefixes {
+		if strings.HasPrefix(fpath, prefix) {
 			return fmt.Errorf("relabeling content in %s is not allowed", prefix)
 		}
 	}
 	return nil
 }
 
-// Chcon changes the fpath file object to the SELinux label label.
-// If the fpath is a directory and recurse is true Chcon will walk the
-// directory tree setting the label
+// Chcon changes the `fpath` file object to the SELinux label `label`.
+// If `fpath` is a directory and `recurse`` is true, Chcon will walk the
+// directory tree setting the label.
 func Chcon(fpath string, label string, recurse bool) error {
+	if fpath == "" {
+		return ErrEmptyPath
+	}
 	if label == "" {
 		return nil
 	}
@@ -557,7 +732,11 @@ func Chcon(fpath string, label string, recurse bool) error {
 		return err
 	}
 	callback := func(p string, info os.FileInfo, err error) error {
-		return SetFileLabel(p, label)
+		e := SetFileLabel(p, label)
+		if os.IsNotExist(e) {
+			return nil
+		}
+		return e
 	}
 
 	if recurse {
@@ -568,26 +747,34 @@ func Chcon(fpath string, label string, recurse bool) error {
 }
 
 // DupSecOpt takes an SELinux process label and returns security options that
-// can will set the SELinux Type and Level for future container processes
-func DupSecOpt(src string) []string {
+// can be used to set the SELinux Type and Level for future container processes.
+func DupSecOpt(src string) ([]string, error) {
 	if src == "" {
-		return nil
+		return nil, nil
 	}
-	con := NewContext(src)
+	con, err := NewContext(src)
+	if err != nil {
+		return nil, err
+	}
 	if con["user"] == "" ||
 		con["role"] == "" ||
-		con["type"] == "" ||
-		con["level"] == "" {
-		return nil
+		con["type"] == "" {
+		return nil, nil
 	}
-	return []string{"user:" + con["user"],
+	dup := []string{"user:" + con["user"],
 		"role:" + con["role"],
 		"type:" + con["type"],
-		"level:" + con["level"]}
+	}
+
+	if con["level"] != "" {
+		dup = append(dup, "level:"+con["level"])
+	}
+
+	return dup, nil
 }
 
-// DisableSecOpt returns a security opt that can be used to disabling SELinux
-// labeling support for future container processes
+// DisableSecOpt returns a security opt that can be used to disable SELinux
+// labeling support for future container processes.
 func DisableSecOpt() []string {
 	return []string{"disable"}
 }
