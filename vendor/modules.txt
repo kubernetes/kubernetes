@@ -588,7 +588,7 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c => github.com/marstr/guid v0.0.0-20170427235115-8bdf7d1a087c
 github.com/marstr/guid
-# github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de => github.com/mattn/go-shellwords v0.0.0-20180605041737-f8471b0a71de
+# github.com/mattn/go-shellwords v1.0.5 => github.com/mattn/go-shellwords v1.0.5
 github.com/mattn/go-shellwords
 # github.com/matttproud/golang_protobuf_extensions v1.0.1 => github.com/matttproud/golang_protobuf_extensions v1.0.1
 github.com/matttproud/golang_protobuf_extensions/pbutil
