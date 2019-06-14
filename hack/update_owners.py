@@ -14,23 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import print_function
 
 import argparse
 import collections
 import csv
 import json
-import pathlib
+import os
 import random
 import re
 import subprocess
 import sys
 import time
-import urllib.request
+import urllib2
 import zlib
 
-
-BASE_DIR = pathlib.Path(__file__).resolve()
-OWNERS_PATH = str(BASE_DIR.parents[1] / 'test')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OWNERS_PATH = os.path.abspath(
+    os.path.join(BASE_DIR, '..', 'test', 'test_owners.csv'))
 OWNERS_JSON_PATH = OWNERS_PATH.replace('.csv', '.json')
 GCS_URL_BASE = 'https://storage.googleapis.com/kubernetes-test-history/'
 SKIP_MAINTAINERS = {
@@ -47,7 +48,7 @@ def normalize(name):
 def get_test_history(days_ago):
     url = time.strftime(GCS_URL_BASE + 'logs/%Y-%m-%d.json',
                         time.gmtime(time.time() - days_ago * 24 * 60 * 60))
-    resp = urllib.request.urlopen(url)
+    resp = urllib2.urlopen(url)
     content = resp.read()
     if resp.headers.get('content-encoding') == 'gzip':
         content = zlib.decompress(content, 15 | 16)
@@ -63,7 +64,7 @@ def get_test_names_from_test_history():
 
 
 def get_test_names_from_local_files():
-    tests_json = subprocess.check_output(['go', 'run', '../test/list/main.go', '-json'])
+    tests_json = subprocess.check_output(['go', 'run', 'test/list/main.go', '-json'])
     tests = json.loads(tests_json)
     return {normalize(t['Name'] + (' ' + t['TestName'] if 'k8s.io/' not in t['Name'] else ''))
             for t in tests}
@@ -71,7 +72,7 @@ def get_test_names_from_local_files():
 
 def load_owners(fname):
     owners = {}
-    with pathlib.Path.open(fname) as f:
+    with open(fname) as f:
         for n, cols in enumerate(csv.reader(f)):
             if n == 0:
                 continue  # header
@@ -85,7 +86,7 @@ def load_owners(fname):
 
 
 def write_owners(fname, owners):
-    with pathlib.Path.open(fname, 'w') as f:
+    with open(fname, 'w') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['name', 'owner', 'auto-assigned', 'sig'])
         items = sorted(owners.items())
@@ -94,7 +95,7 @@ def write_owners(fname, owners):
 
 
 def get_maintainers():
-    # GitHub doesn't seem to support team membership listing without a key with
+    # Github doesn't seem to support team membership listing without a key with
     # org admin privileges. Instead, we do it manually:
     # Open https://github.com/orgs/kubernetes/teams/kubernetes-maintainers
     # Run this in the js console:
@@ -175,26 +176,28 @@ def main():
 
     prefixes = sig_prefixes(owners)
 
-    with pathlib.Path.open(OWNERS_JSON_PATH, 'w') as f:
+    with open(OWNERS_JSON_PATH, 'w') as f:
         f.write(prefixes + '\n')
 
     if options.print_sig_prefixes:
         print(prefixes)
+        return
 
     outdated_tests = sorted(set(owners) - set(test_names))
     new_tests = sorted(set(test_names) - set(owners))
     maintainers = get_maintainers()
 
-    print('# OUTDATED TESTS (%d):' % len(outdated_tests))
-    print('\n'.join('%s -- %s%s' %
+    print '# OUTDATED TESTS (%d):' % len(outdated_tests)
+    print  '\n'.join('%s -- %s%s' %
                      (t, owners[t][0], ['', ' (random)'][owners[t][1]])
-                      for t in outdated_tests))
-    print('# NEW TESTS (%d):' % len(new_tests))
-    print('\n'.join(new_tests))
+                      for t in outdated_tests)
+    print '# NEW TESTS (%d):' % len(new_tests)
+    print  '\n'.join(new_tests)
 
     if options.check:
         if new_tests or outdated_tests:
-            print('ERROR: The test list has changed')
+            print
+            print 'ERROR: the test list has changed'
             sys.exit(1)
         sys.exit(0)
 
@@ -205,12 +208,13 @@ def main():
         owners.pop(name)
 
     if not options.addonly:
-        print('# UNEXPECTED MAINTAINERS ',)
+        print('# UNEXPECTED MAINTAINERS ', end='')
         print('(randomly assigned, but not in kubernetes-maintainers)')
         for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
             if random_assignment and owner not in maintainers:
-                print('%-16s %s', (owner, name))
+                print('%-16s %s' % (owner, name))
                 owners.pop(name)
+        print
 
     owner_counts = collections.Counter(
         owner for name, (owner, random, sig) in owners.iteritems()
@@ -228,7 +232,7 @@ def main():
     if options.user.lower() == 'random':
         print('# Tests per maintainer:')
         for owner, count in owner_counts.most_common():
-            print('%-20s %3d', (owner, count))
+            print('%-20s %3d' % (owner, count))
 
     write_owners(OWNERS_PATH, owners)
 
