@@ -221,6 +221,12 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 			Name:     "test_clone",
 		},
 	}
+	validSpecNilAPIGroup := core.PersistentVolumeClaimSpec{
+		DataSource: &core.TypedLocalObjectReference{
+			Kind: "PersistentVolumeClaim",
+			Name: "test_clone",
+		},
+	}
 
 	invalidAPIGroup := "invalid.pvc.api.group"
 	invalidSpec := core.PersistentVolumeClaimSpec{
@@ -263,6 +269,16 @@ func TestPVCDataSourceSpecFilter(t *testing.T) {
 		},
 		"diabled with empty ds": {
 			spec:        core.PersistentVolumeClaimSpec{},
+			gateEnabled: false,
+			want:        nil,
+		},
+		"enabled with valid spec but nil APIGroup": {
+			spec:        validSpecNilAPIGroup,
+			gateEnabled: true,
+			want:        validSpecNilAPIGroup.DataSource,
+		},
+		"disabled with valid spec but nil APIGroup": {
+			spec:        validSpecNilAPIGroup,
 			gateEnabled: false,
 			want:        nil,
 		},
