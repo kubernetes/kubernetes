@@ -33,12 +33,12 @@ const testHostname = "test-hostname"
 
 func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServiceInfo)) *BaseServiceInfo {
 	info := &BaseServiceInfo{
-		ClusterIP: net.ParseIP(clusterIP),
-		Port:      port,
-		Protocol:  v1.Protocol(protocol),
+		clusterIP: net.ParseIP(clusterIP),
+		port:      port,
+		protocol:  v1.Protocol(protocol),
 	}
 	if healthcheckNodePort != 0 {
-		info.HealthCheckNodePort = healthcheckNodePort
+		info.healthCheckNodePort = healthcheckNodePort
 	}
 	for _, svcInfoFunc := range svcInfoFuncs {
 		svcInfoFunc(info)
@@ -269,8 +269,8 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("test", "validIPv4", "testPort"): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.ExternalIPs = []string{testExternalIPv4}
-					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv4}
+					info.externalIPs = []string{testExternalIPv4}
+					info.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
 				}),
 			},
 			isIPv6Mode: &falseVal,
@@ -297,8 +297,8 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("test", "validIPv6", "testPort"): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.ExternalIPs = []string{testExternalIPv6}
-					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv6}
+					info.externalIPs = []string{testExternalIPv6}
+					info.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
 				}),
 			},
 			isIPv6Mode: &trueVal,
@@ -325,8 +325,8 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("test", "filterIPv6InIPV4Mode", "testPort"): makeTestServiceInfo(testClusterIPv4, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.ExternalIPs = []string{testExternalIPv4}
-					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv4}
+					info.externalIPs = []string{testExternalIPv4}
+					info.loadBalancerSourceRanges = []string{testSourceRangeIPv4}
 				}),
 			},
 			isIPv6Mode: &falseVal,
@@ -353,8 +353,8 @@ func TestServiceToServiceMap(t *testing.T) {
 			},
 			expected: map[ServicePortName]*BaseServiceInfo{
 				makeServicePortName("test", "filterIPv4InIPV6Mode", "testPort"): makeTestServiceInfo(testClusterIPv6, 12345, "TCP", 0, func(info *BaseServiceInfo) {
-					info.ExternalIPs = []string{testExternalIPv6}
-					info.LoadBalancerSourceRanges = []string{testSourceRangeIPv6}
+					info.externalIPs = []string{testExternalIPv6}
+					info.loadBalancerSourceRanges = []string{testSourceRangeIPv6}
 				}),
 			},
 			isIPv6Mode: &trueVal,
@@ -371,12 +371,12 @@ func TestServiceToServiceMap(t *testing.T) {
 		}
 		for svcKey, expectedInfo := range tc.expected {
 			svcInfo := newServices[svcKey].(*BaseServiceInfo)
-			if !svcInfo.ClusterIP.Equal(expectedInfo.ClusterIP) ||
-				svcInfo.Port != expectedInfo.Port ||
-				svcInfo.Protocol != expectedInfo.Protocol ||
-				svcInfo.HealthCheckNodePort != expectedInfo.HealthCheckNodePort ||
-				!sets.NewString(svcInfo.ExternalIPs...).Equal(sets.NewString(expectedInfo.ExternalIPs...)) ||
-				!sets.NewString(svcInfo.LoadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.LoadBalancerSourceRanges...)) {
+			if !svcInfo.clusterIP.Equal(expectedInfo.clusterIP) ||
+				svcInfo.port != expectedInfo.port ||
+				svcInfo.protocol != expectedInfo.protocol ||
+				svcInfo.healthCheckNodePort != expectedInfo.healthCheckNodePort ||
+				!sets.NewString(svcInfo.externalIPs...).Equal(sets.NewString(expectedInfo.externalIPs...)) ||
+				!sets.NewString(svcInfo.loadBalancerSourceRanges...).Equal(sets.NewString(expectedInfo.loadBalancerSourceRanges...)) {
 				t.Errorf("[%s] expected new[%v]to be %v, got %v", tc.desc, svcKey, expectedInfo, *svcInfo)
 			}
 		}
