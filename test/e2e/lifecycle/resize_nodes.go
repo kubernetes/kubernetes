@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 )
@@ -49,7 +50,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
+		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
 		framework.ExpectNoError(err)
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
@@ -102,7 +103,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			ginkgo.By("waiting for system pods to successfully restart")
-			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+			err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
 			framework.ExpectNoError(err)
 		})
 
@@ -114,7 +115,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
-			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes - 1)
@@ -131,7 +132,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			time.Sleep(time.Minute)
 
 			ginkgo.By("verifying whether the pods from the removed node are recreated")
-			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 		})
 
@@ -145,7 +146,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
-			err = framework.VerifyPods(c, ns, name, true, originalNodeCount)
+			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount)
 			framework.ExpectNoError(err)
 
 			targetNumNodes := int32(framework.TestContext.CloudConfig.NumNodes + 1)
@@ -160,7 +161,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			ginkgo.By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))
 			err = resizeRC(c, ns, name, originalNodeCount+1)
 			framework.ExpectNoError(err)
-			err = framework.VerifyPods(c, ns, name, true, originalNodeCount+1)
+			err = e2epod.VerifyPods(c, ns, name, true, originalNodeCount+1)
 			framework.ExpectNoError(err)
 		})
 	})

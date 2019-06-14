@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -41,7 +42,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
-		systemPods, err := framework.GetPodsInNamespace(c, ns, map[string]string{})
+		systemPods, err := e2epod.GetPodsInNamespace(c, ns, map[string]string{})
 		gomega.Expect(err).To(gomega.BeNil())
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
@@ -92,7 +93,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			ginkgo.By("waiting for system pods to successfully restart")
-			err := framework.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
+			err := e2epod.WaitForPodsRunningReady(c, metav1.NamespaceSystem, systemPodsNo, 0, framework.PodReadyBeforeTimeout, map[string]string{})
 			gomega.Expect(err).To(gomega.BeNil())
 		})
 

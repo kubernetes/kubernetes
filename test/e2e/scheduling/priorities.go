@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -81,7 +82,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 
 		err := framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
-		err = framework.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
+		err = e2epod.WaitForPodsRunningReady(cs, metav1.NamespaceSystem, int32(systemPodsNo), 0, framework.PodReadyBeforeTimeout, map[string]string{})
 		framework.ExpectNoError(err)
 	})
 

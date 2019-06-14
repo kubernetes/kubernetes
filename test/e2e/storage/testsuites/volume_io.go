@@ -30,11 +30,13 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -320,7 +322,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.
 		}
 	}()
 
-	err = framework.WaitForPodRunningInNamespace(cs, clientPod)
+	err = e2epod.WaitForPodRunningInNamespace(cs, clientPod)
 	if err != nil {
 		return fmt.Errorf("client pod %q not running: %v", clientPod.Name, err)
 	}

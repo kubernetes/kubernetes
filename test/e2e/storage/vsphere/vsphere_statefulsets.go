@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -135,7 +136,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		// After scale up, verify all vsphere volumes are attached to node VMs.
 		ginkgo.By("Verify all volumes are attached to Nodes after Statefulsets is scaled up")
 		for _, sspod := range ssPodsAfterScaleUp.Items {
-			err := framework.WaitForPodsReady(client, statefulset.Namespace, sspod.Name, 0)
+			err := e2epod.WaitForPodsReady(client, statefulset.Namespace, sspod.Name, 0)
 			framework.ExpectNoError(err)
 			pod, err := client.CoreV1().Pods(namespace).Get(sspod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

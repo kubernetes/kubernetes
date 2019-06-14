@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -114,7 +115,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 
 			ginkgo.By("Wait for number of running and ready kube-dns pods recover")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSLabelName}))
-			_, err := framework.WaitForPodsWithLabelRunningReady(c, metav1.NamespaceSystem, label, originDNSReplicasCount, DNSdefaultTimeout)
+			_, err := e2epod.WaitForPodsWithLabelRunningReady(c, metav1.NamespaceSystem, label, originDNSReplicasCount, DNSdefaultTimeout)
 			framework.ExpectNoError(err)
 		}()
 		ginkgo.By("Wait for kube-dns scaled to expected number")

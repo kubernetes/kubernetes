@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -132,7 +133,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		podClient.CreateSync(pod)
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key1=\"value1\"\n"))
 
@@ -142,7 +143,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("key3=\"value3\"\n"))
 	})
@@ -166,7 +167,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		framework.ExpectNoError(err, "Failed to get pod %q", pod.Name)
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"bar\"\n"))
 
@@ -176,7 +177,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected downwardAPI", func() {
 		})
 
 		gomega.Eventually(func() (string, error) {
-			return framework.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
+			return e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, containerName)
 		},
 			podLogTimeout, framework.Poll).Should(gomega.ContainSubstring("builder=\"foo\"\n"))
 	})

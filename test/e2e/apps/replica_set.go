@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	replicasetutil "k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	"github.com/onsi/ginkgo"
@@ -131,7 +132,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 
 	// Check that pods for the new RS were created.
 	// TODO: Maybe switch PodsCreated to just check owner references.
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
+	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicas)
 	framework.ExpectNoError(err)
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
@@ -166,7 +167,7 @@ func testReplicaSetServeImageOrFail(f *framework.Framework, test string, image s
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	err = wait.Poll(retryInterval, retryTimeout, framework.NewPodProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
+	err = wait.Poll(retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
 		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
@@ -305,7 +306,7 @@ func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("When the matched label of one of its pods change")
-	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
+	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
 	framework.ExpectNoError(err)
 
 	p = &pods.Items[0]

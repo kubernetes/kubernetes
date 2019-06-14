@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -433,7 +434,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		}()
 
 		// Wait for pod to be running
-		err = framework.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
+		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
@@ -795,7 +796,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	defer func() {
 		framework.DeletePodWithWait(f, f.ClientSet, pod)
 	}()
-	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
@@ -886,7 +887,7 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "while creating pod")
 
-	err = framework.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
@@ -900,7 +901,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "while creating volume init pod")
 
-	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)

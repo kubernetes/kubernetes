@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -861,7 +862,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(prepPod)
 	framework.ExpectNoError(err, "while creating hostPath init pod")
 
-	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
@@ -883,7 +884,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(v.prepPod)
 	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
-	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)

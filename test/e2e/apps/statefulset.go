@@ -35,6 +35,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -166,7 +167,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 
 			ginkgo.By("Checking that the stateful set readopts the pod")
-			gomega.Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
+			gomega.Expect(e2epod.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
 					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef == nil {
@@ -186,7 +187,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 
 			ginkgo.By("Checking that the stateful set releases the pod")
-			gomega.Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "released", framework.StatefulSetTimeout,
+			gomega.Expect(e2epod.WaitForPodCondition(c, pod.Namespace, pod.Name, "released", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
 					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef != nil {
@@ -203,7 +204,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			})
 
 			ginkgo.By("Checking that the stateful set readopts the pod")
-			gomega.Expect(framework.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
+			gomega.Expect(e2epod.WaitForPodCondition(c, pod.Namespace, pod.Name, "adopted", framework.StatefulSetTimeout,
 				func(pod *v1.Pod) (bool, error) {
 					controllerRef := metav1.GetControllerOf(pod)
 					if controllerRef == nil {

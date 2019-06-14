@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -154,22 +155,22 @@ var _ = SIGDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		framework.CreatePodOrFail(cs, ns, name1, labels, []v1.ContainerPort{{ContainerPort: 80}})
+		e2epod.CreatePodOrFail(cs, ns, name1, labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		framework.CreatePodOrFail(cs, ns, name2, labels, []v1.ContainerPort{{ContainerPort: 80}})
+		e2epod.CreatePodOrFail(cs, ns, name2, labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}, name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		framework.DeletePodOrFail(cs, ns, name1)
+		e2epod.DeletePodOrFail(cs, ns, name1)
 		delete(names, name1)
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		framework.DeletePodOrFail(cs, ns, name2)
+		e2epod.DeletePodOrFail(cs, ns, name2)
 		delete(names, name2)
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -240,22 +241,22 @@ var _ = SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		framework.CreatePodOrFail(cs, ns, podname1, labels, containerPorts1)
+		e2epod.CreatePodOrFail(cs, ns, podname1, labels, containerPorts1)
 		names[podname1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		framework.CreatePodOrFail(cs, ns, podname2, labels, containerPorts2)
+		e2epod.CreatePodOrFail(cs, ns, podname2, labels, containerPorts2)
 		names[podname2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}, podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		framework.DeletePodOrFail(cs, ns, podname1)
+		e2epod.DeletePodOrFail(cs, ns, podname1)
 		delete(names, podname1)
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		framework.DeletePodOrFail(cs, ns, podname2)
+		e2epod.DeletePodOrFail(cs, ns, podname2)
 		delete(names, podname2)
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -505,7 +506,7 @@ var _ = SIGDescribe("Services", func() {
 		jig.TestReachableHTTP(nodeIP, nodePort, framework.KubeProxyLagTimeout)
 
 		ginkgo.By("verifying the node port is locked")
-		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		// Even if the node-ip:node-port check above passed, this hostexec pod
 		// might fall on a node with a laggy kube-proxy.
 		cmd := fmt.Sprintf(`for i in $(seq 1 300); do if ss -ant46 'sport = :%d' | grep ^LISTEN; then exit 0; fi; sleep 1; done; exit 1`, nodePort)
@@ -1234,7 +1235,7 @@ var _ = SIGDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
-		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, framework.KubeProxyLagTimeout, func() (bool, error) {
@@ -1321,12 +1322,12 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying pods for RC " + t.Name)
-		framework.ExpectNoError(framework.VerifyPods(t.Client, t.Namespace, t.Name, false, 1))
+		framework.ExpectNoError(e2epod.VerifyPods(t.Client, t.Namespace, t.Name, false, 1))
 
 		svcName := fmt.Sprintf("%v.%v.svc.%v", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		ginkgo.By("Waiting for endpoints of Service with DNS name " + svcName)
 
-		execPodName := framework.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-", nil)
+		execPodName := e2epod.CreateExecPodOrFail(f.ClientSet, f.Namespace.Name, "execpod-", nil)
 		cmd := fmt.Sprintf("wget -qO- http://%s:%d/", svcName, port)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, framework.KubeProxyLagTimeout, func() (bool, error) {
@@ -1422,8 +1423,8 @@ var _ = SIGDescribe("Services", func() {
 		ginkgo.By("Prepare allow source ips")
 		// prepare the exec pods
 		// acceptPod are allowed to access the loadbalancer
-		acceptPodName := framework.CreateExecPodOrFail(cs, namespace, "execpod-accept", nil)
-		dropPodName := framework.CreateExecPodOrFail(cs, namespace, "execpod-drop", nil)
+		acceptPodName := e2epod.CreateExecPodOrFail(cs, namespace, "execpod-accept", nil)
+		dropPodName := e2epod.CreateExecPodOrFail(cs, namespace, "execpod-drop", nil)
 
 		acceptPod, err := cs.CoreV1().Pods(namespace).Get(acceptPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "failed to fetch pod: %s in namespace: %s", acceptPodName, namespace)
@@ -1521,7 +1522,7 @@ var _ = SIGDescribe("Services", func() {
 		//  a pod to test the service.
 		ginkgo.By("hitting the internal load balancer from pod")
 		e2elog.Logf("creating pod with host network")
-		hostExec := framework.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
+		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
 
 		e2elog.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := framework.GetIngressPoint(lbIngress)
@@ -1824,7 +1825,7 @@ var _ = SIGDescribe("Services", func() {
 		podName := "execpod-noendpoints"
 
 		ginkgo.By(fmt.Sprintf("creating %v on node %v", podName, nodeName))
-		execPodName := framework.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
+		execPodName := e2epod.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
 			pod.Spec.NodeName = nodeName
 		})
 		execPod, err := f.ClientSet.CoreV1().Pods(namespace).Get(execPodName, metav1.GetOptions{})
@@ -2142,7 +2143,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		podName := "execpod-sourceip"
 
 		ginkgo.By(fmt.Sprintf("Creating %v on node %v", podName, nodeName))
-		execPodName := framework.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
+		execPodName := e2epod.CreateExecPodOrFail(f.ClientSet, namespace, podName, func(pod *v1.Pod) {
 			pod.Spec.NodeName = nodeName
 		})
 		defer func() {
@@ -2281,7 +2282,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 
 func execSourceipTest(f *framework.Framework, c clientset.Interface, ns, nodeName, serviceIP string, servicePort int) (string, string) {
 	e2elog.Logf("Creating an exec pod on node %v", nodeName)
-	execPodName := framework.CreateExecPodOrFail(f.ClientSet, ns, fmt.Sprintf("execpod-sourceip-%s", nodeName), func(pod *v1.Pod) {
+	execPodName := e2epod.CreateExecPodOrFail(f.ClientSet, ns, fmt.Sprintf("execpod-sourceip-%s", nodeName), func(pod *v1.Pod) {
 		pod.Spec.NodeName = nodeName
 	})
 	defer func() {
@@ -2361,7 +2362,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 		svcIP = svc.Spec.ClusterIP
 	}
 
-	execPodName := framework.CreateExecPodOrFail(cs, ns, "execpod-affinity", nil)
+	execPodName := e2epod.CreateExecPodOrFail(cs, ns, "execpod-affinity", nil)
 	defer func() {
 		e2elog.Logf("Cleaning up the exec pod")
 		err := cs.CoreV1().Pods(ns).Delete(execPodName, nil)

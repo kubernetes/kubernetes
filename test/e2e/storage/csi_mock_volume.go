@@ -33,10 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -261,7 +261,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if pod == nil {
 					return
 				}
-				err = framework.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
@@ -336,7 +336,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				if pod == nil {
 					return
 				}
-				err = framework.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 				ginkgo.By("Checking CSI driver logs")
 
@@ -367,13 +367,13 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			_, _, pod1 := createPod()
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating first pod")
 
-			err = framework.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 			_, _, pod2 := createPod()
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating second pod")
 
-			err = framework.WaitForPodNameRunningInNamespace(m.cs, pod2.Name, pod2.Namespace)
+			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod2.Name, pod2.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod2: %v", err)
 
 			_, _, pod3 := createPod()
@@ -434,7 +434,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				gomega.Expect(*sc.AllowVolumeExpansion).To(gomega.BeTrue(), "failed creating sc with allowed expansion")
 
-				err = framework.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
@@ -525,7 +525,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				gomega.Expect(*sc.AllowVolumeExpansion).To(gomega.BeTrue(), "failed creating sc with allowed expansion")
 
-				err = framework.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
 				framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
 				ginkgo.By("Expanding current pvc")
@@ -711,7 +711,7 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 		"csi.storage.k8s.io/serviceAccount.name": "default",
 	}
 	// Load logs of driver pod
-	log, err := framework.GetPodLogs(cs, namespace, driverPodName, driverContainerName)
+	log, err := e2epod.GetPodLogs(cs, namespace, driverPodName, driverContainerName)
 	if err != nil {
 		return fmt.Errorf("could not load CSI driver logs: %s", err)
 	}

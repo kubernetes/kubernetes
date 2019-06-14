@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -525,7 +526,7 @@ func (config *NetworkingTestConfig) DeleteNodePortService() {
 
 func (config *NetworkingTestConfig) createTestPods() {
 	testContainerPod := config.createTestPodSpec()
-	hostTestContainerPod := NewExecPodSpec(config.Namespace, hostTestPodName, config.HostNetwork)
+	hostTestContainerPod := e2epod.NewExecPodSpec(config.Namespace, hostTestPodName, config.HostNetwork)
 
 	config.createPod(testContainerPod)
 	config.createPod(hostTestContainerPod)
@@ -671,7 +672,7 @@ func (config *NetworkingTestConfig) DeleteNetProxyPod() {
 	config.getPodClient().Delete(pod.Name, metav1.NewDeleteOptions(0))
 	config.EndpointPods = config.EndpointPods[1:]
 	// wait for pod being deleted.
-	err := WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
+	err := e2epod.WaitForPodToDisappear(config.f.ClientSet, config.Namespace, pod.Name, labels.Everything(), time.Second, wait.ForeverTestTimeout)
 	if err != nil {
 		Failf("Failed to delete %s pod: %v", pod.Name, err)
 	}

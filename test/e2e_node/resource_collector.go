@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perftype"
 
 	. "github.com/onsi/ginkgo"
@@ -375,7 +376,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+			Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
 		}(pod)
 	}

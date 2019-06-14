@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
@@ -382,7 +383,7 @@ func TestSampleAPIServer(f *framework.Framework, aggrclient *aggregatorclient.Cl
 		if currentPods != nil {
 			for _, pod := range currentPods.Items {
 				for _, container := range pod.Spec.Containers {
-					logs, err := framework.GetPodLogs(client, namespace, pod.Name, container.Name)
+					logs, err := e2epod.GetPodLogs(client, namespace, pod.Name, container.Name)
 					e2elog.Logf("logs of %s/%s (error: %v): %s", pod.Name, container.Name, err, logs)
 				}
 			}

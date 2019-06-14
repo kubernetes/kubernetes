@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
@@ -76,7 +77,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			var wg sync.WaitGroup
 			passed := true
 			checkRestart := func(podName string, timeout time.Duration) {
-				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
+				err := e2epod.WaitForPodNameRunningInNamespace(c, podName, ns)
 				framework.ExpectNoError(err)
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
 					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
@@ -122,7 +123,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			ginkgo.By("creating secret and pod")
 			framework.RunKubectlOrDieInput(secretYaml, "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if secret was read correctly")
@@ -140,7 +141,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 			ginkgo.By("creating the pod")
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
+			err := e2epod.WaitForPodNoLongerRunningInNamespace(c, podName, ns)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking if name and namespace were passed correctly")

@@ -63,6 +63,7 @@ import (
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -368,7 +369,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By(fmt.Sprintf("creating the pod from %v", podYaml))
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pod-with-readiness-probe.yaml.in")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			gomega.Expect(framework.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{simplePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, simplePodSelector)
@@ -516,7 +517,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				WithStdinData("abcd1234").
 				Exec()
 			framework.ExpectNoError(err)
-			framework.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
+			e2epod.WaitForPodToDisappear(f.ClientSet, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
 
 			ginkgo.By("running a failing command with --leave-stdin-open")
 			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
@@ -539,7 +540,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
 			// to loop test.
 			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
+				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
 					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test")
 				}
 				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
@@ -567,14 +568,14 @@ var _ = SIGDescribe("Kubectl client", func() {
 			g = func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
 			runTestPod, _, err = polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			gomega.Expect(err).To(gomega.BeNil())
-			if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
+			if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
 				framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 			}
 
 			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
 			// to loop test.
 			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !framework.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
+				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
 					framework.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
 				}
 				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
@@ -593,7 +594,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			ginkgo.By("executing a command with run")
 			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+busyboxImage, "--restart=OnFailure", nsFlag, "--", "sh", "-c", "sleep 10; seq 100 | while read i; do echo $i; sleep 0.01; done; echo EOF")
 
-			if !framework.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReady(c, ns, []string{podName}, framework.PodStartTimeout) {
 				framework.Failf("Pod for run-log-test was not ready")
 			}
 
@@ -1213,7 +1214,7 @@ metadata:
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("pause-pod.yaml.in")))
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			gomega.Expect(framework.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{pausePodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
@@ -1254,7 +1255,7 @@ metadata:
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
 			podYaml = commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-pod.yaml")))
 			framework.RunKubectlOrDieInput(podYaml, "create", "-f", "-", nsFlag)
-			gomega.Expect(framework.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
+			gomega.Expect(e2epod.CheckPodsRunningReady(c, ns, []string{busyboxPodName}, framework.PodStartTimeout)).To(gomega.BeTrue())
 		})
 		ginkgo.AfterEach(func() {
 			cleanupKubectlInputs(podYaml, ns, busyboxPodSelector)
@@ -1438,7 +1439,7 @@ metadata:
 			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, nsFlag)
 			ginkgo.By("verifying the pod controlled by " + name + " gets created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": name}))
-			podlist, err := framework.WaitForPodsWithLabel(c, ns, label)
+			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod controlled by %s: %v", name, err)
 			}
@@ -1483,7 +1484,7 @@ metadata:
 
 			ginkgo.By("verifying the pod controlled by rc " + rcName + " was created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": rcName}))
-			podlist, err := framework.WaitForPodsWithLabel(c, ns, label)
+			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod controlled by rc %s: %v", rcName, err)
 			}
@@ -1498,7 +1499,7 @@ metadata:
 			for _, pod := range pods {
 				podNames = append(podNames, pod.Name)
 			}
-			if !framework.CheckPodsRunningReady(c, ns, podNames, framework.PodStartTimeout) {
+			if !e2epod.CheckPodsRunningReady(c, ns, podNames, framework.PodStartTimeout) {
 				framework.Failf("Pods for rc %s were not ready", rcName)
 			}
 			_, err = framework.RunKubectl("logs", "rc/"+rcName, nsFlag)
@@ -1594,7 +1595,7 @@ metadata:
 
 			ginkgo.By("verifying the pod controlled by deployment " + dName + " was created")
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"run": dName}))
-			podlist, err := framework.WaitForPodsWithLabel(c, ns, label)
+			podlist, err := e2epod.WaitForPodsWithLabel(c, ns, label)
 			if err != nil {
 				framework.Failf("Failed getting pod controlled by deployment %s: %v", dName, err)
 			}

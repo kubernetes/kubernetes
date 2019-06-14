@@ -68,6 +68,7 @@ go_library(
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/providers/aws:go_default_library",
         "//test/e2e/framework/providers/azure:go_default_library",
         "//test/e2e/framework/providers/gce:go_default_library",

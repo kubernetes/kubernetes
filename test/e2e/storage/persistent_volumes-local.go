@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -227,7 +228,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 				ginkgo.AfterEach(func() {
 					ginkgo.By("Deleting pod1")
-					framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
+					e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
 				})
 
 				ginkgo.It("should be able to mount volume and read from pod1", func() {
@@ -269,7 +270,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					ginkgo.By("Checking fsGroup is set")
 					pod := createPodWithFsGroupTest(config, testVol, 1234, 1234)
 					ginkgo.By("Deleting pod")
-					framework.DeletePodOrFail(config.client, config.ns, pod.Name)
+					e2epod.DeletePodOrFail(config.client, config.ns, pod.Name)
 				})
 
 				ginkgo.It("should set same fsGroup for two pods simultaneously [Slow]", func() {
@@ -279,9 +280,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					ginkgo.By("Create second pod with same fsGroup and check fsGroup is correct")
 					pod2 := createPodWithFsGroupTest(config, testVol, fsGroup, fsGroup)
 					ginkgo.By("Deleting first pod")
-					framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
+					e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
 					ginkgo.By("Deleting second pod")
-					framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+					e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
 
 				ginkgo.It("should set different fsGroup for second pod if first pod is deleted", func() {
@@ -295,7 +296,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					ginkgo.By("Create second pod and check fsGroup is the new one")
 					pod2 := createPodWithFsGroupTest(config, testVol, fsGroup2, fsGroup2)
 					ginkgo.By("Deleting second pod")
-					framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+					e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
 				})
 			})
 
@@ -317,7 +318,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			createLocalPVCsPVs(config, []*localTestVolume{testVol}, immediateMode)
 			pod, err := createLocalPod(config, testVol, nil)
 			framework.ExpectError(err)
-			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			framework.ExpectError(err)
 			cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 		})
@@ -334,7 +335,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
 			framework.ExpectNoError(err)
 
-			err = framework.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+			err = e2epod.WaitTimeoutForPodRunningInNamespace(config.client, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
 			framework.ExpectError(err)
 
 			cleanupLocalVolumes(config, []*localTestVolume{testVol})
@@ -703,7 +704,7 @@ func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeTyp
 	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
 	framework.ExpectNoError(err)
 
-	err = framework.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodNameUnschedulableInNamespace(config.client, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err)
 }
 
@@ -741,9 +742,9 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	testReadFileContent(volumeDir, testFile, testVol.ltr.Path, pod1, testVol.localVolumeType)
 
 	ginkgo.By("Deleting pod1")
-	framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
+	e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
 	ginkgo.By("Deleting pod2")
-	framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+	e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
 }
 
 // Test two pods one after other, write from pod1, and read from pod2
@@ -762,7 +763,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	testReadFileContent(volumeDir, testFile, testFileContent, pod1, testVol.localVolumeType)
 
 	ginkgo.By("Deleting pod1")
-	framework.DeletePodOrFail(config.client, config.ns, pod1.Name)
+	e2epod.DeletePodOrFail(config.client, config.ns, pod1.Name)
 
 	ginkgo.By("Creating pod2")
 	pod2, pod2Err := createLocalPod(config, testVol, nil)
@@ -773,7 +774,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	testReadFileContent(volumeDir, testFile, testFileContent, pod2, testVol.localVolumeType)
 
 	ginkgo.By("Deleting pod2")
-	framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
+	e2epod.DeletePodOrFail(config.client, config.ns, pod2.Name)
 }
 
 // Test creating pod with fsGroup, and check fsGroup is expected fsGroup.

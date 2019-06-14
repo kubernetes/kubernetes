@@ -48,6 +48,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -431,34 +432,34 @@ func (f *Framework) AddNamespacesToDelete(namespaces ...*v1.Namespace) {
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
 func (f *Framework) WaitForPodTerminated(podName, reason string) error {
-	return waitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
+	return e2epod.WaitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
 }
 
 // WaitForPodNotFound waits for the pod to be completely terminated (not "Get-able").
 func (f *Framework) WaitForPodNotFound(podName string, timeout time.Duration) error {
-	return waitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
+	return e2epod.WaitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
 }
 
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
-	return WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+	return e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
 }
 
 // WaitForPodReady waits for the pod to flip to ready in the namespace.
 func (f *Framework) WaitForPodReady(podName string) error {
-	return waitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
+	return e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, podName, f.Namespace.Name, PodStartTimeout)
 }
 
 // WaitForPodRunningSlow waits for the pod to run in the namespace.
 // It has a longer timeout then WaitForPodRunning (util.slowPodStartTimeout).
 func (f *Framework) WaitForPodRunningSlow(podName string) error {
-	return waitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
+	return e2epod.WaitForPodRunningInNamespaceSlow(f.ClientSet, podName, f.Namespace.Name)
 }
 
 // WaitForPodNoLongerRunning waits for the pod to no longer be running in the namespace, for either
 // success or failure.
 func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
-	return WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
+	return e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
 }
 
 // TestContainerOutput runs the given pod in the given namespace and waits

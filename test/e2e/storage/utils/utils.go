@@ -27,6 +27,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -323,9 +325,9 @@ func RunInPodWithVolume(c clientset.Interface, ns, claimName, command string) {
 	pod, err := c.CoreV1().Pods(ns).Create(pod)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	defer func() {
-		framework.DeletePodOrFail(c, ns, pod.Name)
+		e2epod.DeletePodOrFail(c, ns, pod.Name)
 	}()
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Namespace))
 }
 
 func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginName string) *v1.Pod {
@@ -392,7 +394,7 @@ func StartExternalProvisioner(c clientset.Interface, ns string, externalPluginNa
 	provisionerPod, err := podClient.Create(provisionerPod)
 	framework.ExpectNoError(err, "Failed to create %s pod: %v", provisionerPod.Name, err)
 
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, provisionerPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, provisionerPod))
 
 	ginkgo.By("locating the provisioner pod")
 	pod, err := podClient.Get(provisionerPod.Name, metav1.GetOptions{})

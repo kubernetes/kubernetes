@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 
 	"github.com/onsi/ginkgo"
@@ -121,7 +122,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
 		ginkgo.By("Run a high priority pod that use 60% of a node resources.")
@@ -181,7 +182,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		}
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
 		ginkgo.By("Run a critical pod that use 60% of a node resources.")
@@ -297,7 +298,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 
 		ginkgo.By("Wait for pods to be scheduled.")
 		for _, pod := range pods {
-			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
 		}
 
 		ginkgo.By("Run a high priority pod with node affinity to the first node.")

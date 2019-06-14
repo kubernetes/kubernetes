@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"fmt"
@@ -135,7 +136,7 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 
 			// Create Server with Service in NS-B
 			e2elog.Logf("Waiting for server to come up.")
-			err = framework.WaitForPodRunningInNamespace(f.ClientSet, podServer)
+			err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, podServer)
 			framework.ExpectNoError(err)
 
 			// Create Policy for that service that allows traffic only via namespace B
@@ -545,14 +546,14 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 	}()
 
 	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
-	err := framework.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
+	err := e2epod.WaitForPodNoLongerRunningInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	framework.ExpectNoError(err, "Pod did not finish as expected.")
 
 	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
-	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
+	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 	if err != nil {
 		// Collect pod logs when we see a failure.
-		logs, logErr := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
+		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
 			framework.Failf("Error getting container logs: %s", logErr)
 		}
@@ -564,7 +565,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 		}
 
 		// Collect the list of pods running in the test namespace.
-		podsInNS, err := framework.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
+		podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 		if err != nil {
 			e2elog.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 		}
@@ -592,13 +593,13 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 	}()
 
 	e2elog.Logf("Waiting for %s to complete.", podClient.Name)
-	err := framework.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
+	err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podClient.Name, ns.Name)
 
 	// We expect an error here since it's a cannot connect test.
 	// Dump debug information if the error was nil.
 	if err == nil {
 		// Collect pod logs when we see a failure.
-		logs, logErr := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
+		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
 			framework.Failf("Error getting container logs: %s", logErr)
 		}
@@ -610,7 +611,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 		}
 
 		// Collect the list of pods running in the test namespace.
-		podsInNS, err := framework.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
+		podsInNS, err := e2epod.GetPodsInNamespace(f.ClientSet, f.Namespace.Name, map[string]string{})
 		if err != nil {
 			e2elog.Logf("error getting pods for %s namespace: %s", f.Namespace.Name, err)
 		}

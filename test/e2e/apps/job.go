@@ -26,6 +26,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -156,7 +157,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		ginkgo.By("Checking that the Job readopts the Pod")
-		gomega.Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", jobutil.JobTimeout,
+		gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", jobutil.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
 				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef == nil {
@@ -175,7 +176,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		ginkgo.By("Checking that the Job releases the Pod")
-		gomega.Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", jobutil.JobTimeout,
+		gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", jobutil.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
 				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef != nil {

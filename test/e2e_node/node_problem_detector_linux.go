@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	. "github.com/onsi/ginkgo"
@@ -369,14 +370,14 @@ var _ = framework.KubeDescribe("NodeProblemDetector [NodeFeature:NodeProblemDete
 		AfterEach(func() {
 			if CurrentGinkgoTestDescription().Failed && framework.TestContext.DumpLogsOnFailure {
 				By("Get node problem detector log")
-				log, err := framework.GetPodLogs(c, ns, name, name)
+				log, err := e2epod.GetPodLogs(c, ns, name, name)
 				Expect(err).ShouldNot(HaveOccurred())
 				e2elog.Logf("Node Problem Detector logs:\n %s", log)
 			}
 			By("Delete the node problem detector")
 			f.PodClient().Delete(name, metav1.NewDeleteOptions(0))
 			By("Wait for the node problem detector to disappear")
-			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
+			Expect(e2epod.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
 			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
 			By("Clean up the events")

@@ -31,6 +31,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -137,7 +138,7 @@ func WaitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) 
 	// NodeController evicts pod after 5 minutes, so we need timeout greater than that to observe effects.
 	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
 	// Otherwise, it goes to the 'Terminating' state till the kubelet confirms deletion.
-	return WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
+	return e2epod.WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
 }
 
 // WaitForReplicationController waits until the RC appears (exist == true), or disappears (exist == false)

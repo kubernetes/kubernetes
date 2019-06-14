@@ -36,6 +36,7 @@ go_library(
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/lifecycle:go_default_library",
         "//test/e2e/framework/log:go_default_library",
+        "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/upgrades:go_default_library",
         "//test/e2e/upgrades/apps:go_default_library",

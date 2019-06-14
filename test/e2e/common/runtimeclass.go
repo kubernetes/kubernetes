@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
 
@@ -130,7 +131,7 @@ func createRuntimeClassPod(f *framework.Framework, runtimeClassName string) *v1.
 
 // expectPodSuccess waits for the given pod to terminate successfully.
 func expectPodSuccess(f *framework.Framework, pod *v1.Pod) {
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(
+	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(
 		f.ClientSet, pod.Name, f.Namespace.Name))
 }
 
@@ -143,6 +144,6 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(framework.WaitTimeoutForPodEvent(
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodEvent(
 		f.ClientSet, pod.Name, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }

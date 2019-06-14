@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -187,7 +188,7 @@ func runHugePagesTests(f *framework.Framework) {
 		By("checking if the expected hugetlb settings were applied")
 		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
 		f.PodClient().Create(verifyPod)
-		err := framework.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
 }

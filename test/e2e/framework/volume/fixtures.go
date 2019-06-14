@@ -53,6 +53,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -364,10 +365,10 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		}
 	}
 	if config.WaitForCompletion {
-		framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
 		framework.ExpectNoError(podClient.Delete(serverPod.Name, nil))
 	} else {
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
 			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
@@ -487,7 +488,7 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 		framework.Failf("Failed to create %s pod: %v", clientPod.Name, err)
 
 	}
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, clientPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
 
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
@@ -566,7 +567,7 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 
 	injectPod, err := podClient.Create(injectPod)
 	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
-	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	framework.ExpectNoError(err)
 }
 
