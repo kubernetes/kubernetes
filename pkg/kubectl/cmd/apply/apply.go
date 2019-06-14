@@ -434,12 +434,12 @@ func (o *ApplyOptions) Run() error {
 				objs = append(objs, info.Object)
 				return nil
 			}
-			
+
 			printer, err := o.ToPrinter("serverside-applied")
 			if err != nil {
 				return err
 			}
-			
+
 			return printer.PrintObj(info.Object, o.Out)
 		}
 
