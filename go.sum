@@ -279,8 +279,8 @@ github.com/mesos/mesos-go v0.0.9/go.mod h1:kPYCMQ9gsOXVAle1OsoY4I1+9kPu8GHkf88aV
 github.com/mholt/caddy v1.0.0 h1:KI6RPGih2GFzWRPG8s9clKK28Ns4ZlVMKR/v7mxq6+c=
 github.com/mholt/caddy v1.0.0/go.mod h1:PzUpQ3yGCTuEuy0KSxEeB4TZOi3zBZ8BR/zY0RBP414=
 github.com/mholt/certmagic v0.5.0/go.mod h1:g4cOPxcjV0oFq3qwpjSA30LReKD8AoIfwAY9VvG35NY=
-github.com/miekg/dns v0.0.0-20160614162101-5d001d020961 h1:vX2vkMipgQZ8gfmAsFeZdcgmhHoB7jMo6chAtajG3AI=
-github.com/miekg/dns v0.0.0-20160614162101-5d001d020961/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
+github.com/miekg/dns v1.1.4 h1:rCMZsU2ScVSYcAsOXgmC6+AKOK+6pmQTOcw03nfwYV0=
+github.com/miekg/dns v1.1.4/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 h1:v3dy+FJr7gS7nLgYG7YjX/pmUWuFdudcpnoRNHt2heo=
 github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2/go.mod h1:2eu9pRWp8mo84xCg6KswZ+USQHjwgRhNp06sozOdsTY=
 github.com/mistifyio/go-zfs v2.1.1+incompatible h1:gAMO1HM9xBRONLHHYnu5iFsOJUiJdNZo6oqSENd4eW8=

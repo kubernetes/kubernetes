@@ -594,7 +594,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mholt/caddy v1.0.0 => github.com/mholt/caddy v1.0.0
 github.com/mholt/caddy/caddyfile
 github.com/mholt/caddy/telemetry
-# github.com/miekg/dns v1.1.3 => github.com/miekg/dns v0.0.0-20160614162101-5d001d020961
+# github.com/miekg/dns v1.1.4 => github.com/miekg/dns v1.1.4
 github.com/miekg/dns
 # github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2
 github.com/mindprince/gonvml
@@ -839,6 +839,7 @@ golang.org/x/crypto/ssh/terminal
 golang.org/x/lint
 golang.org/x/lint/golint
 # golang.org/x/net v0.0.0-20190328230028-74de082e2cca => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
+golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/html
@@ -848,8 +849,12 @@ golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
 golang.org/x/net/idna
+golang.org/x/net/internal/iana
+golang.org/x/net/internal/socket
 golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
+golang.org/x/net/ipv4
+golang.org/x/net/ipv6
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket

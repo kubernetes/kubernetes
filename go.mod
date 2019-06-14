@@ -97,7 +97,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.5 // indirect
 	github.com/mesos/mesos-go v0.0.9 // indirect
 	github.com/mholt/caddy v1.0.0
-	github.com/miekg/dns v1.1.3
+	github.com/miekg/dns v1.1.4
 	github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 // indirect
 	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/mitchellh/go-wordwrap v1.0.0
@@ -339,7 +339,7 @@ replace (
 	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.9
 	github.com/mholt/caddy => github.com/mholt/caddy v1.0.0
 	github.com/mholt/certmagic => github.com/mholt/certmagic v0.5.0
-	github.com/miekg/dns => github.com/miekg/dns v0.0.0-20160614162101-5d001d020961
+	github.com/miekg/dns => github.com/miekg/dns v1.1.4
 	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2
 	github.com/mistifyio/go-zfs => github.com/mistifyio/go-zfs v2.1.1+incompatible
 	github.com/mitchellh/go-homedir => github.com/mitchellh/go-homedir v1.1.0
