@@ -566,8 +566,6 @@ github.com/kardianos/osext
 github.com/karrick/godirwalk
 # github.com/konsorten/go-windows-terminal-sequences v1.0.1 => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 github.com/konsorten/go-windows-terminal-sequences
-# github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169 => github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169
-github.com/kr/fs
 # github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875 => github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 github.com/libopenstorage/openstorage/api
 github.com/libopenstorage/openstorage/api/client
@@ -697,8 +695,6 @@ github.com/pelletier/go-toml
 github.com/peterbourgon/diskv
 # github.com/pkg/errors v0.8.0 => github.com/pkg/errors v0.8.0
 github.com/pkg/errors
-# github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6 => github.com/pkg/sftp v0.0.0-20160930220758-4d0e916071f6
-github.com/pkg/sftp
 # github.com/pmezard/go-difflib v1.0.0 => github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
@@ -738,10 +734,9 @@ github.com/sigma/go-inotify
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.3 => github.com/soheilhy/cmux v0.1.3
 github.com/soheilhy/cmux
-# github.com/spf13/afero v0.0.0-20160816080757-b28a7effac97 => github.com/spf13/afero v0.0.0-20160816080757-b28a7effac97
+# github.com/spf13/afero v1.2.2 => github.com/spf13/afero v1.2.2
 github.com/spf13/afero
 github.com/spf13/afero/mem
-github.com/spf13/afero/sftp
 # github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a => github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a
 github.com/spf13/cast
 # github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937 => github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
