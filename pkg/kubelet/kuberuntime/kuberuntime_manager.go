@@ -604,9 +604,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  2. Kill pod sandbox if necessary.
 //  3. Kill any containers that should not be running.
 //  4. Create sandbox if necessary.
-//  5. Create init containers.
-//  6. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+//  5. Wait all volumes to attach/mount
+//  6. Create init containers.
+//  7. Create normal containers.
+func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff, volumesAllMounted chan bool) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
 	klog.V(3).Infof("computePodActions got %+v for pod %q", podContainerChanges, format.Pod(pod))
@@ -724,6 +725,24 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
 		klog.Error(message)
 		configPodSandboxResult.Fail(kubecontainer.ErrConfigPodSandbox, message)
+		return
+	}
+
+	// Waiting all volumes mounted. if true, continue to create container; otherwise, select until timeout
+	waitVolumesAllMountedResult := kubecontainer.NewSyncResult(kubecontainer.WaitMount, podSandboxID)
+	result.AddSyncResult(waitVolumesAllMountedResult)
+	allMounted, open := <-volumesAllMounted
+	if !open {
+		message := fmt.Sprintf("pod %v volumesAllMounted channel is closed. Exiting kubeGenericRuntimeManager SyncPod. : %v", format.Pod(pod), err)
+		klog.Error(message)
+		configPodSandboxResult.Fail(kubecontainer.ErrWaitMount, message)
+		return
+	}
+
+	if !allMounted {
+		message := fmt.Sprintf("pod %v can not wait all volumes mounted.", format.Pod(pod))
+		klog.Error(message)
+		configPodSandboxResult.Fail(kubecontainer.ErrWaitMount, message)
 		return
 	}
 

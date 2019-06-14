@@ -42,6 +42,7 @@ var (
 	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
 	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
 	ErrKillPodSandbox   = errors.New("KillPodSandboxError")
+	ErrWaitMount        = errors.New("WaitMountError")
 )
 
 var (
@@ -62,6 +63,7 @@ const (
 	CreatePodSandbox SyncAction = "CreatePodSandbox"
 	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	KillPodSandbox   SyncAction = "KillPodSandbox"
+	WaitMount        SyncAction = "WaitMount"
 )
 
 // SyncResult is the result of sync action.

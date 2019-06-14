@@ -1459,7 +1459,8 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // * Create a mirror pod if the pod is a static pod, and does not
 //   already have a mirror pod
 // * Create the data directories for the pod if they do not exist
-// * Wait for volumes to attach/mount
+// * Wait for volumes to attach/mount concurrently. if ok,
+//   write "true" to volumeMountedChannel; if timeout, write "false".
 // * Fetch the pull secrets for the pod
 // * Call the container runtime's SyncPod callback
 // * Update the traffic shaping for the pod's ingress and egress limits
@@ -1476,6 +1477,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	mirrorPod := o.mirrorPod
 	podStatus := o.podStatus
 	updateType := o.updateType
+	volumeMountedChannel := o.volumesHaveMounted
 
 	// if we want to kill a pod, do it now!
 	if updateType == kubetypes.SyncPodKill {
@@ -1659,19 +1661,23 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Volume manager will not mount volumes for terminated pods
 	if !kl.podIsTerminated(pod) {
-		// Wait for volumes to attach/mount
-		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
-			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
-			klog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
-			return err
-		}
+		go func() {
+			// Wait for volumes to attach/mount
+			if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
+				klog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
+				volumeMountedChannel <- false
+			} else {
+				volumeMountedChannel <- true
+			}
+		}()
 	}
 
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff, volumeMountedChannel)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
