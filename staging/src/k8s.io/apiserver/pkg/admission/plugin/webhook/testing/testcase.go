@@ -601,6 +601,31 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 			ExpectAllow:       true,
 			ExpectAnnotations: map[string]string{"allow.example.com/key1": "value1"},
 		},
+		{
+			Name: "skip webhook whose objectSelector does not match CRD's labels",
+			Webhooks: []registrationv1beta1.ValidatingWebhook{{
+				Name:                    "allow.example.com",
+				ClientConfig:            ccfgSVC("allow"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:              "shouldNotBeCalled",
+				ClientConfig:      ccfgSVC("shouldNotBeCalled"),
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"label": "nonexistent",
+					},
+				},
+				Rules:                   matchEverythingRules,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			IsCRD:             true,
+			ExpectAllow:       true,
+			ExpectAnnotations: map[string]string{"allow.example.com/key1": "value1"},
+		},
 		// No need to test everything with the url case, since only the
 		// connection is different.
 	}
@@ -725,6 +750,37 @@ func NewMutatingTestCases(url *url.URL) []MutatingTest {
 			ExpectAllow:       true,
 			AdditionalLabels:  map[string]string{"remove": "me"},
 			ExpectLabels:      map[string]string{"pod.name": "my-pod"},
+			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
+		},
+		{
+			Name: "first webhook remove labels from CRD, second webhook shouldn't be called",
+			Webhooks: []registrationv1beta1.MutatingWebhook{{
+				Name:              "removelabel.example.com",
+				ClientConfig:      ccfgSVC("removeLabel"),
+				Rules:             matchEverythingRules,
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"remove": "me",
+					},
+				},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}, {
+				Name:              "shouldNotBeCalled",
+				ClientConfig:      ccfgSVC("shouldNotBeCalled"),
+				NamespaceSelector: &metav1.LabelSelector{},
+				ObjectSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"remove": "me",
+					},
+				},
+				Rules:                   matchEverythingRules,
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			IsCRD:             true,
+			ExpectAllow:       true,
+			AdditionalLabels:  map[string]string{"remove": "me"},
+			ExpectLabels:      map[string]string{"crd.name": "my-test-crd"},
 			ExpectAnnotations: map[string]string{"removelabel.example.com/key1": "value1"},
 		},
 		// No need to test everything with the url case, since only the
