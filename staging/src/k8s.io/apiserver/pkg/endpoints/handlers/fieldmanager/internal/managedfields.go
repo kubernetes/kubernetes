@@ -131,8 +131,8 @@ func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (version
 	return versionedSet, nil
 }
 
-// encodeManagedFields converts ManagedFields from the the format used by
-// sigs.k8s.io/structured-merge-diff to the the wire format (api format)
+// encodeManagedFields converts ManagedFields from the format used by
+// sigs.k8s.io/structured-merge-diff to the wire format (api format)
 func encodeManagedFields(managedFields fieldpath.ManagedFields) (encodedManagedFields []metav1.ManagedFieldsEntry, err error) {
 	// Sort the keys so a predictable order will be used.
 	managers := []string{}

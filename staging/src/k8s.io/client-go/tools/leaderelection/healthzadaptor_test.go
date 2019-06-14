@@ -76,7 +76,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			elector:        nil,
 		},
 		{
-			description:    "call check when the the lease is far expired",
+			description:    "call check when the lease is far expired",
 			expected:       fmt.Errorf("failed election to renew leadership on lease %s", "foo"),
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -93,7 +93,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			},
 		},
 		{
-			description:    "call check when the the lease is far expired but held by another server",
+			description:    "call check when the lease is far expired but held by another server",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -110,7 +110,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			},
 		},
 		{
-			description:    "call check when the the lease is not expired",
+			description:    "call check when the lease is not expired",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
@@ -127,7 +127,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 			},
 		},
 		{
-			description:    "call check when the the lease is expired but inside the timeout",
+			description:    "call check when the lease is expired but inside the timeout",
 			expected:       nil,
 			adaptorTimeout: time.Second * 20,
 			elector: &LeaderElector{
