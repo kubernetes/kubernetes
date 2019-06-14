@@ -126,6 +126,7 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 	c.FlagSet.BoolVar(c.boolSlot("work"), "work", false, "Print the name of the temporary work directory and do not delete it when exiting.")
 	c.FlagSet.StringVar(c.stringSlot("asmflags"), "asmflags", "", "Arguments to pass on each go tool asm invocation.")
 	c.FlagSet.StringVar(c.stringSlot("buildmode"), "buildmode", "", "Build mode to use. See 'go help buildmode' for more.")
+	c.FlagSet.StringVar(c.stringSlot("mod"), "mod", "", "Go module control. See 'go help modules' for more.")
 	c.FlagSet.StringVar(c.stringSlot("compiler"), "compiler", "", "Name of compiler to use, as in runtime.Compiler (gccgo or gc).")
 	c.FlagSet.StringVar(c.stringSlot("gccgoflags"), "gccgoflags", "", "Arguments to pass on each gccgo compiler/linker invocation.")
 	c.FlagSet.StringVar(c.stringSlot("installsuffix"), "installsuffix", "", "A suffix to use in the name of the package installation directory.")
@@ -140,6 +141,7 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 	c.FlagSet.IntVar(c.intSlot("memprofilerate"), "memprofilerate", 0, "Enable more precise (and expensive) memory profiles by setting runtime.MemProfileRate.")
 	c.FlagSet.StringVar(c.stringSlot("outputdir"), "outputdir", "", "Place output files from profiling in the specified directory.")
 	c.FlagSet.BoolVar(c.boolSlot("requireSuite"), "requireSuite", false, "Fail if there are ginkgo tests in a directory but no test suite (missing RunSpecs)")
+	c.FlagSet.StringVar(c.stringSlot("vet"), "vet", "", "Configure the invocation of 'go vet' to use the comma-separated list of vet checks. If list is 'off', 'go test' does not run 'go vet' at all.")
 
 	if mode == runMode || mode == watchMode {
 		config.Flags(c.FlagSet, "", false)

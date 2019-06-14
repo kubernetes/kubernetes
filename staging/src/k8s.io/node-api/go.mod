@@ -12,7 +12,6 @@ require (
 
 replace (
 	github.com/google/uuid => github.com/google/uuid v1.0.0
-	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.6.0
 	github.com/onsi/gomega => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774

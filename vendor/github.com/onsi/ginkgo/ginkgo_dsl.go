@@ -457,13 +457,13 @@ func FMeasure(text string, body interface{}, samples int) bool {
 	return true
 }
 
-//You can mark Maeasurements as pending using PMeasure
+//You can mark Measurements as pending using PMeasure
 func PMeasure(text string, _ ...interface{}) bool {
 	globalSuite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
 }
 
-//You can mark Maeasurements as pending using XMeasure
+//You can mark Measurements as pending using XMeasure
 func XMeasure(text string, _ ...interface{}) bool {
 	globalSuite.PushMeasureNode(text, func(b Benchmarker) {}, types.FlagTypePending, codelocation.New(1), 0)
 	return true
@@ -587,6 +587,16 @@ func BeforeEach(body interface{}, timeout ...float64) bool {
 //a Done channel
 func JustBeforeEach(body interface{}, timeout ...float64) bool {
 	globalSuite.PushJustBeforeEachNode(body, codelocation.New(1), parseTimeout(timeout...))
+	return true
+}
+
+//JustAfterEach blocks are run after It blocks but *before* all AfterEach blocks.  For more details,
+//read the [documentation](http://onsi.github.io/ginkgo/#separating_creation_and_configuration_)
+//
+//Like It blocks, JustAfterEach blocks can be made asynchronous by providing a body function that accepts
+//a Done channel
+func JustAfterEach(body interface{}, timeout ...float64) bool {
+	globalSuite.PushJustAfterEachNode(body, codelocation.New(1), parseTimeout(timeout...))
 	return true
 }
 
