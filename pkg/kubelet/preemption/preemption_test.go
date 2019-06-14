@@ -194,7 +194,7 @@ func BenchmarkGetPodsToPreempt(t *testing.B) {
 		inputPods = append(inputPods, allPods[tinyBurstable])
 	}
 	for n := 0; n < t.N; n++ {
-		getPodsToPreempt(nil, inputPods, admissionRequirementList([]*admissionRequirement{
+		getPodsToPreempt(allPods[bestEffort], inputPods, admissionRequirementList([]*admissionRequirement{
 			{
 				resourceName: v1.ResourceCPU,
 				quantity:     parseCPUToInt64("110m"),
