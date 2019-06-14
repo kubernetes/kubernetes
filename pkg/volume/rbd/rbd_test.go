@@ -139,7 +139,7 @@ type fakeDiskManager struct {
 	rbdDevices    map[string]bool
 }
 
-func NewFakeDiskManager() *fakeDiskManager {
+func newFakeDiskManager() *fakeDiskManager {
 	return &fakeDiskManager{
 		rbdImageLocks: make(map[string]bool),
 		rbdMapIndex:   0,
@@ -254,7 +254,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	}
 	fakeMounter := fakeVolumeHost.GetMounter(plug.GetPluginName()).(*mount.FakeMounter)
 	fakeNodeName := types.NodeName("localhost")
-	fdm := NewFakeDiskManager()
+	fdm := newFakeDiskManager()
 
 	// attacher
 	attacher, err := plug.(*rbdPlugin).newAttacherInternal(fdm)
@@ -538,7 +538,7 @@ func TestGetDeviceMountPath(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	fdm := NewFakeDiskManager()
+	fdm := newFakeDiskManager()
 
 	// attacher
 	attacher, err := plug.(*rbdPlugin).newAttacherInternal(fdm)
