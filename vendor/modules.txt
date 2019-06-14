@@ -138,7 +138,7 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
-# github.com/client9/misspell v0.0.0-20170928000206-9ce5d979ffda => github.com/client9/misspell v0.0.0-20170928000206-9ce5d979ffda
+# github.com/client9/misspell v0.3.4 => github.com/client9/misspell v0.3.4
 github.com/client9/misspell
 github.com/client9/misspell/cmd/misspell
 # github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf => github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf
