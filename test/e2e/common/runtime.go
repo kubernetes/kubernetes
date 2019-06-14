@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -353,28 +354,28 @@ while true; do sleep 1; done
 			}
 
 			ginkgo.It("should not be able to pull image from invalid registry [NodeConformance]", func() {
-				image := "invalid.com/invalid/alpine:3.1"
+				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
 			ginkgo.It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
-				image := "k8s.gcr.io/invalid-image:invalid-tag"
+				image := imageutils.GetE2EImage(imageutils.Invalid)
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
 			ginkgo.It("should be able to pull image from gcr.io [LinuxOnly] [NodeConformance]", func() {
-				image := "gcr.io/google-containers/debian-base:0.4.1"
+				image := imageutils.GetE2EImage(imageutils.DebianBase)
 				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
 			ginkgo.It("should be able to pull image from gcr.io [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
-				image := "gcr.io/kubernetes-e2e-test-images/windows-nanoserver:v1"
+				image := imageutils.GetE2EImage(imageutils.WindowsNanoServer)
 				imagePullTest(image, false, v1.PodRunning, false, true)
 			})
 
 			ginkgo.It("should be able to pull image from docker hub [LinuxOnly] [NodeConformance]", func() {
-				image := "alpine:3.7"
+				image := imageutils.GetE2EImage(imageutils.Alpine)
 				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
@@ -386,18 +387,18 @@ while true; do sleep 1; done
 			})
 
 			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func() {
-				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
+				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
 			ginkgo.It("should be able to pull from private registry with secret [LinuxOnly] [NodeConformance]", func() {
-				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
+				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
 				imagePullTest(image, true, v1.PodRunning, false, false)
 			})
 
 			ginkgo.It("should be able to pull from private registry with secret [NodeConformance]", func() {
 				framework.SkipUnlessNodeOSDistroIs("windows")
-				image := "gcr.io/authenticated-image-pulling/windows-nanoserver:v1"
+				image := imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
 				imagePullTest(image, true, v1.PodRunning, false, true)
 			})
 		})
