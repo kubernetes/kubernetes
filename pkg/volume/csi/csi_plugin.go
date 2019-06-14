@@ -704,9 +704,6 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 	unmapper.driverName = csiDriverName(data[volDataKey.driverName])
 	unmapper.volumeID = data[volDataKey.volHandle]
 	unmapper.csiClientGetter.driverName = unmapper.driverName
-	if err != nil {
-		return nil, err
-	}
 
 	return unmapper, nil
 }
