@@ -744,7 +744,7 @@ github.com/spf13/cobra
 github.com/spf13/cobra/doc
 # github.com/spf13/jwalterweatherman v1.1.0 => github.com/spf13/jwalterweatherman v1.1.0
 github.com/spf13/jwalterweatherman
-# github.com/spf13/pflag v1.0.3 => github.com/spf13/pflag v1.0.1
+# github.com/spf13/pflag v1.0.3 => github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
 # github.com/spf13/viper v1.3.2 => github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
 github.com/spf13/viper

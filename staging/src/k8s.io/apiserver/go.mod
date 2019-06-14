@@ -72,7 +72,6 @@ replace (
 	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.0
 	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/gorilla/websocket => github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
-	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006

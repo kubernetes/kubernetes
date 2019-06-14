@@ -15,7 +15,6 @@ require (
 )
 
 replace (
-	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	k8s.io/code-generator => ../code-generator

@@ -14,7 +14,6 @@ require (
 replace (
 	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.0
 	github.com/google/uuid => github.com/google/uuid v1.0.0
-	github.com/spf13/pflag => github.com/spf13/pflag v1.0.1
 	github.com/spf13/viper => github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
 	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
