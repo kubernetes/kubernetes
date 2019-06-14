@@ -198,6 +198,92 @@ func TestFindPort(t *testing.T) {
 	}
 }
 
+func TestVisitContainers(t *testing.T) {
+	testCases := []struct {
+		description string
+		haveSpec    *v1.PodSpec
+		wantNames   []string
+	}{
+		{
+			"empty podspec",
+			&v1.PodSpec{},
+			[]string{},
+		},
+		{
+			"regular containers",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+			},
+			[]string{"c1", "c2"},
+		},
+		{
+			"init containers",
+			&v1.PodSpec{
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2"},
+		},
+		{
+			"regular and init containers",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+		{
+			"dropping fields",
+			&v1.PodSpec{
+				Containers: []v1.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &v1.SecurityContext{}},
+				},
+				InitContainers: []v1.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &v1.SecurityContext{}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+	}
+
+	for _, tc := range testCases {
+		gotNames := []string{}
+		VisitContainers(tc.haveSpec, func(c *v1.Container) bool {
+			gotNames = append(gotNames, c.Name)
+			if c.SecurityContext != nil {
+				c.SecurityContext = nil
+			}
+			return true
+		})
+		if !reflect.DeepEqual(gotNames, tc.wantNames) {
+			t.Errorf("VisitContainers() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
+		}
+		for _, c := range tc.haveSpec.Containers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+		for _, c := range tc.haveSpec.InitContainers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for init container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+	}
+}
+
 func TestPodSecrets(t *testing.T) {
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.

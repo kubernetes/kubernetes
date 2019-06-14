@@ -361,17 +361,15 @@ func LogLocation(
 }
 
 func podHasContainerWithName(pod *api.Pod, containerName string) bool {
-	for _, c := range pod.Spec.Containers {
+	var hasContainer bool
+	podutil.VisitContainers(&pod.Spec, func(c *api.Container) bool {
 		if c.Name == containerName {
-			return true
+			hasContainer = true
+			return false
 		}
-	}
-	for _, c := range pod.Spec.InitContainers {
-		if c.Name == containerName {
-			return true
-		}
-	}
-	return false
+		return true
+	})
+	return hasContainer
 }
 
 func streamParams(params url.Values, opts runtime.Object) error {
