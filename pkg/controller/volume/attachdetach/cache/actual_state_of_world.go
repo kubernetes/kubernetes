@@ -277,9 +277,6 @@ func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(
 
 func (asw *actualStateOfWorld) AddVolumeNode(
 	uniqueName v1.UniqueVolumeName, volumeSpec *volume.Spec, nodeName types.NodeName, devicePath string, isAttached bool) (v1.UniqueVolumeName, error) {
-	asw.Lock()
-	defer asw.Unlock()
-
 	volumeName := uniqueName
 	if volumeName == "" {
 		if volumeSpec == nil {
@@ -305,6 +302,9 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 				err)
 		}
 	}
+
+	asw.Lock()
+	defer asw.Unlock()
 
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
