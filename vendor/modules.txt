@@ -580,7 +580,7 @@ github.com/libopenstorage/openstorage/volume
 github.com/liggitt/tabwriter
 # github.com/lithammer/dedent v1.1.0 => github.com/lithammer/dedent v1.1.0
 github.com/lithammer/dedent
-# github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4 => github.com/magiconair/properties v0.0.0-20160816085511-61b492c03cf4
+# github.com/magiconair/properties v1.8.1 => github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
 # github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329 => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 github.com/mailru/easyjson/buffer

@@ -11949,7 +11949,7 @@ THE SOFTWARE.
 
 goproperties - properties file decoder for Go
 
-Copyright (c) 2013-2014 - Frank Schroeder
+Copyright (c) 2013-2018 - Frank Schroeder
 
 All rights reserved.
 
@@ -11973,7 +11973,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-= vendor/github.com/magiconair/properties/LICENSE c383a608fb9a0d227953e928803b9631
+= vendor/github.com/magiconair/properties/LICENSE 1cb2e5b7268c1e1e630f6d0dafebfee8
 ================================================================================
 
 
