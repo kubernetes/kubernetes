@@ -126,7 +126,7 @@ require (
 	github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
 	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/quobyte/api v0.1.2
-	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
+	github.com/robfig/cron v1.1.0
 	github.com/russross/blackfriday v1.5.2
 	github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e // indirect
 	github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db // indirect
@@ -380,7 +380,7 @@ replace (
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a
 	github.com/quobyte/api => github.com/quobyte/api v0.1.2
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
-	github.com/robfig/cron => github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
+	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/russross/blackfriday => github.com/russross/blackfriday v0.0.0-20151117072312-300106c228d5
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
