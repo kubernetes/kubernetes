@@ -56,6 +56,7 @@ func (f *IdentityClient) Probe(ctx context.Context, in *csipb.ProbeRequest, opts
 	return nil, nil
 }
 
+// CSIVolume is a representation of a volume used for testing
 type CSIVolume struct {
 	VolumeHandle    string
 	VolumeContext   map[string]string
@@ -87,6 +88,8 @@ func NewNodeClient(stageUnstageSet bool) *NodeClient {
 	}
 }
 
+// NewNodeClientWithExpansion returns a fake node client with volume expansion
+// capabilities
 func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeClient {
 	return &NodeClient{
 		nodePublishedVolumes: make(map[string]CSIVolume),
@@ -96,6 +99,8 @@ func NewNodeClientWithExpansion(stageUnstageSet bool, expansionSet bool) *NodeCl
 	}
 }
 
+// NewNodeClientWithVolumeStats returns a fake node client with volume stats
+// capabilities
 func NewNodeClientWithVolumeStats(volumeStatsSet bool) *NodeClient {
 	return &NodeClient{
 		volumeStatsSet: volumeStatsSet,
@@ -107,10 +112,12 @@ func (f *NodeClient) SetNextError(err error) {
 	f.nextErr = err
 }
 
+// SetNodeGetInfoResp injects a NodeGetInfo response
 func (f *NodeClient) SetNodeGetInfoResp(resp *csipb.NodeGetInfoResponse) {
 	f.nodeGetInfoResp = resp
 }
 
+// SetNodeVolumeStatsResp injects a NodeVolumeStats response
 func (f *NodeClient) SetNodeVolumeStatsResp(resp *csipb.NodeGetVolumeStatsResponse) {
 	f.nodeVolumeStatsResp = resp
 }
@@ -125,6 +132,7 @@ func (f *NodeClient) GetNodeStagedVolumes() map[string]CSIVolume {
 	return f.nodeStagedVolumes
 }
 
+// AddNodeStagedVolume adds a fake volume to staged volumes
 func (f *NodeClient) AddNodeStagedVolume(volID, deviceMountPath string, volumeContext map[string]string) {
 	f.nodeStagedVolumes[volID] = CSIVolume{
 		Path:          deviceMountPath,
@@ -176,7 +184,7 @@ func (f *NodeClient) NodeUnpublishVolume(ctx context.Context, req *csipb.NodeUnp
 	return &csipb.NodeUnpublishVolumeResponse{}, nil
 }
 
-// NodeStagevolume implements csi method
+// NodeStageVolume implements csi method
 func (f *NodeClient) NodeStageVolume(ctx context.Context, req *csipb.NodeStageVolumeRequest, opts ...grpc.CallOption) (*csipb.NodeStageVolumeResponse, error) {
 	if f.nextErr != nil {
 		return nil, f.nextErr
@@ -246,7 +254,7 @@ func (f *NodeClient) NodeExpandVolume(ctx context.Context, req *csipb.NodeExpand
 	return resp, nil
 }
 
-// NodeGetId implements csi method
+// NodeGetInfo implements csi method
 func (f *NodeClient) NodeGetInfo(ctx context.Context, in *csipb.NodeGetInfoRequest, opts ...grpc.CallOption) (*csipb.NodeGetInfoResponse, error) {
 	if f.nextErr != nil {
 		return nil, f.nextErr
@@ -289,13 +297,6 @@ func (f *NodeClient) NodeGetCapabilities(ctx context.Context, in *csipb.NodeGetC
 	}
 	return resp, nil
 }
-
-/*
-// NodeGetVolumeStats implements csi method
-func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, in *csipb.NodeGetVolumeStatsRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeStatsResponse, error) {
-	return nil, nil
-}
-*/
 
 // NodeGetVolumeStats implements csi method
 func (f *NodeClient) NodeGetVolumeStats(ctx context.Context, req *csipb.NodeGetVolumeStatsRequest, opts ...grpc.CallOption) (*csipb.NodeGetVolumeStatsResponse, error) {

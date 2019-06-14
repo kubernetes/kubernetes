@@ -20,22 +20,27 @@ import (
 	"testing"
 )
 
+// NewCloser returns a fake io.Closer
 func NewCloser(t *testing.T) *Closer {
 	return &Closer{
 		t: t,
 	}
 }
 
+// Closer is a fake io.Closer used for testing
 type Closer struct {
 	wasCalled bool
 	t         *testing.T
 }
 
+// Close implements the io.Closer interface
 func (c *Closer) Close() error {
 	c.wasCalled = true
 	return nil
 }
 
+// Check is a test helper function that fails if Close
+// was not called
 func (c *Closer) Check() *Closer {
 	c.t.Helper()
 
