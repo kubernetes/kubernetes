@@ -207,7 +207,7 @@ def main():
         owners.pop(name)
 
     if not options.addonly:
-        print('# UNEXPECTED MAINTAINERS ', end=' ')
+        print('# UNEXPECTED MAINTAINERS ', end='')
         print('(randomly assigned, but not in kubernetes-maintainers)')
         for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
             if random_assignment and owner not in maintainers:
