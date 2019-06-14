@@ -124,10 +124,9 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 
 		ginkgo.By(fmt.Sprintf("Blocking traffic from node %s to the master", nodeName))
 		host, err := framework.GetNodeExternalIP(&node)
-		// TODO(Huang-Wei): make this case work for local provider
-		// if err != nil {
-		// 	host, err = framework.GetNodeInternalIP(&node)
-		// }
+		if err != nil {
+			host, err = framework.GetNodeInternalIP(&node)
+		}
 		framework.ExpectNoError(err)
 		masterAddresses := framework.GetAllMasterAddresses(cs)
 		taint := newUnreachableNoExecuteTaint()
