@@ -21,7 +21,12 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/images/agnhost",
     deps = [
+        "//test/images/agnhost/net:go_default_library",
+        "//test/images/agnhost/netexec:go_default_library",
+        "//test/images/agnhost/nettest:go_default_library",
+        "//test/images/agnhost/webhook:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -34,6 +39,12 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//test/images/agnhost/net:all-srcs",
+        "//test/images/agnhost/netexec:all-srcs",
+        "//test/images/agnhost/nettest:all-srcs",
+        "//test/images/agnhost/webhook:all-srcs",
+    ],
     tags = ["automanaged"],
 )
