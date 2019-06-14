@@ -523,10 +523,11 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 # github.com/hashicorp/golang-lru v0.5.0 => github.com/hashicorp/golang-lru v0.5.0
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
-# github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1 => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
+# github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
 github.com/hashicorp/hcl
 github.com/hashicorp/hcl/hcl/ast
 github.com/hashicorp/hcl/hcl/parser
+github.com/hashicorp/hcl/hcl/printer
 github.com/hashicorp/hcl/hcl/scanner
 github.com/hashicorp/hcl/hcl/strconv
 github.com/hashicorp/hcl/hcl/token
@@ -737,7 +738,7 @@ github.com/soheilhy/cmux
 # github.com/spf13/afero v1.2.2 => github.com/spf13/afero v1.2.2
 github.com/spf13/afero
 github.com/spf13/afero/mem
-# github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a => github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a
+# github.com/spf13/cast v1.3.0 => github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a
 github.com/spf13/cast
 # github.com/spf13/cobra v0.0.4 => github.com/spf13/cobra v0.0.4
 github.com/spf13/cobra
@@ -746,7 +747,7 @@ github.com/spf13/cobra/doc
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.3 => github.com/spf13/pflag v1.0.3
 github.com/spf13/pflag
-# github.com/spf13/viper v1.3.2 => github.com/spf13/viper v0.0.0-20160820190039-7fb2782df3d8
+# github.com/spf13/viper v1.3.2 => github.com/spf13/viper v1.3.2
 github.com/spf13/viper
 # github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 github.com/storageos/go-api
