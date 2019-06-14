@@ -51,7 +51,6 @@ pkg/apis/scheduling/v1beta1
 pkg/apis/storage
 pkg/apis/storage/v1
 pkg/apis/storage/v1beta1
-pkg/cloudprovider/providers/photon
 pkg/controller
 pkg/controller/apis/config/v1alpha1
 pkg/controller/certificates
@@ -315,7 +314,6 @@ pkg/volume/csi/csiv0
 pkg/volume/csi/fake
 pkg/volume/git_repo
 pkg/volume/iscsi
-pkg/volume/photon_pd
 pkg/volume/rbd
 pkg/volume/scaleio
 pkg/volume/storageos
