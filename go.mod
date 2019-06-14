@@ -90,8 +90,7 @@ require (
 	github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk v1.7.5 // indirect
 	github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169 // indirect
-	github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51 // indirect
-	github.com/kr/text v0.0.0-20130911015532-6807e777504f // indirect
+	github.com/kr/pretty v0.1.0 // indirect
 	github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
@@ -315,7 +314,7 @@ replace (
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
 	github.com/kr/fs => github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169
-	github.com/kr/pretty => github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51
+	github.com/kr/pretty => github.com/kr/pretty v0.1.0
 	github.com/kr/text => github.com/kr/text v0.0.0-20130911015532-6807e777504f
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 	github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de

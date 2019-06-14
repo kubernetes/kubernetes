@@ -237,8 +237,8 @@ github.com/konsorten/go-windows-terminal-sequences v1.0.1 h1:mweAR1A6xJ3oS2pRaGi
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169 h1:YUrU1/jxRqnt0PSrKj1Uj/wEjk/fjnE80QFfi2Zlj7Q=
 github.com/kr/fs v0.0.0-20131111012553-2788f0dbd169/go.mod h1:glhvuHOU9Hy7/8PwwdtnarXqLagOX0b/TbZx2zLMqEg=
-github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51 h1:kGEU5h0EzkNa+B8Q3e0GlaIocJYB1G6ZpefcceXhfgc=
-github.com/kr/pretty v0.0.0-20140812000539-f31442d60e51/go.mod h1:Bvhd+E3laJ0AVkG0c9rmtZcnhV0HQ3+c3YxxqTvc/gA=
+github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=
+github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/text v0.0.0-20130911015532-6807e777504f h1:JaNmHIV9Eby6srQVWuiQ6n8ko2o/lG6udSRCbFZe1fs=
 github.com/kr/text v0.0.0-20130911015532-6807e777504f/go.mod h1:sjUstKUATFIcff4qlB53Kml0wQPtJVc/3fWrmuUmcfA=
 github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875 h1:s+gZ8/rkYrWgN7xTMUISDw6nspgWyju2OCKmpFBrviQ=
