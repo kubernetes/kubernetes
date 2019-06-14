@@ -108,7 +108,7 @@ require (
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
 	github.com/mrunalp/fileutils v0.0.0-20160930181131-4ee1cc9a8058 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
-	github.com/mvdan/xurls v0.0.0-20160110113200-1b768d7c393a
+	github.com/mvdan/xurls v1.1.0
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
@@ -354,7 +354,7 @@ replace (
 	github.com/morikuni/aec => github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c
 	github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20160930181131-4ee1cc9a8058
 	github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
-	github.com/mvdan/xurls => github.com/mvdan/xurls v0.0.0-20160110113200-1b768d7c393a
+	github.com/mvdan/xurls => github.com/mvdan/xurls v1.1.0
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 	github.com/naoina/toml => github.com/naoina/toml v0.1.1

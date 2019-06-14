@@ -617,7 +617,7 @@ github.com/morikuni/aec
 github.com/mrunalp/fileutils
 # github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d => github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
 github.com/munnerz/goautoneg
-# github.com/mvdan/xurls v0.0.0-20160110113200-1b768d7c393a => github.com/mvdan/xurls v0.0.0-20160110113200-1b768d7c393a
+# github.com/mvdan/xurls v1.1.0 => github.com/mvdan/xurls v1.1.0
 github.com/mvdan/xurls
 # github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 github.com/mxk/go-flowrate/flowrate
