@@ -341,10 +341,14 @@ type OwnerReference struct {
 	// otherwise 422 (Unprocessable Entity) will be returned.
 	// +optional
 	BlockOwnerDeletion *bool `json:"blockOwnerDeletion,omitempty" protobuf:"varint,7,opt,name=blockOwnerDeletion"`
-	// Resource of the referent.  If specified, it takes priority over `kind`.
+	// resource of the referent.  If specified, it takes priority over `kind`.
 	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#resources
 	// +optional
 	Resource string `json:"resource,omitempty" protobuf:"bytes,8,opt,name=resource"`
+	// namespace of the referent.  If specified, it must be empty for cluster scoped resources or in the same namespace as the dependent.
+	// More info: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,9,opt,name=namespace"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
