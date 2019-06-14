@@ -25,7 +25,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo",
     deps = [
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
-        "//pkg/apis/rbac/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
