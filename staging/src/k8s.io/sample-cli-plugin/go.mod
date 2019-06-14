@@ -16,7 +16,6 @@ replace (
 	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/hashicorp/hcl => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
 	github.com/spf13/cast => github.com/spf13/cast v0.0.0-20160730092037-e31f36ffc91a
-	github.com/stretchr/testify => github.com/stretchr/testify v1.2.2
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
