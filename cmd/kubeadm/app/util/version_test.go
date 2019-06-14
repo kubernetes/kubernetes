@@ -50,10 +50,7 @@ func TestValidVersion(t *testing.T) {
 	}
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
-			fileFetcher := func(url string, timeout time.Duration) (string, error) {
-				return "", errors.New("should not make internet call")
-			}
-			ver, err := kubernetesReleaseVersion(s, fileFetcher)
+			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Valid: ", s, ver, err)
 			if err != nil {
 				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
@@ -75,10 +72,7 @@ func TestInvalidVersion(t *testing.T) {
 	}
 	for _, s := range invalidVersions {
 		t.Run(s, func(t *testing.T) {
-			fileFetcher := func(url string, timeout time.Duration) (string, error) {
-				return "should not make internet calls", errors.New("should not make internet call")
-			}
-			ver, err := kubernetesReleaseVersion(s, fileFetcher)
+			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Invalid: ", s, ver, err)
 			if err == nil {
 				t.Errorf("KubernetesReleaseVersion error expected for version %q, but returned successfully", s)
@@ -98,10 +92,7 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 	}
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
-			fileFetcher := func(url string, timeout time.Duration) (string, error) {
-				return "", errors.New("should not make internet call")
-			}
-			ver, err := kubernetesReleaseVersion(s, fileFetcher)
+			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Valid: ", s, ver, err)
 			if err != nil {
 				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
@@ -130,17 +121,21 @@ func TestVersionFromNetwork(t *testing.T) {
 		"unknown":    {"The requested URL was not found on this server.", "", true},
 	}
 
-	fileFetcher := func(url string, timeout time.Duration) (string, error) {
-		key := strings.TrimSuffix(path.Base(url), ".txt")
-		res, found := cases[key]
-		if found {
-			return res.Content, nil
-		}
-		return "Unknown test case key!", errors.New("unknown test case key")
-	}
-
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
+
+			fileFetcher := func(url string, timeout time.Duration) (string, error) {
+				key := strings.TrimSuffix(path.Base(url), ".txt")
+				res, found := cases[key]
+				if found {
+					if v.ErrorExpected {
+						return "error", errors.New("expected error")
+					}
+					return res.Content, nil
+				}
+				return "Unknown test case key!", errors.New("unknown test case key")
+			}
+
 			ver, err := kubernetesReleaseVersion(k, fileFetcher)
 			t.Logf("Key: %q. Result: %q, Error: %v", k, ver, err)
 			switch {
@@ -282,7 +277,7 @@ func TestCIBuildVersion(t *testing.T) {
 				if tc.valid {
 					return tc.expected, nil
 				}
-				return "Unknown test case key!", fmt.Errorf("unknown test case key")
+				return "Unknown test case key!", errors.New("unknown test case key")
 			}
 
 			ver, err := kubernetesReleaseVersion(tc.input, fileFetcher)
@@ -481,4 +476,8 @@ func TestValidateStableVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func errorFetcher(url string, timeout time.Duration) (string, error) {
+	return "should not make internet calls", fmt.Errorf("should not make internet calls, tried to request url: %s", url)
 }
