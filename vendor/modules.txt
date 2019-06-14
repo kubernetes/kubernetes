@@ -647,7 +647,7 @@ github.com/onsi/ginkgo/reporters/stenographer
 github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable
 github.com/onsi/ginkgo/reporters/stenographer/support/go-isatty
 github.com/onsi/ginkgo/types
-# github.com/onsi/gomega v1.5.0 => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
+# github.com/onsi/gomega v1.5.0 => github.com/onsi/gomega v1.5.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
 github.com/onsi/gomega/gstruct

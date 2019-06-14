@@ -360,7 +360,7 @@ replace (
 	github.com/naoina/toml => github.com/naoina/toml v0.1.1
 	github.com/natefinch/lumberjack => github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.8.0
-	github.com/onsi/gomega => github.com/onsi/gomega v0.0.0-20190113212917-5533ce8a0da3
+	github.com/onsi/gomega => github.com/onsi/gomega v1.5.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634
 	github.com/opencontainers/runc => github.com/opencontainers/runc v0.0.0-20181113202123-f000fe11ece1
