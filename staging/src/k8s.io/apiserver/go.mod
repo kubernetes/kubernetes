@@ -15,7 +15,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
-	github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633
+	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
 	github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.0 // indirect

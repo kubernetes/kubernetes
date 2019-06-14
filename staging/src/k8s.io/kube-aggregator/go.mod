@@ -6,7 +6,7 @@ go 1.12
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633
+	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/go-openapi/spec v0.17.2
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

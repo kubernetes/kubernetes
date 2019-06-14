@@ -6,7 +6,7 @@ go 1.12
 
 require (
 	github.com/coreos/etcd v3.3.13+incompatible
-	github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633
+	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-openapi/analysis v0.17.2 // indirect
 	github.com/go-openapi/errors v0.17.2 // indirect
