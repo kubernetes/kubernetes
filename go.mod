@@ -41,7 +41,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/coreos/rkt v1.30.0 // indirect
-	github.com/cpuguy83/go-md2man v1.0.4
+	github.com/cpuguy83/go-md2man v1.0.10
 	github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/daviddengcn/go-colortext v0.0.0-20160507010035-511bcaf42ccd
@@ -128,7 +128,7 @@ require (
 	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	github.com/quobyte/api v0.1.2
 	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
-	github.com/russross/blackfriday v0.0.0-20151117072312-300106c228d5
+	github.com/russross/blackfriday v1.5.2
 	github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e // indirect
 	github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db // indirect
 	github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
@@ -236,7 +236,7 @@ replace (
 	github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea
 	github.com/coreos/rkt => github.com/coreos/rkt v1.30.0
-	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.4
+	github.com/cpuguy83/go-md2man => github.com/cpuguy83/go-md2man v1.0.10
 	github.com/cyphar/filepath-securejoin => github.com/cyphar/filepath-securejoin v0.0.0-20170720062807-ae69057f2299
 	github.com/d2g/dhcp4 => github.com/d2g/dhcp4 v0.0.0-20170904100407-a1d1b6c41b1c
 	github.com/d2g/dhcp4client => github.com/d2g/dhcp4client v0.0.0-20170829104524-6e570ed0a266
