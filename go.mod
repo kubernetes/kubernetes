@@ -259,6 +259,7 @@ replace (
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.7
 	github.com/ghodss/yaml => github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4
 	github.com/globalsign/mgo => github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
+	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.17.2
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.17.2
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.0
