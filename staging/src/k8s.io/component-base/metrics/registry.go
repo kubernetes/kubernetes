@@ -94,3 +94,18 @@ func NewKubeRegistry(v apimachineryversion.Info) KubeRegistry {
 		version:      parseVersion(v),
 	}
 }
+
+// NewPreloadedKubeRegistry creates a new Registry with preloaded prometheus collectors
+// already registered. This is exposed specifically to maintain backwards
+// compatibility with the global prometheus registry.
+//
+// Deprecated
+func NewPreloadedKubeRegistry(v apimachineryversion.Info, cs ...prometheus.Collector) KubeRegistry {
+	registry := &kubeRegistry{
+		PromRegistry: prometheus.NewRegistry(),
+		version:      parseVersion(v),
+	}
+
+	registry.PromRegistry.MustRegister(cs...)
+	return registry
+}
