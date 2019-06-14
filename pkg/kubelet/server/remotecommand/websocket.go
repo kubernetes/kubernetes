@@ -95,7 +95,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
-	negotiatedProtocol, streams, err := conn.Open(httplog.Unlogged(w), req)
+	negotiatedProtocol, streams, err := conn.Open(httplog.Unlogged(req, w), req)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Unable to upgrade websocket connection: %v", err))
 		return nil, false
