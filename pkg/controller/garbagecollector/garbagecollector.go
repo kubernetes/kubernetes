@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
+
 	// import known versions
 	_ "k8s.io/client-go/kubernetes"
 )
@@ -337,6 +338,26 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	resource, namespaced, err := gc.apiResource(reference.APIVersion, reference.Kind)
 	if err != nil {
 		return false, nil, err
+	}
+
+	if reference.Namespace != nil {
+		// if we map to a cluster-scoped resource, but the namespace was specified, the dependent lied about an ownerref
+		// and must be dangling and deleted
+		if !namespaced && len(*reference.Namespace) > 0 {
+			klog.V(5).Infof("the actual referent is cluster scoped, so the object is dangling, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			return true, nil, nil
+		}
+		if namespaced && len(*reference.Namespace) == 0 {
+			klog.V(5).Infof("the actual referent is namespace scoped, so the object is dangling, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			return true, nil, nil
+		}
+	}
+
+	if len(reference.Resource) > 0 {
+		if resource.Resource != reference.Resource {
+			klog.V(5).Infof("the referent doesn't match the found resource, so the object is dangling, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			return true, nil, nil
+		}
 	}
 
 	// TODO: It's only necessary to talk to the API server if the owner node
