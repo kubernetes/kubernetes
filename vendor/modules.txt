@@ -662,7 +662,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420 => github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
+# github.com/opencontainers/go-digest v1.0.0-rc1 => github.com/opencontainers/go-digest v1.0.0-rc1
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634 => github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634
 github.com/opencontainers/image-spec/specs-go

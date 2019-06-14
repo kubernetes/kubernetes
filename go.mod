@@ -111,7 +111,7 @@ require (
 	github.com/mvdan/xurls v1.1.0
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
-	github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
+	github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634 // indirect
 	github.com/opencontainers/runc v0.0.0-20181113202123-f000fe11ece1
 	github.com/opencontainers/runtime-spec v1.0.0 // indirect
@@ -361,7 +361,7 @@ replace (
 	github.com/natefinch/lumberjack => github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.5.0
-	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v0.0.0-20170106003457-a6d0ee40d420
+	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0-rc1
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634
 	github.com/opencontainers/runc => github.com/opencontainers/runc v0.0.0-20181113202123-f000fe11ece1
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.0
