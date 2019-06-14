@@ -415,6 +415,10 @@ func Images(nodeStatusMaxImages int32,
 			if len(names) > MaxNamesPerImageInNodeStatus {
 				names = names[0:MaxNamesPerImageInNodeStatus]
 			}
+			// Use the image ID as fallback if no repo tag or digest exists
+			if len(names) == 0 {
+				names = []string{image.ID}
+			}
 			imagesOnNode = append(imagesOnNode, v1.ContainerImage{
 				Names:     names,
 				SizeBytes: image.Size,

@@ -1615,6 +1615,9 @@ func makeExpectedImageList(imageList []kubecontainer.Image, maxImages, maxNames 
 		if len(names) > int(maxNames) {
 			names = names[0:maxNames]
 		}
+		if len(names) == 0 {
+			names = []string{image.ID}
+		}
 		expectedImage.Names = names
 		expectedImage.SizeBytes = image.Size
 	}
