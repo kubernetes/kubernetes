@@ -291,6 +291,7 @@ filegroup(
         "//vendor/github.com/mattn/go-shellwords:all-srcs",
         "//vendor/github.com/matttproud/golang_protobuf_extensions/pbutil:all-srcs",
         "//vendor/github.com/mholt/caddy/caddyfile:all-srcs",
+        "//vendor/github.com/mholt/caddy/telemetry:all-srcs",
         "//vendor/github.com/miekg/dns:all-srcs",
         "//vendor/github.com/mindprince/gonvml:all-srcs",
         "//vendor/github.com/mistifyio/go-zfs:all-srcs",

@@ -3,15 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "dispenser.go",
-        "json.go",
-        "lexer.go",
-        "parse.go",
+        "collection.go",
+        "telemetry.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/mholt/caddy/caddyfile",
-    importpath = "github.com/mholt/caddy/caddyfile",
+    importmap = "k8s.io/kubernetes/vendor/github.com/mholt/caddy/telemetry",
+    importpath = "github.com/mholt/caddy/telemetry",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/mholt/caddy/telemetry:go_default_library"],
+    deps = ["//vendor/github.com/google/uuid:go_default_library"],
 )
 
 filegroup(
