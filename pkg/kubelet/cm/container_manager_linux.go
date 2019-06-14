@@ -465,18 +465,8 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 
 	if cm.KubeletCgroupsName != "" {
 		cont := newSystemCgroups(cm.KubeletCgroupsName)
-		allowAllDevices := true
-		manager := fs.Manager{
-			Cgroups: &configs.Cgroup{
-				Parent: "/",
-				Name:   cm.KubeletCgroupsName,
-				Resources: &configs.Resources{
-					AllowAllDevices: &allowAllDevices,
-				},
-			},
-		}
-		cont.ensureStateFunc = func(_ *fs.Manager) error {
-			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, &manager)
+		cont.ensureStateFunc = func(manager *fs.Manager) error {
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {
