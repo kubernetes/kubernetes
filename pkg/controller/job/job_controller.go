@@ -60,7 +60,8 @@ var (
 	MaxJobBackOff = 360 * time.Second
 )
 
-// Controller is a controller for Jobs.
+// Controller ensures that all Job objects have corresponding pods to
+// run their configured workload.
 type Controller struct {
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
@@ -90,7 +91,8 @@ type Controller struct {
 	recorder record.EventRecorder
 }
 
-// NewController creates a new Controller.
+// NewController creates a new Job controller that keeps the relevant pods
+// in sync with their corresponding Job objects.
 func NewController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
