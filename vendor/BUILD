@@ -361,6 +361,7 @@ filegroup(
         "//vendor/golang.org/x/crypto/internal/subtle:all-srcs",
         "//vendor/golang.org/x/crypto/nacl/secretbox:all-srcs",
         "//vendor/golang.org/x/crypto/ocsp:all-srcs",
+        "//vendor/golang.org/x/crypto/pbkdf2:all-srcs",
         "//vendor/golang.org/x/crypto/pkcs12:all-srcs",
         "//vendor/golang.org/x/crypto/poly1305:all-srcs",
         "//vendor/golang.org/x/crypto/salsa20/salsa:all-srcs",
