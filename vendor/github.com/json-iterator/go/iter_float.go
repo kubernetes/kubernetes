@@ -77,14 +77,12 @@ func (iter *Iterator) ReadFloat32() (ret float32) {
 }
 
 func (iter *Iterator) readPositiveFloat32() (ret float32) {
-	value := uint64(0)
-	c := byte(' ')
 	i := iter.head
 	// first char
 	if i == iter.tail {
 		return iter.readFloat32SlowPath()
 	}
-	c = iter.buf[i]
+	c := iter.buf[i]
 	i++
 	ind := floatDigits[c]
 	switch ind {
@@ -107,7 +105,7 @@ func (iter *Iterator) readPositiveFloat32() (ret float32) {
 			return
 		}
 	}
-	value = uint64(ind)
+	value := uint64(ind)
 	// chars before dot
 non_decimal_loop:
 	for ; i < iter.tail; i++ {
@@ -145,9 +143,7 @@ non_decimal_loop:
 				}
 				// too many decimal places
 				return iter.readFloat32SlowPath()
-			case invalidCharForNumber:
-				fallthrough
-			case dotInNumber:
+			case invalidCharForNumber, dotInNumber:
 				return iter.readFloat32SlowPath()
 			}
 			decimalPlaces++
@@ -218,14 +214,12 @@ func (iter *Iterator) ReadFloat64() (ret float64) {
 }
 
 func (iter *Iterator) readPositiveFloat64() (ret float64) {
-	value := uint64(0)
-	c := byte(' ')
 	i := iter.head
 	// first char
 	if i == iter.tail {
 		return iter.readFloat64SlowPath()
 	}
-	c = iter.buf[i]
+	c := iter.buf[i]
 	i++
 	ind := floatDigits[c]
 	switch ind {
@@ -248,7 +242,7 @@ func (iter *Iterator) readPositiveFloat64() (ret float64) {
 			return
 		}
 	}
-	value = uint64(ind)
+	value := uint64(ind)
 	// chars before dot
 non_decimal_loop:
 	for ; i < iter.tail; i++ {
@@ -286,9 +280,7 @@ non_decimal_loop:
 				}
 				// too many decimal places
 				return iter.readFloat64SlowPath()
-			case invalidCharForNumber:
-				fallthrough
-			case dotInNumber:
+			case invalidCharForNumber, dotInNumber:
 				return iter.readFloat64SlowPath()
 			}
 			decimalPlaces++
