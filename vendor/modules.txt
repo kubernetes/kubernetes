@@ -726,14 +726,12 @@ github.com/quobyte/api
 github.com/robfig/cron
 # github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c => github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 github.com/rubiojr/go-vhd/vhd
-# github.com/russross/blackfriday v1.5.2 => github.com/russross/blackfriday v0.0.0-20151117072312-300106c228d5
+# github.com/russross/blackfriday v1.5.2 => github.com/russross/blackfriday v1.5.2
 github.com/russross/blackfriday
 # github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e => github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e
 github.com/seccomp/libseccomp-golang
-# github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db => github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db
-github.com/shurcooL/sanitized_anchor_name
 # github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
 github.com/sigma/go-inotify
 # github.com/sirupsen/logrus v1.2.0 => github.com/sirupsen/logrus v1.2.0
