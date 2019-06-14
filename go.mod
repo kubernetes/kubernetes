@@ -62,7 +62,7 @@ require (
 	github.com/go-openapi/strfmt v0.17.0
 	github.com/go-openapi/validate v0.18.0
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
-	github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
+	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v0.0.0-20160127222235-bd3c8e81be01
@@ -271,7 +271,7 @@ replace (
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.17.2
 	github.com/go-openapi/validate => github.com/go-openapi/validate v0.18.0
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
-	github.com/godbus/dbus => github.com/godbus/dbus v0.0.0-20151105175453-c7fdd8b5cd55
+	github.com/godbus/dbus => github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
