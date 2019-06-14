@@ -86,17 +86,19 @@ func newCertSubPhases() []workflow.Phase {
 
 	subPhases = append(subPhases, allPhase)
 
-	certTree, _ := certsphase.GetDefaultCertList().AsMap().CertTree()
-
-	for ca, certList := range certTree {
-		caPhase := newCertSubPhase(ca, runCAPhase(ca))
-		subPhases = append(subPhases, caPhase)
-
-		for _, cert := range certList {
-			certPhase := newCertSubPhase(cert, runCertPhase(cert, ca))
-			certPhase.LocalFlags = localFlags()
-			subPhases = append(subPhases, certPhase)
+	// This loop assumes that GetDefaultCertList() always returns a list of
+	// certificate that is preceded by the CAs that sign them.
+	var lastCACert *certsphase.KubeadmCert
+	for _, cert := range certsphase.GetDefaultCertList() {
+		var phase workflow.Phase
+		if cert.CAName == "" {
+			phase = newCertSubPhase(cert, runCAPhase(cert))
+			lastCACert = cert
+		} else {
+			phase = newCertSubPhase(cert, runCertPhase(cert, lastCACert))
+			phase.LocalFlags = localFlags()
 		}
+		subPhases = append(subPhases, phase)
 	}
 
 	// SA creates the private/public key pair, which doesn't use x509 at all
