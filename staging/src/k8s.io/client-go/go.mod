@@ -8,7 +8,7 @@ require (
 	github.com/Azure/go-autorest v11.1.2+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgrijalva/jwt-go v0.0.0-20160705203006-01aeca54ebda // indirect
-	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
+	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/protobuf v1.2.0

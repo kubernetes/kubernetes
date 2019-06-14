@@ -7,7 +7,7 @@ go 1.12
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
+	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 // indirect
 	github.com/go-openapi/jsonpointer v0.19.0 // indirect
 	github.com/go-openapi/jsonreference v0.19.0 // indirect

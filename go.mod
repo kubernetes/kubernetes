@@ -53,7 +53,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/euank/go-kmsg-parser v2.0.0+incompatible // indirect
-	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
+	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v0.0.0-20160318181535-f6a740d52f96
 	github.com/fsnotify/fsnotify v1.4.7
@@ -253,7 +253,7 @@ replace (
 	github.com/elazarl/goproxy => github.com/elazarl/goproxy v0.0.0-20170405201442-c4fc26588b6e
 	github.com/emicklei/go-restful => github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/euank/go-kmsg-parser => github.com/euank/go-kmsg-parser v2.0.0+incompatible
-	github.com/evanphx/json-patch => github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
+	github.com/evanphx/json-patch => github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/exponent-io/jsonpath => github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase => github.com/fatih/camelcase v0.0.0-20160318181535-f6a740d52f96
 	github.com/fsnotify/fsnotify => github.com/fsnotify/fsnotify v1.4.7
