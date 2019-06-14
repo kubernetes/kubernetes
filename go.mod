@@ -72,7 +72,7 @@ require (
 	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
 	github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
-	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
+	github.com/google/gofuzz v1.0.0
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud v0.0.0-20190126172459-c818fa66e4c8
 	github.com/gorilla/context v1.1.1 // indirect
@@ -284,7 +284,7 @@ replace (
 	github.com/google/cadvisor => github.com/google/cadvisor v0.33.2-0.20190411163913-9db8c7dee20a
 	github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.0.21
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
-	github.com/google/gofuzz => github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
+	github.com/google/gofuzz => github.com/google/gofuzz v1.0.0
 	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/googleapis/gnostic => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud => github.com/gophercloud/gophercloud v0.0.0-20190126172459-c818fa66e4c8

@@ -17,7 +17,7 @@ require (
 	github.com/go-openapi/validate v0.18.0
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
 	github.com/google/go-cmp v0.3.0
-	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
+	github.com/google/gofuzz v1.0.0
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/pborman/uuid v1.2.0

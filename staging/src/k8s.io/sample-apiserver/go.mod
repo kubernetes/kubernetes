@@ -5,7 +5,7 @@ module k8s.io/sample-apiserver
 go 1.12
 
 require (
-	github.com/google/gofuzz v0.0.0-20170612174753-24818f796faf
+	github.com/google/gofuzz v1.0.0
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
 	k8s.io/apimachinery v0.0.0
