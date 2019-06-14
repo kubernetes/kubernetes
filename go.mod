@@ -112,7 +112,7 @@ require (
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.5.0
 	github.com/opencontainers/go-digest v1.0.0-rc1
-	github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634 // indirect
+	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v0.0.0-20181113202123-f000fe11ece1
 	github.com/opencontainers/runtime-spec v1.0.0 // indirect
 	github.com/opencontainers/selinux v0.0.0-20170621221121-4a2974bf1ee9
@@ -362,7 +362,7 @@ replace (
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.5.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0-rc1
-	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v0.0.0-20170604055404-372ad780f634
+	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 	github.com/opencontainers/runc => github.com/opencontainers/runc v0.0.0-20181113202123-f000fe11ece1
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.0
 	github.com/opencontainers/selinux => github.com/opencontainers/selinux v0.0.0-20170621221121-4a2974bf1ee9
