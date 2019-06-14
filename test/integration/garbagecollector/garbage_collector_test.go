@@ -60,6 +60,11 @@ func getOrphanOptions() *metav1.DeleteOptions {
 	return &metav1.DeleteOptions{OrphanDependents: &trueVar}
 }
 
+func getPropagateOrphanOptions() *metav1.DeleteOptions {
+	policy := metav1.DeletePropagationOrphan
+	return &metav1.DeleteOptions{PropagationPolicy: &policy}
+}
+
 func getNonOrphanOptions() *metav1.DeleteOptions {
 	var falseVar = false
 	return &metav1.DeleteOptions{OrphanDependents: &falseVar}
@@ -454,6 +459,9 @@ func setupRCsPods(t *testing.T, gc *garbagecollector.GarbageCollector, clientSet
 	case options.OrphanDependents != nil:
 		// if the deletion options explicitly specify whether to orphan, that controls
 		orphan = *options.OrphanDependents
+	case options.PropagationPolicy != nil:
+		// if the deletion options explicitly specify whether to orphan, that controls
+		orphan = *options.PropagationPolicy == metav1.DeletePropagationOrphan
 	case len(initialFinalizers) != 0 && initialFinalizers[0] == metav1.FinalizerOrphanDependents:
 		// if the orphan finalizer is explicitly added, we orphan
 		orphan = true
@@ -517,8 +525,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 
 	const collections = 10
 	var wg sync.WaitGroup
-	wg.Add(collections * 4)
-	rcUIDs := make(chan types.UID, collections*4)
+	wg.Add(collections * 5)
+	rcUIDs := make(chan types.UID, collections*5)
 	for i := 0; i < collections; i++ {
 		// rc is created with empty finalizers, deleted with nil delete options, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection1-"+strconv.Itoa(i), ns.Name, []string{}, nil, &wg, rcUIDs)
@@ -528,6 +536,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 		go setupRCsPods(t, gc, clientSet, "collection3-"+strconv.Itoa(i), ns.Name, []string{metav1.FinalizerOrphanDependents}, getNonOrphanOptions(), &wg, rcUIDs)
 		// rc is created with empty finalizers, deleted with DeleteOptions.OrphanDependents=true, pods will remain.
 		go setupRCsPods(t, gc, clientSet, "collection4-"+strconv.Itoa(i), ns.Name, []string{}, getOrphanOptions(), &wg, rcUIDs)
+		// rc is created with empty finalizers, deleted with DeleteOptions.PropagationPolicy=Orphan, pods will remain.
+		go setupRCsPods(t, gc, clientSet, "collection5-"+strconv.Itoa(i), ns.Name, []string{}, getPropagateOrphanOptions(), &wg, rcUIDs)
 	}
 	wg.Wait()
 	t.Logf("all pods are created, all replications controllers are created then deleted")
@@ -535,7 +545,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	if err := wait.Poll(1*time.Second, 300*time.Second, func() (bool, error) {
 		podsInEachCollection := 3
 		// see the comments on the calls to setupRCsPods for details
-		remainingGroups := 3
+		remainingGroups := 4
 		return verifyRemainingObjects(t, clientSet, ns.Name, 0, collections*podsInEachCollection*remainingGroups)
 	}); err != nil {
 		t.Fatal(err)
@@ -549,7 +559,7 @@ func TestStressingCascadingDeletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, pod := range pods.Items {
-		if !strings.Contains(pod.ObjectMeta.Name, "collection1-") && !strings.Contains(pod.ObjectMeta.Name, "collection2-") && !strings.Contains(pod.ObjectMeta.Name, "collection4-") {
+		if !strings.Contains(pod.ObjectMeta.Name, "collection1-") && !strings.Contains(pod.ObjectMeta.Name, "collection2-") && !strings.Contains(pod.ObjectMeta.Name, "collection4-") && !strings.Contains(pod.ObjectMeta.Name, "collection5-") {
 			t.Errorf("got unexpected remaining pod: %#v", pod)
 		}
 	}
