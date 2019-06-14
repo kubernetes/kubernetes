@@ -13,6 +13,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/discovery:all-srcs",
         "//staging/src/k8s.io/client-go/dynamic:all-srcs",
         "//staging/src/k8s.io/client-go/examples/create-update-delete-deployment:all-srcs",
+        "//staging/src/k8s.io/client-go/examples/dynamic-create-update-delete-deployment:all-srcs",
         "//staging/src/k8s.io/client-go/examples/fake-client:all-srcs",
         "//staging/src/k8s.io/client-go/examples/in-cluster-client-configuration:all-srcs",
         "//staging/src/k8s.io/client-go/examples/leader-election:all-srcs",
