@@ -146,7 +146,7 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 		if !dInfo.SupportedFsType.Has(pattern.FsType) {
 			framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.FsType)
 		}
-		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci") {
+		if pattern.FsType == "xfs" && framework.NodeOSDistroIs("gci", "cos", "windows") {
 			framework.Skipf("Distro doesn't support xfs -- skipping")
 		}
 		if pattern.FsType == "ntfs" && !framework.NodeOSDistroIs("windows") {
