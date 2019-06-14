@@ -92,6 +92,7 @@ type manager struct {
 	prober *prober
 }
 
+// NewManager creates a new prober manager instance.
 func NewManager(
 	statusManager status.Manager,
 	livenessManager results.Manager,

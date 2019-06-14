@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 )
 
+// Manager interface provides methods for Kubelet to manage secrets.
 type Manager interface {
 	// Get secret by secret namespace and name.
 	GetSecret(namespace, name string) (*v1.Secret, error)
@@ -54,6 +55,7 @@ type simpleSecretManager struct {
 	kubeClient clientset.Interface
 }
 
+// NewSimpleSecretManager creates a new SecretManager instance.
 func NewSimpleSecretManager(kubeClient clientset.Interface) Manager {
 	return &simpleSecretManager{kubeClient: kubeClient}
 }

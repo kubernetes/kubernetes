@@ -172,12 +172,10 @@ pkg/kubelet/metrics
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/prober
 pkg/kubelet/prober/results
 pkg/kubelet/prober/testing
 pkg/kubelet/qos
 pkg/kubelet/remote
-pkg/kubelet/secret
 pkg/kubelet/stats
 pkg/kubelet/status
 pkg/kubelet/status/testing
