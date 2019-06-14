@@ -94,10 +94,7 @@ func (w *Watcher) Start(stopCh <-chan struct{}) error {
 						klog.Errorf("error %v when handling create event: %s", err, event)
 					}
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
-					err := w.handleDeleteEvent(event)
-					if err != nil {
-						klog.Errorf("error %v when handling delete event: %s", err, event)
-					}
+					w.handleDeleteEvent(event)
 				}
 				continue
 			case err := <-fsWatcher.Errors:
@@ -219,14 +216,12 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 	return nil
 }
 
-func (w *Watcher) handleDeleteEvent(event fsnotify.Event) error {
+func (w *Watcher) handleDeleteEvent(event fsnotify.Event) {
 	klog.V(6).Infof("Handling delete event: %v", event)
 
 	socketPath := event.Name
 	klog.V(2).Infof("Removing socket path %s from desired state cache", socketPath)
 	w.desiredStateOfWorld.RemovePlugin(socketPath)
-
-	return nil
 }
 
 // While deprecated dir is supported, to add extra protection around #69015
