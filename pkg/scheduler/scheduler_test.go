@@ -58,7 +58,7 @@ import (
 )
 
 // EmptyFramework is an empty framework used in tests.
-// Note: If the test runs in goroutine, please don't using this variable to avoid a race condition.
+// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
 var EmptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, EmptyPluginConfig)
 
 // EmptyPluginConfig is an empty plugin config used in tests.
@@ -159,7 +159,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister, pc *framework.PluginContext) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 

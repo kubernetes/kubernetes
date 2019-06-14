@@ -167,6 +167,10 @@ func (*fakeFramework) NodeInfoSnapshot() *internalcache.NodeInfoSnapshot {
 	return nil
 }
 
+func (*fakeFramework) RunPrefilterPlugins(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+	return nil
+}
+
 func (*fakeFramework) RunPrebindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }

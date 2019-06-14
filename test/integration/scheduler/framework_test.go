@@ -31,10 +31,13 @@ import (
 // TesterPlugin is common ancestor for a test plugin that allows injection of
 // failures and some other test functionalities.
 type TesterPlugin struct {
+	numPrefilterCalled  int
 	numReserveCalled    int
 	numPrebindCalled    int
 	numPostbindCalled   int
 	numUnreserveCalled  int
+	failPrefilter       bool
+	rejectPrefilter     bool
 	failReserve         bool
 	failPrebind         bool
 	rejectPrebind       bool
@@ -44,6 +47,10 @@ type TesterPlugin struct {
 	timeoutPermit       bool
 	waitAndRejectPermit bool
 	waitAndAllowPermit  bool
+}
+
+type PrefilterPlugin struct {
+	TesterPlugin
 }
 
 type ReservePlugin struct {
@@ -68,6 +75,7 @@ type PermitPlugin struct {
 }
 
 const (
+	prefilterPluginName = "prefilter-plugin"
 	reservePluginName   = "reserve-plugin"
 	prebindPluginName   = "prebind-plugin"
 	unreservePluginName = "unreserve-plugin"
@@ -75,6 +83,7 @@ const (
 	permitPluginName    = "permit-plugin"
 )
 
+var _ = framework.PrefilterPlugin(&PrefilterPlugin{})
 var _ = framework.ReservePlugin(&ReservePlugin{})
 var _ = framework.PrebindPlugin(&PrebindPlugin{})
 var _ = framework.PostbindPlugin(&PostbindPlugin{})
@@ -154,6 +163,30 @@ func NewPostbindPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framewo
 	return ptbdPlugin, nil
 }
 
+var pfPlugin = &PrefilterPlugin{}
+
+// Name returns name of the plugin.
+func (pp *PrefilterPlugin) Name() string {
+	return prefilterPluginName
+}
+
+// Prefilter is a test function that returns (true, nil) or errors for testing.
+func (pp *PrefilterPlugin) Prefilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+	pp.numPrefilterCalled++
+	if pp.failPrefilter {
+		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+	}
+	if pp.rejectPrefilter {
+		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
+	}
+	return nil
+}
+
+// NewPrebindPlugin is the factory for prebind plugin.
+func NewPrefilterPlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return pfPlugin, nil
+}
+
 var unresPlugin = &UnreservePlugin{}
 
 // Name returns name of the plugin.
@@ -224,6 +257,84 @@ func (pp *PermitPlugin) Permit(pc *framework.PluginContext, pod *v1.Pod, nodeNam
 func NewPermitPlugin(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
 	perPlugin.fh = fh
 	return perPlugin, nil
+}
+
+// TestPrefilterPlugin tests invocation of prefilter plugins.
+func TestPrefilterPlugin(t *testing.T) {
+	// Create a plugin registry for testing. Register only a reserve plugin.
+	registry := framework.Registry{prefilterPluginName: NewPrefilterPlugin}
+
+	// Setup initial prefilter plugin for testing.
+	prefilterPlugin := &schedulerconfig.Plugins{
+		PreFilter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: prefilterPluginName,
+				},
+			},
+		},
+	}
+	// Set empty plugin config for testing
+	emptyPluginConfig := []schedulerconfig.PluginConfig{}
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "prefilter-plugin", nil),
+		false, nil, registry, prefilterPlugin, emptyPluginConfig, false, time.Second)
+
+	defer cleanupTest(t, context)
+
+	cs := context.clientSet
+	// Add a few nodes.
+	_, err := createNodes(cs, "test-node", nil, 2)
+	if err != nil {
+		t.Fatalf("Cannot create nodes: %v", err)
+	}
+
+	tests := []struct {
+		fail   bool
+		reject bool
+	}{
+		{
+			fail:   false,
+			reject: false,
+		},
+		{
+			fail:   true,
+			reject: false,
+		},
+		{
+			fail:   false,
+			reject: true,
+		},
+	}
+
+	for i, test := range tests {
+		pfPlugin.failPrefilter = test.fail
+		pfPlugin.rejectPrefilter = test.reject
+		// Create a best effort pod.
+		pod, err := createPausePod(cs,
+			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
+		if err != nil {
+			t.Errorf("Error while creating a test pod: %v", err)
+		}
+
+		if test.reject || test.fail {
+			if err = waitForPodUnschedulable(cs, pod); err != nil {
+				t.Errorf("test #%v: Didn't expect the pod to be scheduled. error: %v", i, err)
+			}
+		} else {
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
+			}
+		}
+
+		if pfPlugin.numPrefilterCalled == 0 {
+			t.Errorf("Expected the prefilter plugin to be called.")
+		}
+
+		cleanupPods(cs, t, []*v1.Pod{pod})
+	}
 }
 
 // TestReservePlugin tests invocation of reserve plugins.
