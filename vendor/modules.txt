@@ -599,7 +599,7 @@ github.com/mholt/caddy/telemetry
 github.com/miekg/dns
 # github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2
 github.com/mindprince/gonvml
-# github.com/mistifyio/go-zfs v0.0.0-20151009155749-1b4ae6fb4e77 => github.com/mistifyio/go-zfs v0.0.0-20151009155749-1b4ae6fb4e77
+# github.com/mistifyio/go-zfs v2.1.1+incompatible => github.com/mistifyio/go-zfs v2.1.1+incompatible
 github.com/mistifyio/go-zfs
 # github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 => github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7
 github.com/mitchellh/go-wordwrap
