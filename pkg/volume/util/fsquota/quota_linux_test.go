@@ -16,17 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package quota
+package fsquota
 
 import (
 	"fmt"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume/util/quota/common"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
 	"os"
 	"strings"
 	"testing"
@@ -389,7 +390,7 @@ func fakeSupportsQuotas(path string) (bool, error) {
 	return SupportsQuotas(dummyQuotaTest(), path)
 }
 
-func fakeAssignQuota(path string, poduid string, bytes int64) error {
+func fakeAssignQuota(path string, poduid types.UID, bytes int64) error {
 	dummySetFSInfo(path)
 	return AssignQuota(dummyQuotaTest(), path, poduid, resource.NewQuantity(bytes, resource.DecimalSI))
 }
@@ -401,7 +402,7 @@ func fakeClearQuota(path string) error {
 
 type quotaTestCase struct {
 	path                             string
-	poduid                           string
+	poduid                           types.UID
 	bytes                            int64
 	op                               string
 	expectedProjects                 string

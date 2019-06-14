@@ -8,16 +8,17 @@ go_library(
         "quota_linux.go",
         "quota_unsupported.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/util/quota",
+    importpath = "k8s.io/kubernetes/pkg/volume/util/fsquota",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//pkg/volume/util/quota/common:go_default_library",
+            "//pkg/volume/util/fsquota/common:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
@@ -34,8 +35,9 @@ go_test(
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/features:go_default_library",
             "//pkg/util/mount:go_default_library",
-            "//pkg/volume/util/quota/common:go_default_library",
+            "//pkg/volume/util/fsquota/common:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         ],
@@ -54,7 +56,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/util/quota/common:all-srcs",
+        "//pkg/volume/util/fsquota/common:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

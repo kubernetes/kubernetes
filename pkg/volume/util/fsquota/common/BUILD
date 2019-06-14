@@ -6,7 +6,7 @@ go_library(
         "quota_linux_common.go",
         "quota_linux_common_impl.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/volume/util/quota/common",
+    importpath = "k8s.io/kubernetes/pkg/volume/util/fsquota/common",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [

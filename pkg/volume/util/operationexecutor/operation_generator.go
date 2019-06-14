@@ -698,7 +698,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		mountErr := volumeMounter.SetUp(volume.MounterArgs{
 			FsGroup:     fsGroup,
 			DesiredSize: volumeToMount.DesiredSizeLimit,
-			PodUID:      string(volumeToMount.Pod.UID),
 		})
 		if mountErr != nil {
 			// On failure, return error. Caller will log and retry.

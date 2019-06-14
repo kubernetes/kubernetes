@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/volume/util/quota"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -142,6 +142,6 @@ func diskConcealingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeS
 // Don't bother returning an error; if something goes wrong,
 // simply treat it as "no".
 func supportsQuotas(dir string) bool {
-	supportsQuota, err := quota.SupportsQuotas(mount.New(""), dir)
+	supportsQuota, err := fsquota.SupportsQuotas(mount.New(""), dir)
 	return supportsQuota && err == nil
 }
