@@ -97,7 +97,7 @@ func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{{
 				Name:    "test-node-authn",
-				Image:   imageutils.GetE2EImage(imageutils.Hostexec),
+				Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 				Command: []string{"sleep", "3600"},
 			}},
 			RestartPolicy: v1.RestartPolicyNever,

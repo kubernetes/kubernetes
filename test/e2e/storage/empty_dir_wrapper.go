@@ -221,7 +221,8 @@ func createGitServer(f *framework.Framework) (gitURL string, gitRepo string, cle
 			Containers: []v1.Container{
 				{
 					Name:            "git-repo",
-					Image:           imageutils.GetE2EImage(imageutils.Fakegitserver),
+					Image:           imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:            []string{"fake-gitserver"},
 					ImagePullPolicy: "IfNotPresent",
 					Ports: []v1.ContainerPort{
 						{ContainerPort: int32(containerPort)},

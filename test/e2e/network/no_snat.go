@@ -40,9 +40,6 @@ const (
 	testProxyPort = 31235 // Firewall rule allows external traffic on ports 30000-32767. I just picked a random one.
 )
 
-var testPodImage = imageutils.GetE2EImage(imageutils.NoSnatTest)
-var testProxyImage = imageutils.GetE2EImage(imageutils.NoSnatTestProxy)
-
 var (
 	testPod = v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -55,8 +52,8 @@ var (
 			Containers: []v1.Container{
 				{
 					Name:  "no-snat-test",
-					Image: testPodImage,
-					Args:  []string{"--port", strconv.Itoa(testPodPort)},
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"no-snat-test", "--port", strconv.Itoa(testPodPort)},
 					Env: []v1.EnvVar{
 						{
 							Name:      "POD_IP",
@@ -77,8 +74,8 @@ var (
 			Containers: []v1.Container{
 				{
 					Name:  "no-snat-test-proxy",
-					Image: testProxyImage,
-					Args:  []string{"--port", strconv.Itoa(testProxyPort)},
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"no-snat-test-proxy", "--port", strconv.Itoa(testProxyPort)},
 					Ports: []v1.ContainerPort{
 						{
 							ContainerPort: testProxyPort,

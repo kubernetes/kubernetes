@@ -105,17 +105,8 @@ func (p *loadLoggingPod) Start(f *framework.Framework) error {
 			Containers: []api_v1.Container{
 				{
 					Name:  loggingContainerName,
-					Image: imageutils.GetE2EImage(imageutils.LogsGenerator),
-					Env: []api_v1.EnvVar{
-						{
-							Name:  "LOGS_GENERATOR_LINES_TOTAL",
-							Value: strconv.Itoa(p.expectedLinesCount),
-						},
-						{
-							Name:  "LOGS_GENERATOR_DURATION",
-							Value: p.runDuration.String(),
-						},
-					},
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"logs-generator", "-log-lines-total", strconv.Itoa(p.expectedLinesCount), "-run-duration", p.runDuration.String()},
 					Resources: api_v1.ResourceRequirements{
 						Requests: api_v1.ResourceList{
 							api_v1.ResourceCPU: *resource.NewMilliQuantity(
