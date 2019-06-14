@@ -25,6 +25,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/pointer"
 )
@@ -50,7 +50,7 @@ func TestCreateServiceAccount(t *testing.T) {
 		},
 		{
 			"duplication errors should be ignored",
-			apierrors.NewAlreadyExists(api.Resource(""), ""),
+			apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
 			false,
 		},
 		{
