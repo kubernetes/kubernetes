@@ -578,6 +578,36 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "custom service-cluster-ip-range for " + cpVersion,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking: kubeadmapi.Networking{
+					PodSubnet:     "10.0.1.15/16",
+					ServiceSubnet: "172.20.0.0/24"},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: cpVersion,
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--bind-address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--client-ca-file=" + testCertsDir + "/ca.crt",
+				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--allocate-node-cidrs=true",
+				"--cluster-cidr=10.0.1.15/16",
+				"--node-cidr-mask-size=24",
+				"--service-cluster-ip-range=172.20.0.0/24",
+			},
+		},
+		{
 			name: "custom extra-args for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{PodSubnet: "10.0.1.15/16"},
@@ -610,7 +640,10 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		{
 			name: "custom IPv6 networking for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
-				Networking:        kubeadmapi.Networking{PodSubnet: "2001:db8::/64"},
+				Networking: kubeadmapi.Networking{
+					PodSubnet:     "2001:db8::/64",
+					ServiceSubnet: "fd03::/112",
+				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
 			},
@@ -632,6 +665,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=2001:db8::/64",
 				"--node-cidr-mask-size=80",
+				"--service-cluster-ip-range=fd03::/112",
 			},
 		},
 	}
