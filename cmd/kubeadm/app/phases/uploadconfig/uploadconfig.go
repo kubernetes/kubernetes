@@ -29,7 +29,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 const (
@@ -127,7 +126,12 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("configmaps").Names(kubeadmconstants.KubeadmConfigConfigMap).RuleOrDie(),
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{""},
+				Resources:     []string{"configmaps"},
+				ResourceNames: []string{kubeadmconstants.KubeadmConfigConfigMap},
+			},
 		},
 	})
 	if err != nil {

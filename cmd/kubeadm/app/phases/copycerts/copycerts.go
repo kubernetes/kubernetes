@@ -41,7 +41,6 @@ import (
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	cryptoutil "k8s.io/kubernetes/cmd/kubeadm/app/util/crypto"
-	rbachelper "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 
 const (
@@ -127,7 +126,12 @@ func createRBAC(client clientset.Interface) error {
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
-			rbachelper.NewRule("get").Groups("").Resources("secrets").Names(kubeadmconstants.KubeadmCertsSecret).RuleOrDie(),
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{""},
+				Resources:     []string{"secrets"},
+				ResourceNames: []string{kubeadmconstants.KubeadmCertsSecret},
+			},
 		},
 	})
 	if err != nil {
