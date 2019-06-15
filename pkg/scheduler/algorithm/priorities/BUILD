@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "balanced_resource_allocation.go",
+        "even_pods_spread.go",
         "image_locality.go",
         "interpod_affinity.go",
         "least_requested.go",
@@ -37,6 +38,7 @@ go_library(
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/parsers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -54,6 +56,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "balanced_resource_allocation_test.go",
+        "even_pods_spread_test.go",
         "image_locality_test.go",
         "interpod_affinity_test.go",
         "least_requested_test.go",
