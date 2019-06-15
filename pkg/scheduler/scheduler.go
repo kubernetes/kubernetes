@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
@@ -42,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -300,19 +302,26 @@ func New(client clientset.Interface,
 		}
 		if len(policy.ExtenderConfigs) != 0 {
 			ignoredExtendedResources := sets.NewString()
+			var ignorableExtenders []algorithm.SchedulerExtender
 			for ii := range policy.ExtenderConfigs {
 				klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 				extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
 				if err != nil {
 					return nil, err
 				}
-				extenders = append(extenders, extender)
+				if !extender.IsIgnorable() {
+					extenders = append(extenders, extender)
+				} else {
+					ignorableExtenders = append(ignorableExtenders, extender)
+				}
 				for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
 					if r.IgnoredByScheduler {
 						ignoredExtendedResources.Insert(string(r.Name))
 					}
 				}
 			}
+			// place ignorable extenders to the tail of extenders
+			extenders = append(extenders, ignorableExtenders...)
 			predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 		}
 		// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
@@ -369,6 +378,7 @@ func New(client clientset.Interface,
 		return nil, err
 	}
 
+	enableNonPreempting := utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority)
 	algo := core.NewGenericScheduler(
 		schedulerCache,
 		podQueue,
@@ -384,6 +394,7 @@ func New(client clientset.Interface,
 		alwaysCheckAllPredicates,
 		options.disablePreemption,
 		options.percentageOfNodesToScore,
+		enableNonPreempting,
 	)
 
 	metrics.Register()
