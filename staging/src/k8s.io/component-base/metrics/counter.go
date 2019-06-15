@@ -86,6 +86,10 @@ type CounterVec struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
+	// todo: handle defaulting better
+	if opts.StabilityLevel == "" {
+		opts.StabilityLevel = ALPHA
+	}
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
@@ -104,6 +108,7 @@ func (v *CounterVec) DeprecatedVersion() *semver.Version {
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called
 // the underlying counterVec is a no-op.
 func (v *CounterVec) initializeMetric() {
+	v.CounterOpts.annotateStabilityLevel()
 	v.CounterVec = prometheus.NewCounterVec(v.CounterOpts.toPromCounterOpts(), v.originalLabels)
 }
 
