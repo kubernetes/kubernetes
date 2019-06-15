@@ -326,7 +326,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	if err = saveVolumeData(dataDir, volDataFileName, data); err != nil {
 		klog.Error(log("failed to save volume info data: %v", err))
-		if cleanerr := os.RemoveAll(dataDir); err != nil {
+		if cleanerr := os.RemoveAll(dataDir); cleanerr != nil {
 			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, cleanerr))
 		}
 		return err
