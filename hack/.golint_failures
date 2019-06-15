@@ -153,10 +153,8 @@ pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/client
 pkg/kubelet/cm
 pkg/kubelet/config
-pkg/kubelet/configmap
 pkg/kubelet/container
 pkg/kubelet/container/testing
-pkg/kubelet/custommetrics
 pkg/kubelet/dockershim
 pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
