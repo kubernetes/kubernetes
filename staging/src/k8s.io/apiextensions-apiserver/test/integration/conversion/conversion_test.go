@@ -954,10 +954,12 @@ func (c *conversionTestContext) setStorageVersion(t *testing.T, version string) 
 }
 
 func (c *conversionTestContext) waitForStorageVersion(t *testing.T, version string, versionedClient dynamic.ResourceInterface, obj *unstructured.Unstructured) *unstructured.Unstructured {
-	if err := c.etcdObjectReader.WaitForStorageVersion(version, obj.GetNamespace(), obj.GetName(), 30*time.Second, func() {
-		if _, err := versionedClient.Patch(obj.GetName(), types.MergePatchType, []byte(`{}`), metav1.PatchOptions{}); err != nil {
+	if err := c.etcdObjectReader.WaitForStorageVersion(version, obj.GetNamespace(), obj.GetName(), 30*time.Second, func(idx int) {
+		patch := fmt.Sprintf(`{"metadata":{"annotations":{"probePatch":"%d"}}}`, idx)
+		if _, err := versionedClient.Patch(obj.GetName(), types.MergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 			t.Fatalf("failed to update object: %v", err)
 		}
+		t.Logf("Patched probe CR to wait for storage version update: %d", idx)
 	}); err != nil {
 		t.Fatalf("failed waiting for storage version %s: %v", version, err)
 	}
