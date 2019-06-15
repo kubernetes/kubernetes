@@ -16572,7 +16572,7 @@ msgstr "Attach to a running container"
 
 #: pkg/kubectl/cmd/autoscale.go:56
 msgid "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
-msgstr "Auto-scale a Deployment, ReplicaSet, or ReplicationController"
+msgstr "Deployment, ReplicaSet, ReplicationController のオートスケールのルールを設定する"
 
 #: pkg/kubectl/cmd/expose.go:113
 msgid ""
@@ -16685,9 +16685,7 @@ msgstr "Create an ExternalName service."
 msgid ""
 "Delete resources by filenames, stdin, resources and names, or by resources "
 "and label selector"
-msgstr ""
-"Delete resources by filenames, stdin, resources and names, or by resources "
-"and label selector"
+msgstr "ファイル名、標準入力、リソースと名前、またはリソースとラベルセレクタでリソースを削除する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/delete_cluster.go#L38
 #: pkg/kubectl/cmd/config/delete_cluster.go:39
@@ -16722,7 +16720,7 @@ msgstr "Display Resource (CPU/Memory) usage of pods"
 
 #: pkg/kubectl/cmd/top.go:44
 msgid "Display Resource (CPU/Memory) usage."
-msgstr "Display Resource (CPU/Memory) usage."
+msgstr "CPU, Memoryのリソース使用量を表示する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/get_clusters.go#L40
 #: pkg/kubectl/cmd/clusterinfo.go:51
@@ -16765,7 +16763,7 @@ msgstr "Dump lots of relevant info for debugging and diagnosis"
 
 #: pkg/kubectl/cmd/edit.go:110
 msgid "Edit a resource on the server"
-msgstr "Edit a resource on the server"
+msgstr "サーバ上のリソースを編集する"
 
 #: pkg/kubectl/cmd/create_secret.go:160
 msgid "Email for Docker registry"
@@ -16839,7 +16837,7 @@ msgstr ""
 
 #: pkg/kubectl/cmd/rollout/rollout.go:47
 msgid "Manage a deployment rollout"
-msgstr "Manage a deployment rollout"
+msgstr "リソースのロールアウトを管理する"
 
 #: pkg/kubectl/cmd/drain.go:128
 msgid "Mark node as schedulable"
@@ -16855,7 +16853,7 @@ msgstr "Mark the provided resource as paused"
 
 #: pkg/kubectl/cmd/certificates.go:36
 msgid "Modify certificate resources."
-msgstr "Modify certificate resources."
+msgstr "Certificate Resources を変更する"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/config/config.go#L39
 #: pkg/kubectl/cmd/config/config.go:40
@@ -16941,7 +16939,7 @@ msgstr "Role this RoleBinding should reference"
 
 #: pkg/kubectl/cmd/run.go:97
 msgid "Run a particular image on the cluster"
-msgstr "Run a particular image on the cluster"
+msgstr "クラスタの上で特定のイメージを実行する"
 
 #: pkg/kubectl/cmd/proxy.go:69
 msgid "Run a proxy to the Kubernetes API server"
@@ -16955,11 +16953,11 @@ msgstr "Server location for Docker registry"
 msgid ""
 "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
 msgstr ""
-"Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job"
+"Deployment, ReplicaSet, Replication Controller, Job のレプリカ数を変更する"
 
 #: pkg/kubectl/cmd/set/set.go:38
 msgid "Set specific features on objects"
-msgstr "Set specific features on objects"
+msgstr "オブジェクトに特定の機能を設定する"
 
 #: pkg/kubectl/cmd/apply_set_last_applied.go:83
 msgid ""
@@ -17015,8 +17013,7 @@ msgid ""
 "Take a replication controller, service, deployment or pod and expose it as a "
 "new Kubernetes Service"
 msgstr ""
-"Take a replication controller, service, deployment or pod and expose it as a "
-"new Kubernetes Service"
+"Replication controller, Service, Deployment, Pod を使用して新しい Service として公開する"
 
 #: pkg/kubectl/cmd/run.go:117
 msgid "The image for the container to run."
