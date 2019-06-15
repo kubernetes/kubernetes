@@ -49,8 +49,8 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -251,8 +251,8 @@ func computeAverage(sample []float64) float64 {
 }
 
 func computeQuantile(sample []float64, quantile float64) float64 {
-	Expect(sort.Float64sAreSorted(sample)).To(Equal(true))
-	Expect(quantile >= 0.0 && quantile <= 1.0).To(Equal(true))
+	gomega.Expect(sort.Float64sAreSorted(sample)).To(gomega.Equal(true))
+	gomega.Expect(quantile >= 0.0 && quantile <= 1.0).To(gomega.Equal(true))
 	index := int(quantile*float64(len(sample))) - 1
 	if index < 0 {
 		return math.NaN()
@@ -296,7 +296,7 @@ func logPodStartupStatus(
 // runDensityTest will perform a density test and return the time it took for
 // all pods to start
 func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs *[]float64) time.Duration {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 
 	// Create all secrets, configmaps and daemons.
 	dtc.runSecretConfigs(testPhaseDurations.StartPhase(250, "secrets creation"))
@@ -317,7 +317,7 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	for i := range dtc.Configs {
 		config := dtc.Configs[i]
 		go func() {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			// Call wg.Done() in defer to avoid blocking whole test
 			// in case of error from RunRC.
 			defer wg.Done()
@@ -342,7 +342,7 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	printPodAllocationPhase := testPhaseDurations.StartPhase(400, "printing pod allocation")
 	defer printPodAllocationPhase.End()
 	// Print some data about Pod to Node allocation
-	By("Printing Pod to Node allocation data")
+	ginkgo.By("Printing Pod to Node allocation data")
 	podList, err := dtc.ClientSets[0].CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	pausePodAllocation := make(map[string]int)
@@ -367,17 +367,17 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 }
 
 func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	podCleanupPhase := testPhaseDurations.StartPhase(900, "latency pods deletion")
 	defer podCleanupPhase.End()
-	By("Deleting created Collections")
+	ginkgo.By("Deleting created Collections")
 	numberOfClients := len(dtc.ClientSets)
 	// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
 	for i := range dtc.Configs {
 		name := dtc.Configs[i].GetName()
 		namespace := dtc.Configs[i].GetNamespace()
 		kind := dtc.Configs[i].GetKind()
-		By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
+		ginkgo.By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
 		err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
 		framework.ExpectNoError(err)
 	}
@@ -414,7 +414,7 @@ var _ = SIGDescribe("Density", func() {
 	var etcdMetricsCollector *framework.EtcdMetricsCollector
 
 	// Gathers data prior to framework namespace teardown
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
@@ -426,7 +426,7 @@ var _ = SIGDescribe("Density", func() {
 		if saturationThreshold < MinSaturationThreshold {
 			saturationThreshold = MinSaturationThreshold
 		}
-		Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
+		gomega.Expect(e2eStartupTime).NotTo(gomega.BeNumerically(">", saturationThreshold))
 		saturationData := saturationTime{
 			TimeToSaturate: e2eStartupTime,
 			NumberOfNodes:  nodeCount,
@@ -472,9 +472,9 @@ var _ = SIGDescribe("Density", func() {
 		framework.PrintSummaries(summaries, testCaseBaseName)
 
 		// Fail if there were some high-latency requests.
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		gomega.Expect(highLatencyRequests).NotTo(gomega.BeNumerically(">", 0), "There should be no high-latency requests")
 		// Fail if more than the allowed threshold of measurements were missing in the latencyTest.
-		Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(Equal(true))
+		gomega.Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(gomega.Equal(true))
 	})
 
 	options := framework.Options{
@@ -486,7 +486,7 @@ var _ = SIGDescribe("Density", func() {
 	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
@@ -505,7 +505,7 @@ var _ = SIGDescribe("Density", func() {
 
 		_, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
 		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
+		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 
 		// Compute node capacity, leaving some slack for addon pods.
 		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
@@ -611,7 +611,7 @@ var _ = SIGDescribe("Density", func() {
 			name += " with quotas"
 		}
 		itArg := testArg
-		It(name, func() {
+		ginkgo.It(name, func() {
 			nodePrepPhase := testPhaseDurations.StartPhase(100, "node preparation")
 			defer nodePrepPhase.End()
 			nodePreparer := framework.NewE2ETestNodePreparer(
@@ -757,7 +757,7 @@ var _ = SIGDescribe("Density", func() {
 				// Pick latencyPodsIterations so that:
 				// latencyPodsIterations * nodeCount >= MinPodStartupMeasurements.
 				latencyPodsIterations := (MinPodStartupMeasurements + nodeCount - 1) / nodeCount
-				By(fmt.Sprintf("Scheduling additional %d Pods to measure startup latencies", latencyPodsIterations*nodeCount))
+				ginkgo.By(fmt.Sprintf("Scheduling additional %d Pods to measure startup latencies", latencyPodsIterations*nodeCount))
 
 				createTimes := make(map[string]metav1.Time, 0)
 				nodeNames := make(map[string]string, 0)
@@ -769,7 +769,7 @@ var _ = SIGDescribe("Density", func() {
 				checkPod := func(p *v1.Pod) {
 					mutex.Lock()
 					defer mutex.Unlock()
-					defer GinkgoRecover()
+					defer ginkgo.GinkgoRecover()
 
 					if p.Status.Phase == v1.PodRunning {
 						if _, found := watchTimes[p.Name]; !found {
@@ -819,7 +819,7 @@ var _ = SIGDescribe("Density", func() {
 								if !ok {
 									e2elog.Logf("Failed to cast observed object to *v1.Pod.")
 								}
-								Expect(ok).To(Equal(true))
+								gomega.Expect(ok).To(gomega.Equal(true))
 								go checkPod(p)
 							},
 							UpdateFunc: func(oldObj, newObj interface{}) {
@@ -827,7 +827,7 @@ var _ = SIGDescribe("Density", func() {
 								if !ok {
 									e2elog.Logf("Failed to cast observed object to *v1.Pod.")
 								}
-								Expect(ok).To(Equal(true))
+								gomega.Expect(ok).To(gomega.Equal(true))
 								go checkPod(p)
 							},
 						},
@@ -872,7 +872,7 @@ var _ = SIGDescribe("Density", func() {
 
 					latencyMeasurementPhase := testPhaseDurations.StartPhase(801+latencyPodsIteration*10, "pod startup latencies measurement")
 					defer latencyMeasurementPhase.End()
-					By("Waiting for all Pods begin observed by the watch...")
+					ginkgo.By("Waiting for all Pods begin observed by the watch...")
 					waitTimeout := 10 * time.Minute
 					for start := time.Now(); len(watchTimes) < watchTimesLen+nodeCount; time.Sleep(10 * time.Second) {
 						if time.Since(start) < waitTimeout {
@@ -894,11 +894,11 @@ var _ = SIGDescribe("Density", func() {
 					}
 					latencyMeasurementPhase.End()
 
-					By("Removing additional replication controllers")
+					ginkgo.By("Removing additional replication controllers")
 					podDeletionPhase := testPhaseDurations.StartPhase(802+latencyPodsIteration*10, "latency pods deletion")
 					defer podDeletionPhase.End()
 					deleteRC := func(i int) {
-						defer GinkgoRecover()
+						defer ginkgo.GinkgoRecover()
 						name := additionalPodsPrefix + "-" + strconv.Itoa(podIndexOffset+i+1)
 						framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 					}
@@ -999,7 +999,7 @@ var _ = SIGDescribe("Density", func() {
 })
 
 func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns, image, podType string, cpuRequest, memRequest resource.Quantity) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 	labels := map[string]string{
 		"type": podType,

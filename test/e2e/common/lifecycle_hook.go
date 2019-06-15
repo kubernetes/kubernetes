@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
@@ -39,7 +39,7 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 		postStartWaitTimeout = 2 * time.Minute
 		preStopWaitTimeout   = 30 * time.Second
 	)
-	Context("when create a pod with lifecycle hook", func() {
+	ginkgo.Context("when create a pod with lifecycle hook", func() {
 		var targetIP, targetURL string
 		podHandleHookRequest := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -60,9 +60,9 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 				},
 			},
 		}
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
-			By("create the container to handle the HTTPGet hook request.")
+			ginkgo.By("create the container to handle the HTTPGet hook request.")
 			newPod := podClient.CreateSync(podHandleHookRequest)
 			targetIP = newPod.Status.PodIP
 			targetURL = targetIP
@@ -71,23 +71,23 @@ var _ = framework.KubeDescribe("Container Lifecycle Hook", func() {
 			}
 		})
 		testPodWithHook := func(podWithHook *v1.Pod) {
-			By("create the pod with lifecycle hook")
+			ginkgo.By("create the pod with lifecycle hook")
 			podClient.CreateSync(podWithHook)
 			if podWithHook.Spec.Containers[0].Lifecycle.PostStart != nil {
-				By("check poststart hook")
-				Eventually(func() error {
+				ginkgo.By("check poststart hook")
+				gomega.Eventually(func() error {
 					return podClient.MatchContainerOutput(podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=poststart`)
-				}, postStartWaitTimeout, podCheckInterval).Should(BeNil())
+				}, postStartWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
-			By("delete the pod with lifecycle hook")
+			ginkgo.By("delete the pod with lifecycle hook")
 			podClient.DeleteSync(podWithHook.Name, metav1.NewDeleteOptions(15), framework.DefaultPodDeletionTimeout)
 			if podWithHook.Spec.Containers[0].Lifecycle.PreStop != nil {
-				By("check prestop hook")
-				Eventually(func() error {
+				ginkgo.By("check prestop hook")
+				gomega.Eventually(func() error {
 					return podClient.MatchContainerOutput(podHandleHookRequest.Name, podHandleHookRequest.Spec.Containers[0].Name,
 						`GET /echo\?msg=prestop`)
-				}, preStopWaitTimeout, podCheckInterval).Should(BeNil())
+				}, preStopWaitTimeout, podCheckInterval).Should(gomega.BeNil())
 			}
 		}
 		/*

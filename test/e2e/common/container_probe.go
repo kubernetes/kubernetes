@@ -33,8 +33,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	var podClient *framework.PodClient
 	probe := webserverProbeBuilder{}
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
 
@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		framework.ExpectNoError(err)
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
-		Expect(isReady).To(BeTrue(), "pod should be ready")
+		gomega.Expect(isReady).To(gomega.BeTrue(), "pod should be ready")
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}
 
 		restartCount := getRestartCount(p)
-		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -94,22 +94,22 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	*/
 	framework.ConformanceIt("with readiness probe that fails should never be ready and never restart [NodeConformance]", func() {
 		p := podClient.Create(testWebServerPodSpec(probe.withFailing().build(), nil, "test-webserver", 80))
-		Consistently(func() (bool, error) {
+		gomega.Consistently(func() (bool, error) {
 			p, err := podClient.Get(p.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
 			return podutil.IsPodReady(p), nil
-		}, 1*time.Minute, 1*time.Second).ShouldNot(BeTrue(), "pod should not be ready")
+		}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.BeTrue(), "pod should not be ready")
 
 		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
 		isReady, err := testutils.PodRunningReady(p)
-		Expect(isReady).NotTo(BeTrue(), "pod should be not ready")
+		gomega.Expect(isReady).NotTo(gomega.BeTrue(), "pod should be not ready")
 
 		restartCount := getRestartCount(p)
-		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
+		gomega.Expect(restartCount == 0).To(gomega.BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
 	/*
@@ -164,7 +164,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, using tcp socket, no restart
 		Description: A Pod is created with liveness probe on tcp socket 8080. The http handler on port 8080 will return http errors after 10 seconds, but socket will remain open. Liveness probe MUST not fail to check health and the restart count should remain 0.
 	*/
-	It("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
+	ginkgo.It("should *not* be restarted with a tcp:8080 liveness probe [NodeConformance]", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             tcpSocketHandler(8080),
 			InitialDelaySeconds: 15,
@@ -210,7 +210,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod liveness probe, docker exec, restart
 		Description: A Pod is created with liveness probe with a Exec action on the Pod. If the liveness probe call  does not return within the timeout specified, liveness probe MUST restart the Pod.
 	*/
-	It("should be restarted with a docker exec liveness probe with timeout ", func() {
+	ginkgo.It("should be restarted with a docker exec liveness probe with timeout ", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
 		framework.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")
 		cmd := []string{"/bin/sh", "-c", "sleep 600"}
@@ -229,7 +229,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod http liveness probe, redirected to a local address
 		Description: A Pod is created with liveness probe on http endpoint /redirect?loc=healthz. The http handler on the /redirect will redirect to the /healthz endpoint, which will return a http error after 10 seconds since the Pod is started. This MUST result in liveness check failure. The Pod MUST now be killed and restarted incrementing restart count to 1.
 	*/
-	It("should be restarted with a local redirect http liveness probe", func() {
+	ginkgo.It("should be restarted with a local redirect http liveness probe", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             httpGetHandler("/redirect?loc="+url.QueryEscape("/healthz"), 8080),
 			InitialDelaySeconds: 15,
@@ -244,7 +244,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Testname: Pod http liveness probe, redirected to a non-local address
 		Description: A Pod is created with liveness probe on http endpoint /redirect with a redirect to http://0.0.0.0/. The http handler on the /redirect should not follow the redirect, but instead treat it as a success and generate an event.
 	*/
-	It("should *not* be restarted with a non-local redirect http liveness probe", func() {
+	ginkgo.It("should *not* be restarted with a non-local redirect http liveness probe", func() {
 		livenessProbe := &v1.Probe{
 			Handler:             httpGetHandler("/redirect?loc="+url.QueryEscape("http://0.0.0.0/"), 8080),
 			InitialDelaySeconds: 15,
@@ -407,14 +407,14 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
-	Expect(pod.Spec.Containers).NotTo(BeEmpty())
+	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	containerName := pod.Spec.Containers[0].Name
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
-		By("deleting the pod")
+		ginkgo.By("deleting the pod")
 		podClient.Delete(pod.Name, metav1.NewDeleteOptions(0))
 	}()
-	By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
+	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
 	podClient.Create(pod)
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
@@ -425,7 +425,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	e2elog.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
-	By("checking the pod's current state and verifying that restartCount is present")
+	ginkgo.By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount

@@ -37,7 +37,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
 	testutils "k8s.io/kubernetes/test/utils"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	scaleclient "k8s.io/client-go/scale"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -188,7 +188,7 @@ func (rc *ResourceConsumer) ConsumeCustomMetric(amount int) {
 }
 
 func (rc *ResourceConsumer) makeConsumeCPURequests() {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
@@ -209,7 +209,7 @@ func (rc *ResourceConsumer) makeConsumeCPURequests() {
 }
 
 func (rc *ResourceConsumer) makeConsumeMemRequests() {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
@@ -230,7 +230,7 @@ func (rc *ResourceConsumer) makeConsumeMemRequests() {
 }
 
 func (rc *ResourceConsumer) makeConsumeCustomMetric() {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	rc.stopWaitGroup.Add(1)
 	defer rc.stopWaitGroup.Done()
 	sleepTime := time.Duration(0)
@@ -406,7 +406,7 @@ func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, max
 
 // Pause stops background goroutines responsible for consuming resources.
 func (rc *ResourceConsumer) Pause() {
-	By(fmt.Sprintf("HPA pausing RC %s", rc.name))
+	ginkgo.By(fmt.Sprintf("HPA pausing RC %s", rc.name))
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
 	rc.stopCustomMetric <- 0
@@ -415,14 +415,14 @@ func (rc *ResourceConsumer) Pause() {
 
 // Pause starts background goroutines responsible for consuming resources.
 func (rc *ResourceConsumer) Resume() {
-	By(fmt.Sprintf("HPA resuming RC %s", rc.name))
+	ginkgo.By(fmt.Sprintf("HPA resuming RC %s", rc.name))
 	go rc.makeConsumeCPURequests()
 	go rc.makeConsumeMemRequests()
 	go rc.makeConsumeCustomMetric()
 }
 
 func (rc *ResourceConsumer) CleanUp() {
-	By(fmt.Sprintf("Removing consuming RC %s", rc.name))
+	ginkgo.By(fmt.Sprintf("Removing consuming RC %s", rc.name))
 	close(rc.stopCPU)
 	close(rc.stopMem)
 	close(rc.stopCustomMetric)
@@ -437,7 +437,7 @@ func (rc *ResourceConsumer) CleanUp() {
 }
 
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string) {
-	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
+	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := c.CoreV1().Services(ns).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
@@ -484,14 +484,14 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
-		By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
+		ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
 		framework.ExpectNoError(replicaset.RunReplicaSet(rsConfig))
 		break
 	default:
 		framework.Failf(invalidKind)
 	}
 
-	By(fmt.Sprintf("Running controller"))
+	ginkgo.By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
 	_, err = c.CoreV1().Services(ns).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{

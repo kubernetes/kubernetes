@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
@@ -60,32 +60,32 @@ var _ = framework.KubeDescribe("KubeletManagedEtcHosts", func() {
 		This test is marked LinuxOnly since Windows cannot mount individual files in Containers.
 	*/
 	framework.ConformanceIt("should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance]", func() {
-		By("Setting up the test")
+		ginkgo.By("Setting up the test")
 		config.setup()
 
-		By("Running the test")
+		ginkgo.By("Running the test")
 		config.verifyEtcHosts()
 	})
 })
 
 func (config *KubeletManagedHostConfig) verifyEtcHosts() {
-	By("Verifying /etc/hosts of container is kubelet-managed for pod with hostNetwork=false")
+	ginkgo.By("Verifying /etc/hosts of container is kubelet-managed for pod with hostNetwork=false")
 	assertManagedStatus(config, etcHostsPodName, true, "busybox-1")
 	assertManagedStatus(config, etcHostsPodName, true, "busybox-2")
 
-	By("Verifying /etc/hosts of container is not kubelet-managed since container specifies /etc/hosts mount")
+	ginkgo.By("Verifying /etc/hosts of container is not kubelet-managed since container specifies /etc/hosts mount")
 	assertManagedStatus(config, etcHostsPodName, false, "busybox-3")
 
-	By("Verifying /etc/hosts content of container is not kubelet-managed for pod with hostNetwork=true")
+	ginkgo.By("Verifying /etc/hosts content of container is not kubelet-managed for pod with hostNetwork=true")
 	assertManagedStatus(config, etcHostsHostNetworkPodName, false, "busybox-1")
 	assertManagedStatus(config, etcHostsHostNetworkPodName, false, "busybox-2")
 }
 
 func (config *KubeletManagedHostConfig) setup() {
-	By("Creating hostNetwork=false pod")
+	ginkgo.By("Creating hostNetwork=false pod")
 	config.createPodWithoutHostNetwork()
 
-	By("Creating hostNetwork=true pod")
+	ginkgo.By("Creating hostNetwork=true pod")
 	config.createPodWithHostNetwork()
 }
 

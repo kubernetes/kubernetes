@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
 type Suite string
@@ -135,7 +135,7 @@ func NewSVCByName(c clientset.Interface, ns, name string) error {
 
 // NewRCByName creates a replication controller with a selector by name of name.
 func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
-	By(fmt.Sprintf("creating replication controller %s", name))
+	ginkgo.By(fmt.Sprintf("creating replication controller %s", name))
 	return c.CoreV1().ReplicationControllers(ns).Create(framework.RcByNamePort(
 		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
