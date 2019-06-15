@@ -545,7 +545,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		if statusErr := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); statusErr != nil {
+			klog.Warningf("failed to update status : %v", statusErr)
+			utilruntime.HandleError(err)
+		}
 		return fmt.Errorf("invalid API version in scale target reference: %v", err)
 	}
 
@@ -558,7 +561,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		if statusErr := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); statusErr != nil {
+			klog.Warningf("failed to update status : %v", statusErr)
+			utilruntime.HandleError(err)
+		}
 		return fmt.Errorf("unable to determine resource for scale target reference: %v", err)
 	}
 
@@ -566,7 +572,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		if statusErr := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); statusErr != nil {
+			klog.Warningf("failed to update status : %v", statusErr)
+			utilruntime.HandleError(err)
+		}
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
 	setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededGetScale", "the HPA controller was able to get the target's current scale")
