@@ -236,7 +236,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		}
 	case testpatterns.DynamicPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			ginkgo.It("should fail in binding dynamic provisioned PV to PVC", func() {
+			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow]", func() {
 				init()
 				defer cleanup()
 
