@@ -197,10 +197,26 @@ var _ = SIGDescribe("Proxy", func() {
 				subresourcePodProxyURL("https", "460") + "/": "tls baz",
 				subresourcePodProxyURL("https", "462") + "/": "tls qux",
 
+				// TODO(spiffxp): this is a lot of copy paste of the above, can we refactor
+				// add coverage of proxying to /path/to/resource
+				subresourceServiceProxyURL("http", "portname1") + "/path/to/resource": "foo",
+				subresourceServiceProxyURL("", "portname2") + "/path/to/resource":     "bar",
+				subresourcePodProxyURL("", "160") + "/path/to/resource":               "foo",
+				subresourcePodProxyURL("https", "462") + "/path/to/resource":          "tls qux",
+				// add coverage of proxying with no path at all
+				subresourceServiceProxyURL("http", "portname1") + "": "foo",
+				subresourceServiceProxyURL("", "portname2") + "":     "bar",
+				subresourcePodProxyURL("", "160") + "":               "foo",
+				subresourcePodProxyURL("https", "462") + "":          "tls qux",
+
 				// TODO: below entries don't work, but I believe we should make them work.
 				// podPrefix + ":dest1": "foo",
 				// podPrefix + ":dest2": "bar",
 			}
+
+			// TODO(spiffxp): OPTIONS and HEAD should work but fail, or don't hit the audit log, why?
+			// TODO(spiffxp): these don't mean much if something isn't listening for them on the other side
+			var proxyMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 
 			wg := sync.WaitGroup{}
 			errs := []string{}
@@ -212,37 +228,39 @@ var _ = SIGDescribe("Proxy", func() {
 			}
 			d := time.Since(start)
 			framework.Logf("setup took %v, starting test cases", d)
-			numberTestCases := len(expectations)
+			numberTestCases := len(expectations) * len(proxyMethods)
 			totalAttempts := numberTestCases * proxyAttempts
 			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
 
 			for i := 0; i < proxyAttempts; i++ {
 				wg.Add(numberTestCases)
 				for path, val := range expectations {
-					go func(i int, path, val string) {
-						defer wg.Done()
-						// this runs the test case
-						body, status, d, err := doProxy(f, path, i)
+					for _, verb := range proxyMethods {
+						go func(i int, verb, path, val string) {
+							defer wg.Done()
+							// this runs the test case
+							body, status, d, err := doProxy(f, verb, path, i)
 
-						if err != nil {
-							if serr, ok := err.(*errors.StatusError); ok {
-								recordError(fmt.Sprintf("%v (%v; %v): path %v gave status error: %+v",
-									i, status, d, path, serr.Status()))
-							} else {
-								recordError(fmt.Sprintf("%v: path %v gave error: %v", i, path, err))
+							if err != nil {
+								if serr, ok := err.(*errors.StatusError); ok {
+									recordError(fmt.Sprintf("%v (%v; %v): verb %v path %v gave status error: %+v",
+										i, status, d, verb, path, serr.Status()))
+								} else {
+									recordError(fmt.Sprintf("%v: verb %v path %v gave error: %v", i, verb, path, err))
+								}
+								return
 							}
-							return
-						}
-						if status != http.StatusOK {
-							recordError(fmt.Sprintf("%v: path %v gave status: %v", i, path, status))
-						}
-						if e, a := val, string(body); e != a {
-							recordError(fmt.Sprintf("%v: path %v: wanted %v, got %v", i, path, e, a))
-						}
-						if d > proxyHTTPCallTimeout {
-							recordError(fmt.Sprintf("%v: path %v took %v > %v", i, path, d, proxyHTTPCallTimeout))
-						}
-					}(i, path, val)
+							if status != http.StatusOK {
+								recordError(fmt.Sprintf("%v: verb %v path %v gave status: %v", i, verb, path, status))
+							}
+							if e, a := val, string(body); e != a {
+								recordError(fmt.Sprintf("%v: verb %v, path %v: wanted %v, got %v", i, verb, path, e, a))
+							}
+							if d > proxyHTTPCallTimeout {
+								recordError(fmt.Sprintf("%v: verb %v, path %v took %v > %v", i, verb, path, d, proxyHTTPCallTimeout))
+							}
+						}(i, verb, path, val)
+					}
 				}
 				wg.Wait()
 			}
@@ -261,7 +279,7 @@ var _ = SIGDescribe("Proxy", func() {
 	})
 })
 
-func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
+func doProxy(f *framework.Framework, verb, path string, i int) (body []byte, statusCode int, d time.Duration, err error) {
 	// About all of the proxy accesses in this file:
 	// * AbsPath is used because it preserves the trailing '/'.
 	// * Do().Raw() is used (instead of DoRaw()) because it will turn an
@@ -269,7 +287,7 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.
 	start := time.Now()
-	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
+	body, err = f.ClientSet.CoreV1().RESTClient().Verb(verb).AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
 		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
@@ -297,7 +315,8 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
-		_, status, d, err := doProxy(f, prefix+node.Name+nodeDest, i)
+		// TODO(spiffxp): what does this test look like with verbs other than GET
+		_, status, d, err := doProxy(f, "GET", prefix+node+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
 			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
