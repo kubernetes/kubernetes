@@ -178,7 +178,7 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 	m.Unlock()
 
 	if !cpus.IsEmpty() {
-		err = m.updateContainerCPUSet(containerID, cpus)
+		err = m.updateContainerCPUSet(p, c, containerID, cpus)
 		if err != nil {
 			klog.Errorf("[cpumanager] AddContainer error: %v", err)
 			m.Lock()
@@ -271,7 +271,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			}
 
 			klog.V(4).Infof("[cpumanager] reconcileState: updating container (pod: %s, container: %s, container id: %s, cpuset: \"%v\")", pod.Name, container.Name, containerID, cset)
-			err = m.updateContainerCPUSet(containerID, cset)
+			err = m.updateContainerCPUSet(pod, &container, containerID, cset)
 			if err != nil {
 				klog.Errorf("[cpumanager] reconcileState: failed to update container (pod: %s, container: %s, container id: %s, cpuset: \"%v\", error: %v)", pod.Name, container.Name, containerID, cset, err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
@@ -309,14 +309,18 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
 }
 
-func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
+func (m *manager) updateContainerCPUSet(pod *v1.Pod, container *v1.Container, containerID string, cpus cpuset.CPUSet) error {
 	// TODO: Consider adding a `ResourceConfigForContainer` helper in
 	// helpers_linux.go similar to what exists for pods.
 	// It would be better to pass the full container resources here instead of
 	// this patch-like partial resources.
-	return m.containerRuntime.UpdateContainerResources(
-		containerID,
-		&runtimeapi.LinuxContainerResources{
-			CpusetCpus: cpus.String(),
-		})
+	resources := &runtimeapi.LinuxContainerResources{
+		CpusetCpus: cpus.String(),
+	}
+
+	if !m.policy.EnforceCPUQuota(pod, container) {
+		resources.CpuQuota = -1
+	}
+
+	return m.containerRuntime.UpdateContainerResources(containerID, resources)
 }

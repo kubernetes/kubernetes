@@ -29,4 +29,6 @@ type Policy interface {
 	AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error
 	// RemoveContainer call is idempotent
 	RemoveContainer(s state.State, containerID string) error
+	// EnforceCPUQuota determines whether the pod should have CFS CPU quota enforced
+	EnforceCPUQuota(pod *v1.Pod, container *v1.Container) bool
 }

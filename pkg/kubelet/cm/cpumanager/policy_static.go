@@ -203,6 +203,12 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error 
 	return nil
 }
 
+func (p *staticPolicy) EnforceCPUQuota(pod *v1.Pod, container *v1.Container) bool {
+	// When a dedicated CPU set is assigned, unset CFS CPU quota to avoid performance
+	// degradation due to the way this quota is implemented in the Linux kernel.
+	return guaranteedCPUs(pod, container) == 0
+}
+
 func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int) (cpuset.CPUSet, error) {
 	klog.Infof("[cpumanager] allocateCpus: (numCPUs: %d)", numCPUs)
 	result, err := takeByTopology(p.topology, p.assignableCPUs(s), numCPUs)

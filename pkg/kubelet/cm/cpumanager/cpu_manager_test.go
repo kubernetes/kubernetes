@@ -102,6 +102,10 @@ func (p *mockPolicy) RemoveContainer(s state.State, containerID string) error {
 	return p.err
 }
 
+func (p *mockPolicy) EnforceCPUQuota(pod *v1.Pod, container *v1.Container) bool {
+	return true
+}
+
 type mockRuntimeService struct {
 	err error
 }
@@ -363,7 +367,7 @@ func TestReconcileState(t *testing.T) {
 		expectFailedContainerName    string
 	}{
 		{
-			description: "cpu manager reconclie - no error",
+			description: "cpu manager reconcile - no error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -431,7 +435,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "",
 		},
 		{
-			description: "cpu manager reconclie - pod status not found",
+			description: "cpu manager reconcile - pod status not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -456,7 +460,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - container id not found",
+			description: "cpu manager reconcile - container id not found",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -488,7 +492,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - cpuset is empty",
+			description: "cpu manager reconcile - cpuset is empty",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -522,7 +526,7 @@ func TestReconcileState(t *testing.T) {
 			expectFailedContainerName:    "fakeName",
 		},
 		{
-			description: "cpu manager reconclie - container update error",
+			description: "cpu manager reconcile - container update error",
 			activePods: []*v1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
