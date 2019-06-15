@@ -113,6 +113,9 @@ type crdHandler struct {
 
 	// request timeout we should delay storage teardown for
 	requestTimeout time.Duration
+
+	// minRequestTimeout applies to CR's list/watch calls
+	minRequestTimeout time.Duration
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -155,7 +158,8 @@ func NewCustomResourceDefinitionHandler(
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 	masterCount int,
 	authorizer authorizer.Authorizer,
-	requestTimeout time.Duration) (*crdHandler, error) {
+	requestTimeout time.Duration,
+	minRequestTimeout time.Duration) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -168,6 +172,7 @@ func NewCustomResourceDefinitionHandler(
 		masterCount:             masterCount,
 		authorizer:              authorizer,
 		requestTimeout:          requestTimeout,
+		minRequestTimeout:       minRequestTimeout,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
@@ -289,17 +294,16 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *crdHandler) serveResource(w http.ResponseWriter, req *http.Request, requestInfo *apirequest.RequestInfo, crdInfo *crdInfo, terminating bool, supportedTypes []string) http.HandlerFunc {
 	requestScope := crdInfo.requestScopes[requestInfo.APIVersion]
 	storage := crdInfo.storages[requestInfo.APIVersion].CustomResource
-	minRequestTimeout := 1 * time.Minute
 
 	switch requestInfo.Verb {
 	case "get":
 		return handlers.GetResource(storage, storage, requestScope)
 	case "list":
 		forceWatch := false
-		return handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
+		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
 	case "watch":
 		forceWatch := true
-		return handlers.ListResource(storage, storage, requestScope, forceWatch, minRequestTimeout)
+		return handlers.ListResource(storage, storage, requestScope, forceWatch, r.minRequestTimeout)
 	case "create":
 		if terminating {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
