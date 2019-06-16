@@ -196,26 +196,6 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 	return c.PersistentVolumeClaims(namespace).Get(name)
 }
 
-// CachedNodeInfo implements NodeInfo
-type CachedNodeInfo struct {
-	corelisters.NodeLister
-}
-
-// GetNodeInfo returns cached data for the node 'id'.
-func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
-	node, err := c.Get(id)
-
-	if apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", id, err)
-	}
-
-	return node, nil
-}
-
 // StorageClassInfo interface represents anything that can get a storage class object by class name.
 type StorageClassInfo interface {
 	GetStorageClassInfo(className string) (*storagev1.StorageClass, error)

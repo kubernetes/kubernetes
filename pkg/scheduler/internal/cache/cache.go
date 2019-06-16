@@ -707,3 +707,16 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 func (cache *schedulerCache) NodeTree() *NodeTree {
 	return cache.nodeTree
 }
+
+// GetNodeInfo returns cached data for the node name.
+func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
+	cache.mu.RLock()
+	defer cache.mu.RUnlock()
+
+	n, ok := cache.nodes[nodeName]
+	if !ok {
+		return nil, fmt.Errorf("error retrieving node '%v' from cache", nodeName)
+	}
+
+	return n.info.Node(), nil
+}
