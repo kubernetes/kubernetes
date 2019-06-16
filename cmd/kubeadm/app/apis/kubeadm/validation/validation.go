@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
@@ -103,7 +102,10 @@ func ValidateNodeRegistrationOptions(nro *kubeadm.NodeRegistrationOptions, fldPa
 	if len(nro.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "--node-name or .nodeRegistration.name in the config file is a required value. It seems like this value couldn't be automatically detected in your environment, please specify the desired value using the CLI or config file."))
 	} else {
-		allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(nro.Name, field.NewPath("name"))...)
+		nameFldPath := fldPath.Child("name")
+		for _, err := range validation.IsDNS1123Subdomain(nro.Name) {
+			allErrs = append(allErrs, field.Invalid(nameFldPath, nro.Name, err))
+		}
 	}
 	allErrs = append(allErrs, ValidateSocketPath(nro.CRISocket, fldPath.Child("criSocket"))...)
 	// TODO: Maybe validate .Taints as well in the future using something like validateNodeTaints() in pkg/apis/core/validation
@@ -384,7 +386,10 @@ func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path)
 // ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dnsDomain"))...)
+	dnsDomainFldPath := field.NewPath("dnsDomain")
+	for _, err := range validation.IsDNS1123Subdomain(c.DNSDomain) {
+		allErrs = append(allErrs, field.Invalid(dnsDomainFldPath, c.DNSDomain, err))
+	}
 	allErrs = append(allErrs, ValidateIPNetFromString(c.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("serviceSubnet"))...)
 	if len(c.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.PodSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("podSubnet"))...)
