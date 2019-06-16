@@ -476,7 +476,7 @@ func makeEventRecorder(kubeDeps *kubelet.Dependencies, nodeName types.NodeName) 
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: componentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartLogging(klog.V(3).Infof)
 	if kubeDeps.EventClient != nil {
-		klog.V(4).Infof("Sending events to api server.")
+		klog.V(4).Info("Sending events to api server.")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeDeps.EventClient.Events("")})
 	} else {
 		klog.Warning("No api server defined - no events will be sent to API server.")
@@ -788,7 +788,7 @@ func buildKubeletClientConfig(s *options.KubeletServer, nodeName types.NodeName)
 		// which provides a high powered kubeconfig on the master with cert/key data, we must
 		// bootstrap the cert manager with the contents of the initial client config.
 
-		klog.Infof("Client rotation is on, will bootstrap in background")
+		klog.Info("Client rotation is on, will bootstrap in background")
 		certConfig, clientConfig, err := bootstrap.LoadClientConfig(s.KubeConfig, s.BootstrapKubeconfig, s.CertDirectory)
 		if err != nil {
 			return nil, nil, err
@@ -1269,7 +1269,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	if err != nil {
 		return err
 	}
-	klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
+	klog.V(2).Info("Starting the GRPC server for the docker CRI shim.")
 	server := dockerremote.NewDockerServer(f.RemoteRuntimeEndpoint, ds)
 	if err := server.Start(); err != nil {
 		return err

@@ -303,7 +303,7 @@ func makePodSourceConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, ku
 	}
 
 	if kubeDeps.KubeClient != nil {
-		klog.Infof("Watching apiserver")
+		klog.Info("Watching apiserver")
 		if updatechannel == nil {
 			updatechannel = cfg.Channel(kubetypes.ApiserverSource)
 		}
@@ -566,7 +566,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.configMapManager = configMapManager
 
 	if klet.experimentalHostUserNamespaceDefaulting {
-		klog.Infof("Experimental host user namespace defaulting is enabled.")
+		klog.Info("Experimental host user namespace defaulting is enabled.")
 	}
 
 	machineInfo, err := klet.cadvisor.MachineInfo()
@@ -631,7 +631,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
 			remoteRuntimeEndpoint,
 			remoteImageEndpoint)
-		klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
+		klog.V(2).Info("Starting the GRPC server for the docker CRI shim.")
 		server := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
 		if err := server.Start(); err != nil {
 			return nil, err
@@ -1272,13 +1272,13 @@ func (kl *Kubelet) StartGarbageCollection() {
 				loggedContainerGCFailure = false
 			}
 
-			klog.V(vLevel).Infof("Container garbage collection succeeded")
+			klog.V(vLevel).Info("Container garbage collection succeeded")
 		}
 	}, ContainerGCPeriod, wait.NeverStop)
 
 	// when the high threshold is set to 100, stub the image GC manager
 	if kl.kubeletConfiguration.ImageGCHighThresholdPercent == 100 {
-		klog.V(2).Infof("ImageGCHighThresholdPercent is set 100, Disable image GC")
+		klog.V(2).Info("ImageGCHighThresholdPercent is set 100, Disable image GC")
 		return
 	}
 
@@ -1300,7 +1300,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 				prevImageGCFailed = false
 			}
 
-			klog.V(vLevel).Infof("Image garbage collection succeeded")
+			klog.V(vLevel).Info("Image garbage collection succeeded")
 		}
 	}, ImageGCPeriod, wait.NeverStop)
 }
@@ -1381,7 +1381,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules() {
 		// Adding Registration Callback function for Device Manager
 		kl.pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, kl.containerManager.GetPluginRegistrationHandler())
 		// Start the plugin manager
-		klog.V(4).Infof("starting plugin manager")
+		klog.V(4).Info("starting plugin manager")
 		go kl.pluginManager.Run(kl.sourcesReady, wait.NeverStop)
 	}
 }
@@ -1966,9 +1966,9 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
 			// skip housekeeping, as we may accidentally delete pods from unready sources.
-			klog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
+			klog.V(4).Info("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
 		} else {
-			klog.V(4).Infof("SyncLoop (housekeeping)")
+			klog.V(4).Info("SyncLoop (housekeeping)")
 			if err := handler.HandlePodCleanups(); err != nil {
 				klog.Errorf("Failed cleaning pods: %v", err)
 			}
