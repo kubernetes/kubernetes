@@ -276,13 +276,13 @@ func (p *PriorityQueue) isPodBackingOff(pod *v1.Pod) bool {
 
 // backoffPod checks if pod is currently undergoing backoff. If it is not it updates the backoff
 // timeout otherwise it does nothing.
-func (p *PriorityQueue) backoffPod(pod *v1.Pod) {
+func (p *PriorityQueue) backoffPod(podInfo *framework.PodInfo) {
 	p.podBackoff.CleanupPodsCompletesBackingoff()
 
-	podID := nsNameForPod(pod)
+	podID := nsNameForPod(podInfo.Pod)
 	boTime, found := p.podBackoff.GetBackoffTime(podID)
 	if !found || boTime.Before(p.clock.Now()) {
-		p.podBackoff.BackoffPod(podID)
+		p.podBackoff.BackoffPod(podID, podInfo)
 	}
 }
 
@@ -313,7 +313,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pod *v1.Pod, podSchedulingC
 	}
 
 	// Every unschedulable pod is subject to backoff timers.
-	p.backoffPod(pod)
+	p.backoffPod(pInfo)
 
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulableQ.

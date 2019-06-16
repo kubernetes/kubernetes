@@ -1070,7 +1070,7 @@ var (
 		queue.MoveAllToActiveQueue()
 	}
 	backoffPod = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
-		queue.backoffPod(pInfo.Pod)
+		queue.backoffPod(pInfo)
 	}
 	flushBackoffQ = func(queue *PriorityQueue, _ *framework.PodInfo) {
 		queue.clock.(*clock.FakeClock).Step(2 * time.Second)

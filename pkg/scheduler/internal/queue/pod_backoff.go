@@ -21,6 +21,7 @@ import (
 	"time"
 
 	ktypes "k8s.io/apimachinery/pkg/types"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // PodBackoffMap is a structure that stores backoff related information for pods
@@ -33,17 +34,17 @@ type PodBackoffMap struct {
 	maxDuration time.Duration
 	// map for pod -> number of attempts for this pod
 	podAttempts map[ktypes.NamespacedName]int
-	// map for pod -> lastUpdateTime pod of this pod
-	podLastUpdateTime map[ktypes.NamespacedName]time.Time
+	// map for pod -> *framework.PodInfo
+	podInfoMap map[ktypes.NamespacedName]*framework.PodInfo
 }
 
 // NewPodBackoffMap creates a PodBackoffMap with initial duration and max duration.
 func NewPodBackoffMap(initialDuration, maxDuration time.Duration) *PodBackoffMap {
 	return &PodBackoffMap{
-		initialDuration:   initialDuration,
-		maxDuration:       maxDuration,
-		podAttempts:       make(map[ktypes.NamespacedName]int),
-		podLastUpdateTime: make(map[ktypes.NamespacedName]time.Time),
+		initialDuration: initialDuration,
+		maxDuration:     maxDuration,
+		podAttempts:     make(map[ktypes.NamespacedName]int),
+		podInfoMap:      make(map[ktypes.NamespacedName]*framework.PodInfo),
 	}
 }
 
@@ -54,7 +55,7 @@ func (pbm *PodBackoffMap) GetBackoffTime(nsPod ktypes.NamespacedName) (time.Time
 	if _, found := pbm.podAttempts[nsPod]; found == false {
 		return time.Time{}, false
 	}
-	lastUpdateTime := pbm.podLastUpdateTime[nsPod]
+	lastUpdateTime := pbm.podInfoMap[nsPod].Timestamp
 	backoffDuration := pbm.calculateBackoffDuration(nsPod)
 	backoffTime := lastUpdateTime.Add(backoffDuration)
 	return backoffTime, true
@@ -79,7 +80,7 @@ func (pbm *PodBackoffMap) calculateBackoffDuration(nsPod ktypes.NamespacedName) 
 // Lock is supposed to be acquired by caller.
 func (pbm *PodBackoffMap) clearPodBackoff(nsPod ktypes.NamespacedName) {
 	delete(pbm.podAttempts, nsPod)
-	delete(pbm.podLastUpdateTime, nsPod)
+	delete(pbm.podInfoMap, nsPod)
 }
 
 // ClearPodBackoff is the thread safe version of clearPodBackoff
@@ -95,8 +96,8 @@ func (pbm *PodBackoffMap) ClearPodBackoff(nsPod ktypes.NamespacedName) {
 func (pbm *PodBackoffMap) CleanupPodsCompletesBackingoff() {
 	pbm.lock.Lock()
 	defer pbm.lock.Unlock()
-	for pod, value := range pbm.podLastUpdateTime {
-		if value.Add(pbm.maxDuration).Before(time.Now()) {
+	for pod, podInfo := range pbm.podInfoMap {
+		if podInfo.Timestamp.Add(pbm.maxDuration).Before(time.Now()) {
 			pbm.clearPodBackoff(pod)
 		}
 	}
@@ -104,9 +105,9 @@ func (pbm *PodBackoffMap) CleanupPodsCompletesBackingoff() {
 
 // BackoffPod updates the lastUpdateTime for an nsPod,
 // and increases its numberOfAttempts by 1
-func (pbm *PodBackoffMap) BackoffPod(nsPod ktypes.NamespacedName) {
+func (pbm *PodBackoffMap) BackoffPod(nsPod ktypes.NamespacedName, podInfo *framework.PodInfo) {
 	pbm.lock.Lock()
-	pbm.podLastUpdateTime[nsPod] = time.Now()
+	pbm.podInfoMap[nsPod] = podInfo
 	pbm.podAttempts[nsPod]++
 	pbm.lock.Unlock()
 }
