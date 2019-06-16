@@ -277,12 +277,33 @@ func (p *PriorityQueue) isPodBackingOff(pod *v1.Pod) bool {
 // backoffPod checks if pod is currently undergoing backoff. If it is not it updates the backoff
 // timeout otherwise it does nothing.
 func (p *PriorityQueue) backoffPod(podInfo *framework.PodInfo) {
-	p.podBackoff.CleanupPodsCompletesBackingoff()
+	p.cleanupPodsCompletesBackingoff()
 
 	podID := nsNameForPod(podInfo.Pod)
 	boTime, found := p.podBackoff.GetBackoffTime(podID)
 	if !found || boTime.Before(p.clock.Now()) {
 		p.podBackoff.BackoffPod(podID, podInfo)
+	}
+}
+
+// cleanupPodsCompletesBackingoff executes garbage collection on PodBackoffMap,
+// as well as removes pod from either podBackoffQ or unschedulableQ
+func (p *PriorityQueue) cleanupPodsCompletesBackingoff() {
+	p.podBackoff.lock.Lock()
+	defer p.podBackoff.lock.Unlock()
+
+	for nsNameForPod, podInfo := range p.podBackoff.podInfoMap {
+		if podInfo.Timestamp.Add(p.podBackoff.maxDuration).Before(time.Now()) {
+			// 1. Remove pod from PodBackoffMap
+			p.podBackoff.clearPodBackoff(nsNameForPod)
+			// 2. Remove pod from podBackoffQ or podBackoffQ
+			if _, exists, _ := p.podBackoffQ.Get(podInfo); exists {
+				p.podBackoffQ.Delete(podInfo)
+			}
+			if pInfo := p.unschedulableQ.get(podInfo.Pod); pInfo != nil {
+				p.unschedulableQ.delete(podInfo.Pod)
+			}
+		}
 	}
 }
 
