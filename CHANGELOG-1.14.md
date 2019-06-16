@@ -604,6 +604,7 @@ The memory-cached discovery client is moved from k8s.io/client-go/discovery/cach
 New "APPLY" value for the "verb" metric label which indicates a PATCH with "Content-Type: apply-patch+yaml". This value is experimental and will only be present if the ServerSideApply alpha feature is enabled. ([#74997](https://github.com/kubernetes/kubernetes/pull/74997), [@jennybuckley](https://github.com/jennybuckley))
 - GCE: bumped COS image version to `cos-beta-73-11647-64-0` ([#75149](https://github.com/kubernetes/kubernetes/pull/75149), [@yguo0905](https://github.com/yguo0905))
 - Added alpha support for ephemeral CSI inline volumes that are embedded in pod specs. ([#74086](https://github.com/kubernetes/kubernetes/pull/74086), [@vladimirvivien](https://github.com/vladimirvivien))
+- The NodeLease feature gate has been promoted to Beta, and is enabled by default ([#72096](https://github.com/kubernetes/kubernetes/pull/72096), [@wojtek-t](https://github.com/wojtek-t))
 
 ## API Changes
 
