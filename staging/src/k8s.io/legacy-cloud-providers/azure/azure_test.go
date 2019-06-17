@@ -996,6 +996,7 @@ func getTestCloud() (az *Cloud) {
 	az.lbCache, _ = az.newLBCache()
 	az.nsgCache, _ = az.newNSGCache()
 	az.rtCache, _ = az.newRouteTableCache()
+	az.controllerCommon = &controllerCommon{cloud: az}
 
 	return az
 }
