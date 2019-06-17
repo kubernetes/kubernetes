@@ -217,7 +217,12 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		}
 	})
 
-	ginkgo.It("Pod should be preferably scheduled to nodes pod can tolerate", func() {
+	/*
+		Release : v1.16
+		Testname: Scheduler, Pod Toleration
+		Description: Pod MUST be preferably scheduled onto the Node whose taint can be tolerated.
+	*/
+	framework.ConformanceIt("Pod should be preferably scheduled to nodes pod can tolerate", func() {
 		// make the nodes have balanced cpu,mem usage ratio
 		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.5)
 		framework.ExpectNoError(err)
