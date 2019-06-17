@@ -378,6 +378,9 @@ func (f *framework) appendPlugins(plugins *config.Plugins) error {
 				f.prefilterPlugins = append(f.prefilterPlugins, p)
 			}
 		} else {
+			if _, exists := f.registry[name]; !exists {
+				return fmt.Errorf("%q plugin %q does not exist in registry", ext, name)
+			}
 			return fmt.Errorf("%q plugin %q does not exist", ext, name)
 		}
 		return nil
