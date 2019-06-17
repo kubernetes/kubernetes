@@ -22,7 +22,7 @@ import (
 )
 
 // Summary is our internal representation for our wrapping struct around prometheus
-// summaries. Summary implements both KubeCollector and ObserverMetric
+// summaries. Summary implements both kubeCollector and ObserverMetric
 //
 // DEPRECATED: as per the metrics overhaul KEP
 type Summary struct {
@@ -87,7 +87,7 @@ type SummaryVec struct {
 	originalLabels []string
 }
 
-// NewSummaryVec returns an object which satisfies KubeCollector and wraps the
+// NewSummaryVec returns an object which satisfies kubeCollector and wraps the
 // prometheus.SummaryVec object. However, the object returned will not measure
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 //

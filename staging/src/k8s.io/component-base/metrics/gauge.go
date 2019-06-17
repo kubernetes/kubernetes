@@ -22,7 +22,7 @@ import (
 )
 
 // Gauge is our internal representation for our wrapping struct around prometheus
-// gauges. kubeGauge implements both KubeCollector and KubeGauge.
+// gauges. kubeGauge implements both kubeCollector and KubeGauge.
 type Gauge struct {
 	GaugeMetric
 	*GaugeOpts
@@ -30,7 +30,7 @@ type Gauge struct {
 	selfCollector
 }
 
-// NewGauge returns an object which satisfies the KubeCollector and KubeGauge interfaces.
+// NewGauge returns an object which satisfies the kubeCollector and KubeGauge interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewGauge(opts *GaugeOpts) *Gauge {
@@ -74,7 +74,7 @@ func (g *Gauge) initializeDeprecatedMetric() {
 }
 
 // GaugeVec is the internal representation of our wrapping struct around prometheus
-// gaugeVecs. kubeGaugeVec implements both KubeCollector and KubeGaugeVec.
+// gaugeVecs. kubeGaugeVec implements both kubeCollector and KubeGaugeVec.
 type GaugeVec struct {
 	*prometheus.GaugeVec
 	*GaugeOpts
@@ -82,7 +82,7 @@ type GaugeVec struct {
 	originalLabels []string
 }
 
-// NewGaugeVec returns an object which satisfies the KubeCollector and KubeGaugeVec interfaces.
+// NewGaugeVec returns an object which satisfies the kubeCollector and KubeGaugeVec interfaces.
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {

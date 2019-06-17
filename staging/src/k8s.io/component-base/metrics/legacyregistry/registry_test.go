@@ -148,8 +148,9 @@ func TestMustRegister(t *testing.T) {
 func TestDeferredRegister(t *testing.T) {
 	// reset the global registry for this test.
 	globalRegistryFactory = metricsRegistryFactory{
-		registerQueue:     make([]metrics.KubeCollector, 0),
-		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		registerQueue:     make([]metrics.Registerable, 0),
+		mustRegisterQueue: make([]metrics.Registerable, 0),
+		globalRegistry:    noopRegistry{},
 	}
 	var err error
 	err = Register(alphaDeprecatedCounter)
@@ -177,8 +178,9 @@ func TestDeferredRegister(t *testing.T) {
 func TestDeferredMustRegister(t *testing.T) {
 	// reset the global registry for this test.
 	globalRegistryFactory = metricsRegistryFactory{
-		registerQueue:     make([]metrics.KubeCollector, 0),
-		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		registerQueue:     make([]metrics.Registerable, 0),
+		mustRegisterQueue: make([]metrics.Registerable, 0),
+		globalRegistry:    noopRegistry{},
 	}
 	MustRegister(alphaDeprecatedCounter)
 
@@ -197,8 +199,8 @@ func TestDeferredMustRegister(t *testing.T) {
 func TestPreloadedMetrics(t *testing.T) {
 	// reset the global registry for this test.
 	globalRegistryFactory = metricsRegistryFactory{
-		registerQueue:     make([]metrics.KubeCollector, 0),
-		mustRegisterQueue: make([]metrics.KubeCollector, 0),
+		registerQueue:     make([]metrics.Registerable, 0),
+		mustRegisterQueue: make([]metrics.Registerable, 0),
 	}
 
 	SetRegistryFactoryVersion(apimachineryversion.Info{
