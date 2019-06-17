@@ -46,13 +46,12 @@ var inClusterClientImage = imageutils.GetE2EImage(imageutils.InClusterClient)
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
 
-
 	/*
-	   Release: v1.16
-	   Testname: Service Account: Single Secret Reference
-	   Description: Ensure that a given Service Account has a secret reference
-                    There MUST only be one secret reference. The reference MUST
-                    be able to be deleted, and a new reference added.
+		   Release: v1.16
+		   Testname: Service Account: Single Secret Reference
+		   Description: Ensure that a given Service Account has a secret reference
+	                    There MUST only be one secret reference. The reference MUST
+	                    be able to be deleted, and a new reference added.
 	*/
 	framework.ConformanceIt("should ensure a single API token exists", func() {
 		// wait for the service account to reference a single secret
