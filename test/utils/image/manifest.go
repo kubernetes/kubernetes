@@ -90,6 +90,7 @@ var (
 	registry                = initReg()
 	dockerLibraryRegistry   = registry.DockerLibraryRegistry
 	e2eRegistry             = registry.E2eRegistry
+	e2eGcRegistry           = "gcr.io/kubernetes-e2e-test-images"
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcRegistry              = registry.GcRegistry
 	googleContainerRegistry = registry.GoogleContainerRegistry
@@ -221,6 +222,7 @@ func initImageConfigs() map[int]Config {
 	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.0"}
 	configs[Alpine] = Config{dockerLibraryRegistry, "alpine", "3.7"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
+	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
 	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
 	configs[AuditProxy] = Config{e2eRegistry, "audit-proxy", "1.0"}
@@ -269,7 +271,7 @@ func initImageConfigs() map[int]Config {
 	configs[VolumeISCSIServer] = Config{e2eRegistry, "volume/iscsi", "2.0"}
 	configs[VolumeGlusterServer] = Config{e2eRegistry, "volume/gluster", "1.0"}
 	configs[VolumeRBDServer] = Config{e2eRegistry, "volume/rbd", "1.0.1"}
-	configs[WindowsNanoServer] = Config{e2eRegistry, "windows-nanoserver", "v1"}
+	configs[WindowsNanoServer] = Config{e2eGcRegistry, "windows-nanoserver", "v1"}
 	return configs
 }
 
