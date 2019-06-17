@@ -492,8 +492,13 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 	if err != nil {
 		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
+	var watcherClosed bool
 	ch := watcher.ResultChan()
-	defer watcher.Stop()
+	defer func() {
+		if !watcherClosed {
+			watcher.Stop()
+		}
+	}()
 
 	for {
 		select {
@@ -518,8 +523,10 @@ func (c *csiAttacher) waitForVolumeDetachmentInternal(volumeHandle, attachID str
 				return nil
 
 			case watch.Error:
+				watcher.Stop()
+				watcherClosed = true
 				// start another cycle
-				c.waitForVolumeDetachmentInternal(volumeHandle, attachID, timer, timeout)
+				return c.waitForVolumeDetachmentInternal(volumeHandle, attachID, timer, timeout)
 			}
 
 		case <-timer.C:
