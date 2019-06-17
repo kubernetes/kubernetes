@@ -317,7 +317,7 @@ type KubeletConfiguration struct {
 	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
 	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
 	// when the NodeLease feature is enabled. This feature provides an indicator of node
-	// health by having the Kublet create and periodically renew a lease, named after the node,
+	// health by having the Kubelet create and periodically renew a lease, named after the node,
 	// in the kube-node-lease namespace. If the lease expires, the node can be considered unhealthy.
 	// The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal interval
 	// may be set based on the lease duration.
