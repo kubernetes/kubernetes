@@ -464,6 +464,10 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
+
+	if !reflect.DeepEqual(oldService.Spec.SessionAffinityConfig, newService.Spec.SessionAffinityConfig) {
+		return true
+	}
 	if !loadBalancerIPsAreEqual(oldService, newService) {
 		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadbalancerIP", "%v -> %v",
 			oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP)
