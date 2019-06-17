@@ -41,6 +41,7 @@ type ServerRunOptions struct {
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
 	RequestTimeout              time.Duration
+	MaxStartupSequenceDuration  time.Duration
 	MinRequestTimeout           int
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
@@ -60,6 +61,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
 		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
 		RequestTimeout:              defaults.RequestTimeout,
+		MaxStartupSequenceDuration:  defaults.MaxStartupSequenceDuration,
 		MinRequestTimeout:           defaults.MinRequestTimeout,
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
@@ -72,6 +74,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
+	c.MaxStartupSequenceDuration = s.MaxStartupSequenceDuration
 	c.RequestTimeout = s.RequestTimeout
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
@@ -104,6 +107,10 @@ func (s *ServerRunOptions) Validate() []error {
 	errors := []error{}
 	if s.TargetRAMMB < 0 {
 		errors = append(errors, fmt.Errorf("--target-ram-mb can not be negative value"))
+	}
+
+	if s.MaxStartupSequenceDuration < 0 {
+		errors = append(errors, fmt.Errorf("--maximum-startup-sequence-duration can not be a negative value"))
 	}
 
 	if s.EnableInfightQuotaHandler {
@@ -184,6 +191,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"An optional field indicating the duration a handler must keep a request open before timing "+
 		"it out. This is the default request timeout for requests but may be overridden by flags such as "+
 		"--min-request-timeout for specific types of requests.")
+
+	fs.DurationVar(&s.MaxStartupSequenceDuration, "maximum-startup-sequence-duration", s.MaxStartupSequenceDuration, ""+
+		"This option represents the maximum amount of time it should take for apiserver to complete its startup sequence "+
+		"and become healthy. From apiserver's start time to when this amount of time has elapsed, /healthz will assume "+
+		"that unfinished post-start hooks will complete successfully and therefore return true.")
 
 	fs.IntVar(&s.MinRequestTimeout, "min-request-timeout", s.MinRequestTimeout, ""+
 		"An optional field indicating the minimum number of seconds a handler must keep "+

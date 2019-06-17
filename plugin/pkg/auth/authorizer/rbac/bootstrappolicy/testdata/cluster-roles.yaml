@@ -535,6 +535,7 @@ items:
     - /healthz
     - /openapi
     - /openapi/*
+    - /readyz
     - /version
     - /version/
     verbs:
@@ -1156,6 +1157,7 @@ items:
   rules:
   - nonResourceURLs:
     - /healthz
+    - /readyz
     - /version
     - /version/
     verbs:

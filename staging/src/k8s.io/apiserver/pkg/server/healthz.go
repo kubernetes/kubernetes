@@ -18,20 +18,30 @@ package server
 
 import (
 	"fmt"
+	"net/http"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/server/healthz"
 )
 
-// AddHealthzCheck allows you to add a HealthzCheck.
+// AddHealthzCheck adds HealthzCheck(s) to both healthz and readyz. All healthz checks
+// are automatically added to readyz, since we want to avoid the situation where the
+// apiserver is ready but not live.
 func (s *GenericAPIServer) AddHealthzChecks(checks ...healthz.HealthzChecker) error {
-	s.healthzLock.Lock()
-	defer s.healthzLock.Unlock()
+	return s.AddDelayedHealthzChecks(0, checks...)
+}
 
-	if s.healthzCreated {
-		return fmt.Errorf("unable to add because the healthz endpoint has already been created")
+// AddReadyzChecks allows you to add a HealthzCheck to readyz.
+func (s *GenericAPIServer) AddReadyzChecks(checks ...healthz.HealthzChecker) error {
+	s.readyzLock.Lock()
+	defer s.readyzLock.Unlock()
+
+	if s.readyzChecksInstalled {
+		return fmt.Errorf("unable to add because the readyz endpoint has already been created")
 	}
 
-	s.healthzChecks = append(s.healthzChecks, checks...)
+	s.readyzChecks = append(s.readyzChecks, checks...)
 	return nil
 }
 
@@ -39,7 +49,81 @@ func (s *GenericAPIServer) AddHealthzChecks(checks ...healthz.HealthzChecker) er
 func (s *GenericAPIServer) installHealthz() {
 	s.healthzLock.Lock()
 	defer s.healthzLock.Unlock()
-	s.healthzCreated = true
+	s.healthzChecksInstalled = true
 
 	healthz.InstallHandler(s.Handler.NonGoRestfulMux, s.healthzChecks...)
+}
+
+// installReadyz creates the readyz endpoint for this server.
+func (s *GenericAPIServer) installReadyz(stopCh <-chan struct{}) {
+	s.AddReadyzChecks(shutdownCheck{stopCh})
+	s.readyzLock.Lock()
+	defer s.readyzLock.Unlock()
+
+	s.readyzChecksInstalled = true
+
+	healthz.InstallReadyzHandler(s.Handler.NonGoRestfulMux, s.readyzChecks...)
+}
+
+// shutdownCheck fails if the embedded channel is closed. This is intended to allow for graceful shutdown sequences
+// for the apiserver.
+type shutdownCheck struct {
+	StopCh <-chan struct{}
+}
+
+func (shutdownCheck) Name() string {
+	return "shutdown"
+}
+
+func (c shutdownCheck) Check(req *http.Request) error {
+	select {
+	case <-c.StopCh:
+		return fmt.Errorf("process is shutting down")
+	default:
+	}
+	return nil
+}
+
+// AddDelayedHealthzChecks adds a health check to both healthz and readyz. The delay parameter
+// allows you to set the grace period for healthz checks, which will return healthy while
+// grace period has not yet elapsed. One may want to set a grace period in order to prevent
+// the kubelet from restarting the kube-apiserver due to long-ish boot sequences. Readyz health
+// checks have no grace period, since we want readyz to fail while boot has not completed.
+func (s *GenericAPIServer) AddDelayedHealthzChecks(delay time.Duration, checks ...healthz.HealthzChecker) error {
+	s.healthzLock.Lock()
+	defer s.healthzLock.Unlock()
+	if s.healthzChecksInstalled {
+		return fmt.Errorf("unable to add because the healthz endpoint has already been created")
+	}
+	for _, check := range checks {
+		s.healthzChecks = append(s.healthzChecks, delayedHealthCheck(check, s.healthzClock, s.maxStartupSequenceDuration))
+	}
+
+	return s.AddReadyzChecks(checks...)
+}
+
+// delayedHealthCheck wraps a health check which will not fail until the explicitly defined delay has elapsed.
+func delayedHealthCheck(check healthz.HealthzChecker, clock clock.Clock, delay time.Duration) healthz.HealthzChecker {
+	return delayedHealthzCheck{
+		check,
+		clock.Now().Add(delay),
+		clock,
+	}
+}
+
+type delayedHealthzCheck struct {
+	check      healthz.HealthzChecker
+	startCheck time.Time
+	clock      clock.Clock
+}
+
+func (c delayedHealthzCheck) Name() string {
+	return c.check.Name()
+}
+
+func (c delayedHealthzCheck) Check(req *http.Request) error {
+	if c.clock.Now().After(c.startCheck) {
+		return c.check.Check(req)
+	}
+	return nil
 }
