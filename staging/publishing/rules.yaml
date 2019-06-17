@@ -548,6 +548,10 @@ rules:
       branch: master
     - repository: csi-translation-lib
       branch: master
+    - repository: apiserver
+      branch: master
+    - repository: component-base
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/legacy-cloud-providers
