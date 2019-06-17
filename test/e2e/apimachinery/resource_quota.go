@@ -53,7 +53,12 @@ var extendedResourceName = "example.com/dongle"
 var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("resourcequota")
 
-	ginkgo.It("should create a ResourceQuota and ensure its status is promptly calculated.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Calcuate Status Promptly
+		Description: Create a ResourceQuota,the ResourceQuota MUST calculate the its status
+	*/
+	framework.ConformanceIt("should ensure its status is promptly calculated", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -71,7 +76,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a service.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture Service
+		Description: Create a ResourceQuota, and then create a service, the ResourceQuota MUST capture the
+		             service creation. When delete the service, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a service", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -110,7 +121,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a secret.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture Secret
+		Description: Create a ResourceQuota, and then create a secret, the ResourceQuota MUST capture the
+		             secret creation. When delete the secret, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a secret", func() {
 		ginkgo.By("Discovering how many secrets are in namespace by default")
 		found, unchanged := 0, 0
 		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
@@ -169,7 +186,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a pod.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture Pod
+		Description: Create a ResourceQuota, and then create a pod, the ResourceQuota MUST capture the
+		             pod creation, MUST NOT allow a pod to be created that exceeds remaing quota and MUST NOT
+			           update its resource requirements. When delete the pod, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a pod", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -259,7 +283,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a configMap.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture ConfigMap
+		Description: Create a ResourceQuota, and then create a configMap, the ResourceQuota MUST the
+		             configMap creation. When delete the configMap, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a configMap", func() {
 		found, unchanged := 0, 0
 		wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
 			configmaps, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).List(metav1.ListOptions{})
@@ -318,7 +348,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a replication controller.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture ReplicationController
+		Description: Create a ResourceQuota, and then create a replicationController, the ResourceQuota MUST the
+		             replicationController creation. When delete the replicationController, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a replication controller", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -357,7 +393,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a replica set.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture ReplicaSet
+		Description: Create a ResourceQuota, and then create a replicaSet, the ResourceQuota MUST the
+		             replicaSet creation. When delete the replicaSet, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a replica set", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -396,7 +438,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture PVC
+		Description: Create a ResourceQuota, and then create a PVC, the ResourceQuota MUST the
+		             PVC creation. When delete the PVC, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a persistent volume claim", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -438,7 +486,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage]", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture PVC with storage class
+		Description: Create a ResourceQuota, and then create a PVC with storage class, the ResourceQuota MUST the
+		             PVC creation. When delete the PVC, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a persistent volume claim with a storage class", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -490,7 +544,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should create a ResourceQuota and capture the life of a custom resource.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Capture CRD
+		Description: Create a ResourceQuota, and then create a CRD, the ResourceQuota MUST the
+		             CRD creation. When delete the CRD, the ResourceQuota MUST release usage.
+	*/
+	framework.ConformanceIt("should capture the life of a custom resource", func() {
 		ginkgo.By("Creating a Custom Resource Definition")
 		testcrd, err := crd.CreateTestCRD(f)
 		framework.ExpectNoError(err)
@@ -573,7 +633,14 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota with terminating scopes.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Verify Terminating Scopes
+		Description: Create a pod with terminating scopes, and then create ResourceQuota
+		             without terminating scopes, the ResourceQuota without terminating scopes MUST
+		             capture the pod usage, and the other one MUST ignore the pod usage.
+	*/
+	framework.ConformanceIt("should verify ResourceQuota with terminating scopes", func() {
 		ginkgo.By("Creating a ResourceQuota with terminating scope")
 		quotaTerminatingName := "quota-terminating"
 		resourceQuotaTerminating, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope(quotaTerminatingName, v1.ResourceQuotaScopeTerminating))
@@ -677,7 +744,16 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.It("should verify ResourceQuota with best effort scope.", func() {
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: Verify BestEffort Scope
+		Description: Create a Pod with best effort scope, and then create ResourceQuota
+		             without best effort scope, the ResourceQuota with best effort scopes MUST
+			           capture the pod usage, and the other one MUST ignore the pod usage. When create
+				         a not best-effort pod, the ResourceQuota with not best effort MUST capture the
+		             pod usage, and the other one MUST ignore the pod usage.
+	*/
+	framework.ConformanceIt("should verify ResourceQuota with best effort scope", func() {
 		ginkgo.By("Creating a ResourceQuota with best effort scope")
 		resourceQuotaBestEffort, err := createResourceQuota(f.ClientSet, f.Namespace.Name, newTestResourceQuotaWithScope("quota-besteffort", v1.ResourceQuotaScopeBestEffort))
 		framework.ExpectNoError(err)
@@ -750,7 +826,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuotaNotBestEffort.Name, usedResources)
 		framework.ExpectNoError(err)
 	})
-	ginkgo.It("Should be able to update and delete ResourceQuota.", func() {
+
+	/*
+		Release: v1.16
+		Testname: ResourceQuota: CRUD
+		Description: Ensure basic operation on ResourceQuota.
+	*/
+	framework.ConformanceIt("should be able to create, read, update and delete ResourceQuota.", func() {
 		client := f.ClientSet
 		ns := f.Namespace.Name
 
