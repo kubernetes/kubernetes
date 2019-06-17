@@ -12,7 +12,7 @@ go_library(
         "initsystem_unix.go",
         "initsystem_windows.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/util/initsystem",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem",
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//vendor/golang.org/x/sys/windows/svc:go_default_library",

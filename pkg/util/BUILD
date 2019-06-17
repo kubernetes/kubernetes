@@ -25,7 +25,6 @@ filegroup(
         "//pkg/util/flock:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
-        "//pkg/util/initsystem:all-srcs",
         "//pkg/util/interrupt:all-srcs",
         "//pkg/util/ipconfig:all-srcs",
         "//pkg/util/ipset:all-srcs",
