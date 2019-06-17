@@ -221,6 +221,7 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 		driverNames           []string
 		fits                  bool
 		test                  string
+		ignoreCSIDriver       bool
 		migrationEnabled      bool
 		limitSource           string
 		expectedFailureReason *PredicateFailureError
@@ -320,6 +321,52 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 			test:         "don't count pvcs with different type towards volume limit",
 			limitSource:  "node",
 		},
+		// should not schedule pod with unbound PVC when CSI driver is not installed on node
+		{
+			newPod:                unboundPVCPod2,
+			existingPods:          []*v1.Pod{csiEBSTwoVolPod},
+			filterName:            "csi",
+			maxVols:               3,
+			driverNames:           []string{ebsCSIDriverName},
+			fits:                  false,
+			limitSource:           "no-csi-driver",
+			test:                  "should not schedule pod with unbound pvcs when driver is not installed",
+			expectedFailureReason: ErrNodeMissingCSIDriverInstalled,
+		},
+		// should not schedule pod with unbound PVC when CSI driver is installed but volume limits exceeded
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{csiEBSTwoVolPod},
+			filterName:   "csi",
+			maxVols:      2,
+			driverNames:  []string{ebsCSIDriverName},
+			fits:         false,
+			limitSource:  "csinode",
+			test:         "should not schedule pod with unbound pvcs when volume limits are over",
+		},
+		// should schedule pod with unbound PVC when CSI driver is installed and volume limits are not exceeded
+		{
+			newPod:       unboundPVCPod2,
+			existingPods: []*v1.Pod{csiEBSTwoVolPod},
+			filterName:   "csi",
+			maxVols:      3,
+			driverNames:  []string{ebsCSIDriverName},
+			fits:         true,
+			limitSource:  "csinode",
+			test:         "should not prevent scheduling of unbound pvcs when volume limits are not exceeded",
+		},
+		// should schedule pod with unbound PVC when limits are over but there's no csidriver object for driver
+		{
+			newPod:          unboundPVCPod2,
+			existingPods:    []*v1.Pod{csiEBSTwoVolPod},
+			filterName:      "csi",
+			maxVols:         1,
+			driverNames:     []string{ebsCSIDriverName},
+			ignoreCSIDriver: true,
+			fits:            true,
+			limitSource:     "csinode",
+			test:            "should not prevent scheduling of unbound pvcs when volume limits are over but csiobject doesn't exist",
+		},
 		// Tests for in-tree volume migration
 		{
 			newPod:           inTreeOneVolPod,
@@ -387,6 +434,41 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 			limitSource:      "csinode",
 			test:             "should not count non-migratable in-tree volumes",
 		},
+		{
+			newPod:                unboundPVCPod2,
+			existingPods:          []*v1.Pod{csiEBSTwoVolPod},
+			filterName:            "csi",
+			maxVols:               3,
+			driverNames:           []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			fits:                  false,
+			migrationEnabled:      true,
+			limitSource:           "no-csi-driver",
+			test:                  "should not schedule pod with unbound pvc when csi driver is not installed",
+			expectedFailureReason: ErrNodeMissingCSIDriverInstalled,
+		},
+		{
+			newPod:           unboundPVCPod2,
+			existingPods:     []*v1.Pod{csiEBSTwoVolPod},
+			filterName:       "csi",
+			maxVols:          2,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			fits:             false,
+			migrationEnabled: true,
+			limitSource:      "csinode",
+			test:             "should not schedule pod with unbound pvc when volume limits from csi driver exceeds",
+		},
+		{
+			newPod:           unboundPVCPod2,
+			existingPods:     []*v1.Pod{csiEBSTwoVolPod},
+			filterName:       "csi",
+			maxVols:          3,
+			driverNames:      []string{csilibplugins.AWSEBSInTreePluginName, ebsCSIDriverName},
+			fits:             true,
+			migrationEnabled: true,
+			limitSource:      "csinode",
+			test:             "should schedule pod with unbound pvcs when volume limits from csi driver is ok",
+		},
+
 		// mixed volumes
 		{
 			newPod:           inTreeOneVolPod,
@@ -453,7 +535,7 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				expectedFailureReasons = []PredicateFailureReason{test.expectedFailureReason}
 			}
 
-			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIDriverInfo(test.driverNames...),
+			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSIDriverInfo(test.ignoreCSIDriver, test.driverNames...),
 				getFakeCSIPVInfo(test.filterName, test.driverNames...),
 				getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...),
 				getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0]))
@@ -546,8 +628,11 @@ func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) FakePer
 	return pvcInfos
 }
 
-func getFakeCSIDriverInfo(driverNames ...string) FakeCSIDriverInfo {
+func getFakeCSIDriverInfo(ignoreCSIDriver bool, driverNames ...string) FakeCSIDriverInfo {
 	csiDriverInfos := FakeCSIDriverInfo{}
+	if ignoreCSIDriver {
+		return csiDriverInfos
+	}
 	for _, name := range driverNames {
 		csiDriver := storagev1beta1.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
