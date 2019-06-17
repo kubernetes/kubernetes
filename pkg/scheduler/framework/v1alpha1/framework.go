@@ -74,6 +74,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	for name, factory := range r {
 		// initialize only needed plugins
 		if _, ok := pg[name]; !ok {
+			klog.V(2).Infof("Skipped initialize plugin %v, since register doesn't contain", name)
 			continue
 		}
 
