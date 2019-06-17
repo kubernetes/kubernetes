@@ -343,6 +343,9 @@ type ListOptions struct {
 	TypeMeta `json:",inline"`
 
 	// A selector to restrict the list of returned objects by their labels.
+	// If you have a LabelSelector object and need to use it for this field, use
+	// FormatLabelSelector(selector) rather than selector.String() to create a
+	// string in the correct format.
 	// Defaults to everything.
 	// +optional
 	LabelSelector string `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
