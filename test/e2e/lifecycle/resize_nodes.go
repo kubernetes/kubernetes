@@ -108,10 +108,10 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		})
 
 		/*
-		Release : v1.16
-		Testname: ReplicationController: Delete Nodes
-		Description: Ensure that pods are recreated by the replication controller after nodes are deleted.
-	*/
+			Release : v1.16
+			Testname: ReplicationController: Delete Nodes
+			Description: Ensure that pods are recreated by the replication controller after nodes are deleted.
+		*/
 		framework.ConformanceIt("should be able to delete nodes", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
