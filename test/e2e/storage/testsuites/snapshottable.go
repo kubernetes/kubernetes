@@ -45,15 +45,6 @@ var (
 	snapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshotcontents"}
 )
 
-type SnapshotClassTest struct {
-	Name           string
-	CloudProviders []string
-	Snapshotter    string
-	Parameters     map[string]string
-	NodeName       string
-	NodeSelector   map[string]string // NodeSelector for the pod
-}
-
 type snapshottableTestSuite struct {
 	tsInfo TestSuiteInfo
 }
