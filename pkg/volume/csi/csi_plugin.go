@@ -482,20 +482,18 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	var spec *volume.Spec
 	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
 
+	// If inlineEnabled is true and mode is ephemeralDriverMode,
+	// use constructVolSourceSpec to construct volume source spec.
+	// If inlineEnabled is false or mode is persistentDriverMode,
+	// use constructPVSourceSpec to construct volume construct pv source spec.
 	if inlineEnabled {
-		mode := driverMode(volData[volDataKey.driverMode])
-		switch {
-		case mode == ephemeralDriverMode:
+		if driverMode(volData[volDataKey.driverMode]) == ephemeralDriverMode {
 			spec = p.constructVolSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName])
+			return spec, nil
 
-		case mode == persistentDriverMode:
-			fallthrough
-		default:
-			spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 		}
-	} else {
-		spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 	}
+	spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 
 	return spec, nil
 }
