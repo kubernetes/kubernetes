@@ -84,6 +84,7 @@ go_test(
         "azure_cache_test.go",
         "azure_config_test.go",
         "azure_controller_common_test.go",
+        "azure_controller_standard_test.go",
         "azure_instances_test.go",
         "azure_loadbalancer_test.go",
         "azure_metrics_test.go",
