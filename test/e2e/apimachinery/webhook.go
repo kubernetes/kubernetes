@@ -125,7 +125,12 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		cleanWebhookTest(client, namespaceName)
 	})
 
-	ginkgo.It("Should be able to deny pod and configmap creation", func() {
+	/*
+		Release : v1.16
+		Testname: LimitRange: CRUD
+		Description: Ensure that AdmissionWebhook is able to deny pod and configmap creation
+	*/
+	framework.ConformanceIt("Should be able to deny pod and configmap creation", func() {
 		webhookCleanup := registerWebhook(f, context)
 		defer webhookCleanup()
 		testWebhook(f)
