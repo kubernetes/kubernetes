@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -59,7 +60,7 @@ func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 	for !expected && !timeout {
 		select {
 		case n := <-newNode:
-			if framework.IsNodeConditionSetAsExpected(n, v1.NodeReady, isReady) {
+			if e2enode.IsConditionSetAsExpected(n, v1.NodeReady, isReady) {
 				expected = true
 			} else {
 				e2elog.Logf("Observed node ready status is NOT %v as expected", isReady)
@@ -142,8 +143,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				nodeOpts := metav1.ListOptions{}
 				nodes, err := c.CoreV1().Nodes().List(nodeOpts)
 				framework.ExpectNoError(err)
-				framework.FilterNodes(nodes, func(node v1.Node) bool {
-					if !framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
+				e2enode.Filter(nodes, func(node v1.Node) bool {
+					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
 					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
@@ -199,7 +200,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				go controller.Run(stopCh)
 
 				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
-				host, err := framework.GetNodeExternalIP(&node)
+				host, err := e2enode.GetExternalIP(&node)
 				framework.ExpectNoError(err)
 				masterAddresses := framework.GetAllMasterAddresses(c)
 				defer func() {
@@ -240,7 +241,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil)
@@ -274,7 +275,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			})
 
 			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
 				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 
@@ -307,7 +308,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			gracePeriod := int64(30)
 
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, &gracePeriod)
@@ -341,7 +342,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			})
 
 			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
 				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 		})
@@ -382,9 +383,9 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 
 			pst := framework.NewStatefulSetTester(c)
 
-			nn, err := framework.NumberOfRegisteredNodes(f.ClientSet)
+			nn, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
-			nodes, err := framework.CheckNodesReady(f.ClientSet, nn, framework.NodeReadyInitialTimeout)
+			nodes, err := e2enode.CheckReady(f.ClientSet, nn, framework.NodeReadyInitialTimeout)
 			framework.ExpectNoError(err)
 			common.RestartNodes(f.ClientSet, nodes)
 
@@ -414,7 +415,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			})
 
 			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
 				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 
@@ -462,7 +463,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			})
 
 			e2elog.Logf("Waiting %v for node %s to be ready once temporary network failure ends", resizeNodeReadyTimeout, node.Name)
-			if !framework.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
+			if !e2enode.WaitForNodeToBeReady(c, node.Name, resizeNodeReadyTimeout) {
 				framework.Failf("Node %s did not become ready within %v", node.Name, resizeNodeReadyTimeout)
 			}
 		})
@@ -485,8 +486,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
 				nodes := framework.GetReadySchedulableNodesOrDie(c)
-				framework.FilterNodes(nodes, func(node v1.Node) bool {
-					if !framework.IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
+				e2enode.Filter(nodes, func(node v1.Node) bool {
+					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
 					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
@@ -581,7 +582,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				go controller.Run(stopCh)
 
 				ginkgo.By(fmt.Sprintf("Block traffic from node %s to the master", node.Name))
-				host, err := framework.GetNodeExternalIP(&node)
+				host, err := e2enode.GetExternalIP(&node)
 				framework.ExpectNoError(err)
 				masterAddresses := framework.GetAllMasterAddresses(c)
 				defer func() {

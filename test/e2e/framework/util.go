@@ -80,7 +80,6 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
-	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -90,6 +89,7 @@ import (
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -133,8 +133,6 @@ const (
 
 	// PollShortTimeout is the short timeout value in polling.
 	PollShortTimeout = 1 * time.Minute
-	// PollLongTimeout is the long timeout value in polling.
-	PollLongTimeout = 5 * time.Minute
 
 	// ServiceAccountProvisionTimeout is how long to wait for a service account to be provisioned.
 	// service accounts are provisioned after namespace creation
@@ -1914,9 +1912,9 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 // 2) it's Ready condition is set to true
 // 3) doesn't have NetworkUnavailable condition set to true
 func isNodeSchedulable(node *v1.Node) bool {
-	nodeReady := IsNodeConditionSetAsExpected(node, v1.NodeReady, true)
-	networkReady := IsNodeConditionUnset(node, v1.NodeNetworkUnavailable) ||
-		IsNodeConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
+	nodeReady := e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true)
+	networkReady := e2enode.IsConditionUnset(node, v1.NodeNetworkUnavailable) ||
+		e2enode.IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
 	return !node.Spec.Unschedulable && nodeReady && networkReady
 }
 
@@ -1958,7 +1956,7 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	nodes = waitListSchedulableNodesOrDie(c)
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
-	FilterNodes(nodes, func(node v1.Node) bool {
+	e2enode.Filter(nodes, func(node v1.Node) bool {
 		return isNodeSchedulable(&node) && isNodeUntainted(&node)
 	})
 	return nodes
@@ -1970,7 +1968,7 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 // presence of nvidia.com/gpu=present:NoSchedule taint
 func GetReadyNodesIncludingTaintedOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	nodes = waitListSchedulableNodesOrDie(c)
-	FilterNodes(nodes, func(node v1.Node) bool {
+	e2enode.Filter(nodes, func(node v1.Node) bool {
 		return isNodeSchedulable(&node)
 	})
 	return nodes
@@ -2024,8 +2022,8 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 				for i := range notSchedulable {
 					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v",
 						notSchedulable[i].Name,
-						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						IsNodeConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
+						e2enode.IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
+						e2enode.IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
 						notSchedulable[i].Spec.Taints)
 				}
 				e2elog.Logf("================================")
@@ -2410,20 +2408,6 @@ func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 	return ds, pollErr
 }
 
-// NodeAddresses returns the first address of the given type of each node.
-func NodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
-	hosts := []string{}
-	for _, n := range nodelist.Items {
-		for _, addr := range n.Status.Addresses {
-			if addr.Type == addrType && addr.Address != "" {
-				hosts = append(hosts, addr.Address)
-				break
-			}
-		}
-	}
-	return hosts
-}
-
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
@@ -2456,118 +2440,6 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 	}
 }
 
-// WaitForNodeToBeReady returns whether node name is ready within timeout.
-func WaitForNodeToBeReady(c clientset.Interface, name string, timeout time.Duration) bool {
-	return WaitForNodeToBe(c, name, v1.NodeReady, true, timeout)
-}
-
-// WaitForNodeToBeNotReady returns whether node name is not ready (i.e. the
-// readiness condition is anything but ready, e.g false or unknown) within
-// timeout.
-func WaitForNodeToBeNotReady(c clientset.Interface, name string, timeout time.Duration) bool {
-	return WaitForNodeToBe(c, name, v1.NodeReady, false, timeout)
-}
-
-func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
-	// Check the node readiness condition (logging all).
-	for _, cond := range node.Status.Conditions {
-		// Ensure that the condition type and the status matches as desired.
-		if cond.Type == conditionType {
-			// For NodeReady condition we need to check Taints as well
-			if cond.Type == v1.NodeReady {
-				hasNodeControllerTaints := false
-				// For NodeReady we need to check if Taints are gone as well
-				taints := node.Spec.Taints
-				for _, taint := range taints {
-					if taint.MatchTaint(nodectlr.UnreachableTaintTemplate) || taint.MatchTaint(nodectlr.NotReadyTaintTemplate) {
-						hasNodeControllerTaints = true
-						break
-					}
-				}
-				if wantTrue {
-					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
-						return true
-					}
-					msg := ""
-					if !hasNodeControllerTaints {
-						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-					}
-					msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
-					if !silent {
-						e2elog.Logf(msg)
-					}
-					return false
-				}
-				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
-				if cond.Status != v1.ConditionTrue {
-					return true
-				}
-				if !silent {
-					e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-				}
-				return false
-			}
-			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
-				return true
-			}
-			if !silent {
-				e2elog.Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
-					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
-			}
-			return false
-		}
-
-	}
-	if !silent {
-		e2elog.Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
-	}
-	return false
-}
-
-// IsNodeConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
-func IsNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
-}
-
-// IsNodeConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
-func IsNodeConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
-	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
-}
-
-// IsNodeConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
-func IsNodeConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
-	for _, cond := range node.Status.Conditions {
-		if cond.Type == conditionType {
-			return false
-		}
-	}
-	return true
-}
-
-// WaitForNodeToBe returns whether node "name's" condition state matches wantTrue
-// within timeout. If wantTrue is true, it will ensure the node condition status
-// is ConditionTrue; if it's false, it ensures the node condition is in any state
-// other than ConditionTrue (e.g. not true or unknown).
-func WaitForNodeToBe(c clientset.Interface, name string, conditionType v1.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
-	e2elog.Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
-		if err != nil {
-			e2elog.Logf("Couldn't get node %s", name)
-			continue
-		}
-
-		if IsNodeConditionSetAsExpected(node, conditionType, wantTrue) {
-			return true
-		}
-	}
-	e2elog.Logf("Node %s didn't reach desired %s condition status (%t) within %v", name, conditionType, wantTrue, timeout)
-	return false
-}
-
 // AllNodesReady checks whether all registered nodes are ready.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
@@ -2588,7 +2460,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !IsNodeConditionSetAsExpected(node, v1.NodeReady, true) {
+			if !e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
@@ -2612,88 +2484,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		return fmt.Errorf("Not ready nodes: %#v", msg)
 	}
 	return nil
-}
-
-// WaitForAllNodesHealthy checks whether all registered nodes are ready and all required Pods are running on them.
-func WaitForAllNodesHealthy(c clientset.Interface, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for all nodes to be ready", timeout)
-
-	var notReady []v1.Node
-	var missingPodsPerNode map[string][]string
-	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		notReady = nil
-		// It should be OK to list unschedulable Nodes here.
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{ResourceVersion: "0"})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		for _, node := range nodes.Items {
-			if !IsNodeConditionSetAsExpected(&node, v1.NodeReady, true) {
-				notReady = append(notReady, node)
-			}
-		}
-		pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{ResourceVersion: "0"})
-		if err != nil {
-			return false, err
-		}
-
-		systemPodsPerNode := make(map[string][]string)
-		for _, pod := range pods.Items {
-			if pod.Namespace == metav1.NamespaceSystem && pod.Status.Phase == v1.PodRunning {
-				if pod.Spec.NodeName != "" {
-					systemPodsPerNode[pod.Spec.NodeName] = append(systemPodsPerNode[pod.Spec.NodeName], pod.Name)
-				}
-			}
-		}
-		missingPodsPerNode = make(map[string][]string)
-		for _, node := range nodes.Items {
-			if !system.IsMasterNode(node.Name) {
-				for _, requiredPod := range requiredPerNodePods {
-					foundRequired := false
-					for _, presentPod := range systemPodsPerNode[node.Name] {
-						if requiredPod.MatchString(presentPod) {
-							foundRequired = true
-							break
-						}
-					}
-					if !foundRequired {
-						missingPodsPerNode[node.Name] = append(missingPodsPerNode[node.Name], requiredPod.String())
-					}
-				}
-			}
-		}
-		return len(notReady) == 0 && len(missingPodsPerNode) == 0, nil
-	})
-
-	if err != nil && err != wait.ErrWaitTimeout {
-		return err
-	}
-
-	if len(notReady) > 0 {
-		return fmt.Errorf("Not ready nodes: %v", notReady)
-	}
-	if len(missingPodsPerNode) > 0 {
-		return fmt.Errorf("Not running system Pods: %v", missingPodsPerNode)
-	}
-	return nil
-
-}
-
-// FilterNodes filters nodes in NodeList in place, removing nodes that do not
-// satisfy the given condition
-// TODO: consider merging with pkg/client/cache.NodeLister
-func FilterNodes(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
-	var l []v1.Node
-
-	for _, node := range nodeList.Items {
-		if fn(node) {
-			l = append(l, node)
-		}
-	}
-	nodeList.Items = l
 }
 
 // ParseKVLines parses output that looks like lines containing "<key>: <val>"
@@ -2962,68 +2752,6 @@ func CheckForControllerManagerHealthy(duration time.Duration) error {
 	return nil
 }
 
-// NumberOfRegisteredNodes returns number of registered Nodes excluding Master Node.
-func NumberOfRegisteredNodes(c clientset.Interface) (int, error) {
-	nodes, err := waitListSchedulableNodes(c)
-	if err != nil {
-		e2elog.Logf("Failed to list nodes: %v", err)
-		return 0, err
-	}
-	return len(nodes.Items), nil
-}
-
-// NumberOfReadyNodes returns number of ready Nodes excluding Master Node.
-func NumberOfReadyNodes(c clientset.Interface) (int, error) {
-	nodes, err := waitListSchedulableNodes(c)
-	if err != nil {
-		e2elog.Logf("Failed to list nodes: %v", err)
-		return 0, err
-	}
-
-	// Filter out not-ready nodes.
-	FilterNodes(nodes, func(node v1.Node) bool {
-		return IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
-	})
-	return len(nodes.Items), nil
-}
-
-// CheckNodesReady waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
-func CheckNodesReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := waitListSchedulableNodes(c)
-		if err != nil {
-			e2elog.Logf("Failed to list nodes: %v", err)
-			continue
-		}
-		numNodes := len(nodes.Items)
-
-		// Filter out not-ready nodes.
-		FilterNodes(nodes, func(node v1.Node) bool {
-			nodeReady := IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
-			networkReady := IsNodeConditionUnset(&node, v1.NodeNetworkUnavailable) || IsNodeConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
-			return nodeReady && networkReady
-		})
-		numReady := len(nodes.Items)
-
-		if numNodes == size && numReady == size {
-			e2elog.Logf("Cluster has reached the desired number of ready nodes %d", size)
-			return nodes.Items, nil
-		}
-		e2elog.Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numReady, numNodes-numReady)
-	}
-	return nil, fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
-}
-
-// WaitForReadyNodes waits up to timeout for cluster to has desired size and
-// there is no not-ready nodes in it. By cluster size we mean number of Nodes
-// excluding Master Node.
-func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) error {
-	_, err := CheckNodesReady(c, size, timeout)
-	return err
-}
-
 // GenerateMasterRegexp returns a regex for matching master node name.
 func GenerateMasterRegexp(prefix string) string {
 	return prefix + "(-...)?"
@@ -3039,7 +2767,7 @@ func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 		}
 
 		// Filter out nodes that are not master replicas
-		FilterNodes(nodes, func(node v1.Node) bool {
+		e2enode.Filter(nodes, func(node v1.Node) bool {
 			res, err := regexp.Match(GenerateMasterRegexp(masterPrefix), ([]byte)(node.Name))
 			if err != nil {
 				e2elog.Logf("Failed to match regexp to node name: %v", err)
@@ -3051,8 +2779,8 @@ func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 		numNodes := len(nodes.Items)
 
 		// Filter out not-ready nodes.
-		FilterNodes(nodes, func(node v1.Node) bool {
-			return IsNodeConditionSetAsExpected(&node, v1.NodeReady, true)
+		e2enode.Filter(nodes, func(node v1.Node) bool {
+			return e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true)
 		})
 
 		numReady := len(nodes.Items)
@@ -3152,62 +2880,6 @@ func LookForStringInFile(ns, podName, container, file, expectedString string, ti
 	})
 }
 
-// getSvcNodePort returns the node port for the given service:port.
-func getSvcNodePort(client clientset.Interface, ns, name string, svcPort int) (int, error) {
-	svc, err := client.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return 0, err
-	}
-	for _, p := range svc.Spec.Ports {
-		if p.Port == int32(svcPort) {
-			if p.NodePort != 0 {
-				return int(p.NodePort), nil
-			}
-		}
-	}
-	return 0, fmt.Errorf(
-		"No node port found for service %v, port %v", name, svcPort)
-}
-
-// GetNodePortURL returns the url to a nodeport Service.
-func GetNodePortURL(client clientset.Interface, ns, name string, svcPort int) (string, error) {
-	nodePort, err := getSvcNodePort(client, ns, name, svcPort)
-	if err != nil {
-		return "", err
-	}
-	// This list of nodes must not include the master, which is marked
-	// unschedulable, since the master doesn't run kube-proxy. Without
-	// kube-proxy NodePorts won't work.
-	var nodes *v1.NodeList
-	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		nodes, err = client.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector().String()})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	}) != nil {
-		return "", err
-	}
-	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("Unable to list nodes in cluster")
-	}
-	for _, node := range nodes.Items {
-		for _, address := range node.Status.Addresses {
-			if address.Type == v1.NodeExternalIP {
-				if address.Address != "" {
-					return fmt.Sprintf("http://%v:%v", address.Address, nodePort), nil
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("Failed to find external address for service %v", name)
-}
-
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
@@ -3270,33 +2942,6 @@ func UnblockNetwork(from string, to string) {
 	}
 }
 
-// timeout for proxy requests.
-const proxyTimeout = 2 * time.Minute
-
-// NodeProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
-func NodeProxyRequest(c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
-	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
-	// This will leak a goroutine if proxy hangs. #22165
-	var result restclient.Result
-	finished := make(chan struct{})
-	go func() {
-		result = c.CoreV1().RESTClient().Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", node, port)).
-			Suffix(endpoint).
-			Do()
-
-		finished <- struct{}{}
-	}()
-	select {
-	case <-finished:
-		return result, nil
-	case <-time.After(proxyTimeout):
-		return restclient.Result{}, nil
-	}
-}
-
 // GetKubeletPods retrieves the list of pods on the kubelet.
 // TODO(alejandrox1): move to pod subpkg once node methods have been refactored.
 func GetKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
@@ -3315,7 +2960,7 @@ func GetKubeletRunningPods(c clientset.Interface, node string) (*v1.PodList, err
 // refactored.
 func getKubeletPods(c clientset.Interface, node, resource string) (*v1.PodList, error) {
 	result := &v1.PodList{}
-	client, err := NodeProxyRequest(c, node, resource, ports.KubeletPort)
+	client, err := e2enode.ProxyRequest(c, node, resource, ports.KubeletPort)
 	if err != nil {
 		return &v1.PodList{}, err
 	}
@@ -3635,40 +3280,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
 	return ips.List()
-}
-
-// GetNodeExternalIP returns node external IP concatenated with port 22 for ssh
-// e.g. 1.2.3.4:22
-func GetNodeExternalIP(node *v1.Node) (string, error) {
-	e2elog.Logf("Getting external IP address for %s", node.Name)
-	host := ""
-	for _, a := range node.Status.Addresses {
-		if a.Type == v1.NodeExternalIP && a.Address != "" {
-			host = net.JoinHostPort(a.Address, sshPort)
-			break
-		}
-	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the external IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
-}
-
-// GetNodeInternalIP returns node internal IP
-func GetNodeInternalIP(node *v1.Node) (string, error) {
-	host := ""
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeInternalIP {
-			if address.Address != "" {
-				host = net.JoinHostPort(address.Address, sshPort)
-				break
-			}
-		}
-	}
-	if host == "" {
-		return "", fmt.Errorf("Couldn't get the internal IP of host %s with addresses %v", node.Name, node.Status.Addresses)
-	}
-	return host, nil
 }
 
 // SimpleGET executes a get on the given url, returns error if non-200 returned.

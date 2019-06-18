@@ -25,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
@@ -97,7 +98,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
-			if err := framework.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
+			if err := e2enode.WaitForReadyNodes(c, int(originalNodeCount), 10*time.Minute); err != nil {
 				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
@@ -111,7 +112,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			numNodes, err := framework.NumberOfRegisteredNodes(c)
+			numNodes, err := e2enode.TotalRegistered(c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
@@ -124,7 +125,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			framework.ExpectNoError(err)
-			err = framework.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
+			err = e2enode.WaitForReadyNodes(c, int(originalNodeCount-1), 10*time.Minute)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting 1 minute for the watch in the podGC to catch up, remove any pods scheduled on " +
@@ -142,7 +143,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := framework.NumberOfRegisteredNodes(c)
+			numNodes, err := e2enode.TotalRegistered(c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil)
@@ -155,7 +156,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForGroupSize(group, targetNumNodes)
 			framework.ExpectNoError(err)
-			err = framework.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
+			err = e2enode.WaitForReadyNodes(c, int(originalNodeCount+1), 10*time.Minute)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("increasing size of the replication controller to %d and verifying all pods are running", originalNodeCount+1))

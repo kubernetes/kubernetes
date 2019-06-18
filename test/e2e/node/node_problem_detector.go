@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -50,7 +51,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		framework.SkipUnlessProviderIs("gce", "gke")
 		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
-		framework.WaitForAllNodesHealthy(f.ClientSet, time.Minute)
+		e2enode.WaitForTotalHealthy(f.ClientSet, time.Minute)
 	})
 
 	ginkgo.It("should run without error", func() {

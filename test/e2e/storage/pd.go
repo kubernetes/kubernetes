@@ -40,6 +40,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -442,7 +443,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 })
 
 func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
-	framework.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
+	e2enode.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
 	framework.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
 	nodes := framework.GetReadySchedulableNodesOrDie(c)
 	return len(nodes.Items)

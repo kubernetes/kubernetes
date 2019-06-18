@@ -50,6 +50,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -744,7 +745,7 @@ func (j *TestJig) VerifyURL(route, host string, iterations int, interval time.Du
 
 func (j *TestJig) pollServiceNodePort(ns, name string, port int) error {
 	// TODO: Curl all nodes?
-	u, err := framework.GetNodePortURL(j.Client, ns, name, port)
+	u, err := e2enode.GetPortURL(j.Client, ns, name, port)
 	if err != nil {
 		return err
 	}

@@ -28,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -54,7 +55,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 
-		framework.WaitForAllNodesHealthy(cs, time.Minute)
+		e2enode.WaitForTotalHealthy(cs, time.Minute)
 		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
 
 		framework.ExpectNoError(framework.CheckTestingNSDeletedExcept(cs, ns))

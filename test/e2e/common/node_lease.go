@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -86,7 +87,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 		ginkgo.It("the kubelet should report node status infrequently", func() {
 			ginkgo.By("wait until node is ready")
-			framework.WaitForNodeToBeReady(f.ClientSet, nodeName, 5*time.Minute)
+			e2enode.WaitForNodeToBeReady(f.ClientSet, nodeName, 5*time.Minute)
 
 			ginkgo.By("wait until there is node lease")
 			var err error

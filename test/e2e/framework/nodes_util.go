@@ -25,10 +25,11 @@ import (
 	"sync"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
@@ -202,12 +203,12 @@ func waitForNodesReadyAfterUpgrade(f *Framework) error {
 	//
 	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
 	// GKE; the operation shouldn't return until they all are.
-	numNodes, err := NumberOfRegisteredNodes(f.ClientSet)
+	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
 	if err != nil {
 		return fmt.Errorf("couldn't detect number of nodes")
 	}
 	e2elog.Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout, numNodes)
-	if _, err := CheckNodesReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
+	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil
