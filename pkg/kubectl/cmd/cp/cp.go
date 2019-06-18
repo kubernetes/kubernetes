@@ -452,6 +452,7 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 }
 
 func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix string) error {
+	destDir = evalSymlinksAnyway(destDir)
 	symlinkWarningPrinted := false
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
@@ -463,7 +464,6 @@ func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix s
 			}
 			break
 		}
-
 		// All the files will start with the prefix, which is the directory where
 		// they were located on the pod, we need to strip down that prefix, but
 		// if the prefix is missing it means the tar was tempered with.
@@ -553,4 +553,16 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 		return err
 	}
 	return nil
+}
+
+func evalSymlinksAnyway(inpath string) string {
+	evaledPath, err := filepath.EvalSymlinks(inpath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return inpath
+		}
+		return path.Join(evalSymlinksAnyway(path.Dir(inpath)), path.Base(inpath))
+	}
+
+	return evaledPath
 }
