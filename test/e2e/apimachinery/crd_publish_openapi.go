@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/rest"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	"sigs.k8s.io/yaml"
 )
@@ -59,7 +60,7 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 	ginkgo.It("works for CRD with validation schema", func() {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-foo")
@@ -68,66 +69,66 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with known and required properties")
 		validCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"name":"test-bar"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(validCR, ns, "create", "-f", "-"); err != nil {
-			framework.Failf("failed to create valid CR %s: %v", validCR, err)
+			e2elog.Failf("failed to create valid CR %s: %v", validCR, err)
 		}
 		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
-			framework.Failf("failed to delete valid CR: %v", err)
+			e2elog.Failf("failed to delete valid CR: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(validCR, ns, "apply", "-f", "-"); err != nil {
-			framework.Failf("failed to apply valid CR %s: %v", validCR, err)
+			e2elog.Failf("failed to apply valid CR %s: %v", validCR, err)
 		}
 		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-foo"); err != nil {
-			framework.Failf("failed to delete valid CR: %v", err)
+			e2elog.Failf("failed to delete valid CR: %v", err)
 		}
 
 		ginkgo.By("client-side validation (kubectl create and apply) rejects request with unknown properties when disallowed by the schema")
 		unknownCR := fmt.Sprintf(`{%s,"spec":{"foo":true}}`, meta)
 		if _, err := framework.RunKubectlInput(unknownCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
-			framework.Failf("unexpected no error when creating CR with unknown field: %v", err)
+			e2elog.Failf("unexpected no error when creating CR with unknown field: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(unknownCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `unknown field "foo"`) {
-			framework.Failf("unexpected no error when applying CR with unknown field: %v", err)
+			e2elog.Failf("unexpected no error when applying CR with unknown field: %v", err)
 		}
 
 		ginkgo.By("client-side validation (kubectl create and apply) rejects request without required properties")
 		noRequireCR := fmt.Sprintf(`{%s,"spec":{"bars":[{"age":"10"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(noRequireCR, ns, "create", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
-			framework.Failf("unexpected no error when creating CR without required field: %v", err)
+			e2elog.Failf("unexpected no error when creating CR without required field: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(noRequireCR, ns, "apply", "-f", "-"); err == nil || !strings.Contains(err.Error(), `missing required field "name"`) {
-			framework.Failf("unexpected no error when applying CR without required field: %v", err)
+			e2elog.Failf("unexpected no error when applying CR without required field: %v", err)
 		}
 
 		ginkgo.By("kubectl explain works to explain CR properties")
 		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*Foo CRD for Testing.*FIELDS:.*apiVersion.*<string>.*APIVersion defines.*spec.*<Object>.*Specification of Foo`); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("kubectl explain works to explain CR properties recursively")
 		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".metadata", `(?s)DESCRIPTION:.*Standard object's metadata.*FIELDS:.*creationTimestamp.*<string>.*CreationTimestamp is a timestamp`); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec", `(?s)DESCRIPTION:.*Specification of Foo.*FIELDS:.*bars.*<\[\]Object>.*List of Bars and their specs`); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural+".spec.bars", `(?s)RESOURCE:.*bars.*<\[\]Object>.*DESCRIPTION:.*List of Bars and their specs.*FIELDS:.*bazs.*<\[\]string>.*List of Bazs.*name.*<string>.*Name of Bar`); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("kubectl explain works to return error when explain is called on property that doesn't exist")
 		if _, err := framework.RunKubectl("explain", crd.Crd.Spec.Names.Plural+".spec.bars2"); err == nil || !strings.Contains(err.Error(), `field "bars2" does not exist`) {
-			framework.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
+			e2elog.Failf("unexpected no error when explaining property that doesn't exist: %v", err)
 		}
 
 		if err := cleanupCRD(f, crd); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
 	ginkgo.It("works for CRD without validation schema", func() {
 		crd, err := setupCRD(f, nil, "empty", "v1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		meta := fmt.Sprintf(metaPattern, crd.Crd.Spec.Names.Kind, crd.Crd.Spec.Group, crd.Crd.Spec.Versions[0].Name, "test-cr")
@@ -136,25 +137,25 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("client-side validation (kubectl create and apply) allows request with any unknown properties")
 		randomCR := fmt.Sprintf(`{%s,"a":{"b":[{"c":"d"}]}}`, meta)
 		if _, err := framework.RunKubectlInput(randomCR, ns, "create", "-f", "-"); err != nil {
-			framework.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
+			e2elog.Failf("failed to create random CR %s for CRD without schema: %v", randomCR, err)
 		}
 		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
-			framework.Failf("failed to delete random CR: %v", err)
+			e2elog.Failf("failed to delete random CR: %v", err)
 		}
 		if _, err := framework.RunKubectlInput(randomCR, ns, "apply", "-f", "-"); err != nil {
-			framework.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
+			e2elog.Failf("failed to apply random CR %s for CRD without schema: %v", randomCR, err)
 		}
 		if _, err := framework.RunKubectl(ns, "delete", crd.Crd.Spec.Names.Plural, "test-cr"); err != nil {
-			framework.Failf("failed to delete random CR: %v", err)
+			e2elog.Failf("failed to delete random CR: %v", err)
 		}
 
 		ginkgo.By("kubectl explain works to explain CR without validation schema")
 		if err := verifyKubectlExplain(crd.Crd.Spec.Names.Plural, `(?s)DESCRIPTION:.*<empty>`); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		if err := cleanupCRD(f, crd); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
@@ -162,26 +163,26 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crdWaldo, err := setupCRD(f, schemaWaldo, "waldo", "v1beta1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if crdFoo.Crd.Spec.Group == crdWaldo.Crd.Spec.Group {
-			framework.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
+			e2elog.Failf("unexpected: CRDs should be of different group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v1beta1"), schemaWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v1"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
@@ -189,41 +190,41 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdMultiVer); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("CRs in the same group but different versions (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v4")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crdWaldo, err := setupCRD(f, schemaWaldo, "common-group", "v5")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
-			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
+			e2elog.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v5"), schemaWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v4"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
@@ -231,26 +232,26 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v6")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crdWaldo, err := setupCRD(f, schemaWaldo, "common-group", "v6")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if crdFoo.Crd.Spec.Group != crdWaldo.Crd.Spec.Group {
-			framework.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
+			e2elog.Failf("unexpected: CRDs should be of the same group %v, %v", crdFoo.Crd.Spec.Group, crdWaldo.Crd.Spec.Group)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdWaldo, "v6"), schemaWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdFoo, "v6"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := cleanupCRD(f, crdWaldo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
@@ -258,40 +259,40 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("set up a multi version CRD")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v3"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("rename a version")
 		patch := []byte(`{"spec":{"versions":[{"name":"v2","served":true,"storage":true},{"name":"v4","served":true,"storage":false}]}}`)
 		crdMultiVer.Crd, err = crdMultiVer.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Patch(crdMultiVer.Crd.Name, types.MergePatchType, patch)
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("check the new version name is served")
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v4"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		ginkgo.By("check the old version name is removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crdMultiVer, "v3")); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		ginkgo.By("check the other version is not changed")
 		if err := waitForDefinition(f.ClientSet, definitionName(crdMultiVer, "v2"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		// TestCrd.Versions is different from TestCrd.Crd.Versions, we have to manually
 		// update the name there. Used by cleanupCRD
 		crdMultiVer.Crd.Spec.Versions[1].Name = "v4"
 		if err := cleanupCRD(f, crdMultiVer); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 
@@ -299,38 +300,38 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		ginkgo.By("set up a multi version CRD")
 		crd, err := setupCRD(f, schemaFoo, "multi-to-single-ver", "v5", "v6alpha1")
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		// just double check. setupCRD() checked this for us already
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v6alpha1"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("mark a version not serverd")
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(crd.Crd.Name, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		crd.Crd.Spec.Versions[1].Served = false
 		crd.Crd, err = crd.APIExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd.Crd)
 		if err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		ginkgo.By("check the unserved version gets removed")
 		if err := waitForDefinitionCleanup(f.ClientSet, definitionName(crd, "v6alpha1")); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 		ginkgo.By("check the other version is not changed")
 		if err := waitForDefinition(f.ClientSet, definitionName(crd, "v5"), schemaFoo); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 
 		if err := cleanupCRD(f, crd); err != nil {
-			framework.Failf("%v", err)
+			e2elog.Failf("%v", err)
 		}
 	})
 })
