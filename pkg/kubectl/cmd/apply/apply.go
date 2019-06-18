@@ -398,6 +398,7 @@ func (o *ApplyOptions) Run() error {
 			if err != nil {
 				return cmdutil.AddSourceToErr("serverside-apply", info.Source, err)
 			}
+
 			options := metav1.PatchOptions{
 				Force:        &o.ForceConflicts,
 				FieldManager: o.FieldManager,
@@ -405,6 +406,7 @@ func (o *ApplyOptions) Run() error {
 			if o.ServerDryRun {
 				options.DryRun = []string{metav1.DryRunAll}
 			}
+
 			obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(
 				info.Namespace,
 				info.Name,
@@ -412,29 +414,33 @@ func (o *ApplyOptions) Run() error {
 				data,
 				&options,
 			)
-			if err == nil {
-				info.Refresh(obj, true)
-				metadata, err := meta.Accessor(info.Object)
-				if err != nil {
-					return err
+			if err != nil {
+				if isIncompatibleServerError(err) {
+					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
 				}
-				visitedUids.Insert(string(metadata.GetUID()))
-				count++
-				if len(output) > 0 && !shortOutput {
-					objs = append(objs, info.Object)
-					return nil
-				}
-				printer, err := o.ToPrinter("serverside-applied")
-				if err != nil {
-					return err
-				}
-				return printer.PrintObj(info.Object, o.Out)
-			} else if !isIncompatibleServerError(err) {
+
 				return err
 			}
-			// If we're talking to a server which does not implement server-side apply,
-			// continue with the client side apply after this block.
-			klog.Warningf("serverside-apply incompatible server: %v", err)
+
+			info.Refresh(obj, true)
+			metadata, err := meta.Accessor(info.Object)
+			if err != nil {
+				return err
+			}
+
+			visitedUids.Insert(string(metadata.GetUID()))
+			count++
+			if len(output) > 0 && !shortOutput {
+				objs = append(objs, info.Object)
+				return nil
+			}
+
+			printer, err := o.ToPrinter("serverside-applied")
+			if err != nil {
+				return err
+			}
+
+			return printer.PrintObj(info.Object, o.Out)
 		}
 
 		// Get the modified configuration of the object. Embed the result
