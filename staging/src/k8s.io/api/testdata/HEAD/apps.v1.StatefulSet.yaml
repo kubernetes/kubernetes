@@ -32,9 +32,8 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
-  podManagementPolicy: C
   replicas: -1978186127
-  revisionHistoryLimit: 1684743280
+  revisionHistoryLimit: 1538760390
   selector:
     matchExpressions:
     - key: 5816m59-dx8----i--5-8t36b--09--23-u19m-35--d.vo61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-ekg-071b/YJTrcd-2.-__E_Sv__26KX_F
@@ -484,6 +483,8 @@ spec:
       nodeName: "283"
       nodeSelector:
         "279": "280"
+      overhead:
+        锒鿦Ršțb贇髪č: "840"
       preemptionPolicy: qiǙĞǠ
       priority: -895317190
       priorityClassName: "340"
@@ -725,19 +726,18 @@ spec:
           volumePath: "110"
   updateStrategy:
     rollingUpdate:
-      partition: -186717017
-    type: Z槇鿖]甙ªŒ,躻[鶆f盧詳痍4'
+      partition: 1952497813
   volumeClaimTemplates:
   - metadata:
       annotations:
         "353": "354"
       clusterName: "359"
       creationTimestamp: null
-      deletionGracePeriodSeconds: 8854032467905298740
+      deletionGracePeriodSeconds: 5247456886637678767
       finalizers:
       - "358"
       generateName: "347"
-      generation: 1599344877585039625
+      generation: -3511493794676511173
       labels:
         "351": "352"
       managedFields:
@@ -746,65 +746,64 @@ spec:
           "362":
             "363": null
         manager: "360"
+        operation: 餘ŁƁ翂|C
       name: "346"
       namespace: "348"
       ownerReferences:
       - apiVersion: "355"
-        blockOwnerDeletion: false
+        blockOwnerDeletion: true
         controller: false
         kind: "356"
         name: "357"
-        uid: D很唟-墡è箁E嗆R2
-      resourceVersion: "15930892079168115837"
+        uid: Bb偃礳Ȭ痍脉PP
+      resourceVersion: "5540407251138887855"
       selfLink: "349"
     spec:
       accessModes:
-      - Pöƌ镳餘
+      - 藷曥摮Z Ǐg鲅峣/vɟ擅Ɇǥ
       dataSource:
         apiGroup: "374"
         kind: "375"
         name: "376"
       resources:
         limits:
-          撣樀: "688"
+          "": "204"
         requests:
-          4Y鳲Jɡ: "987"
+          Z綶ĀRġ磸: "628"
       selector:
         matchExpressions:
-        - key: PfNx__-U_.Pn-W23-_.z_.._s--_F-R
-          operator: In
-          values:
-          - g__4K..-68-7AlR__8-7_-YD-Q9_-_1
+        - key: 39-A_-_l67Q.-_r
+          operator: Exists
         matchLabels:
-          t.k47M7y-Dy__3wc.q.8_00.0_N: ""
+          L_1-wv3UDf.-4D-r.-F__r.oh..2_uGGP..-_N_h_4Hl-X0_2--__40: a68-7AlR__8-7_-YD-Q9_-__..YNFu7Pg-.814e-_07-ht-EP
       storageClassName: "373"
-      volumeMode: iD¢ƿ媴h5ƅȸȓɻ猶
+      volumeMode: ȗ<8^翜T蘈
       volumeName: "372"
     status:
       accessModes:
-      - Ǣ龞瞯å檳ė>c緍k¢茤Ƣǟ½灶
+      - ""
       capacity:
-        u汎mō6µɑ`ȗ<8^翜T蘈ý: "37"
+        CǙķȈĐI梞ū筀-: "457"
       conditions:
-      - lastProbeTime: "2489-11-15T17:36:06Z"
-        lastTransitionTime: "2023-10-20T16:52:07Z"
+      - lastProbeTime: "2725-12-02T15:24:11Z"
+        lastTransitionTime: "2546-07-16T14:04:49Z"
         message: "378"
         reason: "377"
-        status: I梞ū筀
-        type: ɁºǱ秶ʑ韝e溣狣愿激H\Ȳ
-      phase: 嫡牿咸Ǻ潑鶋洅啶'ƈo
+        status: 4'N擻
+        type: mAȥ睙蜵E坉Ɖ虼/h毂y覙 
+      phase: 筞X銲tHǽ÷閂抰
 status:
-  collisionCount: 1836894267
+  collisionCount: 1897665453
   conditions:
   - lastTransitionTime: "2741-08-01T23:33:42Z"
     message: "383"
     reason: "382"
     status: 誀ŭ"ɦ?
-    type: 囨汙Ȗ><僚徘ó蒿
-  currentReplicas: 1538760390
+    type: <僚徘ó蒿
+  currentReplicas: -2037929910
   currentRevision: "380"
-  observedGeneration: 3145429786196118388
-  readyReplicas: -63012996
-  replicas: 1256299227
+  observedGeneration: 8218676932085767799
+  readyReplicas: -1147281085
+  replicas: 1423120294
   updateRevision: "381"
-  updatedReplicas: 346775159
+  updatedReplicas: 1589830480

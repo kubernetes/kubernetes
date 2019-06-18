@@ -3001,6 +3001,16 @@ type PodSpec struct {
 	// This field is alpha-level and is only honored by servers that enable the NonPreemptingPriority feature.
 	// +optional
 	PreemptionPolicy *PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,31,opt,name=preemptionPolicy"`
+	// Overhead represents the resource overhead associated with running a pod for a given RuntimeClass.
+	// This field will be autopopulated at admission time by the RuntimeClass admission controller. If
+	// the RuntimeClass admission controller is enabled, overhead must not be set in Pod create requests.
+	// The RuntimeClass admission controller will reject Pod create requests which have the overhead already
+	// set. If RuntimeClass is configured and selected in the PodSpec, Overhead will be set to the value
+	// defined in the corresponding RuntimeClass, otherwise it will remain unset and treated as zero.
+	// More info: https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
+	// This field is alpha-level as of Kubernetes v1.16, and is only honored by servers that enable the PodOverhead feature.
+	// +optional
+	Overhead ResourceList `json:"overhead,omitempty" protobuf:"bytes,32,opt,name=overhead"`
 }
 
 const (

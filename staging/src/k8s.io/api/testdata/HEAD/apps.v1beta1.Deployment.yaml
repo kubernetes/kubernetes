@@ -32,13 +32,12 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
-  minReadySeconds: 1173434715
-  paused: true
-  progressDeadlineSeconds: 787287347
+  minReadySeconds: 1969832939
+  progressDeadlineSeconds: 1694052880
   replicas: -1978186127
-  revisionHistoryLimit: -853633578
+  revisionHistoryLimit: -984441502
   rollbackTo:
-    revision: -9097966625998465286
+    revision: -968047089167364108
   selector:
     matchExpressions:
     - key: 5816m59-dx8----i--5-8t36b--09--23-u19m-35--d.vo61---4fy--9---7--9-9s-0-u5lj2--10pq-0-7-9-2-ekg-071b/YJTrcd-2.-__E_Sv__26KX_F
@@ -49,7 +48,7 @@ spec:
       w9v--m0-1y5-g3/JFHn7y-74.-0MUORQQ.N2.1.L.l-Y._.-44..d.__g: F-_3-n-_-__3u-.__P__.7U-Uo_F
   strategy:
     rollingUpdate: {}
-    type: 闍ŏŃŋŏ}ŀ姳Ŭ尌eáNRǊ丧
+    type: 暇镘買ɱD很唟-墡è箁E嗆R2璻
   template:
     metadata:
       annotations:
@@ -490,6 +489,8 @@ spec:
       nodeName: "283"
       nodeSelector:
         "279": "280"
+      overhead:
+        锒鿦Ršțb贇髪č: "840"
       preemptionPolicy: qiǙĞǠ
       priority: -895317190
       priorityClassName: "340"
@@ -730,17 +731,17 @@ spec:
           storagePolicyName: "112"
           volumePath: "110"
 status:
-  availableReplicas: -882790979
-  collisionCount: 1813037030
+  availableReplicas: 1224561536
+  collisionCount: -248869594
   conditions:
-  - lastTransitionTime: "2682-02-22T19:36:37Z"
-    lastUpdateTime: "2811-10-04T08:41:37Z"
+  - lastTransitionTime: "2915-06-26T10:11:26Z"
+    lastUpdateTime: "2156-01-27T01:49:17Z"
     message: "347"
     reason: "346"
-    status: ɩ繞怨Ǫ
-    type: 雤Ƽ]焤Ɂ癏BɺȔªɛȨç捌聮ŃŻ
-  observedGeneration: -5913324997018604801
-  readyReplicas: -1159900491
-  replicas: -1158620766
-  unavailableReplicas: -1006636575
-  updatedReplicas: 1221768764
+    status: '@ǮJ=礏ƴ磳藷曥摮Z'
+    type: 餘ŁƁ翂|C
+  observedGeneration: -7566638657230957553
+  readyReplicas: 99448460
+  replicas: 573685667
+  unavailableReplicas: 1852139780
+  updatedReplicas: -1328244525

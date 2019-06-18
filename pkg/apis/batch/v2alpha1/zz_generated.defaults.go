@@ -174,6 +174,7 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 			}
 		}
 	}
+	v1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_CronJobList(in *v2alpha1.CronJobList) {
@@ -320,4 +321,5 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 			}
 		}
 	}
+	v1.SetDefaults_ResourceList(&in.Template.Spec.Template.Spec.Overhead)
 }

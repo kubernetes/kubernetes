@@ -21,12 +21,21 @@ syntax = 'proto2';
 
 package k8s.io.api.node.v1alpha1;
 
+import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
+
+// Overhead structure represents the resource overhead associated with running a pod.
+message Overhead {
+  // PodFixed represents the fixed resource overhead associated with running a pod.
+  // +optional
+  map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> podFixed = 1;
+}
 
 // RuntimeClass defines a class of container runtime supported in the cluster.
 // The RuntimeClass is used to determine which container runtime is used to run
@@ -72,5 +81,12 @@ message RuntimeClassSpec {
   // The RuntimeHandler must conform to the DNS Label (RFC 1123) requirements
   // and is immutable.
   optional string runtimeHandler = 1;
+
+  // Overhead represents the resource overhead associated with running a pod for a
+  // given RuntimeClass. For more details, see
+  // https://git.k8s.io/enhancements/keps/sig-node/20190226-pod-overhead.md
+  // This field is alpha-level as of Kubernetes v1.15, and is only honored by servers that enable the PodOverhead feature.
+  // +optional
+  optional Overhead overhead = 2;
 }
 

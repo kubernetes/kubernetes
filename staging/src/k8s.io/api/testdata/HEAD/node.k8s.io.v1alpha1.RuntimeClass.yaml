@@ -32,4 +32,7 @@ metadata:
   selfLink: "5"
   uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
 spec:
+  overhead:
+    podFixed:
+      ǸƢ6/: "569"
   runtimeHandler: "24"

@@ -175,6 +175,7 @@ func SetObjectDefaults_Deployment(in *v1beta1.Deployment) {
 			}
 		}
 	}
+	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_DeploymentList(in *v1beta1.DeploymentList) {
@@ -322,6 +323,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta1.StatefulSet) {
 			}
 		}
 	}
+	v1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		v1.SetDefaults_PersistentVolumeClaim(a)
