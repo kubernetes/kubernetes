@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -831,4 +831,101 @@ var _ = framework.KubeDescribe("Pods", func() {
 		validatePodReadiness(false)
 
 	})
+
+	ginkgo.It("pod should be in running state after the graceful terimination delete call", func() {
+		value := strconv.Itoa(time.Now().Nanosecond())
+		pod := getPodObject(podClient, f, value)
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		listCompleted := make(chan bool, 1)
+		lw := &cache.ListWatch{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				options.LabelSelector = selector.String()
+				podList, err := podClient.List(options)
+				if err == nil {
+					select {
+					case listCompleted <- true:
+						e2elog.Logf("observed the pod list")
+						return podList, err
+					default:
+						e2elog.Logf("channel blocked")
+					}
+				}
+				return podList, err
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				options.LabelSelector = selector.String()
+				return podClient.Watch(options)
+			},
+		}
+		_, _, w, _ := watchtools.NewIndexerInformerWatcher(lw, &v1.Pod{})
+		defer w.Stop()
+
+		ginkgo.By("submitting the pod to kubernetes")
+		podClient.CreateSync(pod)
+
+		// We need to wait for the pod to be running, otherwise the deletion
+		// may be carried out immediately rather than gracefully.
+		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+
+		ginkgo.By("verifying the pod is in kubernetes")
+		pods, err := podClient.List(options)
+		framework.ExpectNoError(err, "failed to query for pods")
+		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		pod = &pods.Items[0]
+
+		ginkgo.By("deleting the pod")
+		err = podClient.Delete(pod.Name, metav1.NewDeleteOptions(30))
+		framework.ExpectNoError(err, "failed to delete pod")
+
+		ginkgo.By("verifying pod deletion was observed")
+		deleted := false
+		var lastPod *v1.Pod
+		var deleteObservedTime time.Time
+		timer := time.After(framework.DefaultPodDeletionTimeout)
+		for !deleted {
+			select {
+			case event, _ := <-w.ResultChan():
+				switch event.Type {
+				case watch.Deleted:
+					deleteObservedTime = time.Now()
+					lastPod = event.Object.(*v1.Pod)
+					deleted = true
+				case watch.Error:
+					e2elog.Logf("received a watch error: %v", event.Object)
+					framework.Failf("watch closed with error")
+				}
+			case <-timer:
+				framework.Failf("timed out waiting for pod deletion")
+			}
+		}
+		if !deleted {
+			framework.Failf("Failed to observe pod deletion")
+		}
+		gomega.Expect(deleteObservedTime).Should(gomega.BeTemporally(">", lastPod.DeletionTimestamp.Time), "pod failed to run up to grace period seconds")
+	})
 })
+
+func getPodObject(podClient *framework.PodClient, f *framework.Framework, value string) *v1.Pod {
+	ginkgo.By("creating the pod")
+	name := "pod-graceful-termination-" + string(uuid.NewUUID())
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": "foo",
+				"time": value,
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:    "nginx-container",
+					Image:   imageutils.GetE2EImage(imageutils.Nginx),
+					Command: []string{"sleep", "600"},
+				},
+			},
+		},
+	}
+	return pod
+}
