@@ -28,9 +28,9 @@ import (
 
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
+	pkgversion "k8s.io/client-go/pkg/version"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	pkgversion "k8s.io/kubernetes/pkg/version"
 )
 
 const (
