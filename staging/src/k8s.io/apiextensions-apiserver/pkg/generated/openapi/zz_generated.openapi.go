@@ -1887,7 +1887,7 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 					},
 					"labelSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+							Description: "A selector to restrict the list of returned objects by their labels. If you have a LabelSelector object and need to use it for this field, use FormatLabelSelector(selector) rather than selector.String() to create a string in the correct format. Defaults to everything.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
