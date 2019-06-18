@@ -210,12 +210,52 @@ func (r *responder) Error(_ http.ResponseWriter, _ *http.Request, err error) {
 
 // these methods provide locked access to fields
 
-func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIService) {
+// updateWhileKeepingAvailability updates an api service handling info
+// if this is the first time we see the service we take availability directly from the apiService argument
+// otherwise we take it from the currently stored value
+//
+// note that the current availability of the service is updated through updateAvailabilityIfExists method
+func (r *proxyHandler) updateWhileKeepingAvailability(apiService *apiregistrationv1api.APIService) {
+	serviceAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available)
+	value := r.handlingInfo.Load()
+	if value != nil {
+		handlingInfo := value.(proxyHandlingInfo)
+		serviceAvailable = handlingInfo.serviceAvailable
+	}
+
+	r.updateAPIService(apiService, serviceAvailable)
+}
+
+// updateAvailabilityIfExists updates availability of a service
+// this method is noop if availability of a service hasn't changed or no service has been registered
+func (r *proxyHandler) updateAvailabilityIfExists(apiService *apiregistrationv1api.APIService) {
+	serviceAvailable := apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available)
+	value := r.handlingInfo.Load()
+	handlingInfo := value.(proxyHandlingInfo)
+	if handlingInfo.serviceAvailable == serviceAvailable {
+		// if availability of the service hasn't changed this is noop
+		return
+	}
+	r.updateAPIService(apiService, serviceAvailable)
+}
+
+func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIService, serviceAvailable bool) {
 	if apiService.Spec.Service == nil {
 		r.handlingInfo.Store(proxyHandlingInfo{local: true})
 		return
 	}
 
+	newInfo, err := r.newProxyHandlingInfo(apiService)
+	if err != nil {
+		// note that the error is not ignored it will be reported to the callers in ServeHTTP function
+		klog.Warning(newInfo.transportBuildingError.Error())
+	}
+	newInfo.serviceAvailable = serviceAvailable
+
+	r.handlingInfo.Store(newInfo)
+}
+
+func (r *proxyHandler) newProxyHandlingInfo(apiService *apiregistrationv1api.APIService) (proxyHandlingInfo, error) {
 	newInfo := proxyHandlingInfo{
 		name: apiService.Name,
 		restConfig: &restclient.Config{
@@ -230,14 +270,14 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 		serviceName:      apiService.Spec.Service.Name,
 		serviceNamespace: apiService.Spec.Service.Namespace,
 		servicePort:      *apiService.Spec.Service.Port,
-		serviceAvailable: apiregistrationv1apihelper.IsAPIServiceConditionTrue(apiService, apiregistrationv1api.Available),
 	}
 	if r.proxyTransport != nil && r.proxyTransport.DialContext != nil {
 		newInfo.restConfig.Dial = r.proxyTransport.DialContext
 	}
 	newInfo.proxyRoundTripper, newInfo.transportBuildingError = restclient.TransportFor(newInfo.restConfig)
 	if newInfo.transportBuildingError != nil {
-		klog.Warning(newInfo.transportBuildingError.Error())
+		return newInfo, newInfo.transportBuildingError
 	}
-	r.handlingInfo.Store(newInfo)
+
+	return newInfo, nil
 }

@@ -46,9 +46,14 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
-// ServiceResolver knows how to convert a service reference into an actual location.
-type ServiceResolver interface {
+// serviceResolver knows how to convert a service reference into an actual location.
+type serviceResolver interface {
 	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
+}
+
+// localAPIServiceStatusUpdater propagates the current status of an APIService to the handling layer.
+type localAPIServiceStatusUpdater interface {
+	UpdateAvailability(apiService *apiregistrationv1.APIService) error
 }
 
 // AvailableConditionController handles checking the availability of registered API services.
@@ -65,8 +70,9 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
-	discoveryClient *http.Client
-	serviceResolver ServiceResolver
+	discoveryClient           *http.Client
+	serviceResolver           serviceResolver
+	localServiceStatusUpdater localAPIServiceStatusUpdater
 
 	// To allow injection for testing.
 	syncFn func(key string) error
@@ -83,17 +89,19 @@ func NewAvailableConditionController(
 	proxyTransport *http.Transport,
 	proxyClientCert []byte,
 	proxyClientKey []byte,
-	serviceResolver ServiceResolver,
+	serviceResolver serviceResolver,
+	localServiceStatusUpdater localAPIServiceStatusUpdater,
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
-		apiServiceClient: apiServiceClient,
-		apiServiceLister: apiServiceInformer.Lister(),
-		apiServiceSynced: apiServiceInformer.Informer().HasSynced,
-		serviceLister:    serviceInformer.Lister(),
-		servicesSynced:   serviceInformer.Informer().HasSynced,
-		endpointsLister:  endpointsInformer.Lister(),
-		endpointsSynced:  endpointsInformer.Informer().HasSynced,
-		serviceResolver:  serviceResolver,
+		apiServiceClient:          apiServiceClient,
+		apiServiceLister:          apiServiceInformer.Lister(),
+		apiServiceSynced:          apiServiceInformer.Informer().HasSynced,
+		serviceLister:             serviceInformer.Lister(),
+		servicesSynced:            serviceInformer.Informer().HasSynced,
+		endpointsLister:           endpointsInformer.Lister(),
+		endpointsSynced:           endpointsInformer.Informer().HasSynced,
+		serviceResolver:           serviceResolver,
+		localServiceStatusUpdater: localServiceStatusUpdater,
 		queue: workqueue.NewNamedRateLimitingQueue(
 			// We want a fairly tight requeue time.  The controller listens to the API, but because it relies on the routability of the
 			// service network, it is possible for an external, non-watchable factor to affect availability.  This keeps
@@ -174,7 +182,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	// local API services are always considered available
 	if apiService.Spec.Service == nil {
 		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, apiregistrationv1apihelper.NewLocalAvailableAPIServiceCondition())
-		_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+		_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 		return err
 	}
 
@@ -184,14 +192,14 @@ func (c *AvailableConditionController) sync(key string) error {
 		availableCondition.Reason = "ServiceNotFound"
 		availableCondition.Message = fmt.Sprintf("service/%s in %q is not present", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-		_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+		_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 		return err
 	} else if err != nil {
 		availableCondition.Status = apiregistrationv1.ConditionUnknown
 		availableCondition.Reason = "ServiceAccessError"
 		availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 		apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-		_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+		_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 		return err
 	}
 
@@ -211,7 +219,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "ServicePortError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q is not listening on port %d", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, *apiService.Spec.Service.Port)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 			return err
 		}
 
@@ -221,14 +229,14 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "EndpointsNotFound"
 			availableCondition.Message = fmt.Sprintf("cannot find endpoints for service/%s in %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 			return err
 		} else if err != nil {
 			availableCondition.Status = apiregistrationv1.ConditionUnknown
 			availableCondition.Reason = "EndpointsAccessError"
 			availableCondition.Message = fmt.Sprintf("service/%s in %q cannot be checked due to: %v", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, err)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 			return err
 		}
 		hasActiveEndpoints := false
@@ -247,7 +255,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "MissingEndpoints"
 			availableCondition.Message = fmt.Sprintf("endpoints for service/%s in %q have no addresses with port name %q", apiService.Spec.Service.Name, apiService.Spec.Service.Namespace, portName)
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, err := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, err := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 			return err
 		}
 	}
@@ -320,7 +328,7 @@ func (c *AvailableConditionController) sync(key string) error {
 			availableCondition.Reason = "FailedDiscoveryCheck"
 			availableCondition.Message = lastError.Error()
 			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, updateErr := updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+			_, updateErr := updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 			if updateErr != nil {
 				return updateErr
 			}
@@ -333,13 +341,17 @@ func (c *AvailableConditionController) sync(key string) error {
 	availableCondition.Reason = "Passed"
 	availableCondition.Message = "all checks passed"
 	apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-	_, err = updateAPIServiceStatus(c.apiServiceClient, originalAPIService, apiService)
+	_, err = updateAPIServiceStatus(c.apiServiceClient, c.localServiceStatusUpdater, originalAPIService, apiService)
 	return err
 }
 
 // updateAPIServiceStatus only issues an update if a change is detected.  We have a tight resync loop to quickly detect dead
 // apiservices.  Doing that means we don't want to quickly issue no-op updates.
-func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
+func updateAPIServiceStatus(client apiregistrationclient.APIServicesGetter, localServiceStatusUpdater localAPIServiceStatusUpdater, originalAPIService, newAPIService *apiregistrationv1.APIService) (*apiregistrationv1.APIService, error) {
+	if localServiceStatusUpdater != nil {
+		localServiceStatusUpdater.UpdateAvailability(newAPIService)
+	}
+
 	if equality.Semantic.DeepEqual(originalAPIService.Status, newAPIService.Status) {
 		return newAPIService, nil
 	}

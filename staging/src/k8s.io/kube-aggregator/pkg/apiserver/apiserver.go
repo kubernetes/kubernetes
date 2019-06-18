@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,8 +113,11 @@ type APIAggregator struct {
 	proxyClientKey  []byte
 	proxyTransport  *http.Transport
 
+	// mutex that protects proxyHandlers map
+	mutex sync.RWMutex
 	// proxyHandlers are the proxy handlers that are currently registered, keyed by apiservice.name
 	proxyHandlers map[string]*proxyHandler
+
 	// handledGroups are the groups that already have routes
 	handledGroups sets.String
 
@@ -207,6 +211,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		c.ExtraConfig.ProxyClientCert,
 		c.ExtraConfig.ProxyClientKey,
 		s.serviceResolver,
+		s,
 	)
 	if err != nil {
 		return nil, err
@@ -265,19 +270,31 @@ func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
 	return s.runnable.Run(stopCh)
 }
 
-// AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.
-// It's a slow moving API, so its ok to run the controller on a single thread
+// AddAPIService adds an API service. It is not thread-safe, so only call it on one thread at a time please.
+// It's a slow moving API, so it's ok to acquire a lock.
 func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	// if the proxyHandler already exists, it needs to be updated. The aggregation bits do not
 	// since they are wired against listers because they require multiple resources to respond
-	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
-		proxyHandler.updateAPIService(apiService)
-		if s.openAPIAggregationController != nil {
-			s.openAPIAggregationController.UpdateAPIService(proxyHandler, apiService)
+	tryToUpdateExistingProxyHandler := func() bool {
+		s.mutex.RLock()
+		defer s.mutex.RUnlock()
+		if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
+			proxyHandler.updateWhileKeepingAvailability(apiService)
+			if s.openAPIAggregationController != nil {
+				s.openAPIAggregationController.UpdateAPIService(proxyHandler, apiService)
+			}
+			return true
 		}
+		return false
+	}
+	if serviceUpdated := tryToUpdateExistingProxyHandler(); serviceUpdated {
 		return nil
 	}
 
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	// no double-checked locking, this function is not thread-safe,
+	// so it is okay to acquire the lock without checking if the service exist in the map (proxyHandlers)
 	proxyPath := "/apis/" + apiService.Spec.Group + "/" + apiService.Spec.Version
 	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
 	if apiService.Name == legacyAPIServiceName {
@@ -292,7 +309,7 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 		proxyTransport:  s.proxyTransport,
 		serviceResolver: s.serviceResolver,
 	}
-	proxyHandler.updateAPIService(apiService)
+	proxyHandler.updateWhileKeepingAvailability(apiService)
 	if s.openAPIAggregationController != nil {
 		s.openAPIAggregationController.AddAPIService(proxyHandler, apiService)
 	}
@@ -325,11 +342,12 @@ func (s *APIAggregator) AddAPIService(apiService *v1.APIService) error {
 	return nil
 }
 
-// RemoveAPIService removes the APIService from being handled.  It is not thread-safe, so only call it on one thread at a time please.
-// It's a slow moving API, so it's ok to run the controller on a single thread.
+// RemoveAPIService removes the APIService from being handled. It's a slow moving API, so it's ok to acquire a lock
 func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
-	version := v1helper.APIServiceNameToGroupVersion(apiServiceName)
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 
+	version := v1helper.APIServiceNameToGroupVersion(apiServiceName)
 	proxyPath := "/apis/" + version.Group + "/" + version.Version
 	// v1. is a special case for the legacy API.  It proxies to a wider set of endpoints.
 	if apiServiceName == legacyAPIServiceName {
@@ -344,6 +362,16 @@ func (s *APIAggregator) RemoveAPIService(apiServiceName string) {
 
 	// TODO unregister group level discovery when there are no more versions for the group
 	// We don't need this right away because the handler properly delegates when no versions are present
+}
+
+// UpdateAvailability propagates the current status of an APIService to the handling layer
+func (s *APIAggregator) UpdateAvailability(apiService *v1.APIService) error {
+	s.mutex.RLock()
+	defer s.mutex.RUnlock()
+	if proxyHandler, exists := s.proxyHandlers[apiService.Name]; exists {
+		proxyHandler.updateAvailabilityIfExists(apiService)
+	}
+	return nil
 }
 
 // DefaultAPIResourceConfigSource returns default configuration for an APIResource.

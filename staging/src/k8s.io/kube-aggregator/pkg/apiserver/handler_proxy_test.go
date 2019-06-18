@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -27,8 +28,10 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/net/websocket"
 
@@ -87,6 +90,276 @@ type mockedRouter struct {
 
 func (r *mockedRouter) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	return &url.URL{Scheme: "https", Host: r.destinationHost}, r.err
+}
+
+func TestUpdateWhileKeepingAvailabilityConcurrent(t *testing.T) {
+	// test data
+	wg := sync.WaitGroup{}
+	heartBeat := make(chan struct{}, 1)
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	target := &targetHTTPHandler{}
+	targetServer := httptest.NewUnstartedServer(target)
+	if cert, err := tls.X509KeyPair(svcCrt, svcKey); err != nil {
+		t.Fatal(err)
+	} else {
+		targetServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+	targetServer.StartTLS()
+	defer targetServer.Close()
+
+	type testCase struct {
+		user       user.Info
+		path       string
+		apiService *apiregistration.APIService
+
+		expectedStatusCode int
+		expectedBody       string
+		expectedCalled     bool
+	}
+	tc := testCase{
+		user: &user.DefaultInfo{
+			Name:   "username",
+			Groups: []string{"one", "two"},
+		},
+		path: "/request/path",
+		apiService: &apiregistration.APIService{
+			ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+			Spec: apiregistration.APIServiceSpec{
+				Service:               &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+				Group:                 "foo",
+				Version:               "v1",
+				InsecureSkipTLSVerify: true,
+			},
+			Status: apiregistration.APIServiceStatus{
+				Conditions: []apiregistration.APIServiceCondition{
+					{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+				},
+			},
+		},
+		expectedStatusCode: http.StatusOK,
+		expectedCalled:     true,
+	}
+
+	validateResponse := func(tc testCase, resp *http.Response) {
+		if e, a := tc.expectedStatusCode, resp.StatusCode; e != a {
+			body, _ := httputil.DumpResponse(resp, true)
+			t.Logf("%v", string(body))
+			t.Errorf("expected %v, got %v", e, a)
+			return
+		}
+		bytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("%v", err)
+			return
+		}
+		if !strings.Contains(string(bytes), tc.expectedBody) {
+			t.Errorf("expected %q, got %q", tc.expectedBody, string(bytes))
+			return
+		}
+
+		if e, a := tc.expectedCalled, target.called; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+			return
+		}
+		if e, a := targetServer.Listener.Addr().String(), target.host; tc.expectedCalled && !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %v, got %v", e, a)
+			return
+		}
+	}
+
+	handler := &proxyHandler{
+		localDelegate:   http.NewServeMux(),
+		serviceResolver: &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
+		proxyTransport:  &http.Transport{},
+	}
+	server := httptest.NewServer(contextHandler(handler, tc.user))
+	defer server.Close()
+
+	// step 1: simply populate handling info based on apiService
+	//         once populated the status is always taken from the previously stored value only
+	//         a call to updateAvailabilityIfExists can change it
+	handler.updateWhileKeepingAvailability(tc.apiService)
+	{
+		resp, err := http.Get(server.URL + tc.path)
+		if err != nil {
+			t.Errorf("%v", err)
+			return
+		}
+		// validate step 1
+		validateResponse(tc, resp)
+	}
+
+	// step 2: verify that updating the service's status doesn't have any effect,
+	//         changing the status to unavailable yields HTTP 200
+	//         this step simulates a situation where the service is updated by the other replica (kube-apiserver) and
+	//         the current status is propagated via etcd
+	wg.Add(1)
+	go func(tcStep2 testCase) {
+		defer wg.Done()
+		heartBeat <- struct{}{}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				tcStep2.apiService.Status.Conditions[0].Status = apiregistration.ConditionFalse
+				handler.updateWhileKeepingAvailability(tcStep2.apiService)
+			}
+		}
+	}(tc)
+
+	// step 3: verify that step2 hasn't change availability of the service
+	//         this steps expects that the service is available
+	wg.Add(1)
+	go func(tcStep3 testCase) {
+		defer wg.Done()
+		heartBeat <- struct{}{}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				resp, err := http.Get(server.URL + tc.path)
+				if err != nil {
+					t.Errorf("%v", err)
+					return
+				}
+				// validate step 3
+				validateResponse(tcStep3, resp)
+			}
+		}
+	}(tc)
+
+	<-heartBeat
+	<-heartBeat
+	time.Sleep(1 * time.Second)
+	ctxCancel()
+	wg.Wait()
+}
+
+func TestUpdateWhileKeepingAvailabilityLockstep(t *testing.T) {
+	// test data
+	target := &targetHTTPHandler{}
+	targetServer := httptest.NewUnstartedServer(target)
+	if cert, err := tls.X509KeyPair(svcCrt, svcKey); err != nil {
+		t.Fatal(err)
+	} else {
+		targetServer.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
+	}
+	targetServer.StartTLS()
+	defer targetServer.Close()
+
+	type testCase struct {
+		user       user.Info
+		path       string
+		apiService *apiregistration.APIService
+
+		expectedStatusCode int
+		expectedBody       string
+		expectedCalled     bool
+	}
+	tc := testCase{
+		user: &user.DefaultInfo{
+			Name:   "username",
+			Groups: []string{"one", "two"},
+		},
+		path: "/request/path",
+		apiService: &apiregistration.APIService{
+			ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
+			Spec: apiregistration.APIServiceSpec{
+				Service:               &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
+				Group:                 "foo",
+				Version:               "v1",
+				InsecureSkipTLSVerify: true,
+			},
+			Status: apiregistration.APIServiceStatus{
+				Conditions: []apiregistration.APIServiceCondition{
+					{Type: apiregistration.Available, Status: apiregistration.ConditionFalse},
+				},
+			},
+		},
+		expectedStatusCode: http.StatusServiceUnavailable,
+		expectedCalled:     false,
+	}
+
+	validateResponse := func(tc testCase, resp *http.Response) {
+		if e, a := tc.expectedStatusCode, resp.StatusCode; e != a {
+			body, _ := httputil.DumpResponse(resp, true)
+			t.Logf("%v", string(body))
+			t.Errorf("expected %v, got %v", e, a)
+			return
+		}
+		bytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Errorf("%v", err)
+			return
+		}
+		if !strings.Contains(string(bytes), tc.expectedBody) {
+			t.Errorf("expected %q, got %q", tc.expectedBody, string(bytes))
+			return
+		}
+
+		if e, a := tc.expectedCalled, target.called; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+			return
+		}
+		if e, a := targetServer.Listener.Addr().String(), target.host; tc.expectedCalled && !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %v, got %v", e, a)
+			return
+		}
+	}
+
+	handler := &proxyHandler{
+		localDelegate:   http.NewServeMux(),
+		serviceResolver: &mockedRouter{destinationHost: targetServer.Listener.Addr().String()},
+		proxyTransport:  &http.Transport{},
+	}
+	server := httptest.NewServer(contextHandler(handler, tc.user))
+	defer server.Close()
+
+	// step 1: simply populate handling info based on apiService
+	handler.updateWhileKeepingAvailability(tc.apiService)
+	{
+		resp, err := http.Get(server.URL + tc.path)
+		if err != nil {
+			t.Errorf("%v", err)
+			return
+		}
+		// validate step 1
+		validateResponse(tc, resp)
+	}
+
+	// step 2: verify that updating the service's status doesn't have any effect,
+	//         changing the status to available yields HTTP 503
+	//         this step simulates a situation where the service is updated by the other replica (kube-apiserver) and
+	//         the current status is propagated via etcd
+	tc.apiService.Status.Conditions[0].Status = apiregistration.ConditionTrue
+	handler.updateWhileKeepingAvailability(tc.apiService)
+	{
+		resp, err := http.Get(server.URL + tc.path)
+		if err != nil {
+			t.Errorf("%v", err)
+			return
+		}
+		// validate step 2
+		validateResponse(tc, resp)
+	}
+
+	// step 3: verify that updating the service's status via updateAvailabilityIfExists method actually works
+	//         this steps simulates a situation where the service is updated by the current replica (available_controller) and
+	//         the status is propagated to an HTTP handler
+	handler.updateAvailabilityIfExists(tc.apiService)
+	tc.expectedCalled = true
+	tc.expectedStatusCode = http.StatusOK
+	{
+		resp, err := http.Get(server.URL + tc.path)
+		if err != nil {
+			t.Errorf("%v", err)
+			return
+		}
+		// validate step 3
+		validateResponse(tc, resp)
+	}
 }
 
 func TestProxyHandler(t *testing.T) {
@@ -281,9 +554,7 @@ func TestProxyHandler(t *testing.T) {
 			defer server.Close()
 
 			if tc.apiService != nil {
-				handler.updateAPIService(tc.apiService)
-				curr := handler.handlingInfo.Load().(proxyHandlingInfo)
-				handler.handlingInfo.Store(curr)
+				handler.updateWhileKeepingAvailability(tc.apiService)
 			}
 
 			resp, err := http.Get(server.URL + tc.path)
@@ -420,7 +691,7 @@ func TestProxyUpgrade(t *testing.T) {
 				serviceResolver: &mockedRouter{destinationHost: serverURL.Host},
 				proxyTransport:  &http.Transport{},
 			}
-			proxyHandler.updateAPIService(tc.APIService)
+			proxyHandler.updateWhileKeepingAvailability(tc.APIService)
 			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
 			defer aggregator.Close()
 

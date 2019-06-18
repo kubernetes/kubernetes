@@ -306,13 +306,13 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
 
 	fakeClient := fake.NewSimpleClientset()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, foo)
+	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), nil, foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, bar)
+	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), nil, foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
