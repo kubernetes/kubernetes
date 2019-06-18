@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -775,6 +776,80 @@ func Test_ReportMultiAttachError(t *testing.T) {
 	}
 }
 
+func Test_AddBackToReportAsAttachedList(t *testing.T) {
+	// Arrange
+	// create plugin for test detach failed
+	// (re-write detach function : fail to detach and return an detach error)
+	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
+	asw := cache.NewActualStateOfWorld(volumePluginMgr)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
+	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
+		fakeKubeClient,
+		volumePluginMgr,
+		fakeRecorder,
+		false, /* checkNodeCapabilitiesBeforeMount */
+		fakeHandler))
+	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	reconciler := NewReconciler(
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, dsw, asw, ad, nsu, fakeRecorder)
+
+	podName := "pod-uid"
+	volumeName := v1.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+	nodeName := k8stypes.NodeName("node-name")
+	dsw.AddNode(nodeName, false /*keepTerminatedPodVolumes*/)
+	volumeExists := dsw.VolumeExists(volumeName, nodeName)
+	if volumeExists {
+		t.Fatalf(
+			"Volume %q/node %q should not exist, but it does.",
+			volumeName,
+			nodeName)
+	}
+	fakePlugin.SetDetachError(fmt.Errorf("fake error occurred, %s -> %s ", nodeName, volumeName))
+
+	generatedVolumeName, podErr := dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	if podErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
+	}
+
+	// Act
+	ch := make(chan struct{})
+	go reconciler.Run(ch)
+	defer close(ch)
+
+	// Assert
+	waitForAttachCallCount(t, 1 /* expectedCallCount */, fakePlugin)
+	// we expect 1 volume is in UpdateStatusFor cache
+	verifyNodesToUpdateStatusFor(t, 1 /* expectedCallCount */, nodeName, asw)
+
+	nodesForVolume := asw.GetNodesForAttachedVolume(generatedVolumeName)
+
+	// Act
+	podToDelete := podName
+	dsw.DeletePod(types.UniquePodName(podToDelete), generatedVolumeName, nodesForVolume[0])
+	volumeExists = dsw.VolumeExists(generatedVolumeName, nodesForVolume[0])
+	if volumeExists {
+		t.Fatalf(
+			"Deleted pod %q from volume %q/node %q. Volume should also be deleted but it still exists.",
+			podToDelete,
+			generatedVolumeName,
+			nodesForVolume[0])
+	}
+
+	// sleep 2s,make sure that reconciler will detach fail some times and get exponential Back off error
+	time.Sleep(2 * time.Second)
+	_, podErr = dsw.AddPod(types.UniquePodName(podName), controllervolumetesting.NewPod(podName, podName), volumeSpec, nodeName)
+	if podErr != nil {
+		t.Fatalf("AddPod failed. Expected: <no error> Actual: <%v>", podErr)
+	}
+
+	// we still expect 1 volume is in UpdateStatusFor cache after delete pod and re-add pod to the same node
+	verifyNodesToUpdateStatusFor(t, 1 /* expectedCallCount */, nodeName, asw)
+}
+
 func waitForMultiAttachErrorOnNode(
 	t *testing.T,
 	attachedNode k8stypes.NodeName,
@@ -1202,4 +1277,21 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 		Steps:    6,
 	}
 	return wait.ExponentialBackoff(backoff, fn)
+}
+
+func verifyNodesToUpdateStatusFor(
+	t *testing.T,
+	expectedCallCount int,
+	nodeName k8stypes.NodeName,
+	asw cache.ActualStateOfWorld) {
+
+	nodesToUpdateStatusFor := asw.GetVolumesToReportAttached()
+	volumes := nodesToUpdateStatusFor[nodeName]
+	count := len(volumes)
+	if expectedCallCount != count {
+		t.Fatalf("Wrong volumes count in AttachedList. Expected: <%v> Actual: <%v>",
+			expectedCallCount,
+			count,
+		)
+	}
 }

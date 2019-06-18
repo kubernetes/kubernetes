@@ -267,6 +267,7 @@ type FakeVolumePlugin struct {
 	VolumeLimitsError      error
 	LimitKey               string
 	ProvisionDelaySeconds  int
+	DetachError            error
 
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
@@ -303,6 +304,7 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 	volume := &FakeVolume{
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
+		DetachError:       plugin.DetachError,
 	}
 	volume.VolumesAttached = make(map[string]types.NodeName)
 	*list = append(*list, volume)
@@ -561,6 +563,10 @@ func (plugin *FakeVolumePlugin) VolumeLimitKey(spec *Spec) string {
 	return plugin.LimitKey
 }
 
+func (plugin *FakeVolumePlugin) SetDetachError(err error) {
+	plugin.DetachError = err
+}
+
 // FakeBasicVolumePlugin implements a basic volume plugin. It wrappers on
 // FakeVolumePlugin but implements VolumePlugin interface only.
 // It is useful to test logic involving plugin interfaces.
@@ -719,6 +725,7 @@ type FakeVolume struct {
 	Plugin  *FakeVolumePlugin
 	MetricsNil
 	VolumesAttached map[string]types.NodeName
+	DetachError     error
 
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
@@ -966,6 +973,9 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	fv.Lock()
 	defer fv.Unlock()
 	fv.DetachCallCount++
+	if fv.DetachError != nil {
+		return fv.DetachError
+	}
 	if _, exist := fv.VolumesAttached[volumeName]; !exist {
 		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, nodeName)
 	}
