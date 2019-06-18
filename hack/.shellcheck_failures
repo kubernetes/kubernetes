@@ -18,7 +18,5 @@
 ./hack/lib/test.sh
 ./hack/test-integration.sh
 ./hack/verify-test-featuregates.sh
-./test/cmd/diff.sh
-./test/cmd/discovery.sh
 ./test/cmd/legacy-script.sh
 ./test/images/image-util.sh
