@@ -93,7 +93,7 @@ func NewWaitFlags(restClientGetter genericclioptions.RESTClientGetter, streams g
 			WithFieldSelector("").
 			WithAll(false).
 			WithAllNamespaces(false).
-			WithAll(false).
+			WithLocal(false).
 			WithLatest(),
 
 		Timeout: 30 * time.Second,
