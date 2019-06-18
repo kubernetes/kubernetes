@@ -412,6 +412,10 @@ type fakeKMSPlugin struct {
 	server     *grpc.Server
 }
 
+func (s *fakeKMSPlugin) Check(context.Context, *kmsapi.HealthCheckRequest) (*kmsapi.HealthCheckResponse, error) {
+	return &kmsapi.HealthCheckResponse{Status: kmsapi.HealthCheckResponse_SERVING}, nil
+}
+
 func (s *fakeKMSPlugin) Version(ctx context.Context, request *kmsapi.VersionRequest) (*kmsapi.VersionResponse, error) {
 	return &kmsapi.VersionResponse{Version: s.apiVersion, RuntimeName: "testKMS", RuntimeVersion: "0.0.1"}, nil
 }

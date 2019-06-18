@@ -98,3 +98,7 @@ func (s *base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptReque
 
 	return &kmsapi.EncryptResponse{Cipher: buf}, nil
 }
+
+func (s *base64Plugin) Check(context.Context, *kmsapi.HealthCheckRequest) (*kmsapi.HealthCheckResponse, error) {
+	return &kmsapi.HealthCheckResponse{Status: kmsapi.HealthCheckResponse_SERVING}, nil
+}

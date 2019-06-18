@@ -28,6 +28,9 @@ service KeyManagementService {
     rpc Decrypt(DecryptRequest) returns (DecryptResponse) {}
     // Execute encryption operation in KMS provider.
     rpc Encrypt(EncryptRequest) returns (EncryptResponse) {}
+
+    // Check health status of KMS plugin.
+    rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
 message VersionRequest {
@@ -66,5 +69,18 @@ message EncryptRequest {
 message EncryptResponse {
     // The encrypted data.
     bytes cipher = 1;
+}
+
+message HealthCheckRequest {
+    string service = 1;
+}
+
+message HealthCheckResponse {
+    enum ServingStatus {
+        UNKNOWN = 0;
+        SERVING = 1;
+        NOT_SERVING = 2;
+    }
+    ServingStatus status = 1;
 }
 
