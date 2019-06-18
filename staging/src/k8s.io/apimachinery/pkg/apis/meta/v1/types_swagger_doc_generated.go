@@ -210,7 +210,7 @@ func (ListMeta) SwaggerDoc() map[string]string {
 
 var map_ListOptions = map[string]string{
 	"":                    "ListOptions is the query options to a standard REST list call.",
-	"labelSelector":       "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
+	"labelSelector":       "A selector to restrict the list of returned objects by their labels. If you have a LabelSelector object and need to use it for this field, use FormatLabelSelector(selector) rather than selector.String() to create a string in the correct format. Defaults to everything.",
 	"fieldSelector":       "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
 	"watch":               "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
 	"allowWatchBookmarks": "allowWatchBookmarks requests watch events with type \"BOOKMARK\". Servers that do not implement bookmarks may ignore this flag and bookmarks are sent at the server's discretion. Clients should not assume bookmarks are returned at any specific interval, nor may they assume the server will send any BOOKMARK event during a session. If this is not a watch, this field is ignored. If the feature gate WatchBookmarks is not enabled in apiserver, this field is ignored.\n\nThis field is alpha and can be changed or removed without notice.",
