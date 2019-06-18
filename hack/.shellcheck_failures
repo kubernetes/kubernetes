@@ -37,13 +37,6 @@
 ./test/cmd/generic-resources.sh
 ./test/cmd/get.sh
 ./test/cmd/legacy-script.sh
-./test/cmd/node-management.sh
-./test/cmd/old-print.sh
-./test/cmd/proxy.sh
-./test/cmd/rbac.sh
-./test/cmd/request-timeout.sh
-./test/cmd/run.sh
-./test/cmd/save-config.sh
 ./test/e2e_node/conformance/run_test.sh
 ./test/e2e_node/gubernator.sh
 ./test/images/image-util.sh
