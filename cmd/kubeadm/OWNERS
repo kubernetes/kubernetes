@@ -18,7 +18,8 @@ reviewers:
 - dixudx
 - rosti
 - yagonobre
-- ereslibre 
+- ereslibre
+- SataQiu
 # Might want to add @xiangpengzhao and @stealthybox back in the future
 labels:
 - area/kubeadm
