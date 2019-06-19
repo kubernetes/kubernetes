@@ -237,7 +237,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	rootStat, err := os.Lstat(filepath.Dir(strings.TrimSuffix(file, "/")))
+	rootStat, err := os.Stat(filepath.Dir(strings.TrimSuffix(file, "/")))
 	if err != nil {
 		return true, err
 	}
