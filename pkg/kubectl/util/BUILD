@@ -67,7 +67,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/util/certificate:all-srcs",
-        "//pkg/kubectl/util/deployment:all-srcs",
         "//pkg/kubectl/util/event:all-srcs",
         "//pkg/kubectl/util/fieldpath:all-srcs",
         "//pkg/kubectl/util/hash:all-srcs",
