@@ -48,7 +48,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
-	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
 
 var (
@@ -97,7 +97,7 @@ func NewHorizontalController(
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
 	mapper apimeta.RESTMapper,
-	metricsClient metricsclient.MetricsClient,
+	metricsClient metrics.Client,
 	hpaInformer autoscalinginformers.HorizontalPodAutoscalerInformer,
 	podInformer coreinformers.PodInformer,
 	resyncPeriod time.Duration,

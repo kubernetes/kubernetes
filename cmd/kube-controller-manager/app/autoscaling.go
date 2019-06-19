@@ -79,7 +79,7 @@ func startHPAControllerWithLegacyClient(ctx ControllerContext) (http.Handler, bo
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }
 
-func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (http.Handler, bool, error) {
+func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.Client) (http.Handler, bool, error) {
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	hpaClientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 

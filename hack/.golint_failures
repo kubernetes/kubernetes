@@ -75,7 +75,6 @@ pkg/controller/nodeipam/config/v1alpha1
 pkg/controller/nodelifecycle/config/v1alpha1
 pkg/controller/podautoscaler
 pkg/controller/podautoscaler/config/v1alpha1
-pkg/controller/podautoscaler/metrics
 pkg/controller/podgc
 pkg/controller/podgc/config/v1alpha1
 pkg/controller/replicaset

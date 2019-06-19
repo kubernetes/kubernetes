@@ -37,7 +37,8 @@ const (
 	metricServerDefaultMetricWindow = time.Minute
 )
 
-func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient, externalClient externalclient.ExternalMetricsClient) MetricsClient {
+// NewRESTMetricsClient creates a new restMetricsClient
+func NewRESTMetricsClient(resourceClient resourceclient.PodMetricsesGetter, customClient customclient.CustomMetricsClient, externalClient externalclient.ExternalMetricsClient) Client {
 	return &restMetricsClient{
 		&resourceMetricsClient{resourceClient},
 		&customMetricsClient{customClient},

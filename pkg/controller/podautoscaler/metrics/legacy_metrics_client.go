@@ -35,15 +35,23 @@ import (
 )
 
 const (
-	DefaultHeapsterNamespace    = "kube-system"
-	DefaultHeapsterScheme       = "http"
-	DefaultHeapsterService      = "heapster"
+	// DefaultHeapsterNamespace is the default vaule of Heapster's namespace
+	DefaultHeapsterNamespace = "kube-system"
+
+	// DefaultHeapsterScheme is the default vaule of Heapster's scheme
+	DefaultHeapsterScheme = "http"
+
+	// DefaultHeapsterService is the default vaule of Heapster's service name
+	DefaultHeapsterService = "heapster"
+
+	// DefaultHeapsterPort is the default vaule of Heapster's port
 	DefaultHeapsterPort         = "" // use the first exposed port on the service
 	heapsterDefaultMetricWindow = time.Minute
 )
 
 var heapsterQueryStart = -5 * time.Minute
 
+// HeapsterMetricsClient gets the given metric for the given pods
 type HeapsterMetricsClient struct {
 	services        v1core.ServiceInterface
 	podsGetter      v1core.PodsGetter
@@ -52,7 +60,8 @@ type HeapsterMetricsClient struct {
 	heapsterPort    string
 }
 
-func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port string) MetricsClient {
+// NewHeapsterMetricsClient creates a new HeapsterMetricsClient
+func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, service, port string) Client {
 	return &HeapsterMetricsClient{
 		services:        client.CoreV1().Services(namespace),
 		podsGetter:      client.CoreV1(),
@@ -62,6 +71,8 @@ func NewHeapsterMetricsClient(client clientset.Interface, namespace, scheme, ser
 	}
 }
 
+// GetResourceMetric gets the given resource metric (and an associated oldest timestamp)
+// for all pods matching the specified selector in the given namespace
 func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, namespace string, selector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	metricPath := fmt.Sprintf("/apis/metrics/v1alpha1/namespaces/%s/pods", namespace)
 	params := map[string]string{"labelSelector": selector.String()}
@@ -114,6 +125,8 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 	return res, timestamp, nil
 }
 
+// GetRawMetric gets the given metric (and an associated oldest timestamp)
+// for all pods matching the specified selector in the given namespace
 func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string, selector labels.Selector, metricSelector labels.Selector) (PodMetricsInfo, time.Time, error) {
 	podList, err := h.podsGetter.Pods(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
@@ -183,10 +196,14 @@ func (h *HeapsterMetricsClient) GetRawMetric(metricName string, namespace string
 	return res, *timestamp, nil
 }
 
+// GetObjectMetric gets the given metric (and an associated timestamp) for the given
+// object in the given namespace
 func (h *HeapsterMetricsClient) GetObjectMetric(metricName string, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (int64, time.Time, error) {
 	return 0, time.Time{}, fmt.Errorf("object metrics are not yet supported")
 }
 
+// GetExternalMetric gets all the values of a given external metric
+// that match the specified selector.
 func (h *HeapsterMetricsClient) GetExternalMetric(metricName, namespace string, selector labels.Selector) ([]int64, time.Time, error) {
 	return nil, time.Time{}, fmt.Errorf("external metrics aren't supported")
 }
@@ -217,9 +234,10 @@ func collapseTimeSamples(metrics heapster.MetricResult, duration time.Duration) 
 
 		if newest.FloatValue != nil {
 			return int64(floatSum / float64(floatSumCount) * 1000), newest.Timestamp, true
-		} else {
-			return (intSum * 1000) / int64(intSumCount), newest.Timestamp, true
 		}
+
+		return (intSum * 1000) / int64(intSumCount), newest.Timestamp, true
+
 	}
 
 	return 0, time.Time{}, false

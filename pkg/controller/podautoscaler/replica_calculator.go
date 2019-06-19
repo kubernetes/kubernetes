@@ -40,14 +40,14 @@ const (
 )
 
 type ReplicaCalculator struct {
-	metricsClient                 metricsclient.MetricsClient
+	metricsClient                 metricsclient.Client
 	podLister                     corelisters.PodLister
 	tolerance                     float64
 	cpuInitializationPeriod       time.Duration
 	delayOfInitialReadinessStatus time.Duration
 }
 
-func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister corelisters.PodLister, tolerance float64, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) *ReplicaCalculator {
+func NewReplicaCalculator(metricsClient metricsclient.Client, podLister corelisters.PodLister, tolerance float64, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) *ReplicaCalculator {
 	return &ReplicaCalculator{
 		metricsClient:                 metricsClient,
 		podLister:                     podLister,
