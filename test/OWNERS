@@ -44,6 +44,7 @@ approvers:
   - shyamjvs
   - sig-testing-approvers
   - smarterclayton
+  - soltysh
   - sttts
   - timothysc
   - vishh
@@ -57,7 +58,6 @@ emeritus_approvers:
   - kow3ns
   - madhusudancs
   - marun
-  - soltysh
   - zmerlynn
   - MaciekPytel
 
