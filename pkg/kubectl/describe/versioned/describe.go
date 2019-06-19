@@ -65,6 +65,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog"
+	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/event"
 	"k8s.io/kubectl/pkg/util/qos"
@@ -73,7 +74,6 @@ import (
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/certificate"
 	"k8s.io/kubernetes/pkg/kubectl/util/fieldpath"
 	"k8s.io/kubernetes/pkg/kubectl/util/slice"
 )
