@@ -689,7 +689,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeCfg.CPUCFSQuotaPeriod,
 		runtimeService,
 		imageService,
-		kubeDeps.ContainerManager.InternalContainerLifecycle(),
+		kubeDeps.ContainerManager.GetInternalContainerLifecycle(),
 		legacyLogProvider,
 		klet.runtimeClassManager,
 	)
@@ -2238,6 +2238,11 @@ func (kl *Kubelet) ListenAndServePodResources() {
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
+	// Handles container resource immediately.
+	if err := kl.containerManager.GetInternalContainerLifecycle().PostStopContainer(exitedContainerID); err != nil {
+		klog.Errorf("Failed to post stop container %s: %v", exitedContainerID, err)
+	}
+
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		removeAll := false
 		if syncedPod, ok := kl.podManager.GetPodByUID(podID); ok {

@@ -52,6 +52,8 @@ type containerManagerImpl struct {
 	cadvisorInterface cadvisor.Interface
 	// Config of this node.
 	nodeConfig NodeConfig
+	// Internal lifecycle event handlers for container resource management.
+	internalLifecycle InternalContainerLifecycle
 }
 
 func (cm *containerManagerImpl) Start(node *v1.Node,
@@ -90,6 +92,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		capacity:          capacity,
 		nodeConfig:        nodeConfig,
 		cadvisorInterface: cadvisorInterface,
+		internalLifecycle: &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager()},
 	}, nil
 }
 
@@ -162,8 +165,8 @@ func (cm *containerManagerImpl) UpdatePluginResources(*schedulernodeinfo.NodeInf
 	return nil
 }
 
-func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager()}
+func (cm *containerManagerImpl) GetInternalContainerLifecycle() InternalContainerLifecycle {
+	return cm.internalLifecycle
 }
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {

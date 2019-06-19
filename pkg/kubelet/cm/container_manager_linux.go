@@ -136,6 +136,8 @@ type containerManagerImpl struct {
 	cpuManager cpumanager.Manager
 	// Interface for Topology resource co-ordination
 	topologyManager topologymanager.Manager
+	// Internal lifecycle event handlers for container resource management.
+	internalLifecycle InternalContainerLifecycle
 }
 
 type features struct {
@@ -331,6 +333,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, err
 		}
 		cm.topologyManager.AddHintProvider(cm.cpuManager)
+		cm.internalLifecycle = &internalContainerLifecycleImpl{cm.cpuManager, cm.topologyManager}
 	}
 
 	return cm, nil
@@ -355,8 +358,8 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	}
 }
 
-func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cm.cpuManager, cm.topologyManager}
+func (cm *containerManagerImpl) GetInternalContainerLifecycle() InternalContainerLifecycle {
+	return cm.internalLifecycle
 }
 
 // Create a cgroup container manager.

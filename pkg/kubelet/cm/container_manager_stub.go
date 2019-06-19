@@ -101,7 +101,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulernodeinfo.NodeInf
 	return nil
 }
 
-func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
+func (cm *containerManagerStub) GetInternalContainerLifecycle() InternalContainerLifecycle {
 	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager()}
 }
 
