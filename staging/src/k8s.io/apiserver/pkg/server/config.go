@@ -662,6 +662,7 @@ func AuthorizeClientBearerToken(loopback *restclient.Config, authn *Authenticati
 	}
 	if authn == nil || authz == nil {
 		// prevent nil pointer panic
+		return
 	}
 	if authn.Authenticator == nil || authz.Authorizer == nil {
 		// authenticator or authorizer might be nil if we want to bypass authz/authn
