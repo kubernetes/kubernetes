@@ -1,7 +1,4 @@
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,12 +9,11 @@ go_library(
         "templater.go",
         "templates.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/templates",
-    visibility = [
-        "//build/visible_to:pkg_kubectl_util_templates_CONSUMERS",
-    ],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/templates",
+    importpath = "k8s.io/kubectl/pkg/util/templates",
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/kubectl/util/term:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/term:go_default_library",
         "//vendor/github.com/MakeNowJust/heredoc:go_default_library",
         "//vendor/github.com/russross/blackfriday:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -29,13 +25,12 @@ filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = [
-        "//build/visible_to:pkg_kubectl_util_templates_CONSUMERS",
-    ],
+    visibility = ["//visibility:public"],
 )
