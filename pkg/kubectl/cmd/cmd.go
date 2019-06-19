@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
+	cmdconfig "k8s.io/kubectl/pkg/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/annotate"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apiresources"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/apply"
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/certificates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/clusterinfo"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/completion"
-	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/cp"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/create"
