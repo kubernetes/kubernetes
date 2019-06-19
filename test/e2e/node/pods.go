@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -179,12 +179,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
 		})
+
 		/*
 			Release : v1.9
 			Testname: Pods, QOS
-			Description:  Create a Pod with CPU and Memory request and limits. Pos status MUST have QOSClass set to PodQOSGuaranteed.
+			Description:  Create a Pod with CPU and Memory request and limits. Pod status MUST have QOSClass set to PodQOSGuaranteed.
 		*/
-		framework.ConformanceIt("should be submitted and removed ", func() {
+		framework.ConformanceIt("should be set on Pods with matching resource requests and limits for memory and cpu", func() {
 			ginkgo.By("creating the pod")
 			name := "pod-qos-class-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
