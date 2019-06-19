@@ -189,7 +189,7 @@ func runHugePagesTests(f *framework.Framework) {
 		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
 		f.PodClient().Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 }
 

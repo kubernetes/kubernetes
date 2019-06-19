@@ -374,7 +374,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			defer wg.Done()
 
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
