@@ -408,6 +408,9 @@ message ListMeta {
 // ListOptions is the query options to a standard REST list call.
 message ListOptions {
   // A selector to restrict the list of returned objects by their labels.
+  // If you have a LabelSelector object and need to use it for this field, use
+  // FormatLabelSelector(selector) rather than selector.String() to create a
+  // string in the correct format.
   // Defaults to everything.
   // +optional
   optional string labelSelector = 1;
