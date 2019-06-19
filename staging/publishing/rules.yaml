@@ -614,21 +614,21 @@ rules:
       dir: staging/src/k8s.io/kubectl
     name: master
     dependencies:
-      - repository: api
-        branch: master
-      - repository: apimachinery
-        branch: master
-      - repository: client-go
-        branch: master
+    - repository: api
+      branch: master
+    - repository: apimachinery
+      branch: master
+    - repository: client-go
+      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kubectl
     name: release-1.15
     go: 1.12.5
     dependencies:
-      - repository: api
-        branch: release-1.15
-      - repository: apimachinery
-        branch: release-1.15
-      - repository: client-go
-        branch: release-12.0
+    - repository: api
+      branch: release-1.15
+    - repository: apimachinery
+      branch: release-1.15
+    - repository: client-go
+      branch: release-12.0

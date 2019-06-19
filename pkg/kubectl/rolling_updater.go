@@ -37,7 +37,6 @@ import (
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/kubectl/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/podutils"
 	"k8s.io/utils/integer"
 	utilpointer "k8s.io/utils/pointer"
 )
