@@ -723,7 +723,7 @@ var _ = SIGDescribe("Density", func() {
 				case batch.Kind("Job"):
 					configs[i] = &testutils.JobConfig{RCConfig: *baseConfig}
 				default:
-					framework.Failf("Unsupported kind: %v", itArg.kind)
+					e2elog.Failf("Unsupported kind: %v", itArg.kind)
 				}
 			}
 
@@ -787,7 +787,7 @@ var _ = SIGDescribe("Density", func() {
 							if startTime != metav1.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
-								framework.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
+								e2elog.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
 							}
 						}
 					}
@@ -876,7 +876,7 @@ var _ = SIGDescribe("Density", func() {
 					waitTimeout := 10 * time.Minute
 					for start := time.Now(); len(watchTimes) < watchTimesLen+nodeCount; time.Sleep(10 * time.Second) {
 						if time.Since(start) < waitTimeout {
-							framework.Failf("Timeout reached waiting for all Pods being observed by the watch.")
+							e2elog.Failf("Timeout reached waiting for all Pods being observed by the watch.")
 						}
 					}
 

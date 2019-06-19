@@ -86,7 +86,7 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 		ts, err := google.DefaultTokenSource(oauth2.NoContext)
 		e2elog.Logf("Couldn't get application default credentials, %v", err)
 		if err != nil {
-			framework.Failf("Error accessing application default credentials, %v", err)
+			e2elog.Failf("Error accessing application default credentials, %v", err)
 		}
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/

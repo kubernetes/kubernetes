@@ -430,12 +430,12 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		var err error
 		node, err = cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
-			framework.Failf("error getting node %q: %v", nodeName, err)
+			e2elog.Failf("error getting node %q: %v", nodeName, err)
 		}
 		var ok bool
 		nodeHostNameLabel, ok = node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
 		if !ok {
-			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+			e2elog.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
 		}
 
 		// update Node API object with a fake resource
@@ -581,7 +581,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		for i, got := range rsPodsSeen {
 			expected := maxRSPodsSeen[i]
 			if got > expected {
-				framework.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expected, got)
+				e2elog.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expected, got)
 			}
 		}
 	})

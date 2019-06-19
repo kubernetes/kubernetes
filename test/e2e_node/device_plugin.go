@@ -250,7 +250,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 	var currentCount int32
 	p, err := f.PodClient().Get(podName, metav1.GetOptions{})
 	if err != nil || len(p.Status.ContainerStatuses) < 1 {
-		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
+		e2elog.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
 	}
 	initialCount = p.Status.ContainerStatuses[0].RestartCount
 	Eventually(func() bool {
@@ -268,7 +268,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 func parseLog(f *framework.Framework, podName string, contName string, re string) string {
 	logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
 	if err != nil {
-		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+		e2elog.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}
 
 	e2elog.Logf("got pod logs: %v", logs)

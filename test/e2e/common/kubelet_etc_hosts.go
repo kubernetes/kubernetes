@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -136,11 +137,11 @@ func assertManagedStatus(
 	}
 
 	if expectedIsManaged {
-		framework.Failf(
+		e2elog.Failf(
 			"/etc/hosts file should be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
 			name, retryCount, etcHostsContent)
 	} else {
-		framework.Failf(
+		e2elog.Failf(
 			"/etc/hosts file should no be kubelet managed (name: %s, retries: %d). /etc/hosts contains %q",
 			name, retryCount, etcHostsContent)
 	}

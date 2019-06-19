@@ -408,7 +408,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 
 			if hasServiceAccountTokenVolume != tc.ExpectTokenVolume {
-				framework.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
+				e2elog.Failf("%s: expected volume=%v, got %v (%#v)", tc.PodName, tc.ExpectTokenVolume, hasServiceAccountTokenVolume, createdPod)
 			} else {
 				e2elog.Logf("pod %s service account token volume mount: %v", tc.PodName, hasServiceAccountTokenVolume)
 			}
@@ -427,7 +427,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 				"ca.crt": string(cfg.TLSClientConfig.CAData),
 			},
 		}); err != nil && !apierrors.IsAlreadyExists(err) {
-			framework.Failf("Unexpected err creating kube-ca-crt: %v", err)
+			e2elog.Failf("Unexpected err creating kube-ca-crt: %v", err)
 		}
 
 		tenMin := int64(10 * 60)
@@ -493,7 +493,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 
 		e2elog.Logf("created pod")
 		if !e2epod.CheckPodsRunningReady(f.ClientSet, f.Namespace.Name, []string{pod.Name}, time.Minute) {
-			framework.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
+			e2elog.Failf("pod %q in ns %q never became ready", pod.Name, f.Namespace.Name)
 		}
 
 		e2elog.Logf("pod is ready")
@@ -516,7 +516,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			}
 			return true, nil
 		}); err != nil {
-			framework.Failf("Unexpected error: %v\n%s", err, logs)
+			e2elog.Failf("Unexpected error: %v\n%s", err, logs)
 		}
 	})
 })

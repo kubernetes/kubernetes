@@ -20,6 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	"github.com/onsi/ginkgo"
@@ -90,7 +91,7 @@ func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
-		framework.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
+		e2elog.Failf("Failed to delete 1 or more PVs/PVCs and/or the GCE volume. Errors: %v", utilerrors.NewAggregate(errs))
 	}
 }
 

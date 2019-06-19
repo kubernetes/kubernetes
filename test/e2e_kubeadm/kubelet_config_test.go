@@ -23,6 +23,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -73,7 +74,7 @@ var _ = KubeadmDescribe("kubelet-config ConfigMap", func() {
 		k8sVersionString := m["kubernetesVersion"].(string)
 		k8sVersion, err := version.ParseSemantic(k8sVersionString)
 		if err != nil {
-			framework.Failf("error reading kubernetesVersion from %s ConfigMap: %v", kubeadmConfigName, err)
+			e2elog.Failf("error reading kubernetesVersion from %s ConfigMap: %v", kubeadmConfigName, err)
 		}
 
 		// Computes all the names derived from the kubernetesVersion

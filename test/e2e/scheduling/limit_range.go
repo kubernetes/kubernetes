@@ -75,10 +75,10 @@ var _ = SIGDescribe("LimitRange", func() {
 		select {
 		case event, _ := <-w.ResultChan():
 			if event.Type != watch.Added {
-				framework.Failf("Failed to observe pod creation: %v", event)
+				e2elog.Failf("Failed to observe pod creation: %v", event)
 			}
 		case <-time.After(framework.ServiceRespondingTimeout):
-			framework.Failf("Timeout while waiting for LimitRange creation")
+			e2elog.Failf("Timeout while waiting for LimitRange creation")
 		}
 
 		ginkgo.By("Fetching the LimitRange to ensure it has proper values")

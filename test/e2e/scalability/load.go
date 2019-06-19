@@ -577,7 +577,7 @@ func GenerateConfigsForGroup(
 		case batch.Kind("Job"):
 			config = &testutils.JobConfig{RCConfig: *baseConfig}
 		default:
-			framework.Failf("Unsupported kind for config creation: %v", kind)
+			e2elog.Failf("Unsupported kind for config creation: %v", kind)
 		}
 		configs = append(configs, config)
 	}

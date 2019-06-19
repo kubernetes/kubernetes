@@ -128,7 +128,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		pods, err := c.CoreV1().Pods(namespaces[0].Name).List(options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
-			framework.Failf("no running pods found")
+			e2elog.Failf("no running pods found")
 		}
 		podName := pods.Items[0].Name
 

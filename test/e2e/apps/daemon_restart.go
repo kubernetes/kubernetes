@@ -274,7 +274,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		if len(newKeys.List()) != len(existingKeys.List()) ||
 			!newKeys.IsSuperset(existingKeys) {
-			framework.Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
+			e2elog.Failf("RcManager created/deleted pods after restart \n\n %+v", tracker)
 		}
 	})
 
@@ -312,7 +312,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		postRestarts, badNodes := getContainerRestarts(f.ClientSet, ns, labelSelector)
 		if postRestarts != preRestarts {
 			framework.DumpNodeDebugInfo(f.ClientSet, badNodes, e2elog.Logf)
-			framework.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
+			e2elog.Failf("Net container restart count went from %v -> %v after kubelet restart on nodes %v \n\n %+v", preRestarts, postRestarts, badNodes, tracker)
 		}
 	})
 })
