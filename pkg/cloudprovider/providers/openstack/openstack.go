@@ -277,11 +277,32 @@ func createKubernetesClient(kubeconfigPath string) (*kubernetes.Clientset, error
 	return client, nil
 }
 
+func ensureKubeconfigPathExists(kubeconfigPath string) error {
+	attempts := 20
+	sleep := 30 * time.Second
+
+	// waiting period is 20 * 30 seconds = 10 minutes
+	for i := 0; i < attempts; i++ {
+		if _, err := os.Stat(kubeconfigPath); err == nil {
+			return nil
+		}
+
+		time.Sleep(sleep)
+	}
+
+	return fmt.Errorf("file %v doesn't exist", kubeconfigPath)
+}
+
 // setConfigFromSecret allows setting up the config from k8s secret
 func setConfigFromSecret(cfg *Config) error {
 	secretName := cfg.Global.SecretName
 	secretNamespace := cfg.Global.SecretNamespace
 	kubeconfigPath := cfg.Global.KubeconfigPath
+
+	err := ensureKubeconfigPathExists(kubeconfigPath)
+	if err != nil {
+		return err
+	}
 
 	k8sClient, err := createKubernetesClient(kubeconfigPath)
 	if err != nil {
