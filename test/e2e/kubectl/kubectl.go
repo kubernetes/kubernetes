@@ -1294,13 +1294,18 @@ metadata:
 		ginkgo.It("should copy a file from a running Pod", func() {
 			remoteContents := "foobar\n"
 			podSource := fmt.Sprintf("%s:/root/foo/bar/foo.bar", busyboxPodName)
-			tempDestination, err := ioutil.TempFile(os.TempDir(), "copy-foobar")
+			tmpDir, err := ioutil.TempDir(os.TempDir(), "copy-foobar")
+			if err != nil {
+				framework.Failf("Failed creating temporary destination dir: %v", err)
+			}
+
+			tempDestination, err := os.OpenFile(filepath.Join(tmpDir, "foo.bar"), os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 			if err != nil {
 				framework.Failf("Failed creating temporary destination file: %v", err)
 			}
 
 			ginkgo.By("specifying a remote filepath " + podSource + " on the pod")
-			framework.RunKubectlOrDie(ns, "cp", podSource, tempDestination.Name(), nsFlag)
+			framework.RunKubectlOrDie(ns, "cp", podSource, tmpDir, nsFlag)
 			ginkgo.By("verifying that the contents of the remote file " + podSource + " have been copied to a local file " + tempDestination.Name())
 			localData, err := ioutil.ReadAll(tempDestination)
 			if err != nil {
