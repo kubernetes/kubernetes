@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -55,6 +56,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	config.Timeout = 10 * time.Second
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)

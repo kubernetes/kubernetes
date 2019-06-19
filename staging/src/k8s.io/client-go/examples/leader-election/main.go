@@ -80,6 +80,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
+	config.Timeout = 10 * time.Second
 	client := clientset.NewForConfigOrDie(config)
 
 	// we use the Lease lock type since edits to Leases are less common

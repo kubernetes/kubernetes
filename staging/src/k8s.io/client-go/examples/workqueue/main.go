@@ -154,6 +154,7 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
+	config.Timeout = 10 * time.Second
 
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)

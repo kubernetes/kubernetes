@@ -53,6 +53,7 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	config.Timeout = 10 * time.Second
 
 	// create the clientset
 	clientset, err := kubernetes.NewForConfig(config)
