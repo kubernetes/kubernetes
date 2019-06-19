@@ -159,13 +159,13 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 
 	// Verify the upgraded deployment is active by scaling up the deployment by 1
 	ginkgo.By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
-	_, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *apps.Deployment) {
+	deploymentWithUpdatedReplicas, err := e2edeploy.UpdateDeploymentWithRetries(c, ns, deploymentName, func(deployment *apps.Deployment) {
 		*deployment.Spec.Replicas = *deployment.Spec.Replicas + 1
 	})
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for deployment %q to complete after scaling", deploymentName))
-	framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(c, deployment))
+	framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(c, deploymentWithUpdatedReplicas))
 }
 
 // Teardown cleans up any remaining resources.
