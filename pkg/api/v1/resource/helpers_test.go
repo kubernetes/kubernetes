@@ -22,7 +22,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -64,27 +68,53 @@ func TestDefaultResourceHelpers(t *testing.T) {
 }
 
 func TestGetResourceRequest(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
 	cases := []struct {
 		pod           *v1.Pod
-		res           v1.ResourceName
+		cName         string
+		resourceName  v1.ResourceName
 		expectedValue int64
-		expectedError error
 	}{
 		{
 			pod:           getPod("foo", podResources{cpuRequest: "9"}),
-			res:           v1.ResourceCPU,
+			resourceName:  v1.ResourceCPU,
 			expectedValue: 9000,
 		},
 		{
 			pod:           getPod("foo", podResources{memoryRequest: "90Mi"}),
-			res:           v1.ResourceMemory,
+			resourceName:  v1.ResourceMemory,
 			expectedValue: 94371840,
+		},
+		{
+			cName:         "just-overhead for cpu",
+			pod:           getPod("foo", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 0,
+		},
+		{
+			cName:         "just-overhead for memory",
+			pod:           getPod("foo", podResources{memoryOverhead: "5"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 0,
+		},
+		{
+			cName:         "cpu overhead and req",
+			pod:           getPod("foo", podResources{cpuRequest: "2", cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceCPU,
+			expectedValue: 7000,
+		},
+		{
+			cName:         "mem overhead and req",
+			pod:           getPod("foo", podResources{cpuRequest: "2", memoryRequest: "1024", cpuOverhead: "5", memoryOverhead: "5"}),
+			resourceName:  v1.ResourceMemory,
+			expectedValue: 1029,
 		},
 	}
 	as := assert.New(t)
 	for idx, tc := range cases {
-		actual := GetResourceRequest(tc.pod, tc.res)
-		as.Equal(actual, tc.expectedValue, "expected test case [%d] to return %q; got %q instead", idx, tc.expectedValue, actual)
+		actual := GetResourceRequest(tc.pod, tc.resourceName)
+		as.Equal(actual, tc.expectedValue, "expected test case [%d] %v: to return %q; got %q instead", idx, tc.cName, tc.expectedValue, actual)
 	}
 }
 
@@ -242,6 +272,78 @@ func TestExtractResourceValue(t *testing.T) {
 	}
 }
 
+func TestPodRequestsAndLimits(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()
+
+	cases := []struct {
+		pod              *v1.Pod
+		cName            string
+		expectedRequests v1.ResourceList
+		expectedLimits   v1.ResourceList
+	}{
+		{
+			cName:            "just-limit-no-overhead",
+			pod:              getPod("foo", podResources{cpuLimit: "9"}),
+			expectedRequests: v1.ResourceList{},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU): resource.MustParse("9"),
+			},
+		},
+		{
+			cName: "just-overhead",
+			pod:   getPod("foo", podResources{cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("5"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("5"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			cName: "req-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", memoryRequest: "10", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+			expectedLimits: v1.ResourceList{},
+		},
+		{
+			cName: "all-req-lim-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", cpuLimit: "2", memoryRequest: "10", memoryLimit: "12", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("7"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("17"),
+			},
+		},
+		{
+			cName: "req-some-lim-and-overhead",
+			pod:   getPod("foo", podResources{cpuRequest: "1", cpuLimit: "2", memoryRequest: "10", cpuOverhead: "5", memoryOverhead: "5"}),
+			expectedRequests: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("6"),
+				v1.ResourceName(v1.ResourceMemory): resource.MustParse("15"),
+			},
+			expectedLimits: v1.ResourceList{
+				v1.ResourceName(v1.ResourceCPU): resource.MustParse("7"),
+			},
+		},
+	}
+	for idx, tc := range cases {
+		resRequests, resLimits := PodRequestsAndLimits(tc.pod)
+
+		if !equality.Semantic.DeepEqual(tc.expectedRequests, resRequests) {
+			t.Errorf("test case failure[%d]: %v, requests:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedRequests, resRequests)
+		}
+
+		if !equality.Semantic.DeepEqual(tc.expectedLimits, resLimits) {
+			t.Errorf("test case failure[%d]: %v, limits:\n expected:\t%v\ngot\t\t%v", idx, tc.cName, tc.expectedLimits, resLimits)
+		}
+	}
+}
+
 type podResources struct {
 	cpuRequest, cpuLimit, memoryRequest, memoryLimit, cpuOverhead, memoryOverhead string
 }
@@ -251,6 +353,9 @@ func getPod(cname string, resources podResources) *v1.Pod {
 		Limits:   make(v1.ResourceList),
 		Requests: make(v1.ResourceList),
 	}
+
+	overhead := make(v1.ResourceList)
+
 	if resources.cpuLimit != "" {
 		r.Limits[v1.ResourceCPU] = resource.MustParse(resources.cpuLimit)
 	}
@@ -263,6 +368,13 @@ func getPod(cname string, resources podResources) *v1.Pod {
 	if resources.memoryRequest != "" {
 		r.Requests[v1.ResourceMemory] = resource.MustParse(resources.memoryRequest)
 	}
+	if resources.cpuOverhead != "" {
+		overhead[v1.ResourceCPU] = resource.MustParse(resources.cpuOverhead)
+	}
+	if resources.memoryOverhead != "" {
+		overhead[v1.ResourceMemory] = resource.MustParse(resources.memoryOverhead)
+	}
+
 	return &v1.Pod{
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
@@ -277,6 +389,7 @@ func getPod(cname string, resources podResources) *v1.Pod {
 					Resources: r,
 				},
 			},
+			Overhead: overhead,
 		},
 	}
 }
