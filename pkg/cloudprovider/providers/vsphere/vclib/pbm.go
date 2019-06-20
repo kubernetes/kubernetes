@@ -85,7 +85,7 @@ func (pbmClient *PbmClient) IsDatastoreCompatible(ctx context.Context, storagePo
 
 // GetCompatibleDatastores filters and returns compatible list of datastores for given storage policy id
 // For Non Compatible Datastores, fault message with the Datastore Name is also returned
-func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, dc *Datacenter, storagePolicyID string, datastores []*DatastoreInfo) ([]*DatastoreInfo, string, error) {
+func (pbmClient *PbmClient) GetCompatibleDatastores(ctx context.Context, storagePolicyID string, datastores []*DatastoreInfo) ([]*DatastoreInfo, string, error) {
 	var (
 		dsMorNameMap                                = getDsMorNameMap(ctx, datastores)
 		localizedMessagesForNotCompatibleDatastores = ""
