@@ -46,12 +46,18 @@ var _ = SIGDescribe("Networking", func() {
 	})
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
+		// AWS does not allow ICMP to internet by default.
+		// Azure does not support ICMP to the internet. For more info: https://blogs.msdn.microsoft.com/mast/2014/06/22/use-port-pings-instead-of-icmp-to-test-azure-vm-connectivity/
+		framework.SkipIfProviderIs("aws", "azure")
 		ginkgo.By("Running container which tries to ping 8.8.8.8")
 		framework.ExpectNoError(
 			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", framework.IPv4PingCommand, 30))
 	})
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental]", func() {
+		// AWS does not allow ICMP to internet by default.
+		// Azure does not support ICMP to the internet. For more info: https://blogs.msdn.microsoft.com/mast/2014/06/22/use-port-pings-instead-of-icmp-to-test-azure-vm-connectivity/
+		framework.SkipIfProviderIs("aws", "azure")
 		ginkgo.By("Running container which tries to ping 2001:4860:4860::8888")
 		framework.ExpectNoError(
 			framework.CheckConnectivityToHost(f, "", "ping-test", "2001:4860:4860::8888", framework.IPv6PingCommand, 30))
