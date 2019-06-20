@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -340,12 +340,12 @@ func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclu
 		}
 	}
 
-	rs := &apps.ReplicaSet{
+	rs := &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rs",
 			Namespace: ns,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Replicas: &size,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},

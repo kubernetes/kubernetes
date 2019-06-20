@@ -19,7 +19,7 @@ package upgrades
 import (
 	"github.com/onsi/ginkgo"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 
@@ -31,7 +31,7 @@ import (
 type StatefulSetUpgradeTest struct {
 	tester  *framework.StatefulSetTester
 	service *v1.Service
-	set     *apps.StatefulSet
+	set     *appsv1.StatefulSet
 }
 
 // Name returns the tracking name of the test.

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,14 +38,14 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *apps.ReplicaSet {
+func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *appsv1.ReplicaSet {
 	zero := int64(0)
-	return &apps.ReplicaSet{
+	return &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   rsName,
 			Labels: rsPodLabels,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: rsPodLabels,
 			},
@@ -220,7 +220,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		}
 		conditions = rs.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, apps.ReplicaSetReplicaFailure)
+		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond != nil, nil
 
 	})
@@ -230,7 +230,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Scaling down replica set %q to satisfy pod quota", name))
-	rs, err = replicasetutil.UpdateReplicaSetWithRetries(c, namespace, name, func(update *apps.ReplicaSet) {
+	rs, err = replicasetutil.UpdateReplicaSetWithRetries(c, namespace, name, func(update *appsv1.ReplicaSet) {
 		x := int32(2)
 		update.Spec.Replicas = &x
 	})
@@ -250,7 +250,7 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 		}
 		conditions = rs.Status.Conditions
 
-		cond := replicaset.GetCondition(rs.Status, apps.ReplicaSetReplicaFailure)
+		cond := replicaset.GetCondition(rs.Status, appsv1.ReplicaSetReplicaFailure)
 		return cond == nil, nil
 	})
 	if err == wait.ErrWaitTimeout {

@@ -23,7 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	storage "k8s.io/api/storage/v1"
@@ -353,9 +353,9 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		}
 	case *v1.Service:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
-	case *apps.StatefulSet:
+	case *appsv1.StatefulSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
-	case *apps.DaemonSet:
+	case *appsv1.DaemonSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	default:
 		return errors.Errorf("missing support for patching item of type %T", item)
@@ -497,11 +497,11 @@ func (*serviceFactory) Create(f *Framework, i interface{}) (func() error, error)
 type statefulSetFactory struct{}
 
 func (f *statefulSetFactory) New() runtime.Object {
-	return &apps.StatefulSet{}
+	return &appsv1.StatefulSet{}
 }
 
 func (*statefulSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*apps.StatefulSet)
+	item, ok := i.(*appsv1.StatefulSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
@@ -518,11 +518,11 @@ func (*statefulSetFactory) Create(f *Framework, i interface{}) (func() error, er
 type daemonSetFactory struct{}
 
 func (f *daemonSetFactory) New() runtime.Object {
-	return &apps.DaemonSet{}
+	return &appsv1.DaemonSet{}
 }
 
 func (*daemonSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*apps.DaemonSet)
+	item, ok := i.(*appsv1.DaemonSet)
 	if !ok {
 		return nil, errorItemNotSupported
 	}

@@ -19,7 +19,7 @@ package upgrades
 import (
 	"github.com/onsi/ginkgo"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,7 +33,7 @@ import (
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after
 // a cluster upgrade.
 type DaemonSetUpgradeTest struct {
-	daemonSet *apps.DaemonSet
+	daemonSet *appsv1.DaemonSet
 }
 
 // Name returns the tracking name of the test.
@@ -47,12 +47,12 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ns := f.Namespace
 
-	t.daemonSet = &apps.DaemonSet{
+	t.daemonSet = &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns.Name,
 			Name:      daemonSetName,
 		},
-		Spec: apps.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelSet,
 			},

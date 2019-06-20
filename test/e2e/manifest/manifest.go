@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbac "k8s.io/api/rbac/v1"
@@ -119,8 +119,8 @@ func IngressToManifest(ing *networkingv1beta1.Ingress, path string) error {
 }
 
 // StatefulSetFromManifest returns a StatefulSet from a manifest stored in fileName in the Namespace indicated by ns.
-func StatefulSetFromManifest(fileName, ns string) (*apps.StatefulSet, error) {
-	var ss apps.StatefulSet
+func StatefulSetFromManifest(fileName, ns string) (*appsv1.StatefulSet, error) {
+	var ss appsv1.StatefulSet
 	data, err := testfiles.Read(fileName)
 	if err != nil {
 		return nil, err
@@ -143,8 +143,8 @@ func StatefulSetFromManifest(fileName, ns string) (*apps.StatefulSet, error) {
 }
 
 // DaemonSetFromManifest returns a DaemonSet from a manifest stored in fileName in the Namespace indicated by ns.
-func DaemonSetFromManifest(fileName, ns string) (*apps.DaemonSet, error) {
-	var ds apps.DaemonSet
+func DaemonSetFromManifest(fileName, ns string) (*appsv1.DaemonSet, error) {
+	var ds appsv1.DaemonSet
 	data, err := testfiles.Read(fileName)
 	if err != nil {
 		return nil, err
