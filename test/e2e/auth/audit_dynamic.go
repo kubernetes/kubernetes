@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,26 +59,26 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		anonymousClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to create the anonymous client")
 
-		_, err = f.ClientSet.CoreV1().Namespaces().Create(&apiv1.Namespace{
+		_, err = f.ClientSet.CoreV1().Namespaces().Create(&v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
 		})
 		framework.ExpectNoError(err, "failed to create namespace")
 
-		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(&apiv1.Pod{
+		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-proxy",
 				Labels: map[string]string{
 					"app": "audit",
 				},
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "proxy",
 						Image: imageutils.GetE2EImage(imageutils.AuditProxy),
-						Ports: []apiv1.ContainerPort{
+						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 8080,
 							},
@@ -89,12 +89,12 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		})
 		framework.ExpectNoError(err, "failed to create proxy pod")
 
-		_, err = f.ClientSet.CoreV1().Services(namespace).Create(&apiv1.Service{
+		_, err = f.ClientSet.CoreV1().Services(namespace).Create(&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
-			Spec: apiv1.ServiceSpec{
-				Ports: []apiv1.ServicePort{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
 					{
 						Port:       80,
 						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 8080},
@@ -182,18 +182,18 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			// https://github.com/kubernetes/kubernetes/issues/70818
 			{
 				func() {
-					pod := &apiv1.Pod{
+					pod := &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "audit-pod",
 						},
-						Spec: apiv1.PodSpec{
-							Containers: []apiv1.Container{{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
 								Name:  "pause",
 								Image: imageutils.GetPauseImageName(),
 							}},
 						},
 					}
-					updatePod := func(pod *apiv1.Pod) {}
+					updatePod := func(pod *v1.Pod) {}
 
 					f.PodClient().CreateSync(pod)
 

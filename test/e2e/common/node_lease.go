@@ -21,7 +21,7 @@ import (
 	"time"
 
 	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -48,7 +48,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 	ginkgo.Context("when the NodeLease feature is enabled", func() {
 		ginkgo.It("the kubelet should create and update a lease in the kube-node-lease namespace", func() {
-			leaseClient := f.ClientSet.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease)
+			leaseClient := f.ClientSet.CoordinationV1beta1().Leases(v1.NamespaceNodeLease)
 			var (
 				err   error
 				lease *coordinationv1beta1.Lease
@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			var err error
 			var lease *coordinationv1beta1.Lease
 			gomega.Eventually(func() error {
-				lease, err = f.ClientSet.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease).Get(nodeName, metav1.GetOptions{})
+				lease, err = f.ClientSet.CoordinationV1beta1().Leases(v1.NamespaceNodeLease).Get(nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -154,17 +154,17 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 			// run controller manager, i.e., no node lifecycle controller.
 			node, err := f.ClientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 			gomega.Expect(err).To(gomega.BeNil())
-			_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
-			gomega.Expect(readyCondition.Status).To(gomega.Equal(corev1.ConditionTrue))
+			_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
+			gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 		})
 	})
 })
 
-func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, corev1.NodeStatus) {
+func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (time.Time, v1.NodeStatus) {
 	node, err := clientSet.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	gomega.Expect(err).To(gomega.BeNil())
-	_, readyCondition := testutils.GetNodeCondition(&node.Status, corev1.NodeReady)
-	gomega.Expect(readyCondition.Status).To(gomega.Equal(corev1.ConditionTrue))
+	_, readyCondition := testutils.GetNodeCondition(&node.Status, v1.NodeReady)
+	gomega.Expect(readyCondition.Status).To(gomega.Equal(v1.ConditionTrue))
 	heartbeatTime := readyCondition.LastHeartbeatTime.Time
 	readyCondition.LastHeartbeatTime = metav1.Time{}
 	return heartbeatTime, node.Status

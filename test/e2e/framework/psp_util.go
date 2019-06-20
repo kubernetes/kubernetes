@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sync"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -54,7 +54,7 @@ func privilegedPSP(name string) *policy.PodSecurityPolicy {
 		Spec: policy.PodSecurityPolicySpec{
 			Privileged:               true,
 			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-			AllowedCapabilities:      []corev1.Capability{"*"},
+			AllowedCapabilities:      []v1.Capability{"*"},
 			Volumes:                  []policy.FSType{policy.All},
 			HostNetwork:              true,
 			HostPorts:                []policy.HostPortRange{{Min: 0, Max: 65535}},

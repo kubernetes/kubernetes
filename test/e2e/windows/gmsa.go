@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -46,12 +46,12 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 				container2Name := "container2"
 				container2Domain := "contoso.org"
 
-				pod := &corev1.Pod{
+				pod := &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Name:  container1Name,
 								Image: imageutils.GetPauseImageName(),
@@ -59,15 +59,15 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 							{
 								Name:  container2Name,
 								Image: imageutils.GetPauseImageName(),
-								SecurityContext: &corev1.SecurityContext{
-									WindowsOptions: &corev1.WindowsSecurityContextOptions{
+								SecurityContext: &v1.SecurityContext{
+									WindowsOptions: &v1.WindowsSecurityContextOptions{
 										GMSACredentialSpec: generateDummyCredSpecs(container2Domain),
 									},
 								},
 							},
 						},
-						SecurityContext: &corev1.PodSecurityContext{
-							WindowsOptions: &corev1.WindowsSecurityContextOptions{
+						SecurityContext: &v1.PodSecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
 								GMSACredentialSpec: generateDummyCredSpecs(podDomain),
 							},
 						},

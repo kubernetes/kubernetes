@@ -30,7 +30,7 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/klog"
 
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -200,8 +200,8 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 	}
 
 	// create the reference and set Node.Spec.ConfigSource
-	src := &apiv1.NodeConfigSource{
-		ConfigMap: &apiv1.ConfigMapNodeConfigSource{
+	src := &v1.NodeConfigSource{
+		ConfigMap: &v1.ConfigMapNodeConfigSource{
 			Namespace:        "kube-system",
 			Name:             cm.Name,
 			KubeletConfigKey: "kubelet",
@@ -233,7 +233,7 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 }
 
 // sets the current node's configSource, this should only be called from Serial tests
-func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource) error {
+func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) error {
 	// since this is a serial test, we just get the node, change the source, and then update it
 	// this prevents any issues with the patch API from affecting the test results
 	nodeclient := f.ClientSet.CoreV1().Nodes()
@@ -310,7 +310,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 }
 
 // creates a configmap containing kubeCfg in kube-system namespace
-func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*apiv1.ConfigMap, error) {
+func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
 	cmap := newKubeletConfigMap("testcfg", internalKC)
 	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(cmap)
 	if err != nil {
@@ -320,11 +320,11 @@ func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletCo
 }
 
 // constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
-func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *apiv1.ConfigMap {
+func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *v1.ConfigMap {
 	data, err := kubeletconfigcodec.EncodeKubeletConfig(internalKC, kubeletconfigv1beta1.SchemeGroupVersion)
 	framework.ExpectNoError(err)
 
-	cmap := &apiv1.ConfigMap{
+	cmap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{GenerateName: name + "-"},
 		Data: map[string]string{
 			"kubelet": string(data),
@@ -345,7 +345,7 @@ func logNodeEvents(f *framework.Framework) {
 	framework.ExpectNoError(err)
 }
 
-func getLocalNode(f *framework.Framework) *apiv1.Node {
+func getLocalNode(f *framework.Framework) *v1.Node {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -37,7 +37,7 @@ import (
 )
 
 // makePodToVerifyPids returns a pod that verifies specified cgroup with pids
-func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *apiv1.Pod {
+func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
@@ -50,18 +50,18 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *apiv1.Po
 	// this command takes the expected value and compares it against the actual value for the pod cgroup pids.max
 	command := fmt.Sprintf("expected=%v; actual=$(cat /tmp/pids/%v/pids.max); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", pidsLimit.Value(), cgroupFsName)
 	e2elog.Logf("Pod to run command: %v", command)
-	pod := &apiv1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
-		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			Containers: []apiv1.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
 				{
 					Image:   busyboxImage,
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", command},
-					VolumeMounts: []apiv1.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "sysfscgroup",
 							MountPath: "/tmp",
@@ -69,11 +69,11 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *apiv1.Po
 					},
 				},
 			},
-			Volumes: []apiv1.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name: "sysfscgroup",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
 					},
 				},
 			},
@@ -107,20 +107,20 @@ func enablePodPidsLimitInKubelet(f *framework.Framework) *kubeletconfig.KubeletC
 func runPodPidsLimitTests(f *framework.Framework) {
 	It("should set pids.max for Pod", func() {
 		By("by creating a G pod")
-		pod := f.PodClient().Create(&apiv1.Pod{
+		pod := f.PodClient().Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
 				Namespace: f.Namespace.Name,
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Image: imageutils.GetPauseImageName(),
 						Name:  "container" + string(uuid.NewUUID()),
-						Resources: apiv1.ResourceRequirements{
-							Limits: apiv1.ResourceList{
-								apiv1.ResourceName("cpu"):    resource.MustParse("10m"),
-								apiv1.ResourceName("memory"): resource.MustParse("100Mi"),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceName("cpu"):    resource.MustParse("10m"),
+								v1.ResourceName("memory"): resource.MustParse("100Mi"),
 							},
 						},
 					},

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -33,8 +33,8 @@ import (
 )
 
 // makeNodePerfPod returns a pod with the information provided from the workload.
-func makeNodePerfPod(w workloads.NodePerfWorkload) *corev1.Pod {
-	return &corev1.Pod{
+func makeNodePerfPod(w workloads.NodePerfWorkload) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-pod", w.Name()),
 		},
@@ -62,7 +62,7 @@ var _ = SIGDescribe("Node Performance Testing [Serial] [Slow] [Flaky]", func() {
 		wl     workloads.NodePerfWorkload
 		oldCfg *kubeletconfig.KubeletConfiguration
 		newCfg *kubeletconfig.KubeletConfiguration
-		pod    *corev1.Pod
+		pod    *v1.Pod
 	)
 	JustBeforeEach(func() {
 		err := wl.PreTestExec()
