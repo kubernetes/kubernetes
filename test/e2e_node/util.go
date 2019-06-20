@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
+	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
@@ -103,7 +103,7 @@ func getNodeSummary() (*kubeletstatsv1alpha1.Summary, error) {
 	return &summary, nil
 }
 
-func getNodeDevices() (*podresourcesapi.ListPodResourcesResponse, error) {
+func getNodeDevices() (*kubeletpodresourcesv1alpha1.ListPodResourcesResponse, error) {
 	endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting local endpoint: %v", err)
@@ -115,7 +115,7 @@ func getNodeDevices() (*podresourcesapi.ListPodResourcesResponse, error) {
 	defer conn.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	resp, err := client.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
+	resp, err := client.List(ctx, &kubeletpodresourcesv1alpha1.ListPodResourcesRequest{})
 	if err != nil {
 		return nil, fmt.Errorf("%v.Get(_) = _, %v", client, err)
 	}
