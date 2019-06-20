@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -41,7 +41,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		ns                string
 		err               error
 		pvc               *v1.PersistentVolumeClaim
-		resizableSc       *storage.StorageClass
+		resizableSc       *storagev1.StorageClass
 		nodeName          string
 		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string

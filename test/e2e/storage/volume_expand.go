@@ -24,7 +24,7 @@ import (
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,7 +47,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		ns              string
 		err             error
 		pvc             *v1.PersistentVolumeClaim
-		storageClassVar *storage.StorageClass
+		storageClassVar *storagev1.StorageClass
 	)
 
 	f := framework.NewDefaultFramework("volume-expand")
@@ -58,7 +58,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	setupFunc := func(allowExpansion bool, blockVolume bool) (*v1.PersistentVolumeClaim, *storage.StorageClass, error) {
+	setupFunc := func(allowExpansion bool, blockVolume bool) (*v1.PersistentVolumeClaim, *storagev1.StorageClass, error) {
 		test := testsuites.StorageClassTest{
 			Name:      "default",
 			ClaimSize: "2Gi",
@@ -241,7 +241,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 	})
 })
 
-func createStorageClass(t testsuites.StorageClassTest, ns string, suffix string, c clientset.Interface) (*storage.StorageClass, error) {
+func createStorageClass(t testsuites.StorageClassTest, ns string, suffix string, c clientset.Interface) (*storagev1.StorageClass, error) {
 	stKlass := newStorageClass(t, ns, suffix)
 
 	var err error

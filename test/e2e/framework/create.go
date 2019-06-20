@@ -26,7 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -325,7 +325,7 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		// know whether the referenced role is a ClusterRole or Role
 		// and therefore always renames, we have to do the same here.
 		f.PatchName(&item.Name)
-	case *storage.StorageClass:
+	case *storagev1.StorageClass:
 		f.PatchName(&item.Name)
 	case *v1.ServiceAccount:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
@@ -539,11 +539,11 @@ func (*daemonSetFactory) Create(f *Framework, i interface{}) (func() error, erro
 type storageClassFactory struct{}
 
 func (f *storageClassFactory) New() runtime.Object {
-	return &storage.StorageClass{}
+	return &storagev1.StorageClass{}
 }
 
 func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, error) {
-	item, ok := i.(*storage.StorageClass)
+	item, ok := i.(*storagev1.StorageClass)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
