@@ -18,10 +18,12 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
+all_e2e_files=()
 # NOTE: This checks e2e test code without the e2e framework which contains Expect().To(HaveOccurred())
-mapfile -t all_e2e_files < <(find test/e2e{,_node,_kubeadm} -name '*.go' | grep -v 'test/e2e/framework/')
+kube::util::read-array all_e2e_files < <(find test/e2e{,_node,_kubeadm} -name '*.go' | grep -v 'test/e2e/framework/')
 errors_expect_no_error=()
 for file in "${all_e2e_files[@]}"
 do
