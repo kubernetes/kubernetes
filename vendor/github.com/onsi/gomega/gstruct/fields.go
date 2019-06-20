@@ -118,12 +118,7 @@ func (m *FieldsMatcher) matchFields(actual interface{}) (errs []error) {
 				return nil
 			}
 
-			var field interface{}
-			if val.Field(i).IsValid() {
-				field = val.Field(i).Interface()
-			} else {
-				field = reflect.Zero(typ.Field(i).Type)
-			}
+			field := val.Field(i).Interface()
 
 			match, err := matcher.Match(field)
 			if err != nil {
