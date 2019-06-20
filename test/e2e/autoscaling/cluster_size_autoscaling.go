@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
-	schedulerapi "k8s.io/api/scheduling/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1917,7 +1917,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 		highPriorityClassName:       1000,
 	}
 	for className, priority := range priorityClasses {
-		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}

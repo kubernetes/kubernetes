@@ -25,7 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulerapi "k8s.io/api/scheduling/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,7 +77,7 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
 		for _, pair := range priorityPairs {
-			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
 			gomega.Expect(err == nil || errors.IsAlreadyExists(err)).To(gomega.Equal(true))
 		}
 
@@ -451,7 +451,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			priorityName := fmt.Sprintf("p%d", i)
 			priorityVal := int32(i)
 			priorityPairs = append(priorityPairs, priorityPair{name: priorityName, value: priorityVal})
-			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
+			_, err := cs.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: priorityName}, Value: priorityVal})
 			if err != nil {
 				e2elog.Logf("Failed to create priority '%v/%v': %v", priorityName, priorityVal, err)
 				e2elog.Logf("Reason: %v. Msg: %v", errors.ReasonForError(err), err)
