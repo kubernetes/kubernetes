@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -92,8 +92,8 @@ func (r *ResourceCollector) Start() {
 	runtimeContainer, err2 := getContainerNameForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
 	if err1 == nil && err2 == nil {
 		systemContainers = map[string]string{
-			stats.SystemContainerKubelet: kubeletContainer,
-			stats.SystemContainerRuntime: runtimeContainer,
+			kubeletstatsv1alpha1.SystemContainerKubelet: kubeletContainer,
+			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
 		}
 	} else {
 		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
@@ -190,15 +190,15 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 func (r *ResourceCollector) GetLatest() (framework.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	stats := make(framework.ResourceUsagePerContainer)
+	kubeletstatsv1alpha1 := make(framework.ResourceUsagePerContainer)
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
 			return nil, fmt.Errorf("No resource usage data for %s container (%s)", key, name)
 		}
-		stats[key] = contStats[len(contStats)-1]
+		kubeletstatsv1alpha1[key] = contStats[len(contStats)-1]
 	}
-	return stats, nil
+	return kubeletstatsv1alpha1, nil
 }
 
 type resourceUsageByCPU []*framework.ContainerResourceUsage

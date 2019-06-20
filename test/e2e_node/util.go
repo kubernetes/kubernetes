@@ -43,7 +43,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -75,7 +75,7 @@ const (
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
 )
 
-func getNodeSummary() (*stats.Summary, error) {
+func getNodeSummary() (*kubeletstatsv1alpha1.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build http request: %v", err)
@@ -95,7 +95,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	}
 
 	decoder := json.NewDecoder(strings.NewReader(string(contentsBytes)))
-	summary := stats.Summary{}
+	summary := kubeletstatsv1alpha1.Summary{}
 	err = decoder.Decode(&summary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)

@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -234,24 +234,24 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 			{
 				podsPerNode: 0,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.20},
-					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.20},
+					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.20},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.20},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
 					// The detail can be found at https://github.com/kubernetes/kubernetes/issues/28384#issuecomment-244158892
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 125 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 125 * 1024 * 1024},
 				},
 			},
 			{
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.35, 0.95: 0.50},
-					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.50},
+					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.35, 0.95: 0.50},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.50},
 				},
 				podsPerNode: 100,
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 350 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 350 * 1024 * 1024},
 				},
 			},
 		}
