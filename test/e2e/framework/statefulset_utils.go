@@ -27,7 +27,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	appsV1beta2 "k8s.io/api/apps/v1beta2"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -825,17 +825,17 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 }
 
 // NewStatefulSetScale creates a new StatefulSet scale subresource and returns it
-func NewStatefulSetScale(ss *appsv1.StatefulSet) *appsV1beta2.Scale {
-	return &appsV1beta2.Scale{
+func NewStatefulSetScale(ss *appsv1.StatefulSet) *appsv1beta2.Scale {
+	return &appsv1beta2.Scale{
 		// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ss.Name,
 			Namespace: ss.Namespace,
 		},
-		Spec: appsV1beta2.ScaleSpec{
+		Spec: appsv1beta2.ScaleSpec{
 			Replicas: *(ss.Spec.Replicas),
 		},
-		Status: appsV1beta2.ScaleStatus{
+		Status: appsv1beta2.ScaleStatus{
 			Replicas: ss.Status.Replicas,
 		},
 	}
