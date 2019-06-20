@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
-	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +71,7 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	case *appsv1.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *batch.Job:
+	case *batchv1.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
@@ -111,7 +111,7 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 		return 0, nil
 	case *appsv1.DaemonSet:
 		return 0, nil
-	case *batch.Job:
+	case *batchv1.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods
 		// that actually finish we need a better way to do this.
 		if typed.Spec.Parallelism != nil {
