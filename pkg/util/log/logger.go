@@ -60,6 +60,17 @@ func (v Verbose) InfoInfreqf(format string, args ...interface{}) {
 	}
 }
 
+// ErrorInfreqf logs to the ERROR, WARNING, and INFO logs, but identical log messages
+// will not be logged if sooner than an reasonable time window. That time window increases
+// each time the message actually gets logged.
+// Arguments are handled in the manner of fmt.Printf; a newline is appended if missing.
+func ErrorInfreqf(format string, args ...interface{}) {
+	message := fmt.Sprintf(format, args...)
+	if message = getMessageInfrequently(message); message != "" {
+		klog.Errorf(message)
+	}
+}
+
 func getMessageInfrequently(message string) string {
 	entry, ok := messages[message]
 	if !ok {

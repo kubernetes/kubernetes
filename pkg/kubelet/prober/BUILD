@@ -25,6 +25,7 @@ go_library(
         "//pkg/probe/exec:go_default_library",
         "//pkg/probe/http:go_default_library",
         "//pkg/probe/tcp:go_default_library",
+        "//pkg/util/log:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",

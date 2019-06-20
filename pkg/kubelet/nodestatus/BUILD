@@ -13,6 +13,7 @@ go_library(
         "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
+        "//pkg/util/log:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

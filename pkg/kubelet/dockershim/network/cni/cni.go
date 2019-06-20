@@ -35,6 +35,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 	utilexec "k8s.io/utils/exec"
 )
 
@@ -179,7 +180,7 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 			continue
 		}
 
-		klog.V(4).Infof("Using CNI configuration file %s", confFile)
+		freqlog.V(4).InfoInfreqf("Using CNI configuration file %s", confFile)
 
 		network := &cniNetwork{
 			name:          confList.Name,

@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 
@@ -736,7 +737,7 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 		for _, volumePlugin := range pluginWithLimits {
 			attachLimits, err := volumePlugin.GetVolumeLimits()
 			if err != nil {
-				klog.V(4).Infof("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
+				freqlog.V(4).InfoInfreqf("Error getting volume limit for plugin %s", volumePlugin.GetPluginName())
 				continue
 			}
 			for limitKey, value := range attachLimits {

@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
@@ -151,7 +152,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 
 	logSpew := func(errs []error) {
 		if len(errs) > 0 {
-			klog.Errorf("%v : There were a total of %v errors similar to this. Turn up verbosity to see them.", errs[0], len(errs))
+			freqlog.ErrorInfreqf("%v : There were a total of %v errors similar to this. Turn up verbosity to see them.", errs[0], len(errs))
 			for _, err := range errs {
 				klog.V(5).Infof("Orphan pod: %v", err)
 			}

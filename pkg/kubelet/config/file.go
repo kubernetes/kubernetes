@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 )
 
 type podEventType int
@@ -95,7 +96,7 @@ func (s *sourceFile) run() {
 	go func() {
 		// Read path immediately to speed up startup.
 		if err := s.listConfig(); err != nil {
-			klog.Errorf("Unable to read config path %q: %v", s.path, err)
+			freqlog.ErrorInfreqf("Unable to read config path %q: %v", s.path, err)
 		}
 		for {
 			select {

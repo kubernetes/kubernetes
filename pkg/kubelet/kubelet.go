@@ -108,6 +108,7 @@ import (
 	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -1968,7 +1969,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			// skip housekeeping, as we may accidentally delete pods from unready sources.
 			klog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
 		} else {
-			klog.V(4).Infof("SyncLoop (housekeeping)")
+			freqlog.V(4).InfoInfreqf("SyncLoop (housekeeping)")
 			if err := handler.HandlePodCleanups(); err != nil {
 				klog.Errorf("Failed cleaning pods: %v", err)
 			}

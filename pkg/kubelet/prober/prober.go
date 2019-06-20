@@ -37,6 +37,7 @@ import (
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
+	freqlog "k8s.io/kubernetes/pkg/util/log"
 	"k8s.io/utils/exec"
 
 	"k8s.io/klog"
@@ -170,10 +171,10 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 			return probe.Unknown, "", err
 		}
 		path := p.HTTPGet.Path
-		klog.V(4).Infof("HTTP-Probe Host: %v://%v, Port: %v, Path: %v", scheme, host, port, path)
+		freqlog.V(4).InfoInfreqf("HTTP-Probe Host: %v://%v, Port: %v, Path: %v", scheme, host, port, path)
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
-		klog.V(4).Infof("HTTP-Probe Headers: %v", headers)
+		freqlog.V(4).InfoInfreqf("HTTP-Probe Headers: %v", headers)
 		if probeType == liveness {
 			return pb.livenessHTTP.Probe(url, headers, timeout)
 		}
@@ -189,7 +190,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		if host == "" {
 			host = status.PodIP
 		}
-		klog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
+		freqlog.V(4).InfoInfreqf("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
 		return pb.tcp.Probe(host, port, timeout)
 	}
 	klog.Warningf("Failed to find probe builder for container: %v", container)

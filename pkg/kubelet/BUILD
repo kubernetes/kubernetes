@@ -101,6 +101,7 @@ go_library(
         "//pkg/security/podsecuritypolicy/sysctl:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/iptables:go_default_library",
+        "//pkg/util/log:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
