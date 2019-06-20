@@ -14,39 +14,57 @@ import (
 	"time"
 
 	units "github.com/docker/go-units"
+	"golang.org/x/sys/unix"
 )
 
 const (
-	cgroupNamePrefix = "name="
+	CgroupNamePrefix = "name="
 	CgroupProcesses  = "cgroup.procs"
 )
 
+// HugePageSizeUnitList is a list of the units used by the linux kernel when
+// naming the HugePage control files.
+// https://www.kernel.org/doc/Documentation/cgroup-v1/hugetlb.txt
+// TODO Since the kernel only use KB, MB and GB; TB and PB should be removed,
+// depends on https://github.com/docker/go-units/commit/a09cd47f892041a4fac473133d181f5aea6fa393
+var HugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
+
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt
-func FindCgroupMountpoint(subsystem string) (string, error) {
-	mnt, _, err := FindCgroupMountpointAndRoot(subsystem)
+func FindCgroupMountpoint(cgroupPath, subsystem string) (string, error) {
+	mnt, _, err := FindCgroupMountpointAndRoot(cgroupPath, subsystem)
 	return mnt, err
 }
 
-func FindCgroupMountpointAndRoot(subsystem string) (string, string, error) {
+func FindCgroupMountpointAndRoot(cgroupPath, subsystem string) (string, string, error) {
 	// We are not using mount.GetMounts() because it's super-inefficient,
 	// parsing it directly sped up x10 times because of not using Sscanf.
 	// It was one of two major performance drawbacks in container start.
 	if !isSubsystemAvailable(subsystem) {
 		return "", "", NewNotFoundError(subsystem)
 	}
+
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return "", "", err
 	}
 	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	return findCgroupMountpointAndRootFromReader(f, cgroupPath, subsystem)
+}
+
+func findCgroupMountpointAndRootFromReader(reader io.Reader, cgroupPath, subsystem string) (string, string, error) {
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		txt := scanner.Text()
-		fields := strings.Split(txt, " ")
-		for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-			if opt == subsystem {
-				return fields[4], fields[3], nil
+		fields := strings.Fields(txt)
+		if len(fields) < 5 {
+			continue
+		}
+		if strings.HasPrefix(fields[4], cgroupPath) {
+			for _, opt := range strings.Split(fields[len(fields)-1], ",") {
+				if opt == subsystem {
+					return fields[4], fields[3], nil
+				}
 			}
 		}
 	}
@@ -156,8 +174,8 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 				continue
 			}
 			ss[opt] = true
-			if strings.HasPrefix(opt, cgroupNamePrefix) {
-				opt = opt[len(cgroupNamePrefix):]
+			if strings.HasPrefix(opt, CgroupNamePrefix) {
+				opt = opt[len(CgroupNamePrefix):]
 			}
 			m.Subsystems = append(m.Subsystems, opt)
 			numFound++
@@ -257,7 +275,7 @@ func GetInitCgroupPath(subsystem string) (string, error) {
 }
 
 func getCgroupPathHelper(subsystem, cgroup string) (string, error) {
-	mnt, root, err := FindCgroupMountpointAndRoot(subsystem)
+	mnt, root, err := FindCgroupMountpointAndRoot("", subsystem)
 	if err != nil {
 		return "", err
 	}
@@ -343,7 +361,7 @@ func getControllerPath(subsystem string, cgroups map[string]string) (string, err
 		return p, nil
 	}
 
-	if p, ok := cgroups[cgroupNamePrefix+subsystem]; ok {
+	if p, ok := cgroups[CgroupNamePrefix+subsystem]; ok {
 		return p, nil
 	}
 
@@ -398,19 +416,26 @@ func RemovePaths(paths map[string]string) (err error) {
 }
 
 func GetHugePageSize() ([]string, error) {
-	var pageSizes []string
-	sizeList := []string{"B", "kB", "MB", "GB", "TB", "PB"}
 	files, err := ioutil.ReadDir("/sys/kernel/mm/hugepages")
 	if err != nil {
-		return pageSizes, err
+		return []string{}, err
 	}
+	var fileNames []string
 	for _, st := range files {
-		nameArray := strings.Split(st.Name(), "-")
+		fileNames = append(fileNames, st.Name())
+	}
+	return getHugePageSizeFromFilenames(fileNames)
+}
+
+func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
+	var pageSizes []string
+	for _, fileName := range fileNames {
+		nameArray := strings.Split(fileName, "-")
 		pageSize, err := units.RAMInBytes(nameArray[1])
 		if err != nil {
 			return []string{}, err
 		}
-		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, sizeList)
+		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, HugePageSizeUnitList)
 		pageSizes = append(pageSizes, sizeString)
 	}
 
@@ -454,10 +479,39 @@ func WriteCgroupProc(dir string, pid int) error {
 	}
 
 	// Dont attach any pid to the cgroup if -1 is specified as a pid
-	if pid != -1 {
-		if err := ioutil.WriteFile(filepath.Join(dir, CgroupProcesses), []byte(strconv.Itoa(pid)), 0700); err != nil {
-			return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
-		}
+	if pid == -1 {
+		return nil
 	}
-	return nil
+
+	cgroupProcessesFile, err := os.OpenFile(filepath.Join(dir, CgroupProcesses), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+	}
+	defer cgroupProcessesFile.Close()
+
+	for i := 0; i < 5; i++ {
+		_, err = cgroupProcessesFile.WriteString(strconv.Itoa(pid))
+		if err == nil {
+			return nil
+		}
+
+		// EINVAL might mean that the task being added to cgroup.procs is in state
+		// TASK_NEW. We should attempt to do so again.
+		if isEINVAL(err) {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+
+		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+	}
+	return err
+}
+
+func isEINVAL(err error) bool {
+	switch err := err.(type) {
+	case *os.PathError:
+		return err.Err == unix.EINVAL
+	default:
+		return false
+	}
 }

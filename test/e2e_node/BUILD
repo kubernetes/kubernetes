@@ -178,6 +178,7 @@ go_test(
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/github.com/docker/go-units:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/onsi/gomega/gstruct:go_default_library",
