@@ -574,15 +574,14 @@ func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCo
 			migratedOps = getVolumeOpCounts(cs, csiName)
 		}
 		return getVolumeOpCounts(cs, pluginName), migratedOps
-	} else {
-		// Not an in-tree driver
-		e2elog.Logf("Test running for native CSI Driver, not checking metrics")
-		return opCounts{}, opCounts{}
 	}
+	// Not an in-tree driver
+	e2elog.Logf("Test running for native CSI Driver, not checking metrics")
+	return opCounts{}, opCounts{}
 }
 
 func getTotOps(ops opCounts) int64 {
-	var tot int64 = 0
+	var tot = int64(0)
 	for _, count := range ops {
 		tot += count
 	}
