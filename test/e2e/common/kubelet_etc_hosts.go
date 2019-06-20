@@ -36,7 +36,7 @@ const (
 	etcHostsOriginalPath       = "/etc/hosts-original"
 )
 
-var etcHostsImageName = imageutils.GetE2EImage(imageutils.Netexec)
+var etcHostsImageName = imageutils.GetE2EImage(imageutils.Agnhost)
 
 type KubeletManagedHostConfig struct {
 	hostNetworkPod *v1.Pod

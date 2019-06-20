@@ -665,11 +665,11 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 }
 
 // GetTestImage returns the image name with the given input
-// If the Node OS is windows, currently we return Nettest image for Windows node
+// If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 func GetTestImage(image string) string {
 	if framework.NodeOSDistroIs("windows") {
-		return imageutils.GetE2EImage(imageutils.Nettest)
+		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
 	return image
 }

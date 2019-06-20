@@ -105,8 +105,6 @@ var (
 const (
 	// CRDConversionWebhook image
 	CRDConversionWebhook = iota
-	// AdmissionWebhook image
-	AdmissionWebhook
 	// Agnhost image
 	Agnhost
 	// Alpine image
@@ -163,12 +161,6 @@ const (
 	MounttestUser
 	// Nautilus image
 	Nautilus
-	// Net image
-	Net
-	// Netexec image
-	Netexec
-	// Nettest image
-	Nettest
 	// Nginx image
 	Nginx
 	// NginxNew image
@@ -217,8 +209,7 @@ const (
 func initImageConfigs() map[int]Config {
 	configs := map[int]Config{}
 	configs[CRDConversionWebhook] = Config{e2eRegistry, "crd-conversion-webhook", "1.13rev2"}
-	configs[AdmissionWebhook] = Config{e2eRegistry, "webhook", "1.15v1"}
-	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.0"}
+	configs[Agnhost] = Config{e2eRegistry, "agnhost", "2.1"}
 	configs[Alpine] = Config{dockerLibraryRegistry, "alpine", "3.7"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.10"}
@@ -245,9 +236,6 @@ func initImageConfigs() map[int]Config {
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
-	configs[Net] = Config{e2eRegistry, "net", "1.0"}
-	configs[Netexec] = Config{e2eRegistry, "netexec", "1.1"}
-	configs[Nettest] = Config{e2eRegistry, "nettest", "1.0"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}

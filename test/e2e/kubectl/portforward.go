@@ -69,7 +69,8 @@ func pfPod(expectedClientData, chunks, chunkSize, chunkIntervalMillis string, bi
 			Containers: []v1.Container{
 				{
 					Name:  "readiness",
-					Image: imageutils.GetE2EImage(imageutils.Netexec),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"netexec"},
 					ReadinessProbe: &v1.Probe{
 						Handler: v1.Handler{
 							Exec: &v1.ExecAction{
