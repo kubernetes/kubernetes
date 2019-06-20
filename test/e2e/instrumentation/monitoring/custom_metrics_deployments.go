@@ -24,7 +24,7 @@ import (
 	gcm "google.golang.org/api/monitoring/v3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -44,16 +44,16 @@ var (
 	StackdriverExporter = "stackdriver-exporter"
 	// HPAPermissions is a ClusterRoleBinding that grants unauthenticated user permissions granted for
 	// HPA for testing purposes, i.e. it should grant permission to read custom metrics.
-	HPAPermissions = &rbac.ClusterRoleBinding{
+	HPAPermissions = &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "custom-metrics-reader",
 		},
-		RoleRef: rbac.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     "system:controller:horizontal-pod-autoscaler",
 		},
-		Subjects: []rbac.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				APIGroup: "rbac.authorization.k8s.io",
 				Kind:     "Group",
