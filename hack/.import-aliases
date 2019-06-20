@@ -3,5 +3,6 @@
   "k8s.io/api/admission/v1beta1": "admissionv1beta1",
   "k8s.io/api/apps/v1": "appsv1",
   "k8s.io/api/apps/v1beta1": "appsv1beta1",
-  "k8s.io/api/apps/v1beta2": "appsv1beta2"
+  "k8s.io/api/apps/v1beta2": "appsv1beta2",
+  "k8s.io/api/auditregistration/v1alpha1": "auditregistrationv1alpha1"
 }

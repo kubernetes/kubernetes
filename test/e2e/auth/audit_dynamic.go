@@ -23,7 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
+	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -131,22 +131,22 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 
 		podURL := fmt.Sprintf("http://%s:8080", podIP)
 		// create audit sink
-		sink := auditregv1alpha1.AuditSink{
+		sink := auditregistrationv1alpha1.AuditSink{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},
-			Spec: auditregv1alpha1.AuditSinkSpec{
-				Policy: auditregv1alpha1.Policy{
-					Level: auditregv1alpha1.LevelRequestResponse,
-					Stages: []auditregv1alpha1.Stage{
-						auditregv1alpha1.StageRequestReceived,
-						auditregv1alpha1.StageResponseStarted,
-						auditregv1alpha1.StageResponseComplete,
-						auditregv1alpha1.StagePanic,
+			Spec: auditregistrationv1alpha1.AuditSinkSpec{
+				Policy: auditregistrationv1alpha1.Policy{
+					Level: auditregistrationv1alpha1.LevelRequestResponse,
+					Stages: []auditregistrationv1alpha1.Stage{
+						auditregistrationv1alpha1.StageRequestReceived,
+						auditregistrationv1alpha1.StageResponseStarted,
+						auditregistrationv1alpha1.StageResponseComplete,
+						auditregistrationv1alpha1.StagePanic,
 					},
 				},
-				Webhook: auditregv1alpha1.Webhook{
-					ClientConfig: auditregv1alpha1.WebhookClientConfig{
+				Webhook: auditregistrationv1alpha1.Webhook{
+					ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 						URL: &podURL,
 					},
 				},
