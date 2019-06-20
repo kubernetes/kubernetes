@@ -504,10 +504,6 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 	return false
 }
 
-func (s *ServiceController) loadBalancerName(service *v1.Service) string {
-	return s.balancer.GetLoadBalancerName(context.TODO(), "", service)
-}
-
 func getPortsForLB(service *v1.Service) ([]*v1.ServicePort, error) {
 	var protocol v1.Protocol
 

@@ -17,6 +17,7 @@ limitations under the License.
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -360,7 +361,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 				}
 				if balancer == nil {
 					t.Errorf("Got no load balancer, expected one to be created")
-				} else if balancer.Name != controller.loadBalancerName(tc.service) ||
+				} else if balancer.Name != controller.balancer.GetLoadBalancerName(context.Background(), "", tc.service) ||
 					balancer.Region != region ||
 					balancer.Ports[0].Port != tc.service.Spec.Ports[0].Port {
 					t.Errorf("Created load balancer has incorrect parameters: %v", balancer)
