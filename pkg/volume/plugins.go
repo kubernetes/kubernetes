@@ -744,7 +744,10 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	if err != nil {
 		klog.Errorf("Error dynamically probing plugins: %s", err)
 		//skipping events will lead to fail to add all health plugins driver once one plugin file is not ready, always keeping consume health events.
-		//return // Use cached plugins upon failure.
+		if events == nil {
+			return // Use cached plugins upon failure.
+		}
+		//continue to handle health events
 	}
 
 	for _, event := range events {
