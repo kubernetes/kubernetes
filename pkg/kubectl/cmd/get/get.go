@@ -44,11 +44,11 @@ import (
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/util/interrupt"
+	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	utilprinters "k8s.io/kubernetes/pkg/kubectl/util/printers"
 )
 
 // GetOptions contains the input to the get command.
