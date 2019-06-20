@@ -33,12 +33,12 @@ run_multi_resources_tests() {
   YAML=".yaml"
   JSON=".json"
   for file in $FILES; do
-    if [ -f "$file"$YAML ]
+    if [ -f "${file}${YAML}" ]
     then
-      file=$file$YAML
+      file=${file}${YAML}
       replace_file="${file%.yaml}-modify.yaml"
     else
-      file=$file$JSON
+      file=${file}${JSON}
       replace_file="${file%.json}-modify.json"
     fi
 
@@ -90,7 +90,7 @@ run_multi_resources_tests() {
     fi
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
-    kubectl replace -f "$replace_file" --force --cascade "${kube_flags[@]}"
+    kubectl replace -f "${replace_file}" --force --cascade "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field:?}.status}}" 'replaced'
@@ -128,7 +128,7 @@ run_multi_resources_tests() {
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing labels.
-    kubectl-with-retry label -f "$file" labeled=true --overwrite "${kube_flags[@]}"
+    kubectl-with-retry label -f "${file}" labeled=true --overwrite "${kube_flags[@]}"
     # Post-condition: mock service and mock rc (and mock2) are labeled
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field}.labeled}}" 'true'
@@ -147,7 +147,7 @@ run_multi_resources_tests() {
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing annotations.
-    kubectl-with-retry annotate -f "$file" annotated=true --overwrite "${kube_flags[@]}"
+    kubectl-with-retry annotate -f "${file}" annotated=true --overwrite "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are annotated
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${annotations_field:?}.annotated}}" 'true'
@@ -299,7 +299,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl label -f hack/testdata/recursive/pod mylabel='myvalue' --recursive 2>&1 "${kube_flags[@]}")
-  echo "$output_message"
+  echo "${output_message}"
   # Post-condition: busybox0 & busybox1 PODs are labeled, but because busybox2 is malformed, it should not show up
   kube::test::get_object_assert pods "{{range.items}}{{${labels_field}.mylabel}}:{{end}}" 'myvalue:myvalue:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -309,7 +309,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl patch -f hack/testdata/recursive/pod -p='{"spec":{"containers":[{"name":"busybox","image":"prom/busybox"}]}}' --recursive 2>&1 "${kube_flags[@]}")
-  echo "$output_message"
+  echo "${output_message}"
   # Post-condition: busybox0 & busybox1 PODs are patched, but because busybox2 is malformed, it should not show up
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'prom/busybox:prom/busybox:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
