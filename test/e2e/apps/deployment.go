@@ -27,7 +27,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -182,11 +182,11 @@ func intOrStrP(num int) *intstr.IntOrString {
 	return &intstr
 }
 
-func newDeploymentRollback(name string, annotations map[string]string, revision int64) *extensions.DeploymentRollback {
-	return &extensions.DeploymentRollback{
+func newDeploymentRollback(name string, annotations map[string]string, revision int64) *extensionsv1beta1.DeploymentRollback {
+	return &extensionsv1beta1.DeploymentRollback{
 		Name:               name,
 		UpdatedAnnotations: annotations,
-		RollbackTo:         extensions.RollbackConfig{Revision: revision},
+		RollbackTo:         extensionsv1beta1.RollbackConfig{Revision: revision},
 	}
 }
 
