@@ -11,5 +11,6 @@
   "k8s.io/api/authorization/v1beta1": "authorizationv1beta1",
   "k8s.io/api/autoscaling/v1": "autoscalingv1",
   "k8s.io/api/batch/v1": "batchv1",
-  "k8s.io/api/batch/v1beta1": "batchv1beta1"
+  "k8s.io/api/batch/v1beta1": "batchv1beta1",
+  "k8s.io/api/certificates/v1beta1": "certificatesv1beta1"
 }
