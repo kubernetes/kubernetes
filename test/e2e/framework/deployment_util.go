@@ -107,8 +107,9 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:  imageName,
-							Image: image,
+							Name:            imageName,
+							Image:           image,
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},

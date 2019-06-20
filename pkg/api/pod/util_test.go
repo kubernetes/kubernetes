@@ -616,12 +616,21 @@ func TestDropProcMount(t *testing.T) {
 			},
 		}
 	}
-	podWithoutProcMount := func() *api.Pod {
+	podWithDefaultProcMount := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
 				RestartPolicy:  api.RestartPolicyNever,
 				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
 				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: &defaultProcMount}}},
+			},
+		}
+	}
+	podWithoutProcMount := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:  api.RestartPolicyNever,
+				Containers:     []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
+				InitContainers: []api.Container{{Name: "container1", Image: "testimage", SecurityContext: &api.SecurityContext{ProcMount: nil}}},
 			},
 		}
 	}
@@ -635,6 +644,11 @@ func TestDropProcMount(t *testing.T) {
 			description:  "has ProcMount",
 			hasProcMount: true,
 			pod:          podWithProcMount,
+		},
+		{
+			description:  "has default ProcMount",
+			hasProcMount: false,
+			pod:          podWithDefaultProcMount,
 		},
 		{
 			description:  "does not have ProcMount",
@@ -683,8 +697,8 @@ func TestDropProcMount(t *testing.T) {
 							t.Errorf("new pod was not changed")
 						}
 						// new pod should not have ProcMount
-						if !reflect.DeepEqual(newPod, podWithoutProcMount()) {
-							t.Errorf("new pod had ProcMount: %v", diff.ObjectReflectDiff(newPod, podWithoutProcMount()))
+						if procMountInUse(&newPod.Spec) {
+							t.Errorf("new pod had ProcMount: %#v", &newPod.Spec)
 						}
 					default:
 						// new pod should not need to be changed

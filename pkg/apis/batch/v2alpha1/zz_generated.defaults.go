@@ -131,9 +131,6 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
@@ -175,9 +172,6 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
-		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
@@ -283,9 +277,6 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Template.Spec.Template.Spec.Containers {
 		a := &in.Template.Spec.Template.Spec.Containers[i]
@@ -327,9 +318,6 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 					v1.SetDefaults_HTTPGetAction(a.Lifecycle.PreStop.HTTPGet)
 				}
 			}
-		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
 		}
 	}
 }
