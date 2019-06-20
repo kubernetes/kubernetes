@@ -20,6 +20,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/mholt/caddy/telemetry"
 )
 
 // Parse parses the input just enough to group tokens, in
@@ -249,9 +251,10 @@ func (p *parser) doImport() error {
 	if p.definedSnippets != nil && p.definedSnippets[importPattern] != nil {
 		importedTokens = p.definedSnippets[importPattern]
 	} else {
-		// make path relative to Caddyfile rather than current working directory (issue #867)
-		// and then use glob to get list of matching filenames
-		absFile, err := filepath.Abs(p.Dispenser.filename)
+		// make path relative to the file of the _token_ being processed rather
+		// than current working directory (issue #867) and then use glob to get
+		// list of matching filenames
+		absFile, err := filepath.Abs(p.Dispenser.File())
 		if err != nil {
 			return p.Errf("Failed to get absolute path of file: %s: %v", p.Dispenser.filename, err)
 		}
@@ -263,14 +266,19 @@ func (p *parser) doImport() error {
 		} else {
 			globPattern = importPattern
 		}
+		if strings.Count(globPattern, "*") > 1 || strings.Count(globPattern, "?") > 1 ||
+			(strings.Contains(globPattern, "[") && strings.Contains(globPattern, "]")) {
+			// See issue #2096 - a pattern with many glob expansions can hang for too long
+			return p.Errf("Glob pattern may only contain one wildcard (*), but has others: %s", globPattern)
+		}
 		matches, err = filepath.Glob(globPattern)
 
 		if err != nil {
 			return p.Errf("Failed to use import pattern %s: %v", importPattern, err)
 		}
 		if len(matches) == 0 {
-			if strings.Contains(globPattern, "*") {
-				log.Printf("[WARNING] No files matching import pattern: %s", importPattern)
+			if strings.ContainsAny(globPattern, "*?[]") {
+				log.Printf("[WARNING] No files matching import glob pattern: %s", importPattern)
 			} else {
 				return p.Errf("File to import not found: %s", importPattern)
 			}
@@ -283,30 +291,6 @@ func (p *parser) doImport() error {
 			if err != nil {
 				return err
 			}
-
-			var importLine int
-			for i, token := range newTokens {
-				if token.Text == "import" {
-					importLine = token.Line
-					continue
-				}
-				if token.Line == importLine {
-					var abs string
-					if filepath.IsAbs(token.Text) {
-						abs = token.Text
-					} else if !filepath.IsAbs(importFile) {
-						abs = filepath.Join(filepath.Dir(absFile), token.Text)
-					} else {
-						abs = filepath.Join(filepath.Dir(importFile), token.Text)
-					}
-					newTokens[i] = Token{
-						Text: abs,
-						Line: token.Line,
-						File: token.File,
-					}
-				}
-			}
-
 			importedTokens = append(importedTokens, newTokens...)
 		}
 	}
@@ -359,7 +343,7 @@ func (p *parser) doSingleImport(importFile string) ([]Token, error) {
 // are loaded into the current server block for later use
 // by directive setup functions.
 func (p *parser) directive() error {
-	dir := p.Val()
+	dir := replaceEnvVars(p.Val())
 	nesting := 0
 
 	// TODO: More helpful error message ("did you mean..." or "maybe you need to install its server type")
@@ -369,6 +353,7 @@ func (p *parser) directive() error {
 
 	// The directive itself is appended as a relevant token
 	p.block.Tokens[dir] = append(p.block.Tokens[dir], p.tokens[p.cursor])
+	telemetry.AppendUnique("directives", dir)
 
 	for p.Next() {
 		if p.Val() == "{" {
@@ -380,6 +365,12 @@ func (p *parser) directive() error {
 			nesting--
 		} else if p.Val() == "}" && nesting == 0 {
 			return p.Err("Unexpected '}' because no matching opening brace")
+		} else if p.Val() == "import" && p.isNewLine() {
+			if err := p.doImport(); err != nil {
+				return err
+			}
+			p.cursor-- // cursor is advanced when we continue, so roll back one more
+			continue
 		}
 		p.tokens[p.cursor].Text = replaceEnvVars(p.tokens[p.cursor].Text)
 		p.block.Tokens[dir] = append(p.block.Tokens[dir], p.tokens[p.cursor])
@@ -439,8 +430,13 @@ func replaceEnvVars(s string) string {
 func replaceEnvReferences(s, refStart, refEnd string) string {
 	index := strings.Index(s, refStart)
 	for index != -1 {
-		endIndex := strings.Index(s, refEnd)
-		if endIndex != -1 {
+		endIndex := strings.Index(s[index:], refEnd)
+		if endIndex == -1 {
+			break
+		}
+
+		endIndex += index
+		if endIndex > index+len(refStart) {
 			ref := s[index : endIndex+len(refEnd)]
 			s = strings.Replace(s, ref, os.Getenv(ref[len(refStart):len(ref)-len(refEnd)]), -1)
 		} else {

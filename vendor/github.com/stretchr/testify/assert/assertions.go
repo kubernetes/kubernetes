@@ -39,7 +39,7 @@ type ValueAssertionFunc func(TestingT, interface{}, ...interface{}) bool
 // for table driven tests.
 type BoolAssertionFunc func(TestingT, bool, ...interface{}) bool
 
-// ValuesAssertionFunc is a common function prototype when validating an error value.  Can be useful
+// ErrorAssertionFunc is a common function prototype when validating an error value.  Can be useful
 // for table driven tests.
 type ErrorAssertionFunc func(TestingT, error, ...interface{}) bool
 
@@ -179,7 +179,11 @@ func messageFromMsgAndArgs(msgAndArgs ...interface{}) string {
 		return ""
 	}
 	if len(msgAndArgs) == 1 {
-		return msgAndArgs[0].(string)
+		msg := msgAndArgs[0]
+		if msgAsStr, ok := msg.(string); ok {
+			return msgAsStr
+		}
+		return fmt.Sprintf("%+v", msg)
 	}
 	if len(msgAndArgs) > 1 {
 		return fmt.Sprintf(msgAndArgs[0].(string), msgAndArgs[1:]...)
@@ -415,6 +419,17 @@ func NotNil(t TestingT, object interface{}, msgAndArgs ...interface{}) bool {
 	return Fail(t, "Expected value not to be nil.", msgAndArgs...)
 }
 
+// containsKind checks if a specified kind in the slice of kinds.
+func containsKind(kinds []reflect.Kind, kind reflect.Kind) bool {
+	for i := 0; i < len(kinds); i++ {
+		if kind == kinds[i] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // isNil checks if a specified object is nil or not, without Failing.
 func isNil(object interface{}) bool {
 	if object == nil {
@@ -423,7 +438,14 @@ func isNil(object interface{}) bool {
 
 	value := reflect.ValueOf(object)
 	kind := value.Kind()
-	if kind >= reflect.Chan && kind <= reflect.Slice && value.IsNil() {
+	isNilableKind := containsKind(
+		[]reflect.Kind{
+			reflect.Chan, reflect.Func,
+			reflect.Interface, reflect.Map,
+			reflect.Ptr, reflect.Slice},
+		kind)
+
+	if isNilableKind && value.IsNil() {
 		return true
 	}
 
@@ -1327,7 +1349,7 @@ func typeAndKind(v interface{}) (reflect.Type, reflect.Kind) {
 }
 
 // diff returns a diff of both values as long as both are of the same type and
-// are a struct, map, slice or array. Otherwise it returns an empty string.
+// are a struct, map, slice, array or string. Otherwise it returns an empty string.
 func diff(expected interface{}, actual interface{}) string {
 	if expected == nil || actual == nil {
 		return ""
@@ -1345,7 +1367,7 @@ func diff(expected interface{}, actual interface{}) string {
 	}
 
 	var e, a string
-	if ek != reflect.String {
+	if et != reflect.TypeOf("") {
 		e = spewConfig.Sdump(expected)
 		a = spewConfig.Sdump(actual)
 	} else {
