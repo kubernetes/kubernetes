@@ -23,15 +23,14 @@ import (
 	"k8s.io/cluster-bootstrap/token/api"
 )
 
+var (
+	bootstrapTokenRe = regexp.MustCompile(api.BootstrapTokenPattern)
+)
+
 // ParseToken tries and parse a valid token from a string.
 // A token ID and token secret are returned in case of success, an error otherwise.
 func ParseToken(s string) (tokenID, tokenSecret string, err error) {
-	bootstrapTokenRegexp, err := regexp.Compile(api.BootstrapTokenPattern)
-	if err != nil {
-		return "", "", fmt.Errorf("error compiling bootstrap regex %q: %v", api.BootstrapTokenPattern, err)
-	}
-
-	split := bootstrapTokenRegexp.FindStringSubmatch(s)
+	split := bootstrapTokenRe.FindStringSubmatch(s)
 	if len(split) != 3 {
 		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, api.BootstrapTokenPattern)
 	}

@@ -28,6 +28,10 @@ import (
 	"k8s.io/klog"
 )
 
+var (
+	secretNameRe = regexp.MustCompile(`^` + regexp.QuoteMeta(api.BootstrapTokenSecretPrefix) + `([a-z0-9]{6})$`)
+)
+
 // GetData returns the string value for the given key in the specified Secret
 // If there is an error or if the key doesn't exist, an empty string is returned.
 func GetData(secret *v1.Secret, key string) string {
@@ -61,13 +65,7 @@ func HasExpired(secret *v1.Secret, currentTime time.Time) bool {
 
 // ParseName parses the name of the secret to extract the secret ID.
 func ParseName(name string) (secretID string, ok bool) {
-	namePattern := `^` + regexp.QuoteMeta(api.BootstrapTokenSecretPrefix) + `([a-z0-9]{6})$`
-	nameRegExp, err := regexp.Compile(namePattern)
-	if err != nil {
-		klog.Errorf("error compiling bootstrap regex %q: %v", namePattern, err)
-		return "", false
-	}
-	r := nameRegExp.FindStringSubmatch(name)
+	r := secretNameRe.FindStringSubmatch(name)
 	if r == nil {
 		return "", false
 	}
