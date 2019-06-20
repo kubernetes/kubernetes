@@ -17,10 +17,19 @@ limitations under the License.
 package benchmark
 
 import (
+	"flag"
 	"testing"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )
+
+func init() {
+	// default logging flags to more reasonable values for this test
+	flag.Set("v", "1")
+	flag.Set("logtostderr", "false")
+	flag.Set("log_dir", ".")
+	flag.Parse()
+}
 
 func TestMain(m *testing.M) {
 	framework.EtcdMain(m.Run)

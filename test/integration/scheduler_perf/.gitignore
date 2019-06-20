@@ -1,0 +1,2 @@
+# ignore log files
+scheduler_perf.test.*
