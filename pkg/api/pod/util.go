@@ -286,12 +286,22 @@ func DropDisabledProcMountField(podSpec *api.PodSpec) {
 		defProcMount := api.DefaultProcMount
 		for i := range podSpec.Containers {
 			if podSpec.Containers[i].SecurityContext != nil {
-				podSpec.Containers[i].SecurityContext.ProcMount = &defProcMount
+				if podSpec.Containers[i].SecurityContext.ProcMount != nil {
+					// The ProcMount field was improperly forced to non-nil in 1.12.
+					// If the feature is disabled, and the ProcMount field is present in the incoming object, force to the default value.
+					// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
+					podSpec.Containers[i].SecurityContext.ProcMount = &defProcMount
+				}
 			}
 		}
 		for i := range podSpec.InitContainers {
 			if podSpec.InitContainers[i].SecurityContext != nil {
-				podSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
+				if podSpec.InitContainers[i].SecurityContext.ProcMount != nil {
+					// The ProcMount field was improperly forced to non-nil in 1.12.
+					// If the feature is disabled, and the ProcMount field is present in the incoming object, force to the default value.
+					// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
+					podSpec.InitContainers[i].SecurityContext.ProcMount = &defProcMount
+				}
 			}
 		}
 	}
