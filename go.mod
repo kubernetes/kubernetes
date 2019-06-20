@@ -379,7 +379,7 @@ replace (
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
 	github.com/sigma/go-inotify => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
-	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.2.0
+	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
 	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.3
