@@ -34,13 +34,17 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
+// Suite represents test suite.
 type Suite string
 
 const (
-	E2E     Suite = "e2e"
+	// E2E represents a test suite for e2e.
+	E2E Suite = "e2e"
+	// NodeE2E represents a test suite for node e2e.
 	NodeE2E Suite = "node e2e"
 )
 
+// CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
 // CommonImageWhiteList is the list of images used in common test. These images should be prepulled
@@ -94,6 +98,7 @@ func init() {
 	}
 }
 
+// SubstituteImageName replaces image name in content.
 func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
@@ -125,6 +130,7 @@ func svcByName(name string, port int) *v1.Service {
 	}
 }
 
+// NewSVCByName creates a service by name.
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
 	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
@@ -138,6 +144,7 @@ func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
+// RestartNodes restarts specific nodes.
 func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Build mapping from zone to nodes in that zone.
 	nodeNamesByZone := make(map[string][]string)
