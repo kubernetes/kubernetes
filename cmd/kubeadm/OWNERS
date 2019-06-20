@@ -6,20 +6,20 @@ approvers:
 - fabriziopandini
 - neolit123
 - rosti
+- ereslibre
 reviewers:
 - luxas
 - timothysc
 - fabriziopandini
 - neolit123
 - kad
-- liztio
-- chuckha
 - detiber
 - dixudx
 - rosti
 - yagonobre
-- ereslibre 
-# Might want to add @xiangpengzhao and @stealthybox back in the future
+- ereslibre
+- SataQiu
+# Might want to add @xiangpengzhao, @stealthybox, @liztio and @chuckha back in the future
 labels:
 - area/kubeadm
 - sig/cluster-lifecycle
