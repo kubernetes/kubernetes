@@ -24,5 +24,6 @@
   "k8s.io/api/node/v1alpha1": "nodev1alpha1",
   "k8s.io/api/node/v1beta1": "nodev1beta1",
   "k8s.io/api/policy/v1beta1": "policyv1beta1",
-  "k8s.io/api/rbac/v1": "rbacv1"
+  "k8s.io/api/rbac/v1": "rbacv1",
+  "k8s.io/api/rbac/v1alpha1": "rbacv1alpha1"
 }
