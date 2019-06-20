@@ -1553,7 +1553,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pod if it should not be running
-	if !runnable.Admit || pod.DeletionTimestamp != nil || apiPodStatus.Phase == v1.PodFailed {
+	if !runnable.Admit || pod.DeletionTimestamp != nil || kl.podIsTerminated(pod) {
 		var syncErr error
 		if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
