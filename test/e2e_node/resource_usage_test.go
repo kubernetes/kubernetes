@@ -24,7 +24,7 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -68,12 +68,12 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 			{
 				podsNr: 10,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.35},
-					stats.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
+					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.35},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 			},
 		}

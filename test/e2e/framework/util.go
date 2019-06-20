@@ -448,7 +448,7 @@ func ProxyMode(f *Framework) (string, error) {
 			Containers: []v1.Container{
 				{
 					Name:    "detector",
-					Image:   imageutils.GetE2EImage(imageutils.Net),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"/bin/sleep", "3600"},
 				},
 			},

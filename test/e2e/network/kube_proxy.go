@@ -38,7 +38,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Net)
+var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 var _ = SIGDescribe("Network", func() {
 	const (
@@ -103,8 +103,8 @@ var _ = SIGDescribe("Network", func() {
 						Name:            "e2e-net-client",
 						Image:           kubeProxyE2eImage,
 						ImagePullPolicy: "Always",
-						Command: []string{
-							"/net", "-serve", fmt.Sprintf("0.0.0.0:%d", testDaemonHTTPPort),
+						Args: []string{
+							"net", "--serve", fmt.Sprintf("0.0.0.0:%d", testDaemonHTTPPort),
 						},
 					},
 				},
@@ -125,10 +125,10 @@ var _ = SIGDescribe("Network", func() {
 						Name:            "e2e-net-server",
 						Image:           kubeProxyE2eImage,
 						ImagePullPolicy: "Always",
-						Command: []string{
-							"/net",
-							"-runner", "nat-closewait-server",
-							"-options",
+						Args: []string{
+							"net",
+							"--runner", "nat-closewait-server",
+							"--options",
 							fmt.Sprintf(`{"LocalAddr":"0.0.0.0:%v", "PostFindTimeoutSeconds":%v}`,
 								testDaemonTCPPort,
 								postFinTimeoutSeconds),

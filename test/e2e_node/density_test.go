@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubemetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -77,12 +77,12 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
-					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
+					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
 				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: framework.LatencyMetric{
@@ -224,12 +224,12 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   10,
 				bgPodsNr: 50,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
-					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
+					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.50},
+					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					kubeletstatsv1alpha1.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
 				},
 				podStartupLimits: framework.LatencyMetric{
 					Perc50: 5000 * time.Millisecond,

@@ -52,7 +52,8 @@ func testPreStop(c clientset.Interface, ns string) {
 			Containers: []v1.Container{
 				{
 					Name:  "server",
-					Image: imageutils.GetE2EImage(imageutils.Nettest),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"nettest"},
 					Ports: []v1.ContainerPort{{ContainerPort: 8080}},
 				},
 			},
