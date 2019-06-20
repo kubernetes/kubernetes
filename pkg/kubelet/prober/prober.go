@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
-	httprobe "k8s.io/kubernetes/pkg/probe/http"
+	httpprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
 
@@ -50,8 +50,8 @@ type prober struct {
 	// probe types needs different httprobe instances so they don't
 	// share a connection pool which can cause collsions to the
 	// same host:port and transient failures. See #49740.
-	readinessHTTP httprobe.Prober
-	livenessHTTP  httprobe.Prober
+	readinessHTTP httpprobe.Prober
+	livenessHTTP  httpprobe.Prober
 	tcp           tcprobe.Prober
 	runner        kubecontainer.ContainerCommandRunner
 
@@ -69,8 +69,8 @@ func newProber(
 	const followNonLocalRedirects = false
 	return &prober{
 		exec:          execprobe.New(),
-		readinessHTTP: httprobe.New(followNonLocalRedirects),
-		livenessHTTP:  httprobe.New(followNonLocalRedirects),
+		readinessHTTP: httpprobe.New(followNonLocalRedirects),
+		livenessHTTP:  httpprobe.New(followNonLocalRedirects),
 		tcp:           tcprobe.New(),
 		runner:        runner,
 		refManager:    refManager,
