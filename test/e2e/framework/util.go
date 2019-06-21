@@ -48,9 +48,7 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 
 	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -74,10 +72,6 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/service"
@@ -91,6 +85,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -2226,94 +2221,11 @@ func ScaleResource(
 	return e2epod.WaitForControlledPodsRunning(clientset, ns, name, kind)
 }
 
-func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, name string) (runtime.Object, error) {
-	switch kind {
-	case api.Kind("ReplicationController"):
-		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
-	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.AppsV1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
-	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
-	case extensionsinternal.Kind("DaemonSet"):
-		return c.AppsV1().DaemonSets(ns).Get(name, metav1.GetOptions{})
-	case batchinternal.Kind("Job"):
-		return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
-	default:
-		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
-	}
-}
-
-func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
-	switch typed := obj.(type) {
-	case *v1.ReplicationController:
-		return labels.SelectorFromSet(typed.Spec.Selector), nil
-	case *extensionsv1beta1.ReplicaSet:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *appsv1.ReplicaSet:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *extensionsv1beta1.Deployment:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *appsv1.Deployment:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *extensionsv1beta1.DaemonSet:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *appsv1.DaemonSet:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *batchv1.Job:
-		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	default:
-		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
-	}
-}
-
-func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
-	switch typed := obj.(type) {
-	case *v1.ReplicationController:
-		if typed.Spec.Replicas != nil {
-			return *typed.Spec.Replicas, nil
-		}
-		return 0, nil
-	case *extensionsv1beta1.ReplicaSet:
-		if typed.Spec.Replicas != nil {
-			return *typed.Spec.Replicas, nil
-		}
-		return 0, nil
-	case *appsv1.ReplicaSet:
-		if typed.Spec.Replicas != nil {
-			return *typed.Spec.Replicas, nil
-		}
-		return 0, nil
-	case *extensionsv1beta1.Deployment:
-		if typed.Spec.Replicas != nil {
-			return *typed.Spec.Replicas, nil
-		}
-		return 0, nil
-	case *appsv1.Deployment:
-		if typed.Spec.Replicas != nil {
-			return *typed.Spec.Replicas, nil
-		}
-		return 0, nil
-	case *extensionsv1beta1.DaemonSet:
-		return 0, nil
-	case *appsv1.DaemonSet:
-		return 0, nil
-	case *batchv1.Job:
-		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods
-		// that actually finish we need a better way to do this.
-		if typed.Spec.Parallelism != nil {
-			return *typed.Spec.Parallelism, nil
-		}
-		return 0, nil
-	default:
-		return -1, fmt.Errorf("Unsupported kind when getting number of replicas: %v", obj)
-	}
-}
-
 // DeleteResourceAndWaitForGC deletes only given resource and waits for GC to delete the pods.
 func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns, name string) error {
 	ginkgo.By(fmt.Sprintf("deleting %v %s in namespace %s, will wait for the garbage collector to delete the pods", kind, name, ns))
 
-	rtObject, err := getRuntimeObjectForKind(c, kind, ns, name)
+	rtObject, err := e2eresource.GetRuntimeObjectForKind(c, kind, ns, name)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			e2elog.Logf("%v %s not found: %v", kind, name, err)
@@ -2321,11 +2233,11 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		}
 		return err
 	}
-	selector, err := getSelectorFromRuntimeObject(rtObject)
+	selector, err := e2eresource.GetSelectorFromRuntimeObject(rtObject)
 	if err != nil {
 		return err
 	}
-	replicas, err := getReplicasFromRuntimeObject(rtObject)
+	replicas, err := e2eresource.GetReplicasFromRuntimeObject(rtObject)
 	if err != nil {
 		return err
 	}
