@@ -26,16 +26,16 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
-var controlPlanePrepareExample = normalizer.Examples(`
+var controlPlanePrepareExample = cmdutil.Examples(`
 	# Prepares the machine for serving a control plane
 	kubeadm join phase control-plane-prepare all
 `)
