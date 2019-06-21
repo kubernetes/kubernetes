@@ -677,7 +677,7 @@ func (nc *Controller) monitorNodeHealth() error {
 			}
 			return false, nil
 		}); err != nil {
-			klog.Errorf("Update health of Node '%v' from Controller error: %v. "+
+			klog.Errorf("Update health of Node %s from Controller error: %v. "+
 				"Skipping - no pods will be evicted.", node.Name, err)
 			continue
 		}

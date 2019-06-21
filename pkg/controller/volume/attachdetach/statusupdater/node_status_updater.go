@@ -65,15 +65,12 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		if errors.IsNotFound(err) {
 			// If node does not exist, its status cannot be updated.
 			// Do nothing so that there is no retry until node is created.
-			klog.V(2).Infof(
-				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
-				nodeName,
-				err)
+			klog.V(2).Infof("Could not update node status: %v", err)
 			continue
 		} else if err != nil {
 			// For all other errors, log error and reset flag statusUpdateNeeded
 			// back to true to indicate this node status needs to be updated again.
-			klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
+			klog.V(2).Infof("Error retrieving nodes from node lister: %v", err)
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 			continue
 		}
