@@ -172,6 +172,7 @@ filegroup(
             "//cmd/linkcheck",
             "//test/e2e:e2e.test_binary",
             "//vendor/github.com/onsi/ginkgo/ginkgo",
+            "//cluster/images/conformance/go-runner",
         ],
     )),
 )

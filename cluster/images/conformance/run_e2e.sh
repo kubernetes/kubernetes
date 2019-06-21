@@ -36,6 +36,14 @@ saveResults() {
     echo -n "${RESULTS_DIR}/e2e.tar.gz" > "${RESULTS_DIR}/done"
 }
 
+# Optional Golang runner alternative to the bash script.
+# Entry provided via env var to simplify invocation. 
+if [[ -n ${E2E_USE_GO_RUNNER:-} ]]; then
+    set -x
+    /gorunner
+    exit $?
+fi
+
 # We get the TERM from kubernetes and handle it gracefully
 trap shutdown TERM
 

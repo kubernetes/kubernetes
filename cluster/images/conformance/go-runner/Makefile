@@ -1,4 +1,4 @@
-# Copyright 2018 The Kubernetes Authors.
+# Copyright 2019 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,22 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+HOST_GOOS ?= $(shell go env GOOS)
+HOST_GOARCH ?= $(shell go env GOARCH)
+GO_BUILD ?= go build
 
-COPY ginkgo /usr/local/bin/
-COPY e2e.test /usr/local/bin/
-COPY kubectl /usr/local/bin/
-COPY run_e2e.sh /run_e2e.sh
-COPY gorunner /gorunner
-COPY cluster /kubernetes/cluster
-WORKDIR /usr/local/bin
+.PHONY: all build clean
 
-ENV E2E_FOCUS="\[Conformance\]"
-ENV E2E_SKIP=""
-ENV E2E_PROVIDER="local"
-ENV E2E_PARALLEL="1"
-ENV E2E_VERBOSITY="4"
-ENV RESULTS_DIR="/tmp/results"
-ENV KUBECONFIG=""
+all: build
 
-CMD [ "/bin/bash", "-c", "/run_e2e.sh" ]
+build:
+	$(GO_BUILD)
+
+clean:
+	rm done e2e.log e2e.tar.gz go-runner
