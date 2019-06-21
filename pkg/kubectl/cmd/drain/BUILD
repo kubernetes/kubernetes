@@ -10,7 +10,6 @@ go_library(
         "//pkg/kubectl/drain:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
         "//pkg/kubectl/util/i18n:go_default_library",
-        "//pkg/kubectl/util/templates:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -22,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )

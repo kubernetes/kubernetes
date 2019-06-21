@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
+	"k8s.io/kubectl/pkg/util/templates"
 )
 
 // CmdCheck is the commom type of functions to check cobra commands
