@@ -11,7 +11,12 @@ import (
 
 // writeDebug writes the debug code file.
 func writeDebug(w io.Writer, c *Config, toc []Asset) error {
-	err := writeDebugHeader(w)
+	err := writeDebugHeader(w, c)
+	if err != nil {
+		return err
+	}
+
+	err = writeAssetFS(w, c)
 	if err != nil {
 		return err
 	}
@@ -28,13 +33,29 @@ func writeDebug(w io.Writer, c *Config, toc []Asset) error {
 
 // writeDebugHeader writes output file headers.
 // This targets debug builds.
-func writeDebugHeader(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
+func writeDebugHeader(w io.Writer, c *Config) error {
+	var header string
+
+	if c.HttpFileSystem {
+		header = `import (
+	"bytes"
+	"net/http"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"`
+	} else {
+		header = `import (
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"`
+	}
+
+	_, err := fmt.Fprintf(w, `%s
 )
 
 // bindataRead reads the given file from disk. It returns an error on failure.
@@ -51,7 +72,7 @@ type asset struct {
 	info  os.FileInfo
 }
 
-`)
+`, header)
 	return err
 }
 

@@ -106,6 +106,10 @@ type Config struct {
 	// the file data when called. Defaults to false.
 	NoCompress bool
 
+	// HttpFileSystem means whether generate return http.FileSystem interface
+	// instance's function.When true,will generate relate code.
+	HttpFileSystem bool
+
 	// Perform a debug build. This generates an asset file, which
 	// loads the asset contents directly from disk at their original
 	// location, instead of embedding the contents in the code.
@@ -148,6 +152,7 @@ func NewConfig() *Config {
 	c.Package = "main"
 	c.NoMemCopy = false
 	c.NoCompress = false
+	c.HttpFileSystem = false
 	c.Debug = false
 	c.Output = "./bindata.go"
 	c.Ignore = make([]*regexp.Regexp, 0)

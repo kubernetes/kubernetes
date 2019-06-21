@@ -5740,6 +5740,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ================================================================================
+= vendor/github.com/go-bindata/go-bindata licensed under: =
+
+This work is subject to the CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+license. Its contents can be found at:
+http://creativecommons.org/publicdomain/zero/1.0
+
+= vendor/github.com/go-bindata/go-bindata/LICENSE 8dcedca69f7a474372829521f37954b1
+================================================================================
+
+
+================================================================================
 = vendor/github.com/go-openapi/analysis licensed under: =
 
 
@@ -11547,17 +11558,6 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 = vendor/github.com/jstemmer/go-junit-report/LICENSE 5d54de929d5bc244d21d8d4d91a6ac64
-================================================================================
-
-
-================================================================================
-= vendor/github.com/jteeuwen/go-bindata licensed under: =
-
-This work is subject to the CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
-license. Its contents can be found at:
-http://creativecommons.org/publicdomain/zero/1.0
-
-= vendor/github.com/jteeuwen/go-bindata/LICENSE 8dcedca69f7a474372829521f37954b1
 ================================================================================
 
 

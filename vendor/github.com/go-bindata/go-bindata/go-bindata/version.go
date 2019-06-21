@@ -23,7 +23,7 @@ var AppVersionRev string
 
 func Version() string {
 	if len(AppVersionRev) == 0 {
-		AppVersionRev = "0"
+		AppVersionRev = "1"
 	}
 
 	return fmt.Sprintf("%s %d.%d.%s (Go runtime %s).\nCopyright (c) 2010-2013, Jim Teeuwen.",
