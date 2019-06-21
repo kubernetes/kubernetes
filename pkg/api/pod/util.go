@@ -315,13 +315,6 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) && !podPriorityInUse(oldPodSpec) {
-		// Set to nil pod's priority fields if the feature is disabled and the old pod
-		// does not specify any values for these fields.
-		podSpec.Priority = nil
-		podSpec.PriorityClassName = ""
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.Sysctls) && !sysctlsInUse(oldPodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.Sysctls = nil

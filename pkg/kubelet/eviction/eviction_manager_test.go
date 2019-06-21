@@ -182,7 +182,6 @@ type podToMake struct {
 
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -401,7 +400,6 @@ func parseQuantity(value string) resource.Quantity {
 
 func TestDiskPressureNodeFs(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
@@ -600,7 +598,6 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 // TestMinReclaim verifies that min-reclaim works as desired.
 func TestMinReclaim(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -740,7 +737,6 @@ func TestMinReclaim(t *testing.T) {
 
 func TestNodeReclaimFuncs(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
@@ -917,7 +913,6 @@ func TestNodeReclaimFuncs(t *testing.T) {
 }
 
 func TestInodePressureNodeFsInodes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	podMaker := func(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
 		pod := newPod(name, priority, []v1.Container{
 			newContainer(name, requests, limits),
@@ -1139,7 +1134,6 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 // TestCriticalPodsAreNotEvicted
 func TestCriticalPodsAreNotEvicted(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -1280,7 +1274,6 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 // TestAllocatableMemoryPressure
 func TestAllocatableMemoryPressure(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{

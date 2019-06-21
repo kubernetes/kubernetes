@@ -551,8 +551,6 @@ func TestPodAdmission(t *testing.T) {
 			},
 		},
 	}
-	// Enable PodPriority feature gate.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	// Enable ExperimentalCriticalPodAnnotation feature gate.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	// Enable NonPreemptingPriority feature gate.

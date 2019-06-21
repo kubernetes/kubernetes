@@ -138,11 +138,8 @@ func DefaultOffAdmissionPlugins() sets.String {
 		validatingwebhook.PluginName,            //ValidatingAdmissionWebhook
 		resourcequota.PluginName,                //ResourceQuota
 		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
+		podpriority.PluginName,                  //PodPriority
 	)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		defaultOnPlugins.Insert(podpriority.PluginName) //PodPriority
-	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition

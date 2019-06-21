@@ -509,7 +509,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	Sysctls:                                     {Default: true, PreRelease: featuregate.Beta},
 	DebugContainers:                             {Default: false, PreRelease: featuregate.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: featuregate.Beta},
-	PodPriority:                                 {Default: true, PreRelease: featuregate.GA},
+	PodPriority:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	TaintNodesByCondition:                       {Default: true, PreRelease: featuregate.Beta},
 	QOSReserved:                                 {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:                     {Default: true, PreRelease: featuregate.Beta},
