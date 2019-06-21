@@ -138,6 +138,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		metadataClientActionSet sets.String
 		gvrError                error
 		expectErrorOnDelete     error
+		expectStatus            *v1.NamespaceStatus
 	}{
 		"pending-finalize": {
 			testNamespace: testNamespacePendingFinalize,
@@ -173,9 +174,15 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				strings.Join([]string{"list", "pods", ""}, "-"),
 				strings.Join([]string{"update", "namespaces", "status"}, "-"),
 			),
-			dynamicClientActionSet: dynamicClientActionSet,
-			gvrError:               fmt.Errorf("test error"),
-			expectErrorOnDelete:    fmt.Errorf("test error"),
+			metadataClientActionSet: metadataClientActionSet,
+			gvrError:                fmt.Errorf("test error"),
+			expectErrorOnDelete:     fmt.Errorf("test error"),
+			expectStatus: &v1.NamespaceStatus{
+				Phase: v1.NamespaceTerminating,
+				Conditions: []v1.NamespaceCondition{
+					{Type: v1.NamespaceDeletionDiscoveryFailure},
+				},
+			},
 		},
 	}
 
@@ -216,6 +223,31 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		if !actionSet.Equal(testInput.metadataClientActionSet) {
 			t.Errorf("scenario %s - metadata client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
 				testInput.metadataClientActionSet, actionSet, testInput.metadataClientActionSet.Difference(actionSet))
+		}
+
+		// validate status conditions
+		if testInput.expectStatus != nil {
+			obj, err := mockClient.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, testInput.testNamespace.Namespace, testInput.testNamespace.Name)
+			if err != nil {
+				t.Errorf("Unexpected error in getting the namespace: %v", err)
+				continue
+			}
+			ns, ok := obj.(*v1.Namespace)
+			if !ok {
+				t.Errorf("Expected a namespace but received %v", obj)
+				continue
+			}
+			if ns.Status.Phase != testInput.expectStatus.Phase {
+				t.Errorf("Expected namespace status phase %v but received %v", testInput.expectStatus.Phase, ns.Status.Phase)
+				continue
+			}
+			for _, expCondition := range testInput.expectStatus.Conditions {
+				nsCondition := getCondition(ns.Status.Conditions, expCondition.Type)
+				if nsCondition == nil {
+					t.Errorf("Missing namespace status condition %v", expCondition.Type)
+					continue
+				}
+			}
 		}
 	}
 }
