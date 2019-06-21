@@ -82,7 +82,6 @@ func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
 	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
 
-	controller.init()
 	cloud.Calls = nil     // ignore any cloud calls made in init()
 	client.ClearActions() // ignore any client calls made in init()
 
