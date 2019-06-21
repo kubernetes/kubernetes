@@ -653,7 +653,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	availableTopologyAligned := available
 
 	sockets := make(map[int]bool)
-	socketsArray := containerTopologyHint.SocketMask.GetSockets()
+	socketsArray := containerTopologyHint.SocketAffinity.GetSockets()
 	for _, socket := range socketsArray {
 		sockets[socket] = true
 	}
