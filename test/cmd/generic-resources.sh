@@ -33,12 +33,12 @@ run_multi_resources_tests() {
   YAML=".yaml"
   JSON=".json"
   for file in $FILES; do
-    if [ -f $file$YAML ]
+    if [ -f "${file}${YAML}" ]
     then
-      file=$file$YAML
+      file=${file}${YAML}
       replace_file="${file%.yaml}-modify.yaml"
     else
-      file=$file$JSON
+      file=${file}${JSON}
       replace_file="${file%.json}-modify.json"
     fi
 
@@ -60,10 +60,10 @@ run_multi_resources_tests() {
     ### 4) JSON, with a ReplicationControllerList type; 5) JSON, with a ServiceList type
     echo "Testing with file ${file} and replace with file ${replace_file}"
     # Pre-condition: no service (other than default kubernetes services) or replication controller exists
-    kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" ''
+    kube::test::get_object_assert services "{{range.items}}{{${id_field:?}}}:{{end}}" ''
     kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
     # Command
-    kubectl create -f "${file}" "${kube_flags[@]}"
+    kubectl create -f "${file}" "${kube_flags[@]:?}"
     # Post-condition: mock service (and mock2) exists
     if [ "$has_svc" = true ]; then
       if [ "$two_svcs" = true ]; then
@@ -84,16 +84,16 @@ run_multi_resources_tests() {
     kubectl get -f "${file}" "${kube_flags[@]}"
     # Command: watching multiple resources should return "not supported" error
     WATCH_ERROR_FILE="${KUBE_TEMP}/kubectl-watch-error"
-    kubectl get -f "${file}" "${kube_flags[@]}" "--watch" 2> ${WATCH_ERROR_FILE} || true
+    kubectl get -f "${file}" "${kube_flags[@]}" "--watch" 2> "${WATCH_ERROR_FILE}" || true
     if ! grep -q "watch is only supported on individual resources and resource collections" "${WATCH_ERROR_FILE}"; then
-      kube::log::error_exit "kubectl watch multiple resource returns unexpected error or non-error: $(cat ${WATCH_ERROR_FILE})" "1"
+      kube::log::error_exit "kubectl watch multiple resource returns unexpected error or non-error: $(cat "${WATCH_ERROR_FILE}")" "1"
     fi
     kubectl describe -f "${file}" "${kube_flags[@]}"
     # Command
-    kubectl replace -f $replace_file --force --cascade "${kube_flags[@]}"
+    kubectl replace -f "${replace_file}" --force --cascade "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are replaced
     if [ "$has_svc" = true ]; then
-      kube::test::get_object_assert 'services mock' "{{${labels_field}.status}}" 'replaced'
+      kube::test::get_object_assert 'services mock' "{{${labels_field:?}.status}}" 'replaced'
       if [ "$two_svcs" = true ]; then
         kube::test::get_object_assert 'services mock2' "{{${labels_field}.status}}" 'replaced'
       fi
@@ -128,7 +128,7 @@ run_multi_resources_tests() {
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing labels.
-    kubectl-with-retry label -f $file labeled=true --overwrite "${kube_flags[@]}"
+    kubectl-with-retry label -f "${file}" labeled=true --overwrite "${kube_flags[@]}"
     # Post-condition: mock service and mock rc (and mock2) are labeled
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field}.labeled}}" 'true'
@@ -147,10 +147,10 @@ run_multi_resources_tests() {
     # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate"
     # fails on some, but not all, of the resources, retries will fail because it tries to modify
     # existing annotations.
-    kubectl-with-retry annotate -f $file annotated=true --overwrite "${kube_flags[@]}"
+    kubectl-with-retry annotate -f "${file}" annotated=true --overwrite "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are annotated
     if [ "$has_svc" = true ]; then
-      kube::test::get_object_assert 'services mock' "{{${annotations_field}.annotated}}" 'true'
+      kube::test::get_object_assert 'services mock' "{{${annotations_field:?}.annotated}}" 'true'
       if [ "$two_svcs" = true ]; then
         kube::test::get_object_assert 'services mock2' "{{${annotations_field}.annotated}}" 'true'
       fi
@@ -210,13 +210,14 @@ run_recursive_resources_tests() {
   # Pre-condition: busybox0 & busybox1 PODs exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
+  # shellcheck disable=SC2016  # $1 here is not a Expressions
   echo -e '#!/usr/bin/env bash\nsed -i "s/image: busybox/image: prom\/busybox/g" $1' > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   output_message=$(! EDITOR=/tmp/tmp-editor.sh kubectl edit -f hack/testdata/recursive/pod --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox1 PODs are not edited, and since busybox2 is malformed, it should error
   # The reason why busybox0 & busybox1 PODs are not edited is because the editor tries to load all objects in
   # a list but since it contains invalid objects, it will never open.
-  kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'busybox:busybox:'
+  kube::test::get_object_assert pods "{{range.items}}{{${image_field:?}}}:{{end}}" 'busybox:busybox:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   # cleaning
   rm /tmp/tmp-editor.sh
@@ -266,7 +267,7 @@ run_recursive_resources_tests() {
   # Create a deployment (revision 1)
   kubectl create -f hack/testdata/deployment-revision1.yaml "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
-  kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
+  kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Command
   output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1 -o yaml "${kube_flags[@]}")
   # Post-condition: apiVersion is still extensions/v1beta1 in the live deployment, but command output is the new value
@@ -298,7 +299,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl label -f hack/testdata/recursive/pod mylabel='myvalue' --recursive 2>&1 "${kube_flags[@]}")
-  echo $output_message
+  echo "${output_message}"
   # Post-condition: busybox0 & busybox1 PODs are labeled, but because busybox2 is malformed, it should not show up
   kube::test::get_object_assert pods "{{range.items}}{{${labels_field}.mylabel}}:{{end}}" 'myvalue:myvalue:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -308,7 +309,7 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
   # Command
   output_message=$(! kubectl patch -f hack/testdata/recursive/pod -p='{"spec":{"containers":[{"name":"busybox","image":"prom/busybox"}]}}' --recursive 2>&1 "${kube_flags[@]}")
-  echo $output_message
+  echo "${output_message}"
   # Post-condition: busybox0 & busybox1 PODs are patched, but because busybox2 is malformed, it should not show up
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'prom/busybox:prom/busybox:'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
@@ -334,13 +335,13 @@ run_recursive_resources_tests() {
   # Pre-condition: busybox0 & busybox1 replication controllers exist & 1
   # replica each
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'busybox0:busybox1:'
-  kube::test::get_object_assert 'rc busybox0' "{{$rc_replicas_field}}" '1'
+  kube::test::get_object_assert 'rc busybox0' "{{${rc_replicas_field:?}}}" '1'
   kube::test::get_object_assert 'rc busybox1' "{{$rc_replicas_field}}" '1'
   # Command
   output_message=$(! kubectl autoscale --min=1 --max=2 -f hack/testdata/recursive/rc --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: busybox0 & busybox replication controllers are autoscaled
   # with min. of 1 replica & max of 2 replicas, and since busybox2 is malformed, it should error
-  kube::test::get_object_assert 'hpa busybox0' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
+  kube::test::get_object_assert 'hpa busybox0' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '1 2 80'
   kube::test::get_object_assert 'hpa busybox1' "{{$hpa_min_field}} {{$hpa_max_field}} {{$hpa_cpu_field}}" '1 2 80'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   kubectl delete hpa busybox0 "${kube_flags[@]}"
@@ -355,7 +356,7 @@ run_recursive_resources_tests() {
   # Command
   output_message=$(! kubectl expose -f hack/testdata/recursive/rc --recursive --port=80 2>&1 "${kube_flags[@]}")
   # Post-condition: service exists and the port is unnamed
-  kube::test::get_object_assert 'service busybox0' "{{$port_name}} {{$port_field}}" '<no value> 80'
+  kube::test::get_object_assert 'service busybox0' "{{${port_name:?}}} {{${port_field:?}}}" '<no value> 80'
   kube::test::get_object_assert 'service busybox1' "{{$port_name}} {{$port_field}}" '<no value> 80'
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
 
@@ -395,15 +396,16 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Pause the deployments recursively
+  # shellcheck disable=SC2034  # PRESERVE_ERR_FILE is used in kubectl-with-retry
   PRESERVE_ERR_FILE=true
   kubectl-with-retry rollout pause -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}"
-  output_message=$(cat ${ERROR_FILE})
+  output_message=$(cat "${ERROR_FILE}")
   # Post-condition: nginx0 & nginx1 should both have paused set to true, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "true:true:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Resume the deployments recursively
   kubectl-with-retry rollout resume -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}"
-  output_message=$(cat ${ERROR_FILE})
+  output_message=$(cat "${ERROR_FILE}")
   # Post-condition: nginx0 & nginx1 should both have paused set to nothing, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "<no value>:<no value>:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"

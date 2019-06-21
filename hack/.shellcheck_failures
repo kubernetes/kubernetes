@@ -29,8 +29,6 @@
 ./hack/verify-test-featuregates.sh
 ./test/cmd/diff.sh
 ./test/cmd/discovery.sh
-./test/cmd/generic-resources.sh
-./test/cmd/get.sh
 ./test/cmd/legacy-script.sh
 ./test/e2e_node/conformance/run_test.sh
 ./test/e2e_node/gubernator.sh
