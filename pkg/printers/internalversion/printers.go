@@ -643,7 +643,10 @@ func printPod(pod *api.Pod, options printers.PrintOptions) ([]metav1.TableRow, e
 	if options.Wide {
 		nodeName := pod.Spec.NodeName
 		nominatedNodeName := pod.Status.NominatedNodeName
-		podIP := pod.Status.PodIP
+		podIP := ""
+		if len(pod.Status.PodIPs) > 0 {
+			podIP = pod.Status.PodIPs[0].IP
+		}
 
 		if podIP == "" {
 			podIP = "<none>"

@@ -696,7 +696,9 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		if len(pod.Status.Message) > 0 {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
+		// remove when .IP field is depreciated
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
+		describePodIPs(pod, w, "")
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
@@ -751,6 +753,17 @@ func printController(controllee metav1.Object) string {
 		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
 	}
 	return ""
+}
+
+func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
+	if len(pod.Status.PodIPs) == 0 {
+		w.Write(LEVEL_0, "%sIPs:\t<none>\n", space)
+		return
+	}
+	w.Write(LEVEL_0, "%sIPs:\n", space)
+	for _, ipInfo := range pod.Status.PodIPs {
+		w.Write(LEVEL_1, "IP:\t%s\n", ipInfo.IP)
+	}
 }
 
 func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
@@ -2949,8 +2962,13 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		w.Write(LEVEL_0, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
 		w.Write(LEVEL_0, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
+		// remove when .PodCIDR is depreciated
 		if len(node.Spec.PodCIDR) > 0 {
 			w.Write(LEVEL_0, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
+		}
+
+		if len(node.Spec.PodCIDRs) > 0 {
+			w.Write(LEVEL_0, "PodCIDRs:\t%s\n", strings.Join(node.Spec.PodCIDRs, ","))
 		}
 		if len(node.Spec.ProviderID) > 0 {
 			w.Write(LEVEL_0, "ProviderID:\t%s\n", node.Spec.ProviderID)
