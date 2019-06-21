@@ -741,7 +741,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
 			if err := f.WaitForPodRunning(podName); err != nil {
-				framework.Failf("Pod %v did not start running: %v", podName, err)
+				e2elog.Failf("Pod %v did not start running: %v", podName, err)
 			}
 
 			var initialStatefulPodUID types.UID
@@ -767,7 +767,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				return false, nil
 			})
 			if err != nil {
-				framework.Failf("Pod %v expected to be re-created at least once", statefulPodName)
+				e2elog.Failf("Pod %v expected to be re-created at least once", statefulPodName)
 			}
 
 			ginkgo.By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
@@ -803,7 +803,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("getting scale subresource")
 			scale, err := c.AppsV1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
 			if err != nil {
-				framework.Failf("Failed to get scale subresource: %v", err)
+				e2elog.Failf("Failed to get scale subresource: %v", err)
 			}
 			gomega.Expect(scale.Spec.Replicas).To(gomega.Equal(int32(1)))
 			gomega.Expect(scale.Status.Replicas).To(gomega.Equal(int32(1)))
@@ -812,14 +812,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			scale.Spec.Replicas = 2
 			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(ssName, scale)
 			if err != nil {
-				framework.Failf("Failed to put scale subresource: %v", err)
+				e2elog.Failf("Failed to put scale subresource: %v", err)
 			}
 			gomega.Expect(scaleResult.Spec.Replicas).To(gomega.Equal(int32(2)))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
 			if err != nil {
-				framework.Failf("Failed to get statefulset resource: %v", err)
+				e2elog.Failf("Failed to get statefulset resource: %v", err)
 			}
 			gomega.Expect(*(ss.Spec.Replicas)).To(gomega.Equal(int32(2)))
 		})
@@ -880,7 +880,7 @@ func kubectlExecWithRetries(args ...string) (out string) {
 		}
 		e2elog.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
 	}
-	framework.Failf("Failed to execute \"%v\" with retries: %v", args, err)
+	e2elog.Failf("Failed to execute \"%v\" with retries: %v", args, err)
 	return
 }
 
@@ -917,7 +917,7 @@ func (c *clusterAppTester) run() {
 
 	ginkgo.By("Reading value under foo from member with index 2")
 	if err := pollReadWithTimeout(c.statefulPod, 2, "foo", "bar"); err != nil {
-		framework.Failf("%v", err)
+		e2elog.Failf("%v", err)
 	}
 }
 

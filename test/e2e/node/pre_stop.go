@@ -143,7 +143,7 @@ func testPreStop(c clientset.Interface, ns string) {
 
 		if err != nil {
 			if ctx.Err() != nil {
-				framework.Failf("Error validating prestop: %v", err)
+				e2elog.Failf("Error validating prestop: %v", err)
 				return true, err
 			}
 			ginkgo.By(fmt.Sprintf("Error validating prestop: %v", err))

@@ -145,7 +145,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil {
-				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
 	}

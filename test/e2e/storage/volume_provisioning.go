@@ -70,28 +70,28 @@ func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZo
 func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, matchZones bool) {
 	ginkgo.By("checking PV's zone label and node affinity terms match expected zone")
 	if pv == nil {
-		framework.Failf("nil pv passed")
+		e2elog.Failf("nil pv passed")
 	}
 	pvLabel, ok := pv.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
-		framework.Failf("label %s not found on PV", v1.LabelZoneFailureDomain)
+		e2elog.Failf("label %s not found on PV", v1.LabelZoneFailureDomain)
 	}
 
 	zonesFromLabel, err := volumehelpers.LabelZonesToSet(pvLabel)
 	if err != nil {
-		framework.Failf("unable to parse zone labels %s: %v", pvLabel, err)
+		e2elog.Failf("unable to parse zone labels %s: %v", pvLabel, err)
 	}
 	if matchZones && !zonesFromLabel.Equal(zones) {
-		framework.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
+		e2elog.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
 	}
 	if !matchZones && !zonesFromLabel.IsSuperset(zones) {
-		framework.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
+		e2elog.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
 	}
 	if pv.Spec.NodeAffinity == nil {
-		framework.Failf("node affinity not found in PV spec %v", pv.Spec)
+		e2elog.Failf("node affinity not found in PV spec %v", pv.Spec)
 	}
 	if len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		framework.Failf("node selector terms not found in PV spec %v", pv.Spec)
+		e2elog.Failf("node selector terms not found in PV spec %v", pv.Spec)
 	}
 
 	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
@@ -103,15 +103,15 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 			keyFound = true
 			zonesFromNodeAffinity := sets.NewString(r.Values...)
 			if matchZones && !zonesFromNodeAffinity.Equal(zones) {
-				framework.Failf("zones from NodeAffinity of PV: %v does not equal expected zone[s]: %v", zonesFromNodeAffinity, zones)
+				e2elog.Failf("zones from NodeAffinity of PV: %v does not equal expected zone[s]: %v", zonesFromNodeAffinity, zones)
 			}
 			if !matchZones && !zonesFromNodeAffinity.IsSuperset(zones) {
-				framework.Failf("zones from NodeAffinity of PV: %v does not contain expected zone[s]: %v", zonesFromNodeAffinity, zones)
+				e2elog.Failf("zones from NodeAffinity of PV: %v does not contain expected zone[s]: %v", zonesFromNodeAffinity, zones)
 			}
 			break
 		}
 		if !keyFound {
-			framework.Failf("label %s not found in term %v", v1.LabelZoneFailureDomain, term)
+			e2elog.Failf("label %s not found in term %v", v1.LabelZoneFailureDomain, term)
 		}
 	}
 }
@@ -231,14 +231,14 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 		}
 		pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 		if node == nil {
-			framework.Failf("unexpected nil node found")
+			e2elog.Failf("unexpected nil node found")
 		}
 		zone, ok := node.Labels[v1.LabelZoneFailureDomain]
 		if !ok {
-			framework.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
+			e2elog.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
 		}
 		if specifyAllowedTopology && topoZone != zone {
-			framework.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, zone)
+			e2elog.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, zone)
 		}
 		for _, pv := range pvs {
 			checkZoneFromLabelAndAffinity(pv, zone, true)
@@ -621,7 +621,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				for i, pv := range residualPVs {
 					e2elog.Logf("\t%d) %s", i+1, pv.Name)
 				}
-				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
+				e2elog.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
 			}
 			e2elog.Logf("0 PersistentVolumes remain.")
 		})
@@ -778,7 +778,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName, scErr := framework.GetDefaultStorageClassName(c)
 			if scErr != nil {
-				framework.Failf(scErr.Error())
+				e2elog.Failf(scErr.Error())
 			}
 			test := testsuites.StorageClassTest{
 				Name:      "default",
@@ -812,7 +812,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName, scErr := framework.GetDefaultStorageClassName(c)
 			if scErr != nil {
-				framework.Failf(scErr.Error())
+				e2elog.Failf(scErr.Error())
 			}
 			test := testsuites.StorageClassTest{
 				Name:      "default",
@@ -897,7 +897,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				e2elog.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 				if err != nil && !apierrs.IsNotFound(err) {
-					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+					e2elog.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 				}
 			}()
 

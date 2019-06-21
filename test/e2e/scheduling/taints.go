@@ -196,7 +196,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		timeoutChannel := time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+additionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
-			framework.Failf("Failed to evict Pod")
+			e2elog.Failf("Failed to evict Pod")
 		case <-observedDeletions:
 			e2elog.Logf("Noticed Pod eviction. Test successful")
 		}
@@ -230,7 +230,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-timeoutChannel:
 			e2elog.Logf("Pod wasn't evicted. Test successful")
 		case <-observedDeletions:
-			framework.Failf("Pod was evicted despite toleration")
+			e2elog.Failf("Pod was evicted despite toleration")
 		}
 	})
 
@@ -263,14 +263,14 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-timeoutChannel:
 			e2elog.Logf("Pod wasn't evicted")
 		case <-observedDeletions:
-			framework.Failf("Pod was evicted despite toleration")
+			e2elog.Failf("Pod was evicted despite toleration")
 			return
 		}
 		ginkgo.By("Waiting for Pod to be deleted")
 		timeoutChannel = time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+additionalWaitPerDeleteSeconds) * time.Second).C
 		select {
 		case <-timeoutChannel:
-			framework.Failf("Pod wasn't evicted")
+			e2elog.Failf("Pod wasn't evicted")
 		case <-observedDeletions:
 			e2elog.Logf("Pod was evicted after toleration time run out. Test successful")
 			return
@@ -312,7 +312,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-timeoutChannel:
 			e2elog.Logf("Pod wasn't evicted. Proceeding")
 		case <-observedDeletions:
-			framework.Failf("Pod was evicted despite toleration")
+			e2elog.Failf("Pod was evicted despite toleration")
 			return
 		}
 		e2elog.Logf("Removing taint from Node")
@@ -324,7 +324,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		case <-timeoutChannel:
 			e2elog.Logf("Pod wasn't evicted. Test successful")
 		case <-observedDeletions:
-			framework.Failf("Pod was evicted despite toleration")
+			e2elog.Failf("Pod was evicted despite toleration")
 		}
 	})
 })
@@ -383,9 +383,9 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 			select {
 			case <-timeoutChannel:
 				if evicted == 0 {
-					framework.Failf("Failed to evict Pod1.")
+					e2elog.Failf("Failed to evict Pod1.")
 				} else if evicted == 2 {
-					framework.Failf("Pod1 is evicted. But unexpected Pod2 also get evicted.")
+					e2elog.Failf("Pod1 is evicted. But unexpected Pod2 also get evicted.")
 				}
 				return
 			case podName := <-observedDeletions:
@@ -393,7 +393,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 				if podName == podGroup+"1" {
 					e2elog.Logf("Noticed Pod %q gets evicted.", podName)
 				} else if podName == podGroup+"2" {
-					framework.Failf("Unexepected Pod %q gets evicted.", podName)
+					e2elog.Failf("Unexepected Pod %q gets evicted.", podName)
 					return
 				}
 			}
@@ -418,7 +418,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		framework.ExpectNoError(err)
 		nodeHostNameLabel, ok := node.GetObjectMeta().GetLabels()["kubernetes.io/hostname"]
 		if !ok {
-			framework.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
+			e2elog.Failf("error getting kubernetes.io/hostname label on node %s", nodeName)
 		}
 		framework.ExpectNoError(err)
 		e2elog.Logf("Pod1 is running on %v. Tainting Node", nodeName)
@@ -441,7 +441,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		for evicted != 2 {
 			select {
 			case <-timeoutChannel:
-				framework.Failf("Failed to evict all Pods. %d pod(s) is not evicted.", 2-evicted)
+				e2elog.Failf("Failed to evict all Pods. %d pod(s) is not evicted.", 2-evicted)
 				return
 			case podName := <-observedDeletions:
 				e2elog.Logf("Noticed Pod %q gets evicted.", podName)

@@ -159,10 +159,10 @@ func (t *MySQLUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, up
 	readRatio := float64(readSuccess) / float64(readSuccess+readFailure)
 	writeRatio := float64(writeSuccess) / float64(writeSuccess+writeFailure)
 	if readRatio < 0.75 {
-		framework.Failf("Too many failures reading data. Success ratio: %f", readRatio)
+		e2elog.Failf("Too many failures reading data. Success ratio: %f", readRatio)
 	}
 	if writeRatio < 0.75 {
-		framework.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
+		e2elog.Failf("Too many failures writing data. Success ratio: %f", writeRatio)
 	}
 }
 

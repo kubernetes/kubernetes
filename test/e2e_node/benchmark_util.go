@@ -158,22 +158,22 @@ func getTestNodeInfo(f *framework.Framework, testName, testDesc string) map[stri
 
 	cpu, ok := node.Status.Capacity[v1.ResourceCPU]
 	if !ok {
-		framework.Failf("Fail to fetch CPU capacity value of test node.")
+		e2elog.Failf("Fail to fetch CPU capacity value of test node.")
 	}
 
 	memory, ok := node.Status.Capacity[v1.ResourceMemory]
 	if !ok {
-		framework.Failf("Fail to fetch Memory capacity value of test node.")
+		e2elog.Failf("Fail to fetch Memory capacity value of test node.")
 	}
 
 	cpuValue, ok := cpu.AsInt64()
 	if !ok {
-		framework.Failf("Fail to fetch CPU capacity value as Int64.")
+		e2elog.Failf("Fail to fetch CPU capacity value as Int64.")
 	}
 
 	memoryValue, ok := memory.AsInt64()
 	if !ok {
-		framework.Failf("Fail to fetch Memory capacity value as Int64.")
+		e2elog.Failf("Fail to fetch Memory capacity value as Int64.")
 	}
 
 	image := node.Status.NodeInfo.OSImage

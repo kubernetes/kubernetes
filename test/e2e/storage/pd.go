@@ -366,7 +366,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 						// if this defer is reached due to an Expect then nested
 						// Expects are lost, so use Failf here
 						if numNodes != origNodeCnt {
-							framework.Failf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt)
+							e2elog.Failf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt)
 						}
 					}
 				}()
@@ -520,7 +520,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 	// escape if not a supported provider
 	if !(framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" ||
 		framework.TestContext.Provider == "aws") {
-		framework.Failf(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", framework.TestContext.Provider))
+		e2elog.Failf(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", framework.TestContext.Provider))
 	}
 
 	containers := make([]v1.Container, numContainers)

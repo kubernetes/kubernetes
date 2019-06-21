@@ -157,11 +157,11 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 			// Delete PV and PVCs
 			if errs := framework.PVPVCCleanup(c, ns, pv1, pvc1); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv1, pvc1 = nil, nil
 			if errs := framework.PVPVCCleanup(c, ns, pv2, pvc2); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv2, pvc2 = nil, nil
 

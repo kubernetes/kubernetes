@@ -154,7 +154,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.AfterEach(func() {
 				e2elog.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -221,7 +221,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 					for _, e := range errs {
 						errmsg = append(errmsg, e.Error())
 					}
-					framework.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
+					e2elog.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
 				}
 			})
 
@@ -270,7 +270,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.AfterEach(func() {
 				e2elog.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 

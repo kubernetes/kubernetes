@@ -56,7 +56,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 		runPodCheckpointTest(f, podName, func() {
 			checkpoints := findCheckpoints(podName)
 			if len(checkpoints) == 0 {
-				framework.Failf("No checkpoint for the pod was found")
+				e2elog.Failf("No checkpoint for the pod was found")
 			}
 		})
 	})
@@ -85,7 +85,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 			runPodCheckpointTest(f, podName, func() {
 				checkpoints := findCheckpoints(podName)
 				if len(checkpoints) == 0 {
-					framework.Failf("No checkpoint for the pod was found")
+					e2elog.Failf("No checkpoint for the pod was found")
 				}
 				By("Removing checkpoint of test pod")
 				for _, filename := range checkpoints {
@@ -134,7 +134,7 @@ var _ = SIGDescribe("Dockershim [Serial] [Disruptive] [Feature:Docker][Legacy:Do
 				By("Corrupt checkpoint file")
 				checkpoints := findCheckpoints(podName)
 				if len(checkpoints) == 0 {
-					framework.Failf("No checkpoint for the pod was found")
+					e2elog.Failf("No checkpoint for the pod was found")
 				}
 				for _, file := range checkpoints {
 					f, err := os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0644)
@@ -179,7 +179,7 @@ func runPodCheckpointTest(f *framework.Framework, podName string, twist func()) 
 		e2elog.Logf("Checkpoint of %q still exists: %v", podName, checkpoints)
 		return false, nil
 	}); err != nil {
-		framework.Failf("Failed to observe checkpoint being removed within timeout: %v", err)
+		e2elog.Failf("Failed to observe checkpoint being removed within timeout: %v", err)
 	}
 }
 

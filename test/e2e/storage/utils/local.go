@@ -29,6 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // LocalVolumeType represents type of local volume, e.g. tmpfs, directory,
@@ -309,11 +310,11 @@ func (l *ltrMgr) Create(node *v1.Node, volumeType LocalVolumeType, parameters ma
 	case LocalVolumeGCELocalSSD:
 		ltr = l.setupLocalVolumeGCELocalSSD(node, parameters)
 	default:
-		framework.Failf("Failed to create local test resource on node %q, unsupported volume type: %v is specified", node.Name, volumeType)
+		e2elog.Failf("Failed to create local test resource on node %q, unsupported volume type: %v is specified", node.Name, volumeType)
 		return nil
 	}
 	if ltr == nil {
-		framework.Failf("Failed to create local test resource on node %q, volume type: %v, parameters: %v", node.Name, volumeType, parameters)
+		e2elog.Failf("Failed to create local test resource on node %q, volume type: %v, parameters: %v", node.Name, volumeType, parameters)
 	}
 	ltr.VolumeType = volumeType
 	return ltr
@@ -338,7 +339,7 @@ func (l *ltrMgr) Remove(ltr *LocalTestResource) {
 	case LocalVolumeGCELocalSSD:
 		l.cleanupLocalVolumeGCELocalSSD(ltr)
 	default:
-		framework.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
+		e2elog.Failf("Failed to remove local test resource, unsupported volume type: %v is specified", ltr.VolumeType)
 	}
 	return
 }

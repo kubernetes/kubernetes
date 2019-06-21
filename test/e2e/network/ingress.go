@@ -201,7 +201,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				if annotations != nil && (annotations[umKey] != "" || annotations[fwKey] != "" ||
 					annotations[tpKey] != "" || annotations[fwsKey] != "" || annotations[tpsKey] != "" ||
 					annotations[scKey] != "" || annotations[beKey] != "") {
-					framework.Failf("unexpected annotations. Expected to not have annotations for urlmap, forwarding rule, target proxy, ssl cert and backends, got: %v", annotations)
+					e2elog.Failf("unexpected annotations. Expected to not have annotations for urlmap, forwarding rule, target proxy, ssl cert and backends, got: %v", annotations)
 					return true, nil
 				}
 				return false, nil
@@ -210,26 +210,26 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Verify that the controller does not create any other resource except instance group.
 			// TODO(59778): Check GCE resources specific to this ingress instead of listing all resources.
 			if len(gceController.ListURLMaps()) != 0 {
-				framework.Failf("unexpected url maps, expected none, got: %v", gceController.ListURLMaps())
+				e2elog.Failf("unexpected url maps, expected none, got: %v", gceController.ListURLMaps())
 			}
 			if len(gceController.ListGlobalForwardingRules()) != 0 {
-				framework.Failf("unexpected forwarding rules, expected none, got: %v", gceController.ListGlobalForwardingRules())
+				e2elog.Failf("unexpected forwarding rules, expected none, got: %v", gceController.ListGlobalForwardingRules())
 			}
 			if len(gceController.ListTargetHTTPProxies()) != 0 {
-				framework.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
+				e2elog.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
 			if len(gceController.ListTargetHTTPSProxies()) != 0 {
-				framework.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
+				e2elog.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
 			if len(gceController.ListSslCertificates()) != 0 {
-				framework.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
+				e2elog.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
 			}
 			if len(gceController.ListGlobalBackendServices()) != 0 {
-				framework.Failf("unexpected backend service, expected none, got: %v", gceController.ListGlobalBackendServices())
+				e2elog.Failf("unexpected backend service, expected none, got: %v", gceController.ListGlobalBackendServices())
 			}
 			// Controller does not have a list command for firewall rule. We use get instead.
 			if fw, err := gceController.GetFirewallRuleOrError(); err == nil {
-				framework.Failf("unexpected nil error in getting firewall rule, expected firewall NotFound, got firewall: %v", fw)
+				e2elog.Failf("unexpected nil error in getting firewall rule, expected firewall NotFound, got firewall: %v", fw)
 			}
 
 			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
@@ -662,16 +662,16 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			filePath := filepath.Join(framework.TestContext.OutputDir, "mci.yaml")
 			output, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath)
 			if err != nil {
-				framework.Failf("unexpected error in running kubemci remove-clusters command to remove from all clusters: %s", err)
+				e2elog.Failf("unexpected error in running kubemci remove-clusters command to remove from all clusters: %s", err)
 			}
 			if !strings.Contains(output, "You should use kubemci delete to delete the ingress completely") {
-				framework.Failf("unexpected output in removing an ingress from all clusters, expected the output to include: You should use kubemci delete to delete the ingress completely, actual output: %s", output)
+				e2elog.Failf("unexpected output in removing an ingress from all clusters, expected the output to include: You should use kubemci delete to delete the ingress completely, actual output: %s", output)
 			}
 			// Verify that the ingress is still spread to 1 cluster as expected.
 			verifyKubemciStatusHas(name, "is spread across 1 cluster")
 			// remove-clusters should succeed with --force=true
 			if _, err := framework.RunKubemciWithKubeconfig("remove-clusters", name, "--ingress="+filePath, "--force=true"); err != nil {
-				framework.Failf("unexpected error in running kubemci remove-clusters to remove from all clusters with --force=true: %s", err)
+				e2elog.Failf("unexpected error in running kubemci remove-clusters to remove from all clusters with --force=true: %s", err)
 			}
 			verifyKubemciStatusHas(name, "is spread across 0 cluster")
 		})
@@ -765,10 +765,10 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 func verifyKubemciStatusHas(name, expectedSubStr string) {
 	statusStr, err := framework.RunKubemciCmd("get-status", name)
 	if err != nil {
-		framework.Failf("unexpected error in running kubemci get-status %s: %s", name, err)
+		e2elog.Failf("unexpected error in running kubemci get-status %s: %s", name, err)
 	}
 	if !strings.Contains(statusStr, expectedSubStr) {
-		framework.Failf("expected status to have sub string %s, actual status: %s", expectedSubStr, statusStr)
+		e2elog.Failf("expected status to have sub string %s, actual status: %s", expectedSubStr, statusStr)
 	}
 }
 
@@ -843,7 +843,7 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	defer func() {
 		ginkgo.By("Cleaning up re-encryption ingress, service and deployment")
 		if errs := jig.DeleteTestResource(f.ClientSet, deployCreated, svcCreated, ingCreated); len(errs) > 0 {
-			framework.Failf("ginkgo.Failed to cleanup re-encryption ingress: %v", errs)
+			e2elog.Failf("ginkgo.Failed to cleanup re-encryption ingress: %v", errs)
 		}
 	}()
 	framework.ExpectNoError(err, "ginkgo.Failed to create re-encryption ingress")

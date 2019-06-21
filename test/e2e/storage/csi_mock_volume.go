@@ -445,7 +445,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 				if pvcSize.Cmp(newSize) != 0 {
-					framework.Failf("error updating pvc size %q", pvc.Name)
+					e2elog.Failf("error updating pvc size %q", pvc.Name)
 				}
 				if test.expectFailure {
 					err = waitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
@@ -536,7 +536,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 				if pvcSize.Cmp(newSize) != 0 {
-					framework.Failf("error updating pvc size %q", pvc.Name)
+					e2elog.Failf("error updating pvc size %q", pvc.Name)
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")

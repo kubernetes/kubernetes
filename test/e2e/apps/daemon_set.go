@@ -418,7 +418,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 			case newDS.Spec.Template.Spec.Containers[0].Image:
 				newPods = append(newPods, &pod)
 			default:
-				framework.Failf("unexpected pod found, image = %s", image)
+				e2elog.Failf("unexpected pod found, image = %s", image)
 			}
 		}
 		schedulableNodes = framework.GetReadySchedulableNodesOrDie(c)
@@ -655,7 +655,7 @@ func canScheduleOnNode(node v1.Node, ds *appsv1.DaemonSet) bool {
 	nodeInfo.SetNode(&node)
 	fit, _, err := daemon.Predicates(newPod, nodeInfo)
 	if err != nil {
-		framework.Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
+		e2elog.Failf("Can't test DaemonSet predicates for node %s: %v", node.Name, err)
 		return false
 	}
 	return fit

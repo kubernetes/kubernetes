@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -98,12 +99,12 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 					}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 
 					if !strings.HasPrefix(output, domain) {
-						framework.Failf("Expected %q to start with %q", output, domain)
+						e2elog.Failf("Expected %q to start with %q", output, domain)
 					}
 
 					expectedSubstr := "The command completed successfully"
 					if !strings.Contains(output, expectedSubstr) {
-						framework.Failf("Expected %q to contain %q", output, expectedSubstr)
+						e2elog.Failf("Expected %q to contain %q", output, expectedSubstr)
 					}
 				}
 

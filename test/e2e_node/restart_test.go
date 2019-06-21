@@ -91,7 +91,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 				// startTimeout fit on the node and the node is now saturated.
 				runningPods := waitForPods(f, podCount, startTimeout)
 				if len(runningPods) < minPods {
-					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
+					e2elog.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
 
 				for i := 0; i < restartCount; i += 1 {
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 						return nil
 					}, 1*time.Minute, 2*time.Second).Should(BeNil())
 					if stdout, err := exec.Command("sudo", "kill", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
-						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
+						e2elog.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
 					// Assume that container runtime will be restarted by systemd/supervisord etc.
 					time.Sleep(20 * time.Second)
@@ -123,12 +123,12 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 				By("Checking currently Running/Ready pods")
 				postRestartRunningPods := waitForPods(f, len(runningPods), recoverTimeout)
 				if len(postRestartRunningPods) == 0 {
-					framework.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
+					e2elog.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
 				}
 				By("Confirm no containers have terminated")
 				for _, pod := range postRestartRunningPods {
 					if c := testutils.TerminatedContainers(pod); len(c) != 0 {
-						framework.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
+						e2elog.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
 					}
 				}
 				By(fmt.Sprintf("Container runtime restart test passed with %d pods", len(postRestartRunningPods)))

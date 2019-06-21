@@ -255,7 +255,7 @@ var _ = SIGDescribe("Proxy", func() {
 					e2elog.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				framework.Failf(strings.Join(errs, "\n"))
+				e2elog.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})

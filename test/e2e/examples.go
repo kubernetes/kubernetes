@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			}
 			wg.Wait()
 			if !passed {
-				framework.Failf("At least one liveness example failed.  See the logs above.")
+				e2elog.Failf("At least one liveness example failed.  See the logs above.")
 			}
 		})
 	})

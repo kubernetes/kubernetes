@@ -222,7 +222,7 @@ func stopDeployment(c clientset.Interface, ns, deploymentName string) {
 		}
 		return false, nil
 	}); err != nil {
-		framework.Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", err, deploymentName, pods)
+		e2elog.Failf("Err : %s\n. Failed to remove deployment %s pods : %+v", err, deploymentName, pods)
 	}
 }
 
@@ -382,14 +382,14 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 				}
 				numPodCreation--
 				if numPodCreation < 0 {
-					framework.Failf("Expect only one pod creation, the second creation event: %#v\n", event)
+					e2elog.Failf("Expect only one pod creation, the second creation event: %#v\n", event)
 				}
 				pod, ok := event.Object.(*v1.Pod)
 				if !ok {
-					framework.Failf("Expect event Object to be a pod")
+					e2elog.Failf("Expect event Object to be a pod")
 				}
 				if pod.Spec.Containers[0].Name != RedisImageName {
-					framework.Failf("Expect the created pod to have container name %s, got pod %#v\n", RedisImageName, pod)
+					e2elog.Failf("Expect the created pod to have container name %s, got pod %#v\n", RedisImageName, pod)
 				}
 			case <-stopCh:
 				return

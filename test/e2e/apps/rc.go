@@ -167,7 +167,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	err = wait.Poll(retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
-		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+		e2elog.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
 }
 

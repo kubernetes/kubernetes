@@ -26,6 +26,7 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
@@ -206,7 +207,7 @@ var _ = SIGDescribe("Job", func() {
 		// updates we need to allow more than backoff+1
 		// TODO revert this back to above when https://github.com/kubernetes/kubernetes/issues/64787 gets fixed
 		if len(pods.Items) < backoff+1 {
-			framework.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
+			e2elog.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
 		}
 		for _, pod := range pods.Items {
 			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodFailed))

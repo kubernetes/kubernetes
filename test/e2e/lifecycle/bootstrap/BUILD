@@ -21,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/lifecycle:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

@@ -247,7 +247,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, 
 
 	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
 	if err != nil {
-		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
+		e2elog.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
 
 	return config, pod, secret, ip
@@ -485,7 +485,7 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 	}
 	clientPod, err := podsNamespacer.Create(clientPod)
 	if err != nil {
-		framework.Failf("Failed to create %s pod: %v", clientPod.Name, err)
+		e2elog.Failf("Failed to create %s pod: %v", clientPod.Name, err)
 
 	}
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))

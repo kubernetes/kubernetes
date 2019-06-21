@@ -829,7 +829,7 @@ func cleanupLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume) {
 		ginkgo.By("Cleaning up PVC and PV")
 		errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
 		if len(errs) > 0 {
-			framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
+			e2elog.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 }
@@ -870,11 +870,11 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 	// TODO: hostname may not be the best option
 	nodeKey := "kubernetes.io/hostname"
 	if volume.ltr.Node.Labels == nil {
-		framework.Failf("Node does not have labels")
+		e2elog.Failf("Node does not have labels")
 	}
 	nodeValue, found := volume.ltr.Node.Labels[nodeKey]
 	if !found {
-		framework.Failf("Node does not have required label %q", nodeKey)
+		e2elog.Failf("Node does not have required label %q", nodeKey)
 	}
 
 	pvConfig := framework.PersistentVolumeConfig{

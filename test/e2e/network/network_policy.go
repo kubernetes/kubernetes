@@ -541,7 +541,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podName))
 		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+			e2elog.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
 
@@ -555,7 +555,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 		// Collect pod logs when we see a failure.
 		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
-			framework.Failf("Error getting container logs: %s", logErr)
+			e2elog.Failf("Error getting container logs: %s", logErr)
 		}
 
 		// Collect current NetworkPolicies applied in the test namespace.
@@ -575,7 +575,7 @@ func testCanConnect(f *framework.Framework, ns *v1.Namespace, podName string, se
 			pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
 		}
 
-		framework.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podName, service.Name, logs, policies.Items, pods)
+		e2elog.Failf("Pod %s should be able to connect to service %s, but was not able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t%v\n\n", podName, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
 		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
@@ -588,7 +588,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 	defer func() {
 		ginkgo.By(fmt.Sprintf("Cleaning up the pod %s", podName))
 		if err := f.ClientSet.CoreV1().Pods(ns.Name).Delete(podClient.Name, nil); err != nil {
-			framework.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
+			e2elog.Failf("unable to cleanup pod %v: %v", podClient.Name, err)
 		}
 	}()
 
@@ -601,7 +601,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 		// Collect pod logs when we see a failure.
 		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, fmt.Sprintf("%s-container", podName))
 		if logErr != nil {
-			framework.Failf("Error getting container logs: %s", logErr)
+			e2elog.Failf("Error getting container logs: %s", logErr)
 		}
 
 		// Collect current NetworkPolicies applied in the test namespace.
@@ -621,7 +621,7 @@ func testCannotConnect(f *framework.Framework, ns *v1.Namespace, podName string,
 			pods = append(pods, fmt.Sprintf("Pod: %s, Status: %s\n", p.Name, p.Status.String()))
 		}
 
-		framework.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podName, service.Name, logs, policies.Items, pods)
+		e2elog.Failf("Pod %s should not be able to connect to service %s, but was able to connect.\nPod logs:\n%s\n\n Current NetworkPolicies:\n\t%v\n\n Pods:\n\t %v\n\n", podName, service.Name, logs, policies.Items, pods)
 
 		// Dump debug information for the test namespace.
 		framework.DumpDebugInfo(f.ClientSet, f.Namespace.Name)
@@ -712,11 +712,11 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 func cleanupServerPodAndService(f *framework.Framework, pod *v1.Pod, service *v1.Service) {
 	ginkgo.By("Cleaning up the server.")
 	if err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
-		framework.Failf("unable to cleanup pod %v: %v", pod.Name, err)
+		e2elog.Failf("unable to cleanup pod %v: %v", pod.Name, err)
 	}
 	ginkgo.By("Cleaning up the server's service.")
 	if err := f.ClientSet.CoreV1().Services(service.Namespace).Delete(service.Name, nil); err != nil {
-		framework.Failf("unable to cleanup svc %v: %v", service.Name, err)
+		e2elog.Failf("unable to cleanup svc %v: %v", service.Name, err)
 	}
 }
 
@@ -756,6 +756,6 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 func cleanupNetworkPolicy(f *framework.Framework, policy *networkingv1.NetworkPolicy) {
 	ginkgo.By("Cleaning up the policy.")
 	if err := f.ClientSet.NetworkingV1().NetworkPolicies(policy.Namespace).Delete(policy.Name, nil); err != nil {
-		framework.Failf("unable to cleanup policy %v: %v", policy.Name, err)
+		e2elog.Failf("unable to cleanup policy %v: %v", policy.Name, err)
 	}
 }

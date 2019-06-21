@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -159,7 +160,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	},
 		h.manifests...)
 	if err != nil {
-		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
+		e2elog.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
 	}
 
 	return config, func() {
@@ -304,7 +305,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	},
 		m.manifests...)
 	if err != nil {
-		framework.Failf("deploying csi mock driver: %v", err)
+		e2elog.Failf("deploying csi mock driver: %v", err)
 	}
 
 	return config, func() {
@@ -420,7 +421,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 
 	cleanup, err := f.CreateFromManifests(nil, manifests...)
 	if err != nil {
-		framework.Failf("deploying csi gce-pd driver: %v", err)
+		e2elog.Failf("deploying csi gce-pd driver: %v", err)
 	}
 
 	return &testsuites.PerTestConfig{

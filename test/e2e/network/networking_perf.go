@@ -87,7 +87,7 @@ func networkingIPerfTest(isIPv6 bool) {
 		)
 
 		if err != nil {
-			framework.Failf("Fatal error waiting for iperf server endpoint : %v", err)
+			e2elog.Failf("Fatal error waiting for iperf server endpoint : %v", err)
 		}
 
 		iperfClientPodLabels := f.CreatePodsPerNodeForSimpleApp(
@@ -134,9 +134,9 @@ func networkingIPerfTest(isIPv6 bool) {
 
 		pods, err2 := iperfClusterVerification.WaitFor(expectedCli, iperfTimeout)
 		if err2 != nil {
-			framework.Failf("Error in wait...")
+			e2elog.Failf("Error in wait...")
 		} else if len(pods) < expectedCli {
-			framework.Failf("IPerf restuls : Only got %v out of %v, after waiting %v", len(pods), expectedCli, iperfTimeout)
+			e2elog.Failf("IPerf restuls : Only got %v out of %v, after waiting %v", len(pods), expectedCli, iperfTimeout)
 		} else {
 			// For each builds up a collection of IPerfRecords
 			iperfClusterVerification.ForEach(
@@ -146,7 +146,7 @@ func networkingIPerfTest(isIPv6 bool) {
 						e2elog.Logf(resultS)
 						iperfResults.Add(NewIPerf(resultS))
 					} else {
-						framework.Failf("Unexpected error, %v when running forEach on the pods.", err)
+						e2elog.Failf("Unexpected error, %v when running forEach on the pods.", err)
 					}
 				})
 		}

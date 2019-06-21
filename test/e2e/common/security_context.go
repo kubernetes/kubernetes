@@ -260,12 +260,12 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podName := createAndWaitUserPod(false)
 			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+				e2elog.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}
 
 			e2elog.Logf("Got logs for pod %q: %q", podName, logs)
 			if !strings.Contains(logs, "Operation not permitted") {
-				framework.Failf("unprivileged container shouldn't be able to create dummy device")
+				e2elog.Failf("unprivileged container shouldn't be able to create dummy device")
 			}
 		})
 	})
@@ -312,7 +312,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2elog.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
@@ -328,7 +328,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2elog.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
@@ -345,7 +345,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2elog.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 	})

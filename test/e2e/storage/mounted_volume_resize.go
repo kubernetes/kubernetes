@@ -62,7 +62,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		if len(nodeList.Items) != 0 {
 			nodeName = nodeList.Items[0].Name
 		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
+			e2elog.Failf("Unable to find ready and schedulable Node")
 		}
 
 		nodeKey = "mounted_volume_expand"
@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		if c != nil {
 			if errs := framework.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
 			nodeKeyValueLabel = make(map[string]string)
@@ -134,7 +134,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 		if pvcSize.Cmp(newSize) != 0 {
-			framework.Failf("error updating pvc size %q", pvc.Name)
+			e2elog.Failf("error updating pvc size %q", pvc.Name)
 		}
 
 		ginkgo.By("Waiting for cloudprovider resize to finish")

@@ -275,7 +275,7 @@ func VerifyJobNCompletions(f *framework.Framework, completions int32) {
 		}
 	}
 	if successes != completions {
-		framework.Failf("Only got %v completions. Expected %v completions.", successes, completions)
+		e2elog.Failf("Only got %v completions. Expected %v completions.", successes, completions)
 	}
 }
 

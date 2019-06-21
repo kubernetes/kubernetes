@@ -92,7 +92,7 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	ginkgo.AfterEach(func() {
 		e2elog.Logf("AfterEach: Cleaning up test resources.")
 		if errs := framework.PVPVCCleanup(client, nameSpace, pv, pvc); len(errs) > 0 {
-			framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 		}
 	})
 

@@ -340,11 +340,11 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 	}
 	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
-		framework.Failf("unexpected nil node found")
+		e2elog.Failf("unexpected nil node found")
 	}
 	zone, ok := node.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
-		framework.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
+		e2elog.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
 	}
 	for _, pv := range pvs {
 		checkZoneFromLabelAndAffinity(pv, zone, false)
@@ -400,11 +400,11 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 	}
 	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 	if node == nil {
-		framework.Failf("unexpected nil node found")
+		e2elog.Failf("unexpected nil node found")
 	}
 	nodeZone, ok := node.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
-		framework.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
+		e2elog.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
 	}
 	zoneFound := false
 	for _, zone := range topoZones {
@@ -414,7 +414,7 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 		}
 	}
 	if !zoneFound {
-		framework.Failf("zones specified in AllowedTopologies: %v does not contain zone of node where PV got provisioned: %s", topoZones, nodeZone)
+		e2elog.Failf("zones specified in AllowedTopologies: %v does not contain zone of node where PV got provisioned: %s", topoZones, nodeZone)
 	}
 	for _, pv := range pvs {
 		checkZonesFromLabelAndAffinity(pv, sets.NewString(topoZones...), true)

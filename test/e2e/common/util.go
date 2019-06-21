@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -103,11 +104,11 @@ func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
 	if err != nil {
-		framework.Failf("Failed Parse the template: %v", err)
+		e2elog.Failf("Failed Parse the template: %v", err)
 	}
 	err = tmpl.Execute(contentWithImageName, testImages)
 	if err != nil {
-		framework.Failf("Failed executing template: %v", err)
+		e2elog.Failf("Failed executing template: %v", err)
 	}
 	return contentWithImageName.String()
 }
