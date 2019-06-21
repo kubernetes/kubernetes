@@ -13,6 +13,7 @@ go_library(
         "logging.go",
         "node.go",
         "operations.go",
+        "state.go",
         "topology.go",
         "volume.go",
     ],
