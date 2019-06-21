@@ -35,9 +35,13 @@ rules:
   - daemonsets
   - deployments
   - replicasets
+  - ingresses
   verbs: ["list", "watch"]
 - apiGroups: ["apps"]
   resources:
+  - daemonsets
+  - deployments
+  - replicasets
   - statefulsets
   verbs: ["list", "watch"]
 - apiGroups: ["batch"]
@@ -49,25 +53,22 @@ rules:
   resources:
   - horizontalpodautoscalers
   verbs: ["list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: kube-state-metrics-resizer
-  namespace: kube-system
-  labels:
-    kubernetes.io/cluster-service: "true"
-    addonmanager.kubernetes.io/mode: Reconcile
-rules:
-- apiGroups: [""]
+- apiGroups: ["policy"]
   resources:
-  - pods
-  verbs: ["get"]
-- apiGroups: ["extensions"]
+  - poddisruptionbudgets
+  verbs: ["list", "watch"]
+- apiGroups: ["certificates.k8s.io"]
   resources:
-  - deployments
-  resourceNames: ["kube-state-metrics"]
-  verbs: ["get", "update"]
+  - certificatesigningrequests
+  verbs: ["list", "watch"]
+- apiGroups: ["storage.k8s.io"]
+  resources:
+  - storageclasses
+  verbs: ["list", "watch"]
+- apiGroups: ["autoscaling.k8s.io"]
+  resources:
+  - verticalpodautoscalers
+  verbs: ["list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -80,23 +81,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: kube-state-metrics
-subjects:
-- kind: ServiceAccount
-  name: kube-state-metrics
-  namespace: kube-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: kube-state-metrics
-  namespace: kube-system
-  labels:
-    kubernetes.io/cluster-service: "true"
-    addonmanager.kubernetes.io/mode: Reconcile
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: kube-state-metrics-resizer
 subjects:
 - kind: ServiceAccount
   name: kube-state-metrics
