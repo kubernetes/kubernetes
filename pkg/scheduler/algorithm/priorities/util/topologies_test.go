@@ -23,9 +23,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func fakePod() *v1.Pod {
@@ -42,19 +39,19 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 	tests := []struct {
 		name            string
 		podAffinityTerm *v1.PodAffinityTerm
-		expectedValue   sets.String
+		expectedValue   []string
 	}{
 		{
 			"podAffinityTerm_namespace_empty",
 			&v1.PodAffinityTerm{},
-			sets.String{metav1.NamespaceDefault: sets.Empty{}},
+			[]string{metav1.NamespaceDefault},
 		},
 		{
 			"podAffinityTerm_namespace_not_empty",
 			&v1.PodAffinityTerm{
 				Namespaces: []string{metav1.NamespacePublic, metav1.NamespaceSystem},
 			},
-			sets.String{metav1.NamespacePublic: sets.Empty{}, metav1.NamespaceSystem: sets.Empty{}},
+			[]string{metav1.NamespacePublic, metav1.NamespaceSystem},
 		},
 	}
 
@@ -67,9 +64,16 @@ func TestGetNamespacesFromPodAffinityTerm(t *testing.T) {
 }
 
 func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
-	fakeNamespaces := sets.String{metav1.NamespacePublic: sets.Empty{}, metav1.NamespaceSystem: sets.Empty{}}
-	fakeRequirement, _ := labels.NewRequirement("service", selection.In, []string{"topologies_service1", "topologies_service2"})
-	fakeSelector := labels.NewSelector().Add(*fakeRequirement)
+	fakeNamespaces := []string{metav1.NamespacePublic, metav1.NamespaceSystem}
+	fakeLabelSelector := &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "service",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"topologies_service1", "topologies_service2"},
+			},
+		},
+	}
 
 	tests := []struct {
 		name           string
@@ -103,7 +107,7 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 			fakeTestPod.Namespace = test.podNamespaces
 			fakeTestPod.Labels = test.podLabels
 
-			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeSelector)
+			realValue := PodMatchesTermsNamespaceAndSelector(fakeTestPod, fakeNamespaces, fakeLabelSelector)
 			assert.EqualValuesf(t, test.expectedResult, realValue, "Failed to test: %s", test.name)
 		})
 	}

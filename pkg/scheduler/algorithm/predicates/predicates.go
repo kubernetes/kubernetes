@@ -29,7 +29,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -1236,10 +1235,7 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, 
 	if len(terms) == 0 {
 		return false, false, fmt.Errorf("terms array is empty")
 	}
-	props, err := getAffinityTermProperties(pod, terms)
-	if err != nil {
-		return false, false, err
-	}
+	props := getAffinityTermProperties(pod, terms)
 	if !podMatchesAllAffinityTermProperties(targetPod, props) {
 		return false, false, nil
 	}
@@ -1298,12 +1294,8 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 
 	topologyMaps := newTopologyPairsMaps()
 	for _, term := range GetPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-		if err != nil {
-			return nil, err
-		}
 		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
+		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, term.LabelSelector) {
 			if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 				pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 				topologyMaps.addTopologyPair(pair, existingPod)

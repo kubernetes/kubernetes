@@ -315,26 +315,22 @@ func (meta *predicateMetadata) ShallowCopy() PredicateMetadata {
 }
 
 type affinityTermProperties struct {
-	namespaces sets.String
-	selector   labels.Selector
+	namespaces []string
+	selector   *metav1.LabelSelector
 }
 
 // getAffinityTermProperties receives a Pod and affinity terms and returns the namespaces and
 // selectors of the terms.
-func getAffinityTermProperties(pod *v1.Pod, terms []v1.PodAffinityTerm) (properties []*affinityTermProperties, err error) {
+func getAffinityTermProperties(pod *v1.Pod, terms []v1.PodAffinityTerm) (properties []*affinityTermProperties) {
 	if terms == nil {
-		return properties, nil
+		return properties
 	}
 
 	for _, term := range terms {
 		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
-		selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-		if err != nil {
-			return nil, err
-		}
-		properties = append(properties, &affinityTermProperties{namespaces: namespaces, selector: selector})
+		properties = append(properties, &affinityTermProperties{namespaces: namespaces, selector: term.LabelSelector})
 	}
-	return properties, nil
+	return properties
 }
 
 // podMatchesAllAffinityTermProperties returns true IFF the given pod matches all the given properties.
@@ -441,14 +437,8 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 	}
 
 	affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
-	affinityProperties, err := getAffinityTermProperties(pod, affinityTerms)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	affinityProperties := getAffinityTermProperties(pod, affinityTerms)
 	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
-
-	ctx, cancel := context.WithCancel(context.Background())
 
 	processNode := func(i int) {
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
@@ -472,12 +462,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			// Check anti-affinity properties.
 			for _, term := range antiAffinityTerms {
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-				if err != nil {
-					errCh.SendErrorWithCancel(err, cancel)
-					return
-				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
+				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, term.LabelSelector) {
 					if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 						pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 						nodeTopologyPairsAntiAffinityPodsMaps.addTopologyPair(pair, existingPod)
@@ -490,7 +475,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(context.TODO(), 16, len(allNodeNames), processNode)
 
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, nil, err
@@ -508,11 +493,7 @@ func targetPodMatchesAffinityOfPod(pod, targetPod *v1.Pod) bool {
 	if affinity == nil || affinity.PodAffinity == nil {
 		return false
 	}
-	affinityProperties, err := getAffinityTermProperties(pod, GetPodAffinityTerms(affinity.PodAffinity))
-	if err != nil {
-		klog.Errorf("error in getting affinity properties of Pod %v", pod.Name)
-		return false
-	}
+	affinityProperties := getAffinityTermProperties(pod, GetPodAffinityTerms(affinity.PodAffinity))
 	return podMatchesAllAffinityTermProperties(targetPod, affinityProperties)
 }
 
@@ -525,10 +506,6 @@ func targetPodMatchesAntiAffinityOfPod(pod, targetPod *v1.Pod) bool {
 	if affinity == nil || affinity.PodAntiAffinity == nil {
 		return false
 	}
-	properties, err := getAffinityTermProperties(pod, GetPodAntiAffinityTerms(affinity.PodAntiAffinity))
-	if err != nil {
-		klog.Errorf("error in getting anti-affinity properties of Pod %v", pod.Name)
-		return false
-	}
+	properties := getAffinityTermProperties(pod, GetPodAntiAffinityTerms(affinity.PodAntiAffinity))
 	return podMatchesAnyAffinityTermProperties(targetPod, properties)
 }

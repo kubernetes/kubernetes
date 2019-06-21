@@ -18,34 +18,87 @@ package util
 
 import (
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 )
 
-// GetNamespacesFromPodAffinityTerm returns a set of names
+// GetNamespacesFromPodAffinityTerm returns a list of names
 // according to the namespaces indicated in podAffinityTerm.
 // If namespaces is empty it considers the given pod's namespace.
-func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
-	names := sets.String{}
-	if len(podAffinityTerm.Namespaces) == 0 {
-		names.Insert(pod.Namespace)
-	} else {
-		names.Insert(podAffinityTerm.Namespaces...)
+func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) []string {
+	if len(podAffinityTerm.Namespaces) > 0 {
+		return podAffinityTerm.Namespaces
 	}
-	return names
+	return []string{pod.Namespace}
 }
 
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
 // matches the namespace and selector defined by <affinityPod>`s <term>.
-func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, selector labels.Selector) bool {
-	if !namespaces.Has(pod.Namespace) {
-		return false
+func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces []string, selector *metav1.LabelSelector) bool {
+	for _, ns := range namespaces {
+		if pod.Namespace == ns {
+			return LabelsMatchLabelSelector(labels.Set(pod.Labels), selector)
+		}
 	}
 
-	if !selector.Matches(labels.Set(pod.Labels)) {
+	return false
+}
+
+// LabelsMatchLabelSelector returns true if the given <labels> matches the labelSelector
+func LabelsMatchLabelSelector(labels labels.Labels, labelSelector *metav1.LabelSelector) bool {
+	if labelSelector == nil {
 		return false
 	}
+	for k, v := range labelSelector.MatchLabels {
+		if !matchLabels(labels, k, v) {
+			return false
+		}
+	}
+	for _, expr := range labelSelector.MatchExpressions {
+		if !matchExpression(labels, expr) {
+			return false
+		}
+	}
 	return true
+}
+
+func matchLabels(labels labels.Labels, key string, value string) bool {
+	if !labels.Has(key) {
+		return false
+	}
+	return value == labels.Get(key)
+}
+
+func expressionHasValue(expr metav1.LabelSelectorRequirement, value string) bool {
+	for _, v := range expr.Values {
+		if value == v {
+			return true
+		}
+	}
+	return false
+}
+
+func matchExpression(labels labels.Labels, expr metav1.LabelSelectorRequirement) bool {
+	switch expr.Operator {
+	case metav1.LabelSelectorOpIn:
+		if !labels.Has(expr.Key) {
+			return false
+		}
+		return expressionHasValue(expr, labels.Get(expr.Key))
+	case metav1.LabelSelectorOpNotIn:
+		if !labels.Has(expr.Key) {
+			return true
+		}
+		return !expressionHasValue(expr, labels.Get(expr.Key))
+	case metav1.LabelSelectorOpExists:
+		return labels.Has(expr.Key)
+	case metav1.LabelSelectorOpDoesNotExist:
+		return !labels.Has(expr.Key)
+	default:
+		klog.V(5).Infof("%q is not a valid pod selector operator", expr.Operator)
+		return false
+	}
 }
 
 // NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.

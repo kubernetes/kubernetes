@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -86,12 +85,7 @@ func (p *podAffinityPriorityMap) setError(err error) {
 
 func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight int64) {
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-	if err != nil {
-		p.setError(err)
-		return
-	}
-	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
+	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, term.LabelSelector)
 	if match {
 		for _, node := range p.nodes {
 			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
