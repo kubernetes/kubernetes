@@ -32,6 +32,7 @@ func (o *JobControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	if o == nil {
 		return
 	}
+        fs.Int32Var(&o.ConcurrentJobSyncs, "concurrent-job-syncs", o.ConcurrentJobSyncs, "The number of job objects that are allowed to sync concurrently. Larger number = more responsive jobs, but more CPU (and network) load")
 }
 
 // ApplyTo fills up JobController config with options.
