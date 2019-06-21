@@ -65,6 +65,9 @@ func KubernetesReleaseVersion(version string) (string, error) {
 	return kubernetesReleaseVersion(version, fetchFromURL)
 }
 
+// kubernetesReleaseVersion is a helper function to fetch
+// available version information. Used for testing to eliminate
+// the need for internet calls.
 func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration) (string, error)) (string, error) {
 	ver := normalizedBuildVersion(version)
 	if len(ver) != 0 {
