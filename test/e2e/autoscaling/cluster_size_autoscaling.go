@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
-	schedulerapi "k8s.io/api/scheduling/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1015,12 +1015,12 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 
 	ginkgo.By("Create a PodDisruptionBudget")
 	minAvailable := intstr.FromInt(numPods - pdbSize)
-	pdb := &policy.PodDisruptionBudget{
+	pdb := &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
 			Namespace: namespace,
 		},
-		Spec: policy.PodDisruptionBudgetSpec{
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
 			MinAvailable: &minAvailable,
 		},
@@ -1891,12 +1891,12 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		labelMap := map[string]string{"k8s-app": pdbData.label}
 		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
 		minAvailable := intstr.FromInt(pdbData.minAvailable)
-		pdb := &policy.PodDisruptionBudget{
+		pdb := &policyv1beta1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pdbName,
 				Namespace: "kube-system",
 			},
-			Spec: policy.PodDisruptionBudgetSpec{
+			Spec: policyv1beta1.PodDisruptionBudgetSpec{
 				Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
 				MinAvailable: &minAvailable,
 			},
@@ -1917,7 +1917,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 		highPriorityClassName:       1000,
 	}
 	for className, priority := range priorityClasses {
-		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}

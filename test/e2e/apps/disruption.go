@@ -23,9 +23,9 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -168,7 +168,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			pod, err := locateRunningPod(cs, ns)
 			framework.ExpectNoError(err)
 
-			e := &policy.Eviction{
+			e := &policyv1beta1.Eviction{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      pod.Name,
 					Namespace: ns,
@@ -208,7 +208,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		framework.ExpectNoError(err)
 
 		waitForPodsOrDie(cs, ns, 3) // make sure that they are running and so would be evictable with a different pdb
-		e := &policy.Eviction{
+		e := &policyv1beta1.Eviction{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pod.Name,
 				Namespace: ns,
@@ -228,12 +228,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 })
 
 func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.IntOrString) {
-	pdb := policy.PodDisruptionBudget{
+	pdb := policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
-		Spec: policy.PodDisruptionBudgetSpec{
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MinAvailable: &minAvailable,
 		},
@@ -244,12 +244,12 @@ func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
-	pdb := policy.PodDisruptionBudget{
+	pdb := policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
-		Spec: policy.PodDisruptionBudgetSpec{
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MaxUnavailable: &maxUnavailable,
 		},
@@ -340,12 +340,12 @@ func createReplicaSetOrDie(cs kubernetes.Interface, ns string, size int32, exclu
 		}
 	}
 
-	rs := &apps.ReplicaSet{
+	rs := &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rs",
 			Namespace: ns,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Replicas: &size,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},

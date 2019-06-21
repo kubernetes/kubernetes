@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
-	storageV1 "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -112,11 +112,11 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		var pvcClaimList []string
 		nodeVolumeMap := make(map[string][]string)
 		// Volumes will be provisioned with each different types of Storage Class
-		scArrays := make([]*storageV1.StorageClass, len(scNames))
+		scArrays := make([]*storagev1.StorageClass, len(scNames))
 		for index, scname := range scNames {
 			// Create vSphere Storage Class
 			ginkgo.By(fmt.Sprintf("Creating Storage Class : %q", scname))
-			var sc *storageV1.StorageClass
+			var sc *storagev1.StorageClass
 			scParams := make(map[string]string)
 			var err error
 			switch scname {
@@ -181,7 +181,7 @@ func getClaimsForPod(pod *v1.Pod, volumesPerPod int) []string {
 }
 
 // VolumeCreateAndAttach peforms create and attach operations of vSphere persistent volumes at scale
-func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*storageV1.StorageClass, volumeCountPerInstance int, volumesPerPod int, nodeSelectorList []*NodeSelector, nodeVolumeMapChan chan map[string][]string) {
+func VolumeCreateAndAttach(client clientset.Interface, namespace string, sc []*storagev1.StorageClass, volumeCountPerInstance int, volumesPerPod int, nodeSelectorList []*NodeSelector, nodeVolumeMapChan chan map[string][]string) {
 	defer ginkgo.GinkgoRecover()
 	nodeVolumeMap := make(map[string][]string)
 	nodeSelectorIndex := 0

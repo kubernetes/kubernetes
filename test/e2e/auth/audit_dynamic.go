@@ -23,8 +23,8 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
-	apiv1 "k8s.io/api/core/v1"
+	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,26 +59,26 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		anonymousClient, err := clientset.NewForConfig(config)
 		framework.ExpectNoError(err, "failed to create the anonymous client")
 
-		_, err = f.ClientSet.CoreV1().Namespaces().Create(&apiv1.Namespace{
+		_, err = f.ClientSet.CoreV1().Namespaces().Create(&v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
 		})
 		framework.ExpectNoError(err, "failed to create namespace")
 
-		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(&apiv1.Pod{
+		_, err = f.ClientSet.CoreV1().Pods(namespace).Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-proxy",
 				Labels: map[string]string{
 					"app": "audit",
 				},
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "proxy",
 						Image: imageutils.GetE2EImage(imageutils.AuditProxy),
-						Ports: []apiv1.ContainerPort{
+						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 8080,
 							},
@@ -89,12 +89,12 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 		})
 		framework.ExpectNoError(err, "failed to create proxy pod")
 
-		_, err = f.ClientSet.CoreV1().Services(namespace).Create(&apiv1.Service{
+		_, err = f.ClientSet.CoreV1().Services(namespace).Create(&v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit",
 			},
-			Spec: apiv1.ServiceSpec{
-				Ports: []apiv1.ServicePort{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{
 					{
 						Port:       80,
 						TargetPort: intstr.IntOrString{Type: intstr.Int, IntVal: 8080},
@@ -131,22 +131,22 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 
 		podURL := fmt.Sprintf("http://%s:8080", podIP)
 		// create audit sink
-		sink := auditregv1alpha1.AuditSink{
+		sink := auditregistrationv1alpha1.AuditSink{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test",
 			},
-			Spec: auditregv1alpha1.AuditSinkSpec{
-				Policy: auditregv1alpha1.Policy{
-					Level: auditregv1alpha1.LevelRequestResponse,
-					Stages: []auditregv1alpha1.Stage{
-						auditregv1alpha1.StageRequestReceived,
-						auditregv1alpha1.StageResponseStarted,
-						auditregv1alpha1.StageResponseComplete,
-						auditregv1alpha1.StagePanic,
+			Spec: auditregistrationv1alpha1.AuditSinkSpec{
+				Policy: auditregistrationv1alpha1.Policy{
+					Level: auditregistrationv1alpha1.LevelRequestResponse,
+					Stages: []auditregistrationv1alpha1.Stage{
+						auditregistrationv1alpha1.StageRequestReceived,
+						auditregistrationv1alpha1.StageResponseStarted,
+						auditregistrationv1alpha1.StageResponseComplete,
+						auditregistrationv1alpha1.StagePanic,
 					},
 				},
-				Webhook: auditregv1alpha1.Webhook{
-					ClientConfig: auditregv1alpha1.WebhookClientConfig{
+				Webhook: auditregistrationv1alpha1.Webhook{
+					ClientConfig: auditregistrationv1alpha1.WebhookClientConfig{
 						URL: &podURL,
 					},
 				},
@@ -182,18 +182,18 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 			// https://github.com/kubernetes/kubernetes/issues/70818
 			{
 				func() {
-					pod := &apiv1.Pod{
+					pod := &v1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "audit-pod",
 						},
-						Spec: apiv1.PodSpec{
-							Containers: []apiv1.Container{{
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{{
 								Name:  "pause",
 								Image: imageutils.GetPauseImageName(),
 							}},
 						},
 					}
-					updatePod := func(pod *apiv1.Pod) {}
+					updatePod := func(pod *v1.Pod) {}
 
 					f.PodClient().CreateSync(pod)
 

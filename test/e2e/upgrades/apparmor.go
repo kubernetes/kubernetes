@@ -17,7 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
-	api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -30,7 +30,7 @@ import (
 
 // AppArmorUpgradeTest tests that AppArmor profiles are enforced & usable across upgrades.
 type AppArmorUpgradeTest struct {
-	pod *api.Pod
+	pod *v1.Pod
 }
 
 // Name returns the tracking name of the test.
@@ -87,7 +87,7 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 	ginkgo.By("Verifying an AppArmor profile is continuously enforced for a pod")
 	pod, err := f.PodClient().Get(t.pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "Should be able to get pod")
-	gomega.Expect(pod.Status.Phase).To(gomega.Equal(api.PodRunning), "Pod should stay running")
+	gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning), "Pod should stay running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].State.Running).NotTo(gomega.BeNil(), "Container should be running")
 	gomega.Expect(pod.Status.ContainerStatuses[0].RestartCount).To(gomega.BeZero(), "Container should not need to be restarted")
 }
@@ -111,5 +111,5 @@ func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework)
 }
 
 func conditionType(condition interface{}) string {
-	return string(condition.(api.NodeCondition).Type)
+	return string(condition.(v1.NodeCondition).Type)
 }

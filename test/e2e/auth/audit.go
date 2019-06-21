@@ -22,8 +22,8 @@ import (
 	"strings"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -68,18 +68,18 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	})
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch pods.", func() {
-		pod := &apiv1.Pod{
+		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-pod",
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{{
 					Name:  "pause",
 					Image: imageutils.GetPauseImageName(),
 				}},
 			},
 		}
-		updatePod := func(pod *apiv1.Pod) {}
+		updatePod := func(pod *v1.Pod) {}
 
 		f.PodClient().CreateSync(pod)
 
@@ -203,7 +203,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch deployments.", func() {
 		podLabels := map[string]string{"name": "audit-deployment-pod"}
-		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), apps.RecreateDeploymentStrategyType)
+		d := e2edeploy.NewDeployment("audit-deployment", int32(1), podLabels, "redis", imageutils.GetE2EImage(imageutils.Redis), appsv1.RecreateDeploymentStrategyType)
 
 		_, err := f.ClientSet.AppsV1().Deployments(namespace).Create(d)
 		framework.ExpectNoError(err, "failed to create audit-deployment")
@@ -329,7 +329,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	})
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch configmaps.", func() {
-		configMap := &apiv1.ConfigMap{
+		configMap := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-configmap",
 			},
@@ -462,7 +462,7 @@ var _ = SIGDescribe("Advanced Audit [DisabledForLargeClusters][Flaky]", func() {
 	})
 
 	ginkgo.It("should audit API calls to create, get, update, patch, delete, list, watch secrets.", func() {
-		secret := &apiv1.Secret{
+		secret := &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "audit-secret",
 			},

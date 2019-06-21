@@ -22,7 +22,7 @@ import (
 
 	"fmt"
 
-	api_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -96,23 +96,23 @@ func (p *loadLoggingPod) Name() string {
 
 func (p *loadLoggingPod) Start(f *framework.Framework) error {
 	e2elog.Logf("Starting load logging pod %s", p.name)
-	f.PodClient().Create(&api_v1.Pod{
+	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.name,
 		},
-		Spec: api_v1.PodSpec{
-			RestartPolicy: api_v1.RestartPolicyNever,
-			Containers: []api_v1.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
 				{
 					Name:  loggingContainerName,
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args:  []string{"logs-generator", "-log-lines-total", strconv.Itoa(p.expectedLinesCount), "-run-duration", p.runDuration.String()},
-					Resources: api_v1.ResourceRequirements{
-						Requests: api_v1.ResourceList{
-							api_v1.ResourceCPU: *resource.NewMilliQuantity(
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(
 								loggingContainerCPURequest,
 								resource.DecimalSI),
-							api_v1.ResourceMemory: *resource.NewQuantity(
+							v1.ResourceMemory: *resource.NewQuantity(
 								loggingContainerMemoryRequest,
 								resource.BinarySI),
 						},
@@ -162,22 +162,22 @@ func (p *execLoggingPod) Name() string {
 
 func (p *execLoggingPod) Start(f *framework.Framework) error {
 	e2elog.Logf("Starting repeating logging pod %s", p.name)
-	f.PodClient().Create(&api_v1.Pod{
+	f.PodClient().Create(&v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
 			Name: p.name,
 		},
-		Spec: api_v1.PodSpec{
-			Containers: []api_v1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:    loggingContainerName,
 					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: p.cmd,
-					Resources: api_v1.ResourceRequirements{
-						Requests: api_v1.ResourceList{
-							api_v1.ResourceCPU: *resource.NewMilliQuantity(
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(
 								loggingContainerCPURequest,
 								resource.DecimalSI),
-							api_v1.ResourceMemory: *resource.NewQuantity(
+							v1.ResourceMemory: *resource.NewQuantity(
 								loggingContainerMemoryRequest,
 								resource.BinarySI),
 						},

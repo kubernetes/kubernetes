@@ -30,8 +30,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	storage "k8s.io/api/storage/v1"
-	storagebeta "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1059,7 +1059,7 @@ func getDefaultPluginName() string {
 	return ""
 }
 
-func addSingleZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *storage.StorageClass, zone string) {
+func addSingleZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *storagev1.StorageClass, zone string) {
 	term := v1.TopologySelectorTerm{
 		MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 			{
@@ -1071,7 +1071,7 @@ func addSingleZoneAllowedTopologyToStorageClass(c clientset.Interface, sc *stora
 	sc.AllowedTopologies = append(sc.AllowedTopologies, term)
 }
 
-func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *storage.StorageClass {
+func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *storagev1.StorageClass {
 	pluginName := t.Provisioner
 	if pluginName == "" {
 		pluginName = getDefaultPluginName()
@@ -1079,9 +1079,9 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *s
 	if suffix == "" {
 		suffix = "sc"
 	}
-	bindingMode := storage.VolumeBindingImmediate
+	bindingMode := storagev1.VolumeBindingImmediate
 	if t.DelayBinding {
-		bindingMode = storage.VolumeBindingWaitForFirstConsumer
+		bindingMode = storagev1.VolumeBindingWaitForFirstConsumer
 	}
 	sc := getStorageClass(pluginName, t.Parameters, &bindingMode, ns, suffix)
 	if t.AllowVolumeExpansion {
@@ -1093,15 +1093,15 @@ func newStorageClass(t testsuites.StorageClassTest, ns string, suffix string) *s
 func getStorageClass(
 	provisioner string,
 	parameters map[string]string,
-	bindingMode *storage.VolumeBindingMode,
+	bindingMode *storagev1.VolumeBindingMode,
 	ns string,
 	suffix string,
-) *storage.StorageClass {
+) *storagev1.StorageClass {
 	if bindingMode == nil {
-		defaultBindingMode := storage.VolumeBindingImmediate
+		defaultBindingMode := storagev1.VolumeBindingImmediate
 		bindingMode = &defaultBindingMode
 	}
-	return &storage.StorageClass{
+	return &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -1116,7 +1116,7 @@ func getStorageClass(
 }
 
 // TODO: remove when storage.k8s.io/v1beta1 is removed.
-func newBetaStorageClass(t testsuites.StorageClassTest, suffix string) *storagebeta.StorageClass {
+func newBetaStorageClass(t testsuites.StorageClassTest, suffix string) *storagev1beta1.StorageClass {
 	pluginName := t.Provisioner
 
 	if pluginName == "" {
@@ -1126,7 +1126,7 @@ func newBetaStorageClass(t testsuites.StorageClassTest, suffix string) *storageb
 		suffix = "default"
 	}
 
-	return &storagebeta.StorageClass{
+	return &storagev1beta1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},

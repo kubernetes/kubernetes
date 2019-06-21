@@ -21,9 +21,9 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -43,7 +43,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		ns                string
 		err               error
 		pvc               *v1.PersistentVolumeClaim
-		resizableSc       *storage.StorageClass
+		resizableSc       *storagev1.StorageClass
 		nodeName          string
 		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
@@ -163,7 +163,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 	})
 })
 
-func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *apps.Deployment) (v1.Pod, error) {
+func waitForDeploymentToRecreatePod(client clientset.Interface, deployment *appsv1.Deployment) (v1.Pod, error) {
 	var runningPod v1.Pod
 	waitErr := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)

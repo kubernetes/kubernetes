@@ -47,10 +47,10 @@ import (
 	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 
-	apps "k8s.io/api/apps/v1"
-	batch "k8s.io/api/batch/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -2247,19 +2247,19 @@ func getSelectorFromRuntimeObject(obj runtime.Object) (labels.Selector, error) {
 	switch typed := obj.(type) {
 	case *v1.ReplicationController:
 		return labels.SelectorFromSet(typed.Spec.Selector), nil
-	case *extensions.ReplicaSet:
+	case *extensionsv1beta1.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *apps.ReplicaSet:
+	case *appsv1.ReplicaSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *extensions.Deployment:
+	case *extensionsv1beta1.Deployment:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *apps.Deployment:
+	case *appsv1.Deployment:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *extensions.DaemonSet:
+	case *extensionsv1beta1.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *apps.DaemonSet:
+	case *appsv1.DaemonSet:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
-	case *batch.Job:
+	case *batchv1.Job:
 		return metav1.LabelSelectorAsSelector(typed.Spec.Selector)
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting selector: %v", obj)
@@ -2273,31 +2273,31 @@ func getReplicasFromRuntimeObject(obj runtime.Object) (int32, error) {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
-	case *extensions.ReplicaSet:
+	case *extensionsv1beta1.ReplicaSet:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
-	case *apps.ReplicaSet:
+	case *appsv1.ReplicaSet:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
-	case *extensions.Deployment:
+	case *extensionsv1beta1.Deployment:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
-	case *apps.Deployment:
+	case *appsv1.Deployment:
 		if typed.Spec.Replicas != nil {
 			return *typed.Spec.Replicas, nil
 		}
 		return 0, nil
-	case *extensions.DaemonSet:
+	case *extensionsv1beta1.DaemonSet:
 		return 0, nil
-	case *apps.DaemonSet:
+	case *appsv1.DaemonSet:
 		return 0, nil
-	case *batch.Job:
+	case *batchv1.Job:
 		// TODO: currently we use pause pods so that's OK. When we'll want to switch to Pods
 		// that actually finish we need a better way to do this.
 		if typed.Spec.Parallelism != nil {
@@ -2379,11 +2379,11 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	return nil
 }
 
-type updateDSFunc func(*apps.DaemonSet)
+type updateDSFunc func(*appsv1.DaemonSet)
 
 // UpdateDaemonSetWithRetries updates daemonsets with the given applyUpdate func
 // until it succeeds or a timeout expires.
-func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *apps.DaemonSet, err error) {
+func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *appsv1.DaemonSet, err error) {
 	daemonsets := c.AppsV1().DaemonSets(namespace)
 	var updateErr error
 	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
@@ -3432,8 +3432,8 @@ func DumpDebugInfo(c clientset.Interface, ns string) {
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func DsFromManifest(url string) (*apps.DaemonSet, error) {
-	var controller apps.DaemonSet
+func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
+	var controller appsv1.DaemonSet
 	e2elog.Logf("Parsing ds from %v", url)
 
 	var response *http.Response
