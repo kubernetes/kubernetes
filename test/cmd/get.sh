@@ -77,16 +77,16 @@ run_kubectl_get_tests() {
   kube::test::if_has_not_string "${output_message}" 'No resources found'
   # Command
   output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}")
-  # Post-condition: The text "No resources found" should be part of the output
-  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Post-condition: The text "No pods found in namespace default" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No pods found in namespace default'
   # Command
   output_message=$(kubectl get pods --ignore-not-found 2>&1 "${kube_flags[@]}")
   # Post-condition: The text "No resources found" should not be part of the output
   kube::test::if_has_not_string "${output_message}" 'No resources found'
   # Command
   output_message=$(kubectl get pods 2>&1 "${kube_flags[@]}" -o wide)
-  # Post-condition: The text "No resources found" should be part of the output
-  kube::test::if_has_string "${output_message}" 'No resources found'
+  # Post-condition: The text "No pods found in namespace default" should be part of the output
+  kube::test::if_has_string "${output_message}" 'No pods found in namespace default'
 
   ### Test retrieval of non-existing POD with json output flag specified
   # Pre-condition: no POD exists
