@@ -357,12 +357,20 @@ func TestGetEmptyTable(t *testing.T) {
 		defaultNamespace string
 		expectedErr      string
 	}{
-		{cmdArg: "pods", defaultNamespace: "test", expectedErr: `No pods found in namespace test.
-`},
-		{cmdArg: "deployment", defaultNamespace: "anotherTestNamespace", expectedErr: `No deployment found in namespace anotherTestNamespace.
-`},
-		{cmdArg: "services", defaultNamespace: "anotherTestNamespace2", expectedErr: `No services found in namespace anotherTestNamespace2.
-`},
+		{
+			cmdArg:           "pods",
+			defaultNamespace: "test",
+			expectedErr:      "No pods found in namespace test.\n"},
+		{
+			cmdArg:           "deployment",
+			defaultNamespace: "anotherTestNamespace",
+			expectedErr:      "No deployment found in namespace anotherTestNamespace.\n",
+		},
+		{
+			cmdArg:           "services",
+			defaultNamespace: "anotherTestNamespace2",
+			expectedErr:      "No services found in namespace anotherTestNamespace2.\n",
+		},
 	}
 	for _, td := range testData {
 		testName := "No " + td.cmdArg + " in namespace " + td.defaultNamespace
