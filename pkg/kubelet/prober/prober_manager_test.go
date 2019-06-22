@@ -37,7 +37,7 @@ func init() {
 	runtime.ReallyCrash = true
 }
 
-var defaultProbe *v1.Probe = &v1.Probe{
+var defaultProbe = &v1.Probe{
 	Handler: v1.Handler{
 		Exec: &v1.ExecAction{},
 	},
