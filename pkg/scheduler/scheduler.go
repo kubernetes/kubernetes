@@ -412,11 +412,25 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 
 // bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
 // handle binding metrics internally.
-func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
+func (sched *Scheduler) bind(assumed *v1.Pod, targetNode string, pluginContext *framework.PluginContext) error {
 	bindingStart := time.Now()
-	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
-	// it's atomic with setting host.
-	err := sched.config.GetBinder(assumed).Bind(b)
+	bindStatus := sched.config.Framework.RunBindPlugins(pluginContext, assumed, targetNode)
+	var err error
+	if bindStatus != nil && bindStatus.Code() == framework.Skip {
+		// All bind plugins chooses to skip binding of this pod, call original binding func.
+
+		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
+		// it's atomic with setting host.
+		err = sched.config.GetBinder(assumed).Bind(&v1.Binding{
+			ObjectMeta: metav1.ObjectMeta{Namespace: assumed.Namespace, Name: assumed.Name, UID: assumed.UID},
+			Target: v1.ObjectReference{
+				Kind: "Node",
+				Name: targetNode,
+			},
+		})
+	} else if !bindStatus.IsSuccess() {
+		err = fmt.Errorf("scheduler RunBindPlugins failed for pod %v/%v: code %d, err %v", assumed.Namespace, assumed.Name, bindStatus.Code(), err)
+	}
 	if finErr := sched.config.SchedulerCache.FinishBinding(assumed); finErr != nil {
 		klog.Errorf("scheduler cache FinishBinding failed: %v", finErr)
 	}
@@ -434,7 +448,7 @@ func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
 	metrics.DeprecatedBindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
 	metrics.SchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
 	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.Binding).Observe(metrics.SinceInSeconds(bindingStart))
-	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, b.Target.Name)
+	sched.config.Recorder.Eventf(assumed, v1.EventTypeNormal, "Scheduled", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 	return nil
 }
 
@@ -575,13 +589,7 @@ func (sched *Scheduler) scheduleOne() {
 			return
 		}
 
-		err := sched.bind(assumedPod, &v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: assumedPod.Namespace, Name: assumedPod.Name, UID: assumedPod.UID},
-			Target: v1.ObjectReference{
-				Kind: "Node",
-				Name: scheduleResult.SuggestedHost,
-			},
-		})
+		err := sched.bind(assumedPod, scheduleResult.SuggestedHost, pluginContext)
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInSeconds(start))
 		metrics.DeprecatedE2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
