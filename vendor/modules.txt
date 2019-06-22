@@ -1005,7 +1005,7 @@ gopkg.in/gcfg.v1/token
 gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.0 => gopkg.in/inf.v0 v0.9.0
 gopkg.in/inf.v0
-# gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
+# gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/square/go-jose.v2 v2.2.2 => gopkg.in/square/go-jose.v2 v2.2.2
 gopkg.in/square/go-jose.v2

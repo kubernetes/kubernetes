@@ -352,7 +352,6 @@ replace (
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 	github.com/naoina/toml => github.com/naoina/toml v0.1.1
-	github.com/natefinch/lumberjack => github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.5.0
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0-rc1
@@ -429,7 +428,7 @@ replace (
 	gopkg.in/gcfg.v1 => gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/inf.v0 => gopkg.in/inf.v0 v0.9.0
 	gopkg.in/mcuadros/go-syslog.v2 => gopkg.in/mcuadros/go-syslog.v2 v2.2.1
-	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
+	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1

@@ -33,7 +33,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
-	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
@@ -74,7 +73,6 @@ replace (
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
-	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
