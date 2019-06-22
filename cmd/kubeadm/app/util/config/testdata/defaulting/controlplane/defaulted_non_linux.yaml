@@ -73,7 +73,6 @@ mode: ""
 nodePortAddresses: null
 oomScoreAdj: -999
 portRange: ""
-resourceContainer: /kube-proxy
 udpIdleTimeout: 250ms
 winkernel:
   enableDSR: false

@@ -58,9 +58,6 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 		temp := int32(qos.KubeProxyOOMScoreAdj)
 		obj.OOMScoreAdj = &temp
 	}
-	if obj.ResourceContainer == "" {
-		obj.ResourceContainer = "/kube-proxy"
-	}
 	if obj.IPTables.SyncPeriod.Duration == 0 {
 		obj.IPTables.SyncPeriod = metav1.Duration{Duration: 30 * time.Second}
 	}
