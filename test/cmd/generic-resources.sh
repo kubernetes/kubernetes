@@ -269,10 +269,10 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx:'
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   # Command
-  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=apps/v1 -o yaml "${kube_flags[@]}")
-  # Post-condition: apiVersion is still extensions/v1beta1 in the live deployment, but command output is the new value
-  kube::test::get_object_assert 'deployment nginx' "{{ .apiVersion }}" 'extensions/v1beta1'
-  kube::test::if_has_string "${output_message}" "apps/v1"
+  output_message=$(kubectl convert --local -f hack/testdata/deployment-revision1.yaml --output-version=extensions/v1beta1 -o yaml "${kube_flags[@]}")
+  # Post-condition: apiVersion is still apps/v1 in the live deployment, but command output is the new value
+  kube::test::get_object_assert 'deployment nginx' "{{ .apiVersion }}" 'apps/v1'
+  kube::test::if_has_string "${output_message}" "extensions/v1beta1"
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 

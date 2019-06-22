@@ -434,9 +434,9 @@ func TestStorageVersionHashEqualities(t *testing.T) {
 	for _, r := range extList.APIResources {
 		if r.Name == "replicasets" {
 			extReplicasetHash = r.StorageVersionHash
+			assert.NotEmpty(extReplicasetHash)
 		}
 	}
-	assert.NotEmpty(extReplicasetHash)
 
 	resp, err = http.Get(server.URL + "/apis/apps/v1")
 	assert.Empty(err)
@@ -445,9 +445,12 @@ func TestStorageVersionHashEqualities(t *testing.T) {
 	for _, r := range appsList.APIResources {
 		if r.Name == "replicasets" {
 			appsReplicasetHash = r.StorageVersionHash
+			assert.NotEmpty(appsReplicasetHash)
 		}
 	}
-	assert.Equal(extReplicasetHash, appsReplicasetHash)
+	if len(extReplicasetHash) > 0 && len(appsReplicasetHash) > 0 {
+		assert.Equal(extReplicasetHash, appsReplicasetHash)
+	}
 
 	// Test 2: batch/v1/jobs and batch/v1beta1/cronjobs have different
 	// storage version hashes.

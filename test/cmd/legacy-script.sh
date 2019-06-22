@@ -365,7 +365,6 @@ runTests() {
   pdb_min_available=".spec.minAvailable"
   pdb_max_unavailable=".spec.maxUnavailable"
   generation_field=".metadata.generation"
-  template_generation_field=".spec.templateGeneration"
   container_len="(len .spec.template.spec.containers)"
   image_field0="(index .spec.template.spec.containers 0).image"
   image_field1="(index .spec.template.spec.containers 1).image"
