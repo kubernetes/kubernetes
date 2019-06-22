@@ -25,12 +25,13 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -982,6 +983,50 @@ func TestNeedsUpdate(t *testing.T) {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
 				newSvc.Spec.HealthCheckNodePort = 30123
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If TargetGroup is different 1",
+			updateFn: func() {
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.Parse("20"),
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If TargetGroup is different 2",
+			updateFn: func() {
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.Parse("22"),
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("dns")
 			},
 			expectedNeedsUpdate: true,
 		},
