@@ -352,10 +352,25 @@ foo    0/0              0          <unknown>   <none>
 }
 
 func TestGetEmptyTable(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
+	testData := []struct {
+		cmdArg           string
+		defaultNamespace string
+		expectedErr      string
+	}{
+		{cmdArg: "pods", defaultNamespace: "test", expectedErr: `No pods found in namespace test.
+`},
+		{cmdArg: "deployment", defaultNamespace: "anotherTestNamespace", expectedErr: `No deployment found in namespace anotherTestNamespace.
+`},
+		{cmdArg: "services", defaultNamespace: "anotherTestNamespace2", expectedErr: `No services found in namespace anotherTestNamespace2.
+`},
+	}
+	for _, td := range testData {
+		testName := "No " + td.cmdArg + " in namespace " + td.defaultNamespace
+		t.Run(testName, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace(td.defaultNamespace)
+			defer tf.Cleanup()
 
-	emptyTable := ioutil.NopCloser(bytes.NewBufferString(`{
+			emptyTable := ioutil.NopCloser(bytes.NewBufferString(`{
 "kind":"Table",
 "apiVersion":"meta.k8s.io/v1beta1",
 "metadata":{
@@ -368,24 +383,25 @@ func TestGetEmptyTable(t *testing.T) {
 "rows":[]
 }`))
 
-	tf.UnstructuredClient = &fake.RESTClient{
-		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-		Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTable},
-	}
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: emptyTable},
+			}
 
-	streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdGet("kubectl", tf, streams)
-	cmd.SetOutput(buf)
-	cmd.Run(cmd, []string{"pods"})
+			streams, _, buf, errbuf := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdGet("kubectl", tf, streams)
+			cmd.SetOutput(buf)
+			cmd.Run(cmd, []string{td.cmdArg})
 
-	expected := ``
-	if e, a := expected, buf.String(); e != a {
-		t.Errorf("expected\n%v\ngot\n%v", e, a)
-	}
-	expectedErr := `No resources found.
-`
-	if e, a := expectedErr, errbuf.String(); e != a {
-		t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
+			expected := ``
+			if e, a := expected, buf.String(); e != a {
+				t.Errorf("expected\n%v\ngot\n%v", e, a)
+			}
+
+			if e, a := td.expectedErr, errbuf.String(); e != a {
+				t.Errorf("expectedErr\n%v\ngot\n%v", e, a)
+			}
+		})
 	}
 }
 
