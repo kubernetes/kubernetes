@@ -50,6 +50,7 @@ const (
 
 	// owner: @mbohlool, @roycaihw
 	// alpha: v1.13
+	// beta: v1.15
 	//
 	// CustomResourceWebhookConversion defines the webhook conversion for Custom Resources.
 	CustomResourceWebhookConversion featuregate.Feature = "CustomResourceWebhookConversion"
