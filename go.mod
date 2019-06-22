@@ -297,7 +297,7 @@ replace (
 	github.com/grpc-ecosystem/grpc-gateway => github.com/grpc-ecosystem/grpc-gateway v1.3.0
 	github.com/hashicorp/go-syslog => github.com/hashicorp/go-syslog v1.0.0
 	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.0
-	github.com/hashicorp/hcl => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
+	github.com/hashicorp/hcl => github.com/hashicorp/hcl v1.0.0
 	github.com/heketi/heketi => github.com/heketi/heketi v9.0.0+incompatible
 	github.com/heketi/rest => github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6

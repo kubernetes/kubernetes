@@ -526,7 +526,7 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 # github.com/hashicorp/golang-lru v0.5.0 => github.com/hashicorp/golang-lru v0.5.0
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
-# github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
+# github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v1.0.0
 github.com/hashicorp/hcl
 github.com/hashicorp/hcl/hcl/ast
 github.com/hashicorp/hcl/hcl/parser

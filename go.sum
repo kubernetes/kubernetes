@@ -212,8 +212,8 @@ github.com/grpc-ecosystem/grpc-gateway v1.3.0/go.mod h1:RSKVYQBd5MCa4OVpNdGskqpg
 github.com/hashicorp/go-syslog v1.0.0/go.mod h1:qPfqrKkXGihmCqbJM2mZgkZGvKG1dFdvsLplgctolz4=
 github.com/hashicorp/golang-lru v0.5.0 h1:CL2msUPvZTLb5O648aiLNJw3hnBxN2+1Jq8rCOH9wdo=
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
-github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1 h1:9j16AiR0R5hDbDBMzfUfIP9CUbbw6T8nYN4iZz3/wjg=
-github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1/go.mod h1:oZtUIOe8dh44I2q6ScRibXws4Ajl+d+nod3AaR9vL5w=
+github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
+github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/heketi/heketi v9.0.0+incompatible h1:B2ACAbYsCHkJXKozYVV7p2j+eEy/zNlLsicihMWCk30=
 github.com/heketi/heketi v9.0.0+incompatible/go.mod h1:bB9ly3RchcQqsQ9CpyaQwvva7RS5ytVoSoholZQON6o=
 github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413 h1:nGZBOxRgSMbqjm2/FYDtO6BU4a+hfR7Om9VGQ9tbbSc=

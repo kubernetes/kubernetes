@@ -22,7 +22,6 @@ require (
 )
 
 replace (
-	github.com/hashicorp/hcl => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
