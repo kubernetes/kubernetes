@@ -39,7 +39,6 @@ type framework struct {
 	prefilterPlugins []PrefilterPlugin
 	reservePlugins   []ReservePlugin
 	prebindPlugins   []PrebindPlugin
-	bindPlugins      []BindPlugin
 	postbindPlugins  []PostbindPlugin
 	unreservePlugins []UnreservePlugin
 	permitPlugins    []PermitPlugin
@@ -125,20 +124,6 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				f.prebindPlugins = append(f.prebindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prebind plugin %v does not exist", pb.Name)
-			}
-		}
-	}
-
-	if plugins.Bind != nil {
-		for _, pb := range plugins.Bind.Enabled {
-			if pg, ok := f.plugins[pb.Name]; ok {
-				p, ok := pg.(BindPlugin)
-				if !ok {
-					return nil, fmt.Errorf("plugin %v does not extend bind plugin", pb.Name)
-				}
-				f.bindPlugins = append(f.bindPlugins, p)
-			} else {
-				return nil, fmt.Errorf("bind plugin %v does not exist", pb.Name)
 			}
 		}
 	}
@@ -256,27 +241,6 @@ func (f *framework) RunPrebindPlugins(
 		}
 	}
 	return nil
-}
-
-// RunBindPlugins runs the set of configured bind plugins until one returns a non `Skip` status.
-func (f *framework) RunBindPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status {
-	if len(f.bindPlugins) == 0 {
-		return NewStatus(Skip, "")
-	}
-	var status *Status
-	for _, bp := range f.bindPlugins {
-		status = bp.Bind(pc, pod, nodeName)
-		if status != nil && status.Code() == Skip {
-			continue
-		}
-		if !status.IsSuccess() {
-			msg := fmt.Sprintf("bind plugin %v failed to bind pod %v/%v: %v", bp.Name(), pod.Namespace, pod.Name, status.Message())
-			klog.Error(msg)
-			return NewStatus(Error, msg)
-		}
-		return status
-	}
-	return status
 }
 
 // RunPostbindPlugins runs the set of configured postbind plugins.
