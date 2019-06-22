@@ -37,6 +37,7 @@ const (
 
 	// owner: @roycaihw, @sttts
 	// alpha: v1.14
+	// beta: v1.15
 	//
 	// CustomResourcePublishOpenAPI enables publishing of CRD OpenAPI specs.
 	CustomResourcePublishOpenAPI featuregate.Feature = "CustomResourcePublishOpenAPI"
