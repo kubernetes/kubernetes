@@ -16,7 +16,6 @@ require (
 )
 
 replace (
-	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.0
 	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/gorilla/websocket => github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
 	github.com/hashicorp/hcl => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1

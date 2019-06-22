@@ -69,7 +69,6 @@ require (
 )
 
 replace (
-	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.0
 	github.com/google/uuid => github.com/google/uuid v1.0.0
 	github.com/gorilla/websocket => github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
