@@ -249,19 +249,6 @@ func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
 }
 
-// Failf logs the fail info.
-func Failf(format string, args ...interface{}) {
-	FailfWithOffset(1, format, args...)
-}
-
-// FailfWithOffset calls "Fail" and logs the error at "offset" levels above its caller
-// (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
-func FailfWithOffset(offset int, format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	log("INFO", msg)
-	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
-}
-
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	log("INFO", msg)
@@ -465,7 +452,7 @@ func ProxyMode(f *Framework) (string, error) {
 func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
 	gte, err := ServerVersionGTE(v, c)
 	if err != nil {
-		Failf("Failed to get server version: %v", err)
+		e2elog.Failf("Failed to get server version: %v", err)
 	}
 	if !gte {
 		skipInternalf(1, "Not supported for server versions before %q", v)
@@ -481,7 +468,7 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
 			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
 		}
-		Failf("Unexpected error getting %v: %v", gvr, err)
+		e2elog.Failf("Unexpected error getting %v: %v", gvr, err)
 	}
 }
 
@@ -1289,7 +1276,7 @@ func ServiceResponding(c clientset.Interface, ns, name string) error {
 			Raw()
 		if err != nil {
 			if ctx.Err() != nil {
-				Failf("Failed to GET from service %s: %v", name, err)
+				e2elog.Failf("Failed to GET from service %s: %v", name, err)
 				return true, err
 			}
 			e2elog.Logf("Failed to GET from service %s: %v:", name, err)
@@ -1430,7 +1417,7 @@ func AssertCleanup(ns string, selectors ...string) {
 	}
 	err := wait.PollImmediate(500*time.Millisecond, 1*time.Minute, verifyCleanupFunc)
 	if err != nil {
-		Failf(e.Error())
+		e2elog.Failf(e.Error())
 	}
 }
 
@@ -1671,7 +1658,7 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
 	ginkgo.By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
-		Failf("Invalid container index: %d", containerIndex)
+		e2elog.Failf("Invalid container index: %d", containerIndex)
 	}
 	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
 }
@@ -1937,7 +1924,7 @@ func isNodeUntainted(node *v1.Node) bool {
 	nodeInfo.SetNode(node)
 	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
 	if err != nil {
-		Failf("Can't test predicates for node %s: %v", node.Name, err)
+		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
 		return false
 	}
 	return fit
@@ -2114,7 +2101,7 @@ func verifyThatTaintIsGone(c clientset.Interface, nodeName string, taint *v1.Tai
 	nodeUpdated, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
 	if taintutils.TaintExists(nodeUpdated.Spec.Taints, taint) {
-		Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
+		e2elog.Failf("Failed removing taint " + taint.ToString() + " of the node " + nodeName)
 	}
 }
 
@@ -2123,7 +2110,7 @@ func ExpectNodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint)
 	ginkgo.By("verifying the node has the taint " + taint.ToString())
 	if has, err := NodeHasTaint(c, nodeName, taint); !has {
 		ExpectNoError(err)
-		Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
+		e2elog.Failf("Failed to find taint %s on node %s", taint.ToString(), nodeName)
 	}
 }
 
@@ -2822,7 +2809,7 @@ func BlockNetwork(from string, to string) {
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
 	if result, err := e2essh.SSH(dropCmd, from, TestContext.Provider); result.Code != 0 || err != nil {
 		e2essh.LogResult(result)
-		Failf("Unexpected error: %v", err)
+		e2elog.Failf("Unexpected error: %v", err)
 	}
 }
 
@@ -2849,7 +2836,7 @@ func UnblockNetwork(from string, to string) {
 		return false, nil
 	})
 	if err != nil {
-		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
+		e2elog.Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 			"required on host %s: remove rule %s, if exists", from, iptablesRule)
 	}
 }
@@ -3043,7 +3030,7 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 		scheduledPods, currentlyNotScheduledPods = e2epod.GetPodsScheduled(masterNodes, allPods)
 
 		if startTime.Add(timeout).Before(time.Now()) {
-			Failf("Timed out after %v waiting for stable cluster.", timeout)
+			e2elog.Failf("Timed out after %v waiting for stable cluster.", timeout)
 			break
 		}
 	}
@@ -3149,17 +3136,17 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 	// Populate the internal IP.
 	eps, err := c.CoreV1().Endpoints(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 	if err != nil {
-		Failf("Failed to get kubernetes endpoints: %v", err)
+		e2elog.Failf("Failed to get kubernetes endpoints: %v", err)
 	}
 	if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
-		Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
+		e2elog.Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
 	}
 	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
 	url, err := url.Parse(TestContext.Host)
 	if err != nil {
-		Failf("Failed to parse hostname: %v", err)
+		e2elog.Failf("Failed to parse hostname: %v", err)
 	}
 	if net.ParseIP(url.Host) != nil {
 		externalIP = url.Host
@@ -3189,7 +3176,7 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 	case "aws":
 		ips.Insert(awsMasterIP)
 	default:
-		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
+		e2elog.Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
 	return ips.List()
 }

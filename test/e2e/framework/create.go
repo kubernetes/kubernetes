@@ -79,7 +79,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
 		data, err := testfiles.Read(fileName)
 		if err != nil {
-			Failf("reading manifest file: %v", err)
+			e2elog.Failf("reading manifest file: %v", err)
 		}
 
 		// Split at the "---" separator before working on
