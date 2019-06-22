@@ -641,6 +641,6 @@ rules:
     go: 1.12.5
     dependencies:
       - repository: apimachinery
-        branch: master
+        branch: release-1.15
       - repository: client-go
-        branch: master
+        branch: release-12.0
