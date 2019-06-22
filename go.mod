@@ -310,7 +310,6 @@ replace (
 	github.com/jonboulle/clockwork => github.com/jonboulle/clockwork v0.1.0
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.6
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
-	github.com/jteeuwen/go-bindata => github.com/jteeuwen/go-bindata v0.0.0-20151023091102-a0ff2567cfb7
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
 	github.com/kardianos/osext => github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
@@ -378,7 +377,6 @@ replace (
 	github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e
-	github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v0.0.0-20151028001915-10ef21a441db
 	github.com/sigma/go-inotify => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
 	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.2.0
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
@@ -433,7 +431,6 @@ replace (
 	gopkg.in/square/go-jose.v2 => gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/tomb.v1 => gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
-	gopkg.in/yaml.v1 => gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.2
 	gotest.tools => gotest.tools v2.2.0+incompatible
 	k8s.io/api => ./staging/src/k8s.io/api

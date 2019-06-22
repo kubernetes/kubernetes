@@ -53,7 +53,6 @@ require (
 	google.golang.org/grpc v1.13.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 	gotest.tools v2.2.0+incompatible // indirect
 	k8s.io/api v0.0.0
