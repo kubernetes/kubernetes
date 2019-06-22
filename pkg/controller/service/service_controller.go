@@ -267,12 +267,12 @@ func (s *ServiceController) processServiceCreateOrUpdate(service *v1.Service, ke
 	// Always cache the service, we need the info for service deletion in case
 	// when load balancer cleanup is not handled via finalizer.
 	cachedService.state = service
-	op, err := s.syncLoadBalancerIfNeeded(service, key)
+	op, err, loadBalancerDeleted := s.syncLoadBalancerIfNeeded(service, key)
 	if err != nil {
 		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
 		return err
 	}
-	if op == deleteLoadBalancer {
+	if op == deleteLoadBalancer && loadBalancerDeleted {
 		// Only delete the cache upon successful load balancer deletion.
 		s.cache.delete(key)
 	}
@@ -290,7 +290,7 @@ const (
 // syncLoadBalancerIfNeeded ensures that service's status is synced up with loadbalancer
 // i.e. creates loadbalancer for service if requested and deletes loadbalancer if the service
 // doesn't want a loadbalancer no more. Returns whatever error occurred.
-func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key string) (loadBalancerOperation, error) {
+func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key string) (loadBalancerOperation, error, bool) {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
@@ -299,6 +299,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 	var newStatus *v1.LoadBalancerStatus
 	var op loadBalancerOperation
 	var err error
+	loadBalancerDeleted := false
 
 	if !wantsLoadBalancer(service) || needsCleanup(service) {
 		// Delete the load balancer if service no longer wants one, or if service needs cleanup.
@@ -306,21 +307,22 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		newStatus = &v1.LoadBalancerStatus{}
 		_, exists, err := s.balancer.GetLoadBalancer(context.TODO(), s.clusterName, service)
 		if err != nil {
-			return op, fmt.Errorf("failed to check if load balancer exists before cleanup: %v", err)
+			return op, fmt.Errorf("failed to check if load balancer exists before cleanup: %v", err), false
 		}
 		if exists {
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
-				return op, fmt.Errorf("failed to delete load balancer: %v", err)
+				return op, fmt.Errorf("failed to delete load balancer: %v", err), false
 			}
 		}
+		loadBalancerDeleted = true
 		// Always try to remove finalizer when load balancer is deleted.
 		// It will be a no-op if finalizer does not exist.
 		// Note this also clears up finalizer if the cluster is downgraded
 		// from a version that attaches finalizer to a version that doesn't.
 		if err := s.removeFinalizer(service); err != nil {
-			return op, fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err)
+			return op, fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err), loadBalancerDeleted
 		}
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
 	} else {
@@ -335,12 +337,12 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 			// is upgraded from a version that doesn't attach finalizer to a
 			// version that does.
 			if err := s.addFinalizer(service); err != nil {
-				return op, fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err)
+				return op, fmt.Errorf("failed to add load balancer cleanup finalizer: %v", err), false
 			}
 		}
 		newStatus, err = s.ensureLoadBalancer(service)
 		if err != nil {
-			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
+			return op, fmt.Errorf("failed to ensure load balancer: %v", err), false
 		}
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
@@ -351,11 +353,11 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		//   we remove the finalizer.
 		// - We can't patch status on non-exist service anyway.
 		if !errors.IsNotFound(err) {
-			return op, fmt.Errorf("failed to update load balancer status: %v", err)
+			return op, fmt.Errorf("failed to update load balancer status: %v", err), loadBalancerDeleted
 		}
 	}
 
-	return op, nil
+	return op, nil, loadBalancerDeleted
 }
 
 func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {

@@ -317,7 +317,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			}
 			client.ClearActions()
 
-			op, err := controller.syncLoadBalancerIfNeeded(tc.service, key)
+			op, err, _ := controller.syncLoadBalancerIfNeeded(tc.service, key)
 			if err != nil {
 				t.Errorf("Got error: %v, want nil", err)
 			}
