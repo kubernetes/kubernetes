@@ -8,6 +8,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
+	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/pkg/errors v0.8.0 // indirect
 	github.com/russross/blackfriday v1.5.2

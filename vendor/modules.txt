@@ -1634,6 +1634,7 @@ k8s.io/kube-proxy/config/v1alpha1
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 k8s.io/kubectl/pkg/util/interrupt
+k8s.io/kubectl/pkg/util/printers
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
