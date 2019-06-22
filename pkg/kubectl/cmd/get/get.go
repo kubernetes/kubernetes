@@ -570,7 +570,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		fmt.Fprintln(o.ErrOut, "No resources found.")
+
+		resourceType := args[0]
+		fmt.Fprintf(o.ErrOut, "No %s found in namespace %s.\n", resourceType, o.Namespace)
+
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
