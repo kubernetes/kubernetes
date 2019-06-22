@@ -189,10 +189,7 @@ pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
-pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
-pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
-pkg/registry/apps/daemonset/storage
 pkg/registry/apps/deployment/storage
 pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage
@@ -205,11 +202,8 @@ pkg/registry/authorization/localsubjectaccessreview
 pkg/registry/authorization/rest
 pkg/registry/authorization/selfsubjectaccessreview
 pkg/registry/authorization/subjectaccessreview
-pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/autoscaling/rest
-pkg/registry/batch/cronjob/storage
 pkg/registry/batch/job
-pkg/registry/batch/job/storage
 pkg/registry/batch/rest
 pkg/registry/certificates/certificates
 pkg/registry/certificates/certificates/storage
