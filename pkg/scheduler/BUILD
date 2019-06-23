@@ -21,7 +21,6 @@ go_library(
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
-        "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

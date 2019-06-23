@@ -42,7 +42,6 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -465,7 +464,7 @@ func (sched *Scheduler) scheduleOne() {
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
 		if fitError, ok := err.(*core.FitError); ok {
-			if !util.PodPriorityEnabled() || sched.config.DisablePreemption {
+			if sched.config.DisablePreemption {
 				klog.V(3).Infof("Pod priority feature is not enabled or preemption is disabled by scheduler configuration." +
 					" No preemption is performed.")
 			} else {

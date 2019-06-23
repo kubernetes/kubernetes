@@ -483,8 +483,6 @@ func thresholdEqual(a evictionapi.Threshold, b evictionapi.Threshold) bool {
 }
 
 func TestOrderedByExceedsRequestMemory(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
-
 	below := newPod("below-requests", -1, []v1.Container{
 		newContainer("below-requests", newResourceList("", "200Mi", ""), newResourceList("", "", "")),
 	}, nil)
@@ -511,7 +509,6 @@ func TestOrderedByExceedsRequestMemory(t *testing.T) {
 }
 
 func TestOrderedByExceedsRequestDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	below := newPod("below-requests", -1, []v1.Container{
 		newContainer("below-requests", v1.ResourceList{v1.ResourceEphemeralStorage: resource.MustParse("200Mi")}, newResourceList("", "", "")),
@@ -539,7 +536,6 @@ func TestOrderedByExceedsRequestDisk(t *testing.T) {
 }
 
 func TestOrderedByPriority(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	low := newPod("low-priority", -134, []v1.Container{
 		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)
@@ -554,30 +550,6 @@ func TestOrderedByPriority(t *testing.T) {
 	orderedBy(priority).Sort(pods)
 
 	expected := []*v1.Pod{low, medium, high}
-	for i := range expected {
-		if pods[i] != expected[i] {
-			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
-		}
-	}
-}
-
-func TestOrderedByPriorityDisabled(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, false)()
-	low := newPod("low-priority", lowPriority, []v1.Container{
-		newContainer("low-priority", newResourceList("", "", ""), newResourceList("", "", "")),
-	}, nil)
-	medium := newPod("medium-priority", defaultPriority, []v1.Container{
-		newContainer("medium-priority", newResourceList("100m", "100Mi", ""), newResourceList("200m", "200Mi", "")),
-	}, nil)
-	high := newPod("high-priority", highPriority, []v1.Container{
-		newContainer("high-priority", newResourceList("200m", "200Mi", ""), newResourceList("200m", "200Mi", "")),
-	}, nil)
-
-	pods := []*v1.Pod{high, medium, low}
-	orderedBy(priority).Sort(pods)
-
-	// orderedBy(priority) should not change the input ordering, since we did not enable the PodPriority feature gate
-	expected := []*v1.Pod{high, medium, low}
 	for i := range expected {
 		if pods[i] != expected[i] {
 			t.Errorf("Expected pod: %s, but got: %s", expected[i].Name, pods[i].Name)
@@ -719,7 +691,6 @@ func TestOrderedbyDiskDisableLocalStorage(t *testing.T) {
 }
 
 func TestOrderedbyInodes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	low := newPod("low", defaultPriority, []v1.Container{
 		newContainer("low", newResourceList("", "", ""), newResourceList("", "", "")),
@@ -763,7 +734,6 @@ func TestOrderedbyInodes(t *testing.T) {
 
 // TestOrderedByPriorityDisk ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityDisk(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
@@ -848,7 +818,6 @@ func TestOrderedByPriorityDisk(t *testing.T) {
 
 // TestOrderedByPriorityInodes ensures we order pods by priority and then greediest resource consumer
 func TestOrderedByPriorityInodes(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	pod1 := newPod("low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, []v1.Volume{
@@ -941,7 +910,6 @@ func TestOrderedByMemory(t *testing.T) {
 
 // TestOrderedByPriorityMemory ensures we order by priority and then memory consumption relative to request.
 func TestOrderedByPriorityMemory(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, true)()
 	pod1 := newPod("above-requests-low-priority-high-usage", lowPriority, []v1.Container{
 		newContainer("above-requests-low-priority-high-usage", newResourceList("", "", ""), newResourceList("", "", "")),
 	}, nil)

@@ -156,8 +156,7 @@ func initTestScheduler(
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 ) *testContext {
-	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
-	// feature gate is enabled at the same time.
+	// Pod preemption is enabled by default scheduler configuration.
 	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerframework.NewRegistry(),
 		nil, []schedulerconfig.PluginConfig{}, false, time.Second)
 }

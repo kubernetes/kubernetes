@@ -513,10 +513,6 @@ func (ms *multiSorter) Less(i, j int) bool {
 
 // priority compares pods by Priority, if priority is enabled.
 func priority(p1, p2 *v1.Pod) int {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		// If priority is not enabled, all pods are equal.
-		return 0
-	}
 	priority1 := schedulerutils.GetPodPriority(p1)
 	priority2 := schedulerutils.GetPodPriority(p2)
 	if priority1 == priority2 {
