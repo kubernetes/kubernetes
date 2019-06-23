@@ -19,41 +19,9 @@ import (
 	"github.com/heketi/heketi/pkg/utils"
 )
 
-// DbDump provides a JSON representation of current state of DB
-func (c *Client) DbDump() (string, error) {
-	req, err := http.NewRequest("GET", c.host+"/db/dump", nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Set token
-	err = c.setToken(req)
-	if err != nil {
-		return "", err
-	}
-
-	// Send request
-	r, err := c.do(req)
-	if err != nil {
-		return "", err
-	}
-	defer r.Body.Close()
-	if r.StatusCode != http.StatusOK {
-		return "", utils.GetErrorFromResponse(r)
-	}
-
-	respBytes, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return "", err
-	}
-
-	respJSON := string(respBytes)
-	return respJSON, nil
-}
-
-// DbCheck provides a JSON summary of the DB check operation
-func (c *Client) DbCheck() (string, error) {
-	req, err := http.NewRequest("GET", c.host+"/db/check", nil)
+// StateExamineGluster provides a comparision of DB and Gluster
+func (c *Client) StateExamineGluster() (string, error) {
+	req, err := http.NewRequest("GET", c.host+"/internal/state/examine/gluster", nil)
 	if err != nil {
 		return "", err
 	}
