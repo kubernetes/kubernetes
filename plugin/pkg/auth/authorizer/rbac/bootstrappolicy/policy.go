@@ -139,6 +139,9 @@ func NodeRules() []rbacv1.PolicyRule {
 		// Used to create a certificatesigningrequest for a node-specific client certificate, and watch
 		// for it to be signed. This allows the kubelet to rotate it's own certificate.
 		rbacv1helpers.NewRule("create", "get", "list", "watch").Groups(certificatesGroup).Resources("certificatesigningrequests").RuleOrDie(),
+
+		// CSI
+		rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
@@ -156,13 +159,9 @@ func NodeRules() []rbacv1.PolicyRule {
 	}
 
 	// CSI
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {
-		volAttachRule := rbacv1helpers.NewRule("get").Groups(storageGroup).Resources("volumeattachments").RuleOrDie()
-		nodePolicyRules = append(nodePolicyRules, volAttachRule)
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-			csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
-			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
-		}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		csiDriverRule := rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csidrivers").RuleOrDie()
+		nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
