@@ -840,38 +840,9 @@ filename | sha512 hash
 
 ### Action Required
 
-* ACTION REQUIRED  The deprecated flag --conntrack-max has been removed from kube-proxy. Users of this flag should switch to --conntrack-min and --conntrack-max-per-core instead. ([#78399](https://github.com/kubernetes/kubernetes/pull/78399), [@rikatz](https://github.com/rikatz))
+* ACTION REQUIRED: The deprecated flag --conntrack-max has been removed from kube-proxy. Users of this flag should switch to --conntrack-min and --conntrack-max-per-core instead. ([#78399](https://github.com/kubernetes/kubernetes/pull/78399), [@rikatz](https://github.com/rikatz))
 * ACTION REQUIRED: kubeadm: the mixture of "--config" and "--certificate-key" is no longer allowed. The InitConfiguration and JoinConfiguration objects now support the "certificateKey" field and this field should be used instead of the command line argument in case a configuration file is already passed. ([#78542](https://github.com/kubernetes/kubernetes/pull/78542), [@neolit123](https://github.com/neolit123))
-* Azure cloud provider could now be configured by Kubernetes secrets and a new option `cloudConfigType` is introduced, whose candicate values are `file`, `secret` and `merge` (default is `merge`). ([#78242](https://github.com/kubernetes/kubernetes/pull/78242), [@feiskyer](https://github.com/feiskyer))
-    * action required:
-    * Since Azure cloud provider would read Kubernetes secrets, the following RBAC should be configured:
-    *     ---
-    *     apiVersion: rbac.authorization.k8s.io/v1beta1
-    *     kind: ClusterRole
-    *     metadata:
-    *     labels:
-    *         kubernetes.io/cluster-service: "true"
-    *     name: system:azure-cloud-provider-secret-getter
-    *     rules:
-    *     - apiGroups: [""]
-    *     resources: ["secrets"]
-    *     verbs:
-    *     - get
-    *     ---
-    *     apiVersion: rbac.authorization.k8s.io/v1beta1
-    *     kind: ClusterRoleBinding
-    *     metadata:
-    *     labels:
-    *         kubernetes.io/cluster-service: "true"
-    *     name: system:azure-cloud-provider-secret-getter
-    *     roleRef:
-    *     apiGroup: rbac.authorization.k8s.io
-    *     kind: ClusterRole
-    *     name: system:azure-cloud-provider-secret-getter
-    *     subjects:
-    *     - kind: ServiceAccount
-    *     name: azure-cloud-provider
-    *     namespace: kube-system
+* ACTION REQUIRED: Azure cloud provider could now be configured by Kubernetes secrets and a new option `cloudConfigType` is introduced, whose candidate values are `file`, `secret` and `merge` (default is `merge`). Note that the secret is a serialized version of azure.json file with key cloud-config. And the secret name is azure-cloud-provider in kube-system namespace. To allow Azure cloud provider read this secret, the RBAC permission referred [here](https://github.com/kubernetes/kubernetes/pull/78242) should also be assigned to service account `kube-system:azure-cloud-provider`.([#78242](https://github.com/kubernetes/kubernetes/pull/78242), [@feiskyer](https://github.com/feiskyer))
 
 ### Other notable changes
 
