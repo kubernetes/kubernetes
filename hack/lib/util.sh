@@ -531,6 +531,16 @@ EOF
 EOF
 }
 
+# list_staging_repos outputs a sorted list of repos in staging/src/k8s.io
+# each entry will just be the $repo portion of staging/src/k8s.io/$repo/...
+function kube::util::list_staging_repos() {
+  (
+    cd "${KUBE_ROOT}/staging/src/k8s.io" && \
+    find . -mindepth 1 -maxdepth 1 -type d | cut -c 3- | sort
+  )
+}
+
+
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {
   IFS=" " read -ra DOCKER <<< "${DOCKER_OPTS}"
