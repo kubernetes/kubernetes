@@ -702,6 +702,15 @@ function kube::util::require-jq {
   fi
 }
 
+# outputs md5 hash of $1, works on macOS and Linux
+function kube::util::md5() {
+  if which md5 >/dev/null 2>&1; then
+    md5 -q "$1"
+  else
+    md5sum "$1" | awk '{ print $1 }'
+  fi
+}
+
 # kube::util::read-array
 # Reads in stdin and adds it line by line to the array provided. This can be
 # used instead of "mapfile -t", and is bash 3 compatible.
