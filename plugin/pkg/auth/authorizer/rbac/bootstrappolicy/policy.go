@@ -164,8 +164,7 @@ func NodeRules() []rbacv1.PolicyRule {
 			nodePolicyRules = append(nodePolicyRules, csiDriverRule)
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		csiNodeInfoRule := rbacv1helpers.NewRule("get", "create", "update", "patch", "delete").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie()
 		nodePolicyRules = append(nodePolicyRules, csiNodeInfoRule)
 	}

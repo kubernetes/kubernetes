@@ -329,13 +329,6 @@ const (
 	VolumeSubpathEnvExpansion featuregate.Feature = "VolumeSubpathEnvExpansion"
 
 	// owner: @vikaschoudhary16
-	// GA: v1.13
-	//
-	//
-	// Enable probe based plugin watcher utility for discovering Kubelet plugins
-	KubeletPluginsWatcher featuregate.Feature = "KubeletPluginsWatcher"
-
-	// owner: @vikaschoudhary16
 	// beta: v1.12
 	//
 	//
@@ -549,7 +542,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: featuregate.Alpha},
 	PodReadinessGates:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	VolumeSubpathEnvExpansion:                   {Default: true, PreRelease: featuregate.Beta},
-	KubeletPluginsWatcher:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIBlockVolume:                              {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                             {Default: false, PreRelease: featuregate.Alpha},
