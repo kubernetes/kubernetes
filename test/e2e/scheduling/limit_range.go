@@ -44,7 +44,7 @@ var _ = SIGDescribe("LimitRange", func() {
 	/*
 		Release : v1.16
 		Testname: LimitRange: CRUD
-		Description: Ensure that LimitRange values are able to be applied, updated, deleted, and that this is observed by Pods.
+		Description: Create a LimitRange. Creation MUST be successful and creation of pods MUST respect set limits.
 	*/
 	framework.ConformanceIt("should create a LimitRange with defaults and ensure pod has those defaults applied", func() {
 		ginkgo.By("Creating a LimitRange")
