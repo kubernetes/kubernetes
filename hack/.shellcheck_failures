@@ -23,7 +23,6 @@
 ./hack/lib/version.sh
 ./hack/make-rules/make-help.sh
 ./hack/test-integration.sh
-./hack/verify-no-vendor-cycles.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/diff.sh
 ./test/cmd/discovery.sh
