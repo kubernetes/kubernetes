@@ -136,9 +136,17 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 			createRequest.Scheme = aws.String("internal")
 		}
 
+		var allocationIDs []string
+		if eipList, present := annotations[ServiceAnnotationLoadBalancerEIPAllocations]; present {
+			allocationIDs = strings.Split(eipList, ",")
+			if len(allocationIDs) != len(subnetIDs) {
+				return nil, fmt.Errorf("Error creating load balancer: Must have same number of EIP AllocationIDs (%d) and SubnetIDs (%d)", len(allocationIDs), len(subnetIDs))
+			}
+		}
+
 		// We are supposed to specify one subnet per AZ.
 		// TODO: What happens if we have more than one subnet per AZ?
-		createRequest.SubnetMappings = createSubnetMappings(subnetIDs)
+		createRequest.SubnetMappings = createSubnetMappings(subnetIDs, allocationIDs)
 
 		for k, v := range tags {
 			createRequest.Tags = append(createRequest.Tags, &elbv2.Tag{
@@ -1222,12 +1230,15 @@ func elbListenersAreEqual(actual, expected *elb.Listener) bool {
 	return true
 }
 
-func createSubnetMappings(subnetIDs []string) []*elbv2.SubnetMapping {
+func createSubnetMappings(subnetIDs []string, allocationIDs []string) []*elbv2.SubnetMapping {
 	response := []*elbv2.SubnetMapping{}
 
-	for _, id := range subnetIDs {
-		// Ignore AllocationId for now
-		response = append(response, &elbv2.SubnetMapping{SubnetId: aws.String(id)})
+	for index, id := range subnetIDs {
+		sm := &elbv2.SubnetMapping{SubnetId: aws.String(id)}
+		if len(allocationIDs) > 0 {
+			sm.AllocationId = aws.String(allocationIDs[index])
+		}
+		response = append(response, sm)
 	}
 
 	return response
