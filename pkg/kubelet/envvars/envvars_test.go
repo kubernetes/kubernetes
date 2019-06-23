@@ -17,16 +17,43 @@ limitations under the License.
 package envvars_test
 
 import (
-	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
 )
 
 func TestFromServices(t *testing.T) {
+	masterServiceFunc := func(svc *v1.Service) bool {
+		return svc.Name == "external-master"
+	}
 	sl := []*v1.Service{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "external-not-master-ignored"},
+			Spec: v1.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "",
+				Ports: []v1.ServicePort{
+					{Port: 8080, Protocol: "TCP"},
+				},
+				Type:         v1.ServiceTypeExternalName,
+				ExternalName: "baz.bar",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "external-master"},
+			Spec: v1.ServiceSpec{
+				Selector:  map[string]string{"bar": "baz"},
+				ClusterIP: "",
+				Ports: []v1.ServicePort{
+					{Port: 8443, Protocol: "TCP"},
+				},
+				Type:         v1.ServiceTypeExternalName,
+				ExternalName: "foo.bar",
+			},
+		},
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "foo-bar"},
 			Spec: v1.ServiceSpec{
@@ -101,8 +128,15 @@ func TestFromServices(t *testing.T) {
 			},
 		},
 	}
-	vars := envvars.FromServices(sl)
+	vars := envvars.FromServices(sl, masterServiceFunc)
 	expected := []v1.EnvVar{
+		{Name: "EXTERNAL_MASTER_SERVICE_HOST", Value: "foo.bar"},
+		{Name: "EXTERNAL_MASTER_SERVICE_PORT", Value: "8443"},
+		{Name: "EXTERNAL_MASTER_PORT", Value: "tcp://foo.bar:8443"},
+		{Name: "EXTERNAL_MASTER_PORT_8443_TCP", Value: "tcp://foo.bar:8443"},
+		{Name: "EXTERNAL_MASTER_PORT_8443_TCP_PROTO", Value: "tcp"},
+		{Name: "EXTERNAL_MASTER_PORT_8443_TCP_PORT", Value: "8443"},
+		{Name: "EXTERNAL_MASTER_PORT_8443_TCP_ADDR", Value: "foo.bar"},
 		{Name: "FOO_BAR_SERVICE_HOST", Value: "1.2.3.4"},
 		{Name: "FOO_BAR_SERVICE_PORT", Value: "8080"},
 		{Name: "FOO_BAR_PORT", Value: "tcp://1.2.3.4:8080"},
@@ -156,13 +190,6 @@ func TestFromServices(t *testing.T) {
 		{Name: "SCTP_1_PORT_777_SCTP_PORT", Value: "777"},
 		{Name: "SCTP_1_PORT_777_SCTP_ADDR", Value: "1.2.3.4"},
 	}
-	if len(vars) != len(expected) {
-		t.Errorf("Expected %d env vars, got: %+v", len(expected), vars)
-		return
-	}
-	for i := range expected {
-		if !reflect.DeepEqual(vars[i], expected[i]) {
-			t.Errorf("expected %#v, got %#v", vars[i], expected[i])
-		}
-	}
+
+	assert.Equal(t, expected, vars, "env entries")
 }

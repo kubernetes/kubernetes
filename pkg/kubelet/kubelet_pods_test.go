@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -410,8 +410,16 @@ func buildService(name, namespace, clusterIP, protocol string, port int) *v1.Ser
 				Port:     int32(port),
 			}},
 			ClusterIP: clusterIP,
+			Type:      v1.ServiceTypeClusterIP,
 		},
 	}
+}
+
+func buildExternalNameService(name, namespace, externalName, protocol string, port int) *v1.Service {
+	svc := buildService(name, namespace, "", protocol, port)
+	svc.Spec.Type = v1.ServiceTypeExternalName
+	svc.Spec.ExternalName = externalName
+	return svc
 }
 
 func TestMakeEnvironmentVariables(t *testing.T) {
@@ -423,10 +431,20 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		buildService("test", "test2", "1.2.3.5", "TCP", 8085),
 		buildService("test", "test2", "None", "TCP", 8085),
 		buildService("test", "test2", "", "TCP", 8085),
+		buildExternalNameService("test", "test2", "example.com", "TCP", 8085),
 		buildService("kubernetes", "kubernetes", "1.2.3.6", "TCP", 8086),
 		buildService("not-special", "kubernetes", "1.2.3.8", "TCP", 8088),
 		buildService("not-special", "kubernetes", "None", "TCP", 8088),
 		buildService("not-special", "kubernetes", "", "TCP", 8088),
+		buildExternalNameService("not-special", "kubernetes", "baz.bar", "TCP", 8088),
+		buildService("test", "test3", "1.2.3.9", "TCP", 4001),
+		buildService("test", "test3", "None", "TCP", 4001),
+		buildService("test", "test3", "", "TCP", 4001),
+		buildExternalNameService("test", "test3", "example.com", "TCP", 4002),
+		buildExternalNameService("kubernetes", "kubernetes-external-name", "foo.bar", "TCP", 4003),
+		buildService("not-special", "kubernetes-external-name", "1.2.3.10", "TCP", 4004),
+		buildService("not-special", "kubernetes-external-name", "None", "TCP", 4004),
+		buildService("not-special", "kubernetes-external-name", "", "TCP", 4004),
 	}
 
 	trueValue := true
@@ -650,6 +668,98 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				{Name: "KUBERNETES_PORT_8086_TCP_PROTO", Value: "tcp"},
 				{Name: "KUBERNETES_PORT_8086_TCP_PORT", Value: "8086"},
 				{Name: "KUBERNETES_PORT_8086_TCP_ADDR", Value: "1.2.3.6"},
+			},
+		},
+		{
+			name:               "[external name] master service in pod ns",
+			ns:                 "test3",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{Name: "FOO", Value: "DUF"},
+				},
+			},
+			masterServiceNs: "kubernetes-external-name",
+			nilLister:       false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "FOO", Value: "DUF"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "foo.bar"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_ADDR", Value: "foo.bar"},
+			},
+		},
+		{
+			name:               "[external name] master service in pod ns, service env vars",
+			ns:                 "test3",
+			enableServiceLinks: &trueValue,
+			container: &v1.Container{
+				Env: []v1.EnvVar{
+					{Name: "FOO", Value: "PAP"},
+				},
+			},
+			masterServiceNs: "kubernetes-external-name",
+			nilLister:       false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "FOO", Value: "PAP"},
+				{Name: "TEST_SERVICE_HOST", Value: "1.2.3.9"},
+				{Name: "TEST_SERVICE_PORT", Value: "4001"},
+				{Name: "TEST_PORT", Value: "tcp://1.2.3.9:4001"},
+				{Name: "TEST_PORT_4001_TCP", Value: "tcp://1.2.3.9:4001"},
+				{Name: "TEST_PORT_4001_TCP_PROTO", Value: "tcp"},
+				{Name: "TEST_PORT_4001_TCP_PORT", Value: "4001"},
+				{Name: "TEST_PORT_4001_TCP_ADDR", Value: "1.2.3.9"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "foo.bar"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_ADDR", Value: "foo.bar"},
+			},
+		},
+		{
+			name:               "[external name] pod in master service ns",
+			ns:                 "kubernetes-external-name",
+			enableServiceLinks: &falseValue,
+			container:          &v1.Container{},
+			masterServiceNs:    "kubernetes-external-name",
+			nilLister:          false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "foo.bar"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_ADDR", Value: "foo.bar"},
+			},
+		},
+		{
+			name:               "[external name] pod in master service ns, service env vars",
+			ns:                 "kubernetes-external-name",
+			enableServiceLinks: &trueValue,
+			container:          &v1.Container{},
+			masterServiceNs:    "kubernetes-external-name",
+			nilLister:          false,
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "NOT_SPECIAL_SERVICE_HOST", Value: "1.2.3.10"},
+				{Name: "NOT_SPECIAL_SERVICE_PORT", Value: "4004"},
+				{Name: "NOT_SPECIAL_PORT", Value: "tcp://1.2.3.10:4004"},
+				{Name: "NOT_SPECIAL_PORT_4004_TCP", Value: "tcp://1.2.3.10:4004"},
+				{Name: "NOT_SPECIAL_PORT_4004_TCP_PROTO", Value: "tcp"},
+				{Name: "NOT_SPECIAL_PORT_4004_TCP_PORT", Value: "4004"},
+				{Name: "NOT_SPECIAL_PORT_4004_TCP_ADDR", Value: "1.2.3.10"},
+				{Name: "KUBERNETES_SERVICE_HOST", Value: "foo.bar"},
+				{Name: "KUBERNETES_SERVICE_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP", Value: "tcp://foo.bar:4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PROTO", Value: "tcp"},
+				{Name: "KUBERNETES_PORT_4003_TCP_PORT", Value: "4003"},
+				{Name: "KUBERNETES_PORT_4003_TCP_ADDR", Value: "foo.bar"},
 			},
 		},
 		{
@@ -1644,6 +1754,114 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			sort.Sort(envs(tc.expectedEnvs))
 			assert.Equal(t, tc.expectedEnvs, result, "[%s] env entries", tc.name)
 		}
+	}
+}
+
+func TestIsMasterService(t *testing.T) {
+	tcc := []struct {
+		testName        string
+		svcName         string
+		svcNamespace    string
+		masterNamespace string
+		expected        bool
+	}{
+		{testName: "service namespace not the same",
+			svcName:         "kubernetes",
+			svcNamespace:    "wrong",
+			masterNamespace: "correct",
+			expected:        false,
+		},
+		{testName: "service name not kubernetes",
+			svcName:         "wrong",
+			svcNamespace:    "correct",
+			masterNamespace: "correct",
+			expected:        false,
+		},
+		{testName: "service name kubernetes; same namespace",
+			svcName:         "kubernetes",
+			svcNamespace:    "correct",
+			masterNamespace: "correct",
+			expected:        true,
+		},
+	}
+	for _, tc := range tcc {
+		t.Run(tc.testName, func(t *testing.T) {
+			kl := Kubelet{masterServiceNamespace: tc.masterNamespace}
+			isMaster := kl.isMasterService(&v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      tc.svcName,
+					Namespace: tc.svcNamespace,
+				}})
+
+			assert.Equal(t, tc.expected, isMaster)
+		})
+	}
+}
+
+func TestFilterService(t *testing.T) {
+	tcc := []struct {
+		testName      string
+		clusterIPSet  bool
+		masterService bool
+		externalType  bool
+		externalName  string
+		expected      bool
+	}{
+		{testName: "ClusterIP is set, not master service",
+			clusterIPSet: true,
+			expected:     true,
+		},
+		{testName: "ClusterIP is set, master service",
+			clusterIPSet:  true,
+			masterService: true,
+			expected:      true,
+		},
+		{testName: "ExteralName empty, master service",
+			masterService: true,
+			externalType:  true,
+			expected:      false,
+		},
+		{testName: "ExteralName empty, not master service",
+			externalType: true,
+			expected:     false,
+		},
+		{testName: "ExteralName set, master service",
+			masterService: true,
+			externalType:  true,
+			externalName:  "foo.bar",
+			expected:      true,
+		},
+		{testName: "ExteralName set, not master service",
+			externalType: true,
+			externalName: "foo.bar",
+			expected:     false,
+		},
+	}
+	for _, tc := range tcc {
+		t.Run(tc.testName, func(t *testing.T) {
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "kubernetes",
+					Namespace: "default",
+				}}
+			masterNamespace := "default"
+			if !tc.masterService {
+				masterNamespace = "wrong"
+			}
+
+			if tc.clusterIPSet {
+				svc.Spec.Type = v1.ServiceTypeClusterIP
+				svc.Spec.ClusterIP = "1.2.3.4"
+			} else if tc.externalType {
+				svc.Spec.Type = v1.ServiceTypeExternalName
+				svc.Spec.ExternalName = tc.externalName
+			}
+
+			kl := Kubelet{masterServiceNamespace: masterNamespace}
+			isMaster := kl.filterService(svc)
+
+			assert.Equal(t, tc.expected, isMaster)
+		})
 	}
 }
 

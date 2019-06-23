@@ -22,28 +22,30 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 // FromServices builds environment variables that a container is started with,
 // which tell the container where to find the services it may need, which are
-// provided as an argument.
-func FromServices(services []*v1.Service) []v1.EnvVar {
+// provided as an argument. "masterFilterFunc" checks if the service is the master
+// service and it can be of type ExternalName.
+func FromServices(services []*v1.Service, masterFilterFunc func(*v1.Service) bool) []v1.EnvVar {
 	var result []v1.EnvVar
 	for i := range services {
 		service := services[i]
 
 		// ignore services where ClusterIP is "None" or empty
 		// the services passed to this method should be pre-filtered
-		// only services that have the cluster IP set should be included here
-		if !v1helper.IsServiceIPSet(service) {
+		// only services that have the cluster IP set should be included here.
+		// Exception is made for the master service, which can be of type "ExternalName".
+		if !v1helper.IsServiceIPSet(service) && !masterFilterFunc(service) {
 			continue
 		}
 
 		// Host
 		name := makeEnvVariableName(service.Name) + "_SERVICE_HOST"
-		result = append(result, v1.EnvVar{Name: name, Value: service.Spec.ClusterIP})
+		result = append(result, v1.EnvVar{Name: name, Value: getHost(service)})
 		// First port - give it the backwards-compatible name
 		name = makeEnvVariableName(service.Name) + "_SERVICE_PORT"
 		result = append(result, v1.EnvVar{Name: name, Value: strconv.Itoa(int(service.Spec.Ports[0].Port))})
@@ -59,6 +61,13 @@ func FromServices(services []*v1.Service) []v1.EnvVar {
 		result = append(result, makeLinkVariables(service)...)
 	}
 	return result
+}
+
+func getHost(svc *v1.Service) string {
+	if svc.Spec.Type == v1.ServiceTypeExternalName {
+		return svc.Spec.ExternalName
+	}
+	return svc.Spec.ClusterIP
 }
 
 func makeEnvVariableName(str string) string {
@@ -79,8 +88,8 @@ func makeLinkVariables(service *v1.Service) []v1.EnvVar {
 		if sp.Protocol != "" {
 			protocol = string(sp.Protocol)
 		}
-
-		hostPort := net.JoinHostPort(service.Spec.ClusterIP, strconv.Itoa(int(sp.Port)))
+		hostName := getHost(service)
+		hostPort := net.JoinHostPort(hostName, strconv.Itoa(int(sp.Port)))
 
 		if i == 0 {
 			// Docker special-cases the first port.
@@ -105,7 +114,7 @@ func makeLinkVariables(service *v1.Service) []v1.EnvVar {
 			},
 			{
 				Name:  portPrefix + "_ADDR",
-				Value: service.Spec.ClusterIP,
+				Value: hostName,
 			},
 		}...)
 	}

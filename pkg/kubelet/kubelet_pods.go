@@ -32,7 +32,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -70,6 +70,7 @@ import (
 const (
 	managedHostsHeader                = "# Kubernetes-managed hosts file.\n"
 	managedHostsHeaderWithHostNetwork = "# Kubernetes-managed hosts file (host network).\n"
+	masterService                     = "kubernetes"
 )
 
 // Get a list of pods that have data directories.
@@ -490,8 +491,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	return opts, cleanupAction, nil
 }
 
-var masterServices = sets.NewString("kubernetes")
-
 // getServiceEnvVarMap makes a map[string]string of env vars for services a
 // pod in namespace ns should see.
 func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[string]string, error) {
@@ -514,17 +513,18 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 	// project the services in namespace ns onto the master services
 	for i := range services {
 		service := services[i]
-		// ignore services where ClusterIP is "None" or empty
-		if !v1helper.IsServiceIPSet(service) {
+		// ignore services where ClusterIP is "None" or empty.
+		// Exception is made for the master service, which can be of type "ExternalName".
+		if !kl.filterService(service) {
 			continue
 		}
 		serviceName := service.Name
 
-		// We always want to add environment variabled for master services
+		// We always want to add environment variabled for master service
 		// from the master service namespace, even if enableServiceLinks is false.
 		// We also add environment variables for other services in the same
 		// namespace, if enableServiceLinks is true.
-		if service.Namespace == kl.masterServiceNamespace && masterServices.Has(serviceName) {
+		if kl.isMasterService(service) {
 			if _, exists := serviceMap[serviceName]; !exists {
 				serviceMap[serviceName] = service
 			}
@@ -538,10 +538,24 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 		mappedServices = append(mappedServices, serviceMap[key])
 	}
 
-	for _, e := range envvars.FromServices(mappedServices) {
+	for _, e := range envvars.FromServices(mappedServices, kl.isMasterService) {
 		m[e.Name] = e.Value
 	}
 	return m, nil
+}
+
+// isMasterService checks if svc is the master service.
+func (kl *Kubelet) isMasterService(svc *v1.Service) bool {
+	return svc.Namespace == kl.masterServiceNamespace && masterService == svc.Name
+}
+
+// filterService returns true for a service if
+// its ClusterIP is not "None" or empty
+// OR
+// it's the master service AND its ExternalName is not empty.
+func (kl *Kubelet) filterService(svc *v1.Service) bool {
+	return v1helper.IsServiceIPSet(svc) ||
+		(kl.isMasterService(svc) && svc.Spec.Type == v1.ServiceTypeExternalName && svc.Spec.ExternalName != "")
 }
 
 // Make the environment variables for a pod in the given namespace.
