@@ -162,13 +162,6 @@ const (
 	// Enable nodes to change CPUCFSQuotaPeriod
 	CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
 
-	// owner: @derekwaynecarr
-	// beta: v1.10
-	// GA: v1.14
-	//
-	// Enable pods to consume pre-allocated huge pages of varying page sizes
-	HugePages featuregate.Feature = "HugePages"
-
 	// owner: @sjenning
 	// beta: v1.11
 	//
@@ -187,12 +180,6 @@ const (
 	// Enable running mount utilities in containers.
 	MountContainers featuregate.Feature = "MountContainers"
 
-	// owner: @msau42
-	// GA: v1.13
-	//
-	// Extend the default scheduler to be aware of PV topology and handle PV binding
-	VolumeScheduling featuregate.Feature = "VolumeScheduling"
-
 	// owner: @vladimirvivien
 	// GA: v1.13
 	//
@@ -210,12 +197,6 @@ const (
 	// beta:  v1.14
 	// Enable all logic related to the CSINode API object in storage.k8s.io
 	CSINodeInfo featuregate.Feature = "CSINodeInfo"
-
-	// owner @MrHohn
-	// GA: v1.14
-	//
-	// Support configurable pod DNS parameters.
-	CustomPodDNS featuregate.Feature = "CustomPodDNS"
 
 	// owner: @screeley44
 	// alpha: v1.9
@@ -314,12 +295,6 @@ const (
 	// A node which has closer cpu,memory utilization and volume count is favoured by scheduler
 	// while making decisions.
 	BalanceAttachedNodeVolumes featuregate.Feature = "BalanceAttachedNodeVolumes"
-
-	// owner @freehan
-	// GA: v1.14
-	//
-	// Allow user to specify additional conditions to be evaluated for Pod readiness.
-	PodReadinessGates featuregate.Feature = "PodReadinessGates"
 
 	// owner: @kevtaylor
 	// beta: v1.15
@@ -505,7 +480,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RotateKubeletClientCertificate:              {Default: true, PreRelease: featuregate.Beta},
 	PersistentLocalVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
 	LocalStorageCapacityIsolation:               {Default: true, PreRelease: featuregate.Beta},
-	HugePages:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	Sysctls:                                     {Default: true, PreRelease: featuregate.Beta},
 	DebugContainers:                             {Default: false, PreRelease: featuregate.Alpha},
 	PodShareProcessNamespace:                    {Default: true, PreRelease: featuregate.Beta},
@@ -520,11 +494,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: featuregate.Alpha},
 	MountContainers:                             {Default: false, PreRelease: featuregate.Alpha},
-	VolumeScheduling:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	CSIPersistentVolume:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	CSIDriverRegistry:                           {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                                 {Default: true, PreRelease: featuregate.Beta},
-	CustomPodDNS:                                {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	BlockVolume:                                 {Default: true, PreRelease: featuregate.Beta},
 	StorageObjectInUseProtection:                {Default: true, PreRelease: featuregate.GA},
 	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: featuregate.Alpha},
@@ -547,7 +519,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationOpenStack:                       {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                               {Default: true, PreRelease: featuregate.GA},
 	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: featuregate.Alpha},
-	PodReadinessGates:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	VolumeSubpathEnvExpansion:                   {Default: true, PreRelease: featuregate.Beta},
 	KubeletPluginsWatcher:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: featuregate.Beta},
