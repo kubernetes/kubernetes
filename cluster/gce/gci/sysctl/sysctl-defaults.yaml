@@ -1,8 +1,39 @@
-kernel.pid_max: "4194304"
-kernel.threads-max: "29563"
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
+
+###############################################################################
+# The following parameters are enforced by this file.
+###############################################################################
+
+# Override the default value (32768 on Ubuntu), which is too small for most use
+# cases.
+kernel.pid_max: "4194304"
+
+# Do not set kernel.threads-max because it cannot be set to arbitary value and
+# kernel may use different values for different machine types. This parameter
+# seems to be auto-tuned by kernel.
+# kernel.threads-max: ""
+
+# Enforce the OS default value (16384).
+fs.inotify.max_queued_events: "16384"
+# Override the OS default value (128), which is too small for most use cases.
+fs.inotify.max_user_instances: "8192"
+# Override the OS default value (8192), which is too small for most use cases.
 fs.inotify.max_user_watches: "12288"
 
+# Enforce the following OS default values.
 net.core.netdev_budget: "300"
 net.core.netdev_budget_usecs: "2000"
 net.core.netdev_max_backlog: "1000"
@@ -11,8 +42,10 @@ net.core.rmem_max: "212992"
 net.core.wmem_default: "212992"
 net.core.wmem_max: "212992"
 net.core.optmem_max: "20480"
-net.core.somaxconn: "128"
+# Override the OS default value (128), which is too small for most use cases.
+net.core.somaxconn: "1024"
 
+# Enforce the following OS default values.
 net.ipv4.tcp_rmem: "4096 87380 6291456"
 net.ipv4.tcp_wmem: "4096 16384 4194304"
 net.ipv4.tcp_mem: "43158 57544 86316"
@@ -29,7 +62,43 @@ net.ipv4.udp_mem: "86316 115088 172632"
 net.ipv4.udp_rmem_min: "4096"
 net.ipv4.udp_wmem_min: "4096"
 
+# Enforce the following OS default values.
 net.netfilter.nf_conntrack_generic_timeout: "600"
+
+
+###############################################################################
+# The following parameters are enforced by other Kubernetes/GKE components.
+#
+# - DO NOT modify the values below without coordinating with the enforcing
+#   Kubernetes/GKE components because the changes will be overridden by the
+#   components when they (re)start.
+# - Record the parameters and values here in order for the node config
+#   monitoring system to monitor and report any changes on these parameters.
+# - The list MAY NOT contain all the parameters that are enforced by
+#   Kubernetes/GKE components.
+###############################################################################
+
+# The following parameters are enforced by Docker.
+net.ipv4.conf.all.accept_redirects: "0"
+net.ipv4.conf.all.forwarding: "1"
+net.ipv4.conf.default.forwarding: "1"
+net.ipv4.conf.docker0.forwarding: "1"
+net.ipv4.conf.eth0.forwarding: "1"
+net.ipv4.conf.lo.forwarding: "1"
+net.ipv4.ip_forward: "1"
+
+# The following parameters are enforced by kubelet.
+kernel.keys.root_maxkeys: "1000000"
+kernel.keys.root_maxbytes: "25000000"
+kernel.panic: "10"
+kernel.panic_on_oops: "1"
+vm.overcommit_memory: "1"
+vm.panic_on_oom: "0"
+
+# The following parameters are enforced by kube-proxy.
+net.ipv4.conf.all.route_localnet: "1"
 net.netfilter.nf_conntrack_max: "131072"
 net.netfilter.nf_conntrack_tcp_timeout_close_wait: "3600"
 net.netfilter.nf_conntrack_tcp_timeout_established: "86400"
+# This is an alias of net.netfilter.nf_conntrack_max.
+net.nf_conntrack_max: "131072"

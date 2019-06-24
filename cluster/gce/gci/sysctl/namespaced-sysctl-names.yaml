@@ -1,15 +1,36 @@
-# This file contains the names of the namespaced kernel parameters.
+# Copyright 2019 Google LLC
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# This file contains the names of the namespaced kernel parameters.
+
+
 # The kernel parameter namespace adoption is kernel version dependent.
 #
 # The list was generated according to the following rules.
 #   - kernel.shm*, kernel.msg*, kernel.sem* and fs.mqueue.* are namespaced.
-#   - If a net sysctl is accessible in a pod namespace, it's namespaced.
+#   - If a net.* sysctl can be changed in container networking namespace, it's
+#     namespaced.
+#
+# However, there are exceptions. The following sysctls can be changed in
+# container networking namespace but they are unnamespaced.
+#   - net.netfilter.nf_conntrack_expect_max
+#   - net.netfilter.nf_conntrack_max
+#
 #
 # TODO(ygg): Build this file into the OS images in the preloading process since
 # the values only depends on images.
 
-- kernel: "4.15"
+- kernel: '4.15'
   namespaced:
   - fs.mqueue.msg_default
   - fs.mqueue.msg_max
@@ -51,7 +72,6 @@
   - net.ipv4.conf.all.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.all.ignore_routes_with_linkdown
   - net.ipv4.conf.all.log_martians
-  - net.ipv4.conf.all.mc_forwarding
   - net.ipv4.conf.all.medium_id
   - net.ipv4.conf.all.promote_secondaries
   - net.ipv4.conf.all.proxy_arp
@@ -82,7 +102,6 @@
   - net.ipv4.conf.default.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.default.ignore_routes_with_linkdown
   - net.ipv4.conf.default.log_martians
-  - net.ipv4.conf.default.mc_forwarding
   - net.ipv4.conf.default.medium_id
   - net.ipv4.conf.default.promote_secondaries
   - net.ipv4.conf.default.proxy_arp
@@ -113,7 +132,6 @@
   - net.ipv4.conf.eth0.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.eth0.ignore_routes_with_linkdown
   - net.ipv4.conf.eth0.log_martians
-  - net.ipv4.conf.eth0.mc_forwarding
   - net.ipv4.conf.eth0.medium_id
   - net.ipv4.conf.eth0.promote_secondaries
   - net.ipv4.conf.eth0.proxy_arp
@@ -144,7 +162,6 @@
   - net.ipv4.conf.lo.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.lo.ignore_routes_with_linkdown
   - net.ipv4.conf.lo.log_martians
-  - net.ipv4.conf.lo.mc_forwarding
   - net.ipv4.conf.lo.medium_id
   - net.ipv4.conf.lo.promote_secondaries
   - net.ipv4.conf.lo.proxy_arp
@@ -175,17 +192,15 @@
   - net.ipv4.ip_forward
   - net.ipv4.ip_forward_use_pmtu
   - net.ipv4.ip_local_port_range
-  - net.ipv4.ip_local_reserved_ports =
+  - net.ipv4.ip_local_reserved_ports
   - net.ipv4.ip_no_pmtu_disc
   - net.ipv4.ip_nonlocal_bind
   - net.ipv4.ip_unprivileged_port_start
-  - net.ipv4.ipfrag_high_thresh
   - net.ipv4.ipfrag_low_thresh
   - net.ipv4.ipfrag_max_dist
   - net.ipv4.ipfrag_time
   - net.ipv4.neigh.eth0.anycast_delay
   - net.ipv4.neigh.eth0.app_solicit
-  - net.ipv4.neigh.eth0.base_reachable_time
   - net.ipv4.neigh.eth0.base_reachable_time_ms
   - net.ipv4.neigh.eth0.delay_first_probe_time
   - net.ipv4.neigh.eth0.gc_stale_time
@@ -194,14 +209,12 @@
   - net.ipv4.neigh.eth0.mcast_solicit
   - net.ipv4.neigh.eth0.proxy_delay
   - net.ipv4.neigh.eth0.proxy_qlen
-  - net.ipv4.neigh.eth0.retrans_time
   - net.ipv4.neigh.eth0.retrans_time_ms
   - net.ipv4.neigh.eth0.ucast_solicit
   - net.ipv4.neigh.eth0.unres_qlen
   - net.ipv4.neigh.eth0.unres_qlen_bytes
   - net.ipv4.neigh.lo.anycast_delay
   - net.ipv4.neigh.lo.app_solicit
-  - net.ipv4.neigh.lo.base_reachable_time
   - net.ipv4.neigh.lo.base_reachable_time_ms
   - net.ipv4.neigh.lo.delay_first_probe_time
   - net.ipv4.neigh.lo.gc_stale_time
@@ -210,7 +223,6 @@
   - net.ipv4.neigh.lo.mcast_solicit
   - net.ipv4.neigh.lo.proxy_delay
   - net.ipv4.neigh.lo.proxy_qlen
-  - net.ipv4.neigh.lo.retrans_time
   - net.ipv4.neigh.lo.retrans_time_ms
   - net.ipv4.neigh.lo.ucast_solicit
   - net.ipv4.neigh.lo.unres_qlen
@@ -277,32 +289,6 @@
   - net.ipv4.tcp_workaround_signed_windows
   - net.ipv4.udp_early_demux
   - net.ipv4.udp_l3mdev_accept
-  - net.ipv4.vs.am_droprate
-  - net.ipv4.vs.amemthresh
-  - net.ipv4.vs.backup_only
-  - net.ipv4.vs.cache_bypass
-  - net.ipv4.vs.conn_reuse_mode
-  - net.ipv4.vs.conntrack
-  - net.ipv4.vs.drop_entry
-  - net.ipv4.vs.drop_packet
-  - net.ipv4.vs.expire_nodest_conn
-  - net.ipv4.vs.expire_quiescent_template
-  - net.ipv4.vs.ignore_tunneled
-  - net.ipv4.vs.nat_icmp_send
-  - net.ipv4.vs.pmtu_disc
-  - net.ipv4.vs.schedule_icmp
-  - net.ipv4.vs.secure_tcp
-  - net.ipv4.vs.sloppy_sctp
-  - net.ipv4.vs.sloppy_tcp
-  - net.ipv4.vs.snat_reroute
-  - net.ipv4.vs.sync_persist_mode
-  - net.ipv4.vs.sync_ports
-  - net.ipv4.vs.sync_qlen_max
-  - net.ipv4.vs.sync_refresh_period
-  - net.ipv4.vs.sync_retries
-  - net.ipv4.vs.sync_sock_size
-  - net.ipv4.vs.sync_threshold
-  - net.ipv4.vs.sync_version
   - net.ipv4.xfrm4_gc_thresh
   - net.ipv6.anycast_src_echo_reply
   - net.ipv6.auto_flowlabels
@@ -335,7 +321,6 @@
   - net.ipv6.conf.all.keep_addr_on_down
   - net.ipv6.conf.all.max_addresses
   - net.ipv6.conf.all.max_desync_factor
-  - net.ipv6.conf.all.mc_forwarding
   - net.ipv6.conf.all.mldv1_unsolicited_report_interval
   - net.ipv6.conf.all.mldv2_unsolicited_report_interval
   - net.ipv6.conf.all.mtu
@@ -383,7 +368,6 @@
   - net.ipv6.conf.default.keep_addr_on_down
   - net.ipv6.conf.default.max_addresses
   - net.ipv6.conf.default.max_desync_factor
-  - net.ipv6.conf.default.mc_forwarding
   - net.ipv6.conf.default.mldv1_unsolicited_report_interval
   - net.ipv6.conf.default.mldv2_unsolicited_report_interval
   - net.ipv6.conf.default.mtu
@@ -431,7 +415,6 @@
   - net.ipv6.conf.eth0.keep_addr_on_down
   - net.ipv6.conf.eth0.max_addresses
   - net.ipv6.conf.eth0.max_desync_factor
-  - net.ipv6.conf.eth0.mc_forwarding
   - net.ipv6.conf.eth0.mldv1_unsolicited_report_interval
   - net.ipv6.conf.eth0.mldv2_unsolicited_report_interval
   - net.ipv6.conf.eth0.mtu
@@ -479,7 +462,6 @@
   - net.ipv6.conf.lo.keep_addr_on_down
   - net.ipv6.conf.lo.max_addresses
   - net.ipv6.conf.lo.max_desync_factor
-  - net.ipv6.conf.lo.mc_forwarding
   - net.ipv6.conf.lo.mldv1_unsolicited_report_interval
   - net.ipv6.conf.lo.mldv2_unsolicited_report_interval
   - net.ipv6.conf.lo.mtu
@@ -506,7 +488,6 @@
   - net.ipv6.icmp.ratelimit
   - net.ipv6.idgen_delay
   - net.ipv6.idgen_retries
-  - net.ipv6.ip6frag_high_thresh
   - net.ipv6.ip6frag_low_thresh
   - net.ipv6.ip6frag_time
   - net.ipv6.ip_nonlocal_bind
@@ -516,7 +497,6 @@
   - net.ipv6.max_hbh_opts_number
   - net.ipv6.neigh.eth0.anycast_delay
   - net.ipv6.neigh.eth0.app_solicit
-  - net.ipv6.neigh.eth0.base_reachable_time
   - net.ipv6.neigh.eth0.base_reachable_time_ms
   - net.ipv6.neigh.eth0.delay_first_probe_time
   - net.ipv6.neigh.eth0.gc_stale_time
@@ -525,14 +505,12 @@
   - net.ipv6.neigh.eth0.mcast_solicit
   - net.ipv6.neigh.eth0.proxy_delay
   - net.ipv6.neigh.eth0.proxy_qlen
-  - net.ipv6.neigh.eth0.retrans_time
   - net.ipv6.neigh.eth0.retrans_time_ms
   - net.ipv6.neigh.eth0.ucast_solicit
   - net.ipv6.neigh.eth0.unres_qlen
   - net.ipv6.neigh.eth0.unres_qlen_bytes
   - net.ipv6.neigh.lo.anycast_delay
   - net.ipv6.neigh.lo.app_solicit
-  - net.ipv6.neigh.lo.base_reachable_time
   - net.ipv6.neigh.lo.base_reachable_time_ms
   - net.ipv6.neigh.lo.delay_first_probe_time
   - net.ipv6.neigh.lo.gc_stale_time
@@ -541,7 +519,6 @@
   - net.ipv6.neigh.lo.mcast_solicit
   - net.ipv6.neigh.lo.proxy_delay
   - net.ipv6.neigh.lo.proxy_qlen
-  - net.ipv6.neigh.lo.retrans_time
   - net.ipv6.neigh.lo.retrans_time_ms
   - net.ipv6.neigh.lo.ucast_solicit
   - net.ipv6.neigh.lo.unres_qlen
@@ -557,9 +534,7 @@
   - net.ipv6.route.mtu_expires
   - net.ipv6.xfrm6_gc_thresh
   - net.netfilter.nf_conntrack_acct
-  - net.netfilter.nf_conntrack_buckets
   - net.netfilter.nf_conntrack_checksum
-  - net.netfilter.nf_conntrack_count
   - net.netfilter.nf_conntrack_dccp_loose
   - net.netfilter.nf_conntrack_dccp_timeout_closereq
   - net.netfilter.nf_conntrack_dccp_timeout_closing
@@ -569,12 +544,10 @@
   - net.netfilter.nf_conntrack_dccp_timeout_respond
   - net.netfilter.nf_conntrack_dccp_timeout_timewait
   - net.netfilter.nf_conntrack_events
-  - net.netfilter.nf_conntrack_expect_max
   - net.netfilter.nf_conntrack_generic_timeout
   - net.netfilter.nf_conntrack_helper
   - net.netfilter.nf_conntrack_icmp_timeout
   - net.netfilter.nf_conntrack_log_invalid
-  - net.netfilter.nf_conntrack_max
   - net.netfilter.nf_conntrack_sctp_timeout_closed
   - net.netfilter.nf_conntrack_sctp_timeout_cookie_echoed
   - net.netfilter.nf_conntrack_sctp_timeout_cookie_wait
@@ -614,7 +587,7 @@
   - net.netfilter.nf_log.8
   - net.netfilter.nf_log.9
   - net.unix.max_dgram_qlen
-- kernel: "4.14"
+- kernel: '4.14'
   namespaced:
   - fs.mqueue.msg_default
   - fs.mqueue.msg_max
@@ -657,7 +630,6 @@
   - net.ipv4.conf.all.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.all.ignore_routes_with_linkdown
   - net.ipv4.conf.all.log_martians
-  - net.ipv4.conf.all.mc_forwarding
   - net.ipv4.conf.all.medium_id
   - net.ipv4.conf.all.promote_secondaries
   - net.ipv4.conf.all.proxy_arp
@@ -688,7 +660,6 @@
   - net.ipv4.conf.default.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.default.ignore_routes_with_linkdown
   - net.ipv4.conf.default.log_martians
-  - net.ipv4.conf.default.mc_forwarding
   - net.ipv4.conf.default.medium_id
   - net.ipv4.conf.default.promote_secondaries
   - net.ipv4.conf.default.proxy_arp
@@ -719,7 +690,6 @@
   - net.ipv4.conf.eth0.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.eth0.ignore_routes_with_linkdown
   - net.ipv4.conf.eth0.log_martians
-  - net.ipv4.conf.eth0.mc_forwarding
   - net.ipv4.conf.eth0.medium_id
   - net.ipv4.conf.eth0.promote_secondaries
   - net.ipv4.conf.eth0.proxy_arp
@@ -750,7 +720,6 @@
   - net.ipv4.conf.lo.igmpv3_unsolicited_report_interval
   - net.ipv4.conf.lo.ignore_routes_with_linkdown
   - net.ipv4.conf.lo.log_martians
-  - net.ipv4.conf.lo.mc_forwarding
   - net.ipv4.conf.lo.medium_id
   - net.ipv4.conf.lo.promote_secondaries
   - net.ipv4.conf.lo.proxy_arp
@@ -785,13 +754,11 @@
   - net.ipv4.ip_no_pmtu_disc
   - net.ipv4.ip_nonlocal_bind
   - net.ipv4.ip_unprivileged_port_start
-  - net.ipv4.ipfrag_high_thresh
   - net.ipv4.ipfrag_low_thresh
   - net.ipv4.ipfrag_max_dist
   - net.ipv4.ipfrag_time
   - net.ipv4.neigh.eth0.anycast_delay
   - net.ipv4.neigh.eth0.app_solicit
-  - net.ipv4.neigh.eth0.base_reachable_time
   - net.ipv4.neigh.eth0.base_reachable_time_ms
   - net.ipv4.neigh.eth0.delay_first_probe_time
   - net.ipv4.neigh.eth0.gc_stale_time
@@ -800,14 +767,12 @@
   - net.ipv4.neigh.eth0.mcast_solicit
   - net.ipv4.neigh.eth0.proxy_delay
   - net.ipv4.neigh.eth0.proxy_qlen
-  - net.ipv4.neigh.eth0.retrans_time
   - net.ipv4.neigh.eth0.retrans_time_ms
   - net.ipv4.neigh.eth0.ucast_solicit
   - net.ipv4.neigh.eth0.unres_qlen
   - net.ipv4.neigh.eth0.unres_qlen_bytes
   - net.ipv4.neigh.lo.anycast_delay
   - net.ipv4.neigh.lo.app_solicit
-  - net.ipv4.neigh.lo.base_reachable_time
   - net.ipv4.neigh.lo.base_reachable_time_ms
   - net.ipv4.neigh.lo.delay_first_probe_time
   - net.ipv4.neigh.lo.gc_stale_time
@@ -816,7 +781,6 @@
   - net.ipv4.neigh.lo.mcast_solicit
   - net.ipv4.neigh.lo.proxy_delay
   - net.ipv4.neigh.lo.proxy_qlen
-  - net.ipv4.neigh.lo.retrans_time
   - net.ipv4.neigh.lo.retrans_time_ms
   - net.ipv4.neigh.lo.ucast_solicit
   - net.ipv4.neigh.lo.unres_qlen
@@ -835,6 +799,7 @@
   - net.ipv4.tcp_l3mdev_accept
   - net.ipv4.tcp_max_syn_backlog
   - net.ipv4.tcp_max_tw_buckets
+  - net.ipv4.tcp_min_snd_mss
   - net.ipv4.tcp_mtu_probing
   - net.ipv4.tcp_notsent_lowat
   - net.ipv4.tcp_orphan_retries
@@ -852,32 +817,6 @@
   - net.ipv4.tcp_window_scaling
   - net.ipv4.udp_early_demux
   - net.ipv4.udp_l3mdev_accept
-  - net.ipv4.vs.am_droprate
-  - net.ipv4.vs.amemthresh
-  - net.ipv4.vs.backup_only
-  - net.ipv4.vs.cache_bypass
-  - net.ipv4.vs.conn_reuse_mode
-  - net.ipv4.vs.conntrack
-  - net.ipv4.vs.drop_entry
-  - net.ipv4.vs.drop_packet
-  - net.ipv4.vs.expire_nodest_conn
-  - net.ipv4.vs.expire_quiescent_template
-  - net.ipv4.vs.ignore_tunneled
-  - net.ipv4.vs.nat_icmp_send
-  - net.ipv4.vs.pmtu_disc
-  - net.ipv4.vs.schedule_icmp
-  - net.ipv4.vs.secure_tcp
-  - net.ipv4.vs.sloppy_sctp
-  - net.ipv4.vs.sloppy_tcp
-  - net.ipv4.vs.snat_reroute
-  - net.ipv4.vs.sync_persist_mode
-  - net.ipv4.vs.sync_ports
-  - net.ipv4.vs.sync_qlen_max
-  - net.ipv4.vs.sync_refresh_period
-  - net.ipv4.vs.sync_retries
-  - net.ipv4.vs.sync_sock_size
-  - net.ipv4.vs.sync_threshold
-  - net.ipv4.vs.sync_version
   - net.ipv4.xfrm4_gc_thresh
   - net.ipv6.anycast_src_echo_reply
   - net.ipv6.auto_flowlabels
@@ -889,6 +828,7 @@
   - net.ipv6.conf.all.accept_ra_min_hop_limit
   - net.ipv6.conf.all.accept_ra_mtu
   - net.ipv6.conf.all.accept_ra_pinfo
+  - net.ipv6.conf.all.accept_ra_rt_table
   - net.ipv6.conf.all.accept_redirects
   - net.ipv6.conf.all.accept_source_route
   - net.ipv6.conf.all.addr_gen_mode
@@ -930,6 +870,7 @@
   - net.ipv6.conf.default.accept_ra_min_hop_limit
   - net.ipv6.conf.default.accept_ra_mtu
   - net.ipv6.conf.default.accept_ra_pinfo
+  - net.ipv6.conf.default.accept_ra_rt_table
   - net.ipv6.conf.default.accept_redirects
   - net.ipv6.conf.default.accept_source_route
   - net.ipv6.conf.default.addr_gen_mode
@@ -971,6 +912,7 @@
   - net.ipv6.conf.eth0.accept_ra_min_hop_limit
   - net.ipv6.conf.eth0.accept_ra_mtu
   - net.ipv6.conf.eth0.accept_ra_pinfo
+  - net.ipv6.conf.eth0.accept_ra_rt_table
   - net.ipv6.conf.eth0.accept_redirects
   - net.ipv6.conf.eth0.accept_source_route
   - net.ipv6.conf.eth0.addr_gen_mode
@@ -1012,6 +954,7 @@
   - net.ipv6.conf.lo.accept_ra_min_hop_limit
   - net.ipv6.conf.lo.accept_ra_mtu
   - net.ipv6.conf.lo.accept_ra_pinfo
+  - net.ipv6.conf.lo.accept_ra_rt_table
   - net.ipv6.conf.lo.accept_redirects
   - net.ipv6.conf.lo.accept_source_route
   - net.ipv6.conf.lo.addr_gen_mode
@@ -1053,13 +996,11 @@
   - net.ipv6.icmp.ratelimit
   - net.ipv6.idgen_delay
   - net.ipv6.idgen_retries
-  - net.ipv6.ip6frag_high_thresh
   - net.ipv6.ip6frag_low_thresh
   - net.ipv6.ip6frag_time
   - net.ipv6.ip_nonlocal_bind
   - net.ipv6.neigh.eth0.anycast_delay
   - net.ipv6.neigh.eth0.app_solicit
-  - net.ipv6.neigh.eth0.base_reachable_time
   - net.ipv6.neigh.eth0.base_reachable_time_ms
   - net.ipv6.neigh.eth0.delay_first_probe_time
   - net.ipv6.neigh.eth0.gc_stale_time
@@ -1068,14 +1009,12 @@
   - net.ipv6.neigh.eth0.mcast_solicit
   - net.ipv6.neigh.eth0.proxy_delay
   - net.ipv6.neigh.eth0.proxy_qlen
-  - net.ipv6.neigh.eth0.retrans_time
   - net.ipv6.neigh.eth0.retrans_time_ms
   - net.ipv6.neigh.eth0.ucast_solicit
   - net.ipv6.neigh.eth0.unres_qlen
   - net.ipv6.neigh.eth0.unres_qlen_bytes
   - net.ipv6.neigh.lo.anycast_delay
   - net.ipv6.neigh.lo.app_solicit
-  - net.ipv6.neigh.lo.base_reachable_time
   - net.ipv6.neigh.lo.base_reachable_time_ms
   - net.ipv6.neigh.lo.delay_first_probe_time
   - net.ipv6.neigh.lo.gc_stale_time
@@ -1084,7 +1023,6 @@
   - net.ipv6.neigh.lo.mcast_solicit
   - net.ipv6.neigh.lo.proxy_delay
   - net.ipv6.neigh.lo.proxy_qlen
-  - net.ipv6.neigh.lo.retrans_time
   - net.ipv6.neigh.lo.retrans_time_ms
   - net.ipv6.neigh.lo.ucast_solicit
   - net.ipv6.neigh.lo.unres_qlen
@@ -1100,9 +1038,7 @@
   - net.ipv6.route.mtu_expires
   - net.ipv6.xfrm6_gc_thresh
   - net.netfilter.nf_conntrack_acct
-  - net.netfilter.nf_conntrack_buckets
   - net.netfilter.nf_conntrack_checksum
-  - net.netfilter.nf_conntrack_count
   - net.netfilter.nf_conntrack_dccp_loose
   - net.netfilter.nf_conntrack_dccp_timeout_closereq
   - net.netfilter.nf_conntrack_dccp_timeout_closing
@@ -1112,12 +1048,13 @@
   - net.netfilter.nf_conntrack_dccp_timeout_respond
   - net.netfilter.nf_conntrack_dccp_timeout_timewait
   - net.netfilter.nf_conntrack_events
-  - net.netfilter.nf_conntrack_expect_max
+  - net.netfilter.nf_conntrack_frag6_low_thresh
+  - net.netfilter.nf_conntrack_frag6_timeout
   - net.netfilter.nf_conntrack_generic_timeout
   - net.netfilter.nf_conntrack_helper
   - net.netfilter.nf_conntrack_icmp_timeout
+  - net.netfilter.nf_conntrack_icmpv6_timeout
   - net.netfilter.nf_conntrack_log_invalid
-  - net.netfilter.nf_conntrack_max
   - net.netfilter.nf_conntrack_sctp_timeout_closed
   - net.netfilter.nf_conntrack_sctp_timeout_cookie_echoed
   - net.netfilter.nf_conntrack_sctp_timeout_cookie_wait
