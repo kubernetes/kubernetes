@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/record"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // Config has all the context to run a Scheduler
@@ -51,6 +52,9 @@ type Config struct {
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
+
+	// Registry is a collection of all available plugins.
+	Registry framework.Registry
 }
 
 type completedConfig struct {
@@ -72,6 +76,9 @@ func (c *Config) Complete() CompletedConfig {
 	}
 	if c.InsecureMetricsServing != nil {
 		c.InsecureMetricsServing.Name = "metrics"
+	}
+	if c.Registry == nil {
+		c.Registry = framework.NewRegistry()
 	}
 
 	apiserver.AuthorizeClientBearerToken(c.LoopbackClientConfig, &c.Authentication, &c.Authorization)

@@ -58,10 +58,13 @@ import (
 	"k8s.io/klog"
 )
 
-var frameworkRegistry = framework.NewRegistry()
-
 // NewSchedulerCommand creates a *cobra.Command object with default parameters
 func NewSchedulerCommand() *cobra.Command {
+	return NewSchedulerCommandWithRegistry(nil)
+}
+
+// NewSchedulerCommandWithRegistry creates a *cobra.Command object with registry and default parameters
+func NewSchedulerCommandWithRegistry(registry framework.Registry) *cobra.Command {
 	opts, err := options.NewOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -77,7 +80,7 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := runCommand(cmd, args, opts); err != nil {
+			if err := runCommand(cmd, args, opts, registry); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -108,7 +111,7 @@ through the API as necessary.`,
 }
 
 // runCommand runs the scheduler.
-func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error {
+func runCommand(cmd *cobra.Command, args []string, opts *options.Options, registry framework.Registry) error {
 	verflag.PrintAndExitIfRequested()
 	utilflag.PrintFlags(cmd.Flags())
 
@@ -136,6 +139,10 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options) error 
 	}
 
 	stopCh := make(chan struct{})
+
+	if registry != nil {
+		c.Registry = registry
+	}
 
 	// Get the completed config
 	cc := c.Complete()
@@ -177,7 +184,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
-		frameworkRegistry,
+		cc.Registry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
@@ -327,10 +334,4 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 		}
 	}
 	return pathRecorderMux
-}
-
-// RegisterFrameworkPlugin adds a new plugin to the registry. If a plugin with the same name
-// exists, it returns an error.
-func RegisterFrameworkPlugin(name string, factory framework.PluginFactory) error {
-	return frameworkRegistry.Register(name, factory)
 }
