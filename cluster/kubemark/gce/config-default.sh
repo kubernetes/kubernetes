@@ -132,12 +132,6 @@ FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 # Enable a simple "AdvancedAuditing" setup for testing.
 ENABLE_APISERVER_ADVANCED_AUDIT="${ENABLE_APISERVER_ADVANCED_AUDIT:-false}"
 
-# Optional: enable pod priority
-ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
-if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
-fi
-
 # The number of services that are allowed to sync concurrently. Will be passed
 # into kube-controller-manager via `--concurrent-service-syncs`
 CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"

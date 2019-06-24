@@ -452,12 +452,6 @@ KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
 
-# Optional: enable pod priority
-ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
-if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
-fi
-
 # Optional: enable certificate rotation of the kubelet certificates.
 ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 
