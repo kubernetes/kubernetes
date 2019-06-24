@@ -275,11 +275,6 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 		&joinOptions.controlPlane, options.ControlPlane, joinOptions.controlPlane,
 		"Create a new control plane instance on this node",
 	)
-	flagSet.BoolVar(
-		&joinOptions.controlPlane, options.ExperimentalControlPlane, joinOptions.controlPlane,
-		"Create a new control plane instance on this node",
-	)
-	flagSet.MarkDeprecated(options.ExperimentalControlPlane, fmt.Sprintf("use --%s instead", options.ControlPlane))
 }
 
 // newJoinOptions returns a struct ready for being used for creating cmd join flags.
