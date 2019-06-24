@@ -94,7 +94,7 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 	encodedManagerCopy := *encodedManager
 
 	// Never include the fields in the manager identifier
-	encodedManagerCopy.Fields = nil
+	encodedManagerCopy.Fields = ""
 
 	// For appliers, don't include the APIVersion or Time in the manager identifier,
 	// so it will always have the same manager identifier each time it applied.
@@ -113,15 +113,11 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 }
 
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet fieldpath.VersionedSet, err error) {
-	fields := metav1.Fields{}
-	if encodedVersionedSet.Fields != nil {
-		fields = *encodedVersionedSet.Fields
-	}
-	set, err := FieldsToSet(fields)
+	set, err := FieldsToSet(encodedVersionedSet.Fields)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding set: %v", err)
 	}
-	return fieldpath.NewVersionedSet(&set, fieldpath.APIVersion(encodedVersionedSet.APIVersion), encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply), nil
+	return fieldpath.NewVersionedSet(set, fieldpath.APIVersion(encodedVersionedSet.APIVersion), encodedVersionedSet.Operation == metav1.ManagedFieldsOperationApply), nil
 }
 
 // encodeManagedFields converts ManagedFields from the the format used by
@@ -185,11 +181,10 @@ func encodeManagerVersionedSet(manager string, versionedSet fieldpath.VersionedS
 	if versionedSet.Applied() {
 		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
 	}
-	fields, err := SetToFields(*versionedSet.Set())
+	encodedVersionedSet.Fields, err = SetToFields(versionedSet.Set())
 	if err != nil {
 		return nil, fmt.Errorf("error encoding set: %v", err)
 	}
-	encodedVersionedSet.Fields = &fields
 
 	return encodedVersionedSet, nil
 }

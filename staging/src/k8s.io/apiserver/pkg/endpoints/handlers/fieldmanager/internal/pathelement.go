@@ -42,50 +42,78 @@ const (
 
 	// Separator separates the type of a path element from the contents
 	Separator = ":"
+
+	// LevelSeparator separates the level from the path element
+	LevelSeparator = "."
 )
 
+func NewLeveledElement(s string, element *fieldpath.LeveledElement) error {
+	split := strings.SplitN(s, LevelSeparator, 2)
+	if level, err := strconv.Atoi(split[0]); err != nil {
+		return err
+	} else {
+		element.Level = level
+	}
+	if element.Level != -1 {
+		if len(split) < 2 {
+			return fmt.Errorf("missing .: %v", s)
+		}
+		newPathElement(split[1], &element.Element)
+	}
+	return nil
+}
+
+func LeveledElementString(element *fieldpath.LeveledElement) (string, error) {
+	pe := ""
+	if element.Level != -1 {
+		var err error
+		pe, err = pathElementString(element.Element)
+		if err != nil {
+			return "", err
+		}
+	}
+	return fmt.Sprintf("%d%s%s", element.Level, LevelSeparator, pe), nil
+}
+
 // NewPathElement parses a serialized path element
-func NewPathElement(s string) (fieldpath.PathElement, error) {
+func newPathElement(s string, element *fieldpath.PathElement) error {
 	split := strings.SplitN(s, Separator, 2)
 	if len(split) < 2 {
-		return fieldpath.PathElement{}, fmt.Errorf("missing colon: %v", s)
+		return fmt.Errorf("missing colon: %v", s)
 	}
 	switch split[0] {
 	case Field:
-		return fieldpath.PathElement{
-			FieldName: &split[1],
-		}, nil
+		element.FieldName = &split[1]
+		return nil
 	case Value:
 		val, err := value.FromJSON([]byte(split[1]))
 		if err != nil {
-			return fieldpath.PathElement{}, err
+			return err
 		}
-		return fieldpath.PathElement{
-			Value: &val,
-		}, nil
+		element.Value = &val
+		return nil
 	case Index:
 		i, err := strconv.Atoi(split[1])
 		if err != nil {
-			return fieldpath.PathElement{}, err
+			return err
 		}
-		return fieldpath.PathElement{
-			Index: &i,
-		}, nil
+		element.Index = &i
+		return nil
 	case Key:
 		kv := map[string]json.RawMessage{}
 		err := json.Unmarshal([]byte(split[1]), &kv)
 		if err != nil {
-			return fieldpath.PathElement{}, err
+			return err
 		}
 		fields := []value.Field{}
 		for k, v := range kv {
 			b, err := json.Marshal(v)
 			if err != nil {
-				return fieldpath.PathElement{}, err
+				return err
 			}
 			val, err := value.FromJSON(b)
 			if err != nil {
-				return fieldpath.PathElement{}, err
+				return err
 			}
 
 			fields = append(fields, value.Field{
@@ -93,17 +121,16 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 				Value: val,
 			})
 		}
-		return fieldpath.PathElement{
-			Key: fields,
-		}, nil
+		element.Key = fields
+		return nil
 	default:
 		// Ignore unknown key types
-		return fieldpath.PathElement{}, nil
+		return nil
 	}
 }
 
 // PathElementString serializes a path element
-func PathElementString(pe fieldpath.PathElement) (string, error) {
+func pathElementString(pe fieldpath.PathElement) (string, error) {
 	switch {
 	case pe.FieldName != nil:
 		return Field + Separator + *pe.FieldName, nil

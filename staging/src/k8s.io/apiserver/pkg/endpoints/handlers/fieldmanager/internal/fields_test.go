@@ -21,32 +21,26 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 // TestFieldsRoundTrip tests that a fields trie can be round tripped as a path set
 func TestFieldsRoundTrip(t *testing.T) {
-	tests := []metav1.Fields{
-		{
-			Map: map[string]metav1.Fields{
-				"f:metadata": {
-					Map: map[string]metav1.Fields{
-						".":      newFields(),
-						"f:name": newFields(),
-					},
-				},
+	tests := []fieldMap{
+		map[string]fieldMap{
+			"f:metadata": map[string]fieldMap{
+				".":      newFields(),
+				"f:name": newFields(),
 			},
 		},
 	}
 
 	for _, test := range tests {
-		set, err := FieldsToSet(test)
+		set, err := fieldMapToSet(test)
 		if err != nil {
 			t.Fatalf("Failed to create path set: %v", err)
 		}
-		output, err := SetToFields(set)
+		output, err := setToFieldMap(set)
 		if err != nil {
 			t.Fatalf("Failed to create fields trie from path set: %v", err)
 		}
@@ -59,18 +53,14 @@ func TestFieldsRoundTrip(t *testing.T) {
 // TestFieldsToSetError tests that errors are picked up by FieldsToSet
 func TestFieldsToSetError(t *testing.T) {
 	tests := []struct {
-		fields    metav1.Fields
+		fields    fieldMap
 		errString string
 	}{
 		{
-			fields: metav1.Fields{
-				Map: map[string]metav1.Fields{
-					"k:{invalid json}": {
-						Map: map[string]metav1.Fields{
-							".":      newFields(),
-							"f:name": newFields(),
-						},
-					},
+			fields: map[string]fieldMap{
+				"k:{invalid json}": map[string]fieldMap{
+					".":      newFields(),
+					"f:name": newFields(),
 				},
 			},
 			errString: "invalid character",
@@ -78,7 +68,7 @@ func TestFieldsToSetError(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := FieldsToSet(test.fields)
+		_, err := fieldMapToSet(test.fields)
 		if err == nil || !strings.Contains(err.Error(), test.errString) {
 			t.Fatalf("Expected error to contain %q but got: %v", test.errString, err)
 		}
@@ -101,7 +91,7 @@ func TestSetToFieldsError(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		_, err := SetToFields(test.set)
+		_, err := setToFieldMap(test.set)
 		if err == nil || !strings.Contains(err.Error(), test.errString) {
 			t.Fatalf("Expected error to contain %q but got: %v", test.errString, err)
 		}

@@ -32,99 +32,33 @@ import (
 func TestRoundTripManagedFields(t *testing.T) {
 	tests := []string{
 		`- apiVersion: v1
-  fields:
-    v:3:
-      f:alsoPi: {}
-    v:3.1415:
-      f:pi: {}
-    v:false:
-      f:notTrue: {}
+  fields: '{"v:3":{"f:alsoPi":{}},"v:3.1415":{"f:pi":{}},"v:false":{"f:notTrue":{}}}'
   manager: foo
   operation: Update
   time: "2001-02-03T04:05:06Z"
 - apiVersion: v1beta1
-  fields:
-    i:5:
-      f:i: {}
+  fields: '{"i:5":{"f:i":{}}}'
   manager: foo
   operation: Update
   time: "2011-12-13T14:15:16Z"
 `,
 		`- apiVersion: v1
-  fields:
-    f:spec:
-      f:containers:
-        k:{"name":"c"}:
-          f:image: {}
-          f:name: {}
+  fields: '{"f:spec":{"f:containers":{"k:{\"name\":\"c\"}":{"f:image":{},"f:name":{}}}}}'
   manager: foo
   operation: Apply
 `,
 		`- apiVersion: v1
-  fields:
-    f:apiVersion: {}
-    f:kind: {}
-    f:metadata:
-      f:labels:
-        f:app: {}
-      f:name: {}
-    f:spec:
-      f:replicas: {}
-      f:selector:
-        f:matchLabels:
-          f:app: {}
-      f:template:
-        f:medatada:
-          f:labels:
-            f:app: {}
-        f:spec:
-          f:containers:
-            k:{"name":"nginx"}:
-              .: {}
-              f:image: {}
-              f:name: {}
-              f:ports:
-                i:0:
-                  f:containerPort: {}
+  fields: '{"f:apiVersion":{},"f:kind":{},"f:metadata":{"f:labels":{"f:app":{}},"f:name":{}},"f:spec":{"f:replicas":{},"f:selector":{"f:matchLabels":{"f:app":{}}},"f:template":{"f:medatada":{"f:labels":{"f:app":{}}},"f:spec":{"f:containers":{"k:{\"name\":\"nginx\"}":{".":{},"f:image":{},"f:name":{},"f:ports":{"i:0":{"f:containerPort":{}}}}}}}}}'
   manager: foo
   operation: Update
 `,
 		`- apiVersion: v1
-  fields:
-    f:allowVolumeExpansion: {}
-    f:apiVersion: {}
-    f:kind: {}
-    f:metadata:
-      f:name: {}
-      f:parameters:
-        f:resturl: {}
-        f:restuser: {}
-        f:secretName: {}
-        f:secretNamespace: {}
-    f:provisioner: {}
+  fields: '{"f:allowVolumeExpansion":{},"f:apiVersion":{},"f:kind":{},"f:metadata":{"f:name":{},"f:parameters":{"f:resturl":{},"f:restuser":{},"f:secretName":{},"f:secretNamespace":{}}},"f:provisioner":{}}'
   manager: foo
   operation: Apply
 `,
 		`- apiVersion: v1
-  fields:
-    f:apiVersion: {}
-    f:kind: {}
-    f:metadata:
-      f:name: {}
-    f:spec:
-      f:group: {}
-      f:names:
-        f:kind: {}
-        f:plural: {}
-        f:shortNames:
-          i:0: {}
-        f:singular: {}
-      f:scope: {}
-      f:versions:
-        k:{"name":"v1"}:
-          f:name: {}
-          f:served: {}
-          f:storage: {}
+  fields: '{"f:apiVersion":{},"f:kind":{},"f:metadata":{"f:name":{}},"f:spec":{"f:group":{},"f:names":{"f:kind":{},"f:plural":{},"f:shortNames":{"i:0":{}},"f:singular":{}},"f:scope":{},"f:versions":{"k:{\"name\":\"v1\"}":{"f:name":{},"f:served":{},"f:storage":{}}}}}'
   manager: foo
   operation: Update
 `,
@@ -163,8 +97,7 @@ func TestBuildManagerIdentifier(t *testing.T) {
 		{
 			managedFieldsEntry: `
 apiVersion: v1
-fields:
-  f:apiVersion: {}
+fields: '{"f:apiVersion":{}}'
 manager: foo
 operation: Update
 time: "2001-02-03T04:05:06Z"
@@ -174,8 +107,7 @@ time: "2001-02-03T04:05:06Z"
 		{
 			managedFieldsEntry: `
 apiVersion: v1
-fields:
-  f:apiVersion: {}
+fields: '{"f:apiVersion":{}}'
 manager: foo
 operation: Apply
 time: "2001-02-03T04:05:06Z"

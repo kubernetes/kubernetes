@@ -245,7 +245,7 @@ func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedF
 }
 
 // stripSet is the list of fields that should never be part of a mangedFields.
-var stripSet = fieldpath.NewSet(
+var stripSet = fieldpath.NewSetAsList(
 	fieldpath.MakePathOrDie("apiVersion"),
 	fieldpath.MakePathOrDie("kind"),
 	fieldpath.MakePathOrDie("metadata", "name"),
@@ -266,7 +266,7 @@ func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager stri
 		if vs == nil {
 			panic(fmt.Sprintf("Found unexpected nil manager which should never happen: %s", manager))
 		}
-		newSet := vs.Set().Difference(stripSet)
+		newSet := fieldpath.Difference(vs.Set(), stripSet)
 		if newSet.Empty() {
 			delete(managed, manager)
 		} else {

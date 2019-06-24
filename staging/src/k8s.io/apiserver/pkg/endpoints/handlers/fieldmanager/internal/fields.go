@@ -17,79 +17,71 @@ limitations under the License.
 package internal
 
 import (
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
-func newFields() metav1.Fields {
-	return metav1.Fields{Map: map[string]metav1.Fields{}}
+type fieldsList []string
+
+// fieldsToSet creates a set paths from an input trie of fields
+func fieldsToSet(f fieldsList) (*fieldpath.SetAsList, error) {
+	elements := make([]fieldpath.LeveledElement, len(f))
+
+	for i, s := range f {
+		if err := NewLeveledElement(s, &elements[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	return fieldpath.NewSetAsListFromList(elements), nil
 }
 
-func fieldsSet(f metav1.Fields, path fieldpath.Path, set *fieldpath.Set) error {
-	if len(f.Map) == 0 {
-		set.Insert(path)
-	}
-	for k := range f.Map {
-		if k == "." {
-			set.Insert(path)
-			continue
-		}
-		pe, err := NewPathElement(k)
+func setToFields(set *fieldpath.SetAsList) (fieldsList, error) {
+	l := make(fieldsList, len(set.List()))
+	for i, lpe := range set.List() {
+		s, err := LeveledElementString(&lpe)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		path = append(path, pe)
-		err = fieldsSet(f.Map[k], path, set)
-		if err != nil {
-			return err
-		}
-		path = path[:len(path)-1]
+		l[i] = s
 	}
-	return nil
+	return l, nil
 }
+
+var EmptyFields metav1.Fields = func() metav1.Fields {
+	fm, err := setToFields(fieldpath.NewSetAsList())
+	if err != nil {
+		panic("should never happen")
+	}
+	f, err := json.Marshal(fm)
+	if err != nil {
+		panic("should never happen")
+	}
+	return metav1.Fields(f)
+}()
 
 // FieldsToSet creates a set paths from an input trie of fields
-func FieldsToSet(f metav1.Fields) (fieldpath.Set, error) {
-	set := fieldpath.Set{}
-	return set, fieldsSet(f, fieldpath.Path{}, &set)
-}
-
-func removeUselessDots(f metav1.Fields) metav1.Fields {
-	if _, ok := f.Map["."]; ok && len(f.Map) == 1 {
-		delete(f.Map, ".")
-		return f
+func FieldsToSet(f metav1.Fields) (*fieldpath.SetAsList, error) {
+	fl := fieldsList{}
+	err := json.Unmarshal([]byte(f), &fl)
+	if err != nil {
+		return nil, err
 	}
-	for k, tf := range f.Map {
-		f.Map[k] = removeUselessDots(tf)
-	}
-	return f
+	return fieldsToSet(fl)
 }
 
 // SetToFields creates a trie of fields from an input set of paths
-func SetToFields(s fieldpath.Set) (metav1.Fields, error) {
-	var err error
-	f := newFields()
-	s.Iterate(func(path fieldpath.Path) {
-		if err != nil {
-			return
-		}
-		tf := f
-		for _, pe := range path {
-			var str string
-			str, err = PathElementString(pe)
-			if err != nil {
-				break
-			}
-			if _, ok := tf.Map[str]; ok {
-				tf = tf.Map[str]
-			} else {
-				tf.Map[str] = newFields()
-				tf = tf.Map[str]
-			}
-		}
-		tf.Map["."] = newFields()
-	})
-	f = removeUselessDots(f)
-	return f, err
+func SetToFields(s *fieldpath.SetAsList) (metav1.Fields, error) {
+	fm, err := setToFields(s)
+	if err != nil {
+		return EmptyFields, err
+	}
+	f, err := json.Marshal(fm)
+	if err != nil {
+		return EmptyFields, err
+	}
+	return metav1.Fields(f), nil
 }

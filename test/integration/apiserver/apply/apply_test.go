@@ -332,24 +332,14 @@ func TestApplyManagedFields(t *testing.T) {
 					"manager": "apply_test",
 					"operation": "Apply",
 					"apiVersion": "v1",
-					"fields": {
-						"f:metadata": {
-							"f:labels": {
-								"f:test-label": {}
-							}
-						}
-					}
+					"fields": "{\"f:metadata\":{\"f:labels\":{\"f:test-label\":{}}}}"
 				},
 				{
 					"manager": "updater",
 					"operation": "Update",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
-					"fields": {
-						"f:data": {
-							"f:key": {}
-						}
-					}
+					"fields": "{\"f:data\":{\"f:key\":{}}}"
 				}
 			]
 		},
@@ -674,25 +664,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 					"manager": "sidecar_controller",
 					"operation": "Apply",
 					"apiVersion": "extensions/v1beta1",
-					"fields": {
-						"f:metadata": {
-							"f:labels": {
-								"f:sidecar_version": {}
-							}
-						},
-						"f:spec": {
-							"f:template": {
-								"f: spec": {
-									"f:containers": {
-										"k:{\"name\":\"sidecar\"}": {
-											".": {},
-											"f:image": {}
-										}
-									}
-								}
-							}
-						}
-					}
+					"fields": "{\"f:metadata\":{\"f:labels\":{\"f:sidecar_version\":{}}},\"f:spec\":{\"f:template\":{\"f: spec\":{\"f:containers\":{\"k:{\\\"name\\\":\\\"sidecar\\\"}\":{\".\":{},\"f:image\":{}}}}}}}"
 				}
 			]
 		},
@@ -783,47 +755,13 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		t.Fatalf("Expected managed fields to contain entry with manager '%v' with converted api version '%v', but got managed fields:\n%v", "sidecar_controller", "apps/v1", managed)
 	}
 
+	expectedFields := metav1.Fields(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`)
 	expected := &metav1.ManagedFieldsEntry{
 		Manager:    "sidecar_controller",
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
-		Fields: &metav1.Fields{
-			Map: map[string]metav1.Fields{
-				"f:metadata": {
-					Map: map[string]metav1.Fields{
-						"f:labels": {
-							Map: map[string]metav1.Fields{
-								"f:sidecar_version": {Map: map[string]metav1.Fields{}},
-							},
-						},
-					},
-				},
-				"f:spec": {
-					Map: map[string]metav1.Fields{
-						"f:template": {
-							Map: map[string]metav1.Fields{
-								"f:spec": {
-									Map: map[string]metav1.Fields{
-										"f:containers": {
-											Map: map[string]metav1.Fields{
-												"k:{\"name\":\"sidecar\"}": {
-													Map: map[string]metav1.Fields{
-														".":       {Map: map[string]metav1.Fields{}},
-														"f:image": {Map: map[string]metav1.Fields{}},
-														"f:name":  {Map: map[string]metav1.Fields{}},
-													},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+		Fields:     &expectedFields,
 	}
 
 	if !reflect.DeepEqual(actual, expected) {

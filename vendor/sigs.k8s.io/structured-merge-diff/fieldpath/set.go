@@ -129,6 +129,12 @@ type SetAsList struct {
 	last Path
 }
 
+func NewSetAsListFromList(lpes []LeveledElement) *SetAsList {
+	return &SetAsList{
+		list: lpes,
+	}
+}
+
 func NewSetAsList(paths ...Path) *SetAsList {
 	s := &SetAsList{
 		list: []LeveledElement{},
@@ -143,6 +149,10 @@ func NewSetAsList(paths ...Path) *SetAsList {
 	}
 
 	return s
+}
+
+func (s *SetAsList) List() []LeveledElement {
+	return s.list
 }
 
 func (s *SetAsList) Empty() bool {
@@ -220,7 +230,7 @@ func (s *SetAsList) Insert(p Path) {
 			Level:   level + i,
 		})
 	}
-	s.last = p
+	s.last = p.Copy()
 }
 
 func (s *SetAsList) Iterator() SetIterator {
@@ -234,9 +244,10 @@ type SetIterator interface {
 	Empty() bool
 }
 
-func Union(a, b SetIterator) *SetAsList {
+func Union(as, bs *SetAsList) *SetAsList {
 	set := NewSetAsList()
 
+	a, b := as.Iterator(), bs.Iterator()
 	apath, bpath := a.Next(), b.Next()
 
 	for apath != nil && bpath != nil {
@@ -267,9 +278,10 @@ func Union(a, b SetIterator) *SetAsList {
 	return set
 }
 
-func Intersection(a, b SetIterator) *SetAsList {
+func Intersection(as, bs *SetAsList) *SetAsList {
 	set := NewSetAsList()
 
+	a, b := as.Iterator(), bs.Iterator()
 	apath, bpath := a.Next(), b.Next()
 
 	for apath != nil && bpath != nil {
@@ -288,9 +300,10 @@ func Intersection(a, b SetIterator) *SetAsList {
 	return set
 }
 
-func Difference(a, b SetIterator) *SetAsList {
+func Difference(as, bs *SetAsList) *SetAsList {
 	set := NewSetAsList()
 
+	a, b := as.Iterator(), bs.Iterator()
 	apath, bpath := a.Next(), b.Next()
 	for apath != nil && bpath != nil {
 		comp := apath.Compare(bpath)

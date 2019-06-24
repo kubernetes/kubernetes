@@ -75,7 +75,7 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 			versions[managerSet.APIVersion()] = compare
 		}
 
-		conflictSet := fieldpath.Intersection(managerSet.Set(), fieldpath.Union(compare.Modified.Iterator(), compare.Added.Iterator()).Iterator())
+		conflictSet := fieldpath.Intersection(managerSet.Set(), fieldpath.Union(compare.Modified, compare.Added))
 		if !conflictSet.Empty() {
 			conflicts[manager] = fieldpath.NewVersionedSet(conflictSet, managerSet.APIVersion(), false)
 		}
@@ -112,12 +112,12 @@ func (s *Updater) update(oldObject, newObject *typed.TypedValue, version fieldpa
 // PATCH call), and liveObject must be the original object (empty if
 // this is a CREATE call).
 func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldpath.APIVersion, managers fieldpath.ManagedFields, manager string) (*typed.TypedValue, fieldpath.ManagedFields, error) {
-	newObject, err := liveObject.NormalizeUnions(newObject)
-	if err != nil {
-		return nil, fieldpath.ManagedFields{}, err
-	}
+	// newObject, err := liveObject.NormalizeUnions(newObject)
+	// if err != nil {
+	// 	return nil, fieldpath.ManagedFields{}, err
+	// }
 	managers = shallowCopyManagers(managers)
-	managers, err = s.update(liveObject, newObject, version, managers, manager, true)
+	managers, err := s.update(liveObject, newObject, version, managers, manager, true)
 	if err != nil {
 		return nil, fieldpath.ManagedFields{}, err
 	}
@@ -133,11 +133,11 @@ func (s *Updater) Update(liveObject, newObject *typed.TypedValue, version fieldp
 			fieldpath.Union(
 				fieldpath.Union(
 					managers[manager].Set(),
-					compare.Modified.Iterator(),
-				).Iterator(),
-				compare.Added.Iterator(),
-			).Iterator(),
-			compare.Removed.Iterator(),
+					compare.Modified,
+				),
+				compare.Added,
+			),
+			compare.Removed,
 		),
 		version,
 		false,

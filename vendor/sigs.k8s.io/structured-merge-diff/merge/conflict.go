@@ -79,9 +79,9 @@ func ConflictsFromManagers(sets fieldpath.ManagedFields) Conflicts {
 	conflicts := []Conflict{}
 
 	for manager, set := range sets {
-		it := set.Set()
+		it := set.Set().Iterator()
 		p := it.Next()
-		for p != nil  {
+		for p != nil {
 			conflicts = append(conflicts, Conflict{
 				Manager: manager,
 				Path:    p,

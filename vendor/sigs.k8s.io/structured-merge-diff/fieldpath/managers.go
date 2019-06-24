@@ -22,7 +22,7 @@ import (
 type APIVersion string
 
 type VersionedSet interface {
-	Set() SetIterator
+	Set() *SetAsList
 	APIVersion() APIVersion
 	Applied() bool
 }
@@ -42,8 +42,8 @@ func NewVersionedSet(set *SetAsList, apiVersion APIVersion, applied bool) Versio
 	}
 }
 
-func (v versionedSet) Set() SetIterator {
-	return v.set.Iterator()
+func (v versionedSet) Set() *SetAsList {
+	return v.set
 }
 
 func (v versionedSet) APIVersion() APIVersion {
@@ -65,7 +65,7 @@ func (m ManagedFields) String() string {
 		buf.WriteString(fmt.Sprintf("- Applied: %v\n", vs.Applied()))
 		buf.WriteString(fmt.Sprintf("- APIVersion: %v\n", vs.APIVersion()))
 		buf.WriteString("- Set:\n")
-		it := vs.Set()
+		it := vs.Set().Iterator()
 		path := it.Next()
 		for path != nil {
 			buf.WriteString(fmt.Sprintf("  - %v\n", path))
@@ -99,7 +99,7 @@ func (lhs ManagedFields) Difference(rhs ManagedFields) ManagedFields {
 			continue
 		}
 
-		newSet := Union(Difference(left.Set(), right.Set()).Iterator(), Difference(right.Set(), left.Set()).Iterator())
+		newSet := Union(Difference(left.Set(), right.Set()), Difference(right.Set(), left.Set()))
 		if !newSet.Empty() {
 			diff[manager] = NewVersionedSet(newSet, right.APIVersion(), false)
 		}
