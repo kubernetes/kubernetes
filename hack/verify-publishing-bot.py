@@ -34,7 +34,7 @@ def get_gomod_dependencies(rootdir, components):
                 for dep in components:
                     if dep == component:
                         continue
-                    if ("k8s.io/" + dep + " v0.0.0") not in line:
+                    if ("k8s.io/" + dep + " =>") not in line:
                         continue
                     print("\t"+dep)
                     if dep not in all_dependencies[component]:
@@ -80,10 +80,12 @@ def main():
         if rule["destination"] not in gomod_dependencies:
             raise Exception("missing go.mod for %s" % rule["destination"])
         processed_repos.append(rule["destination"])
+        processed_deps = []
         for dep in set(gomod_dependencies[rule["destination"]]):
             found = False
             if "dependencies" in branch:
                 for dep2 in branch["dependencies"]:
+                    processed_deps.append(dep2["repository"])
                     if dep2["branch"] != "master":
                         raise Exception("Looking for master branch and found : %s for destination", dep2,
                                         rule["destination"])
@@ -96,6 +98,9 @@ def main():
                 raise Exception("Please add %s as a dependency under destination %s in %s" % (dep, rule["destination"], rules_file))
             else:
                 print("  found dependency %s" % dep)
+        extraDeps = set(processed_deps) - set(gomod_dependencies[rule["destination"]])
+        if len(extraDeps) > 0:
+            raise Exception("extra dependencies in rules for %s: %s" % (rule["destination"], ','.join(str(s) for s in extraDeps)))
     items = set(gomod_dependencies.keys()) - set(processed_repos)
     if len(items) > 0:
         raise Exception("missing rules for %s" % ','.join(str(s) for s in items))
