@@ -62,6 +62,13 @@ var (
 //  latest-1    (latest release in 1.x, including alpha/beta)
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
 func KubernetesReleaseVersion(version string) (string, error) {
+	return kubernetesReleaseVersion(version, fetchFromURL)
+}
+
+// kubernetesReleaseVersion is a helper function to fetch
+// available version information. Used for testing to eliminate
+// the need for internet calls.
+func kubernetesReleaseVersion(version string, fetcher func(string, time.Duration) (string, error)) (string, error) {
 	ver := normalizedBuildVersion(version)
 	if len(ver) != 0 {
 		return ver, nil
@@ -87,7 +94,7 @@ func KubernetesReleaseVersion(version string) (string, error) {
 		clientVersion, clientVersionErr := kubeadmVersion(pkgversion.Get().String())
 		// Fetch version from the internet.
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
-		body, err := fetchFromURL(url, getReleaseVersionTimeout)
+		body, err := fetcher(url, getReleaseVersionTimeout)
 		if err != nil {
 			// If the network operaton was successful but the server did not reply with StatusOK
 			if body != "" {
@@ -97,18 +104,18 @@ func KubernetesReleaseVersion(version string) (string, error) {
 				// Handle air-gapped environments by falling back to the client version.
 				klog.Warningf("could not fetch a Kubernetes version from the internet: %v", err)
 				klog.Warningf("falling back to the local client version: %s", clientVersion)
-				return KubernetesReleaseVersion(clientVersion)
+				return kubernetesReleaseVersion(clientVersion, fetcher)
 			}
 		}
 
 		if clientVersionErr != nil {
 			if err != nil {
 				klog.Warningf("could not obtain neither client nor remote version; fall back to: %s", constants.CurrentKubernetesVersion)
-				return KubernetesReleaseVersion(constants.CurrentKubernetesVersion.String())
+				return kubernetesReleaseVersion(constants.CurrentKubernetesVersion.String(), fetcher)
 			}
 
 			klog.Warningf("could not obtain client version; using remote version: %s", body)
-			return KubernetesReleaseVersion(body)
+			return kubernetesReleaseVersion(body, fetcher)
 		}
 
 		// both the client and the remote version are obtained; validate them and pick a stable version
@@ -117,7 +124,7 @@ func KubernetesReleaseVersion(version string) (string, error) {
 			return "", err
 		}
 		// Re-validate received version and return.
-		return KubernetesReleaseVersion(body)
+		return kubernetesReleaseVersion(body, fetcher)
 	}
 	return "", errors.Errorf("version %q doesn't match patterns for neither semantic version nor labels (stable, latest, ...)", version)
 }
