@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "policy.go",
+        "policy_none.go",
         "policy_preferred.go",
         "policy_strict.go",
         "topology_manager.go",
@@ -37,6 +38,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "policy_none_test.go",
         "policy_preferred_test.go",
         "policy_strict_test.go",
     ],
