@@ -505,16 +505,13 @@ func linkJoin(base, link string) string {
 	if filepath.IsAbs(link) {
 		return link
 	}
-	return filepath.Join(base, link)
+	return filepath.Join(filepath.Dir(base), link)
 }
 
 // isDestRelative returns true if dest is pointing outside the base directory,
 // false otherwise.
 func isDestRelative(base, dest string) bool {
 	fullPath := dest
-	if !filepath.IsAbs(dest) {
-		fullPath = filepath.Join(base, dest)
-	}
 	relative, err := filepath.Rel(base, fullPath)
 	if err != nil {
 		return false
