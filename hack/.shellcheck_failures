@@ -17,7 +17,6 @@
 ./cluster/restore-from-backup.sh
 ./cluster/test-e2e.sh
 ./cluster/validate-cluster.sh
-./hack/lib/init.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
 ./hack/test-integration.sh
