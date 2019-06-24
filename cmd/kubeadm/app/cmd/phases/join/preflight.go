@@ -65,7 +65,6 @@ func NewPreflightPhase() workflow.Phase {
 			options.TLSBootstrapToken,
 			options.TokenStr,
 			options.ControlPlane,
-			options.ExperimentalControlPlane,
 			options.APIServerAdvertiseAddress,
 			options.APIServerBindPort,
 			options.NodeCRISocket,

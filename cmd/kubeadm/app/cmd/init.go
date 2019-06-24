@@ -264,11 +264,6 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 		"Upload control-plane certificates to the kubeadm-certs Secret.",
 	)
 	flagSet.BoolVar(
-		&initOptions.uploadCerts, options.ExperimentalUploadCerts, initOptions.uploadCerts,
-		"Upload control-plane certificates to the kubeadm-certs Secret.",
-	)
-	flagSet.MarkDeprecated(options.ExperimentalUploadCerts, fmt.Sprintf("use --%s instead", options.UploadCerts))
-	flagSet.BoolVar(
 		&initOptions.skipCertificateKeyPrint, options.SkipCertificateKeyPrint, initOptions.skipCertificateKeyPrint,
 		"Don't print the key used to encrypt the control-plane certificates.",
 	)
