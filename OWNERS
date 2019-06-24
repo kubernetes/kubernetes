@@ -15,12 +15,13 @@ filters:
       - brendandburns
       - dchen1107
       - jbeda
-      - monopole # To move code per kubernetes/community#598
       - lavalamp
       - smarterclayton
       - thockin
       - wojtek-t
       - liggitt
+      # Emeritus
+      # - monopole # To move code per kubernetes/community#598
 
   # Bazel build infrastructure changes often touch files throughout the tree
   "\\.bzl$":
