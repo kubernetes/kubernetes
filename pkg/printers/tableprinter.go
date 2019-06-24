@@ -80,18 +80,22 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 	if table, ok := obj.(*metav1beta1.Table); ok {
 		// Do not print headers if this table has no column definitions, or they are the same as the last ones we printed
 		localOptions := h.options
-		if len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns) {
+		if h.printedHeaders && (len(table.ColumnDefinitions) == 0 || reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns)) {
 			localOptions.NoHeaders = true
 		}
 
 		if len(table.ColumnDefinitions) == 0 {
 			// If this table has no column definitions, use the columns from the last table we printed for decoration and layout.
 			// This is done when receiving tables in watch events to save bandwidth.
-			localOptions.NoHeaders = true
 			table.ColumnDefinitions = h.lastColumns
-		} else {
+		} else if !reflect.DeepEqual(table.ColumnDefinitions, h.lastColumns) {
 			// If this table has column definitions, remember them for future use.
 			h.lastColumns = table.ColumnDefinitions
+			h.printedHeaders = false
+		}
+
+		if len(table.Rows) > 0 {
+			h.printedHeaders = true
 		}
 
 		if err := decorateTable(table, localOptions); err != nil {
