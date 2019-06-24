@@ -231,8 +231,7 @@ const (
 	createTagFactor       = 2.0
 	createTagSteps        = 9
 
-	// volumeCreate* is configuration of exponential backoff for created volume to check
-	// it has not been silently removed by AWS.
+	// volumeCreate* is configuration of exponential backoff for created volume.
 	// On a random AWS account (shared among several developers) it took 4s on
 	// average, 8s max.
 	volumeCreateInitialDelay  = 5 * time.Second
@@ -2449,6 +2448,7 @@ func (c *Cloud) waitUntilVolumeAvailable(volumeName KubernetesVolumeID) error {
 		// Unreachable code
 		return err
 	}
+	time.Sleep(5 * time.Second)
 	backoff := wait.Backoff{
 		Duration: volumeCreateInitialDelay,
 		Factor:   volumeCreateBackoffFactor,
