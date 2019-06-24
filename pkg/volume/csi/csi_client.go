@@ -32,9 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	csipbv0 "k8s.io/kubernetes/pkg/volume/csi/csiv0"
 )
@@ -158,15 +156,13 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 
 	addr := fmt.Sprintf(csiAddrTemplate, driverName)
 	requiresV0Client := true
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPluginsWatcher) {
-		existingDriver, driverExists := csiDrivers.Get(string(driverName))
-		if !driverExists {
-			return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
-		}
-
-		addr = existingDriver.endpoint
-		requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
+	existingDriver, driverExists := csiDrivers.Get(string(driverName))
+	if !driverExists {
+		return nil, fmt.Errorf("driver name %s not found in the list of registered CSI drivers", driverName)
 	}
+
+	addr = existingDriver.endpoint
+	requiresV0Client = versionRequiresV0Client(existingDriver.highestSupportedVersion)
 
 	nodeV1ClientCreator := newV1NodeClient
 	nodeV0ClientCreator := newV0NodeClient
