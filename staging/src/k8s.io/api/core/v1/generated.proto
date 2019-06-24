@@ -2348,6 +2348,10 @@ message NodeStatus {
   // Status of the config assigned to the node via the dynamic Kubelet config feature.
   // +optional
   optional NodeConfigStatus config = 11;
+
+  // Number of Containers under removal
+  // +optional
+  optional uint32 removalInProgress = 12;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.

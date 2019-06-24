@@ -227,6 +227,8 @@ type KubeletConfiguration struct {
 	HairpinMode string
 	// maxPods is the number of pods that can run on this Kubelet.
 	MaxPods int32
+	// Number of container teardowns until node is considered busy.
+	MaxTeardown int32
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string

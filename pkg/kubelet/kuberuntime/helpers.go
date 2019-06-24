@@ -201,7 +201,7 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus) *kubecontainer.Runtim
 			Message: c.Message,
 		})
 	}
-	return &kubecontainer.RuntimeStatus{Conditions: conditions}
+	return &kubecontainer.RuntimeStatus{Conditions: conditions, ContainersUnderRemoval: status.ContainersUnderRemoval}
 }
 
 // getSeccompProfileFromAnnotations gets seccomp profile from annotations.

@@ -4374,6 +4374,9 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus `json:"config,omitempty" protobuf:"bytes,11,opt,name=config"`
+	// Number of Containers under removal
+	// +optional
+	RemovalInProgress uint32 `json:"removalInProgress,omitempty" protobuf:"varint,12,opt,name=removalInProgress"`
 }
 
 type UniqueVolumeName string
@@ -4456,6 +4459,9 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodePIDPressure means the kubelet is under pressure due to insufficient available PID.
 	NodePIDPressure NodeConditionType = "PIDPressure"
+	// NodeTeardownPressure means that the node reached a critical threshold of concurrent container
+	// removal processes
+	NodeTeardownPressure NodeConditionType = "TeardownPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
 )

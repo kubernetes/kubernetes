@@ -115,6 +115,9 @@ func init() {
 	// Fit is determined by node pid pressure condition.
 	factory.RegisterFitPredicate(predicates.CheckNodePIDPressurePred, predicates.CheckNodePIDPressurePredicate)
 
+	// Fit is determined by node teardown count condition.
+	factory.RegisterMandatoryFitPredicate(predicates.CheckNodeTeardownPressurePred, predicates.CheckNodeTeardownPressurePredicate)
+
 	// Fit is determined by node conditions: not ready, network unavailable or out of disk.
 	factory.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate)
 

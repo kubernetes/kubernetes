@@ -27,6 +27,7 @@ import (
 
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
+	dockerfilters "github.com/docker/docker/api/types/filters"
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
@@ -449,7 +450,21 @@ func (ds *dockerService) Status(_ context.Context, r *runtimeapi.StatusRequest) 
 		networkReady.Reason = "NetworkPluginNotReady"
 		networkReady.Message = fmt.Sprintf("docker: network plugin is not ready: %v", err)
 	}
-	status := &runtimeapi.RuntimeStatus{Conditions: conditions}
+
+	// There is no dedicated api for counting containers which are under removal
+	var removal uint32
+	opts := dockertypes.ContainerListOptions{All: true}
+
+	opts.Filters = dockerfilters.NewArgs()
+	if containers, _ := ds.client.ListContainers(opts); containers != nil {
+		for _, container := range containers {
+			if container.State == "removing" {
+				removal += 1
+			}
+		}
+	}
+
+	status := &runtimeapi.RuntimeStatus{Conditions: conditions, ContainersUnderRemoval: removal}
 	return &runtimeapi.StatusResponse{Status: status}, nil
 }
 

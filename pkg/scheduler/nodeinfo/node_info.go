@@ -83,9 +83,10 @@ type NodeInfo struct {
 	TransientInfo *TransientSchedulerInfo
 
 	// Cached conditions of node for faster lookup.
-	memoryPressureCondition v1.ConditionStatus
-	diskPressureCondition   v1.ConditionStatus
-	pidPressureCondition    v1.ConditionStatus
+	memoryPressureCondition   v1.ConditionStatus
+	diskPressureCondition     v1.ConditionStatus
+	pidPressureCondition      v1.ConditionStatus
+	teardownPressureCondition v1.ConditionStatus
 
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
@@ -392,6 +393,14 @@ func (n *NodeInfo) PIDPressureCondition() v1.ConditionStatus {
 	return n.pidPressureCondition
 }
 
+// TeardownPressureCondition returns the teardown ressure condition status on this node.
+func (n *NodeInfo) TeardownPressureCondition() v1.ConditionStatus {
+	if n == nil {
+		return v1.ConditionUnknown
+	}
+	return n.teardownPressureCondition
+}
+
 // RequestedResource returns aggregated resource request of pods on this node.
 func (n *NodeInfo) RequestedResource() Resource {
 	if n == nil {
@@ -448,19 +457,20 @@ func (n *NodeInfo) SetGeneration(newGeneration int64) {
 // Clone returns a copy of this node.
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
-		node:                    n.node,
-		csiNode:                 n.csiNode,
-		requestedResource:       n.requestedResource.Clone(),
-		nonzeroRequest:          n.nonzeroRequest.Clone(),
-		allocatableResource:     n.allocatableResource.Clone(),
-		taintsErr:               n.taintsErr,
-		TransientInfo:           n.TransientInfo,
-		memoryPressureCondition: n.memoryPressureCondition,
-		diskPressureCondition:   n.diskPressureCondition,
-		pidPressureCondition:    n.pidPressureCondition,
-		usedPorts:               make(HostPortInfo),
-		imageStates:             n.imageStates,
-		generation:              n.generation,
+		node:                      n.node,
+		csiNode:                   n.csiNode,
+		requestedResource:         n.requestedResource.Clone(),
+		nonzeroRequest:            n.nonzeroRequest.Clone(),
+		allocatableResource:       n.allocatableResource.Clone(),
+		taintsErr:                 n.taintsErr,
+		TransientInfo:             n.TransientInfo,
+		memoryPressureCondition:   n.memoryPressureCondition,
+		diskPressureCondition:     n.diskPressureCondition,
+		pidPressureCondition:      n.pidPressureCondition,
+		teardownPressureCondition: n.teardownPressureCondition,
+		usedPorts:                 make(HostPortInfo),
+		imageStates:               n.imageStates,
+		generation:                n.generation,
 	}
 	if len(n.pods) > 0 {
 		clone.pods = append([]*v1.Pod(nil), n.pods...)
@@ -662,6 +672,8 @@ func (n *NodeInfo) SetNode(node *v1.Node) error {
 			n.diskPressureCondition = cond.Status
 		case v1.NodePIDPressure:
 			n.pidPressureCondition = cond.Status
+		case v1.NodeTeardownPressure:
+			n.teardownPressureCondition = cond.Status
 		default:
 			// We ignore other conditions.
 		}
@@ -683,6 +695,7 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.memoryPressureCondition = v1.ConditionUnknown
 	n.diskPressureCondition = v1.ConditionUnknown
 	n.pidPressureCondition = v1.ConditionUnknown
+	n.teardownPressureCondition = v1.ConditionUnknown
 	n.imageStates = make(map[string]*ImageStateSummary)
 	n.generation = nextGeneration()
 	return nil

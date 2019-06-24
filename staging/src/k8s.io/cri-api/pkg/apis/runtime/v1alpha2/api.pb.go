@@ -3283,7 +3283,8 @@ func (m *RuntimeCondition) GetMessage() string {
 // RuntimeStatus is information about the current status of the runtime.
 type RuntimeStatus struct {
 	// List of current observed runtime conditions.
-	Conditions []*RuntimeCondition `protobuf:"bytes,1,rep,name=conditions" json:"conditions,omitempty"`
+	Conditions             []*RuntimeCondition `protobuf:"bytes,1,rep,name=conditions" json:"conditions,omitempty"`
+	ContainersUnderRemoval uint32              `protobuf:"varint,2,opt,name=containers_under_removal,json=containersUnderRemoval,proto3" json:"containers_under_removal,omitempty"`
 }
 
 func (m *RuntimeStatus) Reset()                    { *m = RuntimeStatus{} }
@@ -3295,6 +3296,13 @@ func (m *RuntimeStatus) GetConditions() []*RuntimeCondition {
 		return m.Conditions
 	}
 	return nil
+}
+
+func (m *RuntimeStatus) GetContainersUnderRemoval() uint32 {
+	if m != nil {
+		return m.ContainersUnderRemoval
+	}
+	return 0
 }
 
 type StatusRequest struct {
@@ -8538,6 +8546,11 @@ func (m *RuntimeStatus) MarshalTo(dAtA []byte) (int, error) {
 			i += n
 		}
 	}
+	if m.ContainersUnderRemoval != 0 {
+		dAtA[i] = 0x10
+		i++
+		i = encodeVarintApi(dAtA, i, uint64(m.ContainersUnderRemoval))
+	}
 	return i, nil
 }
 
@@ -10698,6 +10711,9 @@ func (m *RuntimeStatus) Size() (n int) {
 			n += 1 + l + sovApi(uint64(l))
 		}
 	}
+	if m.ContainersUnderRemoval != 0 {
+		n += 1 + sovApi(uint64(m.ContainersUnderRemoval))
+	}
 	return n
 }
 
@@ -12138,6 +12154,7 @@ func (this *RuntimeStatus) String() string {
 	}
 	s := strings.Join([]string{`&RuntimeStatus{`,
 		`Conditions:` + strings.Replace(fmt.Sprintf("%v", this.Conditions), "RuntimeCondition", "RuntimeCondition", 1) + `,`,
+		`ContainersUnderRemoval:` + fmt.Sprintf("%v", this.ContainersUnderRemoval) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24946,6 +24963,25 @@ func (m *RuntimeStatus) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 2:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ContainersUnderRemoval", wireType)
+			}
+			m.ContainersUnderRemoval = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowApi
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.ContainersUnderRemoval |= (uint32(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
 		default:
 			iNdEx = preIndex
 			skippy, err := skipApi(dAtA[iNdEx:])

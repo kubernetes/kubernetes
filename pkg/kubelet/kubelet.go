@@ -2185,6 +2185,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 		// Set nil if the container runtime network is ready.
 		kl.runtimeState.setNetworkState(nil)
 	}
+	kl.runtimeState.setContainersUnderRemoval(s.ContainersUnderRemoval)
 	// TODO(random-liu): Add runtime error in runtimeState, and update it
 	// when runtime is not ready, so that the information in RuntimeReady
 	// condition will be propagated to NodeReady condition.

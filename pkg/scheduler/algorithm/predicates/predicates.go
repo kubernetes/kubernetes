@@ -106,6 +106,8 @@ const (
 	CheckNodeDiskPressurePred = "CheckNodeDiskPressure"
 	// CheckNodePIDPressurePred defines the name of predicate CheckNodePIDPressure.
 	CheckNodePIDPressurePred = "CheckNodePIDPressure"
+	// CheckNodeTeardownPressurePred defines the name of predicate CheckNodeTeardownPressure
+	CheckNodeTeardownPressurePred = "CheckNodeTeardownPressure"
 
 	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
 	// GCE instances can have up to 16 PD volumes attached.
@@ -148,7 +150,9 @@ var (
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
-		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred}
+		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, MatchInterPodAffinityPred,
+		CheckNodeTeardownPressurePred,
+	}
 )
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
@@ -1618,6 +1622,15 @@ func CheckNodePIDPressurePredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo
 	return true, nil, nil
 }
 
+// CheckNodeTeardownPressurePredicate checks if a pod can be scheduled on a node that is busy with teardown of containers
+func CheckNodeTeardownPressurePredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
+	// check if node is under teardown pressure
+	if nodeInfo.TeardownPressureCondition() == v1.ConditionTrue {
+		return false, []PredicateFailureReason{ErrNodeUnderTeardownPressure}, nil
+	}
+	return true, nil, nil
+}
+
 // CheckNodeConditionPredicate checks if a pod can be scheduled on a node reporting
 // network unavailable and not ready condition. Only node conditions are accounted in this predicate.
 func CheckNodeConditionPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
@@ -1712,3 +1725,4 @@ func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta PredicateMetadata, no
 	klog.V(5).Infof("All PVCs found matches for pod %v/%v, node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
 }
+

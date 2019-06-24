@@ -465,6 +465,13 @@ type KubeletConfiguration struct {
 	// Default: 110
 	// +optional
 	MaxPods int32 `json:"maxPods,omitempty"`
+	// maxTeardown is the number of concurrent container removal processes until
+	// the node is temporary considered busy. No new workload will be scheduled until
+	// the number drops below threshold. This prevents a buildup of teardown processes
+	// on highly dynamic workloads.
+	// Default: 5
+	// +optional
+	MaxTeardown int32 `json:"maxTeardown,omitempty"`
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
 	// Dynamic Kubelet Config (beta): This field should always be set to the empty default.

@@ -57,6 +57,11 @@ const (
 	// and removed when node has enough disk.
 	TaintNodePIDPressure = "node.kubernetes.io/pid-pressure"
 
+	// TaintNodeTeardownPressure will be added when node has teardown pressure
+	// and feature-gate for TaintNodesByCondition flag is enabled,
+	// and removed when the number of concurrent teardowns falls below threshold.
+	TaintNodeTeardownPressure = "node.kubernetes.io/teardown-pressure"
+
 	// TaintExternalCloudProvider sets this taint on a node to mark it as unusable,
 	// when kubelet is started with the "external" cloud provider, until a controller
 	// from the cloud-controller-manager intitializes this node, and then removes

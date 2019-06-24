@@ -5039,3 +5039,74 @@ func TestCheckNodeUnschedulablePredicate(t *testing.T) {
 		}
 	}
 }
+
+func newStatusResourcePod(usage ...schedulernodeinfo.Resource) *v1.Pod {
+	containers := []v1.Container{}
+	containerstatus := []v1.ContainerStatus{}
+	for _, req := range usage {
+		containers = append(containers, v1.Container{
+			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
+		})
+		containerstatus = append(containerstatus, v1.ContainerStatus {
+			State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{Reason: "test", ExitCode: 0}},
+		})
+	}
+
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: containers,
+		},
+		Status: v1.PodStatus{
+			ContainerStatuses: containerstatus,
+		},
+	}
+}
+
+
+func TestCheckNodeTeardownPredicate(t *testing.T) {
+	previousValue := os.Getenv(CheckNodeTeardownPressurePred)
+
+	tests := []struct {
+		nodeInfo *schedulernodeinfo.NodeInfo
+		ok bool
+		name string
+		env string
+	}{
+		{schedulernodeinfo.NewNodeInfo(
+			newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			newStatusResourcePod(schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}),
+			newStatusResourcePod(schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}),
+			newStatusResourcePod(schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}),
+		), false, "Node busy", "3"},
+		{schedulernodeinfo.NewNodeInfo(
+			newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			newStatusResourcePod(schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}),
+		), true, "Close but ok", "3"},
+		{schedulernodeinfo.NewNodeInfo(
+			newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			newStatusResourcePod(schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}),
+		), false, "Low limit", "1"},
+		{schedulernodeinfo.NewNodeInfo(
+			newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+			newStatusResourcePod(schedulernodeinfo.Resource{MilliCPU: 1}, schedulernodeinfo.Resource{MilliCPU: 1}),
+		), true, "No limit", "0"},
+		{schedulernodeinfo.NewNodeInfo(
+			newResourcePod(schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1}),
+		), true, "Free", "3"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			os.Setenv(CheckNodeTeardownPressurePred, test.env)
+			test.nodeInfo.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "x"}, Spec: v1.NodeSpec{Unschedulable: false}},)
+			if fit, reasons, err := CheckNodeTeardownPressurePredicate(nil, nil, test.nodeInfo); fit != test.ok {
+				t.Errorf("%s: expected: %v, got %v; %+v, %v",
+					test.name, test.ok, fit, reasons, err)
+			}
+		})
+	}
+
+	if previousValue != "" {
+		os.Setenv(CheckNodeTeardownPressurePred, previousValue)
+	}
+}

@@ -63,6 +63,8 @@ var (
 	ErrNodeUnderDiskPressure = newPredicateFailureError("NodeUnderDiskPressure", "node(s) had disk pressure")
 	// ErrNodeUnderPIDPressure is used for NodeUnderPIDPressure predicate error.
 	ErrNodeUnderPIDPressure = newPredicateFailureError("NodeUnderPIDPressure", "node(s) had pid pressure")
+	// ErrNodeUnderTeardownPressure is used for TeardownPressure predicate error.
+	ErrNodeUnderTeardownPressure = newPredicateFailureError("NodeUnderTeardownPressure", "node(s) had teardown pressure")
 	// ErrNodeNotReady is used for NodeNotReady predicate error.
 	ErrNodeNotReady = newPredicateFailureError("NodeNotReady", "node(s) were not ready")
 	// ErrNodeNetworkUnavailable is used for NodeNetworkUnavailable predicate error.

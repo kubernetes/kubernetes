@@ -459,7 +459,8 @@ const (
 // RuntimeStatus contains the status of the runtime.
 type RuntimeStatus struct {
 	// Conditions is an array of current observed runtime conditions.
-	Conditions []RuntimeCondition
+	Conditions             []RuntimeCondition
+	ContainersUnderRemoval uint32
 }
 
 // GetRuntimeCondition gets a specified runtime condition from the runtime status.

@@ -1144,6 +1144,7 @@ message RuntimeCondition {
 message RuntimeStatus {
     // List of current observed runtime conditions.
     repeated RuntimeCondition conditions = 1;
+    uint32 containers_under_removal = 2;
 }
 
 message StatusRequest {

@@ -33,6 +33,7 @@ type runtimeState struct {
 	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
+	containersUnderRemoval   uint32
 }
 
 // A health check function should be efficient and not rely on external
@@ -78,6 +79,18 @@ func (s *runtimeState) podCIDR() string {
 	s.RLock()
 	defer s.RUnlock()
 	return s.cidr
+}
+
+func (s *runtimeState) getContainersUnderRemoval() uint32 {
+	s.RLock()
+	defer s.RUnlock()
+	return s.containersUnderRemoval
+}
+
+func (s *runtimeState) setContainersUnderRemoval(num uint32) {
+	s.Lock()
+	defer s.Unlock()
+	s.containersUnderRemoval = num
 }
 
 func (s *runtimeState) runtimeErrors() error {

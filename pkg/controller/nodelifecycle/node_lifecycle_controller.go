@@ -111,6 +111,7 @@ var (
 		schedulerapi.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
 		schedulerapi.TaintNodeDiskPressure:       v1.NodeDiskPressure,
 		schedulerapi.TaintNodePIDPressure:        v1.NodePIDPressure,
+		schedulerapi.TaintNodeTeardownPressure:   v1.NodeTeardownPressure,
 	}
 )
 

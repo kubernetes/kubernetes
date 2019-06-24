@@ -78,6 +78,8 @@ type RuntimeStats struct {
 	// Usage here refers to the total number of bytes occupied by images on the filesystem.
 	// +optional
 	ImageFs *FsStats `json:"imageFs,omitempty"`
+	// Number of containers under removal
+	ContainersRemoving *int `json:"containersremoving,omitempty"`
 }
 
 const (

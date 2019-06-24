@@ -88,6 +88,12 @@ func AddOrUpdateDaemonPodTolerations(spec *v1.PodSpec) {
 	})
 
 	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
+		Key:      schedulerapi.TaintNodeTeardownPressure,
+		Operator: v1.TolerationOpExists,
+		Effect:   v1.TaintEffectNoSchedule,
+	})
+
+	v1helper.AddOrUpdateTolerationInPodSpec(spec, &v1.Toleration{
 		Key:      schedulerapi.TaintNodeUnschedulable,
 		Operator: v1.TolerationOpExists,
 		Effect:   v1.TaintEffectNoSchedule,

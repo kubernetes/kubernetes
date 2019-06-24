@@ -3785,6 +3785,9 @@ type NodeStatus struct {
 	// Status of the config assigned to the node via the dynamic Kubelet config feature.
 	// +optional
 	Config *NodeConfigStatus
+	// Number of containers currently under removal
+	// +optional
+	RemovalInProgress uint32
 }
 
 type UniqueVolumeName string
@@ -3864,6 +3867,8 @@ const (
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
 	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
 	NodeDiskPressure NodeConditionType = "DiskPressure"
+	// NodeTeardownPressure means the kubelet is under teardown pressure and should not get additional load
+	NodeTeardownPressure NodeConditionType = "TeardownPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
 )

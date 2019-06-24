@@ -161,6 +161,11 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.MaxPods == 0 {
 		obj.MaxPods = 110
 	}
+	if obj.MaxTeardown == 0 {
+		// On nodes with HDD 3 concurrent removals should be OK
+		// in SSD case, teardown is usually fast enough to never trigger
+		obj.MaxTeardown = 3
+	}
 	// default nil or negative value to -1 (implies node allocatable pid limit)
 	if obj.PodPidsLimit == nil || *obj.PodPidsLimit < int64(0) {
 		temp := int64(-1)
