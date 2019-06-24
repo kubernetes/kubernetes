@@ -123,14 +123,14 @@ func tearDownPlugin(tmpDir string) {
 	}
 }
 
-type fakeNetworkHost struct {
+type FakeNetworkHost struct {
 	networktest.FakePortMappingGetter
 	kubeClient clientset.Interface
 	pods       []*containertest.FakePod
 }
 
-func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod, ports map[string][]*hostport.PortMapping) *fakeNetworkHost {
-	host := &fakeNetworkHost{
+func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod, ports map[string][]*hostport.PortMapping) *FakeNetworkHost {
+	host := &FakeNetworkHost{
 		networktest.FakePortMappingGetter{PortMaps: ports},
 		kubeClient,
 		pods,
@@ -138,15 +138,15 @@ func NewFakeHost(kubeClient clientset.Interface, pods []*containertest.FakePod, 
 	return host
 }
 
-func (fnh *fakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
+func (fnh *FakeNetworkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
 	return nil, false
 }
 
-func (fnh *fakeNetworkHost) GetKubeClient() clientset.Interface {
+func (fnh *FakeNetworkHost) GetKubeClient() clientset.Interface {
 	return fnh.kubeClient
 }
 
-func (fnh *fakeNetworkHost) GetNetNS(containerID string) (string, error) {
+func (fnh *FakeNetworkHost) GetNetNS(containerID string) (string, error) {
 	for _, fp := range fnh.pods {
 		for _, c := range fp.Pod.Containers {
 			if c.ID.ID == containerID {
@@ -157,7 +157,7 @@ func (fnh *fakeNetworkHost) GetNetNS(containerID string) (string, error) {
 	return "", fmt.Errorf("container %q not found", containerID)
 }
 
-func (fnh *fakeNetworkHost) SupportsLegacyFeatures() bool {
+func (fnh *FakeNetworkHost) SupportsLegacyFeatures() bool {
 	return true
 }
 
@@ -281,7 +281,7 @@ func TestCNIPlugin(t *testing.T) {
 		RuntimeConfig struct {
 			PortMappings []map[string]interface{}   `json:"portMappings"`
 			Bandwidth    map[string]interface{}     `json:"bandwidth"`
-			IpRanges     [][]map[string]interface{} `json:"ipRanges"`
+			IPRanges     [][]map[string]interface{} `json:"IPRanges"`
 		} `json:"runtimeConfig"`
 	}{}
 	inputBytes, inerr := ioutil.ReadFile(inputFile)
@@ -304,14 +304,14 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("mismatch in expected bandwidth. expected %v got %v", expectedBandwidth, inputConfig.RuntimeConfig.Bandwidth)
 	}
 
-	expectedIpRange := [][]map[string]interface{}{
+	expectedIPRange := [][]map[string]interface{}{
 		{
 			{"subnet": "10.0.2.0/24"},
 		},
 	}
 
-	if !reflect.DeepEqual(inputConfig.RuntimeConfig.IpRanges, expectedIpRange) {
-		t.Errorf("mismatch in expected ipRange. expected %v got %v", expectedIpRange, inputConfig.RuntimeConfig.IpRanges)
+	if !reflect.DeepEqual(inputConfig.RuntimeConfig.IPRanges, expectedIPRange) {
+		t.Errorf("mismatch in expected ipRange. expected %v got %v", expectedIPRange, inputConfig.RuntimeConfig.IPRanges)
 	}
 
 	// Get its IP address

@@ -40,6 +40,7 @@ import (
 )
 
 const (
+	// CNIPluginName is the name of CNI plugin
 	CNIPluginName = "cni"
 
 	// defaultSyncConfigPeriod is the default period to sync CNI config
@@ -95,8 +96,8 @@ type cniBandwidthEntry struct {
 	EgressBurst int `json:"egressBurst,omitempty"`
 }
 
-// cniIpRange maps to the standard CNI ip range Capability
-type cniIpRange struct {
+// cniIPRange maps to the standard CNI ip range Capability
+type cniIPRange struct {
 	Subnet string `json:"subnet"`
 }
 
@@ -112,11 +113,13 @@ type cniDNSConfig struct {
 	Options []string `json:"options,omitempty"`
 }
 
+// SplitDirs : split dirs by ","
 func SplitDirs(dirs string) []string {
 	// Use comma rather than colon to work better with Windows too
 	return strings.Split(dirs, ",")
 }
 
+// ProbeNetworkPlugins : get the network plugin based on cni conf file and bin file
 func ProbeNetworkPlugins(confDir, cacheDir string, binDirs []string) []network.NetworkPlugin {
 	old := binDirs
 	binDirs = make([]string, 0, len(binDirs))
@@ -416,7 +419,7 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 	}
 
 	// Set the PodCIDR
-	rt.CapabilityArgs["ipRanges"] = [][]cniIpRange{{{Subnet: plugin.podCidr}}}
+	rt.CapabilityArgs["ipRanges"] = [][]cniIPRange{{{Subnet: plugin.podCidr}}}
 
 	// Set dns capability args.
 	if dnsOptions, ok := options["dns"]; ok {
