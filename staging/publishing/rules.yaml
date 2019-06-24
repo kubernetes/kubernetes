@@ -216,8 +216,6 @@ rules:
       branch: master
     - repository: code-generator
       branch: master
-    - repository: component-base
-      branch: master
     required-packages:
     - k8s.io/code-generator
   - source:
@@ -233,8 +231,6 @@ rules:
     - repository: client-go
       branch: release-12.0
     - repository: code-generator
-      branch: release-1.15
-    - repository: component-base
       branch: release-1.15
     required-packages:
     - k8s.io/code-generator
@@ -354,8 +350,6 @@ rules:
       branch: master
     - repository: client-go
       branch: master
-    - repository: component-base
-      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/sample-cli-plugin
@@ -370,8 +364,6 @@ rules:
       branch: release-1.15
     - repository: client-go
       branch: release-12.0
-    - repository: component-base
-      branch: release-1.15
 - destination: kube-proxy
   library: true
   branches:
@@ -406,8 +398,6 @@ rules:
       branch: master
     - repository: api
       branch: master
-    - repository: component-base
-      branch: master
   - source:
       branch: release-1.15
       dir: staging/src/k8s.io/kubelet
@@ -417,8 +407,6 @@ rules:
     - repository: apimachinery
       branch: release-1.15
     - repository: api
-      branch: release-1.15
-    - repository: component-base
       branch: release-1.15
 - destination: kube-scheduler
   library: true
@@ -430,8 +418,6 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
-    - repository: apiserver
-      branch: master
     - repository: component-base
       branch: master
   - source:
@@ -441,8 +427,6 @@ rules:
     go: 1.12.5
     dependencies:
     - repository: apimachinery
-      branch: release-1.15
-    - repository: apiserver
       branch: release-1.15
     - repository: component-base
       branch: release-1.15
@@ -456,8 +440,6 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: master
-    - repository: apiserver
-      branch: master
     - repository: component-base
       branch: master
   - source:
@@ -467,8 +449,6 @@ rules:
     go: 1.12.5
     dependencies:
     - repository: apimachinery
-      branch: release-1.15
-    - repository: apiserver
       branch: release-1.15
     - repository: component-base
       branch: release-1.15
@@ -532,6 +512,8 @@ rules:
       branch: master
     - repository: apimachinery
       branch: master
+    - repository: client-go
+      branch: master
     - repository: cloud-provider
       branch: master
   - source:
@@ -544,6 +526,8 @@ rules:
       branch: release-1.15
     - repository: apimachinery
       branch: release-1.15
+    - repository: client-go
+      branch: release-12.0
     - repository: cloud-provider
       branch: release-1.15
 - destination: legacy-cloud-providers
@@ -630,6 +614,8 @@ rules:
       dir: staging/src/k8s.io/kubectl
     name: master
     dependencies:
+      - repository: api
+        branch: master
       - repository: apimachinery
         branch: master
       - repository: client-go
@@ -640,6 +626,8 @@ rules:
     name: release-1.15
     go: 1.12.5
     dependencies:
+      - repository: api
+        branch: release-1.15
       - repository: apimachinery
         branch: release-1.15
       - repository: client-go
