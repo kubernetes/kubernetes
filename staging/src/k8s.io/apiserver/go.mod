@@ -33,7 +33,6 @@ require (
 	github.com/hashicorp/golang-lru v0.5.0
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
-	github.com/natefinch/lumberjack v2.0.0+incompatible // indirect
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.8.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
@@ -54,7 +53,6 @@ require (
 	google.golang.org/grpc v1.13.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	gopkg.in/yaml.v1 v1.0.0-20140924161607-9f9df34309c0 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 	gotest.tools v2.2.0+incompatible // indirect
 	k8s.io/api v0.0.0
@@ -69,15 +67,11 @@ require (
 )
 
 replace (
-	github.com/BurntSushi/toml => github.com/BurntSushi/toml v0.3.0
-	github.com/google/uuid => github.com/google/uuid v1.0.0
-	github.com/gorilla/websocket => github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
-	gopkg.in/natefinch/lumberjack.v2 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

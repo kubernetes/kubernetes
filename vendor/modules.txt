@@ -472,7 +472,7 @@ github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
 # github.com/google/gofuzz v1.0.0 => github.com/google/gofuzz v1.0.0
 github.com/google/gofuzz
-# github.com/google/uuid v1.1.1 => github.com/google/uuid v1.0.0
+# github.com/google/uuid v1.1.1 => github.com/google/uuid v1.1.1
 github.com/google/uuid
 # github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d => github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 github.com/googleapis/gnostic/OpenAPIv2
@@ -510,7 +510,7 @@ github.com/gophercloud/gophercloud/openstack/networking/v2/networks
 github.com/gophercloud/gophercloud/openstack/networking/v2/ports
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
-# github.com/gorilla/websocket v1.4.0 => github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c
+# github.com/gorilla/websocket v1.4.0 => github.com/gorilla/websocket v1.4.0
 github.com/gorilla/websocket
 # github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7 => github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
 github.com/gregjones/httpcache
@@ -526,7 +526,7 @@ github.com/grpc-ecosystem/grpc-gateway/utilities
 # github.com/hashicorp/golang-lru v0.5.0 => github.com/hashicorp/golang-lru v0.5.0
 github.com/hashicorp/golang-lru
 github.com/hashicorp/golang-lru/simplelru
-# github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v0.0.0-20160711231752-d8c773c4cba1
+# github.com/hashicorp/hcl v1.0.0 => github.com/hashicorp/hcl v1.0.0
 github.com/hashicorp/hcl
 github.com/hashicorp/hcl/hcl/ast
 github.com/hashicorp/hcl/hcl/parser
@@ -1005,7 +1005,7 @@ gopkg.in/gcfg.v1/token
 gopkg.in/gcfg.v1/types
 # gopkg.in/inf.v0 v0.9.0 => gopkg.in/inf.v0 v0.9.0
 gopkg.in/inf.v0
-# gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
+# gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
 # gopkg.in/square/go-jose.v2 v2.2.2 => gopkg.in/square/go-jose.v2 v2.2.2
 gopkg.in/square/go-jose.v2

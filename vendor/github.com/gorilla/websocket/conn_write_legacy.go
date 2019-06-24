@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build go1.5
+// +build !go1.8
 
 package websocket
 
-import "io"
-
-func (c *Conn) read(n int) ([]byte, error) {
-	p, err := c.br.Peek(n)
-	if err == io.EOF {
-		err = errUnexpectedEOF
+func (c *Conn) writeBufs(bufs ...[]byte) error {
+	for _, buf := range bufs {
+		if len(buf) > 0 {
+			if _, err := c.conn.Write(buf); err != nil {
+				return err
+			}
+		}
 	}
-	c.br.Discard(len(p))
-	return p, err
+	return nil
 }
