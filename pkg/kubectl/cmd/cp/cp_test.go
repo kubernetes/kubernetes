@@ -194,33 +194,18 @@ func TestIsDestRelative(t *testing.T) {
 	}{
 		{
 			base:     "/dir",
-			dest:     "../link",
+			dest:     "/dir/../link",
 			relative: false,
 		},
 		{
 			base:     "/dir",
-			dest:     "../../link",
+			dest:     "/dir/../../link",
 			relative: false,
 		},
 		{
 			base:     "/dir",
 			dest:     "/link",
 			relative: false,
-		},
-		{
-			base:     "/dir",
-			dest:     "link",
-			relative: true,
-		},
-		{
-			base:     "/dir",
-			dest:     "int/file/link",
-			relative: true,
-		},
-		{
-			base:     "/dir",
-			dest:     "int/../link",
-			relative: true,
 		},
 		{
 			base:     "/dir",
@@ -233,8 +218,18 @@ func TestIsDestRelative(t *testing.T) {
 			relative: true,
 		},
 		{
-			base:     "/dir",
-			dest:     "/dir/../../link",
+			base:     "dir",
+			dest:     "dir/link",
+			relative: true,
+		},
+		{
+			base:     "dir",
+			dest:     "dir/int/../link",
+			relative: true,
+		},
+		{
+			base:     "dir",
+			dest:     "dir/../../link",
 			relative: false,
 		},
 	}
@@ -810,9 +805,10 @@ func TestUntar(t *testing.T) {
 		}
 		return expected + suffix
 	}
-	mkBacktickExpectation := func(expected, suffix string) string {
-		dir, _ := filepath.Split(filepath.Clean(expected))
-		if len(strings.Split(dir, string(os.PathSeparator))) <= 1 {
+	mkBacktickExpectation := func(path, expected, suffix string) string {
+		linkTarget := filepath.Join(backtick(path), "link-target")
+		baseDir := filepath.Join(testdir, dest)
+		if !isDestRelative(baseDir, linkJoin(filepath.Join(baseDir, path), linkTarget)) {
 			return ""
 		}
 		return expected + suffix
@@ -830,7 +826,7 @@ func TestUntar(t *testing.T) {
 		}, file{
 			path:       f.path + "-outerlink",
 			linkTarget: filepath.Join(backtick(f.path), "link-target"),
-			expected:   mkBacktickExpectation(f.expected, "-outerlink"),
+			expected:   mkBacktickExpectation(f.path, f.expected, "-outerlink"),
 		}, file{
 			path:       f.path + "-outerlink-abs",
 			linkTarget: filepath.Join(testdir, "link-target"),
@@ -936,7 +932,7 @@ func TestUntar(t *testing.T) {
 
 // backtick returns a path to one directory up from the target
 func backtick(target string) string {
-	rel, _ := filepath.Rel(filepath.Dir(target), "../")
+	rel := filepath.Join(filepath.Dir(target), "../")
 	return rel
 }
 
