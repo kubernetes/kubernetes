@@ -38,7 +38,6 @@ import (
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
@@ -1649,5 +1648,5 @@ func watchBody(codec runtime.Codec, events []watch.Event) io.ReadCloser {
 			panic(err)
 		}
 	}
-	return json.Framer.NewFrameReader(ioutil.NopCloser(buf))
+	return ioutil.NopCloser(buf)
 }
