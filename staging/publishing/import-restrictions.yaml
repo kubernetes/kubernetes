@@ -125,9 +125,11 @@
 
 - baseImportPath: "./vendor/k8s.io/kubectl/"
   allowedImports:
+  - k8s.io/api
   - k8s.io/apimachinery
   - k8s.io/client-go
   - k8s.io/kubectl
+  - k8s.io/utils
 
 - baseImportPath: "./vendor/k8s.io/sample-apiserver/"
   allowedImports:
