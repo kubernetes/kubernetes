@@ -397,6 +397,54 @@ func TestShouldContainerBeRestarted(t *testing.T) {
 	}
 }
 
+func TestExceedMaxRetries(t *testing.T) {
+	cases := []struct {
+		Name          string
+		MaxRetries    string
+		RestartCount  int
+		ExpectedValue bool
+	}{
+		{
+			Name:          "MaxRetriesTest1",
+			MaxRetries:    "",
+			RestartCount:  5,
+			ExpectedValue: false,
+		},
+		{
+			Name:          "MaxRetriesTest2",
+			MaxRetries:    "3",
+			RestartCount:  5,
+			ExpectedValue: true,
+		},
+		{
+			Name:          "MaxRetriesTest3",
+			MaxRetries:    "3",
+			RestartCount:  2,
+			ExpectedValue: false,
+		},
+		{
+			Name:          "MaxRetriesTest4",
+			MaxRetries:    "3",
+			RestartCount:  3,
+			ExpectedValue: true,
+		},
+		{
+			Name:          "MaxRetriesTest5",
+			MaxRetries:    "not a valid int",
+			RestartCount:  3,
+			ExpectedValue: false,
+		},
+	}
+	var pod v1.Pod
+	pod.Annotations = make(map[string]string)
+	for _, tc := range cases {
+		pod.Annotations[v1.MaxRetriesAnnotation] = tc.MaxRetries
+		if v := ExceedMaxRetries(&pod, tc.RestartCount); v != tc.ExpectedValue {
+			t.Errorf("%s expected %t, got %t", tc.Name, tc.ExpectedValue, v)
+		}
+	}
+}
+
 func TestHasPrivilegedContainer(t *testing.T) {
 	newBoolPtr := func(b bool) *bool {
 		return &b

@@ -1800,7 +1800,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -1900,7 +1900,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }
@@ -2013,7 +2013,237 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses)
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
+		assert.Equal(t, test.status, status, "[test %s]", test.test)
+	}
+}
+
+func withRestartCount(status v1.ContainerStatus, restartCount int32) v1.ContainerStatus {
+	status.RestartCount = restartCount
+	return status
+}
+
+func TestPodPhaseWithRestartOnFailureWithMaxRetries(t *testing.T) {
+	desiredState := v1.PodSpec{
+		NodeName: "machine",
+		Containers: []v1.Container{
+			{Name: "containerA"},
+			{Name: "containerB"},
+		},
+		RestartPolicy: v1.RestartPolicyOnFailure,
+	}
+
+	tests := []struct {
+		pod    *v1.Pod
+		status v1.PodPhase
+		test   string
+	}{
+		{
+			&v1.Pod{
+				Spec:   desiredState,
+				Status: v1.PodStatus{},
+			},
+			v1.PodPending,
+			"waiting",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"all running with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(runningState("containerA"), 3),
+						withRestartCount(runningState("containerB"), 3),
+					},
+				},
+			},
+			v1.PodRunning,
+			"all running with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodSucceeded,
+			"all succeeded with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(succeededState("containerA"), 3),
+						withRestartCount(succeededState("containerB"), 3),
+					},
+				},
+			},
+			v1.PodSucceeded,
+			"all succeeded with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"all failed with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(failedState("containerA"), 3),
+						withRestartCount(failedState("containerB"), 3),
+					},
+				},
+			},
+			v1.PodFailed,
+			"all failed with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						succeededState("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"mixed state #1 with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(runningState("containerA"), 3),
+						withRestartCount(succeededState("containerB"), 3),
+					},
+				},
+			},
+			v1.PodRunning,
+			"mixed state #1 with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+					},
+				},
+			},
+			v1.PodPending,
+			"mixed state #2 with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(runningState("containerA"), 3),
+					},
+				},
+			},
+			v1.PodPending,
+			"mixed state #2 with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						waitingState("containerB"),
+					},
+				},
+			},
+			v1.PodPending,
+			"mixed state #3 with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(runningState("containerA"), 3),
+						withRestartCount(waitingState("containerB"), 3),
+					},
+				},
+			},
+			v1.PodPending,
+			"mixed state #3 with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						waitingStateWithLastTermination("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"backoff crashloop container with restart onfailure",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						waitingStateWithLastTermination("containerB"),
+					},
+				},
+			},
+			v1.PodRunning,
+			"backoff crashloop container with restart onfailure with restart count",
+		},
+		{
+			&v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						withRestartCount(waitingStateWithLastTermination("containerA"), 3),
+						withRestartCount(waitingStateWithLastTermination("containerB"), 3),
+					},
+				},
+			},
+			v1.PodFailed,
+			"backoff all crashloop containers with restart onfailure with restart count",
+		},
+	}
+	maxRetries := "3"
+	for _, test := range tests {
+		test.pod.Annotations = map[string]string{v1.MaxRetriesAnnotation: maxRetries}
+		status := getPhase(test.pod, test.pod.Status.ContainerStatuses)
 		assert.Equal(t, test.status, status, "[test %s]", test.test)
 	}
 }

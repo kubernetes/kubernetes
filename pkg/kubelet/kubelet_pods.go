@@ -1218,8 +1218,16 @@ func (kl *Kubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, con
 	return kl.containerRuntime.GetContainerLogs(ctx, pod, containerID, logOptions, stdout, stderr)
 }
 
+// isContainerRestarting is used to check whether pod restart policy is RestartOnFailure
+// and container restart count is less than maxRetries
+func isContainerRestarting(pod *v1.Pod, status *v1.ContainerStatus) bool {
+	return pod.Spec.RestartPolicy == v1.RestartPolicyOnFailure &&
+		!kubecontainer.ExceedMaxRetries(pod, int(status.RestartCount))
+}
+
 // getPhase returns the phase of a pod given its container info.
-func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
+func getPhase(pod *v1.Pod, info []v1.ContainerStatus) v1.PodPhase {
+	spec := &pod.Spec
 	pendingInitialization := 0
 	failedInitialization := 0
 	for _, container := range spec.InitContainers {
@@ -1254,6 +1262,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 	waiting := 0
 	stopped := 0
 	succeeded := 0
+	restarting := 0
 	for _, container := range spec.Containers {
 		containerStatus, ok := podutil.GetContainerStatus(info, container.Name)
 		if !ok {
@@ -1268,10 +1277,15 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 			stopped++
 			if containerStatus.State.Terminated.ExitCode == 0 {
 				succeeded++
+			} else if isContainerRestarting(pod, &containerStatus) {
+				restarting++
 			}
 		case containerStatus.State.Waiting != nil:
 			if containerStatus.LastTerminationState.Terminated != nil {
 				stopped++
+				if isContainerRestarting(pod, &containerStatus) {
+					restarting++
+				}
 			} else {
 				waiting++
 			}
@@ -1311,6 +1325,11 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 			// terminated with at least one in failure
 			return v1.PodFailed
 		}
+		// Now restart policy is RestartOnFailure
+		if restarting == 0 {
+			// No restarting containers means that all containers fail maxRetires times.
+			return v1.PodFailed
+		}
 		// RestartPolicy is OnFailure, and at least one in failure
 		// and in the process of restarting
 		return v1.PodRunning
@@ -1340,7 +1359,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	// Assume info is ready to process
 	spec := &pod.Spec
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
-	s.Phase = getPhase(spec, allStatus)
+	s.Phase = getPhase(pod, allStatus)
 	// Check for illegal phase transition
 	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
 		// API server shows terminal phase; transitions are not allowed

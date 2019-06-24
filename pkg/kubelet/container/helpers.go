@@ -19,6 +19,7 @@ package container
 import (
 	"fmt"
 	"hash/fnv"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog"
@@ -85,8 +86,36 @@ func ShouldContainerBeRestarted(container *v1.Container, pod *v1.Pod, podStatus 
 			klog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, format.Pod(pod))
 			return false
 		}
+		// Check restart count
+		if ExceedMaxRetries(pod, status.RestartCount) {
+			klog.V(5).Infof("Container %s restart count %d is greater than max, do nothing",
+				status.Name, status.RestartCount)
+			return false
+		}
+		klog.V(5).Infof("Container %s restart count is %d, will retry", status.Name, status.RestartCount)
 	}
 	return true
+}
+
+func getMaxRetries(pod *v1.Pod) int {
+	if pod.Annotations == nil {
+		return v1.MaxRetriesDefault
+	}
+	str, ok := pod.Annotations[v1.MaxRetriesAnnotation]
+	if !ok {
+		return v1.MaxRetriesDefault
+	}
+	if v, err := strconv.ParseInt(str, 10, 32); err != nil {
+		klog.Errorf("Failed to parse max retries(%s) for OnFailure policy: %v", str, err)
+		return v1.MaxRetriesDefault
+	} else {
+		return int(v)
+	}
+}
+
+func ExceedMaxRetries(pod *v1.Pod, restartCount int) bool {
+	maxRetries := getMaxRetries(pod)
+	return maxRetries >= 0 && restartCount >= maxRetries
 }
 
 // HashContainer returns the hash of the container. It is used to compare

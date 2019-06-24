@@ -2473,6 +2473,14 @@ const (
 	RestartPolicyNever     RestartPolicy = "Never"
 )
 
+const (
+	// MaxRetriesAnnotation is an annotation used to specify max retry times
+	// when pod's RestartPolicy is OnFailure. Default value is MaxRetriesDefault,
+	// and negative value means always retry on failure.
+	MaxRetriesAnnotation = "kubernetes.io/maxRetriesForOnFailurePolicy"
+	MaxRetriesDefault    = -1
+)
+
 // DNSPolicy defines how a pod's DNS will be configured.
 type DNSPolicy string
 

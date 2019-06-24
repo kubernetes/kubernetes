@@ -443,8 +443,18 @@ func containerChanged(container *v1.Container, containerStatus *kubecontainer.Co
 	return expectedHash, containerStatus.Hash, containerStatus.Hash != expectedHash
 }
 
-func shouldRestartOnFailure(pod *v1.Pod) bool {
-	return pod.Spec.RestartPolicy != v1.RestartPolicyNever
+func shouldRestartOnFailure(pod *v1.Pod, containerStatus *kubecontainer.ContainerStatus) bool {
+	switch pod.Spec.RestartPolicy {
+	case v1.RestartPolicyNever:
+		return false
+	case v1.RestartPolicyOnFailure:
+		if containerStatus == nil {
+			return true
+		}
+		return !kubecontainer.ExceedMaxRetries(pod, containerStatus.RestartCount)
+	default:
+		return true
+	}
 }
 
 func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) bool {
@@ -472,7 +482,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
-		if !shouldRestartOnFailure(pod) && attempt != 0 {
+		if !shouldRestartOnFailure(pod, nil) && attempt != 0 {
 			// Should not restart the pod, just return.
 			// we should not create a sandbox for a pod if it is already done.
 			// if all containers are done and should not be started, there is no need to create a new sandbox.
@@ -501,7 +511,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	if !done {
 		if next != nil {
 			initFailed := initLastStatus != nil && isInitContainerFailed(initLastStatus)
-			if initFailed && !shouldRestartOnFailure(pod) {
+			if initFailed && !shouldRestartOnFailure(pod, initLastStatus) {
 				changes.KillPod = true
 			} else {
 				// Always try to stop containers in unknown state first.
@@ -560,7 +570,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		}
 		// The container is running, but kill the container if any of the following condition is met.
 		var message string
-		restart := shouldRestartOnFailure(pod)
+		restart := shouldRestartOnFailure(pod, nil)
 		if _, _, changed := containerChanged(&container, containerStatus); changed {
 			message = fmt.Sprintf("Container %s definition changed", container.Name)
 			// Restart regardless of the restart policy because the container
