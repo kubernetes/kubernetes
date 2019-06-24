@@ -312,7 +312,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 						currentRevision))
 			}
-			newImage := NewNginxImage
+			newImage := NewWebserverImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -532,7 +532,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 						pods.Items[i].Labels[appsv1.StatefulSetRevisionLabel],
 						currentRevision))
 			}
-			newImage := NewNginxImage
+			newImage := NewWebserverImage
 			oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update image from %s to %s", oldImage, newImage))
@@ -720,8 +720,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.Nginx),
+							Name:  "webserver",
+							Image: imageutils.GetE2EImage(imageutils.Httpd),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},
@@ -1111,7 +1111,7 @@ func rollbackTest(c clientset.Interface, ns string, ss *appsv1.StatefulSet) {
 	err = sst.BreakPodHTTPProbe(ss, &pods.Items[1])
 	framework.ExpectNoError(err)
 	ss, pods = sst.WaitForPodNotReady(ss, pods.Items[1].Name)
-	newImage := NewNginxImage
+	newImage := NewWebserverImage
 	oldImage := ss.Spec.Template.Spec.Containers[0].Image
 
 	ginkgo.By(fmt.Sprintf("Updating StatefulSet template: update image from %s to %s", oldImage, newImage))
