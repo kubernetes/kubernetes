@@ -1,3 +1,4 @@
+// +build !nolegacyproviders
 // +build linux
 
 /*
