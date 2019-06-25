@@ -40,6 +40,7 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
+	kubeadmversion "k8s.io/client-go/pkg/version"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
 )
 

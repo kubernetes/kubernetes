@@ -86,8 +86,7 @@
 				"k8s.io/kubernetes/pkg/util/parsers",
 				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/sysctl",
-				"k8s.io/kubernetes/pkg/util/taints",
-				"k8s.io/kubernetes/pkg/version"
+				"k8s.io/kubernetes/pkg/util/taints"
 			],
 			"ForbiddenPrefixes": [
 				"k8s.io/kubernetes/pkg/cloudprovider/providers",
