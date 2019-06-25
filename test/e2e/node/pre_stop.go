@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -78,6 +79,8 @@ func testPreStop(c clientset.Interface, ns string) {
 	podOut, err := c.CoreV1().Pods(ns).Get(podDescr.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "getting pod info")
 
+	podURL := net.JoinHostPort(podOut.Status.PodIP, "8080")
+
 	preStopDescr := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tester",
@@ -92,7 +95,7 @@ func testPreStop(c clientset.Interface, ns string) {
 						PreStop: &v1.Handler{
 							Exec: &v1.ExecAction{
 								Command: []string{
-									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s:8080/write", podOut.Status.PodIP),
+									"wget", "-O-", "--post-data=" + val, fmt.Sprintf("http://%s/write", podURL),
 								},
 							},
 						},
