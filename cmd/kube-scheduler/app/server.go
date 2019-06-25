@@ -58,13 +58,11 @@ import (
 	"k8s.io/klog"
 )
 
-// NewSchedulerCommand creates a *cobra.Command object with default parameters
-func NewSchedulerCommand() *cobra.Command {
-	return NewSchedulerCommandWithRegistry(nil)
-}
+// PluginOption is an function type used for dealing with scheduler registry.
+type PluginOption func(framework.Registry) error
 
-// NewSchedulerCommandWithRegistry creates a *cobra.Command object with registry and default parameters
-func NewSchedulerCommandWithRegistry(registry framework.Registry) *cobra.Command {
+// NewSchedulerCommand creates a *cobra.Command object with default parameters and pluginOptions
+func NewSchedulerCommand(pluginOptions ...PluginOption) *cobra.Command {
 	opts, err := options.NewOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -80,7 +78,7 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := runCommand(cmd, args, opts, registry); err != nil {
+			if err := runCommand(cmd, args, opts, pluginOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -111,7 +109,7 @@ through the API as necessary.`,
 }
 
 // runCommand runs the scheduler.
-func runCommand(cmd *cobra.Command, args []string, opts *options.Options, registry framework.Registry) error {
+func runCommand(cmd *cobra.Command, args []string, opts *options.Options, pluginOptions ...PluginOption) error {
 	verflag.PrintAndExitIfRequested()
 	utilflag.PrintFlags(cmd.Flags())
 
@@ -139,11 +137,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	}
 
 	stopCh := make(chan struct{})
-
-	if registry != nil {
-		c.Registry = registry
-	}
-
 	// Get the completed config
 	cc := c.Complete()
 
@@ -161,13 +154,20 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
-	return Run(cc, stopCh)
+	return Run(cc, stopCh, pluginOptions...)
 }
 
 // Run executes the scheduler based on the given configuration. It only return on error or when stopCh is closed.
-func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error {
+func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, pluginOptions ...PluginOption) error {
 	// To help debugging, immediately log version
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
+
+	registry := framework.NewRegistry()
+	for _, option := range pluginOptions {
+		if err := option(registry); err != nil {
+			return err
+		}
+	}
 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
@@ -184,7 +184,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}) error
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
-		cc.Registry,
+		registry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
@@ -334,4 +334,11 @@ func newHealthzHandler(config *kubeschedulerconfig.KubeSchedulerConfiguration, s
 		}
 	}
 	return pathRecorderMux
+}
+
+// WithPlugin creates a PluginOption based on plugin name and factory.
+func WithPlugin(name string, factory framework.PluginFactory) PluginOption {
+	return func(registry framework.Registry) error {
+		return registry.Register(name, factory)
+	}
 }
