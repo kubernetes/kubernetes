@@ -13,6 +13,7 @@ container_layer(
     name = "bins",
     directory = "/usr/local/bin",
     files = [
+        "//cluster/images/conformance/go-runner",
         "//cmd/kubectl",
         "//test/e2e:e2e.test_binary",
         "//vendor/github.com/onsi/ginkgo/ginkgo",
