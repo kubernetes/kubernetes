@@ -29,6 +29,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	cloudprovider "k8s.io/cloud-provider"
+	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -115,6 +116,10 @@ func (g *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, svc 
 	}
 
 	klog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): ensure %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, desiredScheme)
+
+	if servicehelpers.HasMixedProtocols(svc) {
+		return nil, fmt.Errorf("Cannot create a GCE load balancer with mixed protocols")
+	}
 
 	existingFwdRule, err := g.GetRegionForwardingRule(loadBalancerName, g.region)
 	if err != nil && !isNotFound(err) {

@@ -3834,7 +3834,7 @@ func ValidateService(service *core.Service) field.ErrorList {
 				includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
 			}
 		}
-		if includeProtocols.Len() > 1 {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLoadBalancerMixedProtocol) && includeProtocols.Len() > 1 {
 			allErrs = append(allErrs, field.Invalid(portsPath, service.Spec.Ports, "cannot create an external load balancer with mix protocols"))
 		}
 	}

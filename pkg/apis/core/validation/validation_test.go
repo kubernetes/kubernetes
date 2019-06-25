@@ -8906,9 +8906,10 @@ func TestValidateService(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SCTPSupport, true)()
 
 	testCases := []struct {
-		name     string
-		tweakSvc func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs  int
+		name                string
+		tweakSvc            func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs             int
+		enableMixedProtocol bool
 	}{
 		{
 			name: "missing namespace",
@@ -9173,12 +9174,22 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
-			name: "invalid load balancer with mix protocol",
+			name: "invalid load balancer with mixed protocols",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
 				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
 			},
-			numErrs: 1,
+			numErrs:             1,
+			enableMixedProtocol: false,
+		},
+		{
+			name: "valid load balancer with mixed protocols",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.Ports = append(s.Spec.Ports, core.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)})
+			},
+			numErrs:             0,
+			enableMixedProtocol: true,
 		},
 		{
 			name: "valid 1",
@@ -9562,6 +9573,7 @@ func TestValidateService(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerMixedProtocol, tc.enableMixedProtocol)()
 		svc := makeValidService()
 		tc.tweakSvc(&svc)
 		errs := ValidateService(&svc)

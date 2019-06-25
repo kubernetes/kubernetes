@@ -269,3 +269,68 @@ func TestHasLBFinalizer(t *testing.T) {
 		})
 	}
 }
+
+func TestHasMixedProtocols(t *testing.T) {
+	checkHasMixedProtocols := func(hasMixedProtocols bool, service *v1.Service) {
+		res := HasMixedProtocols(service)
+		if res != hasMixedProtocols {
+			t.Errorf("Expected has mixed protocols = %v, got %v",
+				hasMixedProtocols, res)
+		}
+	}
+
+	checkHasMixedProtocols(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+				},
+			},
+		},
+	})
+	checkHasMixedProtocols(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+	})
+	checkHasMixedProtocols(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+				},
+				{
+					Protocol: v1.ProtocolTCP,
+				},
+			},
+		},
+	})
+	checkHasMixedProtocols(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+				},
+				{
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+	})
+	checkHasMixedProtocols(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+				},
+				{
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+	})
+}

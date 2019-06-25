@@ -423,6 +423,12 @@ const (
 	// Enables Finalizer Protection for Service LoadBalancers.
 	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
 
+	// owner: @kiall
+	// alpha: v1.15
+	//
+	// Enables mixed protocol LoadBalancers (e.g. UDP and TCP combined)
+	ServiceLoadBalancerMixedProtocol featuregate.Feature = "ServiceLoadBalancerMixedProtocol"
+
 	// owner: @RobertKrawitz
 	// alpha: v1.15
 	//
@@ -518,6 +524,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResources:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerFinalizer:                {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerMixedProtocol:            {Default: false, PreRelease: featuregate.Alpha},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},

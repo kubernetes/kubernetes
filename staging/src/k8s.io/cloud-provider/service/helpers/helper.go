@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -114,4 +115,13 @@ func HasLBFinalizer(service *v1.Service) bool {
 		}
 	}
 	return false
+}
+
+// HasMixedProtocols checks if a service has more than one protocol in use
+func HasMixedProtocols(service *v1.Service) bool {
+	includeProtocols := sets.NewString()
+	for i := range service.Spec.Ports {
+		includeProtocols.Insert(string(service.Spec.Ports[i].Protocol))
+	}
+	return includeProtocols.Len() > 1
 }
