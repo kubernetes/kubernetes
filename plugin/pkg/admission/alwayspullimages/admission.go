@@ -28,6 +28,7 @@ import (
 	"io"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -91,8 +92,7 @@ func (*AlwaysPullImages) Validate(attributes admission.Attributes, o admission.O
 		}
 	})
 	if len(allErrs) > 0 {
-		// TODO: consider using utilerrors.NewAggregate(allErrs)
-		return allErrs[0]
+		return utilerrors.NewAggregate(allErrs)
 	}
 
 	return nil
