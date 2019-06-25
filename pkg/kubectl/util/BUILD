@@ -72,7 +72,6 @@ filegroup(
         "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",
         "//pkg/kubectl/util/qos:all-srcs",
-        "//pkg/kubectl/util/rbac:all-srcs",
         "//pkg/kubectl/util/resource:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
         "//pkg/kubectl/util/storage:all-srcs",
