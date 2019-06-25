@@ -34,9 +34,9 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/retry"
+	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/kubectl/util"
-	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
 	"k8s.io/utils/integer"
 	utilpointer "k8s.io/utils/pointer"
 )
