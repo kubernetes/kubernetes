@@ -23,10 +23,10 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 )
 
-// computeDetachedSig takes content and token details and computes a detached
+// ComputeDetachedSignature takes content and token details and computes a detached
 // JWS signature.  This is described in Appendix F of RFC 7515.  Basically, this
 // is a regular JWS with the content part of the signature elided.
-func computeDetachedSig(content, tokenID, tokenSecret string) (string, error) {
+func ComputeDetachedSignature(content, tokenID, tokenSecret string) (string, error) {
 	jwk := &jose.JSONWebKey{
 		Key:   []byte(tokenSecret),
 		KeyID: tokenID,
@@ -74,7 +74,7 @@ func stripContent(fullSig string) (string, error) {
 
 // DetachedTokenIsValid checks whether a given detached JWS-encoded token matches JWS output of the given content and token
 func DetachedTokenIsValid(detachedToken, content, tokenID, tokenSecret string) bool {
-	newToken, err := computeDetachedSig(content, tokenID, tokenSecret)
+	newToken, err := ComputeDetachedSignature(content, tokenID, tokenSecret)
 	if err != nil {
 		return false
 	}
