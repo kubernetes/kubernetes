@@ -267,6 +267,7 @@ func TestComponentPod(t *testing.T) {
 					PriorityClassName: "system-cluster-critical",
 					HostNetwork:       true,
 					Volumes:           []v1.Volume{},
+					DNSPolicy:         v1.DNSDefault,
 				},
 			},
 		},
@@ -275,7 +276,7 @@ func TestComponentPod(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
 			c := v1.Container{Name: rt.name}
-			actual := ComponentPod(c, map[string]v1.Volume{})
+			actual := ComponentPod(c, map[string]v1.Volume{}, v1.DNSDefault)
 			if !reflect.DeepEqual(rt.expected, actual) {
 				t.Errorf(
 					"failed componentPod:\n\texpected: %v\n\t  actual: %v",

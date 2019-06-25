@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -64,21 +65,21 @@ var (
 		{{if .ControlPlaneEndpoint -}}
 		{{if .UploadCerts -}}
 		You can now join any number of the control-plane node running the following command on each as root:
-					  
+
 		  {{.joinControlPlaneCommand}}
-					
+
 		Please note that the certificate-key gives access to cluster sensitive data, keep it secret!
-		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use 
+		As a safeguard, uploaded-certs will be deleted in two hours; If necessary, you can use
 		"kubeadm init phase upload-certs --upload-certs" to reload certs afterward.
-		  
+
 		{{else -}}
-		You can now join any number of control-plane nodes by copying certificate authorities 
+		You can now join any number of control-plane nodes by copying certificate authorities
 		and service account keys on each node and then running the following as root:
-				  
-		  {{.joinControlPlaneCommand}}	  
-		  
+
+		  {{.joinControlPlaneCommand}}
+
 		{{end}}{{end}}Then you can join any number of worker nodes by running the following on each as root:
-						  
+
 		{{.joinWorkerCommand}}
 		`)))
 )
@@ -240,6 +241,13 @@ func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.Cluster
 		&cfg.APIServer.CertSANs, options.APIServerCertSANs, cfg.APIServer.CertSANs,
 		`Optional extra Subject Alternative Names (SANs) to use for the API Server serving certificate. Can be both IP addresses and DNS names.`,
 	)
+
+	var dnsPolicy string
+	flagSet.StringVar(
+		&dnsPolicy, "apiserver-dns-policy", string(v1.DNSClusterFirst), `Specify the DNS policy for the API Server.`,
+	)
+  cfg.APIServer.DNSPolicy = v1.DNSPolicy(dnsPolicy)
+
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 }
 

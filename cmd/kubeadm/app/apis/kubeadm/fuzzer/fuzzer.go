@@ -18,6 +18,7 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -54,6 +55,7 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			TimeoutForControlPlane: &metav1.Duration{
 				Duration: constants.DefaultControlPlaneTimeout,
 			},
+			DNSPolicy: v1.DNSClusterFirst,
 		},
 		DNS: kubeadm.DNS{
 			Type: kubeadm.CoreDNS,
@@ -107,6 +109,7 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
 		Duration: constants.DefaultControlPlaneTimeout,
 	}
+	obj.APIServer.DNSPolicy = v1.DNSClusterFirst
 }
 
 func fuzzDNS(obj *kubeadm.DNS, c fuzz.Continue) {

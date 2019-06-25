@@ -48,7 +48,7 @@ const (
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
-func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
+func ComponentPod(container v1.Container, volumes map[string]v1.Volume, dnsPolicy v1.DNSPolicy) v1.Pod {
 	return v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -66,6 +66,7 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 			PriorityClassName: "system-cluster-critical",
 			HostNetwork:       true,
 			Volumes:           VolumeMapToSlice(volumes),
+			DNSPolicy:         dnsPolicy,
 		},
 	}
 }

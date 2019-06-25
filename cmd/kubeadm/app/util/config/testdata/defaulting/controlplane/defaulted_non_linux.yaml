@@ -20,6 +20,7 @@ nodeRegistration:
 ---
 apiServer:
   timeoutForControlPlane: 4m0s
+  dnsPolicy: ClusterFirst
 apiVersion: kubeadm.k8s.io/v1beta1
 certificatesDir: /var/lib/kubernetes/pki
 clusterName: kubernetes

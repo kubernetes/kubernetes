@@ -133,6 +133,9 @@ type APIServer struct {
 
 	// TimeoutForControlPlane controls the timeout that we use for API server to appear
 	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
+
+	// DNSPolicy sets a DNS policy for the API Server.
+	DNSPolicy v1.DNSPolicy `json:"dnsPolicy,omitempty"`
 }
 
 // DNSAddOnType defines string identifying DNS add-on types

@@ -20,6 +20,7 @@ import (
 	"net/url"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -108,6 +109,10 @@ func SetDefaults_APIServer(obj *APIServer) {
 		obj.TimeoutForControlPlane = &metav1.Duration{
 			Duration: constants.DefaultControlPlaneTimeout,
 		}
+	}
+
+	if obj.DNSPolicy == "" {
+		obj.DNSPolicy = v1.DNSClusterFirst
 	}
 }
 

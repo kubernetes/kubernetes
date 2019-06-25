@@ -172,7 +172,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 			&cfg.Etcd, kubeadmconstants.EtcdListenClientPort, cfg.CertificatesDir,
 			kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
 		),
-	}, etcdMounts)
+	}, etcdMounts, v1.DNSClusterFirst)
 }
 
 // getEtcdCommand builds the right etcd command from the given config object

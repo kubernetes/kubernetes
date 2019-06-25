@@ -61,7 +61,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   livenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), int(endpoint.BindPort), v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
 			Env:             getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer), cfg.APIServer.DNSPolicy),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeControllerManager,
 			Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
@@ -71,7 +71,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   livenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), kubeadmconstants.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
 			Resources:       staticpodutil.ComponentResources("200m"),
 			Env:             getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), v1.DNSClusterFirst),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
 			Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
@@ -81,7 +81,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			LivenessProbe:   livenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), kubeadmconstants.InsecureSchedulerPort, v1.URISchemeHTTP),
 			Resources:       staticpodutil.ComponentResources("100m"),
 			Env:             getProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
+		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), v1.DNSClusterFirst),
 	}
 	return staticPodSpecs
 }

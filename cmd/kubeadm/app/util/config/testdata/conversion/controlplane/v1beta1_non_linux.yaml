@@ -30,6 +30,7 @@ apiServer:
     mountPath: /mount/writable
     name: WritableVolume
   timeoutForControlPlane: 4m0s
+  dnsPolicy: ClusterFirst
 apiVersion: kubeadm.k8s.io/v1beta1
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes
