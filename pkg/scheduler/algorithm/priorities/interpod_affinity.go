@@ -30,6 +30,7 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 
 	"k8s.io/klog"
 )
@@ -40,6 +41,7 @@ type InterPodAffinity struct {
 	nodeLister            algorithm.NodeLister
 	podLister             algorithm.PodLister
 	hardPodAffinityWeight int32
+	topologyInfo          internalcache.NodeTopologyInfo
 }
 
 // NewInterPodAffinityPriority creates an InterPodAffinity.
@@ -47,12 +49,14 @@ func NewInterPodAffinityPriority(
 	info predicates.NodeInfo,
 	nodeLister algorithm.NodeLister,
 	podLister algorithm.PodLister,
-	hardPodAffinityWeight int32) PriorityFunction {
+	hardPodAffinityWeight int32,
+	topologyInfo internalcache.NodeTopologyInfo) PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
 		info:                  info,
 		nodeLister:            nodeLister,
 		podLister:             podLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
+		topologyInfo:          topologyInfo,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
 }
@@ -84,7 +88,7 @@ func (p *podAffinityPriorityMap) setError(err error) {
 	}
 }
 
-func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight int64) {
+func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight int64, topologyInfo internalcache.NodeTopologyInfo) {
 	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
@@ -93,18 +97,27 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 	}
 	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
 	if match {
-		for _, node := range p.nodes {
-			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
-				atomic.AddInt64(p.counts[node.Name], weight)
+		klog.V(5).Infof("------topologyInfo: %+v----", topologyInfo)
+		if topologyValue, ok := fixedNode.Labels[term.TopologyKey]; ok {
+			if nodeSet, ok := topologyInfo[internalcache.TopologyPair{
+				Key:   term.TopologyKey,
+				Value: topologyValue,
+			}]; ok {
+				klog.V(5).Infof("------nodeSet: %+v-----", nodeSet)
+				for node, _ := range nodeSet {
+					if _, ok := p.counts[node]; ok {
+						atomic.AddInt64(p.counts[node], weight)
+					}
+				}
 			}
 		}
 	}
 }
 
-func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int) {
+func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int, topologyInfo internalcache.NodeTopologyInfo) {
 	for i := range terms {
 		term := &terms[i]
-		p.processTerm(&term.PodAffinityTerm, podDefiningAffinityTerm, podToCheck, fixedNode, int64(term.Weight*int32(multiplier)))
+		p.processTerm(&term.PodAffinityTerm, podDefiningAffinityTerm, podToCheck, fixedNode, int64(term.Weight*int32(multiplier)), topologyInfo)
 	}
 }
 
@@ -152,14 +165,14 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPods>`s node by the term`s weight.
 			terms := affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, pod, existingPod, existingPodNode, 1)
+			pm.processTerms(terms, pod, existingPod, existingPodNode, 1, ipa.topologyInfo)
 		}
 		if hasAntiAffinityConstraints {
 			// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 			// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>`s node by the term`s weight.
 			terms := affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, pod, existingPod, existingPodNode, -1)
+			pm.processTerms(terms, pod, existingPod, existingPodNode, -1, ipa.topologyInfo)
 		}
 
 		if existingHasAffinityConstraints {
@@ -173,21 +186,21 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 				//	terms = append(terms, existingPodAffinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 				//}
 				for _, term := range terms {
-					pm.processTerm(&term, existingPod, pod, existingPodNode, int64(ipa.hardPodAffinityWeight))
+					pm.processTerm(&term, existingPod, pod, existingPodNode, int64(ipa.hardPodAffinityWeight), ipa.topologyInfo)
 				}
 			}
 			// For every soft pod affinity term of <existingPod>, if <pod> matches the term,
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>'s node by the term's weight.
 			terms := existingPodAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, existingPod, pod, existingPodNode, 1)
+			pm.processTerms(terms, existingPod, pod, existingPodNode, 1, ipa.topologyInfo)
 		}
 		if existingHasAntiAffinityConstraints {
 			// For every soft pod anti-affinity term of <existingPod>, if <pod> matches the term,
 			// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>'s node by the term's weight.
 			terms := existingPodAffinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
-			pm.processTerms(terms, existingPod, pod, existingPodNode, -1)
+			pm.processTerms(terms, existingPod, pod, existingPodNode, -1, ipa.topologyInfo)
 		}
 		return nil
 	}

@@ -95,7 +95,7 @@ func init() {
 	factory.RegisterFitPredicateFactory(
 		predicates.MatchInterPodAffinityPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
+			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.NodeTopologyInfo)
 		},
 	)
 

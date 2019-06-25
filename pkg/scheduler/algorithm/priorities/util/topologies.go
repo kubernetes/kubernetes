@@ -47,35 +47,3 @@ func PodMatchesTermsNamespaceAndSelector(pod *v1.Pod, namespaces sets.String, se
 	}
 	return true
 }
-
-// NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
-// Returns false if topologyKey is empty.
-func NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
-	if len(topologyKey) == 0 {
-		return false
-	}
-
-	if nodeA.Labels == nil || nodeB.Labels == nil {
-		return false
-	}
-
-	nodeALabel, okA := nodeA.Labels[topologyKey]
-	nodeBLabel, okB := nodeB.Labels[topologyKey]
-
-	// If found label in both nodes, check the label
-	if okB && okA {
-		return nodeALabel == nodeBLabel
-	}
-
-	return false
-}
-
-// Topologies contains topologies information of nodes.
-type Topologies struct {
-	DefaultKeys []string
-}
-
-// NodesHaveSameTopologyKey checks if nodeA and nodeB have same label value with given topologyKey as label key.
-func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *v1.Node, topologyKey string) bool {
-	return NodesHaveSameTopologyKey(nodeA, nodeB, topologyKey)
-}

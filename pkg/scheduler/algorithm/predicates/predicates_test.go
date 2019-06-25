@@ -33,6 +33,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 var (
@@ -2898,14 +2899,16 @@ func TestInterPodAffinity(t *testing.T) {
 					podsOnNode = append(podsOnNode, pod)
 				}
 			}
+			nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
+			nodeInfo.SetNode(test.node)
+			nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfoMap)
 
 			fit := PodAffinityChecker{
 				info:      FakeNodeInfo(*node),
 				podLister: schedulertesting.FakePodLister(test.pods),
+				topologyInfo: topologyInfo,
 			}
-			nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
-			nodeInfo.SetNode(test.node)
-			nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
 			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 			if !fits && !reflect.DeepEqual(reasons, test.expectFailureReasons) {
 				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, test.expectFailureReasons)
@@ -4012,10 +4015,12 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				nodeInfoMap[node.Name] = nodeInfo
 			}
 
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfoMap)
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
 					info:      nodeListInfo,
 					podLister: schedulertesting.FakePodLister(test.pods),
+					topologyInfo: topologyInfo,
 				}
 
 				var meta PredicateMetadata

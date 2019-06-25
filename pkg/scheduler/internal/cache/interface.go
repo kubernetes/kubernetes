@@ -111,6 +111,9 @@ type Cache interface {
 
 	// NodeTree returns a node tree structure
 	NodeTree() *NodeTree
+
+	// NodeTopologyInfo returns cached node topology info
+	NodeTopologyInfo() NodeTopologyInfo
 }
 
 // Snapshot is a snapshot of cache state

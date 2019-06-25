@@ -570,6 +570,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
 		VolumeBinder:                   c.volumeBinder,
 		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
+		NodeTopologyInfo:               c.schedulerCache.NodeTopologyInfo(),
 	}, nil
 }
 

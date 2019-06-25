@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 
 	"k8s.io/klog"
 )
@@ -48,6 +49,7 @@ type PluginFactoryArgs struct {
 	StorageClassInfo               predicates.StorageClassInfo
 	VolumeBinder                   *volumebinder.VolumeBinder
 	HardPodAffinitySymmetricWeight int32
+	NodeTopologyInfo               schedulerinternalcache.NodeTopologyInfo
 }
 
 // PriorityMetadataProducerFactory produces PriorityMetadataProducer from the given args.
