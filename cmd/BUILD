@@ -32,6 +32,7 @@ filegroup(
         "//cmd/kubemark:all-srcs",
         "//cmd/linkcheck:all-srcs",
         "//cmd/preferredimports:all-srcs",
+        "//cmd/verifydependencies:all-srcs",
     ],
     tags = ["automanaged"],
 )
