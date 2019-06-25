@@ -56,11 +56,8 @@ Learn more in the [official Kubernetes documentation][k8sElasticsearchDocs].
 
 ## Building
 
-Both images are now being hosted in google cloud and are built via the
-[cloud build](https://cloud.google.com/cloud-build/) product.  To build these
-images yourself you will need to have the [gcloud sdk](https://cloud.google.com/sdk/install)
-installed and you will need to login.  You can then run `make` in either
-image directory to trigger a container build.
+Both images are now being hosted in quay.io and are built locally via `make` and `docker`.
+To build locally run `make build` and then `make push` to publish.  
 
 ### Known problems
 
