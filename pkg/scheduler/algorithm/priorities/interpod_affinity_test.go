@@ -24,9 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 type FakeNodeListInfo []*v1.Node

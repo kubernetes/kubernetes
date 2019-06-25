@@ -43,11 +43,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 const (
@@ -1178,16 +1178,16 @@ func EssentialPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedule
 
 // PodAffinityChecker contains information to check pod affinity.
 type PodAffinityChecker struct {
-	info      NodeInfo
-	podLister algorithm.PodLister
+	info         NodeInfo
+	podLister    algorithm.PodLister
 	topologyInfo internalcache.NodeTopologyInfo
 }
 
 // NewPodAffinityPredicate creates a PodAffinityChecker.
 func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, topologyInfo internalcache.NodeTopologyInfo) FitPredicate {
 	checker := &PodAffinityChecker{
-		info:      info,
-		podLister: podLister,
+		info:         info,
+		podLister:    podLister,
 		topologyInfo: topologyInfo,
 	}
 	return checker.InterPodAffinityMatches

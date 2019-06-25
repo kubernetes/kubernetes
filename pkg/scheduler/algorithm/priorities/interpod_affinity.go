@@ -102,7 +102,7 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 				Key:   term.TopologyKey,
 				Value: topologyValue,
 			}]; ok {
-				for node, _ := range nodeSet {
+				for node := range nodeSet {
 					if _, ok := p.counts[node]; ok {
 						atomic.AddInt64(p.counts[node], weight)
 					}

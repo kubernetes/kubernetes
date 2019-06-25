@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 var (
@@ -2905,8 +2905,8 @@ func TestInterPodAffinity(t *testing.T) {
 			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfoMap)
 
 			fit := PodAffinityChecker{
-				info:      FakeNodeInfo(*node),
-				podLister: schedulertesting.FakePodLister(test.pods),
+				info:         FakeNodeInfo(*node),
+				podLister:    schedulertesting.FakePodLister(test.pods),
 				topologyInfo: topologyInfo,
 			}
 			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
@@ -4018,8 +4018,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfoMap)
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
-					info:      nodeListInfo,
-					podLister: schedulertesting.FakePodLister(test.pods),
+					info:         nodeListInfo,
+					podLister:    schedulertesting.FakePodLister(test.pods),
 					topologyInfo: topologyInfo,
 				}
 

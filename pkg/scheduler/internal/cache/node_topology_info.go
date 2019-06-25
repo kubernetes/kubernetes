@@ -107,6 +107,7 @@ func (t NodeTopologyInfo) removeTopologyPair(pair TopologyPair, nodeName string)
 	}
 }
 
+// Create NodeTopologyInfo based on nodeInfoMap used for test
 func CreateNodeTopologyInfo(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) NodeTopologyInfo {
 	if nodeInfoMap == nil {
 		return nil

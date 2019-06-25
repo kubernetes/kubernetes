@@ -108,11 +108,11 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		period: period,
 		stop:   stop,
 
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(nil),
-		assumedPods: make(map[string]bool),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*imageState),
+		nodes:            make(map[string]*nodeInfoListItem),
+		nodeTree:         newNodeTree(nil),
+		assumedPods:      make(map[string]bool),
+		podStates:        make(map[string]*podState),
+		imageStates:      make(map[string]*imageState),
 		nodeTopologyInfo: make(map[TopologyPair]sets.String),
 	}
 }
