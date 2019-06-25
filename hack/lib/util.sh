@@ -171,6 +171,8 @@ kube::util::host_platform() {
   echo "$(kube::util::host_os)/$(kube::util::host_arch)"
 }
 
+# looks for $1 in well-known output locations for the platform ($2)
+# $KUBE_ROOT must be set
 kube::util::find-binary-for-platform() {
   local -r lookfor="$1"
   local -r platform="$2"
@@ -194,6 +196,8 @@ kube::util::find-binary-for-platform() {
   echo -n "${bin}"
 }
 
+# looks for $1 in well-known output locations for the host platform
+# $KUBE_ROOT must be set
 kube::util::find-binary() {
   kube::util::find-binary-for-platform "$1" "$(kube::util::host_platform)"
 }
@@ -265,6 +269,8 @@ kube::util::remove-gen-docs() {
 # * Special handling for empty group: v1 -> api/v1, unversioned -> api/unversioned
 # * Special handling for groups suffixed with ".k8s.io": foo.k8s.io/v1 -> apis/foo/v1
 # * Very special handling for when both group and version are "": / -> api
+#
+# $KUBE_ROOT must be set.
 kube::util::group-version-to-pkg-path() {
   local group_version="$1"
 
@@ -530,6 +536,17 @@ EOF
     chown ${username} "${dest_dir}/${client_id}.kubeconfig"
 EOF
 }
+
+# list_staging_repos outputs a sorted list of repos in staging/src/k8s.io
+# each entry will just be the $repo portion of staging/src/k8s.io/$repo/...
+# $KUBE_ROOT must be set.
+function kube::util::list_staging_repos() {
+  (
+    cd "${KUBE_ROOT}/staging/src/k8s.io" && \
+    find . -mindepth 1 -maxdepth 1 -type d | cut -c 3- | sort
+  )
+}
+
 
 # Determines if docker can be run, failures may simply require that the user be added to the docker group.
 function kube::util::ensure_docker_daemon_connectivity {

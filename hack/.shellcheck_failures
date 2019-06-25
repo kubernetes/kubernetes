@@ -22,10 +22,7 @@
 ./hack/lib/test.sh
 ./hack/lib/version.sh
 ./hack/make-rules/make-help.sh
-./hack/pin-dependency.sh
 ./hack/test-integration.sh
-./hack/update-vendor.sh
-./hack/verify-no-vendor-cycles.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/diff.sh
 ./test/cmd/discovery.sh
