@@ -983,10 +983,11 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
 				nodes = append(nodes, node)
 			}
-			if test.addAffinityPredicate {
-				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
-			}
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeNameToInfo)
+			if test.addAffinityPredicate {
+				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods), topologyInfo)
+			}
 			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
 			// doesn't have it yet.
 			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)

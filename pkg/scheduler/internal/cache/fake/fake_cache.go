@@ -96,4 +96,4 @@ func (c *Cache) Snapshot() *internalcache.Snapshot {
 func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
 
 // NodeTopologyInfo is a fake method for testing.
-func (c *Cache) NodeTopologyInfo() *internalcache.NodeTopologyInfo { return nil }
+func (c *Cache) NodeTopologyInfo() internalcache.NodeTopologyInfo { return nil }

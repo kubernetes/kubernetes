@@ -6,6 +6,7 @@ go_library(
         "cache.go",
         "interface.go",
         "node_tree.go",
+        "node_topology_info.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/cache",
     visibility = ["//visibility:public"],
@@ -20,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
     ],
 )
 
@@ -28,6 +30,7 @@ go_test(
     srcs = [
         "cache_test.go",
         "node_tree_test.go",
+        "node_topology_info_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
@@ -41,6 +44,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
