@@ -1,3 +1,5 @@
+// +build nolegacyproviders
+
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -14,4 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package azure_dd
+package app
+
+import "k8s.io/kubernetes/pkg/volume"
+
+func appendLegacyProviderVolumes(allPlugins []volume.VolumePlugin) []volume.VolumePlugin {
+	// no-op when we didn't compile in support for these
+	return allPlugins
+}
