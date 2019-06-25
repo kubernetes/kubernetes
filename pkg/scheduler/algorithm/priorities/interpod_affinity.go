@@ -29,8 +29,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
 	"k8s.io/klog"
 )
@@ -97,13 +97,11 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 	}
 	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
 	if match {
-		klog.V(5).Infof("------topologyInfo: %+v----", topologyInfo)
 		if topologyValue, ok := fixedNode.Labels[term.TopologyKey]; ok {
 			if nodeSet, ok := topologyInfo[internalcache.TopologyPair{
 				Key:   term.TopologyKey,
 				Value: topologyValue,
 			}]; ok {
-				klog.V(5).Infof("------nodeSet: %+v-----", nodeSet)
 				for node, _ := range nodeSet {
 					if _, ok := p.counts[node]; ok {
 						atomic.AddInt64(p.counts[node], weight)
