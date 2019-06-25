@@ -727,7 +727,7 @@ github.com/rubiojr/go-vhd/vhd
 github.com/russross/blackfriday
 # github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
-# github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e => github.com/seccomp/libseccomp-golang v0.0.0-20150813023252-1b506fc7c24e
+# github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
 # github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d => github.com/sigma/go-inotify v0.0.0-20181102212354-c87b6cf5033d
 github.com/sigma/go-inotify
