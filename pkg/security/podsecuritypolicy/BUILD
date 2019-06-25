@@ -16,7 +16,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy",
     deps = [
+        "//pkg/api/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/pods:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/security/podsecuritypolicy/apparmor:go_default_library",
         "//pkg/security/podsecuritypolicy/capabilities:go_default_library",

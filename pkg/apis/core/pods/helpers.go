@@ -19,8 +19,26 @@ package pods
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/fieldpath"
 )
+
+// ContainerVisitorWithPath is called with each container and the field.Path to that container
+type ContainerVisitorWithPath func(container *api.Container, path *field.Path)
+
+// VisitContainersWithPath invokes the visitor function with a pointer to the spec
+// of every container in the given pod spec and the field.Path to that container.
+func VisitContainersWithPath(podSpec *api.PodSpec, visitor ContainerVisitorWithPath) {
+	path := field.NewPath("spec", "initContainers")
+	for i := range podSpec.InitContainers {
+		visitor(&podSpec.InitContainers[i], path.Index(i))
+	}
+	path = field.NewPath("spec", "containers")
+	for i := range podSpec.Containers {
+		visitor(&podSpec.Containers[i], path.Index(i))
+	}
+}
 
 // ConvertDownwardAPIFieldLabel converts the specified downward API field label
 // and its value in the pod of the specified version to the internal version,

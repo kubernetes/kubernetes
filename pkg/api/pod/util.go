@@ -26,6 +26,28 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
+// ContainerVisitor is called with each container spec, and returns true
+// if visiting should continue.
+type ContainerVisitor func(container *api.Container) (shouldContinue bool)
+
+// VisitContainers invokes the visitor function with a pointer to the container
+// spec of every container in the given pod spec. If visitor returns false,
+// visiting is short-circuited. VisitContainers returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainers(podSpec *api.PodSpec, visitor ContainerVisitor) bool {
+	for i := range podSpec.InitContainers {
+		if !visitor(&podSpec.InitContainers[i]) {
+			return false
+		}
+	}
+	for i := range podSpec.Containers {
+		if !visitor(&podSpec.Containers[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 
@@ -39,16 +61,9 @@ func VisitPodSecretNames(pod *api.Pod, visitor Visitor) bool {
 			return false
 		}
 	}
-	for i := range pod.Spec.InitContainers {
-		if !visitContainerSecretNames(&pod.Spec.InitContainers[i], visitor) {
-			return false
-		}
-	}
-	for i := range pod.Spec.Containers {
-		if !visitContainerSecretNames(&pod.Spec.Containers[i], visitor) {
-			return false
-		}
-	}
+	VisitContainers(&pod.Spec, func(c *api.Container) bool {
+		return visitContainerSecretNames(c, visitor)
+	})
 	var source *api.VolumeSource
 	for i := range pod.Spec.Volumes {
 		source = &pod.Spec.Volumes[i].VolumeSource
@@ -129,16 +144,9 @@ func visitContainerSecretNames(container *api.Container, visitor Visitor) bool {
 // Transitive references (e.g. pod -> pvc -> pv -> secret) are not visited.
 // Returns true if visiting completed, false if visiting was short-circuited.
 func VisitPodConfigmapNames(pod *api.Pod, visitor Visitor) bool {
-	for i := range pod.Spec.InitContainers {
-		if !visitContainerConfigmapNames(&pod.Spec.InitContainers[i], visitor) {
-			return false
-		}
-	}
-	for i := range pod.Spec.Containers {
-		if !visitContainerConfigmapNames(&pod.Spec.Containers[i], visitor) {
-			return false
-		}
-	}
+	VisitContainers(&pod.Spec, func(c *api.Container) bool {
+		return visitContainerConfigmapNames(c, visitor)
+	})
 	var source *api.VolumeSource
 	for i := range pod.Spec.Volumes {
 		source = &pod.Spec.Volumes[i].VolumeSource
@@ -331,30 +339,22 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
 		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
-		for i := range podSpec.Containers {
-			for j := range podSpec.Containers[i].VolumeMounts {
-				podSpec.Containers[i].VolumeMounts[j].SubPath = ""
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			for i := range c.VolumeMounts {
+				c.VolumeMounts[i].SubPath = ""
 			}
-		}
-		for i := range podSpec.InitContainers {
-			for j := range podSpec.InitContainers[i].VolumeMounts {
-				podSpec.InitContainers[i].VolumeMounts[j].SubPath = ""
-			}
-		}
+			return true
+		})
 	}
 
 	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {
 		// drop subpath env expansion from the pod if either of the subpath features is disabled and the old spec did not specify subpath env expansion
-		for i := range podSpec.Containers {
-			for j := range podSpec.Containers[i].VolumeMounts {
-				podSpec.Containers[i].VolumeMounts[j].SubPathExpr = ""
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			for i := range c.VolumeMounts {
+				c.VolumeMounts[i].SubPathExpr = ""
 			}
-		}
-		for i := range podSpec.InitContainers {
-			for j := range podSpec.InitContainers[i].VolumeMounts {
-				podSpec.InitContainers[i].VolumeMounts[j].SubPathExpr = ""
-			}
-		}
+			return true
+		})
 	}
 
 	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
@@ -392,16 +392,12 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
 		}
-		for i := range podSpec.Containers {
-			if podSpec.Containers[i].SecurityContext != nil {
-				podSpec.Containers[i].SecurityContext.RunAsGroup = nil
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			if c.SecurityContext != nil {
+				c.SecurityContext.RunAsGroup = nil
 			}
-		}
-		for i := range podSpec.InitContainers {
-			if podSpec.InitContainers[i].SecurityContext != nil {
-				podSpec.InitContainers[i].SecurityContext.RunAsGroup = nil
-			}
-		}
+			return true
+		})
 	}
 }
 
@@ -443,26 +439,15 @@ func dropDisabledGMSAFieldsFromContainers(containers []api.Container) {
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
 		defaultProcMount := api.DefaultProcMount
-		for i := range podSpec.Containers {
-			if podSpec.Containers[i].SecurityContext != nil {
-				if podSpec.Containers[i].SecurityContext.ProcMount != nil {
-					// The ProcMount field was improperly forced to non-nil in 1.12.
-					// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
-					// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
-					podSpec.Containers[i].SecurityContext.ProcMount = &defaultProcMount
-				}
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			if c.SecurityContext != nil && c.SecurityContext.ProcMount != nil {
+				// The ProcMount field was improperly forced to non-nil in 1.12.
+				// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
+				// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
+				c.SecurityContext.ProcMount = &defaultProcMount
 			}
-		}
-		for i := range podSpec.InitContainers {
-			if podSpec.InitContainers[i].SecurityContext != nil {
-				if podSpec.InitContainers[i].SecurityContext.ProcMount != nil {
-					// The ProcMount field was improperly forced to non-nil in 1.12.
-					// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
-					// Note: we cannot force the field to nil when the feature is disabled because it causes a diff against previously persisted data.
-					podSpec.InitContainers[i].SecurityContext.ProcMount = &defaultProcMount
-				}
-			}
-		}
+			return true
+		})
 	}
 }
 
@@ -470,12 +455,10 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
 func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeDevicesInUse(oldPodSpec) {
-		for i := range podSpec.Containers {
-			podSpec.Containers[i].VolumeDevices = nil
-		}
-		for i := range podSpec.InitContainers {
-			podSpec.InitContainers[i].VolumeDevices = nil
-		}
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			c.VolumeDevices = nil
+			return true
+		})
 	}
 }
 
@@ -494,21 +477,19 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
-	for i := range podSpec.Containers {
-		for j := range podSpec.Containers[i].VolumeMounts {
-			if len(podSpec.Containers[i].VolumeMounts[j].SubPath) > 0 {
-				return true
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		for i := range c.VolumeMounts {
+			if len(c.VolumeMounts[i].SubPath) > 0 {
+				inUse = true
+				return false
 			}
 		}
-	}
-	for i := range podSpec.InitContainers {
-		for j := range podSpec.InitContainers[i].VolumeMounts {
-			if len(podSpec.InitContainers[i].VolumeMounts[j].SubPath) > 0 {
-				return true
-			}
-		}
-	}
-	return false
+		return true
+	})
+
+	return inUse
 }
 
 // runtimeClassInUse returns true if the pod spec is non-nil and has a RuntimeClassName set
@@ -539,25 +520,20 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].SecurityContext != nil {
-			if podSpec.Containers[i].SecurityContext.ProcMount != nil {
-				if *podSpec.Containers[i].SecurityContext.ProcMount != api.DefaultProcMount {
-					return true
-				}
-			}
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.SecurityContext == nil || c.SecurityContext.ProcMount == nil {
+			return true
 		}
-	}
-	for i := range podSpec.InitContainers {
-		if podSpec.InitContainers[i].SecurityContext != nil {
-			if podSpec.InitContainers[i].SecurityContext.ProcMount != nil {
-				if *podSpec.InitContainers[i].SecurityContext.ProcMount != api.DefaultProcMount {
-					return true
-				}
-			}
+		if *c.SecurityContext.ProcMount != api.DefaultProcMount {
+			inUse = true
+			return false
 		}
-	}
-	return false
+		return true
+	})
+
+	return inUse
 }
 
 // appArmorInUse returns true if the pod has apparmor related information
@@ -638,17 +614,17 @@ func volumeDevicesInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].VolumeDevices != nil {
-			return true
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.VolumeDevices != nil {
+			inUse = true
+			return false
 		}
-	}
-	for i := range podSpec.InitContainers {
-		if podSpec.InitContainers[i].VolumeDevices != nil {
-			return true
-		}
-	}
-	return false
+		return true
+	})
+
+	return inUse
 }
 
 // runAsGroupInUse returns true if the pod spec is non-nil and has a SecurityContext's RunAsGroup field set
@@ -660,17 +636,17 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 	if podSpec.SecurityContext != nil && podSpec.SecurityContext.RunAsGroup != nil {
 		return true
 	}
-	for i := range podSpec.Containers {
-		if podSpec.Containers[i].SecurityContext != nil && podSpec.Containers[i].SecurityContext.RunAsGroup != nil {
-			return true
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.SecurityContext != nil && c.SecurityContext.RunAsGroup != nil {
+			inUse = true
+			return false
 		}
-	}
-	for i := range podSpec.InitContainers {
-		if podSpec.InitContainers[i].SecurityContext != nil && podSpec.InitContainers[i].SecurityContext.RunAsGroup != nil {
-			return true
-		}
-	}
-	return false
+		return true
+	})
+
+	return inUse
 }
 
 // gMSAFieldsInUse returns true if the pod spec is non-nil and has one of any
@@ -716,21 +692,19 @@ func subpathExprInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
 	}
-	for i := range podSpec.Containers {
-		for j := range podSpec.Containers[i].VolumeMounts {
-			if len(podSpec.Containers[i].VolumeMounts[j].SubPathExpr) > 0 {
-				return true
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		for i := range c.VolumeMounts {
+			if len(c.VolumeMounts[i].SubPathExpr) > 0 {
+				inUse = true
+				return false
 			}
 		}
-	}
-	for i := range podSpec.InitContainers {
-		for j := range podSpec.InitContainers[i].VolumeMounts {
-			if len(podSpec.InitContainers[i].VolumeMounts[j].SubPathExpr) > 0 {
-				return true
-			}
-		}
-	}
-	return false
+		return true
+	})
+
+	return inUse
 }
 
 // csiInUse returns true if any pod's spec include inline CSI volumes.
