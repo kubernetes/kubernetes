@@ -180,12 +180,6 @@ const (
 	// Enable running mount utilities in containers.
 	MountContainers featuregate.Feature = "MountContainers"
 
-	// owner: @vladimirvivien
-	// GA: v1.13
-	//
-	// Enable mount/attachment of Container Storage Interface (CSI) backed PVs
-	CSIPersistentVolume featuregate.Feature = "CSIPersistentVolume"
-
 	// owner: @saad-ali
 	// alpha: v1.12
 	// beta:  v1.14
@@ -487,7 +481,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: featuregate.Alpha},
 	MountContainers:                             {Default: false, PreRelease: featuregate.Alpha},
-	CSIPersistentVolume:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.16
 	CSIDriverRegistry:                           {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                                 {Default: true, PreRelease: featuregate.Beta},
 	BlockVolume:                                 {Default: true, PreRelease: featuregate.Beta},

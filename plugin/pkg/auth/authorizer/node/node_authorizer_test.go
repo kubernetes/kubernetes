@@ -40,8 +40,6 @@ import (
 )
 
 var (
-	csiEnabledFeature          = featuregate.NewFeatureGate()
-	csiDisabledFeature         = featuregate.NewFeatureGate()
 	trEnabledFeature           = featuregate.NewFeatureGate()
 	trDisabledFeature          = featuregate.NewFeatureGate()
 	leaseEnabledFeature        = featuregate.NewFeatureGate()
@@ -51,12 +49,6 @@ var (
 )
 
 func init() {
-	if err := csiEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSIPersistentVolume: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSIPersistentVolume: {Default: false}}); err != nil {
-		panic(err)
-	}
 	if err := trEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.TokenRequest: {Default: true}}); err != nil {
 		panic(err)
 	}
@@ -198,22 +190,9 @@ func TestAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - no relationship",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "disallowed attachment - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "allowed attachment - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:     "allowed svcacct token create - feature enabled",
@@ -771,22 +750,14 @@ func BenchmarkAuthorization(b *testing.B) {
 			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - no relationship",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed attachment - no relationship",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed attachment - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
-		},
-		{
-			name:     "allowed attachment - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
-			features: csiEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed attachment",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "volumeattachments", APIGroup: "storage.k8s.io", Name: "attachment0-node0"},
+			expect: authorizer.DecisionAllow,
 		},
 	}
 

@@ -108,10 +108,7 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Deci
 		case pvResource:
 			return r.authorizeGet(nodeName, pvVertexType, attrs)
 		case vaResource:
-			if r.features.Enabled(features.CSIPersistentVolume) {
-				return r.authorizeGet(nodeName, vaVertexType, attrs)
-			}
-			return authorizer.DecisionNoOpinion, fmt.Sprintf("disabled by feature gate %s", features.CSIPersistentVolume), nil
+			return r.authorizeGet(nodeName, vaVertexType, attrs)
 		case svcAcctResource:
 			if r.features.Enabled(features.TokenRequest) {
 				return r.authorizeCreateToken(nodeName, serviceAccountVertexType, attrs)

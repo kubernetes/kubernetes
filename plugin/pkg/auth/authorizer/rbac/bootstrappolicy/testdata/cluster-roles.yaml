@@ -958,6 +958,12 @@ items:
     - list
     - watch
   - apiGroups:
+    - storage.k8s.io
+    resources:
+    - volumeattachments
+    verbs:
+    - get
+  - apiGroups:
     - ""
     resources:
     - persistentvolumeclaims/status
@@ -971,12 +977,6 @@ items:
     - serviceaccounts/token
     verbs:
     - create
-  - apiGroups:
-    - storage.k8s.io
-    resources:
-    - volumeattachments
-    verbs:
-    - get
   - apiGroups:
     - storage.k8s.io
     resources:
