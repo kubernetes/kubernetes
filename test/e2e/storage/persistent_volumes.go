@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -311,7 +312,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
 
 			ginkgo.AfterEach(func() {
-				framework.DeleteAllStatefulSets(c, ns)
+				e2esset.DeleteAllStatefulSets(c, ns)
 			})
 
 			ginkgo.It("should be reschedulable [Slow]", func() {
@@ -319,7 +320,6 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
 
 				numVols := 4
-				ssTester := framework.NewStatefulSetTester(c)
 
 				ginkgo.By("Creating a StatefulSet pod to initialize data")
 				writeCmd := "true"
@@ -352,13 +352,13 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				spec := makeStatefulSetWithPVCs(ns, writeCmd, mounts, claims, probe)
 				ss, err := c.AppsV1().StatefulSets(ns).Create(spec)
 				framework.ExpectNoError(err)
-				ssTester.WaitForRunningAndReady(1, ss)
+				e2esset.WaitForRunningAndReady(c, 1, ss)
 
 				ginkgo.By("Deleting the StatefulSet but not the volumes")
 				// Scale down to 0 first so that the Delete is quick
-				ss, err = ssTester.Scale(ss, 0)
+				ss, err = e2esset.Scale(c, ss, 0)
 				framework.ExpectNoError(err)
-				ssTester.WaitForStatusReplicas(ss, 0)
+				e2esset.WaitForStatusReplicas(c, ss, 0)
 				err = c.AppsV1().StatefulSets(ns).Delete(ss.Name, &metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 
@@ -372,7 +372,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				spec = makeStatefulSetWithPVCs(ns, validateCmd, mounts, claims, probe)
 				ss, err = c.AppsV1().StatefulSets(ns).Create(spec)
 				framework.ExpectNoError(err)
-				ssTester.WaitForRunningAndReady(1, ss)
+				e2esset.WaitForRunningAndReady(c, 1, ss)
 			})
 		})
 	})

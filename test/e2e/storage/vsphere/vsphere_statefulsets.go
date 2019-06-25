@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -66,7 +67,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 	})
 	ginkgo.AfterEach(func() {
 		e2elog.Logf("Deleting all statefulset in namespace: %v", namespace)
-		framework.DeleteAllStatefulSets(client, namespace)
+		e2esset.DeleteAllStatefulSets(client, namespace)
 	})
 
 	ginkgo.It("vsphere statefulset testing", func() {
@@ -79,13 +80,13 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		defer client.StorageV1().StorageClasses().Delete(sc.Name, nil)
 
 		ginkgo.By("Creating statefulset")
-		statefulsetTester := framework.NewStatefulSetTester(client)
-		statefulset := statefulsetTester.CreateStatefulSet(manifestPath, namespace)
+
+		statefulset := e2esset.CreateStatefulSet(client, manifestPath, namespace)
 		replicas := *(statefulset.Spec.Replicas)
 		// Waiting for pods status to be Ready
-		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas)
-		framework.ExpectNoError(statefulsetTester.CheckMount(statefulset, mountPath))
-		ssPodsBeforeScaleDown := statefulsetTester.GetPodList(statefulset)
+		e2esset.WaitForStatusReadyReplicas(client, statefulset, replicas)
+		framework.ExpectNoError(e2esset.CheckMount(client, statefulset, mountPath))
+		ssPodsBeforeScaleDown := e2esset.GetPodList(client, statefulset)
 		gomega.Expect(ssPodsBeforeScaleDown.Items).NotTo(gomega.BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
 		gomega.Expect(len(ssPodsBeforeScaleDown.Items) == int(replicas)).To(gomega.BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
 
@@ -103,9 +104,9 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Scaling down statefulsets to number of Replica: %v", replicas-1))
-		_, scaledownErr := statefulsetTester.Scale(statefulset, replicas-1)
+		_, scaledownErr := e2esset.Scale(client, statefulset, replicas-1)
 		framework.ExpectNoError(scaledownErr)
-		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas-1)
+		e2esset.WaitForStatusReadyReplicas(client, statefulset, replicas-1)
 
 		// After scale down, verify vsphere volumes are detached from deleted pods
 		ginkgo.By("Verify Volumes are detached from Nodes after Statefulsets is scaled down")
@@ -124,12 +125,12 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Scaling up statefulsets to number of Replica: %v", replicas))
-		_, scaleupErr := statefulsetTester.Scale(statefulset, replicas)
+		_, scaleupErr := e2esset.Scale(client, statefulset, replicas)
 		framework.ExpectNoError(scaleupErr)
-		statefulsetTester.WaitForStatusReplicas(statefulset, replicas)
-		statefulsetTester.WaitForStatusReadyReplicas(statefulset, replicas)
+		e2esset.WaitForStatusReplicas(client, statefulset, replicas)
+		e2esset.WaitForStatusReadyReplicas(client, statefulset, replicas)
 
-		ssPodsAfterScaleUp := statefulsetTester.GetPodList(statefulset)
+		ssPodsAfterScaleUp := e2esset.GetPodList(client, statefulset)
 		gomega.Expect(ssPodsAfterScaleUp.Items).NotTo(gomega.BeEmpty(), fmt.Sprintf("Unable to get list of Pods from the Statefulset: %v", statefulset.Name))
 		gomega.Expect(len(ssPodsAfterScaleUp.Items) == int(replicas)).To(gomega.BeTrue(), "Number of Pods in the statefulset should match with number of replicas")
 

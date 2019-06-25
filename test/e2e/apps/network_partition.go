@@ -40,6 +40,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -371,17 +372,15 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			e2elog.Logf("Deleting all stateful set in ns %v", ns)
-			framework.DeleteAllStatefulSets(c, ns)
+			e2esset.DeleteAllStatefulSets(c, ns)
 		})
 
 		ginkgo.It("should come back up if node goes down [Slow] [Disruptive]", func() {
 			petMounts := []v1.VolumeMount{{Name: "datadir", MountPath: "/data/"}}
 			podMounts := []v1.VolumeMount{{Name: "home", MountPath: "/home"}}
-			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
+			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, petMounts, podMounts, labels)
 			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
 			framework.ExpectNoError(err)
-
-			pst := framework.NewStatefulSetTester(c)
 
 			nn, err := e2enode.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
@@ -390,18 +389,17 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			common.RestartNodes(f.ClientSet, nodes)
 
 			ginkgo.By("waiting for pods to be running again")
-			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
+			e2esset.WaitForRunningAndReady(c, *ps.Spec.Replicas, ps)
 		})
 
 		ginkgo.It("should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]", func() {
-			ps := framework.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
+			ps := e2esset.NewStatefulSet(psName, ns, headlessSvcName, 3, []v1.VolumeMount{}, []v1.VolumeMount{}, labels)
 			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
 			framework.ExpectNoError(err)
 
-			pst := framework.NewStatefulSetTester(c)
-			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
+			e2esset.WaitForRunningAndReady(c, *ps.Spec.Replicas, ps)
 
-			pod := pst.GetPodList(ps).Items[0]
+			pod := e2esset.GetPodList(c, ps).Items[0]
 			node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
@@ -420,7 +418,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			}
 
 			ginkgo.By("waiting for pods to be running again")
-			pst.WaitForRunningAndReady(*ps.Spec.Replicas, ps)
+			e2esset.WaitForRunningAndReady(c, *ps.Spec.Replicas, ps)
 		})
 	})
 
