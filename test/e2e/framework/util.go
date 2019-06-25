@@ -1348,6 +1348,11 @@ func RandomSuffix() string {
 	return strconv.Itoa(r.Int() % 10000)
 }
 
+// ExpectEqual expects the specified two are the same, otherwise an exception raises
+func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
+	gomega.Expect(actual).To(gomega.Equal(extra), explain...)
+}
+
 // ExpectError expects an error happens, otherwise an exception raises
 func ExpectError(err error, explain ...interface{}) {
 	gomega.Expect(err).To(gomega.HaveOccurred(), explain...)
@@ -2072,7 +2077,7 @@ func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string,
 	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
 	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
 	ExpectNoError(err)
-	gomega.Expect(node.Labels[labelKey]).To(gomega.Equal(labelValue))
+	ExpectEqual(node.Labels[labelKey], labelValue)
 }
 
 // RemoveTaintOffNode removes the given taint from the given node.
