@@ -96,6 +96,7 @@ func NewKubeConfigFilePhase(kubeConfigFileName string) workflow.Phase {
 func getKubeConfigPhaseFlags(name string) []string {
 	flags := []string{
 		options.APIServerAdvertiseAddress,
+		options.ControlPlaneEndpoint,
 		options.APIServerBindPort,
 		options.CertificatesDir,
 		options.CfgPath,

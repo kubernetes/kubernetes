@@ -230,6 +230,11 @@ func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.Cluster
 		`Use alternative domain for services, e.g. "myorg.internal".`,
 	)
 
+	flagSet.StringVar(
+		&cfg.ControlPlaneEndpoint, options.ControlPlaneEndpoint, cfg.ControlPlaneEndpoint,
+		`Specify a stable IP address or DNS name for the control plane.`,
+	)
+
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 
 	flagSet.StringVar(

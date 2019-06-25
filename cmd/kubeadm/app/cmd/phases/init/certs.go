@@ -140,6 +140,7 @@ func getCertPhaseFlags(name string) []string {
 	if name == "all" || name == "apiserver" {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerCertSANs,
 			options.NetworkingDNSDomain,
 			options.NetworkingServiceSubnet,
