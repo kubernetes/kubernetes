@@ -133,29 +133,6 @@ func TestUpdateNode(t *testing.T) {
 			},
 		},
 		{
-			name: "old and new node with the same labels",
-			oldNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node",
-					Labels: map[string]string{"k1": "v1", "k2": "v2"},
-				},
-			},
-			newNode: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "node",
-					Labels: map[string]string{"k1": "v1", "k2": "v2"},
-				},
-			},
-			topologyInfo: map[TopologyPair]sets.String{
-				{"k1", "v1"}: sets.NewString("node"),
-				{"k2", "v2"}: sets.NewString("node"),
-			},
-			expectedTopologyInfo: map[TopologyPair]sets.String{
-				{"k1", "v1"}: sets.NewString("node"),
-				{"k2", "v2"}: sets.NewString("node"),
-			},
-		},
-		{
 			name: "old and new node with different labels",
 			oldNode: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
