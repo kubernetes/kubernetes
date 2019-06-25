@@ -53,7 +53,7 @@ func (d *DisallowFlunder) Admit(a admission.Attributes, o admission.ObjectInterf
 		return nil
 	}
 
-	if !d.WaitForReady() {
+	if !d.WaitForReady(a.GetContext()) {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 

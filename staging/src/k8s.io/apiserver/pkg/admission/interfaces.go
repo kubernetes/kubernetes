@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,6 +66,9 @@ type Attributes interface {
 
 	// GetReinvocationContext tracks the admission request information relevant to the re-invocation policy.
 	GetReinvocationContext() ReinvocationContext
+
+	// GetContext returns the context associated with the request
+	GetContext() context.Context
 }
 
 // ObjectInterfaces is an interface used by AdmissionController to get object interfaces

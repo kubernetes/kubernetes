@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -46,8 +47,12 @@ type attributesRecord struct {
 	annotationsLock sync.RWMutex
 
 	reinvocationContext ReinvocationContext
+
+	ctx context.Context
 }
 
+// Deprecated: This method only can be used in test files, but not the real apiserver serve
+// functions. Please use NewAttributesRecordWithContext in apiserver serve functions instead.
 func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
 	return &attributesRecord{
 		kind:                kind,
@@ -62,6 +67,25 @@ func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind s
 		oldObject:           oldObject,
 		userInfo:            userInfo,
 		reinvocationContext: &reinvocationContext{},
+		ctx:                 context.TODO(),
+	}
+}
+
+func NewAttributesRecordWithContext(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info, ctx context.Context) Attributes {
+	return &attributesRecord{
+		kind:                kind,
+		namespace:           namespace,
+		name:                name,
+		resource:            resource,
+		subresource:         subresource,
+		operation:           operation,
+		options:             operationOptions,
+		dryRun:              dryRun,
+		object:              object,
+		oldObject:           oldObject,
+		userInfo:            userInfo,
+		reinvocationContext: &reinvocationContext{},
+		ctx:                 ctx,
 	}
 }
 
@@ -145,6 +169,10 @@ func (record *attributesRecord) AddAnnotation(key, value string) error {
 
 func (record *attributesRecord) GetReinvocationContext() ReinvocationContext {
 	return record.reinvocationContext
+}
+
+func (record *attributesRecord) GetContext() context.Context {
+	return record.ctx
 }
 
 type reinvocationContext struct {

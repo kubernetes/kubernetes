@@ -17,7 +17,6 @@ limitations under the License.
 package generic
 
 import (
-	"context"
 	"fmt"
 	"io"
 
@@ -207,12 +206,10 @@ func (a *Webhook) Dispatch(attr admission.Attributes, o admission.ObjectInterfac
 	if rules.IsWebhookConfigurationResource(attr) {
 		return nil
 	}
-	if !a.WaitForReady() {
+	if !a.WaitForReady(attr.GetContext()) {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
 	hooks := a.hookSource.Webhooks()
-	// TODO: Figure out if adding one second timeout make sense here.
-	ctx := context.TODO()
 
-	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
+	return a.dispatcher.Dispatch(attr.GetContext(), attr, o, hooks)
 }

@@ -143,7 +143,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		)
 
 		userInfo, _ := request.UserFrom(ctx)
-		staticCreateAttributes := admission.NewAttributesRecord(
+		staticCreateAttributes := admission.NewAttributesRecordWithContext(
 			nil,
 			nil,
 			scope.Kind,
@@ -154,8 +154,9 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			admission.Create,
 			patchToCreateOptions(options),
 			dryrun.IsDryRun(options.DryRun),
-			userInfo)
-		staticUpdateAttributes := admission.NewAttributesRecord(
+			userInfo,
+			req.Context())
+		staticUpdateAttributes := admission.NewAttributesRecordWithContext(
 			nil,
 			nil,
 			scope.Kind,
@@ -167,6 +168,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			patchToUpdateOptions(options),
 			dryrun.IsDryRun(options.DryRun),
 			userInfo,
+			req.Context(),
 		)
 
 		mutatingAdmission, _ := admit.(admission.MutationInterface)
@@ -494,7 +496,7 @@ func (p *patcher) applyPatch(_ context.Context, _, currentObject runtime.Object)
 
 func (p *patcher) admissionAttributes(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object, operation admission.Operation, operationOptions runtime.Object) admission.Attributes {
 	userInfo, _ := request.UserFrom(ctx)
-	return admission.NewAttributesRecord(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo)
+	return admission.NewAttributesRecordWithContext(updatedObject, currentObject, p.kind, p.namespace, p.name, p.resource, p.subresource, operation, operationOptions, p.dryRun, userInfo, ctx)
 }
 
 // applyAdmission is called every time GuaranteedUpdate asks for the updated object,

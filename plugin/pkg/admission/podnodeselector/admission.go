@@ -100,7 +100,7 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 	if shouldIgnore(a) {
 		return nil
 	}
-	if !p.WaitForReady() {
+	if !p.WaitForReady(a.GetContext()) {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 
@@ -127,7 +127,7 @@ func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) 
 	if shouldIgnore(a) {
 		return nil
 	}
-	if !p.WaitForReady() {
+	if !p.WaitForReady(a.GetContext()) {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
 

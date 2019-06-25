@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -25,7 +26,7 @@ func TestWaitForReady(t *testing.T) {
 	handler := newFakeHandler()
 
 	// 1. test no readyFunc
-	if !handler.WaitForReady() {
+	if !handler.WaitForReady(context.TODO()) {
 		t.Errorf("Expect ready for no readyFunc provided.")
 	}
 
@@ -34,17 +35,19 @@ func TestWaitForReady(t *testing.T) {
 		return true
 	}
 	handler.SetReadyFunc(readyFunc)
-	if !handler.WaitForReady() {
+	if !handler.WaitForReady(context.TODO()) {
 		t.Errorf("Expect ready for readyFunc returns ready immediately.")
 	}
 
 	// 3. readyFunc always return not ready. WaitForReady timeout
+	ctx, cancel := context.WithTimeout(context.TODO(), timeToWaitForReady)
+	defer cancel()
 	readyFunc = func() bool {
 		return false
 	}
 	startTime := time.Now()
 	handler.SetReadyFunc(readyFunc)
-	if handler.WaitForReady() {
+	if handler.WaitForReady(ctx) {
 		t.Errorf("Expect not ready for readyFunc returns not ready immediately.")
 	}
 	if time.Since(startTime) < timeToWaitForReady {

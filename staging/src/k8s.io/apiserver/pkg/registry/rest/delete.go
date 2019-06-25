@@ -154,7 +154,7 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 		if !mutating && !validating {
 			return nil
 		}
-		finalAttributes := admission.NewAttributesRecord(
+		finalAttributes := admission.NewAttributesRecordWithContext(
 			nil,
 			// Deep copy the object to avoid accidentally changing the object.
 			old.DeepCopyObject(),
@@ -167,6 +167,7 @@ func AdmissionToValidateObjectDeleteFunc(admit admission.Interface, staticAttrib
 			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
+			staticAttributes.GetContext(),
 		)
 		if mutating {
 			if err := mutatingAdmission.Admit(finalAttributes, objInterfaces); err != nil {

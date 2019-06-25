@@ -166,7 +166,7 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 		return func(obj runtime.Object) error { return nil }
 	}
 	return func(obj runtime.Object) error {
-		finalAttributes := admission.NewAttributesRecord(
+		finalAttributes := admission.NewAttributesRecordWithContext(
 			obj,
 			staticAttributes.GetOldObject(),
 			staticAttributes.GetKind(),
@@ -178,6 +178,7 @@ func AdmissionToValidateObjectFunc(admit admission.Interface, staticAttributes a
 			staticAttributes.GetOperationOptions(),
 			staticAttributes.IsDryRun(),
 			staticAttributes.GetUserInfo(),
+			staticAttributes.GetContext(),
 		)
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil

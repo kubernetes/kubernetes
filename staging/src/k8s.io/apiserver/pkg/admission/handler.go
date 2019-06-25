@@ -17,6 +17,7 @@ limitations under the License.
 package admission
 
 import (
+	"context"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,18 +62,17 @@ func (h *Handler) SetReadyFunc(readyFunc ReadyFunc) {
 }
 
 // WaitForReady will wait for the readyFunc (if registered) to return ready, and in case of timeout, will return false.
-func (h *Handler) WaitForReady() bool {
+func (h *Handler) WaitForReady(ctx context.Context) bool {
 	// there is no ready func configured, so we return immediately
 	if h.readyFunc == nil {
 		return true
 	}
 
-	timeout := time.After(timeToWaitForReady)
 	for !h.readyFunc() {
 		select {
 		case <-time.After(100 * time.Millisecond):
-		case <-timeout:
-			return h.readyFunc()
+		case <-ctx.Done():
+			return false
 		}
 	}
 	return true
