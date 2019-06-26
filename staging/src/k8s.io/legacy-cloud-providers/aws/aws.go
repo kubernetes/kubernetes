@@ -1402,14 +1402,17 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalIP, Address: externalIP})
 		}
 
-		internalDNS, err := c.metadata.GetMetadata("local-hostname")
-		if err != nil || len(internalDNS) == 0 {
+		localHostname, err := c.metadata.GetMetadata("local-hostname")
+		if err != nil || len(localHostname) == 0 {
 			//TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
 			klog.V(4).Info("Could not determine private DNS from AWS metadata.")
 		} else {
-			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNS})
-			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: internalDNS})
+			hostname, internalDNS := parseMetadataLocalHostname(localHostname)
+			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
+			for _, d := range internalDNS {
+				addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalDNS, Address: d})
+			}
 		}
 
 		externalDNS, err := c.metadata.GetMetadata("public-hostname")
@@ -1429,6 +1432,26 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 		return nil, fmt.Errorf("getInstanceByNodeName failed for %q with %q", name, err)
 	}
 	return extractNodeAddresses(instance)
+}
+
+// parseMetadataLocalHostname parses the output of "local-hostname" metadata.
+// If a DHCP option set is configured for a VPC and it has multiple domain names, GetMetadata
+// returns a string containing first the hostname followed by additional domain names,
+// space-separated. For example, if the DHCP option set has:
+// domain-name = us-west-2.compute.internal a.a b.b c.c d.d;
+// $ curl http://169.254.169.254/latest/meta-data/local-hostname
+// ip-192-168-111-51.us-west-2.compute.internal a.a b.b c.c d.d
+func parseMetadataLocalHostname(metadata string) (string, []string) {
+	localHostnames := strings.Fields(metadata)
+	hostname := localHostnames[0]
+	internalDNS := []string{hostname}
+
+	privateAddress := strings.Split(hostname, ".")[0]
+	for _, h := range localHostnames[1:] {
+		internalDNSAddress := privateAddress + "." + h
+		internalDNS = append(internalDNS, internalDNSAddress)
+	}
+	return hostname, internalDNS
 }
 
 // extractNodeAddresses maps the instance information from EC2 to an array of NodeAddresses

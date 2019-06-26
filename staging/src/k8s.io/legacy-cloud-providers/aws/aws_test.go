@@ -701,6 +701,41 @@ func TestNodeAddressesWithMetadata(t *testing.T) {
 	testHasNodeAddress(t, addrs, v1.NodeExternalIP, "2.3.4.5")
 }
 
+func TestParseMetadataLocalHostname(t *testing.T) {
+	tests := []struct {
+		name        string
+		metadata    string
+		hostname    string
+		internalDNS []string
+	}{
+		{
+			"single hostname",
+			"ip-172-31-16-168.us-west-2.compute.internal",
+			"ip-172-31-16-168.us-west-2.compute.internal",
+			[]string{"ip-172-31-16-168.us-west-2.compute.internal"},
+		},
+		{
+			"dhcp options set with three additional domain names",
+			"ip-172-31-16-168.us-west-2.compute.internal example.com example.ca example.org",
+			"ip-172-31-16-168.us-west-2.compute.internal",
+			[]string{"ip-172-31-16-168.us-west-2.compute.internal", "ip-172-31-16-168.example.com", "ip-172-31-16-168.example.ca", "ip-172-31-16-168.example.org"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hostname, internalDNS := parseMetadataLocalHostname(test.metadata)
+			if hostname != test.hostname {
+				t.Errorf("got hostname %v, expected %v", hostname, test.hostname)
+			}
+			for i, v := range internalDNS {
+				if v != test.internalDNS[i] {
+					t.Errorf("got an internalDNS %v, expected %v", v, test.internalDNS[i])
+				}
+			}
+		})
+	}
+}
+
 func TestGetRegion(t *testing.T) {
 	aws := mockAvailabilityZone("us-west-2e")
 	zones, ok := aws.Zones()
