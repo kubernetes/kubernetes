@@ -10,7 +10,7 @@ information could retrieved through other means. To combat those differences,
 
 `agnhost` is an extendable CLI that behaves and outputs the same expected content,
 no matter the underlying OS. The name itself reflects this idea, being a portmanteau
-word of the words agnost and host.
+word of the words agnostic and host.
 
 The image was created for testing purposes, reducing the need for having different test
 cases for the same tested behaviour.
@@ -74,6 +74,29 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost audit-proxy
+```
+
+
+### connect
+
+Tries to open a TCP connection to the given host and port. On error it
+prints an error message prefixed with a specific fixed string that
+test cases can check for:
+
+* `UNKNOWN` - Generic/unknown (non-network) error (eg, bad arguments)
+* `TIMEOUT` - The connection attempt timed out
+* `DNS` - An error in DNS resolution
+* `REFUSED` - Connection refused
+* `OTHER` - Other networking error (eg, "no route to host")
+
+(Theoretically it would be nicer for it to distinguish these by exit
+code, but it's much easier for test programs to compare strings in the
+output than to check the exit code.)
+
+Usage:
+
+```console
+    kubectl exec test-agnost -- /agnost connect [--timeout=<duration>] <host>:<port>
 ```
 
 

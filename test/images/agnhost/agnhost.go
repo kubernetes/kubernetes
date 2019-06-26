@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/images/agnhost/audit-proxy"
+	"k8s.io/kubernetes/test/images/agnhost/connect"
 	"k8s.io/kubernetes/test/images/agnhost/crd-conversion-webhook"
 	"k8s.io/kubernetes/test/images/agnhost/dns"
 	"k8s.io/kubernetes/test/images/agnhost/entrypoint-tester"
@@ -45,6 +46,7 @@ import (
 func main() {
 	rootCmd := &cobra.Command{Use: "app"}
 	rootCmd.AddCommand(auditproxy.CmdAuditProxy)
+	rootCmd.AddCommand(connect.CmdConnect)
 	rootCmd.AddCommand(crdconvwebhook.CmdCrdConversionWebhook)
 	rootCmd.AddCommand(dns.CmdDNSSuffix)
 	rootCmd.AddCommand(dns.CmdDNSServerList)
