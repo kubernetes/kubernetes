@@ -50,7 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -97,53 +97,41 @@ func setupScheduler(
 	// Enable Features.
 	algorithmprovider.ApplyFeatureGates()
 
-	schedulerConfigFactory := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-		SchedulerName:                  v1.DefaultSchedulerName,
-		Client:                         cs,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PodInformer:                    informerFactory.Core().V1().Pods(),
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		DisablePreemption:              false,
-		PercentageOfNodesToScore:       100,
-		StopCh:                         stopCh,
-	})
-	schedulerConfig, err := schedulerConfigFactory.Create()
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-
-	// TODO: Replace NewFromConfig and AddAllEventHandlers with scheduler.New() in
-	// all test/integration tests.
-	sched := scheduler.NewFromConfig(schedulerConfig)
-	scheduler.AddAllEventHandlers(sched,
-		v1.DefaultSchedulerName,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
-	)
-
 	eventBroadcaster := record.NewBroadcaster()
-	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
-		legacyscheme.Scheme,
-		v1.EventSource{Component: v1.DefaultSchedulerName},
-	)
 	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{
 		Interface: cs.CoreV1().Events(""),
 	})
 
-	algorithmprovider.ApplyFeatureGates()
+	sched, err := scheduler.New(
+		cs,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Storage().V1beta1().CSINodes(),
+		eventBroadcaster.NewRecorder(
+			legacyscheme.Scheme,
+			v1.EventSource{Component: v1.DefaultSchedulerName},
+		),
+		kubeschedulerconfig.SchedulerAlgorithmSource{},
+		stopCh,
+		schedulerframework.NewRegistry(),
+		nil,
+		[]kubeschedulerconfig.PluginConfig{},
+		scheduler.WithName(v1.DefaultSchedulerName),
+		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
+		scheduler.WithPreemptionDisabled(false),
+		scheduler.WithPercentageOfNodesToScore(100),
+	)
+	if err != nil {
+		t.Fatalf("Couldn't create scheduler: %v", err)
+	}
 
 	go sched.Run()
 }
