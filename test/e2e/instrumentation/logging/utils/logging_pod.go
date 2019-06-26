@@ -106,7 +106,7 @@ func (p *loadLoggingPod) Start(f *framework.Framework) error {
 				{
 					Name:  loggingContainerName,
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"logs-generator", "-log-lines-total", strconv.Itoa(p.expectedLinesCount), "-run-duration", p.runDuration.String()},
+					Args:  []string{"logs-generator", "--log-lines-total", strconv.Itoa(p.expectedLinesCount), "--run-duration", p.runDuration.String()},
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceCPU: *resource.NewMilliQuantity(
