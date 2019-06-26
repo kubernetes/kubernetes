@@ -1642,6 +1642,7 @@ k8s.io/kubectl/pkg/util/hash
 k8s.io/kubectl/pkg/util/interrupt
 k8s.io/kubectl/pkg/util/podutils
 k8s.io/kubectl/pkg/util/printers
+k8s.io/kubectl/pkg/util/qos
 k8s.io/kubectl/pkg/util/rbac
 k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
