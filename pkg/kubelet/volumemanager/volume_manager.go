@@ -295,9 +295,9 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 	// that volumes are marked in use as soon as the decision is made that the
 	// volume *should* be attached to this node until it is safely unmounted.
 	desiredVolumes := vm.desiredStateOfWorld.GetVolumesToMount()
-	mountedVolumes := vm.actualStateOfWorld.GetGloballyMountedVolumes()
-	volumesToReportInUse := make([]v1.UniqueVolumeName, 0, len(desiredVolumes)+len(mountedVolumes))
-	desiredVolumesMap := make(map[v1.UniqueVolumeName]bool, len(desiredVolumes)+len(mountedVolumes))
+	allAttachedVolumes := vm.actualStateOfWorld.GetAttachedVolumes()
+	volumesToReportInUse := make([]v1.UniqueVolumeName, 0, len(desiredVolumes)+len(allAttachedVolumes))
+	desiredVolumesMap := make(map[v1.UniqueVolumeName]bool, len(desiredVolumes)+len(allAttachedVolumes))
 
 	for _, volume := range desiredVolumes {
 		if volume.PluginIsAttachable {
@@ -308,7 +308,7 @@ func (vm *volumeManager) GetVolumesInUse() []v1.UniqueVolumeName {
 		}
 	}
 
-	for _, volume := range mountedVolumes {
+	for _, volume := range allAttachedVolumes {
 		if volume.PluginIsAttachable {
 			if _, exists := desiredVolumesMap[volume.VolumeName]; !exists {
 				volumesToReportInUse = append(volumesToReportInUse, volume.VolumeName)
