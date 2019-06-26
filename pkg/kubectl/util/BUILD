@@ -70,7 +70,6 @@ filegroup(
         "//pkg/kubectl/util/fieldpath:all-srcs",
         "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",
-        "//pkg/kubectl/util/qos:all-srcs",
         "//pkg/kubectl/util/resource:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
     ],
