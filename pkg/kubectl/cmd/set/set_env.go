@@ -38,7 +38,7 @@ import (
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/set/env"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 var (

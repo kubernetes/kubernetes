@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 // StatusViewer provides an interface for resources that have rollout status.

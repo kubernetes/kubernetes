@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	kapps "k8s.io/kubernetes/pkg/kubectl/apps"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (

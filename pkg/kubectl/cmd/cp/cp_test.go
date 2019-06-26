@@ -40,7 +40,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 	kexec "k8s.io/kubernetes/pkg/kubectl/cmd/exec"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
-	"k8s.io/kubernetes/pkg/kubectl/scheme"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 type FileType int
