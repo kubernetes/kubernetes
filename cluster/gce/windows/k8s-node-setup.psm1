@@ -1113,13 +1113,39 @@ $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 # sometimes is unstoppable, so we work around it by killing the processes.
 function Restart-StackdriverLoggingAgent {
   Stop-Service -NoWait -ErrorAction Ignore StackdriverLogging
-  # TODO: check periodically to lower the wait time
-  Start-Sleep 10
+ 
+  # Wait (if necessary) for service to stop.
+  $timeout = 10
+  $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
+  for ($i = 0; $i -lt $timeout -and !($stopped); $i++) {
+      Start-Sleep 1
+      $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
+  }
+
   if ((Get-service StackdriverLogging).Status -ne 'Stopped') {
     # Force kill the processes.
     Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
       Where CommandLine -Like '*Stackdriver/logging*').ProcessId
+
+    # Wait until process has stopped.
+    $waited = 0
+    $log_period = 10
+    $timeout = 60
+    while ((Get-service StackdriverLogging).Status -ne 'Stopped' -and $waited -lt $timeout) {
+      Start-Sleep 1
+      $waited++
+
+      if ($waited % $log_period -eq 0) {
+        Log-Output "Waiting for StackdriverLogging service to stop"
+      }
+    }
+
+    # Timeout occurred
+    if ($waited -ge $timeout) {
+      Throw ("Timeout while waiting for StackdriverLogging service to stop")
+    }
   }
+  
   Start-Service StackdriverLogging
 }
 
