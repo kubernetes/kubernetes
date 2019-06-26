@@ -1704,72 +1704,11 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 		mutateStatusFn func(*kubecontainer.PodStatus)
 		actions        podActions
 	}{
-		"Kill sidecars if all non-sidecars are terminated": {
-			mutatePodFn: func(pod *v1.Pod) {
-				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-			},
-			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				for i := range status.ContainerStatuses {
-					if i == 1 {
-						continue
-					}
-					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
-					status.ContainerStatuses[i].ExitCode = 0
-				}
-			},
-			actions: podActions{
-				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				ContainersToKill:  getKillMap(basePod, baseStatus, []int{1}),
-				ContainersToStart: []int{},
-			},
-		},
-		"Kill pod if all sidecars and non-sidecars are terminated": {
-			mutatePodFn: func(pod *v1.Pod) {
-				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-			},
-			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				for i := range status.ContainerStatuses {
-					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
-					if i == 1 {
-						status.ContainerStatuses[i].ExitCode = 1
-					} else {
-						status.ContainerStatuses[i].ExitCode = 0
-					}
-				}
-			},
-			actions: podActions{
-				KillPod:           true,
-				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
-				ContainersToStart: []int{},
-			},
-		},
-		"Don't restart sidecars if all non-sidecars are terminated": {
-			mutatePodFn: func(pod *v1.Pod) {
-				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
-			},
-			mutateStatusFn: func(status *kubecontainer.PodStatus) {
-				for i := range status.ContainerStatuses {
-					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
-					if i == 1 {
-						status.ContainerStatuses[i].ExitCode = 1
-					} else {
-						status.ContainerStatuses[i].ExitCode = 0
-					}
-				}
-			},
-			actions: podActions{
-				KillPod:           true,
-				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
-				ContainersToStart: []int{},
-			},
-		},
 		"Start sidecar containers before non-sidecars when creating a new pod": {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				// No container or sandbox exists.
 				status.SandboxStatuses = []*runtimeapi.PodSandboxStatus{}
-				status.ContainerStatuses = []*kubecontainer.ContainerStatus{}
+				status.ContainerStatuses = []*kubecontainer.Status{}
 			},
 			actions: podActions{
 				KillPod:           true,
