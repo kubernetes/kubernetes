@@ -10,7 +10,10 @@ go_library(
     name = "go_default_library",
     srcs = ["plugins.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/algorithmprovider",
-    deps = ["//pkg/scheduler/algorithmprovider/defaults:go_default_library"],
+    deps = [
+        "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
+        "//pkg/scheduler/api:go_default_library",
+    ],
 )
 
 go_test(
