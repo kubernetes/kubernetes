@@ -686,7 +686,7 @@ var _ = SIGDescribe("Density", func() {
 					Image:                          imageutils.GetPauseImageName(),
 					Name:                           name,
 					Namespace:                      nsName,
-					Labels:                         map[string]string{"type": "densityPod"},
+					Labels:                         map[string]string{"type": "densityPod", "app": name},
 					PollInterval:                   DensityPollInterval,
 					Timeout:                        timeout,
 					PodStatusFile:                  fileHndl,
@@ -713,6 +713,25 @@ var _ = SIGDescribe("Density", func() {
 						},
 					},
 				}
+
+				if framework.TestContext.PodAntiAffinity {
+					baseConfig.Affinity = &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+								{
+									Weight: 100,
+									PodAffinityTerm: v1.PodAffinityTerm{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{"app": name},
+										},
+										TopologyKey: v1.LabelHostname,
+									},
+								},
+							},
+						},
+					}
+				}
+
 				switch itArg.kind {
 				case api.Kind("ReplicationController"):
 					configs[i] = baseConfig

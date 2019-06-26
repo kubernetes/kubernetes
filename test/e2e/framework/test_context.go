@@ -163,6 +163,8 @@ type TestContextType struct {
 
 	// The configration of NodeKiller.
 	NodeKiller NodeKillerConfig
+
+	PodAntiAffinity bool
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -270,6 +272,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
 
 	flag.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
+	flag.BoolVar(&TestContext.PodAntiAffinity, "pod-anti-affinity", false, "If true will involve affinity pods into density test.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
