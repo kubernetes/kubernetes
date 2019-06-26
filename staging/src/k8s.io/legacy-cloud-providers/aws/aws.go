@@ -1538,7 +1538,7 @@ func (c *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID strin
 	return true, nil
 }
 
-// InstanceShutdownByProviderID returns true if the instance is in safe state to detach volumes
+// InstanceShutdownByProviderID returns true if the instance is shutdown in cloud provider
 func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID string) (bool, error) {
 	instanceID, err := KubernetesInstanceID(providerID).MapToAWSInstanceID()
 	if err != nil {
@@ -1567,7 +1567,8 @@ func (c *Cloud) InstanceShutdownByProviderID(ctx context.Context, providerID str
 	if instance.State != nil {
 		state := aws.StringValue(instance.State.Name)
 		// valid state for detaching volumes
-		if state == ec2.InstanceStateNameStopped {
+		// In aws, instance shutdown means either stop (can be turned on again) or terminate (cannot be turned on again)
+		if state == ec2.InstanceStateNameStopped || state == ec2.InstanceStateNameTerminated {
 			return true, nil
 		}
 	}

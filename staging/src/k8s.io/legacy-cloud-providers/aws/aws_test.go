@@ -1875,6 +1875,72 @@ func TestRegionIsValid(t *testing.T) {
 	assert.False(t, isRegionValid("pl-fake-991a", fake.metadata), "expected region 'pl-fake-991' to be invalid but it was not")
 }
 
+func TestInstanceShutdownByProviderID(t *testing.T) {
+	instanceID := "i-abcdef"
+	notExistInstanceID := "i-aaaaa"
+	terminated := ec2.InstanceStateNameTerminated
+	stopped := ec2.InstanceStateNameStopped
+	running := ec2.InstanceStateNameRunning
+
+	tests := []struct {
+		instance *ec2.Instance
+		queryID  string
+		shutdown bool
+	}{
+		{
+			instance: &ec2.Instance{
+				InstanceId: &instanceID,
+				State: &ec2.InstanceState{
+					Name: &running,
+				},
+			},
+			queryID:  instanceID,
+			shutdown: false,
+		},
+		{
+			instance: &ec2.Instance{
+				InstanceId: &instanceID,
+				State: &ec2.InstanceState{
+					Name: &stopped,
+				},
+			},
+			queryID:  instanceID,
+			shutdown: true,
+		},
+		{
+			instance: &ec2.Instance{
+				InstanceId: &instanceID,
+				State: &ec2.InstanceState{
+					Name: &terminated,
+				},
+			},
+			queryID:  instanceID,
+			shutdown: true,
+		},
+		{
+			instance: &ec2.Instance{
+				InstanceId: &instanceID,
+				State: &ec2.InstanceState{
+					Name: &terminated,
+				},
+			},
+			queryID:  notExistInstanceID,
+			shutdown: false,
+		},
+	}
+
+	for _, test := range tests {
+		awsServices := newMockedFakeAWSServices(TestClusterID)
+		c, err := newAWSCloud(CloudConfig{}, awsServices)
+		assert.NoError(t, err)
+		awsServices.instances = append(awsServices.instances, test.instance)
+
+		isShutDown, err := c.InstanceShutdownByProviderID(context.TODO(), test.queryID)
+		assert.NoError(t, err)
+		assert.Equal(t, test.shutdown, isShutDown)
+	}
+}
+
 func newMockedFakeAWSServices(id string) *FakeAWSServices {
 	s := NewFakeAWSServices(id)
 	s.ec2 = &MockedFakeEC2{FakeEC2Impl: s.ec2.(*FakeEC2Impl)}
