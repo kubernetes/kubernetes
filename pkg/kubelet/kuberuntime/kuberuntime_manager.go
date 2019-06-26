@@ -512,21 +512,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		}
 	}
 
-	// Determine if there are any non sidecar containers that are running or need restarting
-	// if there are none, we can kill the remaining sidecars
-	sidecarsOnly := true
-	for _, container := range pod.Spec.Containers {
-		containerStatus := podStatus.FindContainerStatusByName(container.Name)
-		if !isSidecar(pod, container.Name) {
-			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) || (containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateRunning) {
-				sidecarsOnly = false
-			}
-		}
-	}
-
 	// determine sidecar status
 	sidecarStatus := status.GetSidecarsStatus(pod)
-	glog.Infof("Pod: %s, sidecars: %s, status: Present=%v,Ready=%v,ContainerWaiting=%v", format.Pod(pod), sidecarNames, sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
+	glog.Infof("Pod: %s, sidecars: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarNames, sidecarStatus.SidecarsPresent, sidecarStatus.SidecarsReady, sidecarStatus.ContainersWaiting)
 
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
@@ -656,10 +644,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		// If container does not exist, or is not running, check whether we
 		// need to restart it.
 		if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
-			if sidecarsOnly && isSidecar(pod, container.Name) {
-				glog.Infof("Pod: %s: %s: is sidecar, sidecars only, so not restarting", format.Pod(pod), container.Name)
-				continue
-			}
 			if kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 				message := fmt.Sprintf("%s: Container %+v is dead, but RestartPolicy says that we should restart it.", pod.Name, container)
 				klog.V(3).Infof(message)
@@ -686,17 +670,6 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			// Restart regardless of the restart policy because the container
 			// spec changed.
 			restart = true
-		} else if sidecarsOnly && isSidecar(pod, container.Name) {
-			// in this case, the container is a sidecar, but no
-			// non-sidecars are ever going to run again. we don't need
-			// the sidecars, so we kill it as well
-			reason = "Non-sidecars have completed. Container will be killed."
-			// we are not planning to restart this container.
-			restart = false
-			// keepCount set to avoid killing pod right away - we should only
-			// kill pod once all containers have exited and we get back into this
-			// loop.
-			keepCount += 1
 		} else if liveness, found := m.livenessManager.Get(containerStatus.ID); found && liveness == proberesults.Failure {
 			// If the container failed the liveness probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed liveness probe", container.Name)
