@@ -94,10 +94,8 @@ type StorageClassList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Captures the intent to attach or detach the specified volume to/from
-// the specified node.
-//
-// VolumeAttachment objects are non-namespaced.
+// VolumeAttachment objects are non-namespaced. Captures the intent to attach or
+// detach the specified volume to/from the specified node.
 type VolumeAttachment struct {
 	metav1.TypeMeta
 
@@ -131,7 +129,7 @@ type VolumeAttachmentList struct {
 	Items []VolumeAttachment
 }
 
-// The specification of a VolumeAttachment request.
+// VolumeAttachmentSpec is the specification of a VolumeAttachment request.
 type VolumeAttachmentSpec struct {
 	// Attacher indicates the name of the volume driver that MUST handle this
 	// request. This is the name returned by GetPluginName().
@@ -163,7 +161,7 @@ type VolumeAttachmentSource struct {
 	InlineVolumeSpec *api.PersistentVolumeSpec
 }
 
-// The status of a VolumeAttachment request.
+// VolumeAttachmentStatus is the status of a VolumeAttachment request.
 type VolumeAttachmentStatus struct {
 	// Indicates the volume is successfully attached.
 	// This field must only be set by the entity completing the attach
@@ -191,7 +189,7 @@ type VolumeAttachmentStatus struct {
 	DetachError *VolumeError
 }
 
-// Captures an error encountered during a volume operation.
+// VolumeError captures an error encountered during a volume operation.
 type VolumeError struct {
 	// Time the error was encountered.
 	// +optional
