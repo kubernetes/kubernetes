@@ -17,7 +17,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/gke-autoscaling-gcr/cluster-autoscaler:v2019.06.13-1.14-gke.0",
+                "image": "gcr.io/gke-master-images/cluster-autoscaler:cluster-autoscaler-v2019.06.26-1.14-gke.0",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
@@ -36,6 +36,7 @@
                     "--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig",
                     "--cloud-provider=gke",
                     "--expendable-pods-priority-cutoff=-10",
+                    "--filter-out-schedulable-pods-uses-packing=true",
                     {{params}}
                 ],
                 "env": [
