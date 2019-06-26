@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/agnhost",
     deps = [
         "//test/images/agnhost/audit-proxy:go_default_library",
+        "//test/images/agnhost/connect:go_default_library",
         "//test/images/agnhost/crd-conversion-webhook:go_default_library",
         "//test/images/agnhost/dns:go_default_library",
         "//test/images/agnhost/entrypoint-tester:go_default_library",
@@ -51,6 +52,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//test/images/agnhost/audit-proxy:all-srcs",
+        "//test/images/agnhost/connect:all-srcs",
         "//test/images/agnhost/crd-conversion-webhook:all-srcs",
         "//test/images/agnhost/dns:all-srcs",
         "//test/images/agnhost/entrypoint-tester:all-srcs",
