@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
@@ -317,15 +317,7 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	opt = append(opt, cephOpt)
 
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
-	hosts := cephfsVolume.mon
-	l := len(hosts)
-	// pass all monitors and let ceph randomize and fail over
-	i := 0
-	src := ""
-	for i = 0; i < l-1; i++ {
-		src += hosts[i] + ","
-	}
-	src += hosts[i] + ":" + cephfsVolume.path
+	src := strings.Join(cephfsVolume.mon, ",") + ":" + cephfsVolume.path
 
 	opt = util.JoinMountOptions(cephfsVolume.mountOptions, opt)
 	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", opt); err != nil {
@@ -389,17 +381,8 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	} else {
 		keyringFile = cephfsVolume.secretFile
 	}
-
 	// build src like mon1:6789,mon2:6789,mon3:6789:/
-	hosts := cephfsVolume.mon
-	l := len(hosts)
-	// pass all monitors and let ceph randomize and fail over
-	i := 0
-	src := ""
-	for i = 0; i < l-1; i++ {
-		src += hosts[i] + ","
-	}
-	src += hosts[i]
+	src := strings.Join(cephfsVolume.mon, ",")
 
 	mountArgs := []string{}
 	mountArgs = append(mountArgs, "-k")
