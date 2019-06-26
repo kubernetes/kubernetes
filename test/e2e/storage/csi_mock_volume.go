@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -357,12 +357,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			init(testParameters{nodeSelectorKey: nodeSelectorKey, attachLimit: 2})
 			defer cleanup()
 			nodeName := m.config.ClientNodeName
-			attachKey := v1.ResourceName(volumeutil.GetCSIAttachLimitKey(m.provisioner))
+			driverName := m.config.GetUniqueDriverName()
 
-			nodeAttachLimit, err := checkNodeForLimits(nodeName, attachKey, m.cs)
-			framework.ExpectNoError(err, "while fetching node %v", err)
+			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
+			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
 
-			gomega.Expect(nodeAttachLimit).To(gomega.Equal(2))
+			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 2))
 
 			_, _, pod1 := createPod()
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating first pod")
@@ -576,25 +576,21 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	return waitErr
 }
 
-func checkNodeForLimits(nodeName string, attachKey v1.ResourceName, cs clientset.Interface) (int, error) {
-	var attachLimit int64
+func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
+	var attachLimit int32
 
 	waitErr := wait.PollImmediate(10*time.Second, csiNodeLimitUpdateTimeout, func() (bool, error) {
-		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
+		csiNode, err := cs.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err) {
 			return false, err
 		}
-		limits := getVolumeLimit(node)
-		var ok bool
-		if len(limits) > 0 {
-			attachLimit, ok = limits[attachKey]
-			if ok {
-				return true, nil
-			}
+		attachLimit = getVolumeLimitFromCSINode(csiNode, driverName)
+		if attachLimit > 0 {
+			return true, nil
 		}
 		return false, nil
 	})
-	return int(attachLimit), waitErr
+	return attachLimit, waitErr
 }
 
 func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node framework.NodeSelection, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
@@ -804,4 +800,16 @@ func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) st
 		return ""
 	}
 	return pv.Spec.CSI.VolumeHandle
+}
+
+func getVolumeLimitFromCSINode(csiNode *storagev1beta1.CSINode, driverName string) int32 {
+	for _, d := range csiNode.Spec.Drivers {
+		if d.Name != driverName {
+			continue
+		}
+		if d.Allocatable != nil && d.Allocatable.Count != nil {
+			return *d.Allocatable.Count
+		}
+	}
+	return 0
 }

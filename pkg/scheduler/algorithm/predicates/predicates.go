@@ -25,8 +25,9 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,6 +38,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
@@ -315,6 +317,8 @@ type VolumeFilter struct {
 	// Filter normal volumes
 	FilterVolume           func(vol *v1.Volume) (id string, relevant bool)
 	FilterPersistentVolume func(pv *v1.PersistentVolume) (id string, relevant bool)
+	// IsMigrated returns a boolean specifying whether the plugin is migrated to a CSI driver
+	IsMigrated func(csiNode *storagev1beta1.CSINode) bool
 }
 
 // NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
@@ -484,6 +488,11 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 		return true, nil, nil
 	}
 
+	// If a plugin has been migrated to a CSI driver, defer to the CSI predicate.
+	if c.filter.IsMigrated(nodeInfo.CSINode()) {
+		return true, nil, nil
+	}
+
 	// count unique volumes
 	existingVolumes := make(map[string]bool)
 	for _, existingPod := range nodeInfo.Pods() {
@@ -538,6 +547,10 @@ var EBSVolumeFilter = VolumeFilter{
 		}
 		return "", false
 	},
+
+	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+		return isCSIMigrationOn(csiNode, csilibplugins.AWSEBSInTreePluginName)
+	},
 }
 
 // GCEPDVolumeFilter is a VolumeFilter for filtering GCE PersistentDisk Volumes
@@ -554,6 +567,10 @@ var GCEPDVolumeFilter = VolumeFilter{
 			return pv.Spec.GCEPersistentDisk.PDName, true
 		}
 		return "", false
+	},
+
+	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+		return isCSIMigrationOn(csiNode, csilibplugins.GCEPDInTreePluginName)
 	},
 }
 
@@ -572,6 +589,10 @@ var AzureDiskVolumeFilter = VolumeFilter{
 		}
 		return "", false
 	},
+
+	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+		return isCSIMigrationOn(csiNode, csilibplugins.AzureDiskInTreePluginName)
+	},
 }
 
 // CinderVolumeFilter is a VolumeFilter for filtering Cinder Volumes
@@ -589,6 +610,10 @@ var CinderVolumeFilter = VolumeFilter{
 			return pv.Spec.Cinder.VolumeID, true
 		}
 		return "", false
+	},
+
+	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+		return isCSIMigrationOn(csiNode, csilibplugins.CinderInTreePluginName)
 	},
 }
 
