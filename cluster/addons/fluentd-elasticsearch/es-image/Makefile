@@ -23,3 +23,4 @@ build:
 
 push:
     docker push ${PREFIX}/${IMAGE}:${TAG}
+	docker push ${PREFIX}/${IMAGE}:latest
