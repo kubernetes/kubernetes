@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -42,7 +43,6 @@ const manifestPath = "test/e2e/testing-manifests/statefulset/etcd"
 type EtcdUpgradeTest struct {
 	ip               string
 	successfulWrites int
-	ssTester         *framework.StatefulSetTester
 }
 
 // Name returns the tracking name of the test.
@@ -69,13 +69,12 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 	statefulsetPoll := 30 * time.Second
 	statefulsetTimeout := 10 * time.Minute
-	t.ssTester = framework.NewStatefulSetTester(f.ClientSet)
 
 	ginkgo.By("Creating a PDB")
 	kubectlCreate(ns, "pdb.yaml")
 
 	ginkgo.By("Creating an etcd StatefulSet")
-	t.ssTester.CreateStatefulSet(manifestPath, ns)
+	e2esset.CreateStatefulSet(f.ClientSet, manifestPath, ns)
 
 	ginkgo.By("Creating an etcd--test-server deployment")
 	kubectlCreate(ns, "tester.yaml")
