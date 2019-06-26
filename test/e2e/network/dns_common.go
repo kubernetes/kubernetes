@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	dnsutil "github.com/miekg/dns"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -453,16 +454,16 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 		// Resolve by TCP and UDP DNS.  Use $$(...) because $(...) is
 		// expanded by kubernetes (though this won't expand so should
 		// remain a literal, safe > sorry).
-		lookup := "A"
+		lookup := fmt.Sprintf("%s A %s AAAA", name, name)
 		if strings.HasPrefix(name, "_") {
-			lookup = "SRV"
+			lookup = fmt.Sprintf("%s SRV", name)
 		}
 		fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search %s %s)" && test -n "$$check" && echo OK > /results/%s;`, name, lookup, fileName)
+		probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search %s)" && test -n "$$check" && echo OK > /results/%s;`, lookup, fileName)
 		fileName = fmt.Sprintf("%s_tcp@%s", fileNamePrefix, name)
 		fileNames = append(fileNames, fileName)
-		probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search %s %s)" && test -n "$$check" && echo OK > /results/%s;`, name, lookup, fileName)
+		probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search %s)" && test -n "$$check" && echo OK > /results/%s;`, lookup, fileName)
 	}
 
 	for _, name := range hostEntries {
@@ -473,14 +474,17 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 
 	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
 	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-	probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
-	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
-	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
+	probeCmd += fmt.Sprintf(`podARec=$$(getent hosts $$(hostname | awk '{print $1}') | tr ":." "-" | awk '{print $$1".%s.pod.%s"}');`, namespace, dnsDomain)
+	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A $${podARec} AAAA)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
+	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A $${podARec} AAAA)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
 	fileNames = append(fileNames, podARecByUDPFileName)
 	fileNames = append(fileNames, podARecByTCPFileName)
 
 	if len(ptrLookupIP) > 0 {
-		ptrLookup := fmt.Sprintf("%s.in-addr.arpa.", strings.Join(reverseArray(strings.Split(ptrLookupIP, ".")), "."))
+		ptrLookup, err := dnsutil.ReverseAddr(ptrLookupIP)
+		if err != nil {
+			e2elog.Failf("Unable to obtain reverse IP address record from IP %s: %v", ptrLookupIP, err)
+		}
 		ptrRecByUDPFileName := fmt.Sprintf("%s_udp@PTR", ptrLookupIP)
 		ptrRecByTCPFileName := fmt.Sprintf("%s_tcp@PTR", ptrLookupIP)
 		probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search %s PTR)" && test -n "$$check" && echo OK > /results/%s;`, ptrLookup, ptrRecByUDPFileName)
@@ -496,7 +500,11 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 // createTargetedProbeCommand returns a command line that performs a DNS lookup for a specific record type
 func createTargetedProbeCommand(nameToResolve string, lookup string, fileNamePrefix string) (string, string) {
 	fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, nameToResolve)
-	probeCmd := fmt.Sprintf("for i in `seq 1 30`; do dig +short %s %s > /results/%s; sleep 1; done", nameToResolve, lookup, fileName)
+	nameLookup := fmt.Sprintf("%s %s", nameToResolve, lookup)
+	if lookup == "A" {
+		nameLookup = fmt.Sprintf("%s A %s AAAA", nameToResolve, nameToResolve)
+	}
+	probeCmd := fmt.Sprintf("for i in `seq 1 30`; do dig +short %s > /results/%s; sleep 1; done", nameLookup, fileName)
 	return probeCmd, fileName
 }
 

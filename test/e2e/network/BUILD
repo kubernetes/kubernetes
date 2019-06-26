@@ -71,6 +71,7 @@ go_library(
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",
+        "//vendor/github.com/miekg/dns:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
