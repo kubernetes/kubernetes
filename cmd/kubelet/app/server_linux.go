@@ -17,7 +17,7 @@ limitations under the License.
 package app
 
 import (
-	"github.com/sigma/go-inotify"
+	inotify "github.com/sigma/go-inotify"
 	"k8s.io/klog"
 )
 
