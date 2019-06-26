@@ -175,6 +175,7 @@ func NewCustomResourceDefinitionHandler(
 		minRequestTimeout:       minRequestTimeout,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    ret.createCustomResourceDefinition,
 		UpdateFunc: ret.updateCustomResourceDefinition,
 		DeleteFunc: func(obj interface{}) {
 			ret.removeDeadStorage()
@@ -247,9 +248,17 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	if apierrors.IsNotFound(err) {
+		r.delegate.ServeHTTP(w, req)
+		return
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !hasServedCRDVersion(crdInfo.spec, requestInfo.APIVersion) {
+		r.delegate.ServeHTTP(w, req)
 		return
 	}
 
@@ -360,6 +369,16 @@ func (r *crdHandler) serveScale(w http.ResponseWriter, req *http.Request, reques
 	}
 }
 
+// createCustomResourceDefinition removes potentially stale storage so it gets re-created
+func (r *crdHandler) createCustomResourceDefinition(obj interface{}) {
+	crd := obj.(*apiextensions.CustomResourceDefinition)
+	r.customStorageLock.Lock()
+	defer r.customStorageLock.Unlock()
+	// this could happen if the create event is merged from create-update events
+	r.removeStorage_locked(crd.UID)
+}
+
+// updateCustomResourceDefinition removes potentially stale storage so it gets re-created
 func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) {
 	oldCRD := oldObj.(*apiextensions.CustomResourceDefinition)
 	newCRD := newObj.(*apiextensions.CustomResourceDefinition)
@@ -380,6 +399,10 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		}
 	}
 
+	if oldCRD.UID != newCRD.UID {
+		r.removeStorage_locked(oldCRD.UID)
+	}
+
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	oldInfo, found := storageMap[newCRD.UID]
 	if !found {
@@ -390,15 +413,22 @@ func (r *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) 
 		return
 	}
 
-	klog.V(4).Infof("Updating customresourcedefinition %s", oldCRD.Name)
+	klog.V(4).Infof("Updating customresourcedefinition %s", newCRD.Name)
+	r.removeStorage_locked(newCRD.UID)
+}
 
-	if oldInfo, ok := storageMap[types.UID(oldCRD.UID)]; ok {
+// removeStorage_locked removes the cached storage with the given uid as key from the storage map. This function
+// updates r.customStorage with the cleaned-up storageMap and tears down the old storage.
+// NOTE: Caller MUST hold r.customStorageLock to write r.customStorage thread-safely.
+func (r *crdHandler) removeStorage_locked(uid types.UID) {
+	storageMap := r.customStorage.Load().(crdStorageMap)
+	if oldInfo, ok := storageMap[uid]; ok {
 		// Copy because we cannot write to storageMap without a race
 		// as it is used without locking elsewhere.
 		storageMap2 := storageMap.clone()
 
 		// Remove from the CRD info map and store the map
-		delete(storageMap2, types.UID(oldCRD.UID))
+		delete(storageMap2, uid)
 		r.customStorage.Store(storageMap2)
 
 		// Tear down the old storage
@@ -469,22 +499,32 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd)
+	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if err != nil {
 		return nil, err
 	}
 	return info.storages[info.storageVersion].CustomResource, nil
 }
 
-func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResourceDefinition) (*crdInfo, error) {
+// getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
+// Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
+func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
-	if ret, ok := storageMap[crd.UID]; ok {
+	if ret, ok := storageMap[uid]; ok {
 		return ret, nil
 	}
 
 	r.customStorageLock.Lock()
 	defer r.customStorageLock.Unlock()
 
+	// Get the up-to-date CRD when we have the lock, to avoid racing with updateCustomResourceDefinition.
+	// If updateCustomResourceDefinition sees an update and happens later, the storage will be deleted and
+	// we will re-create the updated storage on demand. If updateCustomResourceDefinition happens before,
+	// we make sure that we observe the same up-to-date CRD.
+	crd, err := r.crdLister.Get(name)
+	if err != nil {
+		return nil, err
+	}
 	storageMap = r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[crd.UID]; ok {
 		return ret, nil
@@ -1063,4 +1103,14 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	}
 
 	return nil
+}
+
+// hasServedCRDVersion returns true if the given version is in the list of CRD's versions and the Served flag is set.
+func hasServedCRDVersion(spec *apiextensions.CustomResourceDefinitionSpec, version string) bool {
+	for _, v := range spec.Versions {
+		if v.Name == version {
+			return v.Served
+		}
+	}
+	return false
 }
