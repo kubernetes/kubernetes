@@ -76,12 +76,6 @@ import (
 	"k8s.io/kubectl/pkg/util/slice"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
-	"k8s.io/kubernetes/pkg/kubectl/util/certificate"
-	"k8s.io/kubernetes/pkg/kubectl/util/fieldpath"
-	"k8s.io/kubernetes/pkg/kubectl/util/qos"
-	resourcehelper "k8s.io/kubernetes/pkg/kubectl/util/resource"
-	"k8s.io/kubernetes/pkg/kubectl/util/slice"
-	storageutil "k8s.io/kubernetes/pkg/kubectl/util/storage"
 )
 
 // Each level has 2 spaces for PrefixWriter
