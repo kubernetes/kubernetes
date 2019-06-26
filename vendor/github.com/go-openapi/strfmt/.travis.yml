@@ -6,7 +6,7 @@ go:
 - 1.11.x
 install:
 - go get -u github.com/stretchr/testify/assert
-- go get -u github.com/pborman/uuid
+- go get -u github.com/google/uuid
 - go get -u github.com/asaskevich/govalidator
 - go get -u github.com/mailru/easyjson
 - go get -u github.com/go-openapi/errors

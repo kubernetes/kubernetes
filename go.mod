@@ -58,10 +58,10 @@ require (
 	github.com/fatih/camelcase v1.0.0
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
-	github.com/go-openapi/loads v0.17.2
-	github.com/go-openapi/spec v0.17.2
-	github.com/go-openapi/strfmt v0.17.0
-	github.com/go-openapi/validate v0.18.0
+	github.com/go-openapi/loads v0.19.2
+	github.com/go-openapi/spec v0.19.2
+	github.com/go-openapi/strfmt v0.19.0
+	github.com/go-openapi/validate v0.19.2
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
 	github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
@@ -88,7 +88,6 @@ require (
 	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/kardianos/osext v0.0.0-20150410034420-8fef92e41e22
 	github.com/karrick/godirwalk v1.7.5 // indirect
-	github.com/kr/pretty v0.1.0 // indirect
 	github.com/libopenstorage/openstorage v0.0.0-20170906232338-093a0c388875
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
@@ -139,13 +138,13 @@ require (
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 // indirect
 	github.com/vmware/govmomi v0.20.1
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
-	golang.org/x/crypto v0.0.0-20190228161510-8dd112bcdc25
+	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/net v0.0.0-20190328230028-74de082e2cca
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
-	golang.org/x/sys v0.0.0-20190312061237-fead79001313
+	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
-	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384
+	golang.org/x/tools v0.0.0-20190614205625-5aca471b1d59
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	google.golang.org/api v0.0.0-20181220000619-583d854617af
 	google.golang.org/grpc v1.13.0
@@ -263,12 +262,12 @@ replace (
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.17.2
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.0
 	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.0
-	github.com/go-openapi/loads => github.com/go-openapi/loads v0.17.2
+	github.com/go-openapi/loads => github.com/go-openapi/loads v0.19.2
 	github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.17.2
-	github.com/go-openapi/spec => github.com/go-openapi/spec v0.17.2
-	github.com/go-openapi/strfmt => github.com/go-openapi/strfmt v0.17.0
+	github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.2
+	github.com/go-openapi/strfmt => github.com/go-openapi/strfmt v0.19.0
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.17.2
-	github.com/go-openapi/validate => github.com/go-openapi/validate v0.18.0
+	github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.2
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/godbus/dbus => github.com/godbus/dbus v4.1.0+incompatible
 	github.com/gogo/protobuf => github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415

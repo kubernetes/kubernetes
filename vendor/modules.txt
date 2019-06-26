@@ -345,26 +345,26 @@ github.com/globalsign/mgo/internal/json
 # github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
 github.com/go-bindata/go-bindata
 github.com/go-bindata/go-bindata/go-bindata
-# github.com/go-openapi/analysis v0.17.2 => github.com/go-openapi/analysis v0.17.2
+# github.com/go-openapi/analysis v0.19.2 => github.com/go-openapi/analysis v0.17.2
 github.com/go-openapi/analysis
 github.com/go-openapi/analysis/internal
-# github.com/go-openapi/errors v0.17.2 => github.com/go-openapi/errors v0.17.2
+# github.com/go-openapi/errors v0.19.2 => github.com/go-openapi/errors v0.17.2
 github.com/go-openapi/errors
-# github.com/go-openapi/jsonpointer v0.19.0 => github.com/go-openapi/jsonpointer v0.19.0
+# github.com/go-openapi/jsonpointer v0.19.2 => github.com/go-openapi/jsonpointer v0.19.0
 github.com/go-openapi/jsonpointer
-# github.com/go-openapi/jsonreference v0.19.0 => github.com/go-openapi/jsonreference v0.19.0
+# github.com/go-openapi/jsonreference v0.19.2 => github.com/go-openapi/jsonreference v0.19.0
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/loads v0.17.2 => github.com/go-openapi/loads v0.17.2
+# github.com/go-openapi/loads v0.19.2 => github.com/go-openapi/loads v0.19.2
 github.com/go-openapi/loads
-# github.com/go-openapi/runtime v0.17.2 => github.com/go-openapi/runtime v0.17.2
+# github.com/go-openapi/runtime v0.19.0 => github.com/go-openapi/runtime v0.17.2
 github.com/go-openapi/runtime
-# github.com/go-openapi/spec v0.17.2 => github.com/go-openapi/spec v0.17.2
+# github.com/go-openapi/spec v0.19.2 => github.com/go-openapi/spec v0.19.2
 github.com/go-openapi/spec
-# github.com/go-openapi/strfmt v0.17.0 => github.com/go-openapi/strfmt v0.17.0
+# github.com/go-openapi/strfmt v0.19.0 => github.com/go-openapi/strfmt v0.19.0
 github.com/go-openapi/strfmt
-# github.com/go-openapi/swag v0.17.2 => github.com/go-openapi/swag v0.17.2
+# github.com/go-openapi/swag v0.19.2 => github.com/go-openapi/swag v0.17.2
 github.com/go-openapi/swag
-# github.com/go-openapi/validate v0.18.0 => github.com/go-openapi/validate v0.18.0
+# github.com/go-openapi/validate v0.19.2 => github.com/go-openapi/validate v0.19.2
 github.com/go-openapi/validate
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 github.com/go-ozzo/ozzo-validation
@@ -754,7 +754,7 @@ github.com/storageos/go-api
 github.com/storageos/go-api/netutil
 github.com/storageos/go-api/serror
 github.com/storageos/go-api/types
-# github.com/stretchr/objx v0.1.1 => github.com/stretchr/objx v0.1.1
+# github.com/stretchr/objx v0.2.0 => github.com/stretchr/objx v0.1.1
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.3.0 => github.com/stretchr/testify v1.3.0
 github.com/stretchr/testify/assert
@@ -816,7 +816,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20190228161510-8dd112bcdc25 => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
+# golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8 => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/cryptobyte
@@ -864,7 +864,7 @@ golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sys v0.0.0-20190312061237-fead79001313 => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
+# golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
@@ -894,7 +894,7 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20161028155119-f51c12702a4d => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190328211700-ab21143f2384 => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
+# golang.org/x/tools v0.0.0-20190614205625-5aca471b1d59 => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/ast/astutil
