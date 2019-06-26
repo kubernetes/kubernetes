@@ -30,7 +30,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -808,6 +808,45 @@ func (proxier *Proxier) syncProxyRules() {
 	// activeBindAddrs represents ip address successfully bind to DefaultDummyDevice in this round of sync
 	activeBindAddrs := map[string]bool{}
 
+	hasNodePort := false
+	for _, svc := range proxier.serviceMap {
+		svcInfo, ok := svc.(*serviceInfo)
+		if ok && svcInfo.NodePort() != 0 {
+			hasNodePort = true
+			break
+		}
+	}
+
+	// Both nodeAddresses and nodeIPs can be reused for all nodePort services
+	// and only need to be computed if we have at least one nodePort service.
+	var (
+		// List of node addresses to listen on if a nodePort is set.
+		nodeAddresses []string
+		// List of node IP addresses to be used as IPVS services if nodePort is set.
+		nodeIPs []net.IP
+	)
+
+	if hasNodePort {
+		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
+		if err != nil {
+			klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
+		}
+		if err == nil && nodeAddrSet.Len() > 0 {
+			nodeAddresses = nodeAddrSet.List()
+			for _, address := range nodeAddresses {
+				if !utilproxy.IsZeroCIDR(address) {
+					nodeIPs = append(nodeIPs, net.ParseIP(address))
+					continue
+				}
+				// zero cidr
+				nodeIPs, err = proxier.ipGetter.NodeIPs()
+				if err != nil {
+					klog.Errorf("Failed to list all node IPs from host, err: %v", err)
+				}
+			}
+		}
+	}
+
 	// Build IPVS rules for each service.
 	for svcName, svc := range proxier.serviceMap {
 		svcInfo, ok := svc.(*serviceInfo)
@@ -1064,14 +1103,14 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.NodePort() != 0 {
-			addresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
-			if err != nil {
-				klog.Errorf("Failed to get node ip address matching nodeport cidr: %v", err)
+			if len(nodeAddresses) == 0 || len(nodeIPs) == 0 {
+				// Skip nodePort configuration since an error occurred when
+				// computing nodeAddresses or nodeIPs.
 				continue
 			}
 
 			var lps []utilproxy.LocalPort
-			for address := range addresses {
+			for _, address := range nodeAddresses {
 				lp := utilproxy.LocalPort{
 					Description: "nodePort for " + svcNameString,
 					IP:          address,
@@ -1174,18 +1213,6 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Build ipvs kernel routes for each node ip address
-			var nodeIPs []net.IP
-			for address := range addresses {
-				if !utilproxy.IsZeroCIDR(address) {
-					nodeIPs = append(nodeIPs, net.ParseIP(address))
-					continue
-				}
-				// zero cidr
-				nodeIPs, err = proxier.ipGetter.NodeIPs()
-				if err != nil {
-					klog.Errorf("Failed to list all node IPs from host, err: %v", err)
-				}
-			}
 			for _, nodeIP := range nodeIPs {
 				// ipvs call
 				serv := &utilipvs.VirtualServer{
