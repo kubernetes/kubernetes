@@ -23,7 +23,8 @@ import (
 	"k8s.io/klog"
 
 	"fmt"
-	"k8s.io/api/core/v1"
+
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -34,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
+	jws "k8s.io/cluster-bootstrap/token/jws"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -214,7 +216,7 @@ func (e *Signer) signConfigMap() {
 	// Now recompute signatures and store them on the new map
 	tokens := e.getTokens()
 	for tokenID, tokenValue := range tokens {
-		sig, err := computeDetachedSig(content, tokenID, tokenValue)
+		sig, err := jws.ComputeDetachedSignature(content, tokenID, tokenValue)
 		if err != nil {
 			utilruntime.HandleError(err)
 		}

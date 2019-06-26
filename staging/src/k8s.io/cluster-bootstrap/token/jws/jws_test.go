@@ -28,8 +28,8 @@ const (
 	id      = "joshua"
 )
 
-func TestComputeDetachedSig(t *testing.T) {
-	sig, err := computeDetachedSig(content, id, secret)
+func TestComputeDetachedSignature(t *testing.T) {
+	sig, err := ComputeDetachedSignature(content, id, secret)
 	assert.NoError(t, err, "Error when computing signature: %v", err)
 	assert.Equal(
 		t,
@@ -38,7 +38,7 @@ func TestComputeDetachedSig(t *testing.T) {
 		"Wrong signature. Got: %v", sig)
 
 	// Try with null content
-	sig, err = computeDetachedSig("", id, secret)
+	sig, err = ComputeDetachedSignature("", id, secret)
 	assert.NoError(t, err, "Error when computing signature: %v", err)
 	assert.Equal(
 		t,
@@ -47,7 +47,7 @@ func TestComputeDetachedSig(t *testing.T) {
 		"Wrong signature. Got: %v", sig)
 
 	// Try with no secret
-	sig, err = computeDetachedSig(content, id, "")
+	sig, err = ComputeDetachedSignature(content, id, "")
 	assert.NoError(t, err, "Error when computing signature: %v", err)
 	assert.Equal(
 		t,
