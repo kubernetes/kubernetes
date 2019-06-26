@@ -490,6 +490,12 @@ message JSONSchemaProps {
   //      - type: string
   //    - ... zero or more
   optional bool xKubernetesIntOrString = 40;
+
+  // x-kubernetes-list-map-keys TODO
+  repeated string xKubernetesListMapKeys = 41;
+
+  // x-kubernetes-list-type TODO
+  optional string xKubernetesListType = 42;
 }
 
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
