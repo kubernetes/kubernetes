@@ -21,7 +21,6 @@
 ./hack/lib/swagger.sh
 ./hack/lib/test.sh
 ./hack/lib/version.sh
-./hack/make-rules/make-help.sh
 ./hack/test-integration.sh
 ./hack/verify-test-featuregates.sh
 ./test/cmd/diff.sh
