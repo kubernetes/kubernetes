@@ -918,3 +918,7 @@ func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podr
 func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
 }
+
+func (cm *containerManagerImpl) UpdateAllocatedDevices() {
+	cm.deviceManager.UpdateAllocatedDevices()
+}

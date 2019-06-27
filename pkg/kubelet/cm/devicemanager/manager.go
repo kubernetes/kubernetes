@@ -586,9 +586,9 @@ func (m *ManagerImpl) readCheckpoint() error {
 	return nil
 }
 
-// updateAllocatedDevices gets a list of active pods and then frees any Devices that are bound to
-// terminated pods. Returns error on failure.
-func (m *ManagerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
+// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
+func (m *ManagerImpl) UpdateAllocatedDevices() {
+	activePods := m.activePods()
 	if !m.sourcesReady.AllReady() {
 		return
 	}
@@ -764,7 +764,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// Updates allocatedDevices to garbage collect any stranded resources
 		// before doing the device plugin allocation.
 		if !allocatedDevicesUpdated {
-			m.updateAllocatedDevices(m.activePods())
+			m.UpdateAllocatedDevices()
 			allocatedDevicesUpdated = true
 		}
 		allocDevices, err := m.devicesToAllocate(podUID, contName, resource, needed, devicesToReuse[resource])
@@ -779,7 +779,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		// Manager.Allocate involves RPC calls to device plugin, which
 		// could be heavy-weight. Therefore we want to perform this operation outside
 		// mutex lock. Note if Allocate call fails, we may leave container resources
-		// partially allocated for the failed container. We rely on updateAllocatedDevices()
+		// partially allocated for the failed container. We rely on UpdateAllocatedDevices()
 		// to garbage collect these resources later. Another side effect is that if
 		// we have X resource A and Y resource B in total, and two containers, container1
 		// and container2 both require X resource A and Y resource B. Both allocation
