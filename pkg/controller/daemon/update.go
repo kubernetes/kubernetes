@@ -71,6 +71,10 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 			klog.V(4).Infof("Number of unavailable DaemonSet pods: %d, is equal to or exceeds allowed maximum: %d", numUnavailable, maxUnavailable)
 			break
 		}
+		// Skip terminating pods. We won't delete them again
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		klog.V(4).Infof("Marking pod %s/%s for deletion", ds.Name, pod.Name)
 		oldPodsToDelete = append(oldPodsToDelete, pod.Name)
 		numUnavailable++
