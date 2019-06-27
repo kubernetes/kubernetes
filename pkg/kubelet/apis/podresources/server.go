@@ -26,6 +26,7 @@ import (
 // DevicesProvider knows how to provide the devices used by the given container
 type DevicesProvider interface {
 	GetDevices(podUID, containerName string) []*v1alpha1.ContainerDevices
+	UpdateAllocatedDevices()
 }
 
 // PodsProvider knows how to provide the pods admitted by the node
@@ -52,6 +53,7 @@ func NewPodResourcesServer(podsProvider PodsProvider, devicesProvider DevicesPro
 func (p *podResourcesServer) List(ctx context.Context, req *v1alpha1.ListPodResourcesRequest) (*v1alpha1.ListPodResourcesResponse, error) {
 	pods := p.podsProvider.GetPods()
 	podResources := make([]*v1alpha1.PodResources, len(pods))
+	p.devicesProvider.UpdateAllocatedDevices()
 
 	for i, pod := range pods {
 		pRes := v1alpha1.PodResources{
