@@ -60,7 +60,7 @@ github.com/PuerkitoBio/purell
 github.com/PuerkitoBio/urlesc
 # github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 github.com/armon/circbuf
-# github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a => github.com/asaskevich/govalidator v0.0.0-20180720115003-f9ffefc3facf
+# github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 github.com/asaskevich/govalidator
 # github.com/aws/aws-sdk-go v1.16.26 => github.com/aws/aws-sdk-go v1.16.26
 github.com/aws/aws-sdk-go/aws
