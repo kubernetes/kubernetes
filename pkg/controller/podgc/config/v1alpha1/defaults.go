@@ -31,6 +31,6 @@ import (
 // run it in your wrapper struct of this type in its `SetDefaults_` method.
 func RecommendedDefaultPodGCControllerConfiguration(obj *kubectrlmgrconfigv1alpha1.PodGCControllerConfiguration) {
 	if obj.TerminatedPodGCThreshold == 0 {
-		obj.TerminatedPodGCThreshold = 12500
+		obj.TerminatedPodGCThreshold = 500
 	}
 }
