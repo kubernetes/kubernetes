@@ -8,7 +8,6 @@ go_library(
     deps = [
         "//pkg/kubectl/describe:go_default_library",
         "//pkg/kubectl/scheme:go_default_library",
-        "//pkg/kubectl/util/fieldpath:go_default_library",
         "//pkg/kubectl/util/slice:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/certificate:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/deployment:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/event:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/fieldpath:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/qos:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/rbac:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/resource:go_default_library",

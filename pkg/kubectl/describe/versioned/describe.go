@@ -75,7 +75,6 @@ import (
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/fieldpath"
 	"k8s.io/kubernetes/pkg/kubectl/util/slice"
 )
 
