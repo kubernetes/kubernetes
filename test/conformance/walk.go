@@ -47,18 +47,19 @@ var (
 )
 
 const regexDescribe = "Describe|KubeDescribe|SIGDescribe"
-const regexContext = "Context"
+const regexContext = "^Context$"
 
 type visitor struct {
-	FileSet      *token.FileSet
-	lastDescribe describe
-	cMap         ast.CommentMap
+	FileSet   *token.FileSet
+	describes []describe
+	cMap      ast.CommentMap
 	//list of all the conformance tests in the path
 	tests []conformanceData
 }
 
 //describe contains text associated with ginkgo describe container
 type describe struct {
+	rparen      token.Pos
 	text        string
 	lastContext context
 }
@@ -202,7 +203,8 @@ func (v *visitor) emit(arg ast.Expr) {
 			return
 		}
 
-		err := validateTestName(v.getDescription(at.Value))
+		description := v.getDescription(at.Value)
+		err := validateTestName(description)
 		if err != nil {
 			v.failf(at, err.Error())
 			return
@@ -221,13 +223,21 @@ func (v *visitor) emit(arg ast.Expr) {
 }
 
 func (v *visitor) getDescription(value string) string {
-	if len(v.lastDescribe.lastContext.text) > 0 {
-		return strings.Trim(v.lastDescribe.text, "\"") +
-			" " + strings.Trim(v.lastDescribe.lastContext.text, "\"") +
-			" " + strings.Trim(value, "\"")
+	tokens := []string{}
+	for _, describe := range v.describes {
+		tokens = append(tokens, describe.text)
+		if len(describe.lastContext.text) > 0 {
+			tokens = append(tokens, describe.lastContext.text)
+		}
 	}
-	return strings.Trim(v.lastDescribe.text, "\"") +
-		" " + strings.Trim(value, "\"")
+	tokens = append(tokens, value)
+
+	trimmed := []string{}
+	for _, token := range tokens {
+		trimmed = append(trimmed, strings.Trim(token, "\""))
+	}
+
+	return strings.Join(trimmed, " ")
 }
 
 var (
@@ -321,12 +331,16 @@ func (v *visitor) matchFuncName(n *ast.CallExpr, pattern string) string {
 // It() with a manually embedded [Conformance] tag, which it will complain
 // about.
 func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
+	lastDescribe := len(v.describes) - 1
+
 	switch t := node.(type) {
 	case *ast.CallExpr:
 		if name := v.matchFuncName(t, regexDescribe); name != "" && len(t.Args) >= 2 {
-			v.lastDescribe = describe{text: name}
+			v.describes = append(v.describes, describe{text: name, rparen: t.Rparen})
 		} else if name := v.matchFuncName(t, regexContext); name != "" && len(t.Args) >= 2 {
-			v.lastDescribe.lastContext = context{text: name}
+			if lastDescribe > -1 {
+				v.describes[lastDescribe].lastContext = context{text: name}
+			}
 		} else if v.isConformanceCall(t) {
 			totalConfTests++
 			v.emit(t.Args[0])
@@ -337,6 +351,14 @@ func (v *visitor) Visit(node ast.Node) (w ast.Visitor) {
 			return nil
 		}
 	}
+
+	// If we're past the position of the last describe's rparen, pop the describe off
+	if lastDescribe > -1 && node != nil {
+		if node.Pos() > v.describes[lastDescribe].rparen {
+			v.describes = v.describes[:lastDescribe]
+		}
+	}
+
 	return v
 }
 
