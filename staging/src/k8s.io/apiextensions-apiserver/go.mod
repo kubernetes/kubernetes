@@ -7,7 +7,6 @@ go 1.12
 require (
 	github.com/coreos/etcd v3.3.13+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8 // indirect
 	github.com/go-openapi/spec v0.19.2
 	github.com/go-openapi/strfmt v0.19.0
 	github.com/go-openapi/validate v0.19.2
@@ -34,18 +33,16 @@ require (
 )
 
 replace (
-	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.17.2
-	github.com/go-openapi/errors => github.com/go-openapi/errors v0.17.2
-	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.0
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.0
-	github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.17.2
-	github.com/go-openapi/swag => github.com/go-openapi/swag v0.17.2
+	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
+	github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20180720115003-f9ffefc3facf
 	github.com/kr/pty => github.com/kr/pty v1.1.1
+	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 	github.com/stretchr/objx => github.com/stretchr/objx v0.1.1
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/net => golang.org/x/net v0.0.0-20190206173232-65e2d4e15006
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
+	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
 	gopkg.in/check.v1 => gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405
 	k8s.io/api => ../api

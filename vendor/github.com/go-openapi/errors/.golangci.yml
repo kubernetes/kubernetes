@@ -12,10 +12,9 @@ linters-settings:
   goconst:
     min-len: 2
     min-occurrences: 4
-
 linters:
   enable-all: true
   disable:
     - maligned
+    - lll
     - gochecknoglobals
-    - gochecknoinits

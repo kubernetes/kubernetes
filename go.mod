@@ -15,7 +15,7 @@ require (
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
 	github.com/Microsoft/go-winio v0.4.11
 	github.com/Microsoft/hcsshim v0.8.6
-	github.com/PuerkitoBio/purell v1.1.0
+	github.com/PuerkitoBio/purell v1.1.1
 	github.com/Rican7/retry v0.1.0 // indirect
 	github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 	github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7 // indirect
@@ -140,7 +140,7 @@ require (
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
 	golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
-	golang.org/x/net v0.0.0-20190328230028-74de082e2cca
+	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
 	golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	golang.org/x/sys v0.0.0-20190616124812-15dcb6c0061f
 	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
@@ -258,15 +258,15 @@ replace (
 	github.com/globalsign/mgo => github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
 	github.com/go-acme/lego => github.com/go-acme/lego v2.5.0+incompatible
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
-	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.17.2
-	github.com/go-openapi/errors => github.com/go-openapi/errors v0.17.2
-	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.0
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.0
+	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.2
+	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.2
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.2
 	github.com/go-openapi/loads => github.com/go-openapi/loads v0.19.2
-	github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.17.2
+	github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.19.0
 	github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.2
 	github.com/go-openapi/strfmt => github.com/go-openapi/strfmt v0.19.0
-	github.com/go-openapi/swag => github.com/go-openapi/swag v0.17.2
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.2
 	github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.2
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/godbus/dbus => github.com/godbus/dbus v4.1.0+incompatible
