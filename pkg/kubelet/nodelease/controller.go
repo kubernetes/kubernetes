@@ -17,6 +17,7 @@ limitations under the License.
 package nodelease
 
 import (
+	"fmt"
 	"time"
 
 	coordv1beta1 "k8s.io/api/coordination/v1beta1"
@@ -91,7 +92,9 @@ func (c *controller) sync() {
 	lease, created := c.backoffEnsureLease()
 	// we don't need to update the lease if we just created it
 	if !created {
-		c.retryUpdateLease(lease)
+		if err := c.retryUpdateLease(lease); err != nil {
+			klog.Errorf("%v, will retry after %v", err, c.renewInterval)
+		}
 	}
 }
 
@@ -140,18 +143,23 @@ func (c *controller) ensureLease() (*coordv1beta1.Lease, bool, error) {
 
 // retryUpdateLease attempts to update the lease for maxUpdateRetries,
 // call this once you're sure the lease has been created
-func (c *controller) retryUpdateLease(base *coordv1beta1.Lease) {
+func (c *controller) retryUpdateLease(base *coordv1beta1.Lease) error {
 	for i := 0; i < maxUpdateRetries; i++ {
 		_, err := c.leaseClient.Update(c.newLease(base))
 		if err == nil {
-			return
+			return nil
 		}
 		klog.Errorf("failed to update node lease, error: %v", err)
+		// OptimisticLockError requires getting the newer version of lease to proceed.
+		if apierrors.IsConflict(err) {
+			base, _ = c.backoffEnsureLease()
+			continue
+		}
 		if i > 0 && c.onRepeatedHeartbeatFailure != nil {
 			c.onRepeatedHeartbeatFailure()
 		}
 	}
-	klog.Errorf("failed %d attempts to update node lease, will retry after %v", maxUpdateRetries, c.renewInterval)
+	return fmt.Errorf("failed %d attempts to update node lease", maxUpdateRetries)
 }
 
 // newLease constructs a new lease if base is nil, or returns a copy of base
