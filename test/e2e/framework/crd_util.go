@@ -121,6 +121,24 @@ func CreateTestCRD(f *Framework) (*TestCrd, error) {
 	return CreateMultiVersionTestCRD(f, group, apiVersions, nil)
 }
 
+// CreateTestCRD creates a new CRD specifically for the calling test.
+func CreateMultiVersionTestCRDWithV1Storage(f *Framework) (*TestCrd, error) {
+	group := fmt.Sprintf("%s-multiversion-crd-test.k8s.io", f.BaseName)
+	apiVersions := []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+		{
+			Name:    "v1",
+			Served:  true,
+			Storage: true,
+		},
+		{
+			Name:    "v2",
+			Served:  true,
+			Storage: false,
+		},
+	}
+	return CreateMultiVersionTestCRD(f, group, apiVersions, nil)
+}
+
 // newCRDForTest generates a CRD definition for the test
 func newCRDForTest(testcrd *TestCrd) *apiextensionsv1beta1.CustomResourceDefinition {
 	return &apiextensionsv1beta1.CustomResourceDefinition{
