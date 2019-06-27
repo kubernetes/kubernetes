@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/spec"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 )
 
 // Controller watches CustomResourceDefinitions and publishes validation schema
@@ -191,7 +193,7 @@ func buildVersionSpecs(crd *apiextensions.CustomResourceDefinition, oldSpecs map
 		if !v.Served {
 			continue
 		}
-		spec, err := BuildSwagger(crd, v.Name)
+		spec, err := builder.BuildSwagger(crd, v.Name)
 		if err != nil {
 			return nil, false, err
 		}
@@ -216,7 +218,7 @@ func (c *Controller) updateSpecLocked() error {
 			crdSpecs = append(crdSpecs, s)
 		}
 	}
-	return c.openAPIService.UpdateSpec(mergeSpecs(c.staticSpec, crdSpecs...))
+	return c.openAPIService.UpdateSpec(builder.MergeSpecs(c.staticSpec, crdSpecs...))
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {

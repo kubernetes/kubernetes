@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package openapi
+package builder
 
 import (
 	"fmt"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	openapiv2 "k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2"
 	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -324,7 +325,7 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) 
 		// unknown fields for anything else.
 	} else {
 		if v2 {
-			schema = ToStructuralOpenAPIV2(schema)
+			schema = openapiv2.ToStructuralOpenAPIV2(schema)
 		}
 		ret = schema.ToGoOpenAPI()
 		ret.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).
