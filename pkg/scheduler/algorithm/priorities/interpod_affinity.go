@@ -28,6 +28,8 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+
+	"k8s.io/klog"
 )
 
 // InterPodAffinity contains information to calculate inter pod affinity.
@@ -113,32 +115,31 @@ func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm
 // Symmetry need to be considered for preferredDuringSchedulingIgnoredDuringExecution from podAffinity & podAntiAffinity,
 // symmetry need to be considered for hard requirements from podAffinity
 func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(meta predicates.PredicateMetadata, pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-
 	nodeScore := meta.GetInterPodPriorityNodeScore()
 
-	var max int64
-	var min int64
-	nodeResult := make(map[string]int64, len(nodes))
+	var maxCount, minCount int64
 
 	for _, node := range nodes {
-		nodeResult[node.Name] = nodeScore[node.Name]
-		if nodeResult[node.Name] > max {
-			max = nodeResult[node.Name]
+		if nodeScore[node.Name] > maxCount {
+			maxCount = nodeScore[node.Name]
 		}
-		if nodeResult[node.Name] < min {
-			min = nodeResult[node.Name]
+		if nodeScore[node.Name] < minCount {
+			minCount = nodeScore[node.Name]
 		}
 	}
 
-	mapResult := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	// calculate final priority score for each node
+	result := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	maxMinDiff := maxCount - minCount
 	for _, node := range nodes {
 		fScore := float64(0)
-		if (max - min) > 0 {
-			fScore = float64(schedulerapi.MaxPriority) * (float64(nodeResult[node.Name]-min) / float64(max-min))
+		if maxMinDiff > 0 {
+			fScore = float64(schedulerapi.MaxPriority) * (float64(nodeScore[node.Name]-minCount) / float64(maxCount-minCount))
 		}
-		nodeResult[node.Name] = int64(fScore)
-		mapResult = append(mapResult, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
+		if klog.V(10) {
+			klog.Infof("%v -> %v: InterPodAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
+		}
 	}
-	return mapResult, nil
-
+	return result, nil
 }
