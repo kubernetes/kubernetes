@@ -27,8 +27,7 @@ spec:
       priorityClassName: system-node-critical
       hostNetwork: true
       nodeSelector:
-        # TODO(liggitt): switch to node.kubernetes.io/kube-proxy-ds-ready in 1.16
-        beta.kubernetes.io/kube-proxy-ds-ready: "true"
+        node.kubernetes.io/kube-proxy-ds-ready: "true"
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
