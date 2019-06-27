@@ -136,6 +136,8 @@ func New(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
 				svc, ok := cur.(*v1.Service)
+				// Check cleanup here can provide a remedy when controller failed to handle
+				// changes before it exiting (e.g. crashing, restart, etc.).
 				if ok && (wantsLoadBalancer(svc) || needsCleanup(svc)) {
 					s.enqueueService(cur)
 				}
@@ -438,7 +440,20 @@ func (s *serviceCache) delete(serviceName string) {
 
 // needsCleanup checks if load balancer needs to be cleaned up as indicated by finalizer.
 func needsCleanup(service *v1.Service) bool {
-	return service.ObjectMeta.DeletionTimestamp != nil && servicehelper.HasLBFinalizer(service)
+	if !servicehelper.HasLBFinalizer(service) {
+		return false
+	}
+
+	if service.ObjectMeta.DeletionTimestamp != nil {
+		return true
+	}
+
+	// Service doesn't want loadBalancer but owns loadBalancer finalizer also need to be cleaned up.
+	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return true
+	}
+
+	return false
 }
 
 // needsUpdate checks if load balancer needs to be updated due to change in attributes.
