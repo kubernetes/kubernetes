@@ -584,7 +584,7 @@ func (cache *schedulerCache) AddCSINode(csiNode *storagev1beta1.CSINode) error {
 	return nil
 }
 
-func (cache *schedulerCache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error {
+func (cache *schedulerCache) UpdateCSINode(newCSINode *storagev1beta1.CSINode) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 

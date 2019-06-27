@@ -79,7 +79,7 @@ func (c *Cache) RemoveNode(node *v1.Node) error { return nil }
 func (c *Cache) AddCSINode(csiNode *storagev1beta1.CSINode) error { return nil }
 
 // UpdateCSINode is a fake method for testing.
-func (c *Cache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error { return nil }
+func (c *Cache) UpdateCSINode(newCSINode *storagev1beta1.CSINode) error { return nil }
 
 // RemoveCSINode is a fake method for testing.
 func (c *Cache) RemoveCSINode(csiNode *storagev1beta1.CSINode) error { return nil }

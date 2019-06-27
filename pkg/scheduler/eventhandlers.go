@@ -171,7 +171,7 @@ func (sched *Scheduler) onCSINodeAdd(obj interface{}) {
 }
 
 func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
-	oldCSINode, ok := oldObj.(*storagev1beta1.CSINode)
+	_, ok := oldObj.(*storagev1beta1.CSINode)
 	if !ok {
 		klog.Errorf("cannot convert oldObj to *storagev1beta1.CSINode: %v", oldObj)
 		return
@@ -183,7 +183,7 @@ func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
+	if err := sched.config.SchedulerCache.UpdateCSINode(newCSINode); err != nil {
 		klog.Errorf("scheduler cache UpdateCSINode failed: %v", err)
 	}
 

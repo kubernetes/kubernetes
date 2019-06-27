@@ -105,7 +105,7 @@ type Cache interface {
 	AddCSINode(csiNode *storagev1beta1.CSINode) error
 
 	// UpdateCSINode updates overall CSI-related information about node.
-	UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error
+	UpdateCSINode(newCSINode *storagev1beta1.CSINode) error
 
 	// RemoveCSINode removes overall CSI-related information about node.
 	RemoveCSINode(csiNode *storagev1beta1.CSINode) error
