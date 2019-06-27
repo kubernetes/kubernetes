@@ -577,6 +577,7 @@ func (c *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		NodeLister:                     &nodeLister{c.nodeLister},
 		PDBLister:                      c.pdbLister,
 		NodeInfo:                       c.schedulerCache,
+		NodeTopologyInfo:               c.schedulerCache.NodeTopologyInfo(),
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},

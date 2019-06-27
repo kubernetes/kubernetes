@@ -209,7 +209,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Computing predicates")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(pod, nodes)
+	meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
+	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(meta, pod, nodes)
 	if err != nil {
 		return result, err
 	}
@@ -240,7 +241,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
-	priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
+	priorityList, err := PrioritizeNodes(meta, pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
+
 	if err != nil {
 		return result, err
 	}
@@ -460,7 +462,7 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
+func (g *genericScheduler) findNodesThatFit(meta predicates.PredicateMetadata, pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, FailedPredicateMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 
@@ -480,9 +482,6 @@ func (g *genericScheduler) findNodesThatFit(pod *v1.Pod, nodes []*v1.Node) ([]*v
 		)
 
 		ctx, cancel := context.WithCancel(context.Background())
-
-		// We can use the same metadata producer for all nodes.
-		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
 
 		checkNode := func(i int) {
 			nodeName := g.cache.NodeTree().Next()
@@ -671,6 +670,7 @@ func podFitsOnNode(
 // The node scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all nodes
 func PrioritizeNodes(
+	m predicates.PredicateMetadata,
 	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	meta interface{},
@@ -713,7 +713,7 @@ func PrioritizeNodes(
 			go func(index int) {
 				defer wg.Done()
 				var err error
-				results[index], err = priorityConfigs[index].Function(pod, nodeNameToInfo, nodes)
+				results[index], err = priorityConfigs[index].Function(m, pod, nodeNameToInfo, nodes)
 				if err != nil {
 					appendError(err)
 				}

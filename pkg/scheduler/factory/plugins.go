@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerinternalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"k8s.io/klog"
@@ -42,6 +43,7 @@ type PluginFactoryArgs struct {
 	StatefulSetLister              algorithm.StatefulSetLister
 	NodeLister                     algorithm.NodeLister
 	PDBLister                      algorithm.PDBLister
+	NodeTopologyInfo               schedulerinternalcache.NodeTopologyInfo
 	NodeInfo                       predicates.NodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo

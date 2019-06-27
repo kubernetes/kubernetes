@@ -23,6 +23,8 @@ import (
 
 	"k8s.io/klog"
 
+	"sync/atomic"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,6 +32,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -39,6 +42,7 @@ type PredicateMetadata interface {
 	ShallowCopy() PredicateMetadata
 	AddPod(addedPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) error
 	RemovePod(deletedPod *v1.Pod) error
+	GetInterPodPriorityNodeScore() map[string]int64
 }
 
 // PredicateMetadataProducer is a function that computes predicate metadata for a given pod.
@@ -46,24 +50,24 @@ type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*sche
 
 // PredicateMetadataFactory defines a factory of predicate metadata.
 type PredicateMetadataFactory struct {
-	podLister algorithm.PodLister
-}
-
-// AntiAffinityTerm's topology key value used in predicate metadata
-type topologyPair struct {
-	key   string
-	value string
+	podLister             algorithm.PodLister
+	hardPodAffinityWeight int32
+	topologyInfo          internalcache.NodeTopologyInfo
 }
 
 type podSet map[*v1.Pod]struct{}
 
-type topologyPairSet map[topologyPair]struct{}
+type topologyPairSet map[internalcache.TopologyPair]struct{}
 
 // topologyPairsMaps keeps topologyPairToAntiAffinityPods and antiAffinityPodToTopologyPairs in sync
 // as they are the inverse of each others.
 type topologyPairsMaps struct {
-	topologyPairToPods map[topologyPair]podSet
+	topologyPairToPods map[internalcache.TopologyPair]podSet
 	podToTopologyPairs map[string]topologyPairSet
+}
+
+type pairsMaps struct {
+	pairToScore map[internalcache.TopologyPair]*int64
 }
 
 // NOTE: When new fields are added/removed or logic is changed, please make sure that
@@ -81,9 +85,12 @@ type predicateMetadata struct {
 	// A map of topology pairs to a list of Pods that can potentially match
 	// the anti-affinity terms of the "pod" and its inverse.
 	topologyPairsPotentialAntiAffinityPods *topologyPairsMaps
-	serviceAffinityInUse                   bool
-	serviceAffinityMatchingPodList         []*v1.Pod
-	serviceAffinityMatchingPodServices     []*v1.Service
+
+	interPodPriorityNodeScore map[string]int64
+
+	serviceAffinityInUse               bool
+	serviceAffinityMatchingPodList     []*v1.Pod
+	serviceAffinityMatchingPodServices []*v1.Service
 	// ignoredExtendedResources is a set of extended resource names that will
 	// be ignored in the PodFitsResources predicate.
 	//
@@ -124,9 +131,11 @@ func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtende
 }
 
 // NewPredicateMetadataFactory creates a PredicateMetadataFactory.
-func NewPredicateMetadataFactory(podLister algorithm.PodLister) PredicateMetadataProducer {
+func NewPredicateMetadataFactory(podLister algorithm.PodLister, hardPodAffinityWeight int32, topologyInfo internalcache.NodeTopologyInfo) PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
 		podLister,
+		hardPodAffinityWeight,
+		topologyInfo,
 	}
 	return factory.GetMetadata
 }
@@ -138,25 +147,45 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		return nil
 	}
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
-	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, nodeNameToInfoMap)
+	existingPodPredicateAntiAffinityMap, existingPodPriorityAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, nodeNameToInfoMap, pfactory.hardPodAffinityWeight, pfactory.topologyInfo)
 	if err != nil {
 		return nil
 	}
 	// incomingPodAffinityMap will be used later for efficient check on incoming pod's affinity
 	// incomingPodAntiAffinityMap will be used later for efficient check on incoming pod's anti-affinity
-	incomingPodAffinityMap, incomingPodAntiAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, nodeNameToInfoMap)
+	incomingPodPredicateAffinityMap, incomingPodPredicateAntiAffinityMap, incomingPodPriorityAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, nodeNameToInfoMap, pfactory.topologyInfo)
 	if err != nil {
 		klog.Errorf("[predicate meta data generation] error finding pods that match affinity terms: %v", err)
 		return nil
 	}
+
+	nodeScore := make(map[string]int64, len(nodeNameToInfoMap))
+
+	for pair, value := range existingPodPriorityAffinityMap.pairToScore {
+		if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
+			for name := range nodeSet {
+				nodeScore[name] = nodeScore[name] + *value
+			}
+		}
+	}
+
+	for pair, value := range incomingPodPriorityAffinityMap.pairToScore {
+		if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
+			for name := range nodeSet {
+				nodeScore[name] = nodeScore[name] + *value
+			}
+		}
+	}
+
 	predicateMetadata := &predicateMetadata{
-		pod:                                    pod,
-		podBestEffort:                          isPodBestEffort(pod),
-		podRequest:                             GetResourceRequest(pod),
-		podPorts:                               schedutil.GetContainerPorts(pod),
-		topologyPairsPotentialAffinityPods:     incomingPodAffinityMap,
-		topologyPairsPotentialAntiAffinityPods: incomingPodAntiAffinityMap,
-		topologyPairsAntiAffinityPodsMap:       existingPodAntiAffinityMap,
+		pod:           pod,
+		podBestEffort: isPodBestEffort(pod),
+		podRequest:    GetResourceRequest(pod),
+		podPorts:      schedutil.GetContainerPorts(pod),
+		topologyPairsPotentialAffinityPods:     incomingPodPredicateAffinityMap,
+		topologyPairsPotentialAntiAffinityPods: incomingPodPredicateAntiAffinityMap,
+		topologyPairsAntiAffinityPodsMap:       existingPodPredicateAntiAffinityMap,
+		interPodPriorityNodeScore:              nodeScore,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		klog.V(10).Infof("Precompute: %v", predicateName)
@@ -165,20 +194,41 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	return predicateMetadata
 }
 
+func newPairsMaps(topologyInfo *internalcache.NodeTopologyInfo) *pairsMaps {
+	if topologyInfo == nil {
+		return &pairsMaps{pairToScore: make(map[internalcache.TopologyPair]*int64)}
+	} else {
+		maps := make(map[internalcache.TopologyPair]*int64, len(*topologyInfo))
+		for pair := range *topologyInfo {
+			maps[pair] = new(int64)
+		}
+		return &pairsMaps{pairToScore: maps}
+	}
+}
+
+func (pairsMaps *pairsMaps) addTopologyPair(pair internalcache.TopologyPair, weight int64) {
+	if _, ok := pairsMaps.pairToScore[pair]; ok {
+		atomic.AddInt64(pairsMaps.pairToScore[pair], weight)
+	} else {
+		var w int64 = 0
+		pairsMaps.pairToScore[pair] = &w
+	}
+}
+
 // returns a pointer to a new topologyPairsMaps
 func newTopologyPairsMaps() *topologyPairsMaps {
-	return &topologyPairsMaps{topologyPairToPods: make(map[topologyPair]podSet),
+	return &topologyPairsMaps{topologyPairToPods: make(map[internalcache.TopologyPair]podSet),
 		podToTopologyPairs: make(map[string]topologyPairSet)}
 }
 
-func (topologyPairsMaps *topologyPairsMaps) addTopologyPair(pair topologyPair, pod *v1.Pod) {
+func (topologyPairsMaps *topologyPairsMaps) addTopologyPair(pair internalcache.TopologyPair, pod *v1.Pod) {
 	podFullName := schedutil.GetPodFullName(pod)
 	if topologyPairsMaps.topologyPairToPods[pair] == nil {
 		topologyPairsMaps.topologyPairToPods[pair] = make(map[*v1.Pod]struct{})
 	}
 	topologyPairsMaps.topologyPairToPods[pair][pod] = struct{}{}
 	if topologyPairsMaps.podToTopologyPairs[podFullName] == nil {
-		topologyPairsMaps.podToTopologyPairs[podFullName] = make(map[topologyPair]struct{})
+		topologyPairsMaps.podToTopologyPairs[podFullName] = make(map[internalcache.TopologyPair]struct{})
 	}
 	topologyPairsMaps.podToTopologyPairs[podFullName][pair] = struct{}{}
 }
@@ -203,6 +253,10 @@ func (topologyPairsMaps *topologyPairsMaps) appendMaps(toAppend *topologyPairsMa
 			topologyPairsMaps.addTopologyPair(pair, pod)
 		}
 	}
+}
+
+func (meta *predicateMetadata) GetInterPodPriorityNodeScore() map[string]int64 {
+	return meta.interPodPriorityNodeScore
 }
 
 // RemovePod changes predicateMetadata assuming that the given `deletedPod` is
@@ -262,7 +316,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 			affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
 			for _, term := range affinityTerms {
 				if topologyValue, ok := podNode.Labels[term.TopologyKey]; ok {
-					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
+					pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 					meta.topologyPairsPotentialAffinityPods.addTopologyPair(pair, addedPod)
 				}
 			}
@@ -271,7 +325,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 			antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
 			for _, term := range antiAffinityTerms {
 				if topologyValue, ok := podNode.Labels[term.TopologyKey]; ok {
-					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
+					pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 					meta.topologyPairsPotentialAntiAffinityPods.addTopologyPair(pair, addedPod)
 				}
 			}
@@ -365,7 +419,8 @@ func podMatchesAnyAffinityTermProperties(pod *v1.Pod, properties []*affinityTerm
 // getTPMapMatchingExistingAntiAffinity calculates the following for each existing pod on each node:
 // (1) Whether it has PodAntiAffinity
 // (2) Whether any AffinityTerm matches the incoming pod
-func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) (*topologyPairsMaps, error) {
+func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo, hardPodAffinityWeight int32, topologyInfo internalcache.NodeTopologyInfo) (*topologyPairsMaps, *pairsMaps, error) {
+	//return existingPodPredicateAntiAffinityMap, existingPodPriorityAffinityMap
 	allNodeNames := make([]string, 0, len(nodeInfoMap))
 	for name := range nodeInfoMap {
 		allNodeNames = append(allNodeNames, name)
@@ -381,6 +436,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		defer lock.Unlock()
 		topologyMaps.appendMaps(toAppend)
 	}
+
 	catchError := func(err error) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -391,6 +447,8 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	priorityTopologyMaps := newPairsMaps(&topologyInfo)
+
 	processNode := func(i int) {
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
@@ -398,28 +456,115 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 			catchError(fmt.Errorf("node not found"))
 			return
 		}
+
+		var terms []v1.WeightedPodAffinityTerm
+		var rterms []v1.PodAffinityTerm
+
+		nodeMaps := newTopologyPairsMaps()
+
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, node)
-			if err != nil {
-				catchError(err)
-				cancel()
-				return
+			affinity := existingPod.Spec.Affinity
+			if affinity.PodAntiAffinity != nil {
+				rterms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+				if len(rterms) > 0 {
+					for _, term := range rterms {
+						namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+						selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+						if err != nil {
+							catchError(err)
+							cancel()
+							return
+						}
+						if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+							if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
+								nodeMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, existingPod)
+							}
+						}
+					}
+				}
+
+				terms = affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+				if len(terms) > 0 {
+					for _, term := range terms {
+						namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+						selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+						if err != nil {
+							catchError(err)
+							cancel()
+							return
+						}
+						if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+							if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+								priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, -int64(term.Weight))
+							}
+						}
+
+					}
+
+				}
 			}
-			appendTopologyPairsMaps(existingPodTopologyMaps)
+
+			if affinity.PodAffinity != nil {
+				terms = affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+				if len(terms) > 0 {
+					for _, term := range terms {
+						namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term.PodAffinityTerm)
+						selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+						if err != nil {
+							catchError(err)
+							cancel()
+							return
+						}
+						if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+							if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+								priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+							}
+						}
+
+					}
+				}
+
+				if hardPodAffinityWeight > 0 {
+					rterms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+					if len(rterms) > 0 {
+						for _, term := range rterms {
+							namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+							selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+							if err != nil {
+								catchError(err)
+								cancel()
+								return
+							}
+							if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+								if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
+									priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, int64(hardPodAffinityWeight))
+								}
+							}
+
+						}
+					}
+				}
+			}
+
+			if len(nodeMaps.topologyPairToPods) > 0 {
+				appendTopologyPairsMaps(nodeMaps)
+			}
 		}
 	}
+
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
-	return topologyMaps, firstError
+
+	return topologyMaps, priorityTopologyMaps, firstError
 }
 
 // getTPMapMatchingIncomingAffinityAntiAffinity finds existing Pods that match affinity terms of the given "pod".
 // It returns a topologyPairsMaps that are checked later by the affinity
 // predicate. With this topologyPairsMaps available, the affinity predicate does not
 // need to check all the pods in the cluster.
-func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) (topologyPairsAffinityPodsMaps *topologyPairsMaps, topologyPairsAntiAffinityPodsMaps *topologyPairsMaps, err error) {
+func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo, topologyInfo internalcache.NodeTopologyInfo) (topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps *topologyPairsMaps, priorityTopologyMaps *pairsMaps, err error) {
 	affinity := pod.Spec.Affinity
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
-		return newTopologyPairsMaps(), newTopologyPairsMaps(), nil
+		return newTopologyPairsMaps(), newTopologyPairsMaps(), newPairsMaps(nil), nil
 	}
 
 	allNodeNames := make([]string, 0, len(nodeInfoMap))
@@ -429,6 +574,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 
 	var lock sync.Mutex
 	var firstError error
+
 	topologyPairsAffinityPodsMaps = newTopologyPairsMaps()
 	topologyPairsAntiAffinityPodsMaps = newTopologyPairsMaps()
 	appendResult := func(nodeName string, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps *topologyPairsMaps) {
@@ -450,12 +596,37 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		}
 	}
 
-	affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
-	affinityProperties, err := getAffinityTermProperties(pod, affinityTerms)
-	if err != nil {
-		return nil, nil, err
+	priorityTopologyMaps = newPairsMaps(&topologyInfo)
+
+	var requiredAffinityTerms []v1.PodAffinityTerm
+	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
+
+	if affinity.PodAffinity != nil {
+		if len(affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+			requiredAffinityTerms = affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+
+		if len(affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+			preferredAffinityTerms = affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+		}
 	}
-	antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
+
+	affinityProperties, err := getAffinityTermProperties(pod, requiredAffinityTerms)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var requiredAntiAffinityTerms []v1.PodAffinityTerm
+	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
+	if affinity.PodAntiAffinity != nil {
+		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+			requiredAntiAffinityTerms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution
+		}
+
+		if affinity.PodAntiAffinity != nil && len(affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+			preferredAntiAffinityTerms = affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -468,18 +639,18 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		}
 		nodeTopologyPairsAffinityPodsMaps := newTopologyPairsMaps()
 		nodeTopologyPairsAntiAffinityPodsMaps := newTopologyPairsMaps()
+
 		for _, existingPod := range nodeInfo.Pods() {
 			// Check affinity properties.
 			if podMatchesAllAffinityTermProperties(existingPod, affinityProperties) {
-				for _, term := range affinityTerms {
+				for _, term := range requiredAffinityTerms {
 					if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-						pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-						nodeTopologyPairsAffinityPodsMaps.addTopologyPair(pair, existingPod)
+						nodeTopologyPairsAffinityPodsMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, existingPod)
 					}
 				}
 			}
 			// Check anti-affinity properties.
-			for _, term := range antiAffinityTerms {
+			for _, term := range requiredAntiAffinityTerms {
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
 				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 				if err != nil {
@@ -489,18 +660,54 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				}
 				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
 					if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-						pair := topologyPair{key: term.TopologyKey, value: topologyValue}
-						nodeTopologyPairsAntiAffinityPodsMaps.addTopologyPair(pair, existingPod)
+						nodeTopologyPairsAntiAffinityPodsMaps.addTopologyPair(internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}, existingPod)
 					}
 				}
 			}
+
+			// prioTopologyPairsAffinityPodsMaps
+			for _, term := range preferredAffinityTerms {
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
+				selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+				if err != nil {
+					catchError(err)
+					cancel()
+					return
+				}
+				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
+					if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+						priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, int64(term.Weight))
+					}
+				}
+
+			}
+
+			// prioTopologyPairsAntiAffinityPodsMaps
+			for _, term := range preferredAntiAffinityTerms {
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
+				selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
+				if err != nil {
+					catchError(err)
+					cancel()
+					return
+				}
+				if priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector) {
+					if topologyValue, ok := node.Labels[term.PodAffinityTerm.TopologyKey]; ok {
+						priorityTopologyMaps.addTopologyPair(internalcache.TopologyPair{Key: term.PodAffinityTerm.TopologyKey, Value: topologyValue}, -int64(term.Weight))
+					}
+				}
+
+			}
 		}
+
 		if len(nodeTopologyPairsAffinityPodsMaps.topologyPairToPods) > 0 || len(nodeTopologyPairsAntiAffinityPodsMaps.topologyPairToPods) > 0 {
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
-	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, firstError
+
+	return topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps, priorityTopologyMaps, firstError
+
 }
 
 // targetPodMatchesAffinityOfPod returns true if "targetPod" matches ALL affinity terms of

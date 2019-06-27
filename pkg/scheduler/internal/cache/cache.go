@@ -76,6 +76,8 @@ type schedulerCache struct {
 	nodeTree *NodeTree
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
+	// A map from node label to node names
+	nodeTopologyInfo NodeTopologyInfo
 }
 
 type podState struct {
@@ -107,11 +109,12 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		period: period,
 		stop:   stop,
 
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(nil),
-		assumedPods: make(map[string]bool),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*imageState),
+		nodes:            make(map[string]*nodeInfoListItem),
+		nodeTree:         newNodeTree(nil),
+		assumedPods:      make(map[string]bool),
+		podStates:        make(map[string]*podState),
+		imageStates:      make(map[string]*imageState),
+		nodeTopologyInfo: make(map[TopologyPair]sets.String),
 	}
 }
 
@@ -523,6 +526,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 
 	cache.nodeTree.AddNode(node)
 	cache.addNodeImageStates(node, n.info)
+	cache.nodeTopologyInfo.AddNode(node)
 	return n.info.SetNode(node)
 }
 
@@ -541,6 +545,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 
 	cache.nodeTree.UpdateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
+	cache.nodeTopologyInfo.UpdateNode(oldNode, newNode)
 	return n.info.SetNode(newNode)
 }
 
@@ -567,7 +572,12 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 
 	cache.nodeTree.RemoveNode(node)
 	cache.removeNodeImageStates(node)
+	cache.nodeTopologyInfo.RemoveNode(node)
 	return nil
+}
+
+func (cache *schedulerCache) NodeTopologyInfo() NodeTopologyInfo {
+	return cache.nodeTopologyInfo
 }
 
 func (cache *schedulerCache) AddCSINode(csiNode *storagev1beta1.CSINode) error {

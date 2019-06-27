@@ -25,7 +25,7 @@ func init() {
 	// Register functions that extract metadata used by predicates computations.
 	factory.RegisterPredicateMetadataProducerFactory(
 		func(args factory.PluginFactoryArgs) predicates.PredicateMetadataProducer {
-			return predicates.NewPredicateMetadataFactory(args.PodLister)
+			return predicates.NewPredicateMetadataFactory(args.PodLister, args.HardPodAffinitySymmetricWeight, args.NodeTopologyInfo)
 		})
 
 	// IMPORTANT NOTES for predicate developers:
@@ -95,7 +95,7 @@ func init() {
 	factory.RegisterFitPredicateFactory(
 		predicates.MatchInterPodAffinityPred,
 		func(args factory.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
+			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister, args.NodeTopologyInfo)
 		},
 	)
 

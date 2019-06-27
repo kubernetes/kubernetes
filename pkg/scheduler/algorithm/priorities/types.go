@@ -18,6 +18,7 @@ package priorities
 
 import (
 	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -40,7 +41,7 @@ type PriorityMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*sched
 // PriorityFunction is a function that computes scores for all nodes.
 // DEPRECATED
 // Use Map-Reduce pattern for priority functions.
-type PriorityFunction func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error)
+type PriorityFunction func(meta predicates.PredicateMetadata, pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error)
 
 // PriorityConfig is a config used for a priority function.
 type PriorityConfig struct {

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -1182,15 +1183,17 @@ func EssentialPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedule
 
 // PodAffinityChecker contains information to check pod affinity.
 type PodAffinityChecker struct {
-	info      NodeInfo
-	podLister algorithm.PodLister
+	info         NodeInfo
+	podLister    algorithm.PodLister
+	topologyInfo internalcache.NodeTopologyInfo
 }
 
 // NewPodAffinityPredicate creates a PodAffinityChecker.
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) FitPredicate {
+func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, topologyInfo internalcache.NodeTopologyInfo) FitPredicate {
 	checker := &PodAffinityChecker{
-		info:      info,
-		podLister: podLister,
+		info:         info,
+		podLister:    podLister,
+		topologyInfo: topologyInfo,
 	}
 	return checker.InterPodAffinityMatches
 }
@@ -1305,7 +1308,7 @@ func getMatchingAntiAffinityTopologyPairsOfPod(newPod *v1.Pod, existingPod *v1.P
 		namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
 		if priorityutil.PodMatchesTermsNamespaceAndSelector(newPod, namespaces, selector) {
 			if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-				pair := topologyPair{key: term.TopologyKey, value: topologyValue}
+				pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 				topologyMaps.addTopologyPair(pair, existingPod)
 			}
 		}
@@ -1364,7 +1367,7 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	// Iterate over topology pairs to get any of the pods being affected by
 	// the scheduled pod anti-affinity terms
 	for topologyKey, topologyValue := range node.Labels {
-		if topologyMaps.topologyPairToPods[topologyPair{key: topologyKey, value: topologyValue}] != nil {
+		if topologyMaps.topologyPairToPods[internalcache.TopologyPair{Key: topologyKey, Value: topologyValue}] != nil {
 			klog.V(10).Infof("Cannot schedule pod %+v onto node %v", podName(pod), node.Name)
 			return ErrExistingPodsAntiAffinityRulesNotMatch, nil
 		}
@@ -1384,7 +1387,7 @@ func (c *PodAffinityChecker) nodeMatchesAllTopologyTerms(pod *v1.Pod, topologyPa
 	node := nodeInfo.Node()
 	for _, term := range terms {
 		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-			pair := topologyPair{key: term.TopologyKey, value: topologyValue}
+			pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 			if _, ok := topologyPairs.topologyPairToPods[pair]; !ok {
 				return false
 			}
@@ -1401,7 +1404,7 @@ func (c *PodAffinityChecker) nodeMatchesAnyTopologyTerm(pod *v1.Pod, topologyPai
 	node := nodeInfo.Node()
 	for _, term := range terms {
 		if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
-			pair := topologyPair{key: term.TopologyKey, value: topologyValue}
+			pair := internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}
 			if _, ok := topologyPairs.topologyPairToPods[pair]; ok {
 				return true
 			}
