@@ -754,7 +754,7 @@ github.com/storageos/go-api
 github.com/storageos/go-api/netutil
 github.com/storageos/go-api/serror
 github.com/storageos/go-api/types
-# github.com/stretchr/objx v0.2.0 => github.com/stretchr/objx v0.1.1
+# github.com/stretchr/objx v0.2.0 => github.com/stretchr/objx v0.2.0
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.3.0 => github.com/stretchr/testify v1.3.0
 github.com/stretchr/testify/assert
