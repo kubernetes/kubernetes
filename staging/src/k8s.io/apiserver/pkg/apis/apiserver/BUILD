@@ -16,9 +16,9 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/apiserver",
     importpath = "k8s.io/apiserver/pkg/apis/apiserver",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -33,8 +33,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/apis/apiserver/install:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
 )

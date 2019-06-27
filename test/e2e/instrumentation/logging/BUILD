@@ -13,7 +13,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/instrumentation/logging",
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/log:go_default_library",

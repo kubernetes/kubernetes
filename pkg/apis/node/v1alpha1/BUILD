@@ -13,11 +13,11 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/node:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -42,10 +42,10 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/node:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],

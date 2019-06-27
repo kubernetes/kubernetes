@@ -9,12 +9,12 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//pkg/registry/node/runtimeclass/storage:go_default_library",
-        "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "/staging/src/k8s.io/api/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/api/node/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/server:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
     ],
 )
 

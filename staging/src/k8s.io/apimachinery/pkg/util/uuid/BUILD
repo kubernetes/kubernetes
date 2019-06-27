@@ -11,7 +11,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/uuid",
     importpath = "k8s.io/apimachinery/pkg/util/uuid",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/github.com/google/uuid:go_default_library",
     ],
 )

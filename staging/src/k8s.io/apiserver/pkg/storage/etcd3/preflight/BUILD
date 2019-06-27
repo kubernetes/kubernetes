@@ -17,7 +17,7 @@ go_test(
     name = "go_default_test",
     srcs = ["checks_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 
 filegroup(

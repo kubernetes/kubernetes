@@ -16,11 +16,11 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/custom_metrics",
     importpath = "k8s.io/metrics/pkg/apis/custom_metrics",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -35,9 +35,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install:all-srcs",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:all-srcs",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:all-srcs",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics/install:all-srcs",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:all-srcs",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:all-srcs",
     ],
     tags = ["automanaged"],
 )

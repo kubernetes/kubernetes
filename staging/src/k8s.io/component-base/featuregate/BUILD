@@ -33,7 +33,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/component-base/featuregate/testing:all-srcs",
+        "/staging/src/k8s.io/component-base/featuregate/testing:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

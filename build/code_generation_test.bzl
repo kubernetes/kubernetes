@@ -20,7 +20,7 @@ def _bazel_go_library_test_impl(ctx):
     test_cases = [
         ("pkg/kubectl/util", "//pkg/kubectl/util:go_default_library"),
         ("vendor/some/third/party", "//vendor/some/third/party:go_default_library"),
-        ("staging/src/k8s.io/apimachinery/api", "//staging/src/k8s.io/apimachinery/api:go_default_library"),
+        ("staging/src/k8s.io/apimachinery/api", "/staging/src/k8s.io/apimachinery/api:go_default_library"),
     ]
     for input, expected in test_cases:
         asserts.equals(env, expected, bazel_go_library(input))

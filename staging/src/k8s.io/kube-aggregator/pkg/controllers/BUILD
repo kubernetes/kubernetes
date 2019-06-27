@@ -11,8 +11,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/controllers",
     importpath = "k8s.io/kube-aggregator/pkg/controllers",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -28,9 +28,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/controllers/status:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/controllers/openapi:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/controllers/status:all-srcs",
     ],
     tags = ["automanaged"],
 )

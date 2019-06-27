@@ -13,8 +13,8 @@ go_library(
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

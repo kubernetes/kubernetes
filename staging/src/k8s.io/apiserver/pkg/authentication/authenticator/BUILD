@@ -11,7 +11,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/authenticator",
     importpath = "k8s.io/apiserver/pkg/authentication/authenticator",
-    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["/staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 filegroup(
@@ -35,7 +35,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )

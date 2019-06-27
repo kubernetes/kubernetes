@@ -17,8 +17,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/client-go/discovery:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
@@ -38,7 +38,7 @@ go_test(
     data = ["//api/openapi-spec"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

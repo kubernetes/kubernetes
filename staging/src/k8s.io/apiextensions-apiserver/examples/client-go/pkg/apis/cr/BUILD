@@ -19,7 +19,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1:all-srcs",
+        "/staging/src/k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

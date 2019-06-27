@@ -46,10 +46,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/aes:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/identity:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/aes:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/identity:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -279,7 +279,7 @@ kube::util::group-version-to-pkg-path() {
       echo "vendor/k8s.io/api/${group_version/.*k8s.io/}"
       return
     fi
-  done < <(cd "${KUBE_ROOT}/staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
+  done < <(cd "${KUBE_ROOT}staging/src/k8s.io/api" && find . -name types.go -exec dirname {} \; | sed "s|\./||g" | sort)
 
   # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
@@ -542,7 +542,7 @@ EOF
 # $KUBE_ROOT must be set.
 function kube::util::list_staging_repos() {
   (
-    cd "${KUBE_ROOT}/staging/src/k8s.io" && \
+    cd "${KUBE_ROOT}staging/src/k8s.io" && \
     find . -mindepth 1 -maxdepth 1 -type d | cut -c 3- | sort
   )
 }

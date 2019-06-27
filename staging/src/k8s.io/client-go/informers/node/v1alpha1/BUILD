@@ -10,14 +10,14 @@ go_library(
     importpath = "k8s.io/client-go/informers/node/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/api/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/client-go/informers/internalinterfaces:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "/staging/src/k8s.io/client-go/listers/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

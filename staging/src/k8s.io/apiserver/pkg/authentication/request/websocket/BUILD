@@ -12,8 +12,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/request/websocket",
     importpath = "k8s.io/apiserver/pkg/authentication/request/websocket",
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/util/wsstream:go_default_library",
     ],
 )
 
@@ -22,8 +22,8 @@ go_test(
     srcs = ["protocol_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )
 

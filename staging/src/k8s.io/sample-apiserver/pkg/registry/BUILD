@@ -11,8 +11,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/sample-apiserver/pkg/registry",
     importpath = "k8s.io/sample-apiserver/pkg/registry",
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
     ],
 )
 
@@ -27,8 +27,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer:all-srcs",
-        "//staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder:all-srcs",
+        "/staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer:all-srcs",
+        "/staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -7,9 +7,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubemark:go_default_library",
-        "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "/staging/src/k8s.io/client-go/informers:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
     ],

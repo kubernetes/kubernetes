@@ -16,7 +16,7 @@ go_library(
     srcs = ["swagger_type_docs.go"],
     importpath = "k8s.io/kubernetes/cmd/genswaggertypedocs",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

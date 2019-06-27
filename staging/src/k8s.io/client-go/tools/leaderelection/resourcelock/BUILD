@@ -12,12 +12,12 @@ go_library(
     importpath = "k8s.io/client-go/tools/leaderelection/resourcelock",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/coordination/v1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/coordination/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/coordination/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/typed/coordination/v1:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
     ],
 )
 

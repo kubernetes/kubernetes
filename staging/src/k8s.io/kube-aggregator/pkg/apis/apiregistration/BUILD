@@ -18,10 +18,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration",
     importpath = "k8s.io/kube-aggregator/pkg/apis/apiregistration",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
     ],
 )
 
@@ -36,10 +36,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/install:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/validation:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/install:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

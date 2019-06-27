@@ -7,13 +7,13 @@ go_library(
     importpath = "k8s.io/metrics/pkg/client/custom_metrics/scheme",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
     ],
 )
 

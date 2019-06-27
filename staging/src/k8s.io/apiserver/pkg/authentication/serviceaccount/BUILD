@@ -17,7 +17,7 @@ go_library(
     srcs = ["util.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authentication/serviceaccount",
     importpath = "k8s.io/apiserver/pkg/authentication/serviceaccount",
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library"],
 )
 
 filegroup(

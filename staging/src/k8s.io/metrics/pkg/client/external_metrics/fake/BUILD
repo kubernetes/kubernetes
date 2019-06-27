@@ -11,12 +11,12 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/client/external_metrics/fake",
     importpath = "k8s.io/metrics/pkg/client/external_metrics/fake",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/client-go/testing:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/client/external_metrics:go_default_library",
     ],
 )
 

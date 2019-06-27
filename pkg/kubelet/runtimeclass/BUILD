@@ -6,10 +6,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/runtimeclass",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/listers/node/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "/staging/src/k8s.io/client-go/informers:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "/staging/src/k8s.io/client-go/listers/node/v1beta1:go_default_library",
     ],
 )
 

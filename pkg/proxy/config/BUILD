@@ -15,10 +15,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/proxy/config",
     deps = [
         "//pkg/controller:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -31,14 +31,14 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/informers:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/client-go/informers:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "/staging/src/k8s.io/client-go/testing:go_default_library",
     ],
 )
 

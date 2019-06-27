@@ -6,7 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kv",
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kv",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library"],
 )
 
 go_test(

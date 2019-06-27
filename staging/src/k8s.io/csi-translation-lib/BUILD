@@ -7,9 +7,9 @@ go_library(
     importpath = "k8s.io/csi-translation-lib",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/storage/v1:go_default_library",
-        "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/storage/v1:go_default_library",
+        "/staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
     ],
 )
 
@@ -17,7 +17,7 @@ go_test(
     name = "go_default_test",
     srcs = ["translate_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/api/core/v1:go_default_library"],
+    deps = ["/staging/src/k8s.io/api/core/v1:go_default_library"],
 )
 
 filegroup(
@@ -31,7 +31,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/csi-translation-lib/plugins:all-srcs",
+        "/staging/src/k8s.io/csi-translation-lib/plugins:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

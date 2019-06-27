@@ -11,7 +11,7 @@ go_library(
     srcs = ["clientauth.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/auth",
     importpath = "k8s.io/client-go/tools/auth",
-    deps = ["//staging/src/k8s.io/client-go/rest:go_default_library"],
+    deps = ["/staging/src/k8s.io/client-go/rest:go_default_library"],
 )
 
 go_test(

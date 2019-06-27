@@ -26,7 +26,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 
 APIROOTS=${APIROOTS:-$(git grep --files-with-matches -e '// +k8s:protobuf-gen=package' cmd pkg staging | \
 	xargs -n 1 dirname | \
-	sed 's,^,k8s.io/kubernetes/,;s,k8s.io/kubernetes/staging/src/,,' | \
+	sed 's,^,k8s.io/kubernetes/,;s,k8s.io/kubernetesstaging/src/,,' | \
 	sort | uniq
 )}
 

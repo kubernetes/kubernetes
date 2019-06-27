@@ -64,7 +64,7 @@ ${clientgen} --output-base "${KUBE_ROOT}/vendor" --output-package="k8s.io/client
 
 listergen_external_apis=()
 kube::util::read-array listergen_external_apis < <(
-  cd "${KUBE_ROOT}/staging/src"
+  cd "${KUBE_ROOT}staging/src"
   find k8s.io/api -name types.go -print0 | xargs -0 -n1 dirname | sort
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
@@ -73,7 +73,7 @@ ${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client
 informergen_external_apis=()
 # because client-gen doesn't do policy/v1alpha1, we have to skip it too
 kube::util::read-array informergen_external_apis < <(
-  cd "${KUBE_ROOT}/staging/src"
+  cd "${KUBE_ROOT}staging/src"
   find k8s.io/api -name types.go -print0 | xargs -0 -n1 dirname | sort | grep -v pkg.apis.policy.v1alpha1
 )
 informergen_external_apis_csv=$(IFS=,; echo "${informergen_external_apis[*]}")

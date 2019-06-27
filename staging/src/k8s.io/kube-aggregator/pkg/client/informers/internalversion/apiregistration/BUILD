@@ -11,8 +11,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration",
     importpath = "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration",
     deps = [
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/internalinterfaces:go_default_library",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:go_default_library",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/internalinterfaces:go_default_library",
     ],
 )
 
@@ -27,7 +27,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion:all-srcs",
     ],
     tags = ["automanaged"],
 )

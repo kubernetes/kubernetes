@@ -37,7 +37,7 @@ trap 'rm -f "${CACHE}"' HUP INT TERM ERR
 #   kfind -type f -name foobar.go
 function kfind() {
     # We want to include the "special" vendor directories which are actually
-    # part of the Kubernetes source tree (./staging/*) but we need them to be
+    # part of the Kubernetes source tree (.staging/*) but we need them to be
     # named as their ./vendor/* equivalents.  Also, we  do not want all of
     # ./vendor or even all of ./vendor/k8s.io.
     find -H .                      \
@@ -52,7 +52,7 @@ function kfind() {
         \)                         \
         \)                         \
         "$@"                       \
-        | sed 's|^./staging/src|vendor|'
+        | sed 's|^.staging/src|vendor|'
 }
 
 NEED_FIND=true

@@ -18,16 +18,16 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/iptables",
     deps = [
         "//pkg/util/dbus:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//vendor/github.com/godbus/dbus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/trace:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-            "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+            "/staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+            "/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],
         "//conditions:default": [],
@@ -44,7 +44,7 @@ go_test(
     deps = select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/util/dbus:go_default_library",
-            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
             "//vendor/k8s.io/utils/exec/testing:go_default_library",
         ],

@@ -23,7 +23,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/metrics",
     importpath = "k8s.io/component-base/metrics",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
@@ -44,7 +44,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
@@ -63,7 +63,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/component-base/metrics/legacyregistry:all-srcs",
+        "/staging/src/k8s.io/component-base/metrics/legacyregistry:all-srcs",
     ],
     tags = ["automanaged"],
 )

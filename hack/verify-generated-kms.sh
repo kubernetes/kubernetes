@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-KUBE_KMS_GRPC_ROOT="${KUBE_ROOT}/staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1/"
+KUBE_KMS_GRPC_ROOT="${KUBE_ROOT}staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env

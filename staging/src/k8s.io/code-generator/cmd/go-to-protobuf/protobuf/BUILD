@@ -20,8 +20,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf",
     importpath = "k8s.io/code-generator/cmd/go-to-protobuf/protobuf",
     deps = [
-        "//staging/src/k8s.io/code-generator/pkg/util:go_default_library",
-        "//staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:go_default_library",
+        "/staging/src/k8s.io/code-generator/pkg/util:go_default_library",
+        "/staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph:go_default_library",
         "//vendor/gonum.org/v1/gonum/graph/simple:go_default_library",

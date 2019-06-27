@@ -60,12 +60,12 @@ kube::test::find_dirs() {
           -o -path './test/e2e_kubeadm/*' \
           -o -path './test/integration/*' \
           -o -path './third_party/*' \
-          -o -path './staging/*' \
+          -o -path '.staging/*' \
           -o -path './vendor/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
-    find ./staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\./staging/src/|./vendor/|' | LC_ALL=C sort -u
+    find .staging -name '*_test.go' -not -path '*/test/integration/*' -prune -print0 | xargs -0n1 dirname | sed 's|^\.staging/src/|./vendor/|' | LC_ALL=C sort -u
   )
 }
 

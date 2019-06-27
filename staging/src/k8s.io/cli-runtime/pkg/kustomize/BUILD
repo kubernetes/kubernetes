@@ -7,7 +7,7 @@ go_library(
     importpath = "k8s.io/cli-runtime/pkg/kustomize",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps:go_default_library",
+        "/staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/commands/build:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/fs:go_default_library",
     ],
@@ -24,7 +24,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps:all-srcs",
+        "/staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

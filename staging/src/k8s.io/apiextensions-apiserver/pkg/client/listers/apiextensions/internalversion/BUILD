@@ -14,10 +14,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion",
     importpath = "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion",
     deps = [
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

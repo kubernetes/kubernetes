@@ -10,8 +10,8 @@ go_library(
     importpath = "k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/hash",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/resmap:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/transformers:go_default_library",
     ],
@@ -25,8 +25,8 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kunstruct:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/cli-runtime/pkg/kustomize/k8sdeps/kunstruct:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/gvk:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/resid:go_default_library",
         "//vendor/sigs.k8s.io/kustomize/pkg/resmap:go_default_library",

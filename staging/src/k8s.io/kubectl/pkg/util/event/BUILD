@@ -6,7 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/event",
     importpath = "k8s.io/kubectl/pkg/util/event",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/api/core/v1:go_default_library"],
+    deps = ["/staging/src/k8s.io/api/core/v1:go_default_library"],
 )
 
 go_test(
@@ -14,8 +14,8 @@ go_test(
     srcs = ["sorted_event_list_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
     ],
 )
 

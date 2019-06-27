@@ -33,12 +33,12 @@ limitations under the License.
 // version of this code, located at
 //
 //   https://github.com/kubernetes/kubernetes/
-//       blob/master/staging/src/k8s.io/apimachinery/pkg/util/yaml
+//       blob/masterstaging/src/k8s.io/apimachinery/pkg/util/yaml
 //
 // which is "vendored" via symlinks:
 //   k8s.io/kubernetes/vendor/k8s.io/apimachinery
 // is a symlink to
-//   ../../staging/src/k8s.io/apimachinery
+//   ../..staging/src/k8s.io/apimachinery
 //
 // The staging version is the canonical, under-development
 // version of the code that kubectl depends on, whereas the packages

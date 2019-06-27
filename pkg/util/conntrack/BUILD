@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/conntrack",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
@@ -17,7 +17,7 @@ go_test(
     srcs = ["conntrack_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",

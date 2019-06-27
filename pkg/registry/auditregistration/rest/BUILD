@@ -8,11 +8,11 @@ go_library(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/registry/auditregistration/auditsink/storage:go_default_library",
-        "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "/staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/server:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
     ],
 )
 

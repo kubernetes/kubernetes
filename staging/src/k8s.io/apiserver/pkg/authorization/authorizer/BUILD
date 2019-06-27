@@ -13,7 +13,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/authorization/authorizer",
     importpath = "k8s.io/apiserver/pkg/authorization/authorizer",
-    deps = ["//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
+    deps = ["/staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 filegroup(

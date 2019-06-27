@@ -7,14 +7,14 @@ go_library(
     importpath = "k8s.io/kubectl/pkg/util/deployment",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/apps/v1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
+        "/staging/src/k8s.io/api/apps/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
     ],
 )
 

@@ -10,14 +10,14 @@ go_library(
     importpath = "k8s.io/node-api/pkg/client/informers/externalversions",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/informers/externalversions/internalinterfaces:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/informers/externalversions/node:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/node-api/pkg/client/clientset/versioned:go_default_library",
+        "/staging/src/k8s.io/node-api/pkg/client/informers/externalversions/internalinterfaces:go_default_library",
+        "/staging/src/k8s.io/node-api/pkg/client/informers/externalversions/node:go_default_library",
     ],
 )
 
@@ -32,8 +32,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/node-api/pkg/client/informers/externalversions/internalinterfaces:all-srcs",
-        "//staging/src/k8s.io/node-api/pkg/client/informers/externalversions/node:all-srcs",
+        "/staging/src/k8s.io/node-api/pkg/client/informers/externalversions/internalinterfaces:all-srcs",
+        "/staging/src/k8s.io/node-api/pkg/client/informers/externalversions/node:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

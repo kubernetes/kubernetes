@@ -11,8 +11,8 @@ go_test(
     srcs = ["helpers_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
@@ -22,8 +22,8 @@ go_library(
     srcs = ["helpers.go"],
     importpath = "k8s.io/kubernetes/pkg/api/v1/resource",
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ],
 )
 

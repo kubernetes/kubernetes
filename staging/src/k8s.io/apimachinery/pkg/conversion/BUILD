@@ -14,7 +14,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
@@ -30,7 +30,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/conversion",
     importpath = "k8s.io/apimachinery/pkg/conversion",
-    deps = ["//staging/src/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/third_party/forked/golang/reflect:go_default_library"],
 )
 
 filegroup(
@@ -44,8 +44,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion/queryparams:all-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion/unstructured:all-srcs",
+        "/staging/src/k8s.io/apimachinery/pkg/conversion/queryparams:all-srcs",
+        "/staging/src/k8s.io/apimachinery/pkg/conversion/unstructured:all-srcs",
     ],
     tags = ["automanaged"],
 )

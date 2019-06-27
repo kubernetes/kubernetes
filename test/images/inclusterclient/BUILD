@@ -6,9 +6,9 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/inclusterclient",
     visibility = ["//visibility:private"],
     deps = [
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/component-base/logs:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

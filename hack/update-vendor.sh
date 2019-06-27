@@ -167,10 +167,10 @@ fi
 kube::log::status "go.mod: update staging references"
 # Prune
 go mod edit -json | jq -r '.Require[]? | select(.Version == "v0.0.0")                 | "-droprequire \(.Path)"'     | xargs -L 100 go mod edit -fmt
-go mod edit -json | jq -r '.Replace[]? | select(.New.Path | startswith("./staging/")) | "-dropreplace \(.Old.Path)"' | xargs -L 100 go mod edit -fmt
+go mod edit -json | jq -r '.Replace[]? | select(.New.Path | startswith(".staging/")) | "-dropreplace \(.Old.Path)"' | xargs -L 100 go mod edit -fmt
 # Readd
 kube::util::list_staging_repos | xargs -n 1 -I {} echo "-require k8s.io/{}@v0.0.0"                  | xargs -L 100 go mod edit -fmt
-kube::util::list_staging_repos | xargs -n 1 -I {} echo "-replace k8s.io/{}=./staging/src/k8s.io/{}" | xargs -L 100 go mod edit -fmt
+kube::util::list_staging_repos | xargs -n 1 -I {} echo "-replace k8s.io/{}=.staging/src/k8s.io/{}" | xargs -L 100 go mod edit -fmt
 
 
 # Phase 3: capture required (minimum) versions from all modules, and replaced (pinned) versions from the root module
@@ -191,7 +191,7 @@ for repo in $(kube::util::list_staging_repos); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
     echo "=== propagating to ${repo}" >> "${LOG_FILE}"
     # copy root go.mod, changing module name
-    sed "s#module k8s.io/kubernetes#module k8s.io/${repo}#" < "${KUBE_ROOT}/go.mod" > "${KUBE_ROOT}/staging/src/k8s.io/${repo}/go.mod"
+    sed "s#module k8s.io/kubernetes#module k8s.io/${repo}#" < "${KUBE_ROOT}/go.mod" > "${KUBE_ROOT}staging/src/k8s.io/${repo}/go.mod"
     # remove `require` directives for staging components (will get re-added as needed by `go list`)
     kube::util::list_staging_repos | xargs -n 1 -I {} echo "-droprequire k8s.io/{}"   | xargs -L 100 go mod edit
     # rewrite `replace` directives for staging components to point to peer directories
@@ -217,7 +217,7 @@ while IFS= read -r repo; do
   # record existence of the repo to ensure modules with no peer relationships still get included in the order
   echo "${repo} ${repo}" >> "${TMP_DIR}/tidy_deps.txt"
 
-  pushd "${KUBE_ROOT}/staging/src/${repo}" >/dev/null 2>&1
+  pushd "${KUBE_ROOT}staging/src/${repo}" >/dev/null 2>&1
     # save the original go.mod, since go list doesn't just add missing entries, it also removes specific required versions from it
     tmp_go_mod="${TMP_DIR}/tidy_${repo/\//_}_go.mod.original"
     tmp_go_deps="${TMP_DIR}/tidy_${repo/\//_}_deps.txt"
@@ -250,7 +250,7 @@ done < "${tidy_unordered}"
 
 kube::log::status "go.mod: tidying"
 for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
-  pushd "${KUBE_ROOT}/staging/src/${repo}" >/dev/null 2>&1
+  pushd "${KUBE_ROOT}staging/src/${repo}" >/dev/null 2>&1
     echo "=== tidying ${repo}" >> "${LOG_FILE}"
 
     # prune replace directives that pin to the naturally selected version.
@@ -326,7 +326,7 @@ mv "${TMP_DIR}/modules.txt.tmp" vendor/modules.txt
 # This lets other packages and tools use the local staging components as if they were vendored.
 for repo in $(kube::util::list_staging_repos); do
   rm -fr "${KUBE_ROOT}/vendor/k8s.io/${repo}"
-  ln -s "../../staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
+  ln -s "../..staging/src/k8s.io/${repo}" "${KUBE_ROOT}/vendor/k8s.io/${repo}"
 done
 
 kube::log::status "vendor: updating BUILD files"

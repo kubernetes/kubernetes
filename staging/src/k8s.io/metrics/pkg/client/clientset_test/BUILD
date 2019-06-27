@@ -4,8 +4,8 @@ go_test(
     name = "go_default_test",
     srcs = ["clientset_test.go"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/fake:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/client/clientset/versioned/fake:go_default_library",
     ],
 )
 

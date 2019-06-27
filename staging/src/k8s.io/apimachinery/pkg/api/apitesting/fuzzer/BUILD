@@ -21,7 +21,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/api/apitesting/fuzzer",
     importpath = "k8s.io/apimachinery/pkg/api/apitesting/fuzzer",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )

@@ -10,7 +10,7 @@ go_library(
     srcs = ["logs_generator.go"],
     importpath = "k8s.io/kubernetes/test/images/agnhost/logs-generator",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

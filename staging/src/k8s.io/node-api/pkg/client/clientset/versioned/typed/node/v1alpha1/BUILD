@@ -12,12 +12,12 @@ go_library(
     importpath = "k8s.io/node-api/pkg/client/clientset/versioned/typed/node/v1alpha1",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned/scheme:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/node-api/pkg/client/clientset/versioned/scheme:go_default_library",
     ],
 )
 
@@ -32,7 +32,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/node-api/pkg/client/clientset/versioned/typed/node/v1alpha1/fake:all-srcs",
+        "/staging/src/k8s.io/node-api/pkg/client/clientset/versioned/typed/node/v1alpha1/fake:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

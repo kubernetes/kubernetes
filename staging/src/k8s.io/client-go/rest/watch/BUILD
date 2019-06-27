@@ -15,10 +15,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/rest/watch",
     importpath = "k8s.io/client-go/rest/watch",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
     ],
 )
 
@@ -30,15 +30,15 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ],
 )
 

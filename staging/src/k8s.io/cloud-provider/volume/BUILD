@@ -19,8 +19,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/cloud-provider/volume/errors:all-srcs",
-        "//staging/src/k8s.io/cloud-provider/volume/helpers:all-srcs",
+        "/staging/src/k8s.io/cloud-provider/volume/errors:all-srcs",
+        "/staging/src/k8s.io/cloud-provider/volume/helpers:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -18,13 +18,13 @@ compatibility guarantee.
 
 ## Where does it come from?
 
-`cli-runtime` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/cli-runtime.
+`cli-runtime` is synced from https://github.com/kubernetes/kubernetes/blob/masterstaging/src/k8s.io/cli-runtime.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
 
 ## Things you should *NOT* do
 
  1. Add API types to this repo.  This is for the helpers, not for the types.
- 2. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/cli-runtime`.
+ 2. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kubernetesstaging/src/k8s.io/cli-runtime`.
  3. Expect compatibility.  This repo is direct support of Kubernetes and the API isn't yet stable enough for API guarantees.
  4. Add any type that only makes sense only for `kubectl`.

@@ -14,12 +14,12 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis",
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/features:go_default_library",
-            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+            "/staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         ],
         "//conditions:default": [],
     }),

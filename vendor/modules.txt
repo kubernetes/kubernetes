@@ -1018,7 +1018,7 @@ gopkg.in/tomb.v1
 gopkg.in/warnings.v0
 # gopkg.in/yaml.v2 v2.2.2 => gopkg.in/yaml.v2 v2.2.2
 gopkg.in/yaml.v2
-# k8s.io/api v0.0.0 => ./staging/src/k8s.io/api
+# k8s.io/api v0.0.0 => .staging/src/k8s.io/api
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1beta1
 k8s.io/api/apps/v1
@@ -1057,7 +1057,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.0.0 => ./staging/src/k8s.io/apiextensions-apiserver
+# k8s.io/apiextensions-apiserver v0.0.0 => .staging/src/k8s.io/apiextensions-apiserver
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -1100,7 +1100,7 @@ k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor
 k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
 k8s.io/apiextensions-apiserver/test/integration
 k8s.io/apiextensions-apiserver/test/integration/fixtures
-# k8s.io/apimachinery v0.0.0 => ./staging/src/k8s.io/apimachinery
+# k8s.io/apimachinery v0.0.0 => .staging/src/k8s.io/apimachinery
 k8s.io/apimachinery/pkg/api/apitesting
 k8s.io/apimachinery/pkg/api/apitesting/fuzzer
 k8s.io/apimachinery/pkg/api/apitesting/naming
@@ -1171,7 +1171,7 @@ k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.0.0 => ./staging/src/k8s.io/apiserver
+# k8s.io/apiserver v0.0.0 => .staging/src/k8s.io/apiserver
 k8s.io/apiserver/pkg/admission
 k8s.io/apiserver/pkg/admission/configuration
 k8s.io/apiserver/pkg/admission/initializer
@@ -1296,7 +1296,7 @@ k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest
 k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 k8s.io/apiserver/plugin/pkg/authorizer/webhook
-# k8s.io/cli-runtime v0.0.0 => ./staging/src/k8s.io/cli-runtime
+# k8s.io/cli-runtime v0.0.0 => .staging/src/k8s.io/cli-runtime
 k8s.io/cli-runtime/pkg/genericclioptions
 k8s.io/cli-runtime/pkg/kustomize
 k8s.io/cli-runtime/pkg/kustomize/k8sdeps
@@ -1309,7 +1309,7 @@ k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/patch
 k8s.io/cli-runtime/pkg/kustomize/k8sdeps/validator
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
-# k8s.io/client-go v0.0.0 => ./staging/src/k8s.io/client-go
+# k8s.io/client-go v0.0.0 => .staging/src/k8s.io/client-go
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached
 k8s.io/client-go/discovery/cached/disk
@@ -1533,7 +1533,7 @@ k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/retry
 k8s.io/client-go/util/testing
 k8s.io/client-go/util/workqueue
-# k8s.io/cloud-provider v0.0.0 => ./staging/src/k8s.io/cloud-provider
+# k8s.io/cloud-provider v0.0.0 => .staging/src/k8s.io/cloud-provider
 k8s.io/cloud-provider
 k8s.io/cloud-provider/fake
 k8s.io/cloud-provider/node/helpers
@@ -1541,19 +1541,19 @@ k8s.io/cloud-provider/service/helpers
 k8s.io/cloud-provider/volume
 k8s.io/cloud-provider/volume/errors
 k8s.io/cloud-provider/volume/helpers
-# k8s.io/cluster-bootstrap v0.0.0 => ./staging/src/k8s.io/cluster-bootstrap
+# k8s.io/cluster-bootstrap v0.0.0 => .staging/src/k8s.io/cluster-bootstrap
 k8s.io/cluster-bootstrap/token/api
 k8s.io/cluster-bootstrap/token/jws
 k8s.io/cluster-bootstrap/token/util
 k8s.io/cluster-bootstrap/util/secrets
 k8s.io/cluster-bootstrap/util/tokens
-# k8s.io/code-generator v0.0.0 => ./staging/src/k8s.io/code-generator
+# k8s.io/code-generator v0.0.0 => .staging/src/k8s.io/code-generator
 k8s.io/code-generator/cmd/go-to-protobuf
 k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 k8s.io/code-generator/pkg/util
 k8s.io/code-generator/third_party/forked/golang/reflect
-# k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
+# k8s.io/component-base v0.0.0 => .staging/src/k8s.io/component-base
 k8s.io/component-base/cli/flag
 k8s.io/component-base/cli/globalflag
 k8s.io/component-base/config
@@ -1563,11 +1563,11 @@ k8s.io/component-base/featuregate
 k8s.io/component-base/featuregate/testing
 k8s.io/component-base/logs
 k8s.io/component-base/metrics
-# k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
+# k8s.io/cri-api v0.0.0 => .staging/src/k8s.io/cri-api
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
 k8s.io/cri-api/pkg/apis/testing
-# k8s.io/csi-translation-lib v0.0.0 => ./staging/src/k8s.io/csi-translation-lib
+# k8s.io/csi-translation-lib v0.0.0 => .staging/src/k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib
 k8s.io/csi-translation-lib/plugins
 # k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
@@ -1585,7 +1585,7 @@ k8s.io/gengo/types
 k8s.io/heapster/metrics/api/v1/types
 # k8s.io/klog v0.3.1 => k8s.io/klog v0.3.1
 k8s.io/klog
-# k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
+# k8s.io/kube-aggregator v0.0.0 => .staging/src/k8s.io/kube-aggregator
 k8s.io/kube-aggregator/pkg/apis/apiregistration
 k8s.io/kube-aggregator/pkg/apis/apiregistration/install
 k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
@@ -1614,7 +1614,7 @@ k8s.io/kube-aggregator/pkg/controllers/status
 k8s.io/kube-aggregator/pkg/registry/apiservice
 k8s.io/kube-aggregator/pkg/registry/apiservice/etcd
 k8s.io/kube-aggregator/pkg/registry/apiservice/rest
-# k8s.io/kube-controller-manager v0.0.0 => ./staging/src/k8s.io/kube-controller-manager
+# k8s.io/kube-controller-manager v0.0.0 => .staging/src/k8s.io/kube-controller-manager
 k8s.io/kube-controller-manager/config/v1alpha1
 # k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30 => k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
 k8s.io/kube-openapi/cmd/openapi-gen
@@ -1631,15 +1631,17 @@ k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/proto/testing
 k8s.io/kube-openapi/pkg/util/proto/validation
 k8s.io/kube-openapi/pkg/util/sets
-# k8s.io/kube-proxy v0.0.0 => ./staging/src/k8s.io/kube-proxy
+# k8s.io/kube-proxy v0.0.0 => .staging/src/k8s.io/kube-proxy
 k8s.io/kube-proxy/config/v1alpha1
-# k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
+# k8s.io/kube-scheduler v0.0.0 => .staging/src/k8s.io/kube-scheduler
 k8s.io/kube-scheduler/config/v1alpha1
-# k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
+# k8s.io/kubectl v0.0.0 => .staging/src/k8s.io/kubectl
+k8s.io/kubectl/pkg/generated
 k8s.io/kubectl/pkg/util/certificate
 k8s.io/kubectl/pkg/util/deployment
 k8s.io/kubectl/pkg/util/event
 k8s.io/kubectl/pkg/util/hash
+k8s.io/kubectl/pkg/util/i18n
 k8s.io/kubectl/pkg/util/interrupt
 k8s.io/kubectl/pkg/util/podutils
 k8s.io/kubectl/pkg/util/printers
@@ -1649,9 +1651,9 @@ k8s.io/kubectl/pkg/util/resource
 k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
-# k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
+# k8s.io/kubelet v0.0.0 => .staging/src/k8s.io/kubelet
 k8s.io/kubelet/config/v1beta1
-# k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers
+# k8s.io/legacy-cloud-providers v0.0.0 => .staging/src/k8s.io/legacy-cloud-providers
 k8s.io/legacy-cloud-providers/aws
 k8s.io/legacy-cloud-providers/azure
 k8s.io/legacy-cloud-providers/azure/auth
@@ -1660,7 +1662,7 @@ k8s.io/legacy-cloud-providers/vsphere
 k8s.io/legacy-cloud-providers/vsphere/testing
 k8s.io/legacy-cloud-providers/vsphere/vclib
 k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers
-# k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
+# k8s.io/metrics v0.0.0 => .staging/src/k8s.io/metrics
 k8s.io/metrics/pkg/apis/custom_metrics
 k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
 k8s.io/metrics/pkg/apis/custom_metrics/v1beta2
@@ -1683,7 +1685,7 @@ k8s.io/metrics/pkg/client/external_metrics
 k8s.io/metrics/pkg/client/external_metrics/fake
 # k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3 => k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3
 k8s.io/repo-infra/kazel
-# k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
+# k8s.io/sample-apiserver v0.0.0 => .staging/src/k8s.io/sample-apiserver
 k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 k8s.io/sample-apiserver/pkg/admission/wardleinitializer
 k8s.io/sample-apiserver/pkg/apis/wardle

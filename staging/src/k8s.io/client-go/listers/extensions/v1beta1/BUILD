@@ -23,13 +23,13 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/listers/extensions/v1beta1",
     importpath = "k8s.io/client-go/listers/extensions/v1beta1",
     deps = [
-        "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/api/apps/v1beta1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 
@@ -38,12 +38,12 @@ go_test(
     srcs = ["daemonset_expansion_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/cache:go_default_library",
     ],
 )
 

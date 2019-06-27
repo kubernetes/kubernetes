@@ -14,10 +14,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/apis/networking/v1beta1",
     deps = [
         "//pkg/apis/networking:go_default_library",
-        "//staging/src/k8s.io/api/networking/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/api/networking/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

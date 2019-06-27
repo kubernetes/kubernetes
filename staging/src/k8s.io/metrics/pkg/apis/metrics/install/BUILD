@@ -11,10 +11,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/metrics/pkg/apis/metrics/install",
     importpath = "k8s.io/metrics/pkg/apis/metrics/install",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/metrics:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/metrics:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1:go_default_library",
     ],
 )
 

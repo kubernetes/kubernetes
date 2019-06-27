@@ -25,7 +25,6 @@ require (
 	github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
-	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
@@ -433,35 +432,35 @@ replace (
 	gopkg.in/warnings.v0 => gopkg.in/warnings.v0 v0.1.1
 	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.2
 	gotest.tools => gotest.tools v2.2.0+incompatible
-	k8s.io/api => ./staging/src/k8s.io/api
-	k8s.io/apiextensions-apiserver => ./staging/src/k8s.io/apiextensions-apiserver
-	k8s.io/apimachinery => ./staging/src/k8s.io/apimachinery
-	k8s.io/apiserver => ./staging/src/k8s.io/apiserver
-	k8s.io/cli-runtime => ./staging/src/k8s.io/cli-runtime
-	k8s.io/client-go => ./staging/src/k8s.io/client-go
-	k8s.io/cloud-provider => ./staging/src/k8s.io/cloud-provider
-	k8s.io/cluster-bootstrap => ./staging/src/k8s.io/cluster-bootstrap
-	k8s.io/code-generator => ./staging/src/k8s.io/code-generator
-	k8s.io/component-base => ./staging/src/k8s.io/component-base
-	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
-	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
+	k8s.io/api => .staging/src/k8s.io/api
+	k8s.io/apiextensions-apiserver => .staging/src/k8s.io/apiextensions-apiserver
+	k8s.io/apimachinery => .staging/src/k8s.io/apimachinery
+	k8s.io/apiserver => .staging/src/k8s.io/apiserver
+	k8s.io/cli-runtime => .staging/src/k8s.io/cli-runtime
+	k8s.io/client-go => .staging/src/k8s.io/client-go
+	k8s.io/cloud-provider => .staging/src/k8s.io/cloud-provider
+	k8s.io/cluster-bootstrap => .staging/src/k8s.io/cluster-bootstrap
+	k8s.io/code-generator => .staging/src/k8s.io/code-generator
+	k8s.io/component-base => .staging/src/k8s.io/component-base
+	k8s.io/cri-api => .staging/src/k8s.io/cri-api
+	k8s.io/csi-translation-lib => .staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
 	k8s.io/heapster => k8s.io/heapster v1.2.0-beta.1
 	k8s.io/klog => k8s.io/klog v0.3.1
-	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
-	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
+	k8s.io/kube-aggregator => .staging/src/k8s.io/kube-aggregator
+	k8s.io/kube-controller-manager => .staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20190228160746-b3a7cee44a30
-	k8s.io/kube-proxy => ./staging/src/k8s.io/kube-proxy
-	k8s.io/kube-scheduler => ./staging/src/k8s.io/kube-scheduler
-	k8s.io/kubectl => ./staging/src/k8s.io/kubectl
-	k8s.io/kubelet => ./staging/src/k8s.io/kubelet
-	k8s.io/legacy-cloud-providers => ./staging/src/k8s.io/legacy-cloud-providers
-	k8s.io/metrics => ./staging/src/k8s.io/metrics
-	k8s.io/node-api => ./staging/src/k8s.io/node-api
+	k8s.io/kube-proxy => .staging/src/k8s.io/kube-proxy
+	k8s.io/kube-scheduler => .staging/src/k8s.io/kube-scheduler
+	k8s.io/kubectl => .staging/src/k8s.io/kubectl
+	k8s.io/kubelet => .staging/src/k8s.io/kubelet
+	k8s.io/legacy-cloud-providers => .staging/src/k8s.io/legacy-cloud-providers
+	k8s.io/metrics => .staging/src/k8s.io/metrics
+	k8s.io/node-api => .staging/src/k8s.io/node-api
 	k8s.io/repo-infra => k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3
-	k8s.io/sample-apiserver => ./staging/src/k8s.io/sample-apiserver
-	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
-	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
+	k8s.io/sample-apiserver => .staging/src/k8s.io/sample-apiserver
+	k8s.io/sample-cli-plugin => .staging/src/k8s.io/sample-cli-plugin
+	k8s.io/sample-controller => .staging/src/k8s.io/sample-controller
 	k8s.io/utils => k8s.io/utils v0.0.0-20190221042446-c2654d5206da
 	modernc.org/cc => modernc.org/cc v1.0.0
 	modernc.org/golex => modernc.org/golex v1.0.0

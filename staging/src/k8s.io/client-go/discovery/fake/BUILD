@@ -12,12 +12,12 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/discovery/fake",
     importpath = "k8s.io/client-go/discovery/fake",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//staging/src/k8s.io/client-go/pkg/version:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
+        "/staging/src/k8s.io/client-go/pkg/version:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/client-go/testing:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
     ],
 )
@@ -40,7 +40,7 @@ go_test(
     srcs = ["discovery_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )

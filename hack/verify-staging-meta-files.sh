@@ -34,12 +34,12 @@ exceptions=(
 )
 
 RESULT=0
-for full_repo_path in "${KUBE_ROOT}"/staging/src/k8s.io/*; do
+for full_repo_path in "${KUBE_ROOT}"staging/src/k8s.io/*; do
   repo=$(basename "${full_repo_path}")
   for filename in "${expected_filenames[@]}"; do
     if echo " ${exceptions[*]} " | grep -F " ${repo}/${filename} " >/dev/null; then
       continue
-    elif [ ! -f "${KUBE_ROOT}/staging/src/k8s.io/${repo}/${filename}" ]; then
+    elif [ ! -f "${KUBE_ROOT}staging/src/k8s.io/${repo}/${filename}" ]; then
       echo "staging/src/k8s.io/${repo}/${filename} does not exist and must be created"
       RESULT=1
     fi

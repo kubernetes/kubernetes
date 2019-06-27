@@ -11,7 +11,7 @@ load(
 )
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
-load("//staging:repos_generated.bzl", "staging_repos")
+load("/staging:repos_generated.bzl", "staging_repos")
 
 # Bazel doesn't make the output filename
 # (such as kubernetes-server-{OS}-{ARCH}.tar.gz) configurable, so we instead
@@ -63,7 +63,7 @@ pkg_tar(
     package_dir = "kubernetes",
     strip_prefix = "//",
     symlinks = {
-        "kubernetes/vendor/%s" % repo: "../../staging/src/%s" % repo
+        "kubernetes/vendor/%s" % repo: "../..staging/src/%s" % repo
         for repo in staging_repos
     },
     tags = [

@@ -7,8 +7,8 @@ go_library(
     importpath = "k8s.io/client-go/discovery/cached",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/client-go/discovery:go_default_library",
-        "//staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
+        "/staging/src/k8s.io/client-go/discovery:go_default_library",
+        "/staging/src/k8s.io/client-go/discovery/cached/memory:go_default_library",
     ],
 )
 
@@ -23,8 +23,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/discovery/cached/disk:all-srcs",
-        "//staging/src/k8s.io/client-go/discovery/cached/memory:all-srcs",
+        "/staging/src/k8s.io/client-go/discovery/cached/disk:all-srcs",
+        "/staging/src/k8s.io/client-go/discovery/cached/memory:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

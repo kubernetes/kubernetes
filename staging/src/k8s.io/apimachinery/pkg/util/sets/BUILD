@@ -44,7 +44,7 @@ $(location //vendor/k8s.io/code-generator/cmd/set-gen) \
     --output-package sets
     """,
     go_deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets/types:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets/types:go_default_library",
     ],
     tools = [
         "//vendor/k8s.io/code-generator/cmd/set-gen",
@@ -68,7 +68,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets/types:all-srcs",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets/types:all-srcs",
     ],
     tags = ["automanaged"],
 )

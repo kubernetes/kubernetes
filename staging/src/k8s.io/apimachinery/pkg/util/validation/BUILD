@@ -10,7 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
 )
 
 go_library(
@@ -18,7 +18,7 @@ go_library(
     srcs = ["validation.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/validation",
     importpath = "k8s.io/apimachinery/pkg/util/validation",
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library"],
 )
 
 filegroup(
@@ -32,7 +32,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:all-srcs",
+        "/staging/src/k8s.io/apimachinery/pkg/util/validation/field:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -14,10 +14,10 @@ go_library(
     ],
     deps = [
         "//pkg/cloudprovider/providers/openstack:go_default_library",
-        "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
-        "//staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
-        "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
-        "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
+        "/staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
+        "/staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
+        "/staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
+        "/staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
     ],
 )
 
@@ -41,5 +41,5 @@ go_test(
     name = "go_default_test",
     srcs = ["providers_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/legacy-cloud-providers/vsphere/testing:go_default_library"],
+    deps = ["/staging/src/k8s.io/legacy-cloud-providers/vsphere/testing:go_default_library"],
 )

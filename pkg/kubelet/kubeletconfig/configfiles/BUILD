@@ -15,7 +15,7 @@ go_library(
         "//pkg/kubelet/apis/config/scheme:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/util/filesystem:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
     ],
 )
 
@@ -42,7 +42,7 @@ go_test(
         "//pkg/kubelet/kubeletconfig/util/files:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/test:go_default_library",
         "//pkg/util/filesystem:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
-        "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "/staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
     ],
 )

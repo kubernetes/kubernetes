@@ -17,7 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs/testing",
     deps = [
         "//pkg/util/ipset:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 
@@ -38,5 +38,5 @@ go_test(
     name = "go_default_test",
     srcs = ["fake_test.go"],
     embed = [":go_default_library"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )

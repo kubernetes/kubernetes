@@ -25,7 +25,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/fields",
     importpath = "k8s.io/apimachinery/pkg/fields",
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/selection:go_default_library"],
 )
 
 filegroup(

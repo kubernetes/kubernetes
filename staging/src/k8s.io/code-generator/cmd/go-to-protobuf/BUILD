@@ -17,7 +17,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/go-to-protobuf",
     importpath = "k8s.io/code-generator/cmd/go-to-protobuf",
     deps = [
-        "//staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf:go_default_library",
+        "/staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
@@ -33,8 +33,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf:all-srcs",
-        "//staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo:all-srcs",
+        "/staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protobuf:all-srcs",
+        "/staging/src/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo:all-srcs",
     ],
     tags = ["automanaged"],
 )

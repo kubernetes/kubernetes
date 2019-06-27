@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/util/prometheusclientgo/leaderelection",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )

@@ -11,10 +11,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd/testing",
     importpath = "k8s.io/apiserver/pkg/storage/etcd/testing",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver:go_default_library",
@@ -39,7 +39,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert:all-srcs",
+        "/staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert:all-srcs",
     ],
     tags = ["automanaged"],
 )

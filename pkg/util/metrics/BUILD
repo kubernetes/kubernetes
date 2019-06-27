@@ -11,7 +11,7 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/pkg/util/metrics",
     deps = [
-        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "/staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
@@ -21,7 +21,7 @@ go_test(
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "/staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 

@@ -5,7 +5,7 @@ go_library(
     srcs = ["data.go"],
     importpath = "k8s.io/kubernetes/pkg/master/storageversionhashdata",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )
 
 filegroup(

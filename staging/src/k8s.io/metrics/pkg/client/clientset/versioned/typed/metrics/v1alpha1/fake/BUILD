@@ -12,14 +12,14 @@ go_library(
     importpath = "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/client-go/testing:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1alpha1:go_default_library",
     ],
 )
 

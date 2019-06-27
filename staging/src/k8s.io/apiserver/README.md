@@ -19,12 +19,12 @@ compatibility guarantee. We have a goal to make this easier to use in the future
 
 ## Where does it come from?
 
-`apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver.
+`apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/masterstaging/src/k8s.io/apiserver.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
 
 ## Things you should *NOT* do
 
- 1. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/apiserver`.
+ 1. Directly modify any files under `pkg` in this repo.  Those are driven from `k8s.io/kubernetesstaging/src/k8s.io/apiserver`.
  2. Expect compatibility.  This repo is changing quickly in direct support of
     Kubernetes and the API isn't yet stable enough for API guarantees.

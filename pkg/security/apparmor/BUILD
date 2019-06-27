@@ -18,8 +18,8 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
     ],
 )
@@ -32,8 +32,8 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

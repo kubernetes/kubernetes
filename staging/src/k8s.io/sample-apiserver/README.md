@@ -21,7 +21,7 @@ HEAD of this repo will match HEAD of k8s.io/apiserver, k8s.io/apimachinery, and 
 
 ## Where does it come from?
 
-`sample-apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/sample-apiserver.
+`sample-apiserver` is synced from https://github.com/kubernetes/kubernetes/blob/masterstaging/src/k8s.io/sample-apiserver.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
 ## Fetch sample-apiserver and its dependencies
@@ -62,7 +62,7 @@ popdulate the `vendor` directory.
 If you are developing Kubernetes according to
 https://github.com/kubernetes/community/blob/master/contributors/guide/github-workflow.md
 then you already have a copy of this demo in
-`kubernetes/staging/src/k8s.io/sample-apiserver` and its dependencies
+`kubernetesstaging/src/k8s.io/sample-apiserver` and its dependencies
 --- including the code generator --- are in usable locations.
 
 

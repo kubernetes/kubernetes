@@ -11,8 +11,8 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/certs",
     deps = [
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",
-        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
-        "//staging/src/k8s.io/client-go/util/keyutil:go_default_library",
+        "/staging/src/k8s.io/client-go/util/cert:go_default_library",
+        "/staging/src/k8s.io/client-go/util/keyutil:go_default_library",
     ],
 )
 

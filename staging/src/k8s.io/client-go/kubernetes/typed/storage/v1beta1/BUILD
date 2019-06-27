@@ -19,12 +19,12 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/kubernetes/typed/storage/v1beta1",
     importpath = "k8s.io/client-go/kubernetes/typed/storage/v1beta1",
     deps = [
-        "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
-        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/api/storage/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 
@@ -39,7 +39,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake:all-srcs",
+        "/staging/src/k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake:all-srcs",
     ],
     tags = ["automanaged"],
 )

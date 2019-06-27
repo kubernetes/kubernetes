@@ -11,7 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src:all-srcs",
+        "/staging/src:all-srcs",
     ],
     tags = ["automanaged"],
 )

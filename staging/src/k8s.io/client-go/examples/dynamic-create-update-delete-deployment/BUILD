@@ -7,14 +7,14 @@ go_library(
     importpath = "k8s.io/client-go/examples/dynamic-create-update-delete-deployment",
     visibility = ["//visibility:private"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/client-go/dynamic:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//staging/src/k8s.io/client-go/util/homedir:go_default_library",
-        "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/client-go/dynamic:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/clientcmd:go_default_library",
+        "/staging/src/k8s.io/client-go/util/homedir:go_default_library",
+        "/staging/src/k8s.io/client-go/util/retry:go_default_library",
     ],
 )
 

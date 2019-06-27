@@ -18,12 +18,12 @@ were previously in `k8s.io/kubernetes/pkg/cloudprovider/providers`.
 
 ## Where does it come from?
 
-`legacy-cloud-providers` is synced from https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/legacy-cloud-providers.
+`legacy-cloud-providers` is synced from https://github.com/kubernetes/kubernetes/blob/masterstaging/src/k8s.io/legacy-cloud-providers.
 Code changes are made in that location, merged into `k8s.io/kubernetes` and later synced here.
 
 ## Things you should NOT do
 
  1. Add a new cloud provider here.
- 2. Directly modify anything under this repo. Those are driven from `k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers`.
+ 2. Directly modify anything under this repo. Those are driven from `k8s.io/kubernetesstaging/src/k8s.io/legacy-cloud-providers`.
     sig-cloudprovider.
  3. Add new features/integrations to a cloud provider in this repo. Changes sync here should only be incremental bug fixes.

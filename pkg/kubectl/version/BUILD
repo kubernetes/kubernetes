@@ -8,7 +8,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/version",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/version:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/version:go_default_library"],
 )
 
 filegroup(

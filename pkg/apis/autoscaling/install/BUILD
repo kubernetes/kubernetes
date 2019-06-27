@@ -11,8 +11,8 @@ go_library(
         "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/autoscaling/v2beta1:go_default_library",
         "//pkg/apis/autoscaling/v2beta2:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

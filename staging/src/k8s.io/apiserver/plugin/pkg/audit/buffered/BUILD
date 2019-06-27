@@ -10,11 +10,11 @@ go_library(
     importpath = "k8s.io/apiserver/plugin/pkg/audit/buffered",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
-        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
+        "/staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
     ],
 )
 
@@ -23,9 +23,9 @@ go_test(
     srcs = ["buffered_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/audit/fake:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "/staging/src/k8s.io/apiserver/plugin/pkg/audit/fake:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],

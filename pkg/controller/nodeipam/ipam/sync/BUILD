@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/controller/nodeipam/ipam/cidrset:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -19,8 +19,8 @@ go_test(
     deps = [
         "//pkg/controller/nodeipam/ipam/cidrset:go_default_library",
         "//pkg/controller/nodeipam/ipam/test:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

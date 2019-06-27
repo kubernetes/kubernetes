@@ -12,8 +12,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/scheduling:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
     ],
 )
 
@@ -27,7 +27,7 @@ go_library(
     deps = [
         "//pkg/apis/core/v1/helper/qos:go_default_library",
         "//pkg/kubelet/types:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
     ],
 )
 

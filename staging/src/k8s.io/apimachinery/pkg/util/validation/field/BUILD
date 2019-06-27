@@ -24,8 +24,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/pkg/util/validation/field",
     importpath = "k8s.io/apimachinery/pkg/util/validation/field",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )
 

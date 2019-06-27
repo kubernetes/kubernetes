@@ -6,11 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/audit-proxy",
     visibility = ["//visibility:private"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit/install:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/audit:go_default_library",
     ],
 )
 

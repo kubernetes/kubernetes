@@ -11,8 +11,8 @@ go_library(
     srcs = ["features.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/features",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
-        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
+        "/staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
@@ -36,6 +36,6 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
-        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "/staging/src/k8s.io/component-base/featuregate:go_default_library",
     ],
 )

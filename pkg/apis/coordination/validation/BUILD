@@ -7,8 +7,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/coordination:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 
@@ -18,8 +18,8 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/coordination:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

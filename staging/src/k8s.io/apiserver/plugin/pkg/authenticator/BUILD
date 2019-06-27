@@ -23,11 +23,11 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password:all-srcs",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth:all-srcs",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc:all-srcs",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:all-srcs",
-        "//staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:all-srcs",
+        "/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/password:all-srcs",
+        "/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/request/basicauth:all-srcs",
+        "/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc:all-srcs",
+        "/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest:all-srcs",
+        "/staging/src/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook:all-srcs",
     ],
     tags = ["automanaged"],
 )

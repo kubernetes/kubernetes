@@ -13,10 +13,10 @@ go_library(
     deps = [
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
-        "//staging/src/k8s.io/api/apps/v1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/api/apps/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/policy/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
     ],
 )
 

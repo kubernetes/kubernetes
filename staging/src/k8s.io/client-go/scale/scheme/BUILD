@@ -12,10 +12,10 @@ go_library(
     importpath = "k8s.io/client-go/scale/scheme",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/api/autoscaling/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -30,12 +30,12 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/appsint:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta1:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta2:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/extensionsint:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1:all-srcs",
+        "/staging/src/k8s.io/client-go/scale/scheme/appsint:all-srcs",
+        "/staging/src/k8s.io/client-go/scale/scheme/appsv1beta1:all-srcs",
+        "/staging/src/k8s.io/client-go/scale/scheme/appsv1beta2:all-srcs",
+        "/staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:all-srcs",
+        "/staging/src/k8s.io/client-go/scale/scheme/extensionsint:all-srcs",
+        "/staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

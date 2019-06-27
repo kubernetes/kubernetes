@@ -11,9 +11,9 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/transport/spdy",
     importpath = "k8s.io/client-go/transport/spdy",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/httpstream:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

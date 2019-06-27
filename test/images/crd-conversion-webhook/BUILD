@@ -9,8 +9,8 @@ go_library(
     importpath = "k8s.io/kubernetes/test/images/crd-conversion-webhook",
     visibility = ["//visibility:private"],
     deps = [
-        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
         "//test/images/crd-conversion-webhook/converter:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

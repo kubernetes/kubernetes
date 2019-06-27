@@ -7,8 +7,8 @@ go_library(
     importpath = "k8s.io/cluster-bootstrap/token/util",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-        "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "/staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
     ],
 )
 

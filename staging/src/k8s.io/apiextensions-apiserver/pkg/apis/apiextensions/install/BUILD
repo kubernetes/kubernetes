@@ -11,8 +11,8 @@ go_test(
     srcs = ["roundtrip_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
+        "/staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
     ],
 )
 
@@ -22,10 +22,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install",
     importpath = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install",
     deps = [
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "/staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
     ],
 )
 

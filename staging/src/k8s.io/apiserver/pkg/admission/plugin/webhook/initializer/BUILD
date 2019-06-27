@@ -7,8 +7,8 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/admission/plugin/webhook/initializer",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
     ],
 )
 
@@ -17,8 +17,8 @@ go_test(
     srcs = ["initializer_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
     ],
 )
 

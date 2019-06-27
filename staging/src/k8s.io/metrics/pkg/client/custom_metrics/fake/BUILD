@@ -7,12 +7,12 @@ go_library(
     importpath = "k8s.io/metrics/pkg/client/custom_metrics/fake",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/client-go/testing:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
-        "//staging/src/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/client-go/testing:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
+        "/staging/src/k8s.io/metrics/pkg/client/custom_metrics:go_default_library",
     ],
 )
 

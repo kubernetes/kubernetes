@@ -19,8 +19,8 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
         "//pkg/security/podsecuritypolicy/util:go_default_library",
-        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "/staging/src/k8s.io/api/policy/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 
@@ -34,8 +34,8 @@ go_test(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/policy/v1beta1:go_default_library",
     ],
 )
 

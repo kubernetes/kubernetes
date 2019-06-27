@@ -6,7 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cluster-bootstrap/util/tokens",
     importpath = "k8s.io/cluster-bootstrap/util/tokens",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library"],
+    deps = ["/staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library"],
 )
 
 filegroup(

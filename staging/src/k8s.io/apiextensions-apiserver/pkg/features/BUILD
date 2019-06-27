@@ -11,8 +11,8 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/pkg/features",
     importpath = "k8s.io/apiextensions-apiserver/pkg/features",
     deps = [
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "/staging/src/k8s.io/component-base/featuregate:go_default_library",
     ],
 )
 

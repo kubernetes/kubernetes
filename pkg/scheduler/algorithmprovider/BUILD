@@ -20,8 +20,8 @@ go_test(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
-        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "/staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
     ],
 )
 

@@ -12,12 +12,12 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/apis/audit/install",
     importpath = "k8s.io/apiserver/pkg/apis/audit/install",
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit/v1:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
     ],
 )
 
@@ -39,7 +39,7 @@ go_test(
     srcs = ["roundtrip_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/apis/audit/fuzzer:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/apitesting/roundtrip:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/apis/audit/fuzzer:go_default_library",
     ],
 )

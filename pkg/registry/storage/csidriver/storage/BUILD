@@ -8,9 +8,9 @@ go_library(
     deps = [
         "//pkg/apis/storage:go_default_library",
         "//pkg/registry/storage/csidriver:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
     ],
 )
 
@@ -35,12 +35,12 @@ go_test(
     deps = [
         "//pkg/apis/storage:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
     ],
 )

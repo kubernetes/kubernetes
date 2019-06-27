@@ -13,7 +13,7 @@ go_library(
         "//pkg/quota/v1:go_default_library",
         "//pkg/quota/v1/evaluator/core:go_default_library",
         "//pkg/quota/v1/generic:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 

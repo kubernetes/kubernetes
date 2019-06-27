@@ -93,7 +93,7 @@ func TestHandleCrashLog(t *testing.T) {
 	// ...] Observed a panic: test panic
 	// goroutine 6 [running]:
 	// command-line-arguments.logPanic(0x..., 0x...)
-	// 	.../src/k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/runtime/runtime.go:69 +0x...
+	// 	.../src/k8s.io/kubernetesstaging/src/k8s.io/apimachinery/pkg/util/runtime/runtime.go:69 +0x...
 	lines := strings.Split(log, "\n")
 	if len(lines) < 4 {
 		t.Fatalf("panic log should have 1 line of message, 1 line per goroutine and 2 lines per function call")

@@ -10,7 +10,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/component-base/config",
     importpath = "k8s.io/component-base/config",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 filegroup(
@@ -24,8 +24,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/component-base/config/v1alpha1:all-srcs",
-        "//staging/src/k8s.io/component-base/config/validation:all-srcs",
+        "/staging/src/k8s.io/component-base/config/v1alpha1:all-srcs",
+        "/staging/src/k8s.io/component-base/config/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -25,7 +25,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/legacy-cloud-providers/vsphere/vclib",
     importpath = "k8s.io/legacy-cloud-providers/vsphere/vclib",
     deps = [
-        "//staging/src/k8s.io/client-go/pkg/version:go_default_library",
+        "/staging/src/k8s.io/client-go/pkg/version:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/vmware/govmomi/find:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
@@ -53,8 +53,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers:all-srcs",
-        "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures:all-srcs",
+        "/staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/diskmanagers:all-srcs",
+        "/staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures:all-srcs",
     ],
     tags = ["automanaged"],
 )
@@ -71,7 +71,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures:go_default_library",
+        "/staging/src/k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures:go_default_library",
         "//vendor/github.com/vmware/govmomi:go_default_library",
         "//vendor/github.com/vmware/govmomi/object:go_default_library",
         "//vendor/github.com/vmware/govmomi/simulator:go_default_library",

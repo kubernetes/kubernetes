@@ -13,7 +13,7 @@ go_library(
     deps = [
         "//pkg/kubelet/cm/topologymanager/socketmask:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
     ],
 )
 

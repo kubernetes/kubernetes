@@ -6,7 +6,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/volume/errors",
     importpath = "k8s.io/cloud-provider/volume/errors",
     visibility = ["//visibility:public"],
-    deps = ["//staging/src/k8s.io/apimachinery/pkg/types:go_default_library"],
+    deps = ["/staging/src/k8s.io/apimachinery/pkg/types:go_default_library"],
 )
 
 filegroup(

@@ -14,10 +14,10 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
     importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset",
     deps = [
-        "//staging/src/k8s.io/client-go/discovery:go_default_library",
-        "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
+        "/staging/src/k8s.io/client-go/discovery:go_default_library",
+        "/staging/src/k8s.io/client-go/rest:go_default_library",
+        "/staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:go_default_library",
     ],
 )
 
@@ -32,9 +32,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme:all-srcs",
-        "//staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme:all-srcs",
+        "/staging/src/k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion:all-srcs",
     ],
     tags = ["automanaged"],
 )

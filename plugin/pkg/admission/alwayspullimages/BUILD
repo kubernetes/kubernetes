@@ -13,10 +13,10 @@ go_library(
     deps = [
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/pods:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )
 
@@ -26,10 +26,10 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/admission/testing:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
+        "/staging/src/k8s.io/apiserver/pkg/admission/testing:go_default_library",
     ],
 )
 

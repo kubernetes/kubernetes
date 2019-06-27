@@ -12,7 +12,7 @@ go_library(
         "//pkg/kubelet/apis/pluginregistration/v1:go_default_library",
         "//pkg/kubelet/pluginmanager/cache:go_default_library",
         "//pkg/util/goroutinemap:go_default_library",
-        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "/staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],

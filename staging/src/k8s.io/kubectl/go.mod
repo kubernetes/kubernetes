@@ -7,6 +7,7 @@ go 1.12
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
+	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/mitchellh/go-wordwrap v1.0.0
@@ -20,6 +21,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
+	k8s.io/klog v0.3.1
 	k8s.io/utils v0.0.0-20190221042446-c2654d5206da
 )
 

@@ -16,10 +16,10 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/util",
     visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
@@ -67,7 +67,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/util/fieldpath:all-srcs",
-        "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
     ],
@@ -84,7 +83,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "/staging/src/k8s.io/api/core/v1:go_default_library",
+        "/staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )
