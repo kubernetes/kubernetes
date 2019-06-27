@@ -68,13 +68,13 @@ import (
 	"k8s.io/kubectl/pkg/util/certificate"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
 	"k8s.io/kubectl/pkg/util/event"
+	"k8s.io/kubectl/pkg/util/fieldpath"
 	"k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/kubectl/pkg/util/rbac"
 	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/fieldpath"
 	"k8s.io/kubernetes/pkg/kubectl/util/slice"
 )
 

@@ -12,6 +12,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/util/certificate:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/deployment:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/event:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/util/fieldpath:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/hash:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/interrupt:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/podutils:all-srcs",
