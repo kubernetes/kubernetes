@@ -209,6 +209,8 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 
 	trace.Step("Computing predicates")
 	startPredicateEvalTime := time.Now()
+
+	// meta will be used for predicate and priority for all nodes
 	meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
 	filteredNodes, failedPredicateMap, err := g.findNodesThatFit(meta, pod, nodes)
 	if err != nil {

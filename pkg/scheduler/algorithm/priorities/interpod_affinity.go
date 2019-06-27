@@ -17,14 +17,9 @@ limitations under the License.
 package priorities
 
 import (
-	"sync"
-	"sync/atomic"
-
 	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -56,57 +51,6 @@ func NewInterPodAffinityPriority(
 		topologyInfo:          topologyInfo,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
-}
-
-type podAffinityPriorityMap struct {
-	sync.Mutex
-
-	// nodes contain all nodes that should be considered
-	nodes []*v1.Node
-	// counts store the mapping from node name to so-far computed score of
-	// the node.
-	counts map[string]*int64
-	// The first error that we faced.
-	firstError error
-}
-
-func newPodAffinityPriorityMap(nodes []*v1.Node) *podAffinityPriorityMap {
-	return &podAffinityPriorityMap{
-		nodes:  nodes,
-		counts: make(map[string]*int64, len(nodes)),
-	}
-}
-
-func (p *podAffinityPriorityMap) setError(err error) {
-	p.Lock()
-	defer p.Unlock()
-	if p.firstError == nil {
-		p.firstError = err
-	}
-}
-
-func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, weight int64) {
-	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(podDefiningAffinityTerm, term)
-	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-	if err != nil {
-		p.setError(err)
-		return
-	}
-	match := priorityutil.PodMatchesTermsNamespaceAndSelector(podToCheck, namespaces, selector)
-	if match {
-		for _, node := range p.nodes {
-			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
-				atomic.AddInt64(p.counts[node.Name], weight)
-			}
-		}
-	}
-}
-
-func (p *podAffinityPriorityMap) processTerms(terms []v1.WeightedPodAffinityTerm, podDefiningAffinityTerm, podToCheck *v1.Pod, fixedNode *v1.Node, multiplier int) {
-	for i := range terms {
-		term := &terms[i]
-		p.processTerm(&term.PodAffinityTerm, podDefiningAffinityTerm, podToCheck, fixedNode, int64(term.Weight*int32(multiplier)))
-	}
 }
 
 // CalculateInterPodAffinityPriority compute a sum by iterating through the elements of weightedPodAffinityTerm and adding

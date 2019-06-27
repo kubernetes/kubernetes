@@ -66,6 +66,7 @@ type topologyPairsMaps struct {
 	podToTopologyPairs map[string]topologyPairSet
 }
 
+// pairsMaps keeps the mapping from topologyPair to score
 type pairsMaps struct {
 	pairToScore map[internalcache.TopologyPair]*int64
 }
@@ -146,21 +147,23 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	if pod == nil {
 		return nil
 	}
-	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
+	// existingPodPredicateAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
+	// existingPodPriorityAffinityMap will be used later to calculate priority score on existing pods' anti-affinity and affinity
 	existingPodPredicateAntiAffinityMap, existingPodPriorityAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, nodeNameToInfoMap, pfactory.hardPodAffinityWeight, pfactory.topologyInfo)
 	if err != nil {
 		return nil
 	}
 	// incomingPodAffinityMap will be used later for efficient check on incoming pod's affinity
 	// incomingPodAntiAffinityMap will be used later for efficient check on incoming pod's anti-affinity
+	// incomingPodPriorityAffinityMap will be used later to calculate priority score on incoming pods' anti-affinity and affinity
 	incomingPodPredicateAffinityMap, incomingPodPredicateAntiAffinityMap, incomingPodPriorityAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, nodeNameToInfoMap, pfactory.topologyInfo)
 	if err != nil {
 		klog.Errorf("[predicate meta data generation] error finding pods that match affinity terms: %v", err)
 		return nil
 	}
 
+	// use existingPodPriorityAffinityMap and incomingPodPriorityAffinityMap to calculate priority score for each node
 	nodeScore := make(map[string]int64, len(nodeNameToInfoMap))
-
 	for pair, value := range existingPodPriorityAffinityMap.pairToScore {
 		if nodeSet, ok := pfactory.topologyInfo[pair]; ok {
 			for name := range nodeSet {
@@ -419,8 +422,8 @@ func podMatchesAnyAffinityTermProperties(pod *v1.Pod, properties []*affinityTerm
 // getTPMapMatchingExistingAntiAffinity calculates the following for each existing pod on each node:
 // (1) Whether it has PodAntiAffinity
 // (2) Whether any AffinityTerm matches the incoming pod
+// (3) How it effects priority score
 func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo, hardPodAffinityWeight int32, topologyInfo internalcache.NodeTopologyInfo) (*topologyPairsMaps, *pairsMaps, error) {
-	//return existingPodPredicateAntiAffinityMap, existingPodPriorityAffinityMap
 	allNodeNames := make([]string, 0, len(nodeInfoMap))
 	for name := range nodeInfoMap {
 		allNodeNames = append(allNodeNames, name)
@@ -561,6 +564,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 // It returns a topologyPairsMaps that are checked later by the affinity
 // predicate. With this topologyPairsMaps available, the affinity predicate does not
 // need to check all the pods in the cluster.
+// It also returns a pairsMaps to show how the given "pod" effects the priority score for each node.
 func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo, topologyInfo internalcache.NodeTopologyInfo) (topologyPairsAffinityPodsMaps, topologyPairsAntiAffinityPodsMaps *topologyPairsMaps, priorityTopologyMaps *pairsMaps, err error) {
 	affinity := pod.Spec.Affinity
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
@@ -665,7 +669,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 				}
 			}
 
-			// prioTopologyPairsAffinityPodsMaps
+			// affinity
 			for _, term := range preferredAffinityTerms {
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
 				selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
@@ -682,7 +686,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 
 			}
 
-			// prioTopologyPairsAntiAffinityPodsMaps
+			// antiAffinity
 			for _, term := range preferredAntiAffinityTerms {
 				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term.PodAffinityTerm)
 				selector, err := metav1.LabelSelectorAsSelector(term.PodAffinityTerm.LabelSelector)
