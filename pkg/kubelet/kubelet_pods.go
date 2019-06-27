@@ -515,7 +515,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string, enableServiceLinks bool) (map[
 		service := services[i]
 		// ignore services where ClusterIP is "None" or empty.
 		// Exception is made for the master service, which can be of type "ExternalName".
-		if !kl.filterService(service) {
+		if !kl.validateService(service) {
 			continue
 		}
 		serviceName := service.Name
@@ -549,11 +549,11 @@ func (kl *Kubelet) isMasterService(svc *v1.Service) bool {
 	return svc.Namespace == kl.masterServiceNamespace && masterService == svc.Name
 }
 
-// filterService returns true for a service if
+// validateService returns true for a service if
 // its ClusterIP is not "None" or empty
 // OR
 // it's the master service AND its ExternalName is not empty.
-func (kl *Kubelet) filterService(svc *v1.Service) bool {
+func (kl *Kubelet) validateService(svc *v1.Service) bool {
 	return v1helper.IsServiceIPSet(svc) ||
 		(kl.isMasterService(svc) && svc.Spec.Type == v1.ServiceTypeExternalName && svc.Spec.ExternalName != "")
 }

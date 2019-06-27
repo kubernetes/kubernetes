@@ -1798,7 +1798,7 @@ func TestIsMasterService(t *testing.T) {
 	}
 }
 
-func TestFilterService(t *testing.T) {
+func TestValidateService(t *testing.T) {
 	tcc := []struct {
 		testName      string
 		clusterIPSet  bool
@@ -1858,7 +1858,7 @@ func TestFilterService(t *testing.T) {
 			}
 
 			kl := Kubelet{masterServiceNamespace: masterNamespace}
-			isMaster := kl.filterService(svc)
+			isMaster := kl.validateService(svc)
 
 			assert.Equal(t, tc.expected, isMaster)
 		})
