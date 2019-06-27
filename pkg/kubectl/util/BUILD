@@ -67,7 +67,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubectl/util/fieldpath:all-srcs",
-        "//pkg/kubectl/util/i18n:all-srcs",
         "//pkg/kubectl/util/logs:all-srcs",
         "//pkg/kubectl/util/slice:all-srcs",
     ],

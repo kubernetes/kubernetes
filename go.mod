@@ -25,7 +25,6 @@ require (
 	github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
-	github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 	github.com/client9/misspell v0.3.4
 	github.com/cloudflare/cfssl v0.0.0-20180726162950-56268a613adf
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313

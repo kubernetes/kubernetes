@@ -40,6 +40,7 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -52,7 +53,6 @@ import (
 	generateversioned "k8s.io/kubernetes/pkg/kubectl/generate/versioned"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	uexec "k8s.io/utils/exec"
 )
 

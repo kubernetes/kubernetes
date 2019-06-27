@@ -111,7 +111,6 @@ filegroup(
         "//pkg/kubectl/drain:all-srcs",
         "//pkg/kubectl/explain:all-srcs",
         "//pkg/kubectl/generate:all-srcs",
-        "//pkg/kubectl/generated:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
         "//pkg/kubectl/polymorphichelpers:all-srcs",
         "//pkg/kubectl/proxy:all-srcs",
