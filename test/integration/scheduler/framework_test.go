@@ -21,57 +21,46 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-// TesterPlugin is common ancestor for a test plugin that allows injection of
-// failures and some other test functionalities.
-type TesterPlugin struct {
-	numPrefilterCalled  int
-	numReserveCalled    int
-	numPrebindCalled    int
-	numPostbindCalled   int
-	numUnreserveCalled  int
-	failPrefilter       bool
-	rejectPrefilter     bool
-	failReserve         bool
-	failPrebind         bool
-	rejectPrebind       bool
+type PrefilterPlugin struct {
+	numPrefilterCalled int
+	failPrefilter      bool
+	rejectPrefilter    bool
+}
+
+type ReservePlugin struct {
+	numReserveCalled int
+	failReserve      bool
+}
+
+type PrebindPlugin struct {
+	numPrebindCalled int
+	failPrebind      bool
+	rejectPrebind    bool
+}
+
+type PostbindPlugin struct {
+	numPostbindCalled int
+}
+
+type UnreservePlugin struct {
+	numUnreserveCalled int
+}
+
+type PermitPlugin struct {
 	numPermitCalled     int
 	failPermit          bool
 	rejectPermit        bool
 	timeoutPermit       bool
 	waitAndRejectPermit bool
 	waitAndAllowPermit  bool
-}
-
-type PrefilterPlugin struct {
-	TesterPlugin
-}
-
-type ReservePlugin struct {
-	TesterPlugin
-}
-
-type PrebindPlugin struct {
-	TesterPlugin
-}
-
-type PostbindPlugin struct {
-	TesterPlugin
-}
-
-type UnreservePlugin struct {
-	TesterPlugin
-}
-
-type PermitPlugin struct {
-	TesterPlugin
-	fh framework.FrameworkHandle
+	fh                  framework.FrameworkHandle
 }
 
 const (
@@ -107,6 +96,11 @@ func (rp *ReservePlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeN
 	return nil
 }
 
+// reset used to reset reserve plugin.
+func (rp *ReservePlugin) reset() {
+	rp.numReserveCalled = 0
+}
+
 // NewReservePlugin is the factory for reserve plugin.
 func NewReservePlugin(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 	return resPlugin, nil
@@ -131,9 +125,11 @@ func (pp *PrebindPlugin) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeN
 	return nil
 }
 
-// reset used to reset numPrebindCalled.
+// reset used to reset prebind plugin.
 func (pp *PrebindPlugin) reset() {
 	pp.numPrebindCalled = 0
+	pp.failPrebind = false
+	pp.rejectPrebind = false
 }
 
 // NewPrebindPlugin is the factory for prebind plugin.
@@ -153,7 +149,7 @@ func (pp *PostbindPlugin) Postbind(pc *framework.PluginContext, pod *v1.Pod, nod
 	pp.numPostbindCalled++
 }
 
-// reset used to reset numPostbindCalled.
+// reset used to reset postbind plugin.
 func (pp *PostbindPlugin) reset() {
 	pp.numPostbindCalled = 0
 }
@@ -180,6 +176,13 @@ func (pp *PrefilterPlugin) Prefilter(pc *framework.PluginContext, pod *v1.Pod) *
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name))
 	}
 	return nil
+}
+
+// reset used to reset prefilter plugin.
+func (pp *PrefilterPlugin) reset() {
+	pp.numPrefilterCalled = 0
+	pp.failPrefilter = false
+	pp.rejectPrefilter = false
 }
 
 // NewPrebindPlugin is the factory for prebind plugin.
@@ -251,6 +254,16 @@ func (pp *PermitPlugin) Permit(pc *framework.PluginContext, pod *v1.Pod, nodeNam
 		}
 	}
 	return nil, 0
+}
+
+// reset used to reset permit plugin.
+func (pp *PermitPlugin) reset() {
+	pp.numPermitCalled = 0
+	pp.failPermit = false
+	pp.rejectPermit = false
+	pp.timeoutPermit = false
+	pp.waitAndRejectPermit = false
+	pp.waitAndAllowPermit = false
 }
 
 // NewPermitPlugin is the factory for permit plugin.
@@ -333,6 +346,7 @@ func TestPrefilterPlugin(t *testing.T) {
 			t.Errorf("Expected the prefilter plugin to be called.")
 		}
 
+		pfPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
@@ -391,6 +405,7 @@ func TestReservePlugin(t *testing.T) {
 			t.Errorf("Expected the reserve plugin to be called.")
 		}
 
+		resPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
@@ -482,6 +497,7 @@ func TestPrebindPlugin(t *testing.T) {
 			t.Errorf("Expected the prebind plugin to be called.")
 		}
 
+		pbdPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
@@ -593,6 +609,7 @@ func TestUnreservePlugin(t *testing.T) {
 				}
 			}
 		}
+
 		unresPlugin.reset()
 		pbdPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
@@ -792,6 +809,7 @@ func TestPermitPlugin(t *testing.T) {
 		perPlugin.timeoutPermit = test.timeout
 		perPlugin.waitAndRejectPermit = false
 		perPlugin.waitAndAllowPermit = false
+
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
 			initPausePod(cs, &pausePodConfig{Name: "test-pod", Namespace: context.ns.Name}))
@@ -818,6 +836,7 @@ func TestPermitPlugin(t *testing.T) {
 			t.Errorf("Expected the permit plugin to be called.")
 		}
 
+		perPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{pod})
 	}
 }
@@ -911,6 +930,7 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 			t.Errorf("Expected the permit plugin to be called.")
 		}
 
+		perPlugin.reset()
 		cleanupPods(cs, t, []*v1.Pod{waitingPod, signallingPod})
 	}
 }
