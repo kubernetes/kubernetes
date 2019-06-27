@@ -45,8 +45,8 @@ import (
 var (
 	cpExample = templates.Examples(i18n.T(`
 		# !!!Important Note!!!
-		# Requires that the 'tar' binary is present in your container
-		# image.  If 'tar' is not present, 'kubectl cp' will fail.
+		# Requires that the 'tar' and 'test' binaries are present in your container
+		# image.  If one of 'tar' and 'test' is not present, 'kubectl cp' will fail.
 
 		# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
 		kubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir
