@@ -174,6 +174,66 @@ func (rc *reconciler) reconcile() {
 	// Detaches are triggered before attaches so that volumes referenced by
 	// pods that are rescheduled to a different node are detached first.
 
+	rc.detachUnwantedVolumes()
+
+	rc.attachDesiredVolumes()
+
+	// Update Node Status
+	err := rc.nodeStatusUpdater.UpdateNodeStatuses()
+	if err != nil {
+		klog.Warningf("UpdateNodeStatuses failed with: %v", err)
+	}
+}
+
+func (rc *reconciler) attachDesiredVolumes() {
+	// Ensure volumes that should be attached are attached.
+	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
+		if rc.actualStateOfWorld.IsVolumeAttachedToNode(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
+			// Volume/Node exists, touch it to reset detachRequestedTime
+			if klog.V(5) {
+				klog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
+			}
+			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			continue
+		}
+		// Don't even try to start an operation if there is already one running
+		if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "") {
+			if klog.V(10) {
+				klog.Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
+			}
+			continue
+		}
+
+		if rc.isMultiAttachForbidden(volumeToAttach.VolumeSpec) {
+			nodes := rc.actualStateOfWorld.GetNodesForAttachedVolume(volumeToAttach.VolumeName)
+			if len(nodes) > 0 {
+				if !volumeToAttach.MultiAttachErrorReported {
+					rc.reportMultiAttachError(volumeToAttach, nodes)
+					rc.desiredStateOfWorld.SetMultiAttachError(volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				}
+				continue
+			}
+		}
+
+		// Volume/Node doesn't exist, spawn a goroutine to attach it
+		if klog.V(5) {
+			klog.Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
+		}
+		err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
+		if err == nil {
+			klog.Infof(volumeToAttach.GenerateMsgDetailed("attacherDetacher.AttachVolume started", ""))
+		}
+		if err != nil && !exponentialbackoff.IsExponentialBackoff(err) {
+			// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
+			// Log all other errors.
+			klog.Errorf(volumeToAttach.GenerateErrorDetailed("attacherDetacher.AttachVolume failed to start", err).Error())
+		}
+	}
+}
+
+// detachUnwantedVolumes checks volumes in actualStateOfWorld.
+// If volume is not in desiredStateOfWorld anymore，it will trigger detach logic
+func (rc *reconciler) detachUnwantedVolumes() {
 	// Ensure volumes that should be detached are detached.
 	for _, attachedVolume := range rc.actualStateOfWorld.GetAttachedVolumes() {
 		if !rc.desiredStateOfWorld.VolumeExists(
@@ -240,59 +300,6 @@ func (rc *reconciler) reconcile() {
 		}
 	}
 
-	rc.attachDesiredVolumes()
-
-	// Update Node Status
-	err := rc.nodeStatusUpdater.UpdateNodeStatuses()
-	if err != nil {
-		klog.Warningf("UpdateNodeStatuses failed with: %v", err)
-	}
-}
-
-func (rc *reconciler) attachDesiredVolumes() {
-	// Ensure volumes that should be attached are attached.
-	for _, volumeToAttach := range rc.desiredStateOfWorld.GetVolumesToAttach() {
-		if rc.actualStateOfWorld.IsVolumeAttachedToNode(volumeToAttach.VolumeName, volumeToAttach.NodeName) {
-			// Volume/Node exists, touch it to reset detachRequestedTime
-			if klog.V(5) {
-				klog.Infof(volumeToAttach.GenerateMsgDetailed("Volume attached--touching", ""))
-			}
-			rc.actualStateOfWorld.ResetDetachRequestTime(volumeToAttach.VolumeName, volumeToAttach.NodeName)
-			continue
-		}
-		// Don't even try to start an operation if there is already one running
-		if rc.attacherDetacher.IsOperationPending(volumeToAttach.VolumeName, "") {
-			if klog.V(10) {
-				klog.Infof("Operation for volume %q is already running. Can't start attach for %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
-			}
-			continue
-		}
-
-		if rc.isMultiAttachForbidden(volumeToAttach.VolumeSpec) {
-			nodes := rc.actualStateOfWorld.GetNodesForAttachedVolume(volumeToAttach.VolumeName)
-			if len(nodes) > 0 {
-				if !volumeToAttach.MultiAttachErrorReported {
-					rc.reportMultiAttachError(volumeToAttach, nodes)
-					rc.desiredStateOfWorld.SetMultiAttachError(volumeToAttach.VolumeName, volumeToAttach.NodeName)
-				}
-				continue
-			}
-		}
-
-		// Volume/Node doesn't exist, spawn a goroutine to attach it
-		if klog.V(5) {
-			klog.Infof(volumeToAttach.GenerateMsgDetailed("Starting attacherDetacher.AttachVolume", ""))
-		}
-		err := rc.attacherDetacher.AttachVolume(volumeToAttach.VolumeToAttach, rc.actualStateOfWorld)
-		if err == nil {
-			klog.Infof(volumeToAttach.GenerateMsgDetailed("attacherDetacher.AttachVolume started", ""))
-		}
-		if err != nil && !exponentialbackoff.IsExponentialBackoff(err) {
-			// Ignore exponentialbackoff.IsExponentialBackoff errors, they are expected.
-			// Log all other errors.
-			klog.Errorf(volumeToAttach.GenerateErrorDetailed("attacherDetacher.AttachVolume failed to start", err).Error())
-		}
-	}
 }
 
 // reportMultiAttachError sends events and logs situation that a volume that
