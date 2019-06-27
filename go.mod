@@ -197,7 +197,7 @@ replace (
 	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.11
 	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.6
 	github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
-	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
+	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
 	github.com/Rican7/retry => github.com/Rican7/retry v0.1.0
 	github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e

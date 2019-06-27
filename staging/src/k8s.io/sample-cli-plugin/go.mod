@@ -12,7 +12,6 @@ require (
 )
 
 replace (
-	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.0
 	github.com/kr/pty => github.com/kr/pty v1.1.1
 	github.com/mailru/easyjson => github.com/mailru/easyjson v0.0.0-20180823135443-60711f1a8329
 	github.com/stretchr/objx => github.com/stretchr/objx v0.1.1
