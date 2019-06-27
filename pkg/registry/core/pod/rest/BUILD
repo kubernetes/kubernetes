@@ -35,14 +35,6 @@ go_test(
     name = "go_default_test",
     srcs = ["log_test.go"],
     embed = [":go_default_library"],
-    deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/registry/registrytest:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
-    ],
 )
 
 filegroup(

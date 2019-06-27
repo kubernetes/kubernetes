@@ -223,7 +223,6 @@ pkg/registry/core/persistentvolume/storage
 pkg/registry/core/persistentvolumeclaim
 pkg/registry/core/persistentvolumeclaim/storage
 pkg/registry/core/pod
-pkg/registry/core/pod/rest
 pkg/registry/core/podtemplate/storage
 pkg/registry/core/replicationcontroller
 pkg/registry/core/replicationcontroller/storage

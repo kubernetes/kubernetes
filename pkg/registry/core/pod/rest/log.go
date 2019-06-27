@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,31 +39,25 @@ type LogREST struct {
 }
 
 // LogREST implements GetterWithOptions
-var _ = rest.GetterWithOptions(&LogREST{})
+var _ = rest.Connecter(&LogREST{})
 
-// New creates a new Pod log options object
+// New returns an empty podLogOptions object.
 func (r *LogREST) New() runtime.Object {
-	// TODO - return a resource that represents a log
-	return &api.Pod{}
+	return &api.PodLogOptions{}
 }
 
-// LogREST implements StorageMetadata
-func (r *LogREST) ProducesMIMETypes(verb string) []string {
-	// Since the default list does not include "plain/text", we need to
-	// explicitly override ProducesMIMETypes, so that it gets added to
-	// the "produces" section for pods/{name}/log
-	return []string{
-		"text/plain",
-	}
+// ConnectMethods returns the list of HTTP methods that supported
+func (r *LogREST) ConnectMethods() []string {
+	return []string{"GET"}
 }
 
-// LogREST implements StorageMetadata, return string as the generating object
-func (r *LogREST) ProducesObject(verb string) interface{} {
-	return ""
+// NewConnectOptions returns versioned resource that represents logs parameters
+func (r *LogREST) NewConnectOptions() (runtime.Object, bool, string) {
+	return &api.PodLogOptions{}, false, ""
 }
 
-// Get retrieves a runtime.Object that will stream the contents of the pod log
-func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (runtime.Object, error) {
+// Connect returns a handler for the pod logs
+func (r *LogREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	logOpts, ok := opts.(*api.PodLogOptions)
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
@@ -74,28 +69,15 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 	if err != nil {
 		return nil, err
 	}
-	return &genericrest.LocationStreamer{
+	streamer := &genericrest.LocationStreamer{
 		Location:        location,
 		Transport:       transport,
 		ContentType:     "text/plain",
 		Flush:           logOpts.Follow,
 		ResponseChecker: genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
 		RedirectChecker: genericrest.PreventRedirects,
-	}, nil
-}
-
-// NewGetOptions creates a new options object
-func (r *LogREST) NewGetOptions() (runtime.Object, bool, string) {
-	return &api.PodLogOptions{}, false, ""
-}
-
-// OverrideMetricsVerb override the GET verb to CONNECT for pod log resource
-func (r *LogREST) OverrideMetricsVerb(oldVerb string) (newVerb string) {
-	newVerb = oldVerb
-
-	if oldVerb == "GET" {
-		newVerb = "CONNECT"
 	}
-
-	return
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		responder.Object(http.StatusOK, streamer)
+	}), nil
 }
