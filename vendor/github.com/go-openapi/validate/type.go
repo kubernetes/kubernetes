@@ -26,10 +26,11 @@ import (
 )
 
 type typeValidator struct {
-	Type   spec.StringOrArray
-	Format string
-	In     string
-	Path   string
+	Type     spec.StringOrArray
+	Nullable bool
+	Format   string
+	In       string
+	Path     string
 }
 
 func (t *typeValidator) schemaInfoForType(data interface{}) (string, string) {
@@ -138,7 +139,7 @@ func (t *typeValidator) Validate(data interface{}) *Result {
 	result.Inc()
 	if data == nil || reflect.DeepEqual(reflect.Zero(reflect.TypeOf(data)), reflect.ValueOf(data)) {
 		// nil or zero value for the passed structure require Type: null
-		if len(t.Type) > 0 && !t.Type.Contains("null") { // TODO: if a property is not required it also passes this
+		if len(t.Type) > 0 && !t.Type.Contains("null") && !t.Nullable { // TODO: if a property is not required it also passes this
 			return errorHelp.sErr(errors.InvalidType(t.Path, t.In, strings.Join(t.Type, ","), "null"))
 		}
 		return result
