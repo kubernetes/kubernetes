@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	coordv1beta1 "k8s.io/api/coordination/v1beta1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,8 +47,8 @@ func TestNewLease(t *testing.T) {
 	cases := []struct {
 		desc       string
 		controller *controller
-		base       *coordv1beta1.Lease
-		expect     *coordv1beta1.Lease
+		base       *coordinationv1.Lease
+		expect     *coordinationv1.Lease
 	}{
 		{
 			desc: "nil base without node",
@@ -59,12 +59,12 @@ func TestNewLease(t *testing.T) {
 				clock:                fakeClock,
 			},
 			base: nil,
-			expect: &coordv1beta1.Lease{
+			expect: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
 					Namespace: corev1.NamespaceNodeLease,
 				},
-				Spec: coordv1beta1.LeaseSpec{
+				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       pointer.StringPtr(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
@@ -80,7 +80,7 @@ func TestNewLease(t *testing.T) {
 				clock:                fakeClock,
 			},
 			base: nil,
-			expect: &coordv1beta1.Lease{
+			expect: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
 					Namespace: corev1.NamespaceNodeLease,
@@ -93,7 +93,7 @@ func TestNewLease(t *testing.T) {
 						},
 					},
 				},
-				Spec: coordv1beta1.LeaseSpec{
+				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       pointer.StringPtr(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
@@ -108,18 +108,18 @@ func TestNewLease(t *testing.T) {
 				leaseDurationSeconds: 10,
 				clock:                fakeClock,
 			},
-			base: &coordv1beta1.Lease{
+			base: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
 					Namespace: corev1.NamespaceNodeLease,
 				},
-				Spec: coordv1beta1.LeaseSpec{
+				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       pointer.StringPtr(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
 				},
 			},
-			expect: &coordv1beta1.Lease{
+			expect: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
 					Namespace: corev1.NamespaceNodeLease,
@@ -132,7 +132,7 @@ func TestNewLease(t *testing.T) {
 						},
 					},
 				},
-				Spec: coordv1beta1.LeaseSpec{
+				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       pointer.StringPtr(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
@@ -147,7 +147,7 @@ func TestNewLease(t *testing.T) {
 				leaseDurationSeconds: 10,
 				clock:                fakeClock,
 			},
-			base: &coordv1beta1.Lease{
+			base: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
 					Namespace: corev1.NamespaceNodeLease,
@@ -160,13 +160,13 @@ func TestNewLease(t *testing.T) {
 						},
 					},
 				},
-				Spec: coordv1beta1.LeaseSpec{
+				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       pointer.StringPtr(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-10 * time.Second)},
 				},
 			},
-			expect: &coordv1beta1.Lease{
+			expect: &coordinationv1.Lease{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      node.Name,
 					Namespace: corev1.NamespaceNodeLease,
@@ -179,7 +179,7 @@ func TestNewLease(t *testing.T) {
 						},
 					},
 				},
-				Spec: coordv1beta1.LeaseSpec{
+				Spec: coordinationv1.LeaseSpec{
 					HolderIdentity:       pointer.StringPtr(node.Name),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
@@ -221,7 +221,7 @@ func TestRetryUpdateLease(t *testing.T) {
 		{
 			desc: "no errors",
 			updateReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
-				return true, &coordv1beta1.Lease{}, nil
+				return true, &coordinationv1.Lease{}, nil
 			},
 			getReactor:                 nil,
 			onRepeatedHeartbeatFailure: nil,
@@ -248,12 +248,12 @@ func TestRetryUpdateLease(t *testing.T) {
 					case 2:
 						return true, nil, optimistcLockUpdateErr
 					default:
-						return true, &coordv1beta1.Lease{}, nil
+						return true, &coordinationv1.Lease{}, nil
 					}
 				}
 			}(),
 			getReactor: func(action clienttesting.Action) (bool, runtime.Object, error) {
-				return true, &coordv1beta1.Lease{}, nil
+				return true, &coordinationv1.Lease{}, nil
 			},
 			onRepeatedHeartbeatFailure: func() { t.Fatalf("onRepeatedHeartbeatFailure called") },
 			expectErr:                  false,
@@ -271,7 +271,7 @@ func TestRetryUpdateLease(t *testing.T) {
 			c := &controller{
 				clock:                      clock.NewFakeClock(time.Now()),
 				client:                     cl,
-				leaseClient:                cl.CoordinationV1beta1().Leases(corev1.NamespaceNodeLease),
+				leaseClient:                cl.CoordinationV1().Leases(corev1.NamespaceNodeLease),
 				holderIdentity:             node.Name,
 				leaseDurationSeconds:       10,
 				onRepeatedHeartbeatFailure: tc.onRepeatedHeartbeatFailure,

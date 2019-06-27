@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,10 +48,10 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 	ginkgo.Context("when the NodeLease feature is enabled", func() {
 		ginkgo.It("the kubelet should create and update a lease in the kube-node-lease namespace", func() {
-			leaseClient := f.ClientSet.CoordinationV1beta1().Leases(v1.NamespaceNodeLease)
+			leaseClient := f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease)
 			var (
 				err   error
-				lease *coordinationv1beta1.Lease
+				lease *coordinationv1.Lease
 			)
 			ginkgo.By("check that lease for this Kubelet exists in the kube-node-lease namespace")
 			gomega.Eventually(func() error {
@@ -91,9 +91,9 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 
 			ginkgo.By("wait until there is node lease")
 			var err error
-			var lease *coordinationv1beta1.Lease
+			var lease *coordinationv1.Lease
 			gomega.Eventually(func() error {
-				lease, err = f.ClientSet.CoordinationV1beta1().Leases(v1.NamespaceNodeLease).Get(nodeName, metav1.GetOptions{})
+				lease, err = f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(nodeName, metav1.GetOptions{})
 				if err != nil {
 					return err
 				}
@@ -170,7 +170,7 @@ func getHeartbeatTimeAndStatus(clientSet clientset.Interface, nodeName string) (
 	return heartbeatTime, node.Status
 }
 
-func expectLease(lease *coordinationv1beta1.Lease, nodeName string) error {
+func expectLease(lease *coordinationv1.Lease, nodeName string) error {
 	// expect values for HolderIdentity, LeaseDurationSeconds, and RenewTime
 	if lease.Spec.HolderIdentity == nil {
 		return fmt.Errorf("Spec.HolderIdentity should not be nil")
