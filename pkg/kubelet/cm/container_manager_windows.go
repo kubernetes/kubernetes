@@ -180,3 +180,7 @@ func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
 func (cm *containerManagerImpl) GetTopologyPodAdmitHandler() topologymanager.Manager {
 	return nil
 }
+
+func (cm *containerManagerImpl) UpdateAllocatedDevices() {
+	return
+}
