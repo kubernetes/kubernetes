@@ -18,7 +18,6 @@ package main
 
 import (
 	goflag "flag"
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -48,7 +47,6 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }
