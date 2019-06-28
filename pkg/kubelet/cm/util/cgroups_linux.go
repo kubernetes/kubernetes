@@ -38,7 +38,7 @@ func GetPids(cgroupPath string) ([]int, error) {
 func getCgroupPath(cgroupPath string) (string, error) {
 	cgroupPath = libcontainerutils.CleanPath(cgroupPath)
 
-	mnt, root, err := libcontainercgroups.FindCgroupMountpointAndRoot("devices")
+	mnt, root, err := libcontainercgroups.FindCgroupMountpointAndRoot(cgroupPath, "devices")
 	// If we didn't mount the subsystem, there is no point we make the path.
 	if err != nil {
 		return "", err
