@@ -6,6 +6,7 @@ go_test(
     data = glob(["testdata/**"]),
     deps = [
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
@@ -63,6 +64,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/api/admission/v1beta1:all-srcs",
+        "//staging/src/k8s.io/api/admissionregistration/v1:all-srcs",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/apps/v1:all-srcs",
         "//staging/src/k8s.io/api/apps/v1beta1:all-srcs",
