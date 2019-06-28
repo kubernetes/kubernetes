@@ -54,7 +54,7 @@ limitations under the License.
 //     apiVersion: kubeadm.k8s.io/v1beta2
 //     kind: ClusterConfiguration
 //
-//     apiVersion: kubelet.config.k8s.io/v1beta2
+//     apiVersion: kubelet.config.k8s.io/v1beta1
 //     kind: KubeletConfiguration
 //
 //     apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -139,14 +139,14 @@ limitations under the License.
 // See https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/ or https://godoc.org/k8s.io/kube-proxy/config/v1alpha1#KubeProxyConfiguration
 // for kube proxy official documentation.
 //
-//    apiVersion: kubelet.config.k8s.io/v1beta2
+//    apiVersion: kubelet.config.k8s.io/v1beta1
 //    kind: KubeletConfiguration
 //       ...
 //
 // The KubeletConfiguration type should be used to change the configurations that will be passed to all kubelet instances
 // deployed in the cluster. If this object is not provided or provided only partially, kubeadm applies defaults.
 //
-// See https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/ or https://godoc.org/k8s.io/kubelet/config/v1beta2#KubeletConfiguration
+// See https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/ or https://godoc.org/k8s.io/kubelet/config/v1beta1#KubeletConfiguration
 // for kubelet official documentation.
 //
 // Here is a fully populated example of a single YAML file containing multiple
@@ -244,7 +244,7 @@ limitations under the License.
 // 	useHyperKubeImage: false
 // 	clusterName: "example-cluster"
 // 	---
-// 	apiVersion: kubelet.config.k8s.io/v1beta2
+// 	apiVersion: kubelet.config.k8s.io/v1beta1
 // 	kind: KubeletConfiguration
 // 	# kubelet specific options here
 // 	---
