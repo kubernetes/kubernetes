@@ -1543,7 +1543,10 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 
 func (az *Cloud) getPublicIPAddressResourceGroup(service *v1.Service) string {
 	if resourceGroup, found := service.Annotations[ServiceAnnotationLoadBalancerResourceGroup]; found {
-		return resourceGroup
+		resourceGroupName := strings.TrimSpace(resourceGroup)
+		if len(resourceGroupName) > 0 {
+			return resourceGroupName
+		}
 	}
 
 	return az.ResourceGroup
