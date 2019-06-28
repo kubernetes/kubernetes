@@ -33,7 +33,7 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhoo
 		obj.FailurePolicy = &policy
 	}
 	if obj.MatchPolicy == nil {
-		policy := admissionregistrationv1.Exact
+		policy := admissionregistrationv1.Equivalent
 		obj.MatchPolicy = &policy
 	}
 	if obj.NamespaceSelector == nil {
@@ -65,7 +65,7 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 		obj.FailurePolicy = &policy
 	}
 	if obj.MatchPolicy == nil {
-		policy := admissionregistrationv1.Exact
+		policy := admissionregistrationv1.Equivalent
 		obj.MatchPolicy = &policy
 	}
 	if obj.NamespaceSelector == nil {
