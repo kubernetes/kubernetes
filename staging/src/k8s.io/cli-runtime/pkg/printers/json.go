@@ -68,7 +68,10 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
 // The input object is assumed to be in the internal version of an API and is converted
 // to the given version first.
-type YAMLPrinter struct{}
+// If PrintObj() is called multiple times, objects are separated with a '---' separator.
+type YAMLPrinter struct {
+	printCount int64
+}
 
 // PrintObj prints the data as YAML.
 func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
@@ -77,6 +80,13 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	// using reflect.Indirect indiscriminately is valid here, as all runtime.Objects are supposed to be pointers.
 	if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj)).Type().PkgPath()) {
 		return fmt.Errorf(InternalObjectPrinterErr)
+	}
+
+	count := atomic.AddInt64(&p.printCount, 1)
+	if count > 1 {
+		if _, err := w.Write([]byte("---\n")); err != nil {
+			return err
+		}
 	}
 
 	switch obj := obj.(type) {
