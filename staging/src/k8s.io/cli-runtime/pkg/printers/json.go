@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sync/atomic"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"sigs.k8s.io/yaml"
@@ -41,6 +43,20 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	switch obj := obj.(type) {
+	case *metav1.WatchEvent:
+		if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj.Object.Object)).Type().PkgPath()) {
+			return fmt.Errorf(InternalObjectPrinterErr)
+		}
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write([]byte{'\n'})
+		return err
 	case *runtime.Unknown:
 		var buf bytes.Buffer
 		err := json.Indent(&buf, obj.Raw, "", "    ")
@@ -90,6 +106,20 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 	}
 
 	switch obj := obj.(type) {
+	case *metav1.WatchEvent:
+		if InternalObjectPreventer.IsForbidden(reflect.Indirect(reflect.ValueOf(obj.Object.Object)).Type().PkgPath()) {
+			return fmt.Errorf(InternalObjectPrinterErr)
+		}
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
+		data, err = yaml.JSONToYAML(data)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		return err
 	case *runtime.Unknown:
 		data, err := yaml.JSONToYAML(obj.Raw)
 		if err != nil {
