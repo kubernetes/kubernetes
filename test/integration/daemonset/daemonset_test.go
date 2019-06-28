@@ -111,6 +111,7 @@ func setupScheduler(
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
+		CSIDriverInformer:              informerFactory.Storage().V1beta1().CSIDrivers(),
 		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 		DisablePreemption:              false,
 		PercentageOfNodesToScore:       100,
