@@ -506,9 +506,9 @@ func newExecPodSpec(ns, generateName string) *v1.Pod {
 			TerminationGracePeriodSeconds: &immediate,
 			Containers: []v1.Container{
 				{
-					Name:    "exec",
-					Image:   BusyBoxImage,
-					Command: []string{"sh", "-c", "trap exit TERM; while true; do sleep 5; done"},
+					Name:  "agnhost-pause",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"pause"},
 				},
 			},
 		},
@@ -553,7 +553,8 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 			Containers: []v1.Container{
 				{
 					Name:  "pause",
-					Image: imageutils.GetPauseImageName(),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"pause"},
 					Ports: containerPorts,
 					// Add a dummy environment variable to work around a docker issue.
 					// https://github.com/docker/docker/issues/14203
