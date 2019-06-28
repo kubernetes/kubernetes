@@ -209,9 +209,14 @@ func (cache *schedulerCache) Snapshot() *Snapshot {
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
 func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *NodeInfoSnapshot) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
 	balancedVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
+	if balancedVolumesEnabled {
+		cache.mu.Lock()
+		defer cache.mu.Unlock()
+	} else {
+		cache.mu.RLock()
+		defer cache.mu.RUnlock()
+	}
 
 	// Get the last generation of the the snapshot.
 	snapshotGeneration := nodeSnapshot.Generation
