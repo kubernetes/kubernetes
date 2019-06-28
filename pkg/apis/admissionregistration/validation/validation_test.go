@@ -58,6 +58,16 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		expectedError string
 	}{
 		{
+			name: "AdmissionReviewVersions are required",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, false),
+			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
+		}, {
 			name: "should fail on bad AdmissionReviewVersion value",
 			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
 				{
@@ -357,6 +367,17 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				},
 			}, true),
 			expectedError: `webhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+		},
+		{
+			name: "AdmissionReviewVersions are required",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
+				},
+			}, false),
+			expectedError: `webhooks[0].admissionReviewVersions: Required value: must specify one of v1beta1`,
 		},
 		{
 			name: "SideEffects are required",
