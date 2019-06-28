@@ -8,8 +8,8 @@ go_library(
         "systemstat_linux.go",
         "utils.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/bitbucket.org/bertimus9/systemstat",
-    importpath = "bitbucket.org/bertimus9/systemstat",
+    importmap = "k8s.io/kubernetes/vendor/github.com/nikhita/systemstat",
+    importpath = "github.com/nikhita/systemstat",
     visibility = ["//visibility:public"],
 )
 

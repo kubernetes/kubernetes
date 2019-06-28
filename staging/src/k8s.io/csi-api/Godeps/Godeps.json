@@ -552,7 +552,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "c59034cc13d587f5ef4e85ca0ade0c1866ae8e1d"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "sigs.k8s.io/yaml",
