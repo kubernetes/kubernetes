@@ -1266,7 +1266,12 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
 	})
 
-	ginkgo.It("should create endpoints for unready pods", func() {
+	/*
+		Release: v1.16
+		Testname: Services CRUD
+		Description: Services should create endpoints for unready pods
+	*/
+	framework.ConformanceIt("should create endpoints for unready pods", func() {
 		serviceName := "tolerate-unready"
 		ns := f.Namespace.Name
 
