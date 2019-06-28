@@ -21,5 +21,4 @@
 ./test/cmd/diff.sh
 ./test/cmd/discovery.sh
 ./test/cmd/legacy-script.sh
-./test/e2e_node/conformance/run_test.sh
 ./test/images/image-util.sh
