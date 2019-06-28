@@ -1638,10 +1638,10 @@ k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
-k8s.io/kubectl/pkg/rawhttp
 k8s.io/kubectl/pkg/cmd/util/openapi
 k8s.io/kubectl/pkg/cmd/util/openapi/testing
 k8s.io/kubectl/pkg/cmd/util/openapi/validation
+k8s.io/kubectl/pkg/rawhttp
 k8s.io/kubectl/pkg/util/certificate
 k8s.io/kubectl/pkg/util/deployment
 k8s.io/kubectl/pkg/util/event

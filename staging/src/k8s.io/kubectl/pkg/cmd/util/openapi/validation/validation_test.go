@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/openapi"
 )
 
-var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+var fakeSchema = testing.Fake{Path: filepath.Join("..", "swagger.json")}
 
 var _ = Describe("resource validation using OpenAPI Schema", func() {
 	var validator *SchemaValidation

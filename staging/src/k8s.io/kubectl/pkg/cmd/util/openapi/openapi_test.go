@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubectl/pkg/cmd/util/openapi"
 )
 
-var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
+var fakeSchema = testing.Fake{Path: filepath.Join("swagger.json")}
 
 var _ = Describe("Reading apps/v1beta1/Deployment from openAPIData", func() {
 	var resources openapi.Resources
