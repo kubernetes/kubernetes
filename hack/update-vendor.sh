@@ -270,7 +270,7 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
     # disallow transitive dependencies on k8s.io/kubernetes
     loopback_deps=()
     kube::util::read-array loopback_deps < <(go list all 2>/dev/null | grep k8s.io/kubernetes/ || true)
-    if [[ -n "${loopback_deps[*]}" ]]; then
+    if [[ -n ${loopback_deps[*]:+"${loopback_deps[*]}"} ]]; then
       kube::log::error "Disallowed ${repo} -> k8s.io/kubernetes dependencies exist via the following imports:
 $(go mod why "${loopback_deps[@]}")"
       exit 1
