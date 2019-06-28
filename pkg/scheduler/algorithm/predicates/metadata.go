@@ -150,10 +150,10 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		return nil
 	}
 	predicateMetadata := &predicateMetadata{
-		pod:                                    pod,
-		podBestEffort:                          isPodBestEffort(pod),
-		podRequest:                             GetResourceRequest(pod),
-		podPorts:                               schedutil.GetContainerPorts(pod),
+		pod:           pod,
+		podBestEffort: isPodBestEffort(pod),
+		podRequest:    GetResourceRequest(pod),
+		podPorts:      schedutil.GetContainerPorts(pod),
 		topologyPairsPotentialAffinityPods:     incomingPodAffinityMap,
 		topologyPairsPotentialAntiAffinityPods: incomingPodAntiAffinityMap,
 		topologyPairsAntiAffinityPodsMap:       existingPodAntiAffinityMap,
@@ -395,7 +395,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("node not found"))
+			klog.Errorf("Node %s not found for pod %s", allNodeNames[i], pod.Name)
 			return
 		}
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
@@ -463,7 +463,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 		nodeInfo := nodeInfoMap[allNodeNames[i]]
 		node := nodeInfo.Node()
 		if node == nil {
-			catchError(fmt.Errorf("nodeInfo.Node is nil"))
+			klog.Errorf("Node %s not found for pod %s", allNodeNames[i], pod.Name)
 			return
 		}
 		nodeTopologyPairsAffinityPodsMaps := newTopologyPairsMaps()
