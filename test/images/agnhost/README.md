@@ -31,7 +31,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.1
+        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.2
         name: agnhost
       dnsConfig:
         nameservers:
@@ -65,6 +65,35 @@ created with the `pause` argument instead, allowing us execute multiple commands
 The `agnhost` binary is a CLI with the following subcommands:
 
 
+### audit-proxy
+
+The audit proxy is used to test dynamic auditing. It listens on port 8080 for incoming audit
+events and writes them in a uniform manner to stdout.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost audit-proxy
+```
+
+
+### crd-conversion-webhook
+
+The subcommand tests `CustomResourceConversionWebhook`. After deploying it to Kubernetes cluster,
+the administrator needs to create a `CustomResourceConversion.Webhook` in Kubernetes cluster
+to use remote webhook for conversions.
+
+The subcommand starts a HTTP server, listening on port 443, and creating the `/crdconvert`
+endpoint.
+
+Usage
+
+```console
+    kubectl exec test-agnhost -- /agnhost crd-conversion-webhook \
+        [--tls-cert-file <tls-cert-file>] [--tls-private-key-file <tls-private-key-file>]
+```
+
+
 ### dns-server-list
 
 It will output the host's configured DNS servers, separated by commas.
@@ -84,6 +113,17 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost dns-suffix
+```
+
+
+### entrypoint-tester
+
+This subcommand will print the arguments it's passed and exists.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost entrypoint-tester foo lish args
 ```
 
 
@@ -121,6 +161,22 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost help
+```
+
+
+### inclusterclient
+
+The subcommand will periodically poll the Kubernetes `/healthz` endpoint using the in-cluster
+config. Because of this, the subcommand is meant to be run inside of a Kubernetes pod. It can
+also be used to validate token rotation.
+
+The given `--poll-interval` flag (default is 30 seconds) represents the poll interval in
+seconds of the call to `/healhz`.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost inclusterclient [--poll-interval <poll-interval>]
 ```
 
 
@@ -165,14 +221,14 @@ Examples:
 
 ```console
 docker run -i \
-  gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
+  gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
+  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -299,7 +355,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -366,6 +422,59 @@ Usage:
 ```
 
 
+### porter
+
+Serves requested data on ports specified in ENV variables. For example, if the the environment
+variable `SERVE_PORT_9001` is set, then the subcommand will start serving on the port 9001.
+Additionally, if the environment variable `SERVE_TLS_PORT_9002` is set, then the subcommand
+will start a TLS server on that port.
+
+The included `localhost.crt` is a PEM-encoded TLS cert with SAN IPs `127.0.0.1` and `[::1]`,
+expiring in January 2084, generated from `src/crypto/tls`:
+
+```console
+    go run generate_cert.go  --rsa-bits 2048 --host 127.0.0.1,::1,example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
+```
+
+To use a different cert/key, mount them into the pod and set the `CERT_FILE` and `KEY_FILE`
+environment variables to the desired paths.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost porter
+```
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/porter/README.md?pixel)]()
+
+
+### serve-hostname
+
+This is a small util app to serve your hostname on TCP and/or UDP. Useful for testing.
+
+The subcommand can accept the following flags:
+
+- `tcp` (default: `false`): Serve raw over TCP.
+- `udp` (default: `false`): Serve raw over UDP.
+- `http` (default: `true`): Serve HTTP.
+- `close` (default: `false`): Close connection per each HTTP request.
+- `port` (default: `9376`): The port number to listen to.
+
+Keep in mind that `--http` cannot be given at the same time as `--tcp` or `--udp`.
+
+Usage:
+
+```console
+    kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
+```
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md
+?pixel)]()
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel
+)]()
+
+
 ### webhook (Kubernetes External Admission Webhook)
 
 The subcommand tests MutatingAdmissionWebhook and ValidatingAdmissionWebhook. After deploying
@@ -382,8 +491,14 @@ Usage:
     kubectl exec test-agnhost -- /agnhost webhook [--tls-cert-file <key-file>] [--tls-private-key-file <cert-file>]
 ```
 
+
+## Other tools
+
+The image contains `iperf`.
+
+
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.1` for Linux
-containers, and `e2eteam/agnhost:2.1` for Windows containers. In the future, the same
+The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.2` for Linux
+containers, and `e2eteam/agnhost:2.2` for Windows containers. In the future, the same
 repository can be used for both OSes.

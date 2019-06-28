@@ -35,6 +35,7 @@ var CmdPause = &cobra.Command{
 }
 
 func pause(cmd *cobra.Command, args []string) {
+	fmt.Println("Paused")
 	sigCh := make(chan os.Signal)
 	done := make(chan int, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
