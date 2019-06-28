@@ -384,7 +384,6 @@ package_group(
     name = "pkg_kubectl_testing_CONSUMERS",
     packages = [
         "//pkg/kubectl",
-        "//pkg/printers/internalversion",
     ],
 )
 

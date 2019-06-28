@@ -24,29 +24,26 @@ import (
 	"net/url"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog"
 
 	corev1 "k8s.io/api/core/v1"
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	utilpointer "k8s.io/utils/pointer"
@@ -412,7 +409,7 @@ func NewRuntimeSorter(objects []runtime.Object, sortBy string) *RuntimeSorter {
 
 	return &RuntimeSorter{
 		field:   parsedField,
-		decoder: legacyscheme.Codecs.UniversalDecoder(),
+		decoder: kubernetesscheme.Codecs.UniversalDecoder(),
 		objects: objects,
 	}
 }
@@ -562,14 +559,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			continue
 		}
 
-		internalObj, err := legacyscheme.Scheme.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion())
-		if err != nil {
-			// if there's an error, try to print what you have (mirrors old behavior).
-			klog.V(1).Info(err)
-			printer.PrintObj(info.Object, w)
-		} else {
-			printer.PrintObj(internalObj, w)
-		}
+		printer.PrintObj(info.Object, w)
 	}
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
@@ -666,8 +656,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 
 	writer := utilprinters.GetNewTabWriter(o.Out)
 
-	tableGK := metainternal.SchemeGroupVersion.WithKind("Table").GroupKind()
-
 	// print the current object
 	var objsToPrint []runtime.Object
 	if isList {
@@ -676,11 +664,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		objsToPrint = append(objsToPrint, obj)
 	}
 	for _, objToPrint := range objsToPrint {
-		if o.IsHumanReadablePrinter && objToPrint.GetObjectKind().GroupVersionKind().GroupKind() != tableGK {
-			// printing anything other than tables always takes the internal version, but the watch event uses externals
-			internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-			objToPrint = attemptToConvertToInternal(objToPrint, legacyscheme.Scheme, internalGV)
-		}
 		if err := printer.PrintObj(objToPrint, writer); err != nil {
 			return fmt.Errorf("unable to output the provided object: %v", err)
 		}
@@ -705,14 +688,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
-			// printing always takes the internal version, but the watch event uses externals
-			// TODO fix printing to use server-side or be version agnostic
-			objToPrint := e.Object
-			if o.IsHumanReadablePrinter && objToPrint.GetObjectKind().GroupVersionKind().GroupKind() != tableGK {
-				internalGV := mapping.GroupVersionKind.GroupKind().WithVersion(runtime.APIVersionInternal).GroupVersion()
-				objToPrint = attemptToConvertToInternal(e.Object, legacyscheme.Scheme, internalGV)
-			}
-			if err := printer.PrintObj(objToPrint, writer); err != nil {
+			if err := printer.PrintObj(e.Object, writer); err != nil {
 				return false, err
 			}
 			writer.Flush()
@@ -723,16 +699,6 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	})
 	return nil
-}
-
-// attemptToConvertToInternal tries to convert to an internal type, but returns the original if it can't
-func attemptToConvertToInternal(obj runtime.Object, converter runtime.ObjectConvertor, targetVersion schema.GroupVersion) runtime.Object {
-	internalObject, err := converter.ConvertToVersion(obj, targetVersion)
-	if err != nil {
-		klog.V(1).Infof("Unable to convert %T to %v: %v", obj, targetVersion, err)
-		return obj
-	}
-	return internalObject
 }
 
 func (o *GetOptions) printGeneric(r *resource.Result) error {

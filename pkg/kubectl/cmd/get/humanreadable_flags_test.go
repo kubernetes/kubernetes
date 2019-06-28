@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
@@ -48,19 +47,20 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			Object: runtime.RawExtension{
 				Object: &corev1.Pod{
 					TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{"l1": "value"}},
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foons", Labels: map[string]string{"l1": "value"}},
 				},
 			},
 			Cells: []interface{}{"foo", "0/0", "", int64(0), "<unknown>", "<none>", "<none>", "<none>", "<none>"},
 		}},
 	}
-	testPod := &api.Pod{
+	testPod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Pod",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foo",
+			Name:      "foo",
+			Namespace: "foons",
 			Labels: map[string]string{
 				"l1": "value",
 			},
@@ -89,7 +89,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 		{
 			name:           "empty output format matches a humanreadable printer",
 			testObject:     testPod.DeepCopy(),
-			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\nfoo\\ +0/0\\ +0\\ +<unknown>\n",
+			expectedOutput: "NAME\\ +AGE\nfoo\\ +<unknown>\n",
 		},
 		{
 			name:           "empty output format matches a humanreadable printer",
@@ -100,7 +100,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "\"wide\" output format prints",
 			testObject:     testPod.DeepCopy(),
 			outputFormat:   "wide",
-			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +IP\\ +NODE\\ +NOMINATED NODE\\ +READINESS GATES\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
+			expectedOutput: "NAME\\ +AGE\nfoo\\ +<unknown>\n",
 		},
 		{
 			name:           "\"wide\" output format prints",
@@ -112,7 +112,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "no-headers prints output with no headers",
 			testObject:     testPod.DeepCopy(),
 			noHeaders:      true,
-			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\n",
+			expectedOutput: "foo\\ +<unknown>\n",
 		},
 		{
 			name:           "no-headers prints output with no headers",
@@ -125,7 +125,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			testObject:     testPod.DeepCopy(),
 			outputFormat:   "wide",
 			noHeaders:      true,
-			expectedOutput: "foo\\ +0/0\\ +0\\ +<unknown>\\ +<none>\\ +<none>\\ +<none>\\ +<none>\n",
+			expectedOutput: "foo\\ +<unknown>\n",
 		},
 		{
 			name:           "no-headers and a \"wide\" output format prints output with no headers and additional columns",
@@ -138,7 +138,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "show-kind displays the resource's kind, even when printing a single type of resource",
 			testObject:     testPod.DeepCopy(),
 			showKind:       true,
-			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\npod/foo\\ +0/0\\ +0\\ +<unknown>\n",
+			expectedOutput: "NAME\\ +AGE\npod/foo\\ +<unknown>\n",
 		},
 		{
 			name:           "show-kind displays the resource's kind, even when printing a single type of resource",
@@ -150,7 +150,7 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "label-columns prints specified label values in new column",
 			testObject:     testPod.DeepCopy(),
 			columnLabels:   []string{"l1"},
-			expectedOutput: "NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\\ +L1\nfoo\\ +0/0\\ +0\\ +<unknown>\\ +value\n",
+			expectedOutput: "NAME\\ +AGE\\ +L1\nfoo\\ +<unknown>\\ +value\n",
 		},
 		{
 			name:           "label-columns prints specified label values in new column",
@@ -162,13 +162,13 @@ func TestHumanReadablePrinterSupportsExpectedOptions(t *testing.T) {
 			name:           "withNamespace displays an additional NAMESPACE column",
 			testObject:     testPod.DeepCopy(),
 			withNamespace:  true,
-			expectedOutput: "NAMESPACE\\ +NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\n\\ +foo\\ +0/0\\ +0\\ +<unknown>\n",
+			expectedOutput: "NAMESPACE\\ +NAME\\ +AGE\nfoons\\ +foo\\ +<unknown>\n",
 		},
 		{
 			name:           "withNamespace displays an additional NAMESPACE column",
 			testObject:     testTable.DeepCopy(),
 			withNamespace:  true,
-			expectedOutput: "NAMESPACE\\ +NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\n\\ +foo\\ +0/0\\ +0\\ +<unknown>\n",
+			expectedOutput: "NAMESPACE\\ +NAME\\ +READY\\ +STATUS\\ +RESTARTS\\ +AGE\nfoons\\ +foo\\ +0/0\\ +0\\ +<unknown>\n",
 		},
 		{
 			name:          "no printer is matched on an invalid outputFormat",
