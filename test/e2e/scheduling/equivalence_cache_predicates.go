@@ -35,6 +35,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -82,11 +83,13 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 
 	})
 
-	// This test verifies that GeneralPredicates works as expected:
-	// When a replica pod (with HostPorts) is scheduled to a node, it will invalidate GeneralPredicates cache on this node,
-	// so that subsequent replica pods with same host port claim will be rejected.
-	// We enforce all replica pods bind to the same node so there will always be conflicts.
-	ginkgo.It("validates GeneralPredicates is properly invalidated when a pod is scheduled [Slow]", func() {
+	/*
+		Release : v1.16
+		Testname: GeneralPredicates, invalidate
+		Description: Create a pod which MUST be sheculed. Create Replica Controller with 2 replicas using the same node selector
+		and the same host-port for both replicas. First replica MUST succeed and second one MUST be rejected.
+	*/
+	framework.ConformanceIt("validates GeneralPredicates is properly invalidated when a pod is scheduled [Slow]", func() {
 		ginkgo.By("Launching a RC with two replica pods with HostPorts")
 		nodeName := getNodeThatCanRunPodWithoutToleration(f)
 		rcName := "host-port"
@@ -105,10 +108,14 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		verifyResult(cs, 1, 1, ns)
 	})
 
-	// This test verifies that MatchInterPodAffinity works as expected.
-	// In equivalence cache, it does not handle inter pod affinity (anti-affinity) specially (unless node label changed),
-	// because current predicates algorithm will ensure newly scheduled pod does not break existing affinity in cluster.
-	ginkgo.It("validates pod affinity works properly when new replica pod is scheduled", func() {
+	/*
+		Release : v1.16
+		Testname: Pod affinity, new replica pod
+		Description: Launch pod with a label "security: S1". Update existing node label with a new value - "equivalence-e2e-test".
+		Create Replication Controller with 2 replicas which MUST start successfully.
+		Remove a label from the node. Create another equivalent pod and it MUST be rejected since the node label has been updated.
+	*/
+	framework.ConformanceIt("validates pod affinity works properly when new replica pod is scheduled", func() {
 		// create a pod running with label {security: S1}, and choose this node
 		nodeName, _ := runAndKeepPodWithLabelAndGetNodeName(f)
 
@@ -170,8 +177,14 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		verifyReplicasResult(cs, replica, 1, ns, affinityRCName)
 	})
 
-	// This test verifies that MatchInterPodAffinity (anti-affinity) is respected as expected.
-	ginkgo.It("validates pod anti-affinity works properly when new replica pod is scheduled", func() {
+	/*
+		Release : v1.16
+		Testname: Pod anti-affinity, two replicas rejected
+		Description: Create 2 pods with a replication controller and they MUST be shecduled. Two different nodes MUST becreated.
+		Apply the same label "equivalence-e2etest" for both nodes. Launch a pod with a label {"service": "S1"} on both nodes.
+		Create two replica pods with the same label '"service": "S1"'. Both replicas MUST be rejected.
+	*/
+	framework.ConformanceIt("validates pod anti-affinity works properly when new replica pod is scheduled", func() {
 		// check if there are at least 2 worker nodes available, else skip this test.
 		if len(nodeList.Items) < 2 {
 			framework.Skipf("Skipping as the test requires at least two worker nodes, current number of nodes: %d", len(nodeList.Items))
