@@ -366,6 +366,34 @@ const (
 	// May be overridden by a flag at startup.
 	// Deprecated: use the secure KubeControllerManagerPort instead.
 	InsecureKubeControllerManagerPort = 10252
+
+	// IPVSProxyMode is match set up cluster with ipvs proxy model
+	// TODO (yastij): we should make this shared also with componentConfig
+	IPVSProxyMode = "ipvs"
+
+	// ModeAlwaysAllow is the mode to set all requests as authorized
+	// TODO (yastij): we should make this shared also with componentConfig
+	ModeAlwaysAllow = "AlwaysAllow"
+
+	// ModeAlwaysDeny is the mode to set no requests as authorized
+	// TODO (yastij): we should make this shared also with componentConfig
+	ModeAlwaysDeny = "AlwaysDeny"
+
+	// ModeABAC is the mode to use Attribute Based Access Control to authorize
+	// TODO (yastij): we should make this shared also with componentConfig
+	ModeABAC = "ABAC"
+
+	// ModeWebhook is the mode to make an external webhook call to authorize
+	// TODO (yastij): we should make this shared also with componentConfig
+	ModeWebhook = "Webhook"
+
+	// ModeRBAC is the mode to use Role Based Access Control to authorize
+	// TODO (yastij): we should make this shared also with componentConfig
+	ModeRBAC = "RBAC"
+
+	// ModeNode is an authorization mode that authorizes API requests made by kubelets.
+	// TODO (yastij): we should make this shared also with componentConfig
+	ModeNode = "Node"
 )
 
 var (

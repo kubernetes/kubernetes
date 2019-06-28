@@ -49,7 +49,6 @@ import (
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -914,7 +913,7 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
 		// Check if IVPS kube-proxy mode is supported
-		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+		if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == kubeadmconstants.IPVSProxyMode {
 			checks = append(checks, IPVSProxierCheck{exec: execer})
 		}
 
@@ -1008,7 +1007,7 @@ func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.Clust
 	checks := []Checker{}
 
 	// Check if IPVS kube-proxy mode is supported
-	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
+	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == kubeadmconstants.IPVSProxyMode {
 		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}
 
