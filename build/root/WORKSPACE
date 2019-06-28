@@ -18,13 +18,41 @@ repo_infra_repositories()
 
 load("@io_k8s_repo_infra//:repos.bzl", repo_infra_configure = "configure", repo_infra_go_repositories = "go_repositories")
 
-# IMPORTANT: Only one go version may be specified at a time
-#            'go_version':          used to specify a published upstream go version
-#            'override_go_version': used to specify an alternate go version provided
-#                                   by kubernetes/repo-infra
+load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
+
+go_rules_dependencies()
+
+GOBORING_VERSION = "go1.15.8b5"
+
+go_download_sdk(
+    name = "go_sdk",
+    sdks = {
+        "linux_amd64": (
+            GOBORING_VERSION + ".linux-amd64.tar.gz",
+            "9d897bf42a962b064cfc9bed182c18ade0a3f5857d6a075d93b73ca8fe3b1f3a",
+        ),
+    },
+    urls = ["https://storage.googleapis.com/go-boringcrypto/{}"],
+)
+
+http_file(
+    name = "go_src",
+    downloaded_file_path = GOBORING_VERSION + ".src.tar.gz",
+    sha256 = "57964e7762ab03f0ad17bc787585b1709decccf095b7f7d2e9fca61a71e09010",
+    urls = ["https://storage.googleapis.com/go-boringcrypto/" + GOBORING_VERSION + ".src.tar.gz"],
+)
+
+go_register_toolchains()
+
 repo_infra_configure(
-    go_version = "1.15.8",
     minimum_bazel_version = "2.2.0",
+)
+
+# Install this dependency by running apt-get install glibc-source
+new_local_repository(
+    name = "glibc_src",
+    build_file = "third_party/glibc.BUILD",
+    path = "/usr/src/glibc",
 )
 
 repo_infra_go_repositories()
@@ -60,11 +88,11 @@ load(
 # end setup rules_docker
 
 container_pull(
-    name = "distroless_base",
-    digest = "sha256:7fa7445dfbebae4f4b7ab0e6ef99276e96075ae42584af6286ba080750d6dfe5",
-    registry = "gcr.io",
-    repository = "distroless/base",
-    tag = "latest",  # ignored when digest provided, but kept here for documentation.
+    name = "official_busybox_glibc",
+    digest = "sha256:6b438394f0ac955edd27aa2fc819ff8ee3371ca315ec83f53ed8541c502f71ca",
+    registry = "index.docker.io",
+    repository = "library/busybox",
+    tag = "glibc",  # ignored, but kept here for documentation
 )
 
 load("//build:workspace.bzl", "release_dependencies")

@@ -34,6 +34,7 @@ KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
 kube::build::verify_prereqs
 kube::build::build_image
 kube::build::run_build_command make cross
+kube::build::run_build_command build/copy-host-source.sh
 
 if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
   kube::build::run_build_command make test

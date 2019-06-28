@@ -19,6 +19,7 @@ package(default_visibility = ["//visibility:public"])
 load("@io_k8s_repo_infra//defs:build.bzl", "gcs_upload")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load("//build:platforms.bzl", "for_platforms")
+load("//build:licenses.bzl", "gen_licenses")
 
 filegroup(
     name = "_binary-artifacts-and-hashes",
@@ -126,6 +127,8 @@ platform(
     """,
 )
 
+gen_licenses()
+
 pkg_tar(
     name = "LICENSES",
     srcs = glob(
@@ -133,6 +136,7 @@ pkg_tar(
         allow_empty = False,
         exclude_directories = 0,
     ),
+    deps = ["HOST_LICENSES.tar"],
     mode = "0755",
     strip_prefix = "//",
     tags = [

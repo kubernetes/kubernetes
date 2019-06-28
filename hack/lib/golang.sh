@@ -317,13 +317,15 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
+# When using BoringCrypto, we must dynamically link everything.
 readonly KUBE_STATIC_LIBRARIES=(
-  kube-apiserver
-  kube-controller-manager
-  kube-scheduler
-  kube-proxy
-  kubeadm
-  kubectl
+#  cloud-controller-manager
+#  kube-apiserver
+#  kube-controller-manager
+#  kube-scheduler
+#  kube-proxy
+#  kubeadm
+#  kubectl
 )
 
 # Fully-qualified package names that we want to instrument for coverage information.
@@ -697,15 +699,7 @@ kube::golang::build_binaries_for_platform() {
 
   local -a build_args
   if [[ "${#statics[@]}" != 0 ]]; then
-    build_args=(
-      -installsuffix static
-      ${goflags:+"${goflags[@]}"}
-      -gcflags "${gogcflags:-}"
-      -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
-      -tags "${gotags:-}"
-    )
-    CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
+    kube::log::error_exit "!!! BoringCrypto requires all binaries be dynamically linked"
   fi
 
   if [[ "${#nonstatics[@]}" != 0 ]]; then

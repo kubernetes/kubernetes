@@ -4,7 +4,7 @@ load("@io_bazel_rules_docker//container:container.bzl", "container_image", "cont
 
 container_image(
     name = "image",
-    base = "@distroless_base//image",
+    base = "@official_busybox_glibc//image",
     entrypoint = ["/kubemark"],
     files = ["//cmd/kubemark"],
     stamp = True,

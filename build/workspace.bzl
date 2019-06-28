@@ -121,14 +121,29 @@ def _digest(d, arch):
 
 def image_dependencies():
     for arch in SERVER_PLATFORMS["linux"]:
-        container_pull(
-            name = "go-runner-linux-" + arch,
-            architecture = arch,
-            digest = _digest(_GO_RUNNER_DIGEST, arch),
-            registry = "k8s.gcr.io/build-image",
-            repository = "go-runner",
-            tag = "buster-v2.3.1",  # ignored, but kept here for documentation
-        )
+        if arch == "amd64":
+            # GKE's boringcrypto-patched binaries require glibc, which is not present
+            # in the OSS `go-runner` image. `go-runner-libc` is based on
+            # `gke-distroless/libc` image with a `go-runner` binary mirrored into google3 from
+            # https://github.com/kubernetes/release/blob/master/images/build/go-runner/go-runner.go
+            # For release history, see: http://rapid/gke_distroless
+            # For source, see: http://google3/cloud/kubernetes/distro/images/base/BUILD
+            container_pull(
+                name = "go-runner-linux-amd64",
+                digest = "sha256:fc0895025893d2139ab54068c327ca8f5d92a49c3b43dd2a9cd30e388f265cb6",
+                registry = "gke.gcr.io",
+                repository = "gke-distroless/go-runner-libc",
+                tag = "20200918_1114_RC0",  # ignored, but kept here for documentation
+            )
+        else:
+            container_pull(
+                name = "go-runner-linux-" + arch,
+                architecture = arch,
+                digest = _digest(_GO_RUNNER_DIGEST, arch),
+                registry = "k8s.gcr.io/build-image",
+                repository = "go-runner",
+                tag = "buster-v2.3.1",  # ignored, but kept here for documentation
+            )
 
         container_pull(
             name = "debian-base-" + arch,

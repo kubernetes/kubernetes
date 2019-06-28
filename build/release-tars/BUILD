@@ -12,6 +12,7 @@ load(
 load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
 load("//staging:repos_generated.bzl", "staging_repos")
+load("//build:licenses.bzl", "gen_licenses")
 
 # Bazel doesn't make the output filename
 # (such as kubernetes-server-{OS}-{ARCH}.tar.gz) configurable, so we instead
@@ -54,9 +55,8 @@ filegroup(
 )
 
 pkg_tar(
-    name = "kubernetes-src",
+    name = "_kubernetes-srcs",
     srcs = ["//:all-srcs"],
-    extension = "tar.gz",
     package_dir = "kubernetes",
     strip_prefix = "//",
     symlinks = {
@@ -67,7 +67,35 @@ pkg_tar(
         "manual",
         "no-cache",
     ],
+    visibility = ["//visibility:private"],
 )
+
+pkg_tar(
+    name = "_glibc-srcs",
+    srcs = ["@glibc_src//:srcs"],
+    package_dir = "glibc",
+    tags = [
+        "manual",
+        "no-cache",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+pkg_tar(
+    name = "kubernetes-src",
+    extension = "tar.gz",
+    tags = [
+        "manual",
+        "no-cache",
+    ],
+    deps = [
+        ":_glibc-srcs",
+        ":_kubernetes-srcs",
+        "@go_src//file",
+    ],
+)
+
+gen_licenses()
 
 # Included in node and server tarballs.
 pkg_tar(

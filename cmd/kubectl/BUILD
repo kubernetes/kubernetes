@@ -8,14 +8,17 @@ load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 go_binary(
     name = "kubectl",
     embed = [":go_default_library"],
-    pure = "on",
+    pure = "off",
     visibility = ["//visibility:public"],
     x_defs = version_x_defs(),
 )
 
 go_library(
     name = "go_default_library",
-    srcs = ["kubectl.go"],
+    srcs = [
+        "fipsonly.go",
+        "kubectl.go",
+    ],
     importpath = "k8s.io/kubernetes/cmd/kubectl",
     visibility = ["//visibility:private"],
     deps = [
