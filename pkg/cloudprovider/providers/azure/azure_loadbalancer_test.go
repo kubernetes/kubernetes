@@ -368,3 +368,35 @@ func TestEnsureLoadBalancerDeleted(t *testing.T) {
 		assert.Equal(t, len(result), 0, "TestCase[%d]: %s", i, c.desc)
 	}
 }
+
+func TestGetPublicIPAddressResourceGroup(t *testing.T) {
+	az := getTestCloud()
+
+	for i, c := range []struct {
+		desc        string
+		annotations map[string]string
+		expected    string
+	}{
+		{
+			desc:     "no annotation",
+			expected: "rg",
+		},
+		{
+			desc:        "annoation with empty string resource group",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerResourceGroup: ""},
+			expected:    "rg",
+		},
+		{
+			desc:        "annoation with non-empty resource group ",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerResourceGroup: "rg2"},
+			expected:    "rg2",
+		},
+	} {
+		t.Run(c.desc, func(t *testing.T) {
+			s := &v1.Service{}
+			s.Annotations = c.annotations
+			real := az.getPublicIPAddressResourceGroup(s)
+			assert.Equal(t, c.expected, real, "TestCase[%d]: %s", i, c.desc)
+		})
+	}
+}
