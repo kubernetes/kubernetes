@@ -489,6 +489,7 @@ func generateConfigs(
 	return configs, secretConfigs, configMapConfigs
 }
 
+// GenerateConfigsForGroup generates the configuration needed for a group
 func GenerateConfigsForGroup(
 	nss []*v1.Namespace,
 	groupName string,
@@ -720,6 +721,7 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 		fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 }
 
+// CreateNamespaces creates a namespace
 func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string, testPhase *timer.Phase) ([]*v1.Namespace, error) {
 	defer testPhase.End()
 	namespaces := []*v1.Namespace{}
@@ -733,6 +735,7 @@ func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix str
 	return namespaces, nil
 }
 
+// CreateQuotas creates quotas
 func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount int, testPhase *timer.Phase) error {
 	defer testPhase.End()
 	quotaTemplate := &v1.ResourceQuota{

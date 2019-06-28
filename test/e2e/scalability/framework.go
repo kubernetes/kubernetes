@@ -18,6 +18,7 @@ package scalability
 
 import "github.com/onsi/ginkgo"
 
+// SIGDescribe is the entry point for the sig-scalability e2e framework
 func SIGDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[sig-scalability] "+text, body)
 }
