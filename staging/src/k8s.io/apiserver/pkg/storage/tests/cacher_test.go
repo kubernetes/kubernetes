@@ -47,6 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -120,7 +121,7 @@ func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage
 func makeTestPod(name string) *example.Pod {
 	return &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		Spec:       DeepEqualSafePodSpec(),
+		Spec:       storagetesting.DeepEqualSafePodSpec(),
 	}
 }
 

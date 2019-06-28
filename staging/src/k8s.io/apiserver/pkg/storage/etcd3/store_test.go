@@ -47,7 +47,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd"
-	storagetests "k8s.io/apiserver/pkg/storage/tests"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -693,13 +693,13 @@ func TestTransformationFailure(t *testing.T) {
 		key: "/one-level/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
-			Spec:       storagetests.DeepEqualSafePodSpec(),
+			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}, {
 		key: "/two-level/1/test",
 		obj: &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "baz"},
-			Spec:       storagetests.DeepEqualSafePodSpec(),
+			Spec:       storagetesting.DeepEqualSafePodSpec(),
 		},
 	}}
 	for i, ps := range preset[:1] {
