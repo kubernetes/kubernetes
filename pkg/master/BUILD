@@ -68,6 +68,7 @@ go_library(
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/async:go_default_library",
         "//pkg/util/node:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
