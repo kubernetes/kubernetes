@@ -66,6 +66,8 @@ type GetOptions struct {
 	WatchOnly bool
 	ChunkSize int64
 
+	OutputWatchEvents bool
+
 	LabelSelector     string
 	FieldSelector     string
 	AllNamespaces     bool
@@ -172,6 +174,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericclioptions.IOStr
 	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().BoolVar(&o.WatchOnly, "watch-only", o.WatchOnly, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().BoolVar(&o.OutputWatchEvents, "output-watch-events", o.OutputWatchEvents, "Output watch event objects when --watch or --watch-only is used. Existing objects are output as initial ADDED events.")
 	cmd.Flags().Int64Var(&o.ChunkSize, "chunk-size", o.ChunkSize, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 	cmd.Flags().BoolVar(&o.IgnoreNotFound, "ignore-not-found", o.IgnoreNotFound, "If the requested object does not exist the command will return exit code 0.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
@@ -309,6 +312,9 @@ func (o *GetOptions) Validate(cmd *cobra.Command) error {
 		if outputOption != "" && outputOption != "wide" {
 			return fmt.Errorf("--show-labels option cannot be used with %s printer", outputOption)
 		}
+	}
+	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {
+		return cmdutil.UsageErrorf(cmd, "--output-watch-events option can only be used with --watch or --watch-only")
 	}
 	return nil
 }
@@ -648,6 +654,9 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		objsToPrint = append(objsToPrint, obj)
 	}
 	for _, objToPrint := range objsToPrint {
+		if o.OutputWatchEvents {
+			objToPrint = &metav1.WatchEvent{Type: string(watch.Added), Object: runtime.RawExtension{Object: objToPrint}}
+		}
 		if err := printer.PrintObj(objToPrint, writer); err != nil {
 			return fmt.Errorf("unable to output the provided object: %v", err)
 		}
@@ -672,7 +681,11 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 	intr := interrupt.New(nil, cancel)
 	intr.Run(func() error {
 		_, err := watchtools.UntilWithoutRetry(ctx, w, func(e watch.Event) (bool, error) {
-			if err := printer.PrintObj(e.Object, writer); err != nil {
+			objToPrint := e.Object
+			if o.OutputWatchEvents {
+				objToPrint = &metav1.WatchEvent{Type: string(e.Type), Object: runtime.RawExtension{Object: objToPrint}}
+			}
+			if err := printer.PrintObj(objToPrint, writer); err != nil {
 				return false, err
 			}
 			writer.Flush()

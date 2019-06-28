@@ -2052,6 +2052,220 @@ b      false
 	}
 }
 
+func TestWatchResourceWatchEvents(t *testing.T) {
+
+	testcases := []struct {
+		format   string
+		table    bool
+		expected string
+	}{
+		{
+			format: "",
+			expected: `EVENT      NAMESPACE   NAME      AGE
+ADDED      test        pod/bar   <unknown>
+ADDED      test        pod/foo   <unknown>
+MODIFIED   test        pod/foo   <unknown>
+DELETED    test        pod/foo   <unknown>
+`,
+		},
+		{
+			format: "",
+			table:  true,
+			expected: `EVENT      NAMESPACE   NAME      READY   STATUS   RESTARTS   AGE
+ADDED      test        pod/bar   0/0              0          <unknown>
+ADDED      test        pod/foo   0/0              0          <unknown>
+MODIFIED   test        pod/foo   0/0              0          <unknown>
+DELETED    test        pod/foo   0/0              0          <unknown>
+`,
+		},
+		{
+			format: "wide",
+			table:  true,
+			expected: `EVENT      NAMESPACE   NAME      READY   STATUS   RESTARTS   AGE         IP       NODE     NOMINATED NODE   READINESS GATES
+ADDED      test        pod/bar   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+ADDED      test        pod/foo   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+MODIFIED   test        pod/foo   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+DELETED    test        pod/foo   0/0              0          <unknown>   <none>   <none>   <none>           <none>
+`,
+		},
+		{
+			format: "json",
+			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+`,
+		},
+		{
+			format: "yaml",
+			expected: `object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: bar
+    namespace: test
+    resourceVersion: "9"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: ADDED
+---
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: foo
+    namespace: test
+    resourceVersion: "10"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: ADDED
+---
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: foo
+    namespace: test
+    resourceVersion: "11"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: MODIFIED
+---
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: null
+    name: foo
+    namespace: test
+    resourceVersion: "12"
+  spec:
+    containers: null
+    dnsPolicy: ClusterFirst
+    enableServiceLinks: true
+    restartPolicy: Always
+    securityContext: {}
+    terminationGracePeriodSeconds: 30
+  status: {}
+type: DELETED
+`,
+		},
+		{
+			format: `jsonpath={.type},{.object.metadata.name},{.object.metadata.resourceVersion}{"\n"}`,
+			expected: `ADDED,bar,9
+ADDED,foo,10
+MODIFIED,foo,11
+DELETED,foo,12
+`,
+		},
+		{
+			format: `go-template={{.type}},{{.object.metadata.name}},{{.object.metadata.resourceVersion}}{{"\n"}}`,
+			expected: `ADDED,bar,9
+ADDED,foo,10
+MODIFIED,foo,11
+DELETED,foo,12
+`,
+		},
+		{
+			format: `custom-columns=TYPE:.type,NAME:.object.metadata.name,RSRC:.object.metadata.resourceVersion`,
+			expected: `TYPE    NAME   RSRC
+ADDED   bar    9
+ADDED   foo    10
+MODIFIED   foo    11
+DELETED    foo    12
+`,
+		},
+		{
+			format: `name`,
+			expected: `pod/bar
+pod/foo
+pod/foo
+pod/foo
+`,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%s, table=%v", tc.format, tc.table), func(t *testing.T) {
+			pods, events := watchTestData()
+
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+			podList := &corev1.PodList{
+				Items: pods,
+				ListMeta: metav1.ListMeta{
+					ResourceVersion: "10",
+				},
+			}
+
+			tf.UnstructuredClient = &fake.RESTClient{
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch req.URL.Path {
+					case "/pods":
+						if req.URL.Query().Get("watch") == "true" {
+							if tc.table {
+								return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableWatchBody(codec, events[2:])}, nil
+							} else {
+								return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[2:])}, nil
+							}
+						}
+
+						if tc.table {
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: podTableObjBody(codec, podList.Items...)}, nil
+						} else {
+							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
+						}
+					default:
+						t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+
+			streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+			cmd := NewCmdGet("kubectl", tf, streams)
+			cmd.SetOutput(buf)
+
+			cmd.Flags().Set("watch", "true")
+			cmd.Flags().Set("all-namespaces", "true")
+			cmd.Flags().Set("show-kind", "true")
+			cmd.Flags().Set("output-watch-events", "true")
+			if len(tc.format) > 0 {
+				cmd.Flags().Set("output", tc.format)
+			}
+
+			cmd.Run(cmd, []string{"pods"})
+			if e, a := tc.expected, buf.String(); e != a {
+				t.Errorf("expected\n%v\ngot\n%v", e, a)
+			}
+		})
+	}
+}
+
 func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	pods, events := watchTestData()
 
