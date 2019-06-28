@@ -48,10 +48,6 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhoo
 		obj.TimeoutSeconds = new(int32)
 		*obj.TimeoutSeconds = 10
 	}
-
-	if len(obj.AdmissionReviewVersions) == 0 {
-		obj.AdmissionReviewVersions = []string{admissionregistrationv1.SchemeGroupVersion.Version}
-	}
 }
 
 func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
@@ -78,10 +74,6 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 	if obj.ReinvocationPolicy == nil {
 		never := admissionregistrationv1.NeverReinvocationPolicy
 		obj.ReinvocationPolicy = &never
-	}
-
-	if len(obj.AdmissionReviewVersions) == 0 {
-		obj.AdmissionReviewVersions = []string{admissionregistrationv1.SchemeGroupVersion.Version}
 	}
 }
 

@@ -167,7 +167,7 @@ func validateAdmissionReviewVersions(versions []string, requireRecognizedVersion
 
 	// Currently only v1beta1 accepted in AdmissionReviewVersions
 	if len(versions) < 1 {
-		allErrors = append(allErrors, field.Required(fldPath, ""))
+		allErrors = append(allErrors, field.Required(fldPath, fmt.Sprintf("must specify one of %v", strings.Join(AcceptedAdmissionReviewVersions, ", "))))
 	} else {
 		seen := map[string]bool{}
 		hasAcceptedVersion := false

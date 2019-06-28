@@ -296,9 +296,7 @@ type ValidatingWebhook struct {
 	// If a persisted webhook configuration specifies allowed versions and does not
 	// include any versions known to the API Server, calls to the webhook will fail
 	// and be subject to the failure policy.
-	// Default to `['v1beta1']`.
-	// +optional
-	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 }
 
 // MutatingWebhook describes an admission webhook and the resources and operations it applies to.
@@ -427,9 +425,7 @@ type MutatingWebhook struct {
 	// If a persisted webhook configuration specifies allowed versions and does not
 	// include any versions known to the API Server, calls to the webhook will fail
 	// and be subject to the failure policy.
-	// Default to `['v1beta1']`.
-	// +optional
-	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
+	AdmissionReviewVersions []string `json:"admissionReviewVersions" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 
 	// reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
 	// Allowed values are "Never" and "IfNeeded".
