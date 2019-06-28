@@ -34,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
