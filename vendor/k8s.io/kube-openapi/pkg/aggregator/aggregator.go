@@ -87,13 +87,13 @@ func (s *referenceWalker) walkSchema(schema *spec.Schema) {
 		s.walkSchema(&v)
 		schema.PatternProperties[k] = v
 	}
-	for i, _ := range schema.AllOf {
+	for i := range schema.AllOf {
 		s.walkSchema(&schema.AllOf[i])
 	}
-	for i, _ := range schema.AnyOf {
+	for i := range schema.AnyOf {
 		s.walkSchema(&schema.AnyOf[i])
 	}
-	for i, _ := range schema.OneOf {
+	for i := range schema.OneOf {
 		s.walkSchema(&schema.OneOf[i])
 	}
 	if schema.Not != nil {
@@ -109,7 +109,7 @@ func (s *referenceWalker) walkSchema(schema *spec.Schema) {
 		if schema.Items.Schema != nil {
 			s.walkSchema(schema.Items.Schema)
 		}
-		for i, _ := range schema.Items.Schemas {
+		for i := range schema.Items.Schemas {
 			s.walkSchema(&schema.Items.Schemas[i])
 		}
 	}
@@ -257,7 +257,9 @@ func mergeSpecs(dest, source *spec.Swagger, renameModelConflicts, ignorePathConf
 	specCloned := false
 	// Paths may be empty, due to [ACL constraints](http://goo.gl/8us55a#securityFiltering).
 	if source.Paths == nil {
-		source.Paths = &spec.Paths{}
+		// When a source spec does not have any path, that means none of the definitions
+		// are used thus we should not do anything
+		return nil
 	}
 	if dest.Paths == nil {
 		dest.Paths = &spec.Paths{}

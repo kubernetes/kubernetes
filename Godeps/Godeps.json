@@ -17,15 +17,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "bitbucket.org/bertimus9/systemstat",
-			"Rev": "0eeff89b0690611fc32e21f0cd2e4434abf8fe53"
-		},
-		{
-			"ImportPath": "bitbucket.org/ww/goautoneg",
-			"Comment": "null-5",
-			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
-		},
-		{
 			"ImportPath": "cloud.google.com/go/compute/metadata",
 			"Comment": "v0.1.0-115-g3b1ae453",
 			"Rev": "3b1ae45394a234c385be014e9a488f2bb6eef821"
@@ -2533,6 +2524,10 @@
 			"Rev": "4ee1cc9a80582a0c75febdd5cfa779ee4361cbca"
 		},
 		{
+			"ImportPath": "github.com/munnerz/goautoneg",
+			"Rev": "a547fc61f48d567d5b4ec6f8aee5573d8efce11d"
+		},
+		{
 			"ImportPath": "github.com/mvdan/xurls",
 			"Comment": "v0.8.0-14-g1b768d7",
 			"Rev": "1b768d7c393abd8e8dda1458385a57becd4b2d4e"
@@ -2540,6 +2535,10 @@
 		{
 			"ImportPath": "github.com/mxk/go-flowrate/flowrate",
 			"Rev": "cca7078d478f8520f85629ad7c68962d31ed7682"
+		},
+		{
+			"ImportPath": "github.com/nikhita/systemstat",
+			"Rev": "0eeff89b0690611fc32e21f0cd2e4434abf8fe53"
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
@@ -3874,56 +3873,60 @@
 			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
 		},
 		{
+			"ImportPath": "k8s.io/klog",
+			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/cmd/openapi-gen/args",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/aggregator",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/generators/rules",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/testing",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto/validation",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/sets",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/utils/clock",

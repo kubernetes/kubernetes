@@ -519,8 +519,12 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/klog",
+			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		}
 	]
 }

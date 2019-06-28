@@ -7,10 +7,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "bitbucket.org/ww/goautoneg",
-			"Rev": "75cd24fc2f2c2a2088577d12123ddee5f54e0675"
-		},
-		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
 			"Rev": "d6e3b3328b783f23731bc4d058875b0371ff8109"
 		},
@@ -573,6 +569,10 @@
 		{
 			"ImportPath": "github.com/modern-go/reflect2",
 			"Rev": "05fbef0ca5da472bbf96c9322b84a53edc03c9fd"
+		},
+		{
+			"ImportPath": "github.com/munnerz/goautoneg",
+			"Rev": "a547fc61f48d567d5b4ec6f8aee5573d8efce11d"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",
@@ -2123,24 +2123,28 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/klog",
+			"Rev": "8139d8cb77af419532b33dfa7dd09fbc5f1d344f"
+		},
+		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/builder",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/handler",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
-			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+			"Rev": "fd52d7a69c206aae478f9aff43cb10eaf25e5c2a"
 		},
 		{
 			"ImportPath": "k8s.io/apimachinery/pkg/api/apitesting/fuzzer",
