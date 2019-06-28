@@ -169,8 +169,6 @@ pkg/kubelet/metrics
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/prober/results
-pkg/kubelet/prober/testing
 pkg/kubelet/qos
 pkg/kubelet/remote
 pkg/kubelet/stats
