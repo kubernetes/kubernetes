@@ -62,11 +62,15 @@ for repo in "${staging_repos[@]}"; do
 done
 
 # Run gazelle to update Go rules in BUILD files.
+# filter out known pkg-config error (see buildozer workaround below)
+# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors 
+# while preserving the exit code of gazelle
 gazelle fix \
     -external=vendored \
     -mode=fix \
     -repo_root "${KUBE_ROOT}" \
-    "${KUBE_ROOT}"
+    "${KUBE_ROOT}" \
+    2>&1 | grep -Ev "vendor/github.com/seccomp/libseccomp-golang/seccomp(_internal)?.go: pkg-config not supported: #cgo pkg-config: libseccomp" || (exit "${PIPESTATUS[0]}")
 
 # Run kazel to update the pkg-srcs and all-srcs rules as well as handle
 # Kubernetes code generators.
