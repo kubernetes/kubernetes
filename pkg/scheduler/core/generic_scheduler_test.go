@@ -977,6 +977,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			assignDefaultStartTime(test.pods)
+
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				node := makeNode(n, 1000*5, priorityutil.DefaultMemoryRequest*5)
@@ -1198,6 +1200,8 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			assignDefaultStartTime(test.pods)
+
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
@@ -1639,5 +1643,15 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 				t.Errorf("genericScheduler.numFeasibleNodesToFind() = %v, want %v", gotNumNodes, tt.wantNumNodes)
 			}
 		})
+	}
+}
+
+func assignDefaultStartTime(pods []*v1.Pod) {
+	now := metav1.Now()
+	for i := range pods {
+		pod := pods[i]
+		if pod.Status.StartTime == nil {
+			pod.Status.StartTime = &now
+		}
 	}
 }
