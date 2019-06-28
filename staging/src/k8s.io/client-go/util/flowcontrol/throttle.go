@@ -155,5 +155,5 @@ func (t *fakeNeverRateLimiter) QPS() float32 {
 }
 
 func (t *fakeNeverRateLimiter) Wait(ctx context.Context) error {
-	return errors.New("can not be accept")
+	return errors.New("can not be accepted")
 }
