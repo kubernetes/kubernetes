@@ -117,7 +117,6 @@ filegroup(
         "//pkg/kubectl/proxy:all-srcs",
         "//pkg/kubectl/scheme:all-srcs",
         "//pkg/kubectl/util:all-srcs",
-        "//pkg/kubectl/validation:all-srcs",
         "//pkg/kubectl/version:all-srcs",
     ],
     tags = ["automanaged"],
