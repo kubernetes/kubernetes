@@ -278,9 +278,8 @@ type ValidatingWebhook struct {
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission change and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
-	// sideEffects == Unknown or Some. Defaults to Unknown.
-	// +optional
-	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
+	// sideEffects == Unknown or Some.
+	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 
 	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
 	// the webhook call will be ignored or the API call will fail based on the
@@ -410,9 +409,8 @@ type MutatingWebhook struct {
 	// Webhooks with side effects MUST implement a reconciliation system, since a request may be
 	// rejected by a future step in the admission change and the side effects therefore need to be undone.
 	// Requests with the dryRun attribute will be auto-rejected if they match a webhook with
-	// sideEffects == Unknown or Some. Defaults to Unknown.
-	// +optional
-	SideEffects *SideEffectClass `json:"sideEffects,omitempty" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
+	// sideEffects == Unknown or Some.
+	SideEffects *SideEffectClass `json:"sideEffects" protobuf:"bytes,6,opt,name=sideEffects,casttype=SideEffectClass"`
 
 	// TimeoutSeconds specifies the timeout for this webhook. After the timeout passes,
 	// the webhook call will be ignored or the API call will fail based on the
