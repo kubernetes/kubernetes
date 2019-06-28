@@ -84,6 +84,7 @@ const (
 	defaultPodLogsTimeout = 20 * time.Second
 )
 
+// LogsOptions defines flags and other configuration parameters for the `logs` command
 type LogsOptions struct {
 	Namespace     string
 	ResourceArg   string
@@ -117,6 +118,7 @@ type LogsOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewLogsOptions creates new LogsOptions for the `logs` command
 func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
 	return &LogsOptions{
 		IOStreams:           streams,
@@ -164,6 +166,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	return cmd
 }
 
+// ToLogOptions convert PodLogOptions to LogOptions
 func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 	logOptions := &corev1.PodLogOptions{
 		Container:  o.Container,
@@ -200,6 +203,7 @@ func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 	return logOptions, nil
 }
 
+// Complete verifies if LogsOptions are valid and without conflicts.
 func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.ContainerNameSpecified = cmd.Flag("container").Changed
 	o.Resources = args
@@ -265,6 +269,7 @@ func (o *LogsOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	return nil
 }
 
+// Validate verifies if LogsOptions are valid.
 func (o LogsOptions) Validate() error {
 	if len(o.SinceTime) > 0 && o.SinceSeconds != 0 {
 		return fmt.Errorf("at most one of `sinceTime` or `sinceSeconds` may be specified")
