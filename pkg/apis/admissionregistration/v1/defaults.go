@@ -44,11 +44,6 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhoo
 		selector := metav1.LabelSelector{}
 		obj.ObjectSelector = &selector
 	}
-	if obj.SideEffects == nil {
-		// TODO: revisit/remove this default and possibly make the field required when promoting to v1
-		unknown := admissionregistrationv1.SideEffectClassUnknown
-		obj.SideEffects = &unknown
-	}
 	if obj.TimeoutSeconds == nil {
 		obj.TimeoutSeconds = new(int32)
 		*obj.TimeoutSeconds = 10
@@ -75,11 +70,6 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 	if obj.ObjectSelector == nil {
 		selector := metav1.LabelSelector{}
 		obj.ObjectSelector = &selector
-	}
-	if obj.SideEffects == nil {
-		// TODO: revisit/remove this default and possibly make the field required when promoting to v1
-		unknown := admissionregistrationv1.SideEffectClassUnknown
-		obj.SideEffects = &unknown
 	}
 	if obj.TimeoutSeconds == nil {
 		obj.TimeoutSeconds = new(int32)

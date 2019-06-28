@@ -47,6 +47,8 @@ func newValidatingWebhookConfiguration(hooks []admissionregistration.ValidatingW
 // TODO: Add TestValidateMutatingWebhookConfiguration to test validation for mutating webhooks.
 
 func TestValidateValidatingWebhookConfiguration(t *testing.T) {
+	unknownSideEffect := admissionregistration.SideEffectClassUnknown
+	validSideEffect := &unknownSideEffect
 	validClientConfig := admissionregistration.WebhookClientConfig{
 		URL: strPtr("https://example.com"),
 	}
@@ -72,6 +74,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
@@ -83,6 +86,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1", "invalid-version"},
 				},
 			}, true),
@@ -116,14 +120,17 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 				},
 				{
 					Name:         "k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 				},
 				{
 					Name:         "",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 				},
 			}, true),
 			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
@@ -218,6 +225,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -237,6 +245,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -257,6 +266,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -277,6 +287,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -296,6 +307,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -316,6 +328,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					Rules: []admissionregistration.RuleWithOperations{
 						{
 							Operations: []admissionregistration.OperationType{"CREATE"},
@@ -336,6 +349,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 					FailurePolicy: func() *admissionregistration.FailurePolicyType {
 						r := admissionregistration.FailurePolicyType("other")
 						return &r
@@ -343,6 +357,17 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				},
 			}, true),
 			expectedError: `webhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+		},
+		{
+			name: "SideEffects are required",
+			config: newValidatingWebhookConfiguration([]admissionregistration.ValidatingWebhook{
+				{
+					Name:         "webhook.k8s.io",
+					ClientConfig: validClientConfig,
+					SideEffects:  nil,
+				},
+			}, true),
+			expectedError: `webhooks[0].sideEffects: Required value: must specify one of None, NoneOnDryRun, Some, Unknown`,
 		},
 		{
 			name: "SideEffects can only be \"Unknown\", \"None\", \"Some\", or \"NoneOnDryRun\"",
@@ -499,6 +524,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
+					SideEffects: validSideEffect,
 				},
 			}, true),
 			expectedError: ``,
@@ -516,6 +542,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
+					SideEffects: validSideEffect,
 				},
 			}, true),
 			expectedError: ``,
@@ -533,6 +560,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
+					SideEffects: validSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "//": segment[0] may not be empty`,
@@ -550,6 +578,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
+					SideEffects: validSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo//bar/": segment[1] may not be empty`,
@@ -566,6 +595,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
+					SideEffects: validSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/foo/bar//": segment[2] may not be empty`,
@@ -583,6 +613,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 							Port:      443,
 						},
 					},
+					SideEffects: validSideEffect,
 				},
 			}, true),
 			expectedError: `clientConfig.service.path: Invalid value: "/apis/foo.bar/v1alpha1/--bad": segment[3]: a DNS-1123 subdomain`,
@@ -601,6 +632,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 								Port:      0,
 							},
 						},
+						SideEffects: validSideEffect,
 					},
 				}, true),
 			expectedError: `Invalid value: 0: port is not valid: must be between 1 and 65535, inclusive`,
@@ -619,6 +651,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 								Port:      65536,
 							},
 						},
+						SideEffects: validSideEffect,
 					},
 				}, true),
 			expectedError: `Invalid value: 65536: port is not valid: must be between 1 and 65535, inclusive`,
@@ -629,6 +662,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
+					SideEffects:    validSideEffect,
 					TimeoutSeconds: int32Ptr(31),
 				},
 			}, true),
@@ -640,6 +674,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
+					SideEffects:    validSideEffect,
 					TimeoutSeconds: int32Ptr(0),
 				},
 			}, true),
@@ -651,6 +686,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
+					SideEffects:    validSideEffect,
 					TimeoutSeconds: int32Ptr(-1),
 				},
 			}, true),
@@ -662,16 +698,19 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 				{
 					Name:           "webhook.k8s.io",
 					ClientConfig:   validClientConfig,
+					SideEffects:    validSideEffect,
 					TimeoutSeconds: int32Ptr(1),
 				},
 				{
 					Name:           "webhook2.k8s.io",
 					ClientConfig:   validClientConfig,
+					SideEffects:    validSideEffect,
 					TimeoutSeconds: int32Ptr(15),
 				},
 				{
 					Name:           "webhook3.k8s.io",
 					ClientConfig:   validClientConfig,
+					SideEffects:    validSideEffect,
 					TimeoutSeconds: int32Ptr(30),
 				},
 			}, true),
@@ -696,6 +735,8 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 }
 
 func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
+	unknownSideEffect := admissionregistration.SideEffectClassUnknown
+	validSideEffect := &unknownSideEffect
 	validClientConfig := admissionregistration.WebhookClientConfig{
 		URL: strPtr("https://example.com"),
 	}
@@ -711,6 +752,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				},
 			}, true),
@@ -718,6 +760,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 				},
 			}, true),
 			expectedError: ``,
@@ -728,6 +771,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1", "invalid-v2"},
 				},
 			}, true),
@@ -735,6 +779,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v0"},
 				},
 			}, true),
@@ -746,6 +791,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
@@ -753,6 +799,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"v1beta1", "invalid-v1"},
 				},
 			}, true),
@@ -764,6 +811,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:                    "webhook.k8s.io",
 					ClientConfig:            validClientConfig,
+					SideEffects:             validSideEffect,
 					AdmissionReviewVersions: []string{"invalid-v1"},
 				},
 			}, true),
@@ -771,6 +819,7 @@ func TestValidateValidatingWebhookConfigurationUpdate(t *testing.T) {
 				{
 					Name:         "webhook.k8s.io",
 					ClientConfig: validClientConfig,
+					SideEffects:  validSideEffect,
 				},
 			}, false),
 			expectedError: `Invalid value: []string{"invalid-v1"}`,
