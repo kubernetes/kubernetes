@@ -97,6 +97,7 @@ func createConfiguratorWithPodInformer(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		Registry:                       pluginRegistry,
 		Plugins:                        plugins,
 		PluginConfig:                   pluginConfig,
