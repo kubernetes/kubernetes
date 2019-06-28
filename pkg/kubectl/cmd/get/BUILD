@@ -22,6 +22,7 @@ go_library(
         "get.go",
         "get_flags.go",
         "humanreadable_flags.go",
+        "skip_printer.go",
         "sorter.go",
         "table_printer.go",
     ],
@@ -60,6 +61,7 @@ go_library(
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/vbom.ml/util/sortorder:go_default_library",
     ],
 )
@@ -97,7 +99,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
