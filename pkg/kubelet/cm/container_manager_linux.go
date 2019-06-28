@@ -221,7 +221,6 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		}
 	}
 
-	var capacity = v1.ResourceList{}
 	var internalCapacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
@@ -230,7 +229,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
+	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
 	for k, v := range capacity {
 		internalCapacity[k] = v
 	}
