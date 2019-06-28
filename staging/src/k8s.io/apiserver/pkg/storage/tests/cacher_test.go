@@ -43,7 +43,6 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
-	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
@@ -102,7 +101,7 @@ func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServe
 
 func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage.Versioner) {
 	prefix := "pods"
-	v := etcdstorage.APIObjectVersioner{}
+	v := etcd3.APIObjectVersioner{}
 	config := cacherstorage.Config{
 		CacheCapacity:  cap,
 		Storage:        s,
