@@ -94,5 +94,7 @@ var GVRToStorageVersionHash = map[string]string{
 	"apps/v1/statefulsets":                                                 "H+vl74LkKdo=",
 	"admissionregistration.k8s.io/v1beta1/mutatingwebhookconfigurations":   "yxW1cpLtfp8=",
 	"admissionregistration.k8s.io/v1beta1/validatingwebhookconfigurations": "P9NhrezfnWE=",
+	"admissionregistration.k8s.io/v1/mutatingwebhookconfigurations":        "yxW1cpLtfp8=",
+	"admissionregistration.k8s.io/v1/validatingwebhookconfigurations":      "P9NhrezfnWE=",
 	"events.k8s.io/v1beta1/events":                                         "r2yiGXH7wu8=",
 }
