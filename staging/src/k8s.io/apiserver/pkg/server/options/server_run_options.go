@@ -35,6 +35,7 @@ import (
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
+	AdvertisePort    int
 
 	CorsAllowedOriginList       []string
 	ExternalHost                string
@@ -79,7 +80,8 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MinRequestTimeout = s.MinRequestTimeout
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
-	c.PublicAddress = s.AdvertiseAddress
+	c.AdvertiseAddress = s.AdvertiseAddress
+	c.AdvertisePort = s.AdvertisePort
 
 	return nil
 }
@@ -97,6 +99,10 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 				"Try to set the AdvertiseAddress directly or provide a valid BindAddress to fix this.", err)
 		}
 		s.AdvertiseAddress = hostIP
+	}
+
+	if s.AdvertisePort == 0 {
+		s.AdvertisePort = secure.BindPort
 	}
 
 	return nil
@@ -164,6 +170,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
+
+	fs.IntVar(&s.AdvertisePort, "advertise-port", s.AdvertisePort, ""+
+		"The port on which to advertise the apiserver to members of the cluster. If blank, "+
+		"the --secure-port will be used.")
 
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, ""+
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+

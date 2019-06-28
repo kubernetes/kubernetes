@@ -69,14 +69,14 @@ type Controller struct {
 	SystemNamespaces         []string
 	SystemNamespacesInterval time.Duration
 
-	PublicIP net.IP
+	AdvertiseAddress net.IP
+	AdvertisePort    int
 
 	// ServiceIP indicates where the kubernetes service will live.  It may not be nil.
 	ServiceIP                 net.IP
 	ServicePort               int
 	ExtraServicePorts         []corev1.ServicePort
 	ExtraEndpointPorts        []corev1.EndpointPort
-	PublicServicePort         int
 	KubernetesServiceNodePort int
 
 	runner *async.Runner
@@ -84,11 +84,6 @@ type Controller struct {
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
 func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, healthClient rest.Interface) *Controller {
-	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
-	if err != nil {
-		klog.Fatalf("failed to get listener address: %v", err)
-	}
-
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic}
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
 		systemNamespaces = append(systemNamespaces, corev1.NamespaceNodeLease)
@@ -114,13 +109,13 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
 		ServiceNodePortInterval: 3 * time.Minute,
 
-		PublicIP: c.GenericConfig.PublicAddress,
+		AdvertiseAddress: c.GenericConfig.AdvertiseAddress,
+		AdvertisePort:    c.GenericConfig.AdvertisePort,
 
 		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
 		ServicePort:               c.ExtraConfig.APIServerServicePort,
 		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
 		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
-		PublicServicePort:         publicServicePort,
 		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}
 }
@@ -143,8 +138,8 @@ func (c *Controller) Start() {
 	}
 
 	// Reconcile during first run removing itself until server is ready.
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
+	endpointPorts := createEndpointPortSpec(c.AdvertisePort, "https", c.ExtraEndpointPorts)
+	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.AdvertiseAddress, endpointPorts); err != nil {
 		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
 	}
 
@@ -169,13 +164,13 @@ func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	endpointPorts := createEndpointPortSpec(c.AdvertisePort, "https", c.ExtraEndpointPorts)
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
 		klog.Infof("Shutting down kubernetes service endpoint reconciler")
 		c.EndpointReconciler.StopReconciling()
-		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
+		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.AdvertiseAddress, endpointPorts); err != nil {
 			klog.Error(err)
 		}
 	}()
@@ -230,12 +225,12 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
+	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.AdvertisePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
 	}
-	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
-	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts, reconcile); err != nil {
+	endpointPorts := createEndpointPortSpec(c.AdvertisePort, "https", c.ExtraEndpointPorts)
+	if err := c.EndpointReconciler.ReconcileEndpoints(kubernetesServiceName, c.AdvertiseAddress, endpointPorts, reconcile); err != nil {
 		return err
 	}
 	return nil

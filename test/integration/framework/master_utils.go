@@ -165,6 +165,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 		Groups: []string{user.SystemPrivilegedGroup},
 	}
 
+	masterConfig.GenericConfig.AdvertisePort = 443
+
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
 	if masterConfig.GenericConfig.Authentication.Authenticator == nil {
 		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
@@ -238,7 +240,7 @@ func NewIntegrationTestMasterConfig() *master.Config {
 // configured with the provided options.
 func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 	masterConfig := NewMasterConfigWithOptions(opts)
-	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	masterConfig.GenericConfig.AdvertiseAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 
 	// TODO: get rid of these tests or port them to secure serving

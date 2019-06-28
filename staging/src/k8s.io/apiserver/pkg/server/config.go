@@ -194,10 +194,13 @@ type Config struct {
 	// values below here are targets for removal
 	//===========================================================================
 
-	// PublicAddress is the IP address where members of the cluster (kubelet,
+	// AdvertiseAddress is the IP address where members of the cluster (kubelet,
 	// kube-proxy, services, etc.) can reach the GenericAPIServer.
 	// If nil or 0.0.0.0, the host's default interface will be used.
-	PublicAddress net.IP
+	AdvertiseAddress net.IP
+	// AdvertisePort is the port on which to advertise the apiserver to members
+	// of the cluster.
+	AdvertisePort int
 
 	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
 	// and the kind associated with a given resource. As resources are installed, they are registered here.
@@ -372,8 +375,11 @@ type CompletedConfig struct {
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
-	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
-		c.ExternalAddress = c.PublicAddress.String()
+	if len(c.ExternalAddress) == 0 && c.AdvertiseAddress != nil {
+		c.ExternalAddress = c.AdvertiseAddress.String()
+		if c.AdvertisePort != 0 {
+			c.ExternalAddress = net.JoinHostPort(c.AdvertiseAddress.String(), strconv.Itoa(c.AdvertisePort))
+		}
 	}
 
 	// if there is no port, and we listen on one securely, use that one
