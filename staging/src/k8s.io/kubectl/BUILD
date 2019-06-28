@@ -9,6 +9,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/openapi:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/rawhttp:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/certificate:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/deployment:all-srcs",

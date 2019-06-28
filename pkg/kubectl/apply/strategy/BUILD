@@ -38,9 +38,9 @@ go_test(
     deps = [
         "//pkg/kubectl/apply:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/openapi:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/cmd/util/openapi/testing:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
