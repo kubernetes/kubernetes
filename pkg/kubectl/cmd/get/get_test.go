@@ -1855,6 +1855,53 @@ foo    <unknown>
 	}
 }
 
+func TestWatchStatus(t *testing.T) {
+	pods, events := watchTestData()
+	events = append(events, watch.Event{Type: "ERROR", Object: &metav1.Status{Status: "Failure", Reason: "InternalServerError", Message: "Something happened"}})
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods/foo":
+				return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods[1])}, nil
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" && req.URL.Query().Get("fieldSelector") == "metadata.name=foo" {
+					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: watchBody(codec, events[1:])}, nil
+				}
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+
+	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdGet("kubectl", tf, streams)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Run(cmd, []string{"pods", "foo"})
+
+	expected := `NAME   AGE
+foo    <unknown>
+foo    <unknown>
+foo    <unknown>
+
+STATUS    REASON                MESSAGE
+Failure   InternalServerError   Something happened
+`
+	if e, a := expected, buf.String(); e != a {
+		t.Errorf("expected\n%v\ngot\n%v", e, a)
+	}
+}
+
 func TestWatchTableResource(t *testing.T) {
 	pods, events := watchTestData()
 
