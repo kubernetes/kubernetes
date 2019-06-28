@@ -134,7 +134,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook", func() {
 		context = setupServerCert(f.Namespace.Name, serviceCRDName)
 		createAuthReaderRoleBindingForCRDConversion(f, f.Namespace.Name)
 
-		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.CRDConversionWebhook), context)
+		deployCustomResourceWebhookAndService(f, imageutils.GetE2EImage(imageutils.Agnhost), context)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -269,11 +269,11 @@ func deployCustomResourceWebhookAndService(f *framework.Framework, image string,
 			Name:         "sample-crd-conversion-webhook",
 			VolumeMounts: mounts,
 			Args: []string{
+				"crd-conversion-webhook",
 				"--tls-cert-file=/webhook.local.config/certificates/tls.crt",
 				"--tls-private-key-file=/webhook.local.config/certificates/tls.key",
 				"--alsologtostderr",
 				"-v=4",
-				"2>&1",
 			},
 			Image: image,
 		},

@@ -184,7 +184,8 @@ func newTablePod(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: imageutils.GetE2EImage(imageutils.Porter),
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"porter"},
 					Env:   []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},

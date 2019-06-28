@@ -1236,6 +1236,7 @@ func StartServeHostnameService(c clientset.Interface, svc *v1.Service, ns string
 	config := testutils.RCConfig{
 		Client:               c,
 		Image:                ServeHostnameImage,
+		Command:              []string{"/agnhost", "serve-hostname"},
 		Name:                 name,
 		Namespace:            ns,
 		PollInterval:         3 * time.Second,

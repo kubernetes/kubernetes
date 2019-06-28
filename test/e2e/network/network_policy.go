@@ -640,7 +640,8 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		// Build the containers for the server pod.
 		containers = append(containers, v1.Container{
 			Name:  fmt.Sprintf("%s-container-%d", podName, port),
-			Image: imageutils.GetE2EImage(imageutils.Porter),
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"porter"},
 			Env: []v1.EnvVar{
 				{
 					Name:  fmt.Sprintf("SERVE_PORT_%d", port),

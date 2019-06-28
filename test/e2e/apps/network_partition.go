@@ -88,6 +88,7 @@ func podOnNode(podName, nodeName string, image string) *v1.Pod {
 				{
 					Name:  podName,
 					Image: image,
+					Args:  []string{"serve-hostname"},
 					Ports: []v1.ContainerPort{{ContainerPort: 9376}},
 				},
 			},

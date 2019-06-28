@@ -77,7 +77,8 @@ var _ = SIGDescribe("[Feature:DynamicAudit]", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "proxy",
-						Image: imageutils.GetE2EImage(imageutils.AuditProxy),
+						Image: imageutils.GetE2EImage(imageutils.Agnhost),
+						Args:  []string{"audit-proxy"},
 						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 8080,

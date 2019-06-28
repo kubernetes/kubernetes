@@ -41,7 +41,6 @@ import (
 )
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
-var inClusterClientImage = imageutils.GetE2EImage(imageutils.InClusterClient)
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
@@ -436,7 +435,8 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{{
 					Name:  "inclusterclient",
-					Image: inClusterClientImage,
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"inclusterclient"},
 					VolumeMounts: []v1.VolumeMount{{
 						MountPath: "/var/run/secrets/kubernetes.io/serviceaccount",
 						Name:      "kube-api-access-e2e",

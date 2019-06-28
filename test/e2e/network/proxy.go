@@ -125,7 +125,8 @@ var _ = SIGDescribe("Proxy", func() {
 			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
 				Client:       f.ClientSet,
-				Image:        imageutils.GetE2EImage(imageutils.Porter),
+				Image:        imageutils.GetE2EImage(imageutils.Agnhost),
+				Command:      []string{"/agnhost", "porter"},
 				Name:         service.Name,
 				Namespace:    f.Namespace.Name,
 				Replicas:     1,
