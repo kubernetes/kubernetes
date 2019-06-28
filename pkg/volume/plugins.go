@@ -334,6 +334,8 @@ type KubeletVolumeHost interface {
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 	WaitForCacheSync() error
+	// Returns HostUtils Interface
+	GetHostUtil() mount.HostUtils
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use

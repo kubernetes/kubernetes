@@ -165,7 +165,8 @@ func (n *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
-	resolvedFile, err := n.EvalHostSymlinks(file)
+	hu := NewHostUtil(n.ne, n.rootDir)
+	resolvedFile, err := hu.EvalHostSymlinks(file)
 	if err != nil {
 		return true, err
 	}
@@ -211,36 +212,67 @@ func parseFindMnt(out string) (string, error) {
 	return out[:i], nil
 }
 
+// GetMountRefs finds all mount references to the path, returns a
+// list of paths. Path could be a mountpoint path, device or a normal
+// directory (for bind mount).
+func (n *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	pathExists, pathErr := mount.PathExists(pathname)
+	if !pathExists || mount.IsCorruptedMnt(pathErr) {
+		return []string{}, nil
+	} else if pathErr != nil {
+		return nil, fmt.Errorf("Error checking path %s: %v", pathname, pathErr)
+	}
+	hostpath, err := n.ne.EvalSymlinks(pathname, true /* mustExist */)
+	if err != nil {
+		return nil, err
+	}
+	return mount.SearchMountPoints(hostpath, hostProcMountinfoPath)
+}
+
+type hostUtil struct {
+	ne      *nsenter.Nsenter
+	rootDir string
+}
+
+// hostUtil implements mount.HostUtils
+var _ = mount.HostUtils(&hostUtil{})
+
+// NewHostUtil returns a new mount.HostUtils implementation that works
+// for kubelet running in a container
+func NewHostUtil(ne *nsenter.Nsenter, rootDir string) mount.HostUtils {
+	return &hostUtil{ne: ne, rootDir: rootDir}
+}
+
 // DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
 // Returns true if open returns errno EBUSY, and false if errno is nil.
 // Returns an error if errno is any error other than EBUSY.
 // Returns with error if pathname is not a device.
-func (n *Mounter) DeviceOpened(pathname string) (bool, error) {
+func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
 	return mount.ExclusiveOpenFailsOnDevice(pathname)
 }
 
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
 // to a device.
-func (n *Mounter) PathIsDevice(pathname string) (bool, error) {
-	pathType, err := n.GetFileType(pathname)
+func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+	pathType, err := hu.GetFileType(pathname)
 	isDevice := pathType == mount.FileTypeCharDev || pathType == mount.FileTypeBlockDev
 	return isDevice, err
 }
 
 //GetDeviceNameFromMount given a mount point, find the volume id from checking /proc/mounts
-func (n *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return mount.GetDeviceNameFromMountLinux(n, mountPath, pluginMountDir)
+func (hu *hostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
+	return mount.GetDeviceNameFromMountLinux(mounter, mountPath, pluginMountDir)
 }
 
 // MakeRShared checks if path is shared and bind-mounts it as rshared if needed.
-func (n *Mounter) MakeRShared(path string) error {
+func (hu *hostUtil) MakeRShared(path string) error {
 	return mount.DoMakeRShared(path, hostProcMountinfoPath)
 }
 
 // GetFileType checks for file/directory/socket/block/character devices.
-func (n *Mounter) GetFileType(pathname string) (mount.FileType, error) {
+func (hu *hostUtil) GetFileType(pathname string) (mount.FileType, error) {
 	var pathType mount.FileType
-	outputBytes, err := n.ne.Exec("stat", []string{"-L", "--printf=%F", pathname}).CombinedOutput()
+	outputBytes, err := hu.ne.Exec("stat", []string{"-L", "--printf=%F", pathname}).CombinedOutput()
 	if err != nil {
 		if strings.Contains(string(outputBytes), "No such file") {
 			err = fmt.Errorf("%s does not exist", pathname)
@@ -267,18 +299,18 @@ func (n *Mounter) GetFileType(pathname string) (mount.FileType, error) {
 }
 
 // MakeDir creates a new directory.
-func (n *Mounter) MakeDir(pathname string) error {
+func (hu *hostUtil) MakeDir(pathname string) error {
 	args := []string{"-p", pathname}
-	if _, err := n.ne.Exec("mkdir", args).CombinedOutput(); err != nil {
+	if _, err := hu.ne.Exec("mkdir", args).CombinedOutput(); err != nil {
 		return err
 	}
 	return nil
 }
 
 // MakeFile creates an empty file.
-func (n *Mounter) MakeFile(pathname string) error {
+func (hu *hostUtil) MakeFile(pathname string) error {
 	args := []string{pathname}
-	if _, err := n.ne.Exec("touch", args).CombinedOutput(); err != nil {
+	if _, err := hu.ne.Exec("touch", args).CombinedOutput(); err != nil {
 		return err
 	}
 	return nil
@@ -286,60 +318,43 @@ func (n *Mounter) MakeFile(pathname string) error {
 
 // ExistsPath checks if pathname exists.
 // Error is returned on any other error than "file not found".
-func (n *Mounter) ExistsPath(pathname string) (bool, error) {
+func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
 	// Resolve the symlinks but allow the target not to exist. EvalSymlinks
 	// would return an generic error when the target does not exist.
-	hostPath, err := n.ne.EvalSymlinks(pathname, false /* mustExist */)
+	hostPath, err := hu.ne.EvalSymlinks(pathname, false /* mustExist */)
 	if err != nil {
 		return false, err
 	}
-	kubeletpath := n.ne.KubeletPath(hostPath)
+	kubeletpath := hu.ne.KubeletPath(hostPath)
 	return utilpath.Exists(utilpath.CheckFollowSymlink, kubeletpath)
 }
 
 // EvalHostSymlinks returns the path name after evaluating symlinks.
-func (n *Mounter) EvalHostSymlinks(pathname string) (string, error) {
-	return n.ne.EvalSymlinks(pathname, true)
-}
-
-// GetMountRefs finds all mount references to the path, returns a
-// list of paths. Path could be a mountpoint path, device or a normal
-// directory (for bind mount).
-func (n *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	pathExists, pathErr := mount.PathExists(pathname)
-	if !pathExists || mount.IsCorruptedMnt(pathErr) {
-		return []string{}, nil
-	} else if pathErr != nil {
-		return nil, fmt.Errorf("Error checking path %s: %v", pathname, pathErr)
-	}
-	hostpath, err := n.ne.EvalSymlinks(pathname, true /* mustExist */)
-	if err != nil {
-		return nil, err
-	}
-	return mount.SearchMountPoints(hostpath, hostProcMountinfoPath)
+func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return hu.ne.EvalSymlinks(pathname, true)
 }
 
 // GetFSGroup returns FSGroup of pathname.
-func (n *Mounter) GetFSGroup(pathname string) (int64, error) {
-	hostPath, err := n.ne.EvalSymlinks(pathname, true /* mustExist */)
+func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
+	hostPath, err := hu.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
 		return -1, err
 	}
-	kubeletpath := n.ne.KubeletPath(hostPath)
+	kubeletpath := hu.ne.KubeletPath(hostPath)
 	return mount.GetFSGroupLinux(kubeletpath)
 }
 
 // GetSELinuxSupport tests if pathname is on a mount that supports SELinux.
-func (n *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return mount.GetSELinux(pathname, hostProcMountsPath)
 }
 
 // GetMode returns permissions of pathname.
-func (n *Mounter) GetMode(pathname string) (os.FileMode, error) {
-	hostPath, err := n.ne.EvalSymlinks(pathname, true /* mustExist */)
+func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
+	hostPath, err := hu.ne.EvalSymlinks(pathname, true /* mustExist */)
 	if err != nil {
 		return 0, err
 	}
-	kubeletpath := n.ne.KubeletPath(hostPath)
+	kubeletpath := hu.ne.KubeletPath(hostPath)
 	return mount.GetModeLinux(kubeletpath)
 }
