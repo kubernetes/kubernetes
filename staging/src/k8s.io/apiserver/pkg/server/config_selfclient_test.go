@@ -59,7 +59,9 @@ func TestLoopbackHostPort(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() || ip.To4() != nil {
+	if host == "localhost" {
+		// can happen on machines without IPv6
+	} else if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() || ip.To4() != nil {
 		t.Fatalf("expected IPv6 host to be loopback, got %q", host)
 	}
 
