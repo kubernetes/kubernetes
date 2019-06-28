@@ -29,7 +29,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
-		policy := admissionregistrationv1.Ignore
+		policy := admissionregistrationv1.Fail
 		obj.FailurePolicy = &policy
 	}
 	if obj.MatchPolicy == nil {
@@ -61,7 +61,7 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhoo
 
 func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 	if obj.FailurePolicy == nil {
-		policy := admissionregistrationv1.Ignore
+		policy := admissionregistrationv1.Fail
 		obj.FailurePolicy = &policy
 	}
 	if obj.MatchPolicy == nil {
