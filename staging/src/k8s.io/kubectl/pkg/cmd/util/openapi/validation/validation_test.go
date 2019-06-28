@@ -27,7 +27,7 @@ import (
 
 	// This dependency is needed to register API types.
 	"k8s.io/kube-openapi/pkg/util/proto/testing"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubectl/pkg/cmd/util/openapi"
 )
 
 var fakeSchema = testing.Fake{Path: filepath.Join("..", "..", "..", "..", "..", "..", "api", "openapi-spec", "swagger.json")}
