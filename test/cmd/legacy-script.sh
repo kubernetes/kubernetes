@@ -44,7 +44,6 @@ source "${KUBE_ROOT}/test/cmd/get.sh"
 source "${KUBE_ROOT}/test/cmd/kubeadm.sh"
 source "${KUBE_ROOT}/test/cmd/kubeconfig.sh"
 source "${KUBE_ROOT}/test/cmd/node-management.sh"
-source "${KUBE_ROOT}/test/cmd/old-print.sh"
 source "${KUBE_ROOT}/test/cmd/plugins.sh"
 source "${KUBE_ROOT}/test/cmd/proxy.sh"
 source "${KUBE_ROOT}/test/cmd/rbac.sh"
@@ -503,7 +502,6 @@ runTests() {
 
   if kube::test::if_supports_resource "${pods}" ; then
     record_command run_kubectl_get_tests
-    record_command run_kubectl_old_print_tests
   fi
 
   ################
