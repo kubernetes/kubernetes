@@ -9,7 +9,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["slice.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util/slice",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/util/slice",
+    importpath = "k8s.io/kubectl/pkg/util/slice",
 )
 
 go_test(
