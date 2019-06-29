@@ -7,12 +7,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "doc.go",
-        "etcdtest.go",
-    ],
-    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd/etcdtest",
-    importpath = "k8s.io/apiserver/pkg/storage/etcd/etcdtest",
+    srcs = ["metrics.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/etcd3/metrics",
+    importpath = "k8s.io/apiserver/pkg/storage/etcd3/metrics",
+    deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
 )
 
 filegroup(

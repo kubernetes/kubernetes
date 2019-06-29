@@ -62,15 +62,18 @@ func Register() {
 	})
 }
 
+// UpdateObjectCount sets the etcd_object_counts metric.
 func UpdateObjectCount(resourcePrefix string, count int64) {
 	objectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
 }
 
+// RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
 	deprecatedEtcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(sinceInMicroseconds(startTime))
 }
 
+// Reset resets the etcd_request_duration_seconds metric.
 func Reset() {
 	etcdRequestLatency.Reset()
 
