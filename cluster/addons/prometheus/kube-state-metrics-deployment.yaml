@@ -19,8 +19,6 @@ spec:
       labels:
         k8s-app: kube-state-metrics
         version: v1.3.0
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: kube-state-metrics
