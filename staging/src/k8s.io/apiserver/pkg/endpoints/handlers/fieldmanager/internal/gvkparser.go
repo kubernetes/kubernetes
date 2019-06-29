@@ -38,7 +38,7 @@ type gvkParser struct {
 func (p *gvkParser) Type(gvk schema.GroupVersionKind) typed.ParseableType {
 	typeName, ok := p.gvks[gvk]
 	if !ok {
-		return nil
+		return typed.ParseableType{}
 	}
 	return p.parser.Type(typeName)
 }
