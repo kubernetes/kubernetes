@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
+	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
@@ -89,6 +90,7 @@ var AllOrderedPlugins = []string{
 	resize.PluginName,                       // PersistentVolumeClaimResize
 	mutatingwebhook.PluginName,              // MutatingAdmissionWebhook
 	validatingwebhook.PluginName,            // ValidatingAdmissionWebhook
+	runtimeclass.PluginName,                 //RuntimeClass
 	resourcequota.PluginName,                // ResourceQuota
 	deny.PluginName,                         // AlwaysDeny
 }
@@ -115,6 +117,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)
+	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
 	podsecuritypolicy.Register(plugins)
 	podpriority.Register(plugins)
@@ -143,6 +146,10 @@ func DefaultOffAdmissionPlugins() sets.String {
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		defaultOnPlugins.Insert(runtimeclass.PluginName) //RuntimeClass
 	}
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
