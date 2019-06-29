@@ -73,6 +73,9 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 		UpdateFunc: func(old, new interface{}) {
 			e.pvcAddedUpdated(new)
 		},
+		DeleteFunc: func(obj interface{}) {
+			e.pvcDeleted(obj)
+		},
 	})
 
 	e.podLister = podInformer.Lister()
@@ -253,6 +256,29 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)
+	}
+}
+
+func (c *Controller) pvcDeleted(obj interface{}) {
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+		return
+	}
+	pvc, ok := tombstone.Obj.(*v1.PersistentVolumeClaim)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a PVC %#v", obj))
+		return
+	}
+
+	if protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
+		isUsed, err := c.isBeingUsed(pvc)
+		if err != nil {
+			return
+		}
+		if !isUsed {
+			c.removeFinalizer(pvc)
+		}
 	}
 }
 
