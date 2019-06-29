@@ -40,9 +40,6 @@ func SetDefaults_CustomResourceDefinition(obj *CustomResourceDefinition) {
 }
 
 func SetDefaults_CustomResourceDefinitionSpec(obj *CustomResourceDefinitionSpec) {
-	if len(obj.Scope) == 0 {
-		obj.Scope = NamespaceScoped
-	}
 	if len(obj.Names.Singular) == 0 {
 		obj.Names.Singular = strings.ToLower(obj.Names.Kind)
 	}

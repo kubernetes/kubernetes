@@ -38,7 +38,7 @@ type CustomResourceDefinitionSpec struct {
 	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
-	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
+	// Scope indicates whether this resource is cluster or namespace scoped.
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
 	// Versions is the list of all supported versions for this resource.
 	// Order: The version name will be used to compute the order.

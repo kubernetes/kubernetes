@@ -39,7 +39,6 @@ func TestDefaults(t *testing.T) {
 			original: &CustomResourceDefinition{},
 			expected: &CustomResourceDefinition{
 				Spec: CustomResourceDefinitionSpec{
-					Scope:                 NamespaceScoped,
 					Conversion:            &CustomResourceConversion{Strategy: NoneConverter},
 					PreserveUnknownFields: utilpointer.BoolPtr(true),
 				},
