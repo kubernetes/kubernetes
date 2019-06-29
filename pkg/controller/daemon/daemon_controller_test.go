@@ -46,9 +46,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -1820,6 +1820,34 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec
+
+		manager, podControl, _, err := newTestController(ds)
+		if err != nil {
+			t.Fatalf("error creating DaemonSets controller: %v", err)
+		}
+		node := newNode("too-much-mem", nil)
+		node.Status.Allocatable = allocatableResources("100M", "200m")
+		manager.nodeStore.Add(node)
+		manager.podStore.Add(&v1.Pod{
+			Spec: podSpec,
+		})
+
+		manager.dsStore.Add(ds)
+		switch strategy.Type {
+		case apps.OnDeleteDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
+		case apps.RollingUpdateDaemonSetStrategyType:
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+		default:
+			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
+		}
+	}
+
+	for _, strategy := range updateStrategies() {
+		podSpec := resourcePodSpec("too-much-mem", "75M", "75m")
+		ds := newDaemonSet("critical")
+		ds.Spec.UpdateStrategy = *strategy
+		ds.Spec.Template.Spec = podSpec
 		setDaemonSetCritical(ds)
 
 		manager, podControl, _, err := newTestController(ds)
@@ -1833,25 +1861,13 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 			Spec: podSpec,
 		})
 
-		// Without enabling critical pod annotation feature gate, we shouldn't create critical pod
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, false)()
 		manager.dsStore.Add(ds)
-		switch strategy.Type {
-		case apps.OnDeleteDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
-		case apps.RollingUpdateDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
-		default:
-			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
-		}
 
-		// Enabling critical pod annotation feature gate should create critical pod
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 2)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		case apps.RollingUpdateDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 3)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -1880,7 +1896,6 @@ func TestPortConflictNodeDaemonDoesNotLaunchCriticalPod(t *testing.T) {
 			Spec: podSpec,
 		})
 
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 		ds := newDaemonSet("critical")
 		ds.Spec.UpdateStrategy = *strategy
 		ds.Spec.Template.Spec = podSpec
@@ -1895,7 +1910,8 @@ func setDaemonSetCritical(ds *apps.DaemonSet) {
 	if ds.Spec.Template.ObjectMeta.Annotations == nil {
 		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
 	}
-	ds.Spec.Template.ObjectMeta.Annotations[kubelettypes.CriticalPodAnnotationKey] = ""
+	podPriority := scheduling.SystemCriticalPriority
+	ds.Spec.Template.Spec.Priority = &podPriority
 }
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {

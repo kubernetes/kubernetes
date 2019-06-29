@@ -20,8 +20,6 @@ spec:
       labels:
         k8s-app: node-exporter
         version: v0.15.2
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       containers:

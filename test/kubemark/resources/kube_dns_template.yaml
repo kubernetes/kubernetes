@@ -57,9 +57,8 @@ spec:
     metadata:
       labels:
         k8s-app: kube-dns
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      priorityClassName: system-node-critical
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
