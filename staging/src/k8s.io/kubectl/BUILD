@@ -25,6 +25,7 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/util/storage:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util/term:all-srcs",
+        "//staging/src/k8s.io/kubectl/pkg/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
