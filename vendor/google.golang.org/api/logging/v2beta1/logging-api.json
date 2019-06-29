@@ -119,7 +119,7 @@
     "entries": {
       "methods": {
         "list": {
-          "description": "Lists log entries. Use this method to retrieve log entries from Logging. For ways to export log entries, see Exporting Logs.",
+          "description": "Lists log entries. Use this method to retrieve log entries that originated from a project/folder/organization/billing account. For ways to export log entries, see Exporting Logs.",
           "flatPath": "v2beta1/entries:list",
           "httpMethod": "POST",
           "id": "logging.entries.list",
@@ -529,7 +529,7 @@
       }
     }
   },
-  "revision": "20181020",
+  "revision": "20181215",
   "rootUrl": "https://logging.googleapis.com/",
   "schemas": {
     "BucketOptions": {
