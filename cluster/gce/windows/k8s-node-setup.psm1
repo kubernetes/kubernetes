@@ -973,7 +973,6 @@ function Start-WorkerServices {
   #   kube-proxy --master=https://35.239.84.171
   #   --kubeconfig=/var/lib/kube-proxy/kubeconfig --cluster-cidr=10.64.0.0/14
   #   --oom-score-adj=-998 --v=2
-  #   --feature-gates=ExperimentalCriticalPodAnnotation=true
   #   --iptables-sync-period=1m --iptables-min-sync-period=10s
   #   --ipvs-sync-period=1m --ipvs-min-sync-period=10s
   # And also with various volumeMounts and "securityContext: privileged: true".
