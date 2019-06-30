@@ -145,6 +145,7 @@ pkg/master/controller/crdregistration
 pkg/master/tunneler
 pkg/proxy/apis/config
 pkg/proxy/apis/config/v1alpha1
+pkg/proxy/apis/config/v1alpha2
 pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace

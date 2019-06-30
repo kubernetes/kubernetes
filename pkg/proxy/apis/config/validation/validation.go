@@ -58,8 +58,13 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("ConfigSyncPeriod"), config.ConfigSyncPeriod, "must be greater than 0"))
 	}
 
-	if net.ParseIP(config.BindAddress) == nil {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
+	if len(config.BindAddress) == 0 {
+		allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "must be set"))
+	}
+	for _, bindAddress := range config.BindAddress {
+		if net.ParseIP(bindAddress) == nil {
+			allErrs = append(allErrs, field.Invalid(newPath.Child("BindAddress"), config.BindAddress, "not a valid textual representation of an IP address"))
+		}
 	}
 
 	if config.HealthzBindAddress != "" {

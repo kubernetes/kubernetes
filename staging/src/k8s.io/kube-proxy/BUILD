@@ -10,6 +10,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/kube-proxy/config/v1alpha2:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

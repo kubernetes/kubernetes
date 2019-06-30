@@ -267,10 +267,7 @@ func AppendPortIfNeeded(addr string, port int32) string {
 	}
 
 	// Append port to address.
-	if ip.To4() != nil {
-		return fmt.Sprintf("%s:%d", addr, port)
-	}
-	return fmt.Sprintf("[%s]:%d", addr, port)
+	return net.JoinHostPort(addr, strconv.Itoa(int(port)))
 }
 
 // ShuffleStrings copies strings from the specified slice into a copy in random

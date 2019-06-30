@@ -8,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
         "defaults.go",
         "doc.go",
         "register.go",
@@ -16,7 +15,7 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1",
+    importpath = "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha2",
     deps = [
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -27,7 +26,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/component-base/config/v1alpha1:go_default_library",
-        "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/kube-proxy/config/v1alpha2:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

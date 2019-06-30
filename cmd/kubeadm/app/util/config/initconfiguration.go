@@ -130,9 +130,9 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 
 	ip := net.ParseIP(advertiseAddress)
 	if ip.To4() != nil {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv4
+		cfg.ComponentConfigs.KubeProxy.BindAddress = []string{kubeadmapiv1beta2.DefaultProxyBindAddressv4}
 	} else {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv6
+		cfg.ComponentConfigs.KubeProxy.BindAddress = []string{kubeadmapiv1beta2.DefaultProxyBindAddressv6}
 	}
 
 	// Resolve possible version labels and validate version string

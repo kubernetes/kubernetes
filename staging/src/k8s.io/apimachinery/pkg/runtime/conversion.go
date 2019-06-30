@@ -19,6 +19,7 @@ limitations under the License.
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -62,10 +63,15 @@ var DefaultStringConversions = []interface{}{
 }
 
 func Convert_Slice_string_To_string(input *[]string, out *string, s conversion.Scope) error {
+	if input == nil {
+		return errors.New("can't convert nil slice")
+	}
+
 	if len(*input) == 0 {
 		*out = ""
+	} else {
+		*out = (*input)[0]
 	}
-	*out = (*input)[0]
 	return nil
 }
 

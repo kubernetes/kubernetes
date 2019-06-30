@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -132,6 +133,7 @@ func TestCompileManifests(t *testing.T) {
 	}
 }
 
+// TODO(vllry) this is crashing
 func TestEnsureProxyAddon(t *testing.T) {
 	type SimulatedError int
 	const (
@@ -145,27 +147,27 @@ func TestEnsureProxyAddon(t *testing.T) {
 		name           string
 		simError       SimulatedError
 		expErrString   string
-		expBindAddr    string
-		expClusterCIDR string
+		expBindAddr    []string
+		expClusterCIDR []string
 	}{
 		{
 			name:           "Successful proxy addon",
 			simError:       NoError,
 			expErrString:   "",
-			expBindAddr:    "0.0.0.0",
-			expClusterCIDR: "5.6.7.8/24",
+			expBindAddr:    []string{"0.0.0.0"},
+			expClusterCIDR: []string{"5.6.7.8/24"},
 		}, {
 			name:           "Simulated service account error",
 			simError:       ServiceAccountError,
 			expErrString:   "error when creating kube-proxy service account",
-			expBindAddr:    "0.0.0.0",
-			expClusterCIDR: "5.6.7.8/24",
+			expBindAddr:    []string{"0.0.0.0"},
+			expClusterCIDR: []string{"5.6.7.8/24"},
 		}, {
 			name:           "IPv6 AdvertiseAddress address",
 			simError:       IPv6SetBindAddress,
 			expErrString:   "",
-			expBindAddr:    "::",
-			expClusterCIDR: "2001:101::/96",
+			expBindAddr:    []string{"::"},
+			expClusterCIDR: []string{"2001:101::/96"},
 		},
 	}
 
@@ -207,7 +209,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 				return
 			}
 			intControlPlane.ComponentConfigs.KubeProxy = &kubeproxyconfig.KubeProxyConfiguration{
-				BindAddress:        "",
+				BindAddress:        []string{},
 				HealthzBindAddress: "0.0.0.0:10256",
 				MetricsBindAddress: "127.0.0.1:10249",
 				Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
@@ -240,13 +242,13 @@ func TestEnsureProxyAddon(t *testing.T) {
 					expErr,
 					actErr)
 			}
-			if intControlPlane.ComponentConfigs.KubeProxy.BindAddress != tc.expBindAddr {
+			if !reflect.DeepEqual(intControlPlane.ComponentConfigs.KubeProxy.BindAddress, tc.expBindAddr) {
 				t.Errorf("%s test failed, expected: %s, got: %s",
 					tc.name,
 					tc.expBindAddr,
 					intControlPlane.ComponentConfigs.KubeProxy.BindAddress)
 			}
-			if intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR != tc.expClusterCIDR {
+			if !reflect.DeepEqual(intControlPlane.ComponentConfigs.KubeProxy.ClusterCIDR, tc.expClusterCIDR) {
 				t.Errorf("%s test failed, expected: %s, got: %s",
 					tc.name,
 					tc.expClusterCIDR,
