@@ -69,9 +69,35 @@ func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer
 		UpdateFunc: func(old, new interface{}) {
 			e.pvAddedUpdated(new)
 		},
+		DeleteFunc: func(obj interface{}) {
+			e.pvDeleted(obj)
+		},
 	})
 
 	return e
+}
+
+func (c *Controller) pvDeleted(obj interface{}) {
+	pv, ok := obj.(*v1.PersistentVolume)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("Couldn't get object from tombstone %#v", obj))
+			return
+		}
+		pv, ok = tombstone.Obj.(*v1.PersistentVolume)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("Tombstone contained object that is not a PV %#v", obj))
+			return
+		}
+	}
+
+	if protectionutil.IsDeletionCandidate(pv, volumeutil.PVProtectionFinalizer) {
+		isUsed := c.isBeingUsed(pv)
+		if !isUsed {
+			c.removeFinalizer(pv)
+		}
+	}
 }
 
 // Run runs the controller goroutines.
