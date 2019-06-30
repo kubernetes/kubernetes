@@ -44,27 +44,27 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	}
 	pbmClient, err := vclib.NewPbmClient(ctx, datastore.Client())
 	if err != nil {
-		klog.Errorf("Error occurred while creating new pbmClient, err: %+v", err)
+		klog.Errorf("error occurred while creating new pbmClient, err: %+v", err)
 		return "", err
 	}
 
 	if vmdisk.volumeOptions.StoragePolicyID == "" && vmdisk.volumeOptions.StoragePolicyName != "" {
 		vmdisk.volumeOptions.StoragePolicyID, err = pbmClient.ProfileIDByName(ctx, vmdisk.volumeOptions.StoragePolicyName)
 		if err != nil {
-			klog.Errorf("Error occurred while getting Profile Id from Profile Name: %s, err: %+v", vmdisk.volumeOptions.StoragePolicyName, err)
+			klog.Errorf("error occurred while getting Profile Id from Profile Name: %s, err: %+v", vmdisk.volumeOptions.StoragePolicyName, err)
 			return "", err
 		}
 	}
 	if vmdisk.volumeOptions.StoragePolicyID != "" {
 		compatible, faultMessage, err := datastore.IsCompatibleWithStoragePolicy(ctx, vmdisk.volumeOptions.StoragePolicyID)
 		if err != nil {
-			klog.Errorf("Error occurred while checking datastore compatibility with storage policy id: %s, err: %+v", vmdisk.volumeOptions.StoragePolicyID, err)
+			klog.Errorf("error occurred while checking datastore compatibility with storage policy id: %s, err: %+v", vmdisk.volumeOptions.StoragePolicyID, err)
 			return "", err
 		}
 
 		if !compatible {
 			klog.Errorf("Datastore: %s is not compatible with Policy: %s", datastore.Name(), vmdisk.volumeOptions.StoragePolicyName)
-			return "", fmt.Errorf("User specified datastore is not compatible with the storagePolicy: %q. Failed with faults: %+q", vmdisk.volumeOptions.StoragePolicyName, faultMessage)
+			return "", fmt.Errorf("user specified datastore is not compatible with the storagePolicy: %q. Failed with faults: %+q", vmdisk.volumeOptions.StoragePolicyName, faultMessage)
 		}
 	}
 
@@ -81,9 +81,9 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 		}
 		if dsType != vclib.VSANDatastoreType {
 			klog.Errorf("The specified datastore: %q is not a VSAN datastore", datastore.Name())
-			return "", fmt.Errorf("The specified datastore: %q is not a VSAN datastore."+
-				" The policy parameters will work only with VSAN Datastore."+
-				" So, please specify a valid VSAN datastore in Storage class definition.", datastore.Name())
+			return "", fmt.Errorf("the specified datastore: %q is not a VSAN datastore."+
+				" the policy parameters will work only with VSAN Datastore."+
+				" so, please specify a valid VSAN datastore in Storage class definition", datastore.Name())
 		}
 		storageProfileSpec.ProfileId = ""
 		storageProfileSpec.ProfileData = &types.VirtualMachineProfileRawData{
@@ -92,7 +92,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 		}
 	} else {
 		klog.Errorf("Both volumeOptions.StoragePolicyID and volumeOptions.VSANStorageProfileData are not set. One of them should be set")
-		return "", fmt.Errorf("Both volumeOptions.StoragePolicyID and volumeOptions.VSANStorageProfileData are not set. One of them should be set")
+		return "", fmt.Errorf("both volumeOptions.StoragePolicyID and volumeOptions.VSANStorageProfileData are not set. One of them should be set")
 	}
 	var dummyVM *vclib.VirtualMachine
 	// Check if VM already exist in the folder.
@@ -106,7 +106,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 		klog.V(1).Infof("Creating Dummy VM: %q", dummyVMFullName)
 		dummyVM, err = vmdisk.createDummyVM(ctx, datastore.Datacenter, dummyVMFullName)
 		if err != nil {
-			klog.Errorf("Failed to create Dummy VM. err: %v", err)
+			klog.Errorf("failed to create Dummy VM. err: %v", err)
 			return "", err
 		}
 	}
@@ -115,7 +115,7 @@ func (vmdisk vmDiskManager) Create(ctx context.Context, datastore *vclib.Datasto
 	virtualMachineConfigSpec := types.VirtualMachineConfigSpec{}
 	disk, _, err := dummyVM.CreateDiskSpec(ctx, vmdisk.diskPath, datastore, vmdisk.volumeOptions)
 	if err != nil {
-		klog.Errorf("Failed to create Disk Spec. err: %v", err)
+		klog.Errorf("failed to create Disk Spec. err: %v", err)
 		return "", err
 	}
 	deviceConfigSpec := &types.VirtualDeviceConfigSpec{
@@ -220,7 +220,7 @@ func CleanUpDummyVMs(ctx context.Context, folder *vclib.Folder) error {
 	}
 	if vmList == nil || len(vmList) == 0 {
 		klog.Errorf("No virtual machines found in the kubernetes cluster: %s", folder.InventoryPath)
-		return fmt.Errorf("No virtual machines found in the kubernetes cluster: %s", folder.InventoryPath)
+		return fmt.Errorf("no virtual machines found in the kubernetes cluster: %s", folder.InventoryPath)
 	}
 	var dummyVMList []*vclib.VirtualMachine
 	// Loop through VM's in the Kubernetes cluster to find dummy VM's

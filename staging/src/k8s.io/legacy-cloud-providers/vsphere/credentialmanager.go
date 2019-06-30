@@ -84,7 +84,7 @@ func (secretCredentialManager *SecretCredentialManager) GetCredential(server str
 
 func (secretCredentialManager *SecretCredentialManager) updateCredentialsMap() error {
 	if secretCredentialManager.SecretLister == nil {
-		return fmt.Errorf("SecretLister is not initialized")
+		return fmt.Errorf("secretLister is not initialized")
 	}
 	secret, err := secretCredentialManager.SecretLister.Secrets(secretCredentialManager.SecretNamespace).Get(secretCredentialManager.SecretName)
 	if err != nil {

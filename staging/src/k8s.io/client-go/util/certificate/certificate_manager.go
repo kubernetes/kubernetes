@@ -411,7 +411,7 @@ func (m *manager) rotateCerts() (bool, error) {
 	// is a remainder after the old design using raw watch wrapped with backoff.
 	crtPEM, err := csr.WaitForCertificate(ctx, client, req)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Certificate request was not signed: %v", err))
+		utilruntime.HandleError(fmt.Errorf("certificate request was not signed: %v", err))
 		return false, nil
 	}
 

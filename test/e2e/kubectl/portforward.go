@@ -377,13 +377,13 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
 		}
 		if channel != 0 {
-			return fmt.Errorf("Got message from server that didn't start with channel 0 (data): %v", msg)
+			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)
 		}
 		if p := binary.LittleEndian.Uint16(msg); p != 80 {
-			return fmt.Errorf("Received the wrong port: %d", p)
+			return fmt.Errorf("received the wrong port: %d", p)
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -391,13 +391,13 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
 		}
 		if channel != 1 {
-			return fmt.Errorf("Got message from server that didn't start with channel 1 (error): %v", msg)
+			return fmt.Errorf("got message from server that didn't start with channel 1 (error): %v", msg)
 		}
 		if p := binary.LittleEndian.Uint16(msg); p != 80 {
-			return fmt.Errorf("Received the wrong port: %d", p)
+			return fmt.Errorf("received the wrong port: %d", p)
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
@@ -414,14 +414,14 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 	gomega.Eventually(func() error {
 		channel, msg, err := wsRead(ws)
 		if err != nil {
-			return fmt.Errorf("Failed to read completely from websocket %s: %v", url.String(), err)
+			return fmt.Errorf("failed to read completely from websocket %s: %v", url.String(), err)
 		}
 		if channel != 0 {
-			return fmt.Errorf("Got message from server that didn't start with channel 0 (data): %v", msg)
+			return fmt.Errorf("got message from server that didn't start with channel 0 (data): %v", msg)
 		}
 		buf.Write(msg)
 		if bytes.Equal(expectedData, buf.Bytes()) {
-			return fmt.Errorf("Expected %q from server, got %q", expectedData, buf.Bytes())
+			return fmt.Errorf("expected %q from server, got %q", expectedData, buf.Bytes())
 		}
 		return nil
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())

@@ -65,7 +65,7 @@ type awsTagging struct {
 func (t *awsTagging) init(legacyClusterID string, clusterID string) error {
 	if legacyClusterID != "" {
 		if clusterID != "" && legacyClusterID != clusterID {
-			return fmt.Errorf("ClusterID tags did not match: %q vs %q", clusterID, legacyClusterID)
+			return fmt.Errorf("clusterID tags did not match: %q vs %q", clusterID, legacyClusterID)
 		}
 		t.usesLegacyTags = true
 		clusterID = legacyClusterID

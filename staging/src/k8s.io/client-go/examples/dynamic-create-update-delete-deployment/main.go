@@ -135,18 +135,18 @@ func main() {
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 		result, getErr := client.Resource(deploymentRes).Namespace(namespace).Get("demo-deployment", metav1.GetOptions{})
 		if getErr != nil {
-			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
+			panic(fmt.Errorf("failed to get latest version of Deployment: %v", getErr))
 		}
 
 		// update replicas to 1
 		if err := unstructured.SetNestedField(result.Object, int64(1), "spec", "replicas"); err != nil {
-			panic(fmt.Errorf("Failed to set replica value: %v", err))
+			panic(fmt.Errorf("failed to set replica value: %v", err))
 		}
 
 		// extract spec containers
 		containers, found, err := unstructured.NestedSlice(result.Object, "spec", "template", "spec", "containers")
 		if err != nil || !found || containers == nil {
-			panic(fmt.Errorf("Deployment containers not found or error in spec: %v", err))
+			panic(fmt.Errorf("deployment containers not found or error in spec: %v", err))
 		}
 
 		// update container[0] image
@@ -161,7 +161,7 @@ func main() {
 		return updateErr
 	})
 	if retryErr != nil {
-		panic(fmt.Errorf("Update failed: %v", retryErr))
+		panic(fmt.Errorf("update failed: %v", retryErr))
 	}
 	fmt.Println("Updated deployment...")
 
