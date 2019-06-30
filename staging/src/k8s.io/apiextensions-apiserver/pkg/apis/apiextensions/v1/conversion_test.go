@@ -374,6 +374,118 @@ func TestConversion(t *testing.T) {
 				},
 			},
 		},
+		// webhook conversion config
+		{
+			Name: "internal to v1, no webhook client config",
+			In: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{},
+				},
+			},
+			Out: &CustomResourceDefinition{},
+			ExpectOut: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Conversion: &CustomResourceConversion{},
+				},
+			},
+		},
+		{
+			Name: "internal to v1, webhook client config",
+			In: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+					},
+				},
+			},
+			Out: &CustomResourceDefinition{},
+			ExpectOut: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Conversion: &CustomResourceConversion{
+						Webhook: &WebhookConversion{
+							ClientConfig: &WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "internal to v1, webhook versions",
+			In: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{
+						ConversionReviewVersions: []string{"v1"},
+					},
+				},
+			},
+			Out: &CustomResourceDefinition{},
+			ExpectOut: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Conversion: &CustomResourceConversion{
+						Webhook: &WebhookConversion{
+							ConversionReviewVersions: []string{"v1"},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "v1 to internal, no webhook client config",
+			In: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Conversion: &CustomResourceConversion{},
+				},
+			},
+			Out: &apiextensions.CustomResourceDefinition{},
+			ExpectOut: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion:            &apiextensions.CustomResourceConversion{},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+			},
+		},
+		{
+			Name: "v1 to internal, webhook client config",
+			In: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Conversion: &CustomResourceConversion{
+						Webhook: &WebhookConversion{
+							ClientConfig: &WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+						},
+					},
+				},
+			},
+			Out: &apiextensions.CustomResourceDefinition{},
+			ExpectOut: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+			},
+		},
+		{
+			Name: "v1 to internal, webhook versions",
+			In: &CustomResourceDefinition{
+				Spec: CustomResourceDefinitionSpec{
+					Conversion: &CustomResourceConversion{
+						Webhook: &WebhookConversion{
+							ConversionReviewVersions: []string{"v1"},
+						},
+					},
+				},
+			},
+			Out: &apiextensions.CustomResourceDefinition{},
+			ExpectOut: &apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Conversion: &apiextensions.CustomResourceConversion{
+						ConversionReviewVersions: []string{"v1"},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+			},
+		},
 	}
 
 	scheme := runtime.NewScheme()

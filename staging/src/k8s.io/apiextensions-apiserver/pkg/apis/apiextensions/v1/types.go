@@ -69,10 +69,16 @@ type CustomResourceConversion struct {
 	//   is needed for this option. This requires spec.preserveUnknownFields to be false.
 	Strategy ConversionStrategyType `json:"strategy" protobuf:"bytes,1,name=strategy"`
 
-	// `webhookClientConfig` is the instructions for how to call the webhook if strategy is `Webhook`. This field is
-	// alpha-level and is only honored by servers that enable the CustomResourceWebhookConversion feature.
+	// webhook describes how to call the conversion webhook. Required when strategy is "Webhook".
 	// +optional
-	WebhookClientConfig *WebhookClientConfig `json:"webhookClientConfig,omitempty" protobuf:"bytes,2,name=webhookClientConfig"`
+	Webhook *WebhookConversion `json:"webhook,omitempty" protobuf:"bytes,2,opt,name=webhook"`
+}
+
+// WebhookConversion describes how to call a conversion webhook
+type WebhookConversion struct {
+	// `clientConfig` is the instructions for how to call the webhook if strategy is `Webhook`.
+	// +optional
+	ClientConfig *WebhookClientConfig `json:"clientConfig,omitempty" protobuf:"bytes,2,name=clientConfig"`
 
 	// ConversionReviewVersions is an ordered list of preferred `ConversionReview`
 	// versions the Webhook expects. API server will try to use first version in
@@ -80,9 +86,7 @@ type CustomResourceConversion struct {
 	// supported by API server, conversion will fail for this object.
 	// If a persisted Webhook configuration specifies allowed versions and does not
 	// include any versions known to the API Server, calls to the webhook will fail.
-	// Default to `['v1']`.
-	// +optional
-	ConversionReviewVersions []string `json:"conversionReviewVersions,omitempty" protobuf:"bytes,3,rep,name=conversionReviewVersions"`
+	ConversionReviewVersions []string `json:"conversionReviewVersions" protobuf:"bytes,3,rep,name=conversionReviewVersions"`
 }
 
 // WebhookClientConfig contains the information to make a TLS

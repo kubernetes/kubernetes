@@ -51,8 +51,10 @@ func TestDefaults(t *testing.T) {
 					Scope: NamespaceScoped,
 					Conversion: &CustomResourceConversion{
 						Strategy: WebhookConverter,
-						WebhookClientConfig: &WebhookClientConfig{
-							Service: &ServiceReference{},
+						Webhook: &WebhookConversion{
+							ClientConfig: &WebhookClientConfig{
+								Service: &ServiceReference{},
+							},
 						},
 					},
 					PreserveUnknownFields: utilpointer.BoolPtr(true),
@@ -62,10 +64,11 @@ func TestDefaults(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Scope: NamespaceScoped,
 					Conversion: &CustomResourceConversion{
-						Strategy:                 WebhookConverter,
-						ConversionReviewVersions: []string{"v1"},
-						WebhookClientConfig: &WebhookClientConfig{
-							Service: &ServiceReference{Port: utilpointer.Int32Ptr(443)},
+						Strategy: WebhookConverter,
+						Webhook: &WebhookConversion{
+							ClientConfig: &WebhookClientConfig{
+								Service: &ServiceReference{Port: utilpointer.Int32Ptr(443)},
+							},
 						},
 					},
 					PreserveUnknownFields: utilpointer.BoolPtr(true),

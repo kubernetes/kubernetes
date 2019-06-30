@@ -172,3 +172,41 @@ func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefi
 
 	return nil
 }
+
+func Convert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(in *CustomResourceConversion, out *apiextensions.CustomResourceConversion, s conversion.Scope) error {
+	if err := autoConvert_v1_CustomResourceConversion_To_apiextensions_CustomResourceConversion(in, out, s); err != nil {
+		return err
+	}
+
+	out.WebhookClientConfig = nil
+	out.ConversionReviewVersions = nil
+	if in.Webhook != nil {
+		out.ConversionReviewVersions = in.Webhook.ConversionReviewVersions
+		if in.Webhook.ClientConfig != nil {
+			out.WebhookClientConfig = &apiextensions.WebhookClientConfig{}
+			if err := Convert_v1_WebhookClientConfig_To_apiextensions_WebhookClientConfig(in.Webhook.ClientConfig, out.WebhookClientConfig, s); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func Convert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(in *apiextensions.CustomResourceConversion, out *CustomResourceConversion, s conversion.Scope) error {
+	if err := autoConvert_apiextensions_CustomResourceConversion_To_v1_CustomResourceConversion(in, out, s); err != nil {
+		return err
+	}
+
+	out.Webhook = nil
+	if in.WebhookClientConfig != nil || in.ConversionReviewVersions != nil {
+		out.Webhook = &WebhookConversion{}
+		out.Webhook.ConversionReviewVersions = in.ConversionReviewVersions
+		if in.WebhookClientConfig != nil {
+			out.Webhook.ClientConfig = &WebhookClientConfig{}
+			if err := Convert_apiextensions_WebhookClientConfig_To_v1_WebhookClientConfig(in.WebhookClientConfig, out.Webhook.ClientConfig, s); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
