@@ -212,7 +212,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 
 		if err != nil {
-			errlist = append(errlist, fmt.Errorf("Error loading config file \"%s\": %v", filename, err))
+			errlist = append(errlist, fmt.Errorf("error loading config file \"%s\": %v", filename, err))
 			continue
 		}
 
@@ -483,7 +483,7 @@ func ResolveLocalPaths(config *clientcmdapi.Config) error {
 		}
 		base, err := filepath.Abs(filepath.Dir(cluster.LocationOfOrigin))
 		if err != nil {
-			return fmt.Errorf("Could not determine the absolute path of config file %s: %v", cluster.LocationOfOrigin, err)
+			return fmt.Errorf("could not determine the absolute path of config file %s: %v", cluster.LocationOfOrigin, err)
 		}
 
 		if err := ResolvePaths(GetClusterFileReferences(cluster), base); err != nil {
@@ -496,7 +496,7 @@ func ResolveLocalPaths(config *clientcmdapi.Config) error {
 		}
 		base, err := filepath.Abs(filepath.Dir(authInfo.LocationOfOrigin))
 		if err != nil {
-			return fmt.Errorf("Could not determine the absolute path of config file %s: %v", authInfo.LocationOfOrigin, err)
+			return fmt.Errorf("could not determine the absolute path of config file %s: %v", authInfo.LocationOfOrigin, err)
 		}
 
 		if err := ResolvePaths(GetAuthInfoFileReferences(authInfo), base); err != nil {

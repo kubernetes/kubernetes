@@ -122,7 +122,7 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 	if partition, ok := csiSource.VolumeAttributes["partition"]; ok {
 		partValue, err := strconv.Atoi(partition)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to convert partition %v to integer: %v", partition, err)
+			return nil, fmt.Errorf("failed to convert partition %v to integer: %v", partition, err)
 		}
 		ebsSource.Partition = int32(partValue)
 	}
