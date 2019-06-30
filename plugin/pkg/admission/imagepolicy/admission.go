@@ -206,9 +206,35 @@ func (a *Plugin) admitPod(pod *api.Pod, attributes admission.Attributes, review 
 	return nil
 }
 
-// NewImagePolicyWebhook a new ImagePolicyWebhook plugin from the provided config file.
-// The config file is specified by --admission-control-config-file and has the
-// following format for a webhook:
+// NewImagePolicyWebhook creates a new ImagePolicyWebhook plugin from the
+// provided config file.
+//
+// Like all plugins, the configuration can be provided in two ways:
+//
+//   1. Place the ImagePolicyWebhook configuration in its own file, and link the
+//      file from the shared admission control config specified by
+//      --admission-control-config-file:
+//
+//          # ...
+//          plugins:
+//          - name: ImagePolicyWebhook
+//            path: /path/to/config/file
+//
+//   2. Embed the ImagePolicyWebhook configuration in the shared admission
+//      control config file:
+//
+//          # ...
+//          plugins:
+//          - name: ImagePolicyWebhook
+//            configuration:
+//              imagePolicy:
+//                kubeConfigFile: path/to/kubeconfig
+//                allowTTL: 30
+//                denyTTL: 30
+//                retryBackoff: 500
+//                defaultAllow: true
+//
+//   The config file has the following schema:
 //
 //   {
 //     "imagePolicy": {
