@@ -291,7 +291,7 @@ func (vm *VirtualMachine) CreateDiskSpec(ctx context.Context, diskPath string, d
 			if err := vm.deleteController(ctx, newSCSIController, vmDevices); err != nil {
 				return nil, nil, fmt.Errorf("failed to delete SCSI controller after failing to find it on VM: %v", err)
 			}
-			return nil, nil, fmt.Errorf("Cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
+			return nil, nil, fmt.Errorf("cannot find SCSI controller of type: %q in VM", volumeOptions.SCSIControllerType)
 		}
 	}
 	disk := vmDevices.CreateDisk(scsiController, dsObj.Reference(), diskPath)

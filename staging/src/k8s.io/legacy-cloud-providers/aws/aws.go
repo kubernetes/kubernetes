@@ -2182,13 +2182,13 @@ func wrapAttachError(err error, disk *awsDisk, instance string) error {
 					if disk.awsID != EBSVolumeID(aws.StringValue(a.VolumeId)) {
 						klog.Warningf("Expected to get attachment info of volume %q but instead got info of %q", disk.awsID, aws.StringValue(a.VolumeId))
 					} else if aws.StringValue(a.State) == "attached" {
-						return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
+						return fmt.Errorf("error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
 					}
 				}
 			}
 		}
 	}
-	return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q", disk.awsID, instance, err)
+	return fmt.Errorf("error attaching EBS volume %q to instance %q: %q", disk.awsID, instance, err)
 }
 
 // AttachDisk implements Volumes.AttachDisk
@@ -2780,7 +2780,7 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 				return nil, nil
 			}
 		}
-		return nil, fmt.Errorf("Error describing load balancer: %q", err)
+		return nil, fmt.Errorf("error describing load balancer: %q", err)
 	}
 
 	// AWS will not return 2 load balancers with the same name _and_ type.
@@ -2797,7 +2797,7 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 func (c *Cloud) findVPCID() (string, error) {
 	macs, err := c.metadata.GetMetadata("network/interfaces/macs/")
 	if err != nil {
-		return "", fmt.Errorf("Could not list interfaces of the instance: %q", err)
+		return "", fmt.Errorf("could not list interfaces of the instance: %q", err)
 	}
 
 	// loop over interfaces, first vpc id returned wins
@@ -2812,7 +2812,7 @@ func (c *Cloud) findVPCID() (string, error) {
 		}
 		return vpcID, nil
 	}
-	return "", fmt.Errorf("Could not find VPC ID in instance metadata")
+	return "", fmt.Errorf("could not find VPC ID in instance metadata")
 }
 
 // Retrieves the specified security group from the AWS API, or returns nil if not found
@@ -3357,7 +3357,7 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 	}
 
 	if subnetTable == nil {
-		return false, fmt.Errorf("Could not locate routing table for subnet %s", subnetID)
+		return false, fmt.Errorf("could not locate routing table for subnet %s", subnetID)
 	}
 
 	for _, route := range subnetTable.Routes {
@@ -4037,7 +4037,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 		loadBalancerSecurityGroupID = *securityGroup
 	}
 	if loadBalancerSecurityGroupID == "" {
-		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
+		return fmt.Errorf("could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
 	// Get the actual list of groups that allow ingress from the load-balancer
@@ -4179,14 +4179,14 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 				&elbv2.DescribeTargetGroupsInput{LoadBalancerArn: lb.LoadBalancerArn},
 			)
 			if err != nil {
-				return fmt.Errorf("Error listing target groups before deleting load balancer: %q", err)
+				return fmt.Errorf("error listing target groups before deleting load balancer: %q", err)
 			}
 
 			_, err = c.elbv2.DeleteLoadBalancer(
 				&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: lb.LoadBalancerArn},
 			)
 			if err != nil {
-				return fmt.Errorf("Error deleting load balancer %q: %v", loadBalancerName, err)
+				return fmt.Errorf("error deleting load balancer %q: %v", loadBalancerName, err)
 			}
 
 			for _, group := range targetGroups.TargetGroups {
@@ -4194,7 +4194,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 					&elbv2.DeleteTargetGroupInput{TargetGroupArn: group.TargetGroupArn},
 				)
 				if err != nil {
-					return fmt.Errorf("Error deleting target groups after deleting load balancer: %q", err)
+					return fmt.Errorf("error deleting target groups after deleting load balancer: %q", err)
 				}
 			}
 		}

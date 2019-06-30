@@ -294,7 +294,7 @@ func (c *CRDFinalizer) processNextWorkItem() bool {
 func (c *CRDFinalizer) enqueue(obj *apiextensions.CustomResourceDefinition) {
 	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %#v: %v", obj, err))
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
 	}
 
