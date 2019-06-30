@@ -148,11 +148,18 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
-var _ = rest.Creater(&BindingREST{})
+var _ = rest.NamedCreater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
-func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
-	binding := obj.(*api.Binding)
+func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	binding, ok := obj.(*api.Binding)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %#v", obj))
+	}
+
+	if name != binding.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in Binding object")
+	}
 
 	// TODO: move me to a binding strategy
 	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
