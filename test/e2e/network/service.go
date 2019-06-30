@@ -1957,7 +1957,8 @@ var _ = SIGDescribe("Services", func() {
 				Namespace: t.Namespace,
 			},
 			Spec: v1.ServiceSpec{
-				Selector: t.Labels,
+				Selector:                 t.Labels,
+				PublishNotReadyAddresses: true,
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Port:       int32(port),
@@ -1975,13 +1976,6 @@ var _ = SIGDescribe("Services", func() {
 				Handler: v1.Handler{
 					Exec: &v1.ExecAction{
 						Command: []string{"/bin/false"},
-					},
-				},
-			},
-			Lifecycle: &v1.Lifecycle{
-				PreStop: &v1.Handler{
-					Exec: &v1.ExecAction{
-						Command: []string{"/bin/sleep", fmt.Sprintf("%d", terminateSeconds)},
 					},
 				},
 			},
