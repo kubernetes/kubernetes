@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
 )
@@ -129,7 +130,7 @@ var _ = SIGDescribe("DNS", func() {
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
-		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
@@ -139,7 +140,7 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		regularServiceName := "test-service-2"
-		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
+		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 
@@ -178,7 +179,7 @@ var _ = SIGDescribe("DNS", func() {
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
-		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", dnsTestServiceName)
 		defer func() {
@@ -188,7 +189,7 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		regularServiceName := "test-service-2"
-		regularService := framework.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
+		regularService := e2eservice.CreateServiceSpec(regularServiceName, "", false, testServiceSelector)
 		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
 		framework.ExpectNoError(err, "failed to create regular service: %s", regularServiceName)
 		defer func() {
@@ -235,7 +236,7 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
-		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
@@ -276,7 +277,7 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
-		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
+		headlessService := e2eservice.CreateServiceSpec(serviceName, "", true, testServiceSelector)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		framework.ExpectNoError(err, "failed to create headless service: %s", serviceName)
 
@@ -314,7 +315,7 @@ var _ = SIGDescribe("DNS", func() {
 		// Create a test ExternalName service.
 		ginkgo.By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
-		externalNameService := framework.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
+		externalNameService := e2eservice.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
 		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService)
 		framework.ExpectNoError(err, "failed to create ExternalName service: %s", serviceName)
 
@@ -337,7 +338,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Test changing the externalName field
 		ginkgo.By("changing the externalName to bar.example.com")
-		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = e2eservice.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		framework.ExpectNoError(err, "failed to change externalName of service: %s", serviceName)
@@ -354,7 +355,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Test changing type from ExternalName to ClusterIP
 		ginkgo.By("changing the service to type=ClusterIP")
-		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
+		_, err = e2eservice.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP},

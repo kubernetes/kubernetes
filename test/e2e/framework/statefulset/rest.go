@@ -23,7 +23,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -62,7 +62,7 @@ func CreateStatefulSet(c clientset.Interface, manifestPath, ns string) *appsv1.S
 }
 
 // GetPodList gets the current Pods in ss.
-func GetPodList(c clientset.Interface, ss *appsv1.StatefulSet) *corev1.PodList {
+func GetPodList(c clientset.Interface, ss *appsv1.StatefulSet) *v1.PodList {
 	selector, err := metav1.LabelSelectorAsSelector(ss.Spec.Selector)
 	e2efwk.ExpectNoError(err)
 	podList, err := c.CoreV1().Pods(ss.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
@@ -182,7 +182,7 @@ func Scale(c clientset.Interface, ss *appsv1.StatefulSet, count int32) (*appsv1.
 	e2elog.Logf("Scaling statefulset %s to %d", name, count)
 	ss = update(c, ns, name, func(ss *appsv1.StatefulSet) { *(ss.Spec.Replicas) = count })
 
-	var statefulPodList *corev1.PodList
+	var statefulPodList *v1.PodList
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
 		statefulPodList = GetPodList(c, ss)
 		if int32(len(statefulPodList.Items)) == count {
@@ -194,7 +194,7 @@ func Scale(c clientset.Interface, ss *appsv1.StatefulSet, count int32) (*appsv1.
 		unhealthy := []string{}
 		for _, statefulPod := range statefulPodList.Items {
 			delTs, phase, readiness := statefulPod.DeletionTimestamp, statefulPod.Status.Phase, podutil.IsPodReady(&statefulPod)
-			if delTs != nil || phase != corev1.PodRunning || !readiness {
+			if delTs != nil || phase != v1.PodRunning || !readiness {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}
 		}
@@ -313,7 +313,7 @@ func ExecInStatefulPods(c clientset.Interface, ss *appsv1.StatefulSet, cmd strin
 type updateStatefulSetFunc func(*appsv1.StatefulSet)
 
 // VerifyStatefulPodFunc is a func that examines a StatefulSetPod.
-type VerifyStatefulPodFunc func(*corev1.Pod)
+type VerifyStatefulPodFunc func(*v1.Pod)
 
 // VerifyPodAtIndex applies a visitor pattern to the Pod at index in ss. verify is applied to the Pod to "visit" it.
 func VerifyPodAtIndex(c clientset.Interface, index int, ss *appsv1.StatefulSet, verify VerifyStatefulPodFunc) {

@@ -37,6 +37,7 @@ go_library(
         "//test/e2e/framework/job:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
+        "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/scheduling:go_default_library",
         "//test/utils:go_default_library",
