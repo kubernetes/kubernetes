@@ -36,20 +36,31 @@ import (
 )
 
 type recorder struct {
-	lock  sync.Mutex
-	count int
+	lock     sync.Mutex
+	count    int
+	errCount int
 }
 
-func (r *recorder) Record() {
+func (r *recorder) Record(err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.count++
+
+	if err != nil {
+		r.errCount++
+	}
 }
 
 func (r *recorder) Count() int {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	return r.count
+}
+
+func (r *recorder) ErrorCount() int {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	return r.errCount
 }
 
 func newHandler(responseCh <-chan string, panicCh <-chan struct{}, writeErrCh chan<- error) http.HandlerFunc {
@@ -82,7 +93,7 @@ func TestTimeout(t *testing.T) {
 
 	handler := newHandler(sendResponse, doPanic, writeErrors)
 	ts := httptest.NewServer(withPanicRecovery(
-		WithTimeout(handler, func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+		WithTimeout(handler, func(req *http.Request) (*http.Request, <-chan time.Time, func(error), *apierrors.StatusError) {
 			return req, timeout, record.Record, timeoutErr
 		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
 			gotPanic <- err
@@ -155,5 +166,34 @@ func TestTimeout(t *testing.T) {
 		}
 	case <-time.After(30 * time.Second):
 		t.Fatalf("expected to see a handler panic, but didn't")
+	}
+}
+
+func TestWriteBodyTimeout(t *testing.T) {
+	gotPanic := make(chan interface{}, 1)
+	record := &recorder{}
+	timeoutErr := apierrors.NewServerTimeout(schema.GroupResource{Group: "foo", Resource: "bar"}, "get", 0)
+	ts := httptest.NewServer(withPanicRecovery(
+		WithTimeout(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(200)
+			// mock under-layer hang scene, like socket hang
+			<-make(chan struct{})
+		}), func(req *http.Request) (*http.Request, <-chan time.Time, func(error), *apierrors.StatusError) {
+			return req, time.After(time.Second * 10), record.Record, timeoutErr
+		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
+			gotPanic <- err
+			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
+		}),
+	)
+	defer ts.Close()
+	_, err := http.Get(ts.URL)
+	if err == nil {
+		t.Fatal("unexpect got response without error")
+	}
+	if record.Count() != 1 {
+		t.Errorf("did not invoke record method: %#v", record)
+	}
+	if record.ErrorCount() != 1 {
+		t.Errorf("did not invoke record method with err: %#v", record)
 	}
 }
