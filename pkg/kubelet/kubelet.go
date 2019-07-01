@@ -455,7 +455,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
 		go r.Run(wait.NeverStop)
 	}
-	nodeInfo := &CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
+	nodeInfo := &cachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -2289,13 +2289,13 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 	return config
 }
 
-// CachedNodeInfo implements NodeInfo
-type CachedNodeInfo struct {
+// cachedNodeInfo implements NodeInfo
+type cachedNodeInfo struct {
 	corelisters.NodeLister
 }
 
 // GetNodeInfo returns cached data for the node name.
-func (c *CachedNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
+func (c *cachedNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	node, err := c.Get(nodeName)
 
 	if apierrors.IsNotFound(err) {
