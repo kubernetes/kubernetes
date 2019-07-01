@@ -73,8 +73,9 @@ func TestVisitContainersWithPath(t *testing.T) {
 
 	for _, tc := range testCases {
 		gotNames := []string{}
-		VisitContainersWithPath(tc.haveSpec, func(c *api.Container, p *field.Path) {
+		VisitContainersWithPath(tc.haveSpec, func(c *api.Container, p *field.Path) bool {
 			gotNames = append(gotNames, p.String())
+			return true
 		})
 		if !reflect.DeepEqual(gotNames, tc.wantNames) {
 			t.Errorf("VisitContainersWithPath() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
