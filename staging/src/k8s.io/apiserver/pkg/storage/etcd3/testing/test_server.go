@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/storage/etcd/testing/testingcert"
+	"k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 
 	"context"
@@ -100,7 +100,8 @@ func newSecuredLocalListener(t *testing.T, certFile, keyFile, caFile string) net
 	return l
 }
 
-func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.CancelableTransport {
+// newHTTPTransport create a new tls-based transport.
+func newHTTPTransport(t *testing.T, certFile, keyFile, caFile string) etcd.CancelableTransport {
 	tlsInfo := transport.TLSInfo{
 		CertFile: certFile,
 		KeyFile:  keyFile,
@@ -269,7 +270,7 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 
 	cfg := etcd.Config{
 		Endpoints: server.ClientURLs.StringSlice(),
-		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
+		Transport: newHTTPTransport(t, server.CertFile, server.KeyFile, server.CAFile),
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
@@ -285,7 +286,7 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	return server
 }
 
-// NewEtcd3TestClientServer creates a new client and server for testing
+// NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
 	server := &EtcdTestServer{
 		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),

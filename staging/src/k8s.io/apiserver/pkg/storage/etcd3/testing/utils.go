@@ -21,7 +21,7 @@ import (
 	"path"
 )
 
-// Returns the prefix set via the ETCD_PREFIX environment variable (if any).
+// PathPrefix returns the prefix set via the ETCD_PREFIX environment variable (if any).
 func PathPrefix() string {
 	pref := os.Getenv("ETCD_PREFIX")
 	if pref == "" {
@@ -30,7 +30,7 @@ func PathPrefix() string {
 	return path.Join("/", pref)
 }
 
-// Adds the ETCD_PREFIX to the provided key
+// AddPrefix adds the ETCD_PREFIX to the provided key
 func AddPrefix(in string) string {
 	return path.Join(PathPrefix(), in)
 }
