@@ -1567,12 +1567,13 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	provisioner := "kubernetes.io/aws-ebs"
 	parameters := map[string]string{}
 	if fsType != "" {
-		parameters["fsType"] = fsType
+		parameters["fstype"] = fsType
 	}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (a *awsDriver) GetClaimSize() string {
