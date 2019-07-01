@@ -1112,6 +1112,7 @@ func (NodeSelectorTerm) SwaggerDoc() map[string]string {
 var map_NodeSpec = map[string]string{
 	"":              "NodeSpec describes the attributes that a node is created with.",
 	"podCIDR":       "PodCIDR represents the pod IP range assigned to the node.",
+	"podCIDRs":      "podCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. If this field is specified, the 0th entry must match the podCIDR field. It may contain at most 1 value for each of IPv4 and IPv6.",
 	"providerID":    "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",
 	"unschedulable": "Unschedulable controls node schedulability of new pods. By default, node is schedulable. More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration",
 	"taints":        "If specified, the node's taints.",
@@ -1446,6 +1447,15 @@ func (PodExecOptions) SwaggerDoc() map[string]string {
 	return map_PodExecOptions
 }
 
+var map_PodIP = map[string]string{
+	"":   "IP address information for entries in the (plural) PodIPs field. Each entry includes:\n   IP: An IP address allocated to the pod. Routable at least within the cluster.",
+	"ip": "ip is an IP address (IPv4 or IPv6) assigned to the pod",
+}
+
+func (PodIP) SwaggerDoc() map[string]string {
+	return map_PodIP
+}
+
 var map_PodList = map[string]string{
 	"":         "PodList is a list of Pods.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -1573,6 +1583,7 @@ var map_PodStatus = map[string]string{
 	"nominatedNodeName":     "nominatedNodeName is set only when this pod preempts other pods on the node, but it cannot be scheduled right away as preemption victims receive their graceful termination periods. This field does not guarantee that the pod will be scheduled on this node. Scheduler may decide to place the pod elsewhere if other nodes become available sooner. Scheduler may also decide to give the resources on this node to a higher priority pod that is created after preemption. As a result, this field may be different than PodSpec.nodeName when the pod is scheduled.",
 	"hostIP":                "IP address of the host to which the pod is assigned. Empty if not yet scheduled.",
 	"podIP":                 "IP address allocated to the pod. Routable at least within the cluster. Empty if not yet allocated.",
+	"podIPs":                "podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list is empty if no IPs have been allocated yet.",
 	"startTime":             "RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.",
 	"initContainerStatuses": "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
 	"containerStatuses":     "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
