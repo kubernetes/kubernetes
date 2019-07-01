@@ -359,6 +359,81 @@ func (client RegistriesClient) GetResponder(resp *http.Response) (result Registr
 	return
 }
 
+// GetBuildSourceUploadURL get the upload location for the user to be able to upload the source.
+// Parameters:
+// resourceGroupName - the name of the resource group to which the container registry belongs.
+// registryName - the name of the container registry.
+func (client RegistriesClient) GetBuildSourceUploadURL(ctx context.Context, resourceGroupName string, registryName string) (result SourceUploadDefinition, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: registryName,
+			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+		return result, validation.NewError("containerregistry.RegistriesClient", "GetBuildSourceUploadURL", err.Error())
+	}
+
+	req, err := client.GetBuildSourceUploadURLPreparer(ctx, resourceGroupName, registryName)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "containerregistry.RegistriesClient", "GetBuildSourceUploadURL", nil, "Failure preparing request")
+		return
+	}
+
+	resp, err := client.GetBuildSourceUploadURLSender(req)
+	if err != nil {
+		result.Response = autorest.Response{Response: resp}
+		err = autorest.NewErrorWithError(err, "containerregistry.RegistriesClient", "GetBuildSourceUploadURL", resp, "Failure sending request")
+		return
+	}
+
+	result, err = client.GetBuildSourceUploadURLResponder(resp)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "containerregistry.RegistriesClient", "GetBuildSourceUploadURL", resp, "Failure responding to request")
+	}
+
+	return
+}
+
+// GetBuildSourceUploadURLPreparer prepares the GetBuildSourceUploadURL request.
+func (client RegistriesClient) GetBuildSourceUploadURLPreparer(ctx context.Context, resourceGroupName string, registryName string) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"registryName":      autorest.Encode("path", registryName),
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
+	}
+
+	const APIVersion = "2018-09-01"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsPost(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerRegistry/registries/{registryName}/listBuildSourceUploadUrl", pathParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// GetBuildSourceUploadURLSender sends the GetBuildSourceUploadURL request. The method will close the
+// http.Response Body if it receives an error.
+func (client RegistriesClient) GetBuildSourceUploadURLSender(req *http.Request) (*http.Response, error) {
+	return autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
+}
+
+// GetBuildSourceUploadURLResponder handles the response to the GetBuildSourceUploadURL request. The method always
+// closes the http.Response Body.
+func (client RegistriesClient) GetBuildSourceUploadURLResponder(resp *http.Response) (result SourceUploadDefinition, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
+}
+
 // ImportImage copies an image to this container registry from the specified container registry.
 // Parameters:
 // resourceGroupName - the name of the resource group to which the container registry belongs.
@@ -927,6 +1002,88 @@ func (client RegistriesClient) RegenerateCredentialResponder(resp *http.Response
 		resp,
 		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
+		autorest.ByUnmarshallingJSON(&result),
+		autorest.ByClosing())
+	result.Response = autorest.Response{Response: resp}
+	return
+}
+
+// ScheduleRun schedules a new run based on the request parameters and add it to the run queue.
+// Parameters:
+// resourceGroupName - the name of the resource group to which the container registry belongs.
+// registryName - the name of the container registry.
+// runRequest - the parameters of a run that needs to scheduled.
+func (client RegistriesClient) ScheduleRun(ctx context.Context, resourceGroupName string, registryName string, runRequest BasicRunRequest) (result RegistriesScheduleRunFuture, err error) {
+	if err := validation.Validate([]validation.Validation{
+		{TargetValue: registryName,
+			Constraints: []validation.Constraint{{Target: "registryName", Name: validation.MaxLength, Rule: 50, Chain: nil},
+				{Target: "registryName", Name: validation.MinLength, Rule: 5, Chain: nil},
+				{Target: "registryName", Name: validation.Pattern, Rule: `^[a-zA-Z0-9]*$`, Chain: nil}}}}); err != nil {
+		return result, validation.NewError("containerregistry.RegistriesClient", "ScheduleRun", err.Error())
+	}
+
+	req, err := client.ScheduleRunPreparer(ctx, resourceGroupName, registryName, runRequest)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "containerregistry.RegistriesClient", "ScheduleRun", nil, "Failure preparing request")
+		return
+	}
+
+	result, err = client.ScheduleRunSender(req)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "containerregistry.RegistriesClient", "ScheduleRun", result.Response(), "Failure sending request")
+		return
+	}
+
+	return
+}
+
+// ScheduleRunPreparer prepares the ScheduleRun request.
+func (client RegistriesClient) ScheduleRunPreparer(ctx context.Context, resourceGroupName string, registryName string, runRequest BasicRunRequest) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"registryName":      autorest.Encode("path", registryName),
+		"resourceGroupName": autorest.Encode("path", resourceGroupName),
+		"subscriptionId":    autorest.Encode("path", client.SubscriptionID),
+	}
+
+	const APIVersion = "2018-09-01"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPost(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerRegistry/registries/{registryName}/scheduleRun", pathParameters),
+		autorest.WithJSON(runRequest),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// ScheduleRunSender sends the ScheduleRun request. The method will close the
+// http.Response Body if it receives an error.
+func (client RegistriesClient) ScheduleRunSender(req *http.Request) (future RegistriesScheduleRunFuture, err error) {
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
+	if err != nil {
+		return
+	}
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
+	return
+}
+
+// ScheduleRunResponder handles the response to the ScheduleRun request. The method always
+// closes the http.Response Body.
+func (client RegistriesClient) ScheduleRunResponder(resp *http.Response) (result Run, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
 	result.Response = autorest.Response{Response: resp}
