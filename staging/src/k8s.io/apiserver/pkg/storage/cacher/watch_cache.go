@@ -236,15 +236,17 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		w.Lock()
 		defer w.Unlock()
 
-		previous, exists, err := w.store.Get(elem)
-		if err != nil {
-			return err
-		}
-		if exists {
-			previousElem := previous.(*storeElement)
-			watchCacheEvent.PrevObject = previousElem.Object
-			watchCacheEvent.PrevObjLabels = previousElem.Labels
-			watchCacheEvent.PrevObjFields = previousElem.Fields
+		if event.Type != watch.Added {
+			previous, exists, err := w.store.Get(elem)
+			if err != nil {
+				return err
+			}
+			if exists {
+				previousElem := previous.(*storeElement)
+				watchCacheEvent.PrevObject = previousElem.Object
+				watchCacheEvent.PrevObjLabels = previousElem.Labels
+				watchCacheEvent.PrevObjFields = previousElem.Fields
+			}
 		}
 
 		w.updateCache(watchCacheEvent)
