@@ -33,6 +33,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -454,7 +455,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
 		go r.Run(wait.NeverStop)
 	}
-	nodeInfo := &predicates.CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
+	nodeInfo := &CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -2286,4 +2287,24 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		}
 	}
 	return config
+}
+
+// CachedNodeInfo implements NodeInfo
+type CachedNodeInfo struct {
+	corelisters.NodeLister
+}
+
+// GetNodeInfo returns cached data for the node name.
+func (c *CachedNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
+	node, err := c.Get(nodeName)
+
+	if apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", nodeName, err)
+	}
+
+	return node, nil
 }
