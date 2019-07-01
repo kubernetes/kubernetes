@@ -87,7 +87,7 @@ func TestNewInitData(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "fail if deprecetes feature gates are set",
+			name: "fail if deprecated feature gates are set",
 			flags: map[string]string{
 				options.FeatureGatesString: fmt.Sprintf("%s=true", features.CoreDNS),
 			},
