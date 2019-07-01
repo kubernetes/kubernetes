@@ -127,7 +127,7 @@ func NewRuntimeClass() *RuntimeClass {
 	}
 }
 
-// admissionAction handles Admit and Validate phases of admission, switching based on the admissionPhase parameter
+// prepareObjects returns pod and runtimeClass types from the given admission attributes
 func (r *RuntimeClass) prepareObjects(attributes admission.Attributes) (pod *api.Pod, runtimeClass *v1beta1.RuntimeClass, err error) {
 
 	pod, ok := attributes.GetObject().(*api.Pod)
@@ -160,24 +160,23 @@ func (r *RuntimeClass) getRuntimeClass(pod *api.Pod, runtimeClassName *string) (
 
 func setOverhead(a admission.Attributes, pod *api.Pod, runtimeClass *v1beta1.RuntimeClass) (err error) {
 
-	if runtimeClass != nil {
-		if runtimeClass.Overhead != nil {
-
-			// convert to internal type and assign to pod's Overhead
-			nodeOverhead := &node.Overhead{}
-			err := nodev1beta1.Convert_v1beta1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil)
-			if err != nil {
-				return err
-			}
-
-			// reject pod if Overhead is already set that differs from what is defined in RuntimeClass
-			if pod.Spec.Overhead != nil && !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {
-				return admission.NewForbidden(a, fmt.Errorf("pod rejected: Pod's Overhead doesn't match RuntimeClass's defined Overhead"))
-			}
-
-			pod.Spec.Overhead = nodeOverhead.PodFixed
-		}
+	if runtimeClass == nil || runtimeClass.Overhead == nil {
+		return nil
 	}
+
+	// convert to internal type and assign to pod's Overhead
+	nodeOverhead := &node.Overhead{}
+	err = nodev1beta1.Convert_v1beta1_Overhead_To_node_Overhead(runtimeClass.Overhead, nodeOverhead, nil)
+	if err != nil {
+		return err
+	}
+
+	// reject pod if Overhead is already set that differs from what is defined in RuntimeClass
+	if pod.Spec.Overhead != nil && !apiequality.Semantic.DeepEqual(nodeOverhead.PodFixed, pod.Spec.Overhead) {
+		return admission.NewForbidden(a, fmt.Errorf("pod rejected: Pod's Overhead doesn't match RuntimeClass's defined Overhead"))
+	}
+
+	pod.Spec.Overhead = nodeOverhead.PodFixed
 
 	return nil
 }
