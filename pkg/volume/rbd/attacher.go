@@ -217,7 +217,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 	// Unmount the device from the device mount point.
 	klog.V(4).Infof("rbd: unmouting device mountpoint %s", deviceMountPath)
-	if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
+	if err = mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false); err != nil {
 		return err
 	}
 	klog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
@@ -228,11 +228,6 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	klog.V(3).Infof("rbd: successfully detach device %s", devicePath)
-	err = os.Remove(deviceMountPath)
-	if err != nil {
-		return err
-	}
-	klog.V(3).Infof("rbd: successfully remove device mount point %s", deviceMountPath)
 	return nil
 }
 
