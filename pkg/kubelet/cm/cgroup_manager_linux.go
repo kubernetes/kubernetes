@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -153,10 +154,11 @@ func (l *libcontainerAdapter) newManager(cgroups *libcontainerconfigs.Cgroup, pa
 		if !cgroupsystemd.UseSystemd() {
 			panic("systemd cgroup manager not available")
 		}
-		return &cgroupsystemd.LegacyManager{
-			Cgroups: cgroups,
-			Paths:   paths,
-		}, nil
+		f, err := cgroupsystemd.NewSystemdCgroupsManager()
+		if err != nil {
+			return nil, err
+		}
+		return f(cgroups, paths), nil
 	}
 	return nil, fmt.Errorf("invalid cgroup manager configuration")
 }
@@ -254,6 +256,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	// in https://github.com/opencontainers/runc/issues/1440
 	// once resolved, we can remove this code.
 	whitelistControllers := sets.NewString("cpu", "cpuacct", "cpuset", "memory", "systemd")
+
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		whitelistControllers.Insert("pids")
 	}
@@ -369,14 +372,31 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	if resourceConfig.Memory != nil {
 		resources.Memory = *resourceConfig.Memory
 	}
-	if resourceConfig.CpuShares != nil {
-		resources.CpuShares = *resourceConfig.CpuShares
-	}
-	if resourceConfig.CpuQuota != nil {
-		resources.CpuQuota = *resourceConfig.CpuQuota
-	}
-	if resourceConfig.CpuPeriod != nil {
-		resources.CpuPeriod = *resourceConfig.CpuPeriod
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		if resourceConfig.CpuShares != nil {
+			// Convert from the range [2-262144] to [1-10000]
+			resources.CpuWeight = (1 + ((*resourceConfig.CpuShares-2)*9999)/262142)
+		}
+
+		quota := "max"
+		period := "100000"
+		if resourceConfig.CpuQuota != nil {
+			quota = strconv.FormatInt(*resourceConfig.CpuQuota, 10)
+		}
+		if resourceConfig.CpuPeriod != nil {
+			period = strconv.FormatUint(*resourceConfig.CpuPeriod, 10)
+		}
+		resources.CpuMax = fmt.Sprintf("%s %s", quota, period)
+	} else {
+		if resourceConfig.CpuShares != nil {
+			resources.CpuShares = *resourceConfig.CpuShares
+		}
+		if resourceConfig.CpuQuota != nil {
+			resources.CpuQuota = *resourceConfig.CpuQuota
+		}
+		if resourceConfig.CpuPeriod != nil {
+			resources.CpuPeriod = *resourceConfig.CpuPeriod
+		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportPodPidsLimit) || utilfeature.DefaultFeatureGate.Enabled(kubefeatures.SupportNodePidsLimit) {
 		if resourceConfig.PidsLimit != nil {

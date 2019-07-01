@@ -161,6 +161,10 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 		return f, fmt.Errorf("%s - %v", localErr, err)
 	}
 
+	if cgroups.IsCgroup2UnifiedMode() {
+		return f, nil
+	}
+
 	expectedCgroups := sets.NewString("cpu", "cpuacct", "cpuset", "memory")
 	for _, mountPoint := range mountPoints {
 		if mountPoint.Type == cgroupMountType {
@@ -882,6 +886,11 @@ func getContainer(pid int) (string, error) {
 	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
+	}
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		c, _ := cgs[""]
+		return c, nil
 	}
 
 	cpu, found := cgs["cpu"]
