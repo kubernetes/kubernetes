@@ -33,7 +33,7 @@ popd
 
 # Find all of the staging repos.
 while IFS='' read -r repo; do staging_repos+=("${repo}"); done <\
-  <(cd "${KUBE_ROOT}/staging/src" && find k8s.io -mindepth 1 -maxdepth 1 -type d | LANG=C sort)
+  <(cd "${KUBE_ROOT}/staging/src" && find k8s.io -mindepth 1 -maxdepth 1 -type d | LC_ALL=C LANG=C sort)
 
 # Save the staging repos into a Starlark list that can be used by Bazel rules.
 (
