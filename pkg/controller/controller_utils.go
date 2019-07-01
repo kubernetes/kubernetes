@@ -573,7 +573,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	if len(nodeName) != 0 {
 		pod.Spec.NodeName = nodeName
 	}
-	if labels.Set(pod.Labels).AsSelectorPreValidated().Empty() {
+	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
 	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
