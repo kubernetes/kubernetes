@@ -68,7 +68,14 @@ func (t testDriverParameter) String() string {
 }
 
 func (t testDriverParameter) Set(filename string) error {
-	driver, err := t.loadDriverDefinition(filename)
+	return AddDriverDefinition(filename)
+}
+
+// AddDriverDefinition defines ginkgo tests for CSI driver definition file.
+// Either --storage.testdriver cmdline argument or AddDriverDefinition can be used
+// to define the tests.
+func AddDriverDefinition(filename string) error {
+	driver, err := loadDriverDefinition(filename)
 	if err != nil {
 		return err
 	}
@@ -84,7 +91,7 @@ func (t testDriverParameter) Set(filename string) error {
 	return nil
 }
 
-func (t testDriverParameter) loadDriverDefinition(filename string) (*driverDefinition, error) {
+func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, errors.New("missing file name")
 	}
