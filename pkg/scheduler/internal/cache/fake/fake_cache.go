@@ -109,3 +109,6 @@ func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
 func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return nil, nil
 }
+
+// NodeTopologyInfo is a fake method for testing.
+func (c *Cache) NodeTopologyInfo() internalcache.NodeTopologyInfo { return nil }

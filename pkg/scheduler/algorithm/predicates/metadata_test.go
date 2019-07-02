@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -422,13 +423,13 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 		},
 		topologyPairsAntiAffinityPodsMap: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "machine1"}: {
+			topologyPairToPods: map[internalcache.TopologyPair]podSet{
+				{Key: "name", Value: "machine1"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeC"},
 					}: struct{}{},
 				},
-				{key: "name", value: "machine2"}: {
+				{Key: "name", Value: "machine2"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeA"},
 					}: struct{}{},
@@ -436,21 +437,21 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 			podToTopologyPairs: map[string]topologyPairSet{
 				"p2_": {
-					topologyPair{key: "name", value: "machine1"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "machine1"}: struct{}{},
 				},
 				"p1_": {
-					topologyPair{key: "name", value: "machine2"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "machine2"}: struct{}{},
 				},
 			},
 		},
 		topologyPairsPotentialAffinityPods: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "nodeA"}: {
+			topologyPairToPods: map[internalcache.TopologyPair]podSet{
+				{Key: "name", Value: "nodeA"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeA"},
 					}: struct{}{},
 				},
-				{key: "name", value: "nodeC"}: {
+				{Key: "name", Value: "nodeC"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
 						Spec: v1.PodSpec{
 							NodeName: "nodeC",
@@ -463,19 +464,19 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 			podToTopologyPairs: map[string]topologyPairSet{
 				"p1_": {
-					topologyPair{key: "name", value: "nodeA"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeA"}: struct{}{},
 				},
 				"p2_": {
-					topologyPair{key: "name", value: "nodeC"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeC"}: struct{}{},
 				},
 				"p6_": {
-					topologyPair{key: "name", value: "nodeC"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeC"}: struct{}{},
 				},
 			},
 		},
 		topologyPairsPotentialAntiAffinityPods: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "nodeN"}: {
+			topologyPairToPods: map[internalcache.TopologyPair]podSet{
+				{Key: "name", Value: "nodeN"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeN"},
 					}: struct{}{},
@@ -490,7 +491,7 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 						},
 					}: struct{}{},
 				},
-				{key: "name", value: "nodeM"}: {
+				{Key: "name", Value: "nodeM"}: {
 					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
 						Spec: v1.PodSpec{NodeName: "nodeM"},
 					}: struct{}{},
@@ -498,16 +499,16 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 			podToTopologyPairs: map[string]topologyPairSet{
 				"p1_": {
-					topologyPair{key: "name", value: "nodeN"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeN"}: struct{}{},
 				},
 				"p2_": {
-					topologyPair{key: "name", value: "nodeN"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeN"}: struct{}{},
 				},
 				"p3_": {
-					topologyPair{key: "name", value: "nodeN"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeN"}: struct{}{},
 				},
 				"p6_": {
-					topologyPair{key: "name", value: "nodeM"}: struct{}{},
+					internalcache.TopologyPair{Key: "name", Value: "nodeM"}: struct{}{},
 				},
 			},
 		},
@@ -627,22 +628,22 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodA: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodA: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodA: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodA: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
@@ -665,22 +666,22 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 				},
 			},
 			wantAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodAB: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodAB: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodAB: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodAB: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
@@ -704,12 +705,12 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			},
 			wantAffinityPodsMaps: newTopologyPairsMaps(),
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodA: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodA: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
@@ -733,12 +734,12 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			},
 			wantAffinityPodsMaps: newTopologyPairsMaps(),
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodAB: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodAB: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
@@ -762,12 +763,12 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 			},
 			wantAffinityPodsMaps: newTopologyPairsMaps(),
 			wantAntiAffinityPodsMaps: &topologyPairsMaps{
-				topologyPairToPods: map[topologyPair]podSet{
-					{key: "hostname", value: "nodeA"}: {normalPodB: struct{}{}},
+				topologyPairToPods: map[internalcache.TopologyPair]podSet{
+					{Key: "hostname", Value: "nodeA"}: {normalPodB: struct{}{}},
 				},
 				podToTopologyPairs: map[string]topologyPairSet{
 					"normal_": {
-						topologyPair{key: "hostname", value: "nodeA"}: struct{}{},
+						internalcache.TopologyPair{Key: "hostname", Value: "nodeA"}: struct{}{},
 					},
 				},
 			},
