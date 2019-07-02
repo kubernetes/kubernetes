@@ -30,9 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapisv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -131,9 +132,9 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, advertiseAd
 
 	ip := net.ParseIP(advertiseAddress)
 	if ip.To4() != nil {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv4
+		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapisv1beta2.DefaultProxyBindAddressv4
 	} else {
-		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapiv1beta2.DefaultProxyBindAddressv6
+		cfg.ComponentConfigs.KubeProxy.BindAddress = kubeadmapisv1beta2.DefaultProxyBindAddressv6
 	}
 
 	// Resolve possible version labels and validate version string

@@ -22,28 +22,29 @@ package v1beta2
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	v1beta2 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaults_ClusterConfiguration(obj.(*ClusterConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&ClusterStatus{}, func(obj interface{}) { SetObjectDefaults_ClusterStatus(obj.(*ClusterStatus)) })
-	scheme.AddTypeDefaultingFunc(&InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*InitConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*JoinConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&v1beta2.ClusterConfiguration{}, func(obj interface{}) { SetObjectDefaults_ClusterConfiguration(obj.(*v1beta2.ClusterConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&v1beta2.ClusterStatus{}, func(obj interface{}) { SetObjectDefaults_ClusterStatus(obj.(*v1beta2.ClusterStatus)) })
+	scheme.AddTypeDefaultingFunc(&v1beta2.InitConfiguration{}, func(obj interface{}) { SetObjectDefaults_InitConfiguration(obj.(*v1beta2.InitConfiguration)) })
+	scheme.AddTypeDefaultingFunc(&v1beta2.JoinConfiguration{}, func(obj interface{}) { SetObjectDefaults_JoinConfiguration(obj.(*v1beta2.JoinConfiguration)) })
 	return nil
 }
 
-func SetObjectDefaults_ClusterConfiguration(in *ClusterConfiguration) {
+func SetObjectDefaults_ClusterConfiguration(in *v1beta2.ClusterConfiguration) {
 	SetDefaults_ClusterConfiguration(in)
 	SetDefaults_APIServer(&in.APIServer)
 }
 
-func SetObjectDefaults_ClusterStatus(in *ClusterStatus) {
+func SetObjectDefaults_ClusterStatus(in *v1beta2.ClusterStatus) {
 }
 
-func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
+func SetObjectDefaults_InitConfiguration(in *v1beta2.InitConfiguration) {
 	SetDefaults_InitConfiguration(in)
 	for i := range in.BootstrapTokens {
 		a := &in.BootstrapTokens[i]
@@ -52,7 +53,7 @@ func SetObjectDefaults_InitConfiguration(in *InitConfiguration) {
 	SetDefaults_APIEndpoint(&in.LocalAPIEndpoint)
 }
 
-func SetObjectDefaults_JoinConfiguration(in *JoinConfiguration) {
+func SetObjectDefaults_JoinConfiguration(in *v1beta2.JoinConfiguration) {
 	SetDefaults_JoinConfiguration(in)
 	SetDefaults_Discovery(&in.Discovery)
 	if in.Discovery.File != nil {

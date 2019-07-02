@@ -21,8 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"

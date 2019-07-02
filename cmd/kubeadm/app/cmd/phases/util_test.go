@@ -20,7 +20,8 @@ import (
 	"testing"
 
 	"k8s.io/client-go/pkg/version"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2"
+	kubeadmapisv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 )
 
 func TestSetKubernetesVersion(t *testing.T) {
@@ -39,7 +40,7 @@ func TestSetKubernetesVersion(t *testing.T) {
 		},
 		{
 			name:   "default version is processed",
-			input:  kubeadmapiv1beta2.DefaultKubernetesVersion,
+			input:  kubeadmapisv1beta2.DefaultKubernetesVersion,
 			output: ver,
 		},
 		{

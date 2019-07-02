@@ -20,9 +20,9 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init",
     visibility = ["//visibility:public"],
     deps = [
+        "//cmd/kubeadm/api/config/v1beta2:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/scheme:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
         "//cmd/kubeadm/app/cmd/options:go_default_library",
         "//cmd/kubeadm/app/cmd/phases/workflow:go_default_library",
         "//cmd/kubeadm/app/cmd/util:go_default_library",

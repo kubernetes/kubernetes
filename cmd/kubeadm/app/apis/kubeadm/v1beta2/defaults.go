@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -66,13 +67,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 // SetDefaults_InitConfiguration assigns default values for the InitConfiguration
-func SetDefaults_InitConfiguration(obj *InitConfiguration) {
+func SetDefaults_InitConfiguration(obj *kubeadmapiv1beta2.InitConfiguration) {
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 }
 
 // SetDefaults_ClusterConfiguration assigns default values for the ClusterConfiguration
-func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
+func SetDefaults_ClusterConfiguration(obj *kubeadmapiv1beta2.ClusterConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
 	}
@@ -103,7 +104,7 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 }
 
 // SetDefaults_APIServer assigns default values for the API Server
-func SetDefaults_APIServer(obj *APIServer) {
+func SetDefaults_APIServer(obj *kubeadmapiv1beta2.APIServer) {
 	if obj.TimeoutForControlPlane == nil {
 		obj.TimeoutForControlPlane = &metav1.Duration{
 			Duration: constants.DefaultControlPlaneTimeout,
@@ -112,16 +113,16 @@ func SetDefaults_APIServer(obj *APIServer) {
 }
 
 // SetDefaults_DNS assigns default values for the DNS component
-func SetDefaults_DNS(obj *ClusterConfiguration) {
+func SetDefaults_DNS(obj *kubeadmapiv1beta2.ClusterConfiguration) {
 	if obj.DNS.Type == "" {
-		obj.DNS.Type = CoreDNS
+		obj.DNS.Type = kubeadmapiv1beta2.CoreDNS
 	}
 }
 
 // SetDefaults_Etcd assigns default values for the proxy
-func SetDefaults_Etcd(obj *ClusterConfiguration) {
+func SetDefaults_Etcd(obj *kubeadmapiv1beta2.ClusterConfiguration) {
 	if obj.Etcd.External == nil && obj.Etcd.Local == nil {
-		obj.Etcd.Local = &LocalEtcd{}
+		obj.Etcd.Local = &kubeadmapiv1beta2.LocalEtcd{}
 	}
 	if obj.Etcd.Local != nil {
 		if obj.Etcd.Local.DataDir == "" {
@@ -131,7 +132,7 @@ func SetDefaults_Etcd(obj *ClusterConfiguration) {
 }
 
 // SetDefaults_JoinConfiguration assigns default values to a regular node
-func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
+func SetDefaults_JoinConfiguration(obj *kubeadmapiv1beta2.JoinConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
 	}
@@ -140,14 +141,14 @@ func SetDefaults_JoinConfiguration(obj *JoinConfiguration) {
 	SetDefaults_Discovery(&obj.Discovery)
 }
 
-func SetDefaults_JoinControlPlane(obj *JoinControlPlane) {
+func SetDefaults_JoinControlPlane(obj *kubeadmapiv1beta2.JoinControlPlane) {
 	if obj != nil {
 		SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 	}
 }
 
 // SetDefaults_Discovery assigns default values for the discovery process
-func SetDefaults_Discovery(obj *Discovery) {
+func SetDefaults_Discovery(obj *kubeadmapiv1beta2.Discovery) {
 	if len(obj.TLSBootstrapToken) == 0 && obj.BootstrapToken != nil {
 		obj.TLSBootstrapToken = obj.BootstrapToken.Token
 	}
@@ -164,7 +165,7 @@ func SetDefaults_Discovery(obj *Discovery) {
 }
 
 // SetDefaults_FileDiscovery assigns default values for file based discovery
-func SetDefaults_FileDiscovery(obj *FileDiscovery) {
+func SetDefaults_FileDiscovery(obj *kubeadmapiv1beta2.FileDiscovery) {
 	// Make sure file URL becomes path
 	if len(obj.KubeConfigPath) != 0 {
 		u, err := url.Parse(obj.KubeConfigPath)
@@ -179,10 +180,10 @@ func SetDefaults_FileDiscovery(obj *FileDiscovery) {
 // through the slice and sets the defaults for the omitempty fields that are TTL,
 // Usages and Groups. Token is NOT defaulted with a random one in the API defaulting
 // layer, but set to a random value later at runtime if not set before.
-func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
+func SetDefaults_BootstrapTokens(obj *kubeadmapiv1beta2.InitConfiguration) {
 
 	if obj.BootstrapTokens == nil || len(obj.BootstrapTokens) == 0 {
-		obj.BootstrapTokens = []BootstrapToken{{}}
+		obj.BootstrapTokens = []kubeadmapiv1beta2.BootstrapToken{{}}
 	}
 
 	for i := range obj.BootstrapTokens {
@@ -191,7 +192,7 @@ func SetDefaults_BootstrapTokens(obj *InitConfiguration) {
 }
 
 // SetDefaults_BootstrapToken sets the defaults for an individual Bootstrap Token
-func SetDefaults_BootstrapToken(bt *BootstrapToken) {
+func SetDefaults_BootstrapToken(bt *kubeadmapiv1beta2.BootstrapToken) {
 	if bt.TTL == nil {
 		bt.TTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
@@ -207,7 +208,7 @@ func SetDefaults_BootstrapToken(bt *BootstrapToken) {
 }
 
 // SetDefaults_APIEndpoint sets the defaults for the API server instance deployed on a node.
-func SetDefaults_APIEndpoint(obj *APIEndpoint) {
+func SetDefaults_APIEndpoint(obj *kubeadmapiv1beta2.APIEndpoint) {
 	if obj.BindPort == 0 {
 		obj.BindPort = DefaultAPIBindPort
 	}

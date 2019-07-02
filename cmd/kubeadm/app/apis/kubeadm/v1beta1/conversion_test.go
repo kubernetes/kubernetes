@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"testing"
 
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -48,7 +49,7 @@ func TestInternalToVersionedInitConfigurationConversion(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			versioned := &InitConfiguration{}
+			versioned := &kubeadmapiv1beta1.InitConfiguration{}
 			err := Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")
@@ -79,7 +80,7 @@ func TestInternalToVersionedJoinConfigurationConversion(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			versioned := &JoinConfiguration{}
+			versioned := &kubeadmapiv1beta1.JoinConfiguration{}
 			err := Convert_kubeadm_JoinConfiguration_To_v1beta1_JoinConfiguration(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")
@@ -108,7 +109,7 @@ func TestInternalToVersionedNodeRegistrationOptionsConversion(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			versioned := &NodeRegistrationOptions{}
+			versioned := &kubeadmapiv1beta1.NodeRegistrationOptions{}
 			err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")
@@ -137,7 +138,7 @@ func TestInternalToVersionedJoinControlPlaneConversion(t *testing.T) {
 	}
 	for name, tc := range testcases {
 		t.Run(name, func(t *testing.T) {
-			versioned := &JoinControlPlane{}
+			versioned := &kubeadmapiv1beta1.JoinControlPlane{}
 			err := Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(&tc.in, versioned, nil)
 			if err == nil && tc.expectedError {
 				t.Error("unexpected success")

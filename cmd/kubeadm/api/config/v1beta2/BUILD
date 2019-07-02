@@ -1,30 +1,32 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = [
-        "conversion.go",
-        "defaults.go",
-        "defaults_unix.go",
-        "defaults_windows.go",
+        "bootstraptokenstring.go",
         "doc.go",
         "register.go",
-        "zz_generated.conversion.go",
+        "types.go",
         "zz_generated.deepcopy.go",
-        "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2",
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2",
     visibility = ["//visibility:public"],
     deps = [
-        "//cmd/kubeadm/api/config/v1beta2:go_default_library",
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
-        "//cmd/kubeadm/app/constants:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/cluster-bootstrap/token/util:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["bootstraptokenstring_test.go"],
+    embed = [":go_default_library"],
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

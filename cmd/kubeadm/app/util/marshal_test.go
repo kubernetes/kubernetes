@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta2"
+	kubeadmapisv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -128,7 +129,7 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 		// at the kubeadmapiv1beta2.InitConfiguration definition.
 	}
 
-	kubeadmapiv1beta2.SetDefaults_InitConfiguration(cfg)
+	kubeadmapisv1beta2.SetDefaults_InitConfiguration(cfg)
 	scheme := runtime.NewScheme()
 	if err := kubeadmapiv1beta2.AddToScheme(scheme); err != nil {
 		t.Fatal(err)

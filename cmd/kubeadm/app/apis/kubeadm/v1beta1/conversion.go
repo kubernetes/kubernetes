@@ -19,10 +19,11 @@ package v1beta1
 import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/conversion"
+	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/api/config/v1beta1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
-func Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+func Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kubeadm.InitConfiguration, out *kubeadmapiv1beta1.InitConfiguration, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in, out, s); err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func Convert_kubeadm_InitConfiguration_To_v1beta1_InitConfiguration(in *kubeadm.
 	return nil
 }
 
-func Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in *kubeadm.JoinControlPlane, out *JoinControlPlane, s conversion.Scope) error {
+func Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in *kubeadm.JoinControlPlane, out *kubeadmapiv1beta1.JoinControlPlane, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in, out, s); err != nil {
 		return err
 	}
@@ -46,7 +47,7 @@ func Convert_kubeadm_JoinControlPlane_To_v1beta1_JoinControlPlane(in *kubeadm.Jo
 	return nil
 }
 
-func Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
+func Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *kubeadmapiv1beta1.NodeRegistrationOptions, s conversion.Scope) error {
 	if err := autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(in, out, s); err != nil {
 		return err
 	}

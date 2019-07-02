@@ -35,6 +35,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//cmd/kubeadm/api:all-srcs",
         "//cmd/kubeadm/app:all-srcs",
         "//cmd/kubeadm/test:all-srcs",
     ],
