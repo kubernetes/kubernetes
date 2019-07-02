@@ -86,8 +86,10 @@ func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
 		if rQuantity, ok := container.Resources.Requests[resource]; ok {
-			if resource == v1.ResourceCPU && rQuantity.MilliValue() > totalResources {
-				totalResources = rQuantity.MilliValue()
+			if resource == v1.ResourceCPU {
+				if rQuantity.MilliValue() > totalResources {
+					totalResources = rQuantity.MilliValue()
+				}
 			} else if rQuantity.Value() > totalResources {
 				totalResources = rQuantity.Value()
 			}
