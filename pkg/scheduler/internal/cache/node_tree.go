@@ -63,7 +63,7 @@ func newNodeTree(nodes []*v1.Node) *NodeTree {
 		tree: make(map[string]*nodeArray),
 	}
 	for _, n := range nodes {
-		nt.AddNode(n)
+		nt.addNode(n)
 	}
 	return nt
 }
