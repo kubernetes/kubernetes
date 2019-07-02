@@ -15,6 +15,7 @@ go_test(
         "fifo_test.go",
         "heap_test.go",
         "index_test.go",
+        "main_test.go",
         "mutation_detector_test.go",
         "processor_listener_test.go",
         "reflector_test.go",

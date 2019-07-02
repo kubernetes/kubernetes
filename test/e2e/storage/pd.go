@@ -18,7 +18,7 @@ package storage
 
 import (
 	"fmt"
-	mathrand "math/rand"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -81,8 +81,6 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
-
-		mathrand.Seed(time.Now().UnixNano())
 	})
 
 	ginkgo.Context("schedule pods each with a PD, delete pod and verify detach [Slow]", func() {
@@ -180,7 +178,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					ginkgo.By("writing content to host0Pod on node0")
 					containerName = "mycontainer"
 					testFile = "/testpd1/tracker"
-					testFileContents = fmt.Sprintf("%v", mathrand.Int())
+					testFileContents = fmt.Sprintf("%v", rand.Int())
 					framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 					e2elog.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 					ginkgo.By("verifying PD is present in node0's VolumeInUse list")
@@ -280,11 +278,11 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					ginkgo.By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
 					containerName := "mycontainer"
 					if numContainers > 1 {
-						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
+						containerName = fmt.Sprintf("mycontainer%v", rand.Intn(numContainers)+1)
 					}
 					for x := 1; x <= numPDs; x++ {
 						testFile := fmt.Sprintf("/testpd%d/tracker%d", x, i)
-						testFileContents := fmt.Sprintf("%v", mathrand.Int())
+						testFileContents := fmt.Sprintf("%v", rand.Int())
 						fileAndContentToVerify[testFile] = testFileContents
 						framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 						e2elog.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
@@ -292,7 +290,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 					ginkgo.By("verifying PD contents via a container")
 					if numContainers > 1 {
-						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
+						containerName = fmt.Sprintf("mycontainer%v", rand.Intn(numContainers)+1)
 					}
 					verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
@@ -379,7 +377,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				ginkgo.By("writing content to host0Pod")
 				testFile := "/testpd1/tracker"
-				testFileContents := fmt.Sprintf("%v", mathrand.Int())
+				testFileContents := fmt.Sprintf("%v", rand.Int())
 				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
 				e2elog.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 

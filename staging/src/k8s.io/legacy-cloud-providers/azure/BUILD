@@ -97,6 +97,7 @@ go_test(
         "azure_vmss_test.go",
         "azure_wrap_test.go",
         "azure_zones_test.go",
+        "main_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
