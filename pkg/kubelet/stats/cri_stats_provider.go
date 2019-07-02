@@ -137,6 +137,7 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
+	podSandboxes = removeTerminatedPods(podSandboxes)
 	for _, s := range podSandboxes {
 		podSandboxMap[s.Id] = s
 	}
@@ -153,7 +154,7 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
-	containers = removeTerminatedContainer(containers)
+	containers = removeTerminatedContainers(containers)
 	// Creates container map.
 	containerMap := make(map[string]*runtimeapi.Container)
 	for _, c := range containers {
@@ -233,6 +234,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
 	}
+	podSandboxes = removeTerminatedPods(podSandboxes)
 	for _, s := range podSandboxes {
 		podSandboxMap[s.Id] = s
 	}
@@ -245,7 +247,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
 
-	containers = removeTerminatedContainer(containers)
+	containers = removeTerminatedContainers(containers)
 	// Creates container map.
 	containerMap := make(map[string]*runtimeapi.Container)
 	for _, c := range containers {
@@ -690,9 +692,51 @@ func (p *criStatsProvider) cleanupOutdatedCaches() {
 	}
 }
 
-// removeTerminatedContainer returns the specified container but with
-// the stats of the terminated containers removed.
-func removeTerminatedContainer(containers []*runtimeapi.Container) []*runtimeapi.Container {
+// removeTerminatedPods returns pods with terminated ones removed.
+// It only removes a terminated pod when there is a running instance
+// of the pod with the same name and namespace.
+// This is needed because:
+// 1) PodSandbox may be recreated;
+// 2) Pod may be recreated with the same name and namespace.
+func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbox {
+	podMap := make(map[statsapi.PodReference][]*runtimeapi.PodSandbox)
+	// Sort order by create time
+	sort.Slice(pods, func(i, j int) bool {
+		return pods[i].CreatedAt < pods[j].CreatedAt
+	})
+	for _, pod := range pods {
+		refID := statsapi.PodReference{
+			Name:      pod.GetMetadata().GetName(),
+			Namespace: pod.GetMetadata().GetNamespace(),
+			// UID is intentionally left empty.
+		}
+		podMap[refID] = append(podMap[refID], pod)
+	}
+
+	result := make([]*runtimeapi.PodSandbox, 0)
+	for _, refs := range podMap {
+		if len(refs) == 1 {
+			result = append(result, refs[0])
+			continue
+		}
+		found := false
+		for i := 0; i < len(refs); i++ {
+			if refs[i].State == runtimeapi.PodSandboxState_SANDBOX_READY {
+				found = true
+				result = append(result, refs[i])
+			}
+		}
+		if !found {
+			result = append(result, refs[len(refs)-1])
+		}
+	}
+	return result
+}
+
+// removeTerminatedContainers returns containers with terminated ones.
+// It only removes a terminated container when there is a running instance
+// of the container.
+func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeapi.Container {
 	containerMap := make(map[containerID][]*runtimeapi.Container)
 	// Sort order by create time
 	sort.Slice(containers, func(i, j int) bool {

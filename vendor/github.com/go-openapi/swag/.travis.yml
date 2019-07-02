@@ -1,16 +1,15 @@
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 go:
-- '1.9'
-- 1.10.x
 - 1.11.x
+- 1.12.x
 install:
-- go get -u github.com/stretchr/testify
-- go get -u github.com/mailru/easyjson
-- go get -u gopkg.in/yaml.v2
+- GO111MODULE=off go get -u gotest.tools/gotestsum
+env:
+- GO111MODULE=on
 language: go
 notifications:
   slack:
     secure: QUWvCkBBK09GF7YtEvHHVt70JOkdlNBG0nIKu/5qc4/nW5HP8I2w0SEf/XR2je0eED1Qe3L/AfMCWwrEj+IUZc3l4v+ju8X8R3Lomhme0Eb0jd1MTMCuPcBT47YCj0M7RON7vXtbFfm1hFJ/jLe5+9FXz0hpXsR24PJc5ZIi/ogNwkaPqG4BmndzecpSh0vc2FJPZUD9LT0I09REY/vXR0oQAalLkW0asGD5taHZTUZq/kBpsNxaAFrLM23i4mUcf33M5fjLpvx5LRICrX/57XpBrDh2TooBU6Qj3CgoY0uPRYUmSNxbVx1czNzl2JtEpb5yjoxfVPQeg0BvQM00G8LJINISR+ohrjhkZmAqchDupAX+yFrxTtORa78CtnIL6z/aTNlgwwVD8kvL/1pFA/JWYmKDmz93mV/+6wubGzNSQCstzjkFA4/iZEKewKUoRIAi/fxyscP6L/rCpmY/4llZZvrnyTqVbt6URWpopUpH4rwYqreXAtJxJsfBJIeSmUIiDIOMGkCTvyTEW3fWGmGoqWtSHLoaWDyAIGb7azb+KvfpWtEcoPFWfSWU+LGee0A/YsUhBl7ADB9A0CJEuR8q4BPpKpfLwPKSiKSAXL7zDkyjExyhtgqbSl2jS+rKIHOZNL8JkCcTP2MKMVd563C5rC5FMKqu3S9m2b6380E=
 script:
-- go test -v -race -cover -coverprofile=coverage.txt -covermode=atomic ./...
+- gotestsum -f short-verbose -- -race -coverprofile=coverage.txt -covermode=atomic ./...

@@ -24,8 +24,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // RenameContextOptions contains the options for running the rename-context cli command.
@@ -45,7 +45,7 @@ var (
 	renameContextLong = templates.LongDesc(`
 		Renames a context from the kubeconfig file.
 
-		CONTEXT_NAME is the context name that you wish change.
+		CONTEXT_NAME is the context name that you wish to change.
 
 		NEW_NAME is the new name you wish to set.
 

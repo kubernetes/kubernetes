@@ -17,106 +17,60 @@ limitations under the License.
 package openapi
 
 import (
-	"strings"
-
-	"github.com/go-openapi/spec"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/validation"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
-// ConvertJSONSchemaPropsToOpenAPIv2Schema converts our internal OpenAPI v3 schema
-// (*apiextensions.JSONSchemaProps) to an OpenAPI v2 schema (*spec.Schema).
-func ConvertJSONSchemaPropsToOpenAPIv2Schema(in *apiextensions.JSONSchemaProps) (*spec.Schema, error) {
+// ToStructuralOpenAPIV2 converts our internal OpenAPI v3 structural schema to
+// to a v2 compatible schema.
+func ToStructuralOpenAPIV2(in *structuralschema.Structural) *structuralschema.Structural {
 	if in == nil {
-		return nil, nil
+		return nil
 	}
 
-	// dirty hack to temporarily set the type at the root. See continuation at the func bottom.
-	// TODO: remove for Kubernetes 1.15
-	oldRootType := in.Type
-	if len(in.Type) == 0 {
-		in.Type = "object"
-	}
+	out := in.DeepCopy()
 
 	// Remove unsupported fields in OpenAPI v2 recursively
-	out := new(spec.Schema)
-	validation.ConvertJSONSchemaPropsWithPostProcess(in, out, func(p *spec.Schema) error {
-		p.OneOf = nil
-		// TODO(roycaihw): preserve cases where we only have one subtree in AnyOf, same for OneOf
-		p.AnyOf = nil
-		p.Not = nil
-
-		// TODO: drop everything below in 1.15 when we have passed one version skew towards kube-openapi in <1.14, which rejects valid openapi schemata
-
-		if p.Ref.String() != "" {
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R95
-			p.Properties = nil
-
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R99
-			p.Type = nil
-
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R104
-			if !strings.HasPrefix(p.Ref.String(), "#/definitions/") {
-				p.Ref = spec.Ref{}
-			}
-		}
-
-		switch {
-		case len(p.Type) == 2 && (p.Type[0] == "null" || p.Type[1] == "null"):
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-ce77fea74b9dd098045004410023e0c3R219
-			p.Type = nil
-		case len(p.Type) == 1:
-			switch p.Type[0] {
-			case "null":
-				// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-ce77fea74b9dd098045004410023e0c3R219
-				p.Type = nil
-			case "array":
-				// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R183
-				// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R184
-				if p.Items == nil || (p.Items.Schema == nil && len(p.Items.Schemas) != 1) {
-					p.Type = nil
-					p.Items = nil
+	mapper := structuralschema.Visitor{
+		Structural: func(s *structuralschema.Structural) bool {
+			changed := false
+			if s.ValueValidation != nil {
+				if s.ValueValidation.AllOf != nil {
+					s.ValueValidation.AllOf = nil
+					changed = true
+				}
+				if s.ValueValidation.OneOf != nil {
+					s.ValueValidation.OneOf = nil
+					changed = true
+				}
+				if s.ValueValidation.AnyOf != nil {
+					s.ValueValidation.AnyOf = nil
+					changed = true
+				}
+				if s.ValueValidation.Not != nil {
+					s.ValueValidation.Not = nil
+					changed = true
 				}
 			}
-		case len(p.Type) > 1:
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R272
-			// We also set Properties to null to enforce parseArbitrary at https://github.com/kubernetes/kube-openapi/blob/814a8073653e40e0e324205d093770d4e7bb811f/pkg/util/proto/document.go#L247
-			p.Type = nil
-			p.Properties = nil
-		default:
-			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R248
-			p.Properties = nil
-		}
 
-		// normalize items
-		if p.Items != nil && len(p.Items.Schemas) == 1 {
-			p.Items = &spec.SchemaOrArray{Schema: &p.Items.Schemas[0]}
-		}
+			// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-ce77fea74b9dd098045004410023e0c3R219
+			if s.Nullable {
+				s.Type = ""
+				s.Nullable = false
 
-		// general fixups not supported by gnostic
-		p.ID = ""
-		p.Schema = ""
-		p.Definitions = nil
-		p.AdditionalItems = nil
-		p.Dependencies = nil
-		p.PatternProperties = nil
-		if p.ExternalDocs != nil && len(p.ExternalDocs.URL) == 0 {
-			p.ExternalDocs = nil
-		}
-		if p.Items != nil && p.Items.Schemas != nil {
-			p.Items = nil
-		}
+				// untyped values break if items or properties are set in kubectl
+				// https://github.com/kubernetes/kube-openapi/pull/143/files#diff-62afddb578e9db18fb32ffb6b7802d92R183
+				s.Items = nil
+				s.Properties = nil
 
-		return nil
-	})
+				changed = true
+			}
 
-	// restore root level type in input, and remove it in output if we had added it
-	// TODO: remove with Kubernetes 1.15
-	in.Type = oldRootType
-	if len(oldRootType) == 0 {
-		out.Type = nil
+			return changed
+		},
+		// we drop all junctors above, and hence, never reach nested value validations
+		NestedValueValidation: nil,
 	}
+	mapper.Visit(out)
 
-	return out, nil
+	return out
 }

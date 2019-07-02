@@ -521,11 +521,12 @@ func (r *Lexer) SkipRecursive() {
 	r.scanToken()
 	var start, end byte
 
-	if r.token.delimValue == '{' {
+	switch r.token.delimValue {
+	case '{':
 		start, end = '{', '}'
-	} else if r.token.delimValue == '[' {
+	case '[':
 		start, end = '[', ']'
-	} else {
+	default:
 		r.consume()
 		return
 	}
@@ -1151,7 +1152,7 @@ func (r *Lexer) Interface() interface{} {
 	} else if r.token.delimValue == '[' {
 		r.consume()
 
-		var ret []interface{}
+		ret := []interface{}{}
 		for !r.IsDelim(']') {
 			ret = append(ret, r.Interface())
 			r.WantComma()

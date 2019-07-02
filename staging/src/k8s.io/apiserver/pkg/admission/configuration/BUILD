@@ -39,6 +39,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/generic:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/listers/admissionregistration/v1beta1:go_default_library",

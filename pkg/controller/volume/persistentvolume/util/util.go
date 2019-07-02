@@ -56,6 +56,17 @@ const (
 	// in storage class to indicate dynamic provisioning is not supported by
 	// the storage.
 	NotSupportedProvisioner = "kubernetes.io/no-provisioner"
+
+	// AnnDynamicallyProvisioned annotation is added to a PV that has been dynamically provisioned by
+	// Kubernetes. Its value is name of volume plugin that created the volume.
+	// It serves both user (to show where a PV comes from) and Kubernetes (to
+	// recognize dynamically provisioned PVs in its decisions).
+	AnnDynamicallyProvisioned = "pv.kubernetes.io/provisioned-by"
+
+	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
+	// provisioned. Its value is name of volume plugin that is supposed to provision
+	// a volume for this PVC.
+	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
 // IsDelayBindingMode checks if claim is in delay binding mode.

@@ -83,7 +83,7 @@ var (
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
 // The indexer is configured to key on namespace
 func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
-	indexer = NewIndexer(MetaNamespaceKeyFunc, Indexers{"namespace": MetaNamespaceIndexFunc})
+	indexer = NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
 	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod)
 	return indexer, reflector
 }
@@ -299,7 +299,12 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
-				klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
+				switch {
+				case apierrs.IsResourceExpired(err):
+					klog.V(4).Infof("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
+				default:
+					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedType, err)
+				}
 			}
 			return nil
 		}

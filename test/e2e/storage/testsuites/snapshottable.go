@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -44,15 +44,6 @@ var (
 	snapshotClassGVR   = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshotclasses"}
 	snapshotContentGVR = schema.GroupVersionResource{Group: snapshotGroup, Version: "v1alpha1", Resource: "volumesnapshotcontents"}
 )
-
-type SnapshotClassTest struct {
-	Name           string
-	CloudProviders []string
-	Snapshotter    string
-	Parameters     map[string]string
-	NodeName       string
-	NodeSelector   map[string]string // NodeSelector for the pod
-}
 
 type snapshottableTestSuite struct {
 	tsInfo TestSuiteInfo
@@ -82,9 +73,9 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		dDriver DynamicPVTestDriver
 	)
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		// Check preconditions.
-		Expect(pattern.SnapshotType).To(Equal(testpatterns.DynamicCreatedSnapshot))
+		gomega.Expect(pattern.SnapshotType).To(gomega.Equal(testpatterns.DynamicCreatedSnapshot))
 		dInfo := driver.GetDriverInfo()
 		ok := false
 		sDriver, ok = driver.(SnapshottableTestDriver)
@@ -103,7 +94,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshotting")
 
-	It("should create snapshot with defaults [Feature:VolumeSnapshotDataSource]", func() {
+	ginkgo.It("should create snapshot with defaults [Feature:VolumeSnapshotDataSource]", func() {
 		cs := f.ClientSet
 		dc := f.DynamicClient
 
@@ -122,7 +113,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		pvc.Spec.StorageClassName = &class.Name
 		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
-		By("creating a StorageClass " + class.Name)
+		ginkgo.By("creating a StorageClass " + class.Name)
 		class, err := cs.StorageV1().StorageClasses().Create(class)
 		framework.ExpectNoError(err)
 		defer func() {
@@ -130,7 +121,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
 
-		By("creating a claim")
+		ginkgo.By("creating a claim")
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
 		defer func() {
@@ -138,13 +129,13 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			// typically this claim has already been deleted
 			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil && !apierrs.IsNotFound(err) {
-				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
-		By("checking the claim")
+		ginkgo.By("checking the claim")
 		// Get new copy of the claim
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(pvc.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -153,7 +144,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		pv, err := cs.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		By("creating a SnapshotClass")
+		ginkgo.By("creating a SnapshotClass")
 		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
@@ -161,7 +152,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
 		}()
 
-		By("creating a snapshot")
+		ginkgo.By("creating a snapshot")
 		snapshot := getSnapshot(pvc.Name, pvc.Namespace, vsc.GetName())
 
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
@@ -171,13 +162,13 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			// typically this snapshot has already been deleted
 			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
 			if err != nil && !apierrs.IsNotFound(err) {
-				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
+				e2elog.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
 			}
 		}()
 		err = WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
 		framework.ExpectNoError(err)
 
-		By("checking the snapshot")
+		ginkgo.By("checking the snapshot")
 		// Get new copy of the snapshot
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Get(snapshot.GetName(), metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -193,11 +184,11 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		persistentVolumeRef := snapshotContentSpec["persistentVolumeRef"].(map[string]interface{})
 
 		// Check SnapshotContent properties
-		By("checking the SnapshotContent")
-		Expect(snapshotContentSpec["snapshotClassName"]).To(Equal(vsc.GetName()))
-		Expect(volumeSnapshotRef["name"]).To(Equal(snapshot.GetName()))
-		Expect(volumeSnapshotRef["namespace"]).To(Equal(snapshot.GetNamespace()))
-		Expect(persistentVolumeRef["name"]).To(Equal(pv.Name))
+		ginkgo.By("checking the SnapshotContent")
+		gomega.Expect(snapshotContentSpec["snapshotClassName"]).To(gomega.Equal(vsc.GetName()))
+		gomega.Expect(volumeSnapshotRef["name"]).To(gomega.Equal(snapshot.GetName()))
+		gomega.Expect(volumeSnapshotRef["namespace"]).To(gomega.Equal(snapshot.GetNamespace()))
+		gomega.Expect(persistentVolumeRef["name"]).To(gomega.Equal(pv.Name))
 	})
 }
 

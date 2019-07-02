@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -117,7 +119,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 	}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
-		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
+		e2elog.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
 	}
 
 	// Analyze results
@@ -269,7 +271,7 @@ func deletePodsSync(f *framework.Framework, pods []*v1.Pod) {
 			err := f.PodClient().Delete(pod.ObjectMeta.Name, metav1.NewDeleteOptions(30))
 			framework.ExpectNoError(err)
 
-			gomega.Expect(framework.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+			gomega.Expect(e2epod.WaitForPodToDisappear(f.ClientSet, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).NotTo(gomega.HaveOccurred())
 		}(pod)
 	}

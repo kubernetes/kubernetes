@@ -19,14 +19,14 @@ package testsuites
 import (
 	"fmt"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -146,7 +146,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				l.pvc.Spec.VolumeMode = &pattern.VolMode
 			}
 		default:
-			framework.Failf("Volume mode test doesn't support: %s", pattern.VolType)
+			e2elog.Failf("Volume mode test doesn't support: %s", pattern.VolType)
 		}
 	}
 
@@ -166,17 +166,17 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	switch pattern.VolType {
 	case testpatterns.PreprovisionedPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			It("should fail to create pod by failing to mount volume [Slow]", func() {
+			ginkgo.It("should fail to create pod by failing to mount volume [Slow]", func() {
 				init()
 				defer cleanup()
 
 				var err error
 
-				By("Creating sc")
+				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				framework.ExpectNoError(err)
 
-				By("Creating pv and pvc")
+				ginkgo.By("Creating pv and pvc")
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
 				framework.ExpectNoError(err)
 
@@ -187,27 +187,27 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
-				By("Creating pod")
+				ginkgo.By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
 					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 				defer func() {
 					framework.ExpectNoError(framework.DeletePodWithWait(f, l.cs, pod))
 				}()
-				Expect(err).To(HaveOccurred())
+				framework.ExpectError(err)
 			})
 		} else {
-			It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
+			ginkgo.It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
 				init()
 				defer cleanup()
 
 				var err error
 
-				By("Creating sc")
+				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				framework.ExpectNoError(err)
 
-				By("Creating pv and pvc")
+				ginkgo.By("Creating pv and pvc")
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Create(l.pv)
 				framework.ExpectNoError(err)
 
@@ -218,7 +218,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 
 				framework.ExpectNoError(framework.WaitOnPVandPVC(l.cs, l.ns.Name, l.pv, l.pvc))
 
-				By("Creating pod")
+				ginkgo.By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
 					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
@@ -227,45 +227,45 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}()
 				framework.ExpectNoError(err)
 
-				By("Checking if persistent volume exists as expected volume mode")
+				ginkgo.By("Checking if persistent volume exists as expected volume mode")
 				utils.CheckVolumeModeOfPath(pod, pattern.VolMode, "/mnt/volume1")
 
-				By("Checking if read/write to persistent volume works properly")
+				ginkgo.By("Checking if read/write to persistent volume works properly")
 				utils.CheckReadWriteToPath(pod, pattern.VolMode, "/mnt/volume1")
 			})
 			// TODO(mkimuram): Add more tests
 		}
 	case testpatterns.DynamicPV:
 		if pattern.VolMode == v1.PersistentVolumeBlock && !isBlockSupported {
-			It("should fail in binding dynamic provisioned PV to PVC", func() {
+			ginkgo.It("should fail in binding dynamic provisioned PV to PVC [Slow]", func() {
 				init()
 				defer cleanup()
 
 				var err error
 
-				By("Creating sc")
+				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				framework.ExpectNoError(err)
 
-				By("Creating pv and pvc")
+				ginkgo.By("Creating pv and pvc")
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				framework.ExpectNoError(err)
 
 				err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, l.cs, l.pvc.Namespace, l.pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
-				Expect(err).To(HaveOccurred())
+				framework.ExpectError(err)
 			})
 		} else {
-			It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
+			ginkgo.It("should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources", func() {
 				init()
 				defer cleanup()
 
 				var err error
 
-				By("Creating sc")
+				ginkgo.By("Creating sc")
 				l.sc, err = l.cs.StorageV1().StorageClasses().Create(l.sc)
 				framework.ExpectNoError(err)
 
-				By("Creating pv and pvc")
+				ginkgo.By("Creating pv and pvc")
 				l.pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(l.pvc)
 				framework.ExpectNoError(err)
 
@@ -278,7 +278,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				l.pv, err = l.cs.CoreV1().PersistentVolumes().Get(l.pvc.Spec.VolumeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 
-				By("Creating pod")
+				ginkgo.By("Creating pod")
 				pod, err := framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, []*v1.PersistentVolumeClaim{l.pvc},
 					false, "", false, false, framework.SELinuxLabel,
 					nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
@@ -287,16 +287,16 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}()
 				framework.ExpectNoError(err)
 
-				By("Checking if persistent volume exists as expected volume mode")
+				ginkgo.By("Checking if persistent volume exists as expected volume mode")
 				utils.CheckVolumeModeOfPath(pod, pattern.VolMode, "/mnt/volume1")
 
-				By("Checking if read/write to persistent volume works properly")
+				ginkgo.By("Checking if read/write to persistent volume works properly")
 				utils.CheckReadWriteToPath(pod, pattern.VolMode, "/mnt/volume1")
 			})
 			// TODO(mkimuram): Add more tests
 		}
 	default:
-		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
+		e2elog.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
 
 }

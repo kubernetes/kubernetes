@@ -144,7 +144,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 	BeforeEach(func() {
 		var err error
 		runtime, _, err = getCRIClient()
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	})
 	for _, pod := range test.testPods {
 		// Initialize the getContainerNames function to use CRI runtime client.
@@ -200,7 +200,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 						containerCount := 0
 						for _, containerName := range containerNames {
 							if containerName == pod.getContainerName(i) {
-								containerCount += 1
+								containerCount++
 							}
 						}
 						if containerCount > maxPerPodContainer+1 {
@@ -228,7 +228,7 @@ func containerGCTest(f *framework.Framework, test testRun) {
 							containerCount := 0
 							for _, containerName := range containerNames {
 								if containerName == pod.getContainerName(i) {
-									containerCount += 1
+									containerCount++
 								}
 							}
 							if pod.restartCount > 0 && containerCount < maxPerPodContainer+1 {

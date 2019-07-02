@@ -21,13 +21,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
 func TestAdmit(t *testing.T) {
 
-	plugin := newExtendedResourceToleration()
+	plugin := admissiontesting.WithReinvocationTesting(t, newExtendedResourceToleration())
 
 	containerRequestingCPU := core.Container{
 		Resources: core.ResourceRequirements{
@@ -354,7 +355,7 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		err := plugin.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, core.Kind("Pod").WithVersion("version"), "foo", "name", core.Resource("pods").WithVersion("version"), "", "ignored", false, nil), nil)
+		err := plugin.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, core.Kind("Pod").WithVersion("version"), "foo", "name", core.Resource("pods").WithVersion("version"), "", "ignored", nil, false, nil), nil)
 		if err != nil {
 			t.Errorf("[%d: %s] unexpected error %v for pod %+v", i, test.description, err, test.requestedPod)
 		}

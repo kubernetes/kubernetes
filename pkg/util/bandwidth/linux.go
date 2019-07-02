@@ -33,7 +33,7 @@ import (
 	"k8s.io/klog"
 )
 
-// tcShaper provides an implementation of the BandwidthShaper interface on Linux using the 'tc' tool.
+// tcShaper provides an implementation of the Shaper interface on Linux using the 'tc' tool.
 // In general, using this requires that the caller posses the NET_CAP_ADMIN capability, though if you
 // do this within an container, it only requires the NS_CAPABLE capability for manipulations to that
 // container's network namespace.
@@ -44,7 +44,8 @@ type tcShaper struct {
 	iface string
 }
 
-func NewTCShaper(iface string) BandwidthShaper {
+// NewTCShaper makes a new tcShaper for the given interface
+func NewTCShaper(iface string) Shaper {
 	shaper := &tcShaper{
 		e:     exec.New(),
 		iface: iface,
@@ -157,10 +158,9 @@ func (t *tcShaper) findCIDRClass(cidr string) (classAndHandleList [][]string, fo
 			// filter parent 1: protocol ip pref 1 u32 fh 800::800 order 2048 key ht 800 bkt 0 flowid 1:1
 			if len(parts) != 19 {
 				return classAndHandleList, false, fmt.Errorf("unexpected output from tc: %s %d (%v)", filter, len(parts), parts)
-			} else {
-				resultTmp := []string{parts[18], parts[9]}
-				classAndHandleList = append(classAndHandleList, resultTmp)
 			}
+			resultTmp := []string{parts[18], parts[9]}
+			classAndHandleList = append(classAndHandleList, resultTmp)
 		}
 	}
 	if len(classAndHandleList) > 0 {

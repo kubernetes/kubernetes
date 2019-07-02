@@ -122,114 +122,6 @@ func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
 	}
 }
 
-func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
-	c1 := intstr.FromString("10%")
-	c2 := intstr.FromInt(1)
-	c3 := intstr.FromInt(2)
-	oldPdb := &policy.PodDisruptionBudget{}
-	pdb := &policy.PodDisruptionBudget{}
-	testCases := []struct {
-		generations []int64
-		name        string
-		specs       []policy.PodDisruptionBudgetSpec
-		status      []policy.PodDisruptionBudgetStatus
-		ok          bool
-	}{
-		{
-			name:        "only update status",
-			generations: []int64{int64(2), int64(3)},
-			specs: []policy.PodDisruptionBudgetSpec{
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c2,
-				},
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c2,
-				},
-			},
-			status: []policy.PodDisruptionBudgetStatus{
-				{
-					PodDisruptionsAllowed: 10,
-					CurrentHealthy:        5,
-					ExpectedPods:          2,
-				},
-				{
-					PodDisruptionsAllowed: 8,
-					CurrentHealthy:        5,
-					DesiredHealthy:        3,
-				},
-			},
-			ok: true,
-		},
-		{
-			name:        "only update pdb spec",
-			generations: []int64{int64(2), int64(3)},
-			specs: []policy.PodDisruptionBudgetSpec{
-				{
-					MaxUnavailable: &c2,
-				},
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c3,
-				},
-			},
-			status: []policy.PodDisruptionBudgetStatus{
-				{
-					PodDisruptionsAllowed: 10,
-				},
-				{
-					PodDisruptionsAllowed: 10,
-				},
-			},
-			ok: false,
-		},
-		{
-			name:        "update spec and status",
-			generations: []int64{int64(2), int64(3)},
-			specs: []policy.PodDisruptionBudgetSpec{
-				{
-					MaxUnavailable: &c2,
-				},
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c3,
-				},
-			},
-			status: []policy.PodDisruptionBudgetStatus{
-				{
-					PodDisruptionsAllowed: 10,
-					CurrentHealthy:        5,
-					ExpectedPods:          2,
-				},
-				{
-					PodDisruptionsAllowed: 8,
-					CurrentHealthy:        5,
-					DesiredHealthy:        3,
-				},
-			},
-			ok: false,
-		},
-	}
-
-	for i, tc := range testCases {
-		oldPdb.Spec = tc.specs[0]
-		oldPdb.Generation = tc.generations[0]
-		oldPdb.Status = tc.status[0]
-
-		pdb.Spec = tc.specs[1]
-		pdb.Generation = tc.generations[1]
-		oldPdb.Status = tc.status[1]
-
-		errs := ValidatePodDisruptionBudgetUpdate(oldPdb, pdb)
-		if tc.ok && len(errs) > 0 {
-			t.Errorf("[%d:%s] unexpected errors: %v", i, tc.name, errs)
-		} else if !tc.ok && len(errs) == 0 {
-			t.Errorf("[%d:%s] expected errors: %v", i, tc.name, errs)
-		}
-	}
-}
-
 func TestValidatePodSecurityPolicy(t *testing.T) {
 	validPSP := func() *policy.PodSecurityPolicy {
 		return &policy.PodSecurityPolicy{
@@ -388,6 +280,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 
 	invalidProcMount := validPSP()
 	invalidProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.ProcMountType("bogus")}
+
+	allowedCSIDriverPSP := validPSP()
+	allowedCSIDriverPSP.Spec.Volumes = []policy.FSType{policy.CSI}
+	allowedCSIDriverPSP.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{}}
 
 	type testCase struct {
 		psp         *policy.PodSecurityPolicy
@@ -555,6 +451,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeRequired,
 			errorDetail: "must specify a driver",
 		},
+		"CSI policy with empty allowed driver list": {
+			psp:       allowedCSIDriverPSP,
+			errorType: field.ErrorTypeRequired,
+		},
 		"invalid allowedProcMountTypes": {
 			psp:         invalidProcMount,
 			errorType:   field.ErrorTypeNotSupported,
@@ -657,6 +557,14 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validProcMount := validPSP()
 	validProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.DefaultProcMount, api.UnmaskedProcMount}
 
+	allowedCSIDriversWithCSIFsType := validPSP()
+	allowedCSIDriversWithCSIFsType.Spec.Volumes = []policy.FSType{policy.CSI}
+	allowedCSIDriversWithCSIFsType.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}}
+
+	allowedCSIDriversWithAllFsTypes := validPSP()
+	allowedCSIDriversWithAllFsTypes.Spec.Volumes = []policy.FSType{policy.All}
+	allowedCSIDriversWithAllFsTypes.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "bar"}}
+
 	successCases := map[string]struct {
 		psp *policy.PodSecurityPolicy
 	}{
@@ -698,6 +606,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid allowedProcMountTypes": {
 			psp: validProcMount,
+		},
+		"allowed CSI drivers when FSType policy is set to CSI": {
+			psp: allowedCSIDriversWithCSIFsType,
+		},
+		"allowed CSI drivers when FSType policy is set to All": {
+			psp: allowedCSIDriversWithAllFsTypes,
 		},
 	}
 

@@ -32,10 +32,10 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	cmdwait "k8s.io/kubernetes/pkg/kubectl/cmd/wait"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (

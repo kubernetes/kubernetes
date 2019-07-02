@@ -25,7 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
-	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 )
@@ -55,7 +55,7 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 		cacherConfig := cacherstorage.Config{
 			CacheCapacity:        capacity,
 			Storage:              s,
-			Versioner:            etcdstorage.APIObjectVersioner{},
+			Versioner:            etcd3.APIObjectVersioner{},
 			ResourcePrefix:       resourcePrefix,
 			KeyFunc:              keyFunc,
 			NewFunc:              newFunc,

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -254,6 +254,7 @@ priorities: []
 			informerFactory.Core().V1().Services(),
 			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			informerFactory.Storage().V1().StorageClasses(),
+			informerFactory.Storage().V1beta1().CSINodes(),
 			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 			kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
@@ -265,6 +266,8 @@ priorities: []
 			},
 			nil,
 			schedulerframework.NewRegistry(),
+			nil,
+			[]kubeschedulerconfig.PluginConfig{},
 			scheduler.WithName(v1.DefaultSchedulerName),
 			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
@@ -323,6 +326,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Storage().V1beta1().CSINodes(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
@@ -334,6 +338,8 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		},
 		nil,
 		schedulerframework.NewRegistry(),
+		nil,
+		[]kubeschedulerconfig.PluginConfig{},
 		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
@@ -598,7 +604,8 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(), stopCh)
+	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(),
+		nil, []kubeschedulerconfig.PluginConfig{}, stopCh)
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
@@ -616,6 +623,7 @@ func TestMultiScheduler(t *testing.T) {
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Storage().V1().StorageClasses(),
+		context.informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
 	go podInformer2.Informer().Run(stopCh)

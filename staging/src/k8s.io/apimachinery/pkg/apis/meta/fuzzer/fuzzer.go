@@ -215,9 +215,6 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Finalizers = nil
 			}
 		},
-		func(j *metav1.Initializers, c fuzz.Continue) {
-			j = nil
-		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.SelfLink = c.RandString()

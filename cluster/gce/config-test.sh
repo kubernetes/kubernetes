@@ -86,17 +86,25 @@ ALLOWED_NOTREADY_NODES="${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}"
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-beta-73-11647-64-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-73-11647-163-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
+
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
 CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
 LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
+if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+  CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
+  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+  LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+  KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --runtime-cgroups=/system.slice/containerd.service"
+fi
+
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
@@ -175,7 +183,7 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.10-0) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.10-1) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -252,8 +260,6 @@ METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # 
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
-  # TODO(liggitt): remove this in v1.16
-  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
 fi
@@ -285,6 +291,7 @@ ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="10.0.0.10"
 LOCAL_DNS_IP="${KUBE_LOCAL_DNS_IP:-169.254.20.10}"
 DNS_DOMAIN="cluster.local"
+DNS_MEMORY_LIMIT="${KUBE_DNS_MEMORY_LIMIT:-170Mi}"
 
 # Optional: Enable DNS horizontal autoscaler
 ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}"
@@ -307,6 +314,7 @@ NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
+CNI_STORAGE_PATH="${CNI_STORAGE_PATH:-https://storage.googleapis.com/kubernetes-release/network-plugins}"
 CNI_VERSION="${CNI_VERSION:-}"
 CNI_SHA1="${CNI_SHA1:-}"
 
@@ -485,12 +493,6 @@ KUBE_PROXY_MODE="${KUBE_PROXY_MODE:-iptables}"
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
 
-# Optional: enable pod priority
-ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
-if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
-fi
-
 # Optional: enable certificate rotation of the kubelet certificates.
 ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"
 
@@ -514,3 +516,7 @@ WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSche
 
 # Whether to set up a private GCE cluster, i.e. a cluster where nodes have only private IPs.
 GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
+
+ETCD_LISTEN_CLIENT_IP=0.0.0.0
+
+GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA=true

@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/ioutil"
-	"k8s.io/kubernetes/pkg/apis/networking"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -37,14 +36,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
-	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -53,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -378,7 +375,6 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 
 // This test doesn't cover the apiregistration and apiextensions group, as they are installed by other apiservers.
 func TestStorageVersionHashes(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionHash, true)()
 	master, etcdserver, _, _ := newMaster(t)
 	defer etcdserver.Terminate(t)
 
@@ -423,7 +419,6 @@ func TestStorageVersionHashes(t *testing.T) {
 }
 
 func TestStorageVersionHashEqualities(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionHash, true)()
 	master, etcdserver, _, assert := newMaster(t)
 	defer etcdserver.Terminate(t)
 
@@ -439,9 +434,9 @@ func TestStorageVersionHashEqualities(t *testing.T) {
 	for _, r := range extList.APIResources {
 		if r.Name == "replicasets" {
 			extReplicasetHash = r.StorageVersionHash
+			assert.NotEmpty(extReplicasetHash)
 		}
 	}
-	assert.NotEmpty(extReplicasetHash)
 
 	resp, err = http.Get(server.URL + "/apis/apps/v1")
 	assert.Empty(err)
@@ -450,9 +445,12 @@ func TestStorageVersionHashEqualities(t *testing.T) {
 	for _, r := range appsList.APIResources {
 		if r.Name == "replicasets" {
 			appsReplicasetHash = r.StorageVersionHash
+			assert.NotEmpty(appsReplicasetHash)
 		}
 	}
-	assert.Equal(extReplicasetHash, appsReplicasetHash)
+	if len(extReplicasetHash) > 0 && len(appsReplicasetHash) > 0 {
+		assert.Equal(extReplicasetHash, appsReplicasetHash)
+	}
 
 	// Test 2: batch/v1/jobs and batch/v1beta1/cronjobs have different
 	// storage version hashes.

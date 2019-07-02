@@ -25,6 +25,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const (
@@ -93,7 +96,7 @@ func gatherProfile(componentName, profileBaseName, profileKind string) error {
 
 	// Get the profile data over SSH.
 	getCommand := fmt.Sprintf("curl -s localhost:%v/debug/pprof/%s", profilePort, profileKind)
-	sshResult, err := SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(getCommand, GetMasterHost()+":22", TestContext.Provider)
 	if err != nil {
 		return fmt.Errorf("Failed to execute curl command on master through SSH: %v", err)
 	}
@@ -179,7 +182,7 @@ func GatherCPUProfileForSeconds(componentName string, profileBaseName string, se
 		defer wg.Done()
 	}
 	if err := gatherProfile(componentName, profileBaseName, fmt.Sprintf("profile?seconds=%v", seconds)); err != nil {
-		Logf("Failed to gather %v CPU profile: %v", componentName, err)
+		e2elog.Logf("Failed to gather %v CPU profile: %v", componentName, err)
 	}
 }
 
@@ -189,7 +192,7 @@ func GatherMemoryProfile(componentName string, profileBaseName string, wg *sync.
 		defer wg.Done()
 	}
 	if err := gatherProfile(componentName, profileBaseName, "heap"); err != nil {
-		Logf("Failed to gather %v memory profile: %v", componentName, err)
+		e2elog.Logf("Failed to gather %v memory profile: %v", componentName, err)
 	}
 }
 

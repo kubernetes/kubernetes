@@ -72,16 +72,19 @@ import (
 )
 
 const (
-	// Jitter used when starting controller managers
+	// ControllerStartJitter is the Jitter used when starting controller managers
 	ControllerStartJitter = 1.0
 	// ConfigzName is the name used for register kube-controller manager /configz, same with GroupName.
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
 )
 
+// ControllerLoopMode is the kube-controller-manager's mode of running controller loops that are cloud provider dependent
 type ControllerLoopMode int
 
 const (
+	// IncludeCloudLoops means the kube-controller-manager include the controller loops that are cloud provider dependent
 	IncludeCloudLoops ControllerLoopMode = iota
+	// ExternalLoops means the kube-controller-manager exclude the controller loops that are cloud provider dependent
 	ExternalLoops
 )
 
@@ -284,6 +287,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	panic("unreachable")
 }
 
+// ControllerContext defines the context object for controller
 type ControllerContext struct {
 	// ClientBuilder will provide a client for this controller to use
 	ClientBuilder controller.ControllerClientBuilder
@@ -328,6 +332,7 @@ type ControllerContext struct {
 	ResyncPeriod func() time.Duration
 }
 
+// IsControllerEnabled checks if the context's controllers enabled or not
 func (c ControllerContext) IsControllerEnabled(name string) bool {
 	return genericcontrollermanager.IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
@@ -337,6 +342,7 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 // The bool indicates whether the controller was enabled.
 type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
 
+// KnownControllers returns all known controllers's name
 func KnownControllers() []string {
 	ret := sets.StringKeySet(NewControllerInitializers(IncludeCloudLoops))
 
@@ -351,6 +357,7 @@ func KnownControllers() []string {
 	return ret.List()
 }
 
+// ControllersDisabledByDefault is the set of controllers which is disabled by default
 var ControllersDisabledByDefault = sets.NewString(
 	"bootstrapsigner",
 	"tokencleaner",
@@ -405,8 +412,9 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	return controllers
 }
 
+// GetAvailableResources gets the map which contains all available resources of the apiserver
 // TODO: In general, any controller checking this needs to be dynamic so
-//  users don't have to restart their controller manager if they change the apiserver.
+// users don't have to restart their controller manager if they change the apiserver.
 // Until we get there, the structure here needs to be exposed for the construction of a proper ControllerContext.
 func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (map[schema.GroupVersionResource]bool, error) {
 	client := clientBuilder.ClientOrDie("controller-discovery")
@@ -484,6 +492,7 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	return ctx, nil
 }
 
+// StartControllers starts a set of controllers with a specified ControllerContext
 func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc, unsecuredMux *mux.PathRecorderMux) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.

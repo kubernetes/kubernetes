@@ -82,9 +82,9 @@ var _ = framework.KubeDescribe("ContainerLogRotation [Slow] [Serial] [Disruptive
 			Expect(len(pod.Status.ContainerStatuses)).To(Equal(1))
 			id := kubecontainer.ParseContainerID(pod.Status.ContainerStatuses[0].ContainerID).ID
 			r, _, err := getCRIClient()
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			status, err := r.ContainerStatus(id)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			logPath := status.GetLogPath()
 			By("wait for container log being rotated to max file limit")
 			Eventually(func() (int, error) {

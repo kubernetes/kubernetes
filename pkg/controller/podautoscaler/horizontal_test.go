@@ -26,7 +26,7 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -2666,6 +2666,100 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 			t.Errorf("[%s] after  stabilization recommendations log has %d entries, expected %d", tc.name, len(hc.recommendations[tc.key]), tc.expectedLogLength)
 		}
 	}
+}
+
+func TestScaleUpOneMetricEmpty(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         3,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricSource{
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		reportedLevels:      []uint64{300, 400, 500},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+	}
+	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
+	})
+	tc.testEMClient = testEMClient
+	tc.runTest(t)
+}
+
+func TestNoScaleDownOneMetricInvalid(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         5,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               50,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: "CheddarCheese",
+			},
+		},
+		reportedLevels:      []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
+		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		},
+	}
+
+	tc.runTest(t)
+}
+
+func TestNoScaleDownOneMetricEmpty(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		initialReplicas:         5,
+		expectedDesiredReplicas: 5,
+		CPUTarget:               50,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricSource{
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Value: resource.NewMilliQuantity(1000, resource.DecimalSI),
+					},
+				},
+			},
+		},
+		reportedLevels:      []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:       true,
+		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
+		},
+	}
+	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
+	})
+	tc.testEMClient = testEMClient
+	tc.runTest(t)
 }
 
 // TODO: add more tests

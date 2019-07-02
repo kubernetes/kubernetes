@@ -193,3 +193,18 @@ func (t *DateTime) SetBSON(raw bson.Raw) error {
 
 	return errors.New("couldn't unmarshal bson raw value as Duration")
 }
+
+// DeepCopyInto copies the receiver and writes its value into out.
+func (t *DateTime) DeepCopyInto(out *DateTime) {
+	*out = *t
+}
+
+// DeepCopy copies the receiver into a new DateTime.
+func (t *DateTime) DeepCopy() *DateTime {
+	if t == nil {
+		return nil
+	}
+	out := new(DateTime)
+	t.DeepCopyInto(out)
+	return out
+}

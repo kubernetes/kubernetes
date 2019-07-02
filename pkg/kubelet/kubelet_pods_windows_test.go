@@ -82,9 +82,9 @@ func TestMakeMountsWindows(t *testing.T) {
 		},
 	}
 
-	fm := &mount.FakeMounter{}
+	fhu := &mount.FakeHostUtil{}
 	fsp := &subpath.FakeSubpath{}
-	mounts, _, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes, fm, fsp, nil)
+	mounts, _, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes, fhu, fsp, nil)
 
 	expectedMounts := []kubecontainer.Mount{
 		{

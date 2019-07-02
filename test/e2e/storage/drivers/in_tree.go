@@ -43,10 +43,10 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -114,7 +115,7 @@ func (n *nfsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	nv, ok := volume.(*nfsVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to NFS test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to NFS test volume")
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverIP,
@@ -126,7 +127,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 
 func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	nv, ok := volume.(*nfsVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to NFS test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to NFS test volume")
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverIP,
@@ -156,16 +157,16 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	err := auth.BindClusterRole(cs.RbacV1beta1(), "cluster-admin", ns.Name,
-		rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
+	err := auth.BindClusterRole(cs.RbacV1(), "cluster-admin", ns.Name,
+		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
 
-	err = auth.WaitForAuthorizationUpdate(cs.AuthorizationV1beta1(),
+	err = auth.WaitForAuthorizationUpdate(cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),
 		"", "get", schema.GroupResource{Group: "storage.k8s.io", Resource: "storageclasses"}, true)
 	framework.ExpectNoError(err, "Failed to update authorization: %v", err)
 
-	By("creating an external dynamic provisioner pod")
+	ginkgo.By("creating an external dynamic provisioner pod")
 	n.externalProvisionerPod = utils.StartExternalProvisioner(cs, ns.Name, n.externalPluginName)
 
 	return &testsuites.PerTestConfig{
@@ -175,7 +176,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 		}, func() {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
-			cs.RbacV1beta1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
+			cs.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
 }
 
@@ -201,7 +202,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.DynamicPV:
 		// Do nothing
 	default:
-		framework.Failf("Unsupported volType:%v is specified", volType)
+		e2elog.Failf("Unsupported volType:%v is specified", volType)
 	}
 	return nil
 }
@@ -255,7 +256,7 @@ func (g *glusterFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) 
 
 func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	gv, ok := volume.(*glusterVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Gluster test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
 	return &v1.VolumeSource{
@@ -270,7 +271,7 @@ func (g *glusterFSDriver) GetVolumeSource(readOnly bool, fsType string, volume t
 
 func (g *glusterFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := volume.(*glusterVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Gluster test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Gluster test volume")
 
 	name := gv.prefix + "-server"
 	return &v1.PersistentVolumeSource{
@@ -316,14 +317,14 @@ func (v *glusterVolume) DeleteVolume() {
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			framework.Failf("Gluster delete endpoints failed: %v", err)
+			e2elog.Failf("Gluster delete endpoints failed: %v", err)
 		}
 		e2elog.Logf("Gluster endpoints %q not found, assuming deleted", name)
 	}
 	e2elog.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = framework.DeletePodWithWait(f, cs, v.serverPod)
 	if err != nil {
-		framework.Failf("Gluster server pod delete failed: %v", err)
+		e2elog.Failf("Gluster server pod delete failed: %v", err)
 	}
 }
 
@@ -378,7 +379,7 @@ func (i *iSCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	iv, ok := volume.(*iSCSIVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to iSCSI test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to iSCSI test volume")
 
 	volSource := v1.VolumeSource{
 		ISCSI: &v1.ISCSIVolumeSource{
@@ -396,7 +397,7 @@ func (i *iSCSIDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 func (i *iSCSIDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	iv, ok := volume.(*iSCSIVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to iSCSI test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to iSCSI test volume")
 
 	pvSource := v1.PersistentVolumeSource{
 		ISCSI: &v1.ISCSIPersistentVolumeSource{
@@ -491,7 +492,7 @@ func (r *rbdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	rv, ok := volume.(*rbdVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to RBD test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to RBD test volume")
 
 	volSource := v1.VolumeSource{
 		RBD: &v1.RBDVolumeSource{
@@ -513,7 +514,7 @@ func (r *rbdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 
 func (r *rbdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	rv, ok := volume.(*rbdVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to RBD test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to RBD test volume")
 
 	f := rv.f
 	ns := f.Namespace
@@ -614,7 +615,7 @@ func (c *cephFSDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	cv, ok := volume.(*cephVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Ceph test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Ceph test volume")
 
 	return &v1.VolumeSource{
 		CephFS: &v1.CephFSVolumeSource{
@@ -630,7 +631,7 @@ func (c *cephFSDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 
 func (c *cephFSDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := volume.(*cephVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Ceph test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Ceph test volume")
 
 	ns := cv.f.Namespace
 
@@ -784,7 +785,7 @@ func (h *hostPathSymlinkDriver) SkipUnsupportedTest(pattern testpatterns.TestPat
 
 func (h *hostPathSymlinkDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	hv, ok := volume.(*hostPathSymlinkVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Hostpath Symlink test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Hostpath Symlink test volume")
 
 	// hostPathSymlink doesn't support readOnly volume
 	if readOnly {
@@ -859,13 +860,13 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	}
 	// h.prepPod will be reused in cleanupDriver.
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(prepPod)
-	Expect(err).ToNot(HaveOccurred(), "while creating hostPath init pod")
+	framework.ExpectNoError(err, "while creating hostPath init pod")
 
-	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	Expect(err).ToNot(HaveOccurred(), "while waiting for hostPath init pod to succeed")
+	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).ToNot(HaveOccurred(), "while deleting hostPath init pod")
+	framework.ExpectNoError(err, "while deleting hostPath init pod")
 	return &hostPathSymlinkVolume{
 		sourcePath: sourcePath,
 		targetPath: targetPath,
@@ -881,13 +882,13 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	v.prepPod.Spec.Containers[0].Command = []string{"/bin/sh", "-ec", cmd}
 
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(v.prepPod)
-	Expect(err).ToNot(HaveOccurred(), "while creating hostPath teardown pod")
+	framework.ExpectNoError(err, "while creating hostPath teardown pod")
 
-	err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
-	Expect(err).ToNot(HaveOccurred(), "while waiting for hostPath teardown pod to succeed")
+	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
 	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
-	Expect(err).ToNot(HaveOccurred(), "while deleting hostPath teardown pod")
+	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
 // emptydir
@@ -995,7 +996,7 @@ func (c *cinderDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	cv, ok := volume.(*cinderVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Cinder test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Cinder test volume")
 
 	volSource := v1.VolumeSource{
 		Cinder: &v1.CinderVolumeSource{
@@ -1011,7 +1012,7 @@ func (c *cinderDriver) GetVolumeSource(readOnly bool, fsType string, volume test
 
 func (c *cinderDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	cv, ok := volume.(*cinderVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Cinder test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Cinder test volume")
 
 	pvSource := v1.PersistentVolumeSource{
 		Cinder: &v1.CinderPersistentVolumeSource{
@@ -1055,7 +1056,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 
 	// We assume that namespace.Name is a random string
 	volumeName := ns.Name
-	By("creating a test Cinder volume")
+	ginkgo.By("creating a test Cinder volume")
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
 	e2elog.Logf("cinder output:\n%s", outputString)
@@ -1079,7 +1080,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 		break
 	}
 	e2elog.Logf("Volume ID: %s", volumeID)
-	Expect(volumeID).NotTo(Equal(""))
+	gomega.Expect(volumeID).NotTo(gomega.Equal(""))
 	return &cinderVolume{
 		volumeName: volumeName,
 		volumeID:   volumeID,
@@ -1166,7 +1167,7 @@ func (g *gcePdDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	gv, ok := volume.(*gcePdVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to GCE PD test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to GCE PD test volume")
 	volSource := v1.VolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1181,7 +1182,7 @@ func (g *gcePdDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 func (g *gcePdDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	gv, ok := volume.(*gcePdVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to GCE PD test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to GCE PD test volume")
 	pvSource := v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 			PDName:   gv.volumeName,
@@ -1207,7 +1208,7 @@ func (g *gcePdDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTest
 	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
-func (h *gcePdDriver) GetClaimSize() string {
+func (g *gcePdDriver) GetClaimSize() string {
 	return "5Gi"
 }
 
@@ -1234,7 +1235,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 		}
 	}
-	By("creating a test gce pd volume")
+	ginkgo.By("creating a test gce pd volume")
 	vname, err := framework.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &gcePdVolume{
@@ -1291,7 +1292,7 @@ func (v *vSphereDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	vsv, ok := volume.(*vSphereVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to vSphere test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1311,7 +1312,7 @@ func (v *vSphereDriver) GetVolumeSource(readOnly bool, fsType string, volume tes
 
 func (v *vSphereDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	vsv, ok := volume.(*vSphereVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to vSphere test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to vSphere test volume")
 
 	// vSphere driver doesn't seem to support readOnly volume
 	// TODO: check if it is correct
@@ -1415,7 +1416,7 @@ func (a *azureDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 
 func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
 	av, ok := volume.(*azureVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Azure test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
@@ -1434,7 +1435,7 @@ func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	av, ok := volume.(*azureVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to Azure test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to Azure test volume")
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
@@ -1476,7 +1477,7 @@ func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 }
 
 func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
-	By("creating a test azure disk volume")
+	ginkgo.By("creating a test azure disk volume")
 	volumeName, err := framework.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &azureVolume{
@@ -1589,7 +1590,7 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 // TODO: Fix authorization error in attach operation and uncomment below
 /*
 func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
-	By("creating a test aws volume")
+	ginkgo.By("creating a test aws volume")
 	var err error
 	a.volumeName, err = framework.CreatePDWithRetry()
 	framework.ExpectNoError(err))
@@ -1652,6 +1653,7 @@ var _ testsuites.TestDriver = &localDriver{}
 var _ testsuites.PreprovisionedVolumeTestDriver = &localDriver{}
 var _ testsuites.PreprovisionedPVTestDriver = &localDriver{}
 
+// InitLocalDriverWithVolumeType initializes the local driver based on the volume type.
 func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() testsuites.TestDriver {
 	maxFileSize := defaultLocalVolumeMaxFileSize
 	if maxFileSizeByVolType, ok := localVolumeMaxFileSizes[volumeType]; ok {
@@ -1736,7 +1738,7 @@ func (l *localDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
 		}
 	default:
-		framework.Failf("Unsupported volType: %v is specified", volType)
+		e2elog.Failf("Unsupported volType: %v is specified", volType)
 	}
 	return nil
 }
@@ -1748,11 +1750,11 @@ func (v *localVolume) DeleteVolume() {
 func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity {
 	nodeKey := "kubernetes.io/hostname"
 	if node.Labels == nil {
-		framework.Failf("Node does not have labels")
+		e2elog.Failf("Node does not have labels")
 	}
 	nodeValue, found := node.Labels[nodeKey]
 	if !found {
-		framework.Failf("Node does not have required label %q", nodeKey)
+		e2elog.Failf("Node does not have required label %q", nodeKey)
 	}
 	return &v1.VolumeNodeAffinity{
 		Required: &v1.NodeSelector{
@@ -1773,7 +1775,7 @@ func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity 
 
 func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
 	lv, ok := volume.(*localVolume)
-	Expect(ok).To(BeTrue(), "Failed to cast test volume to local test volume")
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to local test volume")
 	return &v1.PersistentVolumeSource{
 		Local: &v1.LocalVolumeSource{
 			Path:   lv.ltr.Path,

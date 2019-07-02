@@ -39,12 +39,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/legacy-cloud-providers/gce"
 )
 
 // nodeProcessingInfo tracks information related to current nodes in processing

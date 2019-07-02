@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -44,8 +45,34 @@ func NewAWSElasticBlockStoreCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree EBS storage class parameters to CSI storage class
-func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
-	return scParameters, nil
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	return sc, nil
+}
+
+// TranslateInTreeInlineVolumeToCSI takes a Volume with AWSElasticBlockStore set from in-tree
+// and converts the AWSElasticBlockStore source to a CSIPersistentVolumeSource
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+	if volume == nil || volume.AWSElasticBlockStore == nil {
+		return nil, fmt.Errorf("volume is nil or AWS EBS not defined on volume")
+	}
+	ebsSource := volume.AWSElasticBlockStore
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:       AWSEBSDriverName,
+					VolumeHandle: ebsSource.VolumeID,
+					ReadOnly:     ebsSource.ReadOnly,
+					FSType:       ebsSource.FSType,
+					VolumeAttributes: map[string]string{
+						"partition": strconv.FormatInt(int64(ebsSource.Partition), 10),
+					},
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+	}
+	return pv, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with AWSElasticBlockStore set from in-tree
@@ -105,11 +132,18 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 	return pv, nil
 }
 
-// CanSupport tests whether the plugin supports a given volume
+// CanSupport tests whether the plugin supports a given persistent volume
 // specification from the API.  The spec pointer should be considered
 // const.
 func (t *awsElasticBlockStoreCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.AWSElasticBlockStore != nil
+}
+
+// CanSupportInline tests whether the plugin supports a given inline volume
+// specification from the API.  The spec pointer should be considered
+// const.
+func (t *awsElasticBlockStoreCSITranslator) CanSupportInline(volume *v1.Volume) bool {
+	return volume != nil && volume.AWSElasticBlockStore != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver

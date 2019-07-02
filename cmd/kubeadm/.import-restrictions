@@ -78,29 +78,23 @@
 				"k8s.io/kubernetes/pkg/util/conntrack",
 				"k8s.io/kubernetes/pkg/util/dbus",
 				"k8s.io/kubernetes/pkg/util/hash",
-				"k8s.io/kubernetes/pkg/util/initsystem",
 				"k8s.io/kubernetes/pkg/util/ipset",
 				"k8s.io/kubernetes/pkg/util/iptables",
 				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/util/metrics",
 				"k8s.io/kubernetes/pkg/util/node",
-				"k8s.io/kubernetes/pkg/util/normalizer",
 				"k8s.io/kubernetes/pkg/util/parsers",
 				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/sysctl",
-				"k8s.io/kubernetes/pkg/util/taints",
-				"k8s.io/kubernetes/pkg/version"
+				"k8s.io/kubernetes/pkg/util/taints"
 			],
 			"ForbiddenPrefixes": [
 				"k8s.io/kubernetes/pkg/cloudprovider/providers",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
-				"k8s.io/kubernetes/pkg/cloudprovider/providers/photon",
 				"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
 				"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 			]

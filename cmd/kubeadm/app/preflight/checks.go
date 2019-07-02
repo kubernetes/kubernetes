@@ -40,17 +40,16 @@ import (
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
+	kubeadmversion "k8s.io/client-go/pkg/version"
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util/initsystem"
 	ipvsutil "k8s.io/kubernetes/pkg/util/ipvs"
-	kubeadmversion "k8s.io/kubernetes/pkg/version"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -143,8 +142,8 @@ func (sc ServiceCheck) Check() (warnings, errorList []error) {
 
 	if !initSystem.ServiceIsEnabled(sc.Service) {
 		warnings = append(warnings,
-			errors.Errorf("%s service is not enabled, please run 'systemctl enable %s.service'",
-				sc.Service, sc.Service))
+			errors.Errorf("%s service is not enabled, please run '%s'",
+				sc.Service, initSystem.EnableCommand(sc.Service)))
 	}
 
 	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
@@ -898,10 +897,10 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), ports.KubeletPort}},
+		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), kubeadmconstants.KubeletPort}},
 		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
-		PortOpenCheck{port: ports.InsecureSchedulerPort},
-		PortOpenCheck{port: ports.InsecureKubeControllerManagerPort},
+		PortOpenCheck{port: kubeadmconstants.InsecureSchedulerPort},
+		PortOpenCheck{port: kubeadmconstants.InsecureKubeControllerManagerPort},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
@@ -1008,7 +1007,7 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 func RunOptionalJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.ClusterConfiguration, ignorePreflightErrors sets.String) error {
 	checks := []Checker{}
 
-	// Check if IVPS kube-proxy mode is supported
+	// Check if IPVS kube-proxy mode is supported
 	if cfg.ComponentConfigs.KubeProxy != nil && cfg.ComponentConfigs.KubeProxy.Mode == ipvsutil.IPVSProxyMode {
 		checks = append(checks, IPVSProxierCheck{exec: execer})
 	}
@@ -1059,7 +1058,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 		HostnameCheck{nodeName: nodeReg.Name},
 		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		PortOpenCheck{port: ports.KubeletPort})
+		PortOpenCheck{port: kubeadmconstants.KubeletPort})
 	return checks
 }
 

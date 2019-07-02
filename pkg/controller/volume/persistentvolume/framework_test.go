@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 )
@@ -275,7 +276,7 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase v
 		volume.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case annDynamicallyProvisioned:
+			case pvutil.AnnDynamicallyProvisioned:
 				volume.Annotations[a] = mockPluginName
 			default:
 				volume.Annotations[a] = "yes"
@@ -380,7 +381,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case annStorageProvisioner:
+			case pvutil.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
@@ -416,6 +417,26 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 		claims[0].Annotations[name] = value
 	}
 	return claims
+}
+
+// volumeWithAnnotation saves given annotation into given volume.
+// Meant to be used to compose volume specified inline in a test.
+func volumeWithAnnotation(name, value string, volume *v1.PersistentVolume) *v1.PersistentVolume {
+	if volume.Annotations == nil {
+		volume.Annotations = map[string]string{name: value}
+	} else {
+		volume.Annotations[name] = value
+	}
+	return volume
+}
+
+// volumesWithAnnotation saves given annotation into given volumes.
+// Meant to be used to compose volumes specified inline in a test.
+func volumesWithAnnotation(name, value string, volumes []*v1.PersistentVolume) []*v1.PersistentVolume {
+	for _, volume := range volumes {
+		volumeWithAnnotation(name, value, volume)
+	}
+	return volumes
 }
 
 // claimWithAccessMode saves given access into given claims.
@@ -687,7 +708,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 			obj := reactor.PopChange()
 			if obj == nil {
 				// Nothing was changed, should we exit?
-				if firstSync || reactor.ChangedSinceLastSync() > 0 {
+				if firstSync || reactor.GetChangeCount() > 0 {
 					// There were some changes after the last "periodic sync".
 					// Simulate "periodic sync" of everything (until it produces
 					// no changes).
@@ -711,7 +732,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				ctrl.claims.Update(claim)
 				err = ctrl.syncClaim(claim)
 				if err != nil {
-					if err == pvtesting.VersionConflictError {
+					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
 						klog.V(4).Infof("test intentionaly ignores version error.")
 					} else {
@@ -728,7 +749,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 				ctrl.volumes.store.Update(volume)
 				err = ctrl.syncVolume(volume)
 				if err != nil {
-					if err == pvtesting.VersionConflictError {
+					if err == pvtesting.ErrVersionConflict {
 						// Ignore version errors
 						klog.V(4).Infof("test intentionaly ignores version error.")
 					} else {

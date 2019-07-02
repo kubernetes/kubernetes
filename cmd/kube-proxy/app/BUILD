@@ -40,7 +40,6 @@ go_library(
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/oom:go_default_library",
-        "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
@@ -163,7 +162,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/proxy/apis/config:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

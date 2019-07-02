@@ -21,21 +21,23 @@ import (
 	"path"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	gomegatypes "github.com/onsi/gomega/types"
 )
 
 var _ = framework.KubeDescribe("Container Runtime", func() {
 	f := framework.NewDefaultFramework("container-runtime")
 
-	Describe("blackbox test", func() {
-		Context("when starting a container that exits", func() {
+	ginkgo.Describe("blackbox test", func() {
+		ginkgo.Context("when starting a container that exits", func() {
 
 			/*
 				Release : v1.13
@@ -100,32 +102,32 @@ while true; do sleep 1; done
 					terminateContainer.Create()
 					defer terminateContainer.Delete()
 
-					By(fmt.Sprintf("Container '%s': should get the expected 'RestartCount'", testContainer.Name))
-					Eventually(func() (int32, error) {
+					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'RestartCount'", testContainer.Name))
+					gomega.Eventually(func() (int32, error) {
 						status, err := terminateContainer.GetStatus()
 						return status.RestartCount, err
-					}, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(Equal(testCase.RestartCount))
+					}, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.RestartCount))
 
-					By(fmt.Sprintf("Container '%s': should get the expected 'Phase'", testContainer.Name))
-					Eventually(terminateContainer.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(Equal(testCase.Phase))
+					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Phase'", testContainer.Name))
+					gomega.Eventually(terminateContainer.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(testCase.Phase))
 
-					By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
-					Expect(terminateContainer.IsReady()).Should(Equal(testCase.Ready))
+					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'Ready' condition", testContainer.Name))
+					gomega.Expect(terminateContainer.IsReady()).Should(gomega.Equal(testCase.Ready))
 
 					status, err := terminateContainer.GetStatus()
-					Expect(err).ShouldNot(HaveOccurred())
+					framework.ExpectNoError(err)
 
-					By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
-					Expect(GetContainerState(status.State)).To(Equal(testCase.State))
+					ginkgo.By(fmt.Sprintf("Container '%s': should get the expected 'State'", testContainer.Name))
+					gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(testCase.State))
 
-					By(fmt.Sprintf("Container '%s': should be possible to delete [NodeConformance]", testContainer.Name))
-					Expect(terminateContainer.Delete()).To(Succeed())
-					Eventually(terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(BeFalse())
+					ginkgo.By(fmt.Sprintf("Container '%s': should be possible to delete [NodeConformance]", testContainer.Name))
+					gomega.Expect(terminateContainer.Delete()).To(gomega.Succeed())
+					gomega.Eventually(terminateContainer.Present, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.BeFalse())
 				}
 			})
 		})
 
-		Context("on terminated container", func() {
+		ginkgo.Context("on terminated container", func() {
 			rootUser := int64(0)
 			nonRootUser := int64(10000)
 
@@ -138,29 +140,29 @@ while true; do sleep 1; done
 					RestartPolicy: v1.RestartPolicyNever,
 				}
 
-				By("create the container")
+				ginkgo.By("create the container")
 				c.Create()
 				defer c.Delete()
 
-				By(fmt.Sprintf("wait for the container to reach %s", expectedPhase))
-				Eventually(c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(Equal(expectedPhase))
+				ginkgo.By(fmt.Sprintf("wait for the container to reach %s", expectedPhase))
+				gomega.Eventually(c.GetPhase, ContainerStatusRetryTimeout, ContainerStatusPollInterval).Should(gomega.Equal(expectedPhase))
 
-				By("get the container status")
+				ginkgo.By("get the container status")
 				status, err := c.GetStatus()
-				Expect(err).NotTo(HaveOccurred())
+				framework.ExpectNoError(err)
 
-				By("the container should be terminated")
-				Expect(GetContainerState(status.State)).To(Equal(ContainerStateTerminated))
+				ginkgo.By("the container should be terminated")
+				gomega.Expect(GetContainerState(status.State)).To(gomega.Equal(ContainerStateTerminated))
 
-				By("the termination message should be set")
-				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
-				Expect(status.State.Terminated.Message).Should(expectedMsg)
+				ginkgo.By("the termination message should be set")
+				e2elog.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				gomega.Expect(status.State.Terminated.Message).Should(expectedMsg)
 
-				By("delete the container")
-				Expect(c.Delete()).To(Succeed())
+				ginkgo.By("delete the container")
+				gomega.Expect(c.Delete()).To(gomega.Succeed())
 			}
 
-			It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
+			ginkgo.It("should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]", func() {
 				// Cannot mount files in Windows Containers.
 				container := v1.Container{
 					Image:                  framework.BusyBoxImage,
@@ -171,7 +173,7 @@ while true; do sleep 1; done
 						RunAsUser: &rootUser,
 					},
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, Equal("DONE"))
+				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
 
 			/*
@@ -190,7 +192,7 @@ while true; do sleep 1; done
 						RunAsUser: &nonRootUser,
 					},
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, Equal("DONE"))
+				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("DONE"))
 			})
 
 			/*
@@ -207,7 +209,7 @@ while true; do sleep 1; done
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
-				matchTerminationMessage(container, v1.PodFailed, Equal("DONE"))
+				matchTerminationMessage(container, v1.PodFailed, gomega.Equal("DONE"))
 			})
 
 			/*
@@ -224,7 +226,7 @@ while true; do sleep 1; done
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, Equal(""))
+				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal(""))
 			})
 
 			/*
@@ -241,11 +243,11 @@ while true; do sleep 1; done
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
 				}
-				matchTerminationMessage(container, v1.PodSucceeded, Equal("OK"))
+				matchTerminationMessage(container, v1.PodSucceeded, gomega.Equal("OK"))
 			})
 		})
 
-		Context("when running a container with a new image", func() {
+		ginkgo.Context("when running a container with a new image", func() {
 
 			// Images used for ConformanceContainer are not added into NodeImageWhiteList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
@@ -283,9 +285,9 @@ while true; do sleep 1; done
 						Type: v1.SecretTypeDockerConfigJson,
 					}
 					secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
-					By("create image pull secret")
+					ginkgo.By("create image pull secret")
 					_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 					defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
 					container.ImagePullSecrets = []string{secret.Name}
 				}
@@ -330,74 +332,71 @@ while true; do sleep 1; done
 				const flakeRetry = 3
 				for i := 1; i <= flakeRetry; i++ {
 					var err error
-					By("create the container")
+					ginkgo.By("create the container")
 					container.Create()
-					By("check the container status")
+					ginkgo.By("check the container status")
 					for start := time.Now(); time.Since(start) < ContainerStatusRetryTimeout; time.Sleep(ContainerStatusPollInterval) {
 						if err = checkContainerStatus(); err == nil {
 							break
 						}
 					}
-					By("delete the container")
+					ginkgo.By("delete the container")
 					container.Delete()
 					if err == nil {
 						break
 					}
 					if i < flakeRetry {
-						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
-						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+						e2elog.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}
 				}
 			}
 
-			It("should not be able to pull image from invalid registry [NodeConformance]", func() {
-				image := "invalid.com/invalid/alpine:3.1"
+			ginkgo.It("should not be able to pull image from invalid registry [NodeConformance]", func() {
+				image := imageutils.GetE2EImage(imageutils.InvalidRegistryImage)
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
-				image := "k8s.gcr.io/invalid-image:invalid-tag"
+			ginkgo.It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
+				image := imageutils.GetE2EImage(imageutils.Invalid)
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			It("should be able to pull image from gcr.io [LinuxOnly] [NodeConformance]", func() {
-				image := "gcr.io/google-containers/debian-base:0.4.1"
-				imagePullTest(image, false, v1.PodRunning, false, false)
+			ginkgo.It("should be able to pull image from gcr.io [NodeConformance]", func() {
+				image := imageutils.GetE2EImage(imageutils.DebianBase)
+				isWindows := false
+				if framework.NodeOSDistroIs("windows") {
+					image = imageutils.GetE2EImage(imageutils.WindowsNanoServer)
+					isWindows = true
+				}
+				imagePullTest(image, false, v1.PodRunning, false, isWindows)
 			})
 
-			It("should be able to pull image from gcr.io [NodeConformance]", func() {
-				framework.SkipUnlessNodeOSDistroIs("windows")
-				image := "gcr.io/kubernetes-e2e-test-images/windows-nanoserver:v1"
-				imagePullTest(image, false, v1.PodRunning, false, true)
+			ginkgo.It("should be able to pull image from docker hub [NodeConformance]", func() {
+				image := imageutils.GetE2EImage(imageutils.Alpine)
+				isWindows := false
+				if framework.NodeOSDistroIs("windows") {
+					// TODO(claudiub): Switch to nanoserver image manifest list.
+					image = "e2eteam/busybox:1.29"
+					isWindows = true
+				}
+				imagePullTest(image, false, v1.PodRunning, false, isWindows)
 			})
 
-			It("should be able to pull image from docker hub [LinuxOnly] [NodeConformance]", func() {
-				image := "alpine:3.7"
-				imagePullTest(image, false, v1.PodRunning, false, false)
-			})
-
-			It("should be able to pull image from docker hub [NodeConformance]", func() {
-				framework.SkipUnlessNodeOSDistroIs("windows")
-				// TODO(claudiub): Switch to nanoserver image manifest list.
-				image := "e2eteam/busybox:1.29"
-				imagePullTest(image, false, v1.PodRunning, false, true)
-			})
-
-			It("should not be able to pull from private registry without secret [NodeConformance]", func() {
-				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
+			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func() {
+				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			It("should be able to pull from private registry with secret [LinuxOnly] [NodeConformance]", func() {
-				image := "gcr.io/authenticated-image-pulling/alpine:3.7"
-				imagePullTest(image, true, v1.PodRunning, false, false)
-			})
-
-			It("should be able to pull from private registry with secret [NodeConformance]", func() {
-				framework.SkipUnlessNodeOSDistroIs("windows")
-				image := "gcr.io/authenticated-image-pulling/windows-nanoserver:v1"
-				imagePullTest(image, true, v1.PodRunning, false, true)
+			ginkgo.It("should be able to pull from private registry with secret [NodeConformance]", func() {
+				image := imageutils.GetE2EImage(imageutils.AuthenticatedAlpine)
+				isWindows := false
+				if framework.NodeOSDistroIs("windows") {
+					image = imageutils.GetE2EImage(imageutils.AuthenticatedWindowsNanoServer)
+					isWindows = true
+				}
+				imagePullTest(image, true, v1.PodRunning, false, isWindows)
 			})
 		})
 	})

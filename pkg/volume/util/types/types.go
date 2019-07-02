@@ -17,7 +17,10 @@ limitations under the License.
 // Package types defines types used only by volume components
 package types
 
-import "k8s.io/apimachinery/pkg/types"
+import (
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/runtime"
+)
 
 // UniquePodName defines the type to key pods off of
 type UniquePodName types.UID
@@ -34,3 +37,23 @@ type GeneratedOperations struct {
 	EventRecorderFunc func(*error)
 	CompleteFunc      func(*error)
 }
+
+// Run executes the operations and its supporting functions
+func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
+	if o.CompleteFunc != nil {
+		defer o.CompleteFunc(&detailedErr)
+	}
+	if o.EventRecorderFunc != nil {
+		defer o.EventRecorderFunc(&eventErr)
+	}
+	// Handle panic, if any, from operationFunc()
+	defer runtime.RecoverFromPanic(&detailedErr)
+	return o.OperationFunc()
+}
+
+const (
+	// VolumeResizerKey is key that will be used to store resizer used
+	// for resizing PVC. The generated key/value pair will be added
+	// as a annotation to the PVC.
+	VolumeResizerKey = "volume.kubernetes.io/storage-resizer"
+)

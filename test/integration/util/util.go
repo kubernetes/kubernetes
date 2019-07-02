@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
+
 	// import DefaultProvider
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -84,6 +85,7 @@ func StartScheduler(clientSet clientset.Interface) (factory.Configurator, Shutdo
 		informerFactory.Core().V1().PersistentVolumeClaims(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
 	informerFactory.Start(stopCh)

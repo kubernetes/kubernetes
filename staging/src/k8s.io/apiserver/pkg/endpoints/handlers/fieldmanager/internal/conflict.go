@@ -76,6 +76,9 @@ func printManager(manager string) string {
 		return fmt.Sprintf("%q", manager)
 	}
 	if encodedManager.Operation == metav1.ManagedFieldsOperationUpdate {
+		if encodedManager.Time == nil {
+			return fmt.Sprintf("%q using %v", encodedManager.Manager, encodedManager.APIVersion)
+		}
 		return fmt.Sprintf("%q using %v at %v", encodedManager.Manager, encodedManager.APIVersion, encodedManager.Time.UTC().Format(time.RFC3339))
 	}
 	return fmt.Sprintf("%q", encodedManager.Manager)

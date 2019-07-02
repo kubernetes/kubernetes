@@ -177,12 +177,19 @@ type StatusREST struct {
 var _ = rest.Patcher(&StatusREST{})
 
 func (r *StatusREST) New() runtime.Object {
-	return &unstructured.Unstructured{}
+	return r.store.New()
 }
 
 // Get retrieves the object from the storage. It is required to support Patch.
 func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
-	return r.store.Get(ctx, name, options)
+	o, err := r.store.Get(ctx, name, options)
+	if err != nil {
+		return nil, err
+	}
+	if u, ok := o.(*unstructured.Unstructured); ok {
+		shallowCopyObjectMeta(u)
+	}
+	return o, nil
 }
 
 // Update alters the status subset of an object.

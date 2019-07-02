@@ -136,9 +136,6 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -181,10 +178,8 @@ func SetObjectDefaults_DaemonSet(in *v1.DaemonSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_DaemonSetList(in *v1.DaemonSetList) {
@@ -289,9 +284,6 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -334,10 +326,8 @@ func SetObjectDefaults_Deployment(in *v1.Deployment) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_DeploymentList(in *v1.DeploymentList) {
@@ -442,9 +432,6 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -487,10 +474,8 @@ func SetObjectDefaults_ReplicaSet(in *v1.ReplicaSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_ReplicaSetList(in *v1.ReplicaSetList) {
@@ -595,9 +580,6 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.Template.Spec.Containers {
 		a := &in.Spec.Template.Spec.Containers[i]
@@ -640,10 +622,8 @@ func SetObjectDefaults_StatefulSet(in *v1.StatefulSet) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			corev1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
+	corev1.SetDefaults_ResourceList(&in.Spec.Template.Spec.Overhead)
 	for i := range in.Spec.VolumeClaimTemplates {
 		a := &in.Spec.VolumeClaimTemplates[i]
 		corev1.SetDefaults_PersistentVolumeClaim(a)

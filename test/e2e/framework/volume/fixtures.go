@@ -52,6 +52,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -245,7 +247,7 @@ func NewRBDServer(cs clientset.Interface, namespace string) (config TestConfig, 
 
 	secret, err := cs.CoreV1().Secrets(config.Namespace).Create(secret)
 	if err != nil {
-		framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
+		e2elog.Failf("Failed to create secrets for Ceph RBD: %v", err)
 	}
 
 	return config, pod, secret, ip
@@ -259,7 +261,7 @@ func CreateStorageServer(cs clientset.Interface, config TestConfig) (pod *v1.Pod
 	gomega.Expect(pod).NotTo(gomega.BeNil(), "storage server pod should not be nil")
 	ip = pod.Status.PodIP
 	gomega.Expect(len(ip)).NotTo(gomega.BeZero(), fmt.Sprintf("pod %s's IP should not be empty", pod.Name))
-	framework.Logf("%s server pod IP address: %s", config.Prefix, ip)
+	e2elog.Logf("%s server pod IP address: %s", config.Prefix, ip)
 	return pod, ip
 }
 
@@ -353,7 +355,7 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 	// ok if the server pod already exists. TODO: make this controllable by callers
 	if err != nil {
 		if apierrs.IsAlreadyExists(err) {
-			framework.Logf("Ignore \"already-exists\" error, re-get pod...")
+			e2elog.Logf("Ignore \"already-exists\" error, re-get pod...")
 			ginkgo.By(fmt.Sprintf("re-getting the %q server pod", serverPodName))
 			serverPod, err = podClient.Get(serverPodName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Cannot re-get the server pod %q: %v", serverPodName, err)
@@ -363,10 +365,10 @@ func StartVolumeServer(client clientset.Interface, config TestConfig) *v1.Pod {
 		}
 	}
 	if config.WaitForCompletion {
-		framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
+		framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(client, serverPod.Name, serverPod.Namespace))
 		framework.ExpectNoError(podClient.Delete(serverPod.Name, nil))
 	} else {
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
+		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, serverPod))
 		if pod == nil {
 			ginkgo.By(fmt.Sprintf("locating the %q server pod", serverPodName))
 			pod, err = podClient.Get(serverPodName, metav1.GetOptions{})
@@ -391,17 +393,17 @@ func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 	ns := f.Namespace
 
 	if secret != nil {
-		framework.Logf("Deleting server secret %q...", secret.Name)
+		e2elog.Logf("Deleting server secret %q...", secret.Name)
 		err := cs.CoreV1().Secrets(ns.Name).Delete(secret.Name, &metav1.DeleteOptions{})
 		if err != nil {
-			framework.Logf("Delete secret failed: %v", err)
+			e2elog.Logf("Delete secret failed: %v", err)
 		}
 	}
 
-	framework.Logf("Deleting server pod %q...", serverPod.Name)
+	e2elog.Logf("Deleting server pod %q...", serverPod.Name)
 	err := framework.DeletePodWithWait(f, cs, serverPod)
 	if err != nil {
-		framework.Logf("Server pod delete failed: %v", err)
+		e2elog.Logf("Server pod delete failed: %v", err)
 	}
 }
 
@@ -483,10 +485,10 @@ func TestVolumeClient(client clientset.Interface, config TestConfig, fsGroup *in
 	}
 	clientPod, err := podsNamespacer.Create(clientPod)
 	if err != nil {
-		framework.Failf("Failed to create %s pod: %v", clientPod.Name, err)
+		e2elog.Failf("Failed to create %s pod: %v", clientPod.Name, err)
 
 	}
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, clientPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
 
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
@@ -546,10 +548,8 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 					SecurityContext: GenerateSecurityContext(true),
 				},
 			},
-			SecurityContext: &v1.PodSecurityContext{
-				FSGroup: fsGroup,
-			},
-			RestartPolicy: v1.RestartPolicyNever,
+			SecurityContext: GeneratePodSecurityContext(fsGroup, nil),
+			RestartPolicy:   v1.RestartPolicyNever,
 			Volumes: []v1.Volume{
 				{
 					Name:         volMountName,
@@ -567,7 +567,7 @@ func InjectHTML(client clientset.Interface, config TestConfig, fsGroup *int64, v
 
 	injectPod, err := podClient.Create(injectPod)
 	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
-	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	framework.ExpectNoError(err)
 }
 
@@ -630,7 +630,7 @@ func GenerateWriteandExecuteScriptFileCmd(content, fileName, filePath string) []
 		fullPath := filepath.Join(filePath, scriptName)
 
 		cmd := "echo \"" + content + "\" > " + fullPath + "; .\\" + fullPath
-		framework.Logf("generated pod command %s", cmd)
+		e2elog.Logf("generated pod command %s", cmd)
 		return []string{"powershell", "/c", cmd}
 	}
 	scriptName := fmt.Sprintf("%s.sh", fileName)
@@ -665,11 +665,11 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 }
 
 // GetTestImage returns the image name with the given input
-// If the Node OS is windows, currently we return Nettest image for Windows node
+// If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 func GetTestImage(image string) string {
 	if framework.NodeOSDistroIs("windows") {
-		return imageutils.GetE2EImage(imageutils.Nettest)
+		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
 	return image
 }

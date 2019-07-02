@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -215,7 +216,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		pod = newTestPodForQuota(f, "fail-pod", requests, v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Not allowing a pod to be created that exceeds remaining quota(validation on extended resources)")
 		requests = v1.ResourceList{}
@@ -227,7 +228,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		pod = newTestPodForQuota(f, "fail-pod-for-extended-resource", requests, limits)
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Ensuring a pod cannot update its resource requirements")
 		// a pod cannot dynamically update its resource requirements.
@@ -237,7 +238,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests[v1.ResourceEphemeralStorage] = resource.MustParse("10Gi")
 		podToUpdate.Spec.Containers[0].Resources.Requests = requests
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(podToUpdate)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Ensuring attempts to update pod resource requirements did not change quota usage")
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
@@ -531,10 +532,10 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a custom resource")
-		resourceClient := testcrd.GetV1DynamicClient()
+		resourceClient := testcrd.DynamicClients["v1"]
 		testcr, err := instantiateCustomResource(&unstructured.Unstructured{
 			Object: map[string]interface{}{
-				"apiVersion": testcrd.APIGroup + "/" + testcrd.GetAPIVersions()[0],
+				"apiVersion": testcrd.Crd.Spec.Group + "/" + testcrd.Crd.Spec.Versions[0].Name,
 				"kind":       testcrd.Crd.Spec.Names.Kind,
 				"metadata": map[string]interface{}{
 					"name": "test-cr-1",
@@ -552,7 +553,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		ginkgo.By("Creating a second custom resource")
 		_, err = instantiateCustomResource(&unstructured.Unstructured{
 			Object: map[string]interface{}{
-				"apiVersion": testcrd.APIGroup + "/" + testcrd.GetAPIVersions()[0],
+				"apiVersion": testcrd.Crd.Spec.Group + "/" + testcrd.Crd.Spec.Versions[0].Name,
 				"kind":       testcrd.Crd.Spec.Names.Kind,
 				"metadata": map[string]interface{}{
 					"name": "test-cr-2",
@@ -560,7 +561,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 			},
 		}, resourceClient, testcrd.Crd)
 		// since we only give one quota, this creation should fail.
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Deleting a custom resource")
 		err = deleteCustomResource(resourceClient, testcr.GetName())
@@ -1051,7 +1052,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 		podName2 := "testpod-pclass2-2"
 		pod2 := newTestPodForQuotaWithPriority(f, podName2, v1.ResourceList{}, v1.ResourceList{}, "pclass2")
 		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
-		gomega.Expect(err).To(gomega.HaveOccurred())
+		framework.ExpectError(err)
 
 		ginkgo.By("Deleting first pod")
 		err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod.Name, metav1.NewDeleteOptions(0))
@@ -1591,7 +1592,7 @@ func waitForResourceQuota(c clientset.Interface, ns, quotaName string, used v1.R
 		// verify that the quota shows the expected used resource values
 		for k, v := range used {
 			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
-				framework.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
+				e2elog.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
 				return false, nil
 			}
 		}

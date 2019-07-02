@@ -99,6 +99,7 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcdtestin
 			kind,
 			nil,
 			nil,
+			nil,
 			status,
 			scale,
 		),

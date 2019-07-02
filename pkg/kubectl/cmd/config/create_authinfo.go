@@ -29,9 +29,9 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 type createAuthInfoOptions struct {
@@ -48,11 +48,22 @@ type createAuthInfoOptions struct {
 
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
+
+	execCommand     cliflag.StringFlag
+	execAPIVersion  cliflag.StringFlag
+	execArgs        []string
+	execEnv         map[string]string
+	execEnvToRemove []string
 }
 
 const (
 	flagAuthProvider    = "auth-provider"
 	flagAuthProviderArg = "auth-provider-arg"
+
+	flagExecCommand    = "exec-command"
+	flagExecAPIVersion = "exec-api-version"
+	flagExecArg        = "exec-arg"
+	flagExecEnv        = "exec-env"
 )
 
 var (
@@ -90,7 +101,19 @@ var (
 		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-id=foo --auth-provider-arg=client-secret=bar
 
 		# Remove the "client-secret" config value for the OpenID Connect auth provider for the "cluster-admin" entry
-		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-secret-`)
+		kubectl config set-credentials cluster-admin --auth-provider=oidc --auth-provider-arg=client-secret-
+
+		# Enable new exec auth plugin for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta
+
+		# Define new exec auth plugin args for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --exec-arg=arg1 --exec-arg=arg2
+
+		# Create or update exec auth plugin environment variables for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --exec-env=key1=val1 --exec-env=key2=val2
+
+		# Remove exec auth plugin environment variables for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --exec-env=var-to-remove-`)
 )
 
 // NewCmdConfigSetAuthInfo returns an Command option instance for 'config set-credentials' sub command
@@ -101,7 +124,30 @@ func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess)
 
 func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("set-credentials NAME [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password] [--%v=provider_name] [--%v=key=value]", clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword, flagAuthProvider, flagAuthProviderArg),
+		Use: fmt.Sprintf(
+			"set-credentials NAME [--%v=path/to/certfile] "+
+				"[--%v=path/to/keyfile] "+
+				"[--%v=bearer_token] "+
+				"[--%v=basic_user] "+
+				"[--%v=basic_password] "+
+				"[--%v=provider_name] "+
+				"[--%v=key=value] "+
+				"[--%v=exec_command] "+
+				"[--%v=exec_api_version] "+
+				"[--%v=arg] "+
+				"[--%v=key=value]",
+			clientcmd.FlagCertFile,
+			clientcmd.FlagKeyFile,
+			clientcmd.FlagBearerToken,
+			clientcmd.FlagUsername,
+			clientcmd.FlagPassword,
+			flagAuthProvider,
+			flagAuthProviderArg,
+			flagExecCommand,
+			flagExecAPIVersion,
+			flagExecArg,
+			flagExecEnv,
+		),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Sets a user entry in kubeconfig"),
 		Long:                  createAuthInfoLong,
@@ -126,6 +172,10 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.Flags().Var(&options.password, clientcmd.FlagPassword, clientcmd.FlagPassword+" for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.authProvider, flagAuthProvider, "Auth provider for the user entry in kubeconfig")
 	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arguments for the auth provider")
+	cmd.Flags().Var(&options.execCommand, flagExecCommand, "Command for the exec credential plugin for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.execAPIVersion, flagExecAPIVersion, "API version of the exec credential plugin for the user entry in kubeconfig")
+	cmd.Flags().StringSlice(flagExecArg, nil, "New arguments for the exec credential plugin command for the user entry in kubeconfig")
+	cmd.Flags().StringArray(flagExecEnv, nil, "'key=value' environment values for the exec credential plugin")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "Embed client cert/key for the user entry in kubeconfig")
 	f.NoOptDefVal = "true"
 
@@ -226,6 +276,72 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 		}
 	}
 
+	if o.execCommand.Provided() {
+		newExecCommand := o.execCommand.Value()
+
+		// create new Exec if doesn't exist, otherwise just modify the command
+		if modifiedAuthInfo.Exec == nil {
+			modifiedAuthInfo.Exec = &clientcmdapi.ExecConfig{
+				Command: newExecCommand,
+			}
+		} else {
+			modifiedAuthInfo.Exec.Command = newExecCommand
+			// explicitly reset exec arguments
+			modifiedAuthInfo.Exec.Args = nil
+		}
+	}
+
+	// modify next values only if Exec exists, ignore these changes otherwise
+	if modifiedAuthInfo.Exec != nil {
+		if o.execAPIVersion.Provided() {
+			modifiedAuthInfo.Exec.APIVersion = o.execAPIVersion.Value()
+		}
+
+		// rewrite exec arguments list with new values
+		if o.execArgs != nil {
+			modifiedAuthInfo.Exec.Args = o.execArgs
+		}
+
+		// iterate over the existing exec env values and remove the specified
+		if o.execEnvToRemove != nil {
+			newExecEnv := []clientcmdapi.ExecEnvVar{}
+			for _, value := range modifiedAuthInfo.Exec.Env {
+				needToRemove := false
+				for _, elemToRemove := range o.execEnvToRemove {
+					if value.Name == elemToRemove {
+						needToRemove = true
+						break
+					}
+				}
+				if !needToRemove {
+					newExecEnv = append(newExecEnv, value)
+				}
+			}
+			modifiedAuthInfo.Exec.Env = newExecEnv
+		}
+
+		// update or create specified environment variables for the exec plugin
+		if o.execEnv != nil {
+			newEnv := []clientcmdapi.ExecEnvVar{}
+			for newEnvName, newEnvValue := range o.execEnv {
+				needToCreate := true
+				for i := 0; i < len(modifiedAuthInfo.Exec.Env); i++ {
+					if modifiedAuthInfo.Exec.Env[i].Name == newEnvName {
+						// update the existing value
+						needToCreate = false
+						modifiedAuthInfo.Exec.Env[i].Value = newEnvValue
+						break
+					}
+				}
+				if needToCreate {
+					// create a new env value
+					newEnv = append(newEnv, clientcmdapi.ExecEnvVar{Name: newEnvName, Value: newEnvValue})
+				}
+			}
+			modifiedAuthInfo.Exec.Env = append(modifiedAuthInfo.Exec.Env, newEnv...)
+		}
+	}
+
 	// If any auth info was set, make sure any other existing auth types are cleared
 	if setToken || setBasic {
 		if !setToken {
@@ -258,6 +374,27 @@ func (o *createAuthInfoOptions) complete(cmd *cobra.Command, out io.Writer) erro
 		}
 		o.authProviderArgs = newPairs
 		o.authProviderArgsToRemove = removePairs
+	}
+
+	execArgs, err := cmd.Flags().GetStringSlice(flagExecArg)
+	if err != nil {
+		return fmt.Errorf("Error: %s", err)
+	}
+	if len(execArgs) > 0 {
+		o.execArgs = execArgs
+	}
+
+	execEnv, err := cmd.Flags().GetStringArray(flagExecEnv)
+	if err != nil {
+		return fmt.Errorf("Error: %s", err)
+	}
+	if len(execEnv) > 0 {
+		newPairs, removePairs, err := cmdutil.ParsePairs(execEnv, flagExecEnv, true)
+		if err != nil {
+			return fmt.Errorf("Error: %s", err)
+		}
+		o.execEnv = newPairs
+		o.execEnvToRemove = removePairs
 	}
 
 	o.name = args[0]

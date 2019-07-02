@@ -248,7 +248,7 @@ function install-cni-binaries {
   fi
 
   echo "Downloading cni binaries"
-  download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+  download-or-bust "${cni_sha1}" "${CNI_STORAGE_PATH}/${cni_tar}"
   local -r cni_dir="${KUBE_HOME}/cni"
   mkdir -p "${cni_dir}/bin"
   tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite
@@ -449,10 +449,8 @@ function install-kube-binary-config {
   # Install crictl on each node.
   install-crictl
 
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
-    # TODO(awly): include the binary and license in the OS image.
-    install-exec-auth-plugin
-  fi
+  # TODO(awly): include the binary and license in the OS image.
+  install-exec-auth-plugin
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"

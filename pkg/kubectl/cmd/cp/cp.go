@@ -30,10 +30,10 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/exec"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 
 	"bytes"
 
@@ -411,12 +411,6 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 		}
 	}
 	return nil
-}
-
-// clean prevents path traversals by stripping them out.
-// This is adapted from https://golang.org/src/net/http/fs.go#L74
-func clean(fileName string) string {
-	return path.Clean(string(os.PathSeparator) + fileName)
 }
 
 func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {

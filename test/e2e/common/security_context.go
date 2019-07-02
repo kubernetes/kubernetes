@@ -20,23 +20,28 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Security Context", func() {
 	f := framework.NewDefaultFramework("security-context-test")
 	var podClient *framework.PodClient
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		podClient = f.PodClient()
 	})
 
-	Context("When creating a container with runAsUser", func() {
+	ginkgo.Context("When creating a container with runAsUser", func() {
 		makeUserPod := func(podName, image string, command []string, userid int64) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -69,29 +74,91 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 
 		/*
-		  Release : v1.12
-		  Testname: Security Context: runAsUser (id:65534)
-		  Description: Container created with runAsUser option, passing an id (id:65534) uses that
-		  given id when running the container.
-		  This test is marked LinuxOnly since Windows does not support running as UID / GID.
+			Release : v1.15
+			Testname: Security Context, runAsUser=65534
+			Description: Container is created with runAsUser option by passing uid 65534 to run as unpriviledged user. Pod MUST be in Succeeded phase.
+			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should run the container with uid 65534 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(65534)
 		})
 
 		/*
-		  Release : v1.12
-		  Testname: Security Context: runAsUser (id:0)
-		  Description: Container created with runAsUser option, passing an id (id:0) uses that
-		  given id when running the container.
-		  This test is marked LinuxOnly since Windows does not support running as UID / GID.
+			Release : v1.15
+			Testname: Security Context, runAsUser=0
+			Description: Container is created with runAsUser option by passing uid 0 to run as root priviledged user. Pod MUST be in Succeeded phase.
+			This e2e can not be promoted to Conformance because a Conformant platform may not allow to run containers with 'uid 0' or running privileged operations.
+			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should run the container with uid 0 [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(0)
 		})
 	})
 
-	Context("When creating a pod with readOnlyRootFilesystem", func() {
+	ginkgo.Context("When creating a container with runAsNonRoot", func() {
+		rootImage := imageutils.GetE2EImage(imageutils.BusyBox)
+		nonRootImage := imageutils.GetE2EImage(imageutils.NonRoot)
+		makeNonRootPod := func(podName, image string, userid *int64) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: []string{"id", "-u"}, // Print UID and exit
+							SecurityContext: &v1.SecurityContext{
+								RunAsNonRoot: pointer.BoolPtr(true),
+								RunAsUser:    userid,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		ginkgo.It("should run with an explicit non-root user ID", func() {
+			name := "explicit-nonroot-uid"
+			pod := makeNonRootPod(name, rootImage, pointer.Int64Ptr(1234))
+			pod = podClient.Create(pod)
+
+			podClient.WaitForSuccess(name, framework.PodStartTimeout)
+			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
+		})
+		ginkgo.It("should not run with an explicit root user ID", func() {
+			name := "explicit-root-uid"
+			pod := makeNonRootPod(name, nonRootImage, pointer.Int64Ptr(0))
+			pod = podClient.Create(pod)
+
+			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
+			framework.ExpectNoError(err)
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+		})
+		ginkgo.It("should run with an image specified user ID", func() {
+			name := "implicit-nonroot-uid"
+			pod := makeNonRootPod(name, nonRootImage, nil)
+			pod = podClient.Create(pod)
+
+			podClient.WaitForSuccess(name, framework.PodStartTimeout)
+			framework.ExpectNoError(podClient.MatchContainerOutput(name, name, "1234"))
+		})
+		ginkgo.It("should not run without a specified user ID", func() {
+			name := "implicit-root-uid"
+			pod := makeNonRootPod(name, rootImage, nil)
+			pod = podClient.Create(pod)
+
+			ev, err := podClient.WaitForErrorEventOrSuccess(pod)
+			framework.ExpectNoError(err)
+			gomega.Expect(ev).NotTo(gomega.BeNil())
+			gomega.Expect(ev.Reason).To(gomega.Equal(events.FailedToCreateContainer))
+		})
+	})
+
+	ginkgo.Context("When creating a pod with readOnlyRootFilesystem", func() {
 		makeUserPod := func(podName, image string, command []string, readOnlyRootFilesystem bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -130,26 +197,29 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 
 		/*
-		  Release : v1.12
-		  Testname: Security Context: readOnlyRootFilesystem=true.
-		  Description: when a container has configured readOnlyRootFilesystem to true, write operations are not allowed.
-		  This test is marked LinuxOnly since Windows does not support creating containers with read-only access.
+			Release : v1.15
+			Testname: Security Context, readOnlyRootFilesystem=true.
+			Description: Container is configured to run with readOnlyRootFilesystem to true which will force containers to run with a read only root file system.
+			Write operation MUST NOT be allowed and Pod MUST be in Failed state.
+			At this moment we are not considering this test for Conformance due to use of SecurityContext.
+			[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support creating containers with read-only access.
 		*/
-		It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]", func() {
 			createAndWaitUserPod(true)
 		})
 
 		/*
-		  Release : v1.12
-		  Testname: Security Context: readOnlyRootFilesystem=false.
-		  Description: when a container has configured readOnlyRootFilesystem to false, write operations are allowed.
+			Release : v1.15
+			Testname: Security Context, readOnlyRootFilesystem=false.
+			Description: Container is configured to run with readOnlyRootFilesystem to false.
+			Write operation MUST be allowed and Pod MUST be in Succeeded state.
 		*/
-		It("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
+		framework.ConformanceIt("should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance]", func() {
 			createAndWaitUserPod(false)
 		})
 	})
 
-	Context("When creating a pod with privileged", func() {
+	ginkgo.Context("When creating a pod with privileged", func() {
 		makeUserPod := func(podName, image string, command []string, privileged bool) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -180,23 +250,27 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
 			return podName
 		}
-
-		It("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
-			// This test is marked LinuxOnly since it runs a Linux-specific command, and Windows does not support Windows escalation.
+		/*
+			Release : v1.15
+			Testname: Security Context, privileged=false.
+			Description: Create a container to run in unprivileged mode by setting pod's SecurityContext Privileged option as false. Pod MUST be in Succeeded phase.
+			[LinuxOnly]: This test is marked as LinuxOnly since it runs a Linux-specific command.
+		*/
+		framework.ConformanceIt("should run the container as unprivileged when false [LinuxOnly] [NodeConformance]", func() {
 			podName := createAndWaitUserPod(false)
-			logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
 			if err != nil {
-				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+				e2elog.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 			}
 
-			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			e2elog.Logf("Got logs for pod %q: %q", podName, logs)
 			if !strings.Contains(logs, "Operation not permitted") {
-				framework.Failf("unprivileged container shouldn't be able to create dummy device")
+				e2elog.Failf("unprivileged container shouldn't be able to create dummy device")
 			}
 		})
 	})
 
-	Context("when creating containers with AllowPrivilegeEscalation", func() {
+	ginkgo.Context("when creating containers with AllowPrivilegeEscalation", func() {
 		makeAllowPrivilegeEscalationPod := func(podName string, allowPrivilegeEscalation *bool, uid int64) *v1.Pod {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -227,46 +301,51 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 
 		/*
-		  Testname: allowPrivilegeEscalation unset and uid != 0.
-		  Description: Configuring the allowPrivilegeEscalation unset, allows the privilege escalation operation.
-		  A container is configured with allowPrivilegeEscalation not specified (nil) and a given uid which is not 0.
-		  When the container is run, the container is run using uid=0.
-		  This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
+			Release : v1.15
+			Testname: Security Context, allowPrivilegeEscalation unset, uid != 0.
+			Description: Configuring the allowPrivilegeEscalation unset, allows the privilege escalation operation.
+			A container is configured with allowPrivilegeEscalation not specified (nil) and a given uid which is not 0.
+			When the container is run, container's output MUST match with expected output verifying container ran with uid=0.
+			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and not all conformant platforms will require this behavior.
+			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-nil-" + string(uuid.NewUUID())
 			if err := createAndMatchOutput(podName, "Effective uid: 0", nil, 1000); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2elog.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
 		/*
-		  Testname: allowPrivilegeEscalation=false.
-		  Description: Configuring the allowPrivilegeEscalation to false, does not allow the privilege escalation operation.
-		  A container is configured with allowPrivilegeEscalation=false and a given uid (1000) which is not 0.
-		  When the container is run, the container is run using uid=1000.
-		  This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
+			Release : v1.15
+			Testname: Security Context, allowPrivilegeEscalation=false.
+			Description: Configuring the allowPrivilegeEscalation to false, does not allow the privilege escalation operation.
+			A container is configured with allowPrivilegeEscalation=false and a given uid (1000) which is not 0.
+			When the container is run, container's output MUST match with expected output verifying container ran with given uid i.e. uid=1000.
+			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID, or privilege escalation.
 		*/
-		It("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
+		framework.ConformanceIt("should not allow privilege escalation when false [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-false-" + string(uuid.NewUUID())
 			apeFalse := false
 			if err := createAndMatchOutput(podName, "Effective uid: 1000", &apeFalse, 1000); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2elog.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 
 		/*
-		  Testname: allowPrivilegeEscalation=true.
-		  Description: Configuring the allowPrivilegeEscalation to true, allows the privilege escalation operation.
-		  A container is configured with allowPrivilegeEscalation=true and a given uid (1000) which is not 0.
-		  When the container is run, the container is run using uid=0 (making use of the privilege escalation).
-		  This test is marked LinuxOnly since Windows does not support running as UID / GID.
+			Release : v1.15
+			Testname: Security Context, allowPrivilegeEscalation=true.
+			Description: Configuring the allowPrivilegeEscalation to true, allows the privilege escalation operation.
+			A container is configured with allowPrivilegeEscalation=true and a given uid (1000) which is not 0.
+			When the container is run, container's output MUST match with expected output verifying container ran with uid=0 (making use of the privilege escalation).
+			This e2e Can not be promoted to Conformance as it is Container Runtime dependent and runtime may not allow to run.
+			[LinuxOnly]: This test is marked LinuxOnly since Windows does not support running as UID / GID.
 		*/
-		It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
+		ginkgo.It("should allow privilege escalation when true [LinuxOnly] [NodeConformance]", func() {
 			podName := "alpine-nnp-true-" + string(uuid.NewUUID())
 			apeTrue := true
 			if err := createAndMatchOutput(podName, "Effective uid: 0", &apeTrue, 1000); err != nil {
-				framework.Failf("Match output for pod %q failed: %v", podName, err)
+				e2elog.Failf("Match output for pod %q failed: %v", podName, err)
 			}
 		})
 	})

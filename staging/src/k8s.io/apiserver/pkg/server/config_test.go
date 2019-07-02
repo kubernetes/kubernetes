@@ -115,7 +115,15 @@ func TestNewWithDelegate(t *testing.T) {
     "/healthz/poststarthook/generic-apiserver-start-informers",
     "/healthz/poststarthook/wrapping-post-start-hook",
     "/healthz/wrapping-health",
-    "/metrics"
+    "/metrics",
+    "/readyz",
+    "/readyz/delegate-health",
+    "/readyz/log",
+    "/readyz/ping",
+    "/readyz/poststarthook/delegate-post-start-hook",
+    "/readyz/poststarthook/generic-apiserver-start-informers",
+    "/readyz/poststarthook/wrapping-post-start-hook",
+    "/readyz/shutdown"
   ]
 }`, t)
 	checkPath(server.URL+"/healthz", http.StatusInternalServerError, `[+]ping ok

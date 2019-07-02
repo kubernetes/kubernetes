@@ -17,7 +17,8 @@ limitations under the License.
 package cache
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -99,6 +100,15 @@ type Cache interface {
 	// The node info contains aggregated information of pods scheduled (including assumed to be)
 	// on this node.
 	UpdateNodeInfoSnapshot(nodeSnapshot *NodeInfoSnapshot) error
+
+	// AddCSINode adds overall CSI-related information about node.
+	AddCSINode(csiNode *storagev1beta1.CSINode) error
+
+	// UpdateCSINode updates overall CSI-related information about node.
+	UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error
+
+	// RemoveCSINode removes overall CSI-related information about node.
+	RemoveCSINode(csiNode *storagev1beta1.CSINode) error
 
 	// List lists all cached pods (including assumed ones).
 	List(labels.Selector) ([]*v1.Pod, error)

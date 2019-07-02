@@ -391,6 +391,12 @@ func (p *csiPlugin) NewMounter(
 		return nil, errors.New("failed to get a Kubernetes client")
 	}
 
+	kvh, ok := p.host.(volume.KubeletVolumeHost)
+	if !ok {
+		klog.Error(log("cast from VolumeHost to KubeletVolumeHost failed"))
+		return nil, errors.New("cast from VolumeHost to KubeletVolumeHost failed")
+	}
+
 	mounter := &csiMountMgr{
 		plugin:       p,
 		k8s:          k8s,
@@ -402,6 +408,7 @@ func (p *csiPlugin) NewMounter(
 		volumeID:     volumeHandle,
 		specVolumeID: spec.Name(),
 		readOnly:     readOnly,
+		kubeVolHost:  kvh,
 	}
 	mounter.csiClientGetter.driverName = csiDriverName(driverName)
 
@@ -414,6 +421,8 @@ func (p *csiPlugin) NewMounter(
 		return nil, err
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
+
+	mounter.MetricsProvider = NewMetricsCsi(volumeHandle, dir, csiDriverName(driverName))
 
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
@@ -445,10 +454,17 @@ func (p *csiPlugin) NewMounter(
 func (p *csiPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	klog.V(4).Infof(log("setting up unmounter for [name=%v, podUID=%v]", specName, podUID))
 
+	kvh, ok := p.host.(volume.KubeletVolumeHost)
+	if !ok {
+		klog.Error(log("cast from VolumeHost to KubeletVolumeHost failed"))
+		return nil, errors.New("cast from VolumeHost to KubeletVolumeHost failed")
+	}
+
 	unmounter := &csiMountMgr{
 		plugin:       p,
 		podUID:       podUID,
 		specVolumeID: specName,
+		kubeVolHost:  kvh,
 	}
 
 	// load volume info from file
@@ -480,20 +496,18 @@ func (p *csiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.S
 	var spec *volume.Spec
 	inlineEnabled := utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume)
 
+	// If inlineEnabled is true and mode is ephemeralDriverMode,
+	// use constructVolSourceSpec to construct volume source spec.
+	// If inlineEnabled is false or mode is persistentDriverMode,
+	// use constructPVSourceSpec to construct volume construct pv source spec.
 	if inlineEnabled {
-		mode := driverMode(volData[volDataKey.driverMode])
-		switch {
-		case mode == ephemeralDriverMode:
+		if driverMode(volData[volDataKey.driverMode]) == ephemeralDriverMode {
 			spec = p.constructVolSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName])
+			return spec, nil
 
-		case mode == persistentDriverMode:
-			fallthrough
-		default:
-			spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 		}
-	} else {
-		spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 	}
+	spec = p.constructPVSourceSpec(volData[volDataKey.specVolID], volData[volDataKey.driverName], volData[volDataKey.volHandle])
 
 	return spec, nil
 }
@@ -550,17 +564,7 @@ var _ volume.AttachableVolumePlugin = &csiPlugin{}
 var _ volume.DeviceMountableVolumePlugin = &csiPlugin{}
 
 func (p *csiPlugin) NewAttacher() (volume.Attacher, error) {
-	k8s := p.host.GetKubeClient()
-	if k8s == nil {
-		klog.Error(log("unable to get kubernetes client from host"))
-		return nil, errors.New("unable to get Kubernetes client")
-	}
-
-	return &csiAttacher{
-		plugin:        p,
-		k8s:           k8s,
-		waitSleepTime: 1 * time.Second,
-	}, nil
+	return p.newAttacherDetacher()
 }
 
 func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
@@ -568,17 +572,7 @@ func (p *csiPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 }
 
 func (p *csiPlugin) NewDetacher() (volume.Detacher, error) {
-	k8s := p.host.GetKubeClient()
-	if k8s == nil {
-		klog.Error(log("unable to get kubernetes client from host"))
-		return nil, errors.New("unable to get Kubernetes client")
-	}
-
-	return &csiAttacher{
-		plugin:        p,
-		k8s:           k8s,
-		waitSleepTime: 1 * time.Second,
-	}, nil
+	return p.newAttacherDetacher()
 }
 
 func (p *csiPlugin) CanAttach(spec *volume.Spec) (bool, error) {
@@ -722,9 +716,6 @@ func (p *csiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (vo
 	unmapper.driverName = csiDriverName(data[volDataKey.driverName])
 	unmapper.volumeID = data[volDataKey.volHandle]
 	unmapper.csiClientGetter.driverName = unmapper.driverName
-	if err != nil {
-		return nil, err
-	}
 
 	return unmapper, nil
 }
@@ -835,6 +826,20 @@ func (p *csiPlugin) getPublishContext(client clientset.Interface, handle, driver
 		return nil, err
 	}
 	return attachment.Status.AttachmentMetadata, nil
+}
+
+func (p *csiPlugin) newAttacherDetacher() (*csiAttacher, error) {
+	k8s := p.host.GetKubeClient()
+	if k8s == nil {
+		klog.Error(log("unable to get kubernetes client from host"))
+		return nil, errors.New("unable to get Kubernetes client")
+	}
+
+	return &csiAttacher{
+		plugin:        p,
+		k8s:           k8s,
+		waitSleepTime: 1 * time.Second,
+	}, nil
 }
 
 func unregisterDriver(driverName string) error {

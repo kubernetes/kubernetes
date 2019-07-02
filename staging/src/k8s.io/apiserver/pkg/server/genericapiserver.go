@@ -26,13 +26,13 @@ import (
 
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/go-openapi/spec"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
@@ -145,9 +146,17 @@ type GenericAPIServer struct {
 	preShutdownHooksCalled bool
 
 	// healthz checks
-	healthzLock    sync.Mutex
-	healthzChecks  []healthz.HealthzChecker
-	healthzCreated bool
+	healthzLock                sync.Mutex
+	healthzChecks              []healthz.HealthzChecker
+	healthzChecksInstalled     bool
+	readyzLock                 sync.Mutex
+	readyzChecks               []healthz.HealthzChecker
+	readyzChecksInstalled      bool
+	maxStartupSequenceDuration time.Duration
+	healthzClock               clock.Clock
+	// the readiness stop channel is used to signal that the apiserver has initiated a shutdown sequence, this
+	// will cause readyz to return unhealthy.
+	readinessStopCh chan struct{}
 
 	// auditing. The backend is started after the server starts listening.
 	AuditBackend audit.Backend
@@ -156,6 +165,10 @@ type GenericAPIServer struct {
 	// authorization check using the request URI but it may be necessary to make additional checks, such as in
 	// the create-on-update case
 	Authorizer authorizer.Authorizer
+
+	// EquivalentResourceRegistry provides information about resources equivalent to a given resource,
+	// and the kind associated with a given resource. As resources are installed, they are registered here.
+	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 
 	// enableAPIResponseCompression indicates whether API Responses should support compression
 	// if the client requests it via Accept-Encoding
@@ -255,6 +268,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	}
 
 	s.installHealthz()
+	s.installReadyz(s.readinessStopCh)
 
 	// Register audit backend preShutdownHook.
 	if s.AuditBackend != nil {
@@ -314,6 +328,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		stoppedCh, err = s.SecureServingInfo.Serve(s.Handler, s.ShutdownTimeout, internalStopCh)
 		if err != nil {
 			close(internalStopCh)
+			close(auditStopCh)
 			return err
 		}
 	}
@@ -323,6 +338,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// ensure cleanup.
 	go func() {
 		<-stopCh
+		close(s.readinessStopCh)
 		close(internalStopCh)
 		if stoppedCh != nil {
 			<-stoppedCh
@@ -466,6 +482,8 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
 		Linker:          runtime.SelfLinker(meta.NewAccessor()),
+
+		EquivalentResourceRegistry: s.EquivalentResourceRegistry,
 
 		Admit:                        s.admissionControl,
 		MinRequestTimeout:            s.minRequestTimeout,

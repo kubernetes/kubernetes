@@ -23,7 +23,6 @@ import (
 	"k8s.io/api/core/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
@@ -64,9 +63,7 @@ type EndpointsHandler interface {
 }
 
 // EndpointsConfig tracks a set of endpoints configurations.
-// It accepts "set", "add" and "remove" operations of endpoints via channels, and invokes registered handlers on change.
 type EndpointsConfig struct {
-	lister        listers.EndpointsLister
 	listerSynced  cache.InformerSynced
 	eventHandlers []EndpointsHandler
 }
@@ -74,7 +71,6 @@ type EndpointsConfig struct {
 // NewEndpointsConfig creates a new EndpointsConfig.
 func NewEndpointsConfig(endpointsInformer coreinformers.EndpointsInformer, resyncPeriod time.Duration) *EndpointsConfig {
 	result := &EndpointsConfig{
-		lister:       endpointsInformer.Lister(),
 		listerSynced: endpointsInformer.Informer().HasSynced,
 	}
 
@@ -95,12 +91,9 @@ func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 	c.eventHandlers = append(c.eventHandlers, handler)
 }
 
-// Run starts the goroutine responsible for calling registered handlers.
+// Run waits for cache synced and invokes handlers after syncing.
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
-
 	klog.Info("Starting endpoints config controller")
-	defer klog.Info("Shutting down endpoints config controller")
 
 	if !controller.WaitForCacheSync("endpoints config", stopCh, c.listerSynced) {
 		return
@@ -110,8 +103,6 @@ func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
 		klog.V(3).Infof("Calling handler.OnEndpointsSynced()")
 		c.eventHandlers[i].OnEndpointsSynced()
 	}
-
-	<-stopCh
 }
 
 func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
@@ -163,9 +154,7 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 }
 
 // ServiceConfig tracks a set of service configurations.
-// It accepts "set", "add" and "remove" operations of services via channels, and invokes registered handlers on change.
 type ServiceConfig struct {
-	lister        listers.ServiceLister
 	listerSynced  cache.InformerSynced
 	eventHandlers []ServiceHandler
 }
@@ -173,7 +162,6 @@ type ServiceConfig struct {
 // NewServiceConfig creates a new ServiceConfig.
 func NewServiceConfig(serviceInformer coreinformers.ServiceInformer, resyncPeriod time.Duration) *ServiceConfig {
 	result := &ServiceConfig{
-		lister:       serviceInformer.Lister(),
 		listerSynced: serviceInformer.Informer().HasSynced,
 	}
 
@@ -194,13 +182,9 @@ func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 	c.eventHandlers = append(c.eventHandlers, handler)
 }
 
-// Run starts the goroutine responsible for calling
-// registered handlers.
+// Run waits for cache synced and invokes handlers after syncing.
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
-
 	klog.Info("Starting service config controller")
-	defer klog.Info("Shutting down service config controller")
 
 	if !controller.WaitForCacheSync("service config", stopCh, c.listerSynced) {
 		return
@@ -210,8 +194,6 @@ func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
 		klog.V(3).Info("Calling handler.OnServiceSynced()")
 		c.eventHandlers[i].OnServiceSynced()
 	}
-
-	<-stopCh
 }
 
 func (c *ServiceConfig) handleAddService(obj interface{}) {

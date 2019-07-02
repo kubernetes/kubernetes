@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
+	"k8s.io/klog"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
@@ -115,11 +116,15 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	internal.RemoveObjectManagedFields(newObjVersioned)
 	newObjTyped, err := f.typeConverter.ObjectToTyped(newObjVersioned)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create typed new object: %v", err)
+		// Return newObj and just by-pass fields update. This really shouldn't happen.
+		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed new object: %v", err)
+		return newObj, nil
 	}
 	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create typed live object: %v", err)
+		// Return newObj and just by-pass fields update. This really shouldn't happen.
+		klog.Errorf("[SHOULD NOT HAPPEN] failed to create typed live object: %v", err)
+		return newObj, nil
 	}
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
 	manager, err = f.buildManagerInfo(manager, metav1.ManagedFieldsOperationUpdate)

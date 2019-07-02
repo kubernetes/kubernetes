@@ -115,7 +115,7 @@ func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
 }
 
 // MonitorNodes checks to see if nodes in the cluster have been deleted
-// or shutdown. If deleeted, it deletes the node resource. If shutdown it
+// or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
 func (c *CloudNodeLifecycleController) MonitorNodes() {
 	instances, ok := c.cloud.Instances()

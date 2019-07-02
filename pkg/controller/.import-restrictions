@@ -83,7 +83,8 @@
         "k8s.io/api/admission/v1beta1",
         "k8s.io/api/networking/v1",
         "k8s.io/component-base/config",
-        "k8s.io/component-base/config/v1alpha1"
+        "k8s.io/component-base/config/v1alpha1",
+        "k8s.io/api/scheduling/v1"
       ]
     },
     {

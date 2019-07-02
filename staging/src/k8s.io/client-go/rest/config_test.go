@@ -172,6 +172,10 @@ func (t *fakeLimiter) QPS() float32 {
 	return t.FakeQPS
 }
 
+func (t *fakeLimiter) Wait(ctx context.Context) error {
+	return nil
+}
+
 func (t *fakeLimiter) Stop() {}
 
 func (t *fakeLimiter) Accept() {}
@@ -287,7 +291,7 @@ func TestAnonymousConfig(t *testing.T) {
 			_, actualError := actual.Dial(context.Background(), "", "")
 			_, expectedError := expected.Dial(context.Background(), "", "")
 			if !reflect.DeepEqual(expectedError, actualError) {
-				t.Fatalf("CopyConfig dropped the Dial field")
+				t.Fatalf("AnonymousClientConfig dropped the Dial field")
 			}
 		} else {
 			actual.Dial = nil

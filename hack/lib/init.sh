@@ -29,7 +29,7 @@ unset CDPATH
 export GO111MODULE=auto
 
 # The root of the build/dist directory
-KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 
 KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
@@ -44,7 +44,7 @@ KUBE_RSYNC_COMPRESS="${KUBE_RSYNC_COMPRESS:-0}"
 export no_proxy=127.0.0.1,localhost
 
 # This is a symlink to binaries for "this platform", e.g. build tools.
-THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
+export THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
@@ -56,6 +56,7 @@ source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
 
 KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
+export KUBE_OUTPUT_HOSTBIN
 
 # list of all available group versions.  This should be used when generated code
 # or when starting an API server that you want to have everything.
@@ -110,6 +111,7 @@ KUBE_NONSERVER_GROUP_VERSIONS="
  imagepolicy.k8s.io/v1alpha1\
  admission.k8s.io/v1beta1\
 "
+export KUBE_NONSERVER_GROUP_VERSIONS
 
 # This emulates "readlink -f" which is not available on MacOS X.
 # Test:

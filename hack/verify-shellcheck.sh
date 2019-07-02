@@ -163,7 +163,7 @@ for f in "${all_shell_scripts[@]}"; do
   fi
 done
 
-# Check to be sure all the packages that should pass lint are.
+# Check to be sure all the files that should pass lint are.
 if [ ${#errors[@]} -eq 0 ]; then
   echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
 else
@@ -173,7 +173,7 @@ else
       echo "$err"
     done
     echo
-    echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck"'
+    echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck.sh"'
     echo 'If the above warnings do not make sense, you can exempt this package from shellcheck'
     echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
     echo
@@ -183,7 +183,7 @@ fi
 
 if [[ ${#not_failing[@]} -gt 0 ]]; then
   {
-    echo "Some packages in hack/.shellcheck_failures are passing shellcheck. Please remove them."
+    echo "Some files in hack/.shellcheck_failures are passing shellcheck. Please remove them."
     echo
     for f in "${not_failing[@]}"; do
       echo "  $f"
@@ -193,7 +193,7 @@ if [[ ${#not_failing[@]} -gt 0 ]]; then
   exit 1
 fi
 
-# Check that all failing_packages actually still exist
+# Check that all failing_files actually still exist
 gone=()
 for f in "${failing_files[@]}"; do
   kube::util::array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )

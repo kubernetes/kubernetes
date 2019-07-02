@@ -34,6 +34,7 @@ type attributesRecord struct {
 	resource    schema.GroupVersionResource
 	subresource string
 	operation   Operation
+	options     runtime.Object
 	dryRun      bool
 	object      runtime.Object
 	oldObject   runtime.Object
@@ -43,20 +44,24 @@ type attributesRecord struct {
 	// But ValidatingAdmissionWebhook add annotations concurrently.
 	annotations     map[string]string
 	annotationsLock sync.RWMutex
+
+	reinvocationContext ReinvocationContext
 }
 
-func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, dryRun bool, userInfo user.Info) Attributes {
+func NewAttributesRecord(object runtime.Object, oldObject runtime.Object, kind schema.GroupVersionKind, namespace, name string, resource schema.GroupVersionResource, subresource string, operation Operation, operationOptions runtime.Object, dryRun bool, userInfo user.Info) Attributes {
 	return &attributesRecord{
-		kind:        kind,
-		namespace:   namespace,
-		name:        name,
-		resource:    resource,
-		subresource: subresource,
-		operation:   operation,
-		dryRun:      dryRun,
-		object:      object,
-		oldObject:   oldObject,
-		userInfo:    userInfo,
+		kind:                kind,
+		namespace:           namespace,
+		name:                name,
+		resource:            resource,
+		subresource:         subresource,
+		operation:           operation,
+		options:             operationOptions,
+		dryRun:              dryRun,
+		object:              object,
+		oldObject:           oldObject,
+		userInfo:            userInfo,
+		reinvocationContext: &reinvocationContext{},
 	}
 }
 
@@ -82,6 +87,10 @@ func (record *attributesRecord) GetSubresource() string {
 
 func (record *attributesRecord) GetOperation() Operation {
 	return record.operation
+}
+
+func (record *attributesRecord) GetOperationOptions() runtime.Object {
+	return record.options
 }
 
 func (record *attributesRecord) IsDryRun() bool {
@@ -132,6 +141,46 @@ func (record *attributesRecord) AddAnnotation(key, value string) error {
 	}
 	record.annotations[key] = value
 	return nil
+}
+
+func (record *attributesRecord) GetReinvocationContext() ReinvocationContext {
+	return record.reinvocationContext
+}
+
+type reinvocationContext struct {
+	// isReinvoke is true when admission plugins are being reinvoked
+	isReinvoke bool
+	// reinvokeRequested is true when an admission plugin requested a re-invocation of the chain
+	reinvokeRequested bool
+	// values stores reinvoke context values per plugin.
+	values map[string]interface{}
+}
+
+func (rc *reinvocationContext) IsReinvoke() bool {
+	return rc.isReinvoke
+}
+
+func (rc *reinvocationContext) SetIsReinvoke() {
+	rc.isReinvoke = true
+}
+
+func (rc *reinvocationContext) ShouldReinvoke() bool {
+	return rc.reinvokeRequested
+}
+
+func (rc *reinvocationContext) SetShouldReinvoke() {
+	rc.reinvokeRequested = true
+}
+
+func (rc *reinvocationContext) SetValue(plugin string, v interface{}) {
+	if rc.values == nil {
+		rc.values = map[string]interface{}{}
+	}
+	rc.values[plugin] = v
+}
+
+func (rc *reinvocationContext) Value(plugin string) interface{} {
+	return rc.values[plugin]
 }
 
 func checkKeyFormat(key string) error {

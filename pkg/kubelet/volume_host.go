@@ -160,6 +160,10 @@ func (kvh *kubeletVolumeHost) GetSubpather() subpath.Interface {
 	return kvh.kubelet.subpather
 }
 
+func (kvh *kubeletVolumeHost) GetHostUtil() mount.HostUtils {
+	return kvh.kubelet.hostutil
+}
+
 func (kvh *kubeletVolumeHost) GetInformerFactory() informers.SharedInformerFactory {
 	return kvh.informerFactory
 }

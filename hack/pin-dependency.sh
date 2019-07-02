@@ -29,8 +29,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Explicitly opt into go modules, even though we're inside a GOPATH directory
 export GO111MODULE=on
-# Explicitly clear GOPATH, to ensure nothing this script calls makes use of that path info
-export GOPATH=
 # Explicitly clear GOFLAGS, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
 export GOFLAGS=
 # Detect problematic GOPROXY settings that prevent lookup of dependencies
@@ -92,9 +90,9 @@ echo "Running: go mod edit -replace ${dep}=${dep}@${rev}"
 go mod edit -replace "${dep}=${dep}@${rev}"
 
 # Propagate pinned version to staging repos that also have that dependency
-for repo in $(ls staging/src/k8s.io | sort); do
+for repo in $(kube::util::list_staging_repos); do
   pushd "staging/src/k8s.io/${repo}" >/dev/null 2>&1
-    if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null; then
+    if go mod edit -json | jq -e -r ".Require[] | select(.Path == \"${dep}\")" > /dev/null 2>&1; then
       go mod edit -require "${dep}@${rev}"
       go mod edit -replace "${dep}=${dep}@${rev}"
     fi

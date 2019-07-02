@@ -107,8 +107,8 @@ type realImageGCManager struct {
 
 // imageCache caches latest result of ListImages.
 type imageCache struct {
-	// sync.RWMutex is the mutex protects the image cache.
-	sync.RWMutex
+	// sync.Mutex is the mutex protects the image cache.
+	sync.Mutex
 	// images is the image cache.
 	images []container.Image
 }

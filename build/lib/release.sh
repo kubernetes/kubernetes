@@ -115,7 +115,7 @@ function kube::release::package_src_tarball() {
           \) -prune \
         \))
     )
-    "${TAR}" czf "${src_tarball}" -C "${KUBE_ROOT}" "${source_files[@]}"
+    "${TAR}" czf "${src_tarball}" --transform 's|^\.|kubernetes|' -C "${KUBE_ROOT}" "${source_files[@]}"
   fi
 }
 

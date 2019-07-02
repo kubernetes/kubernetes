@@ -330,8 +330,10 @@ Validators with parameters
 "range(min|max)": Range,
 "length(min|max)": ByteLength,
 "runelength(min|max)": RuneLength,
+"stringlength(min|max)": StringLength,
 "matches(pattern)": StringMatches,
 "in(string1|string2|...|stringN)": IsIn,
+"rsapub(keylength)" : IsRsaPub,
 ```
 
 And here is small example of usage:
@@ -339,12 +341,14 @@ And here is small example of usage:
 type Post struct {
 	Title    string `valid:"alphanum,required"`
 	Message  string `valid:"duck,ascii"`
+	Message2 string `valid:"animal(dog)"`
 	AuthorIP string `valid:"ipv4"`
 	Date     string `valid:"-"`
 }
 post := &Post{
 	Title:   "My Example Post",
 	Message: "duck",
+	Message2: "dog",
 	AuthorIP: "123.234.54.3",
 }
 
@@ -352,6 +356,13 @@ post := &Post{
 govalidator.TagMap["duck"] = govalidator.Validator(func(str string) bool {
 	return str == "duck"
 })
+
+// Add your own struct validation tags with parameter
+govalidator.ParamTagMap["animal"] = govalidator.ParamValidator(func(str string, params ...string) bool {
+    species := params[0]
+    return str == species
+})
+govalidator.ParamTagRegexMap["animal"] = regexp.MustCompile("^animal\\((\\w+)\\)$")
 
 result, err := govalidator.ValidateStruct(post)
 if err != nil {

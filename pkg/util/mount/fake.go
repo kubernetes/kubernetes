@@ -29,7 +29,6 @@ import (
 type FakeMounter struct {
 	MountPoints []MountPoint
 	Log         []FakeAction
-	Filesystem  map[string]FileType
 	// Error to return for a path when calling IsLikelyNotMountPoint
 	MountCheckErrors map[string]error
 	// Some tests run things in parallel, make sure the mounter does not produce
@@ -166,56 +165,6 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-func (f *FakeMounter) DeviceOpened(pathname string) (bool, error) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
-
-	for _, mp := range f.MountPoints {
-		if mp.Device == pathname {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
-}
-
-func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return getDeviceNameFromMount(f, mountPath, pluginMountDir)
-}
-
-func (f *FakeMounter) MakeRShared(path string) error {
-	return nil
-}
-
-func (f *FakeMounter) GetFileType(pathname string) (FileType, error) {
-	if t, ok := f.Filesystem[pathname]; ok {
-		return t, nil
-	}
-	return FileType("Directory"), nil
-}
-
-func (f *FakeMounter) MakeDir(pathname string) error {
-	return nil
-}
-
-func (f *FakeMounter) MakeFile(pathname string) error {
-	return nil
-}
-
-func (f *FakeMounter) ExistsPath(pathname string) (bool, error) {
-	if _, ok := f.Filesystem[pathname]; ok {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (f *FakeMounter) EvalHostSymlinks(pathname string) (string, error) {
-	return pathname, nil
-}
-
 func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	realpath, err := filepath.EvalSymlinks(pathname)
 	if err != nil {
@@ -225,14 +174,73 @@ func (f *FakeMounter) GetMountRefs(pathname string) ([]string, error) {
 	return getMountRefsByDev(f, realpath)
 }
 
-func (f *FakeMounter) GetFSGroup(pathname string) (int64, error) {
+type FakeHostUtil struct {
+	MountPoints []MountPoint
+	Filesystem  map[string]FileType
+
+	mutex sync.Mutex
+}
+
+var _ HostUtils = &FakeHostUtil{}
+
+func (hu *FakeHostUtil) DeviceOpened(pathname string) (bool, error) {
+	hu.mutex.Lock()
+	defer hu.mutex.Unlock()
+
+	for _, mp := range hu.MountPoints {
+		if mp.Device == pathname {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (hu *FakeHostUtil) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+func (hu *FakeHostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
+}
+
+func (hu *FakeHostUtil) MakeRShared(path string) error {
+	return nil
+}
+
+func (hu *FakeHostUtil) GetFileType(pathname string) (FileType, error) {
+	if t, ok := hu.Filesystem[pathname]; ok {
+		return t, nil
+	}
+	return FileType("Directory"), nil
+}
+
+func (hu *FakeHostUtil) MakeDir(pathname string) error {
+	return nil
+}
+
+func (hu *FakeHostUtil) MakeFile(pathname string) error {
+	return nil
+}
+
+func (hu *FakeHostUtil) ExistsPath(pathname string) (bool, error) {
+	if _, ok := hu.Filesystem[pathname]; ok {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (hu *FakeHostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return pathname, nil
+}
+
+func (hu *FakeHostUtil) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("GetFSGroup not implemented")
 }
 
-func (f *FakeMounter) GetSELinuxSupport(pathname string) (bool, error) {
+func (hu *FakeHostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("GetSELinuxSupport not implemented")
 }
 
-func (f *FakeMounter) GetMode(pathname string) (os.FileMode, error) {
+func (hu *FakeHostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return 0, errors.New("not implemented")
 }

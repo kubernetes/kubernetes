@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/storage/etcd"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -397,14 +397,14 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 		// TODO: does it hurt if we make an api call and nothing needs to be updated?
 		claimKey := claimToClaimKey(binding.pvc)
 		klog.V(2).Infof("claim %q bound to volume %q", claimKey, binding.pv.Name)
-		if newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(binding.pv); err != nil {
+		newPV, err := b.kubeClient.CoreV1().PersistentVolumes().Update(binding.pv)
+		if err != nil {
 			klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", binding.pv.Name, claimKey, err)
 			return err
-		} else {
-			klog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", binding.pv.Name, claimKey)
-			// Save updated object from apiserver for later checking.
-			binding.pv = newPV
 		}
+		klog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", binding.pv.Name, claimKey)
+		// Save updated object from apiserver for later checking.
+		binding.pv = newPV
 		lastProcessedBinding++
 	}
 
@@ -412,12 +412,12 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 	// PV controller is expect to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).Infof("bindAPIUpdate: Pod %q, PVC %q", podName, getPVCName(claim))
-		if newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claim); err != nil {
+		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claim)
+		if err != nil {
 			return err
-		} else {
-			// Save updated object from apiserver for later checking.
-			claimsToProvision[i] = newClaim
 		}
+		// Save updated object from apiserver for later checking.
+		claimsToProvision[i] = newClaim
 		lastProcessedProvisioning++
 	}
 
@@ -425,7 +425,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*bindingInfo, cl
 }
 
 var (
-	versioner = etcd.APIObjectVersioner{}
+	versioner = etcd3.APIObjectVersioner{}
 )
 
 // checkBindings runs through all the PVCs in the Pod and checks:
@@ -527,9 +527,8 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*bindingInfo, claim
 					// And if PV does not exist because it's deleted, PVC will
 					// be unbound eventually.
 					return false, nil
-				} else {
-					return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
 				}
+				return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
 			}
 			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
 				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)

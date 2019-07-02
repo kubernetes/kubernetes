@@ -20,9 +20,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/kubectl/pkg/util/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 var (
@@ -55,6 +55,7 @@ var (
 		kubectl apply edit-last-applied -f deploy.yaml -o json`)
 )
 
+// NewCmdApplyEditLastApplied created the cobra CLI command for the `apply edit-last-applied` command.
 func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := editor.NewEditOptions(editor.ApplyEditMode, ioStreams)
 

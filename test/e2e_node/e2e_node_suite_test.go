@@ -41,6 +41,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
 	"github.com/kardianos/osext"
@@ -71,6 +73,13 @@ func init() {
 	// TODO(random-liu): Find who is using flag.Parse() and cause errors and move the following logic
 	// into TestContext.
 	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
+
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
+
 }
 
 func TestMain(m *testing.M) {
@@ -216,7 +225,7 @@ func maskLocksmithdOnCoreos() {
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
 		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
+		framework.ExpectNoError(err, fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		klog.Infof("Locksmithd is masked successfully")
 	}
 }
@@ -229,7 +238,7 @@ func waitForNodeReady() {
 		nodeReadyPollInterval = 1 * time.Second
 	)
 	client, err := getAPIServerClient()
-	Expect(err).NotTo(HaveOccurred(), "should be able to get apiserver client.")
+	framework.ExpectNoError(err, "should be able to get apiserver client.")
 	Eventually(func() error {
 		node, err := getNode(client)
 		if err != nil {
@@ -273,7 +282,7 @@ func updateTestContext() error {
 // getNode gets node object from the apiserver.
 func getNode(c *clientset.Clientset) (*v1.Node, error) {
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	Expect(err).NotTo(HaveOccurred(), "should be able to list nodes.")
+	framework.ExpectNoError(err, "should be able to list nodes.")
 	if nodes == nil {
 		return nil, fmt.Errorf("the node list is nil.")
 	}

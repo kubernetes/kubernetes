@@ -35,11 +35,11 @@ def go_bindata(
     srcs = srcs,
     outs = outs,
     cmd = """
-    $(location //vendor/github.com/jteeuwen/go-bindata/go-bindata:go-bindata) \
+    $(location //vendor/github.com/go-bindata/go-bindata/go-bindata:go-bindata) \
       -o "$@" -pkg %s -prefix $$(pwd) %s $(SRCS)
     """ % (pkg, " ".join(args)),
     tools = [
-      "//vendor/github.com/jteeuwen/go-bindata/go-bindata",
+      "//vendor/github.com/go-bindata/go-bindata/go-bindata",
     ],
     **kw
   )

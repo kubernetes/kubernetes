@@ -18,7 +18,9 @@ package plugins
 
 import (
 	"fmt"
+
 	"k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 )
 
 const (
@@ -39,8 +41,33 @@ func NewOpenStackCinderCSITranslator() InTreePlugin {
 }
 
 // TranslateInTreeStorageClassParametersToCSI translates InTree Cinder storage class parameters to CSI storage class
-func (t *osCinderCSITranslator) TranslateInTreeStorageClassParametersToCSI(scParameters map[string]string) (map[string]string, error) {
-	return scParameters, nil
+func (t *osCinderCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.StorageClass) (*storage.StorageClass, error) {
+	return sc, nil
+}
+
+// TranslateInTreeInlineVolumeToCSI takes a Volume with Cinder set from in-tree
+// and converts the Cinder source to a CSIPersistentVolumeSource
+func (t *osCinderCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+	if volume == nil || volume.Cinder == nil {
+		return nil, fmt.Errorf("volume is nil or Cinder not defined on volume")
+	}
+
+	cinderSource := volume.Cinder
+	pv := &v1.PersistentVolume{
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				CSI: &v1.CSIPersistentVolumeSource{
+					Driver:           CinderDriverName,
+					VolumeHandle:     cinderSource.VolumeID,
+					ReadOnly:         cinderSource.ReadOnly,
+					FSType:           cinderSource.FSType,
+					VolumeAttributes: map[string]string{},
+				},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+		},
+	}
+	return pv, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with Cinder set from in-tree
@@ -85,11 +112,18 @@ func (t *osCinderCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume) 
 	return pv, nil
 }
 
-// CanSupport tests whether the plugin supports a given volume
+// CanSupport tests whether the plugin supports a given persistent volume
 // specification from the API.  The spec pointer should be considered
 // const.
 func (t *osCinderCSITranslator) CanSupport(pv *v1.PersistentVolume) bool {
 	return pv != nil && pv.Spec.Cinder != nil
+}
+
+// CanSupportInline tests whether the plugin supports a given inline volume
+// specification from the API.  The spec pointer should be considered
+// const.
+func (t *osCinderCSITranslator) CanSupportInline(volume *v1.Volume) bool {
+	return volume != nil && volume.Cinder != nil
 }
 
 // GetInTreePluginName returns the name of the intree plugin driver

@@ -65,17 +65,17 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog"
+	"k8s.io/kubectl/pkg/util/certificate"
+	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
+	"k8s.io/kubectl/pkg/util/event"
+	"k8s.io/kubectl/pkg/util/fieldpath"
+	"k8s.io/kubectl/pkg/util/qos"
+	"k8s.io/kubectl/pkg/util/rbac"
+	resourcehelper "k8s.io/kubectl/pkg/util/resource"
+	"k8s.io/kubectl/pkg/util/slice"
+	storageutil "k8s.io/kubectl/pkg/util/storage"
 	"k8s.io/kubernetes/pkg/kubectl/describe"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
-	"k8s.io/kubernetes/pkg/kubectl/util/certificate"
-	deploymentutil "k8s.io/kubernetes/pkg/kubectl/util/deployment"
-	"k8s.io/kubernetes/pkg/kubectl/util/event"
-	"k8s.io/kubernetes/pkg/kubectl/util/fieldpath"
-	"k8s.io/kubernetes/pkg/kubectl/util/qos"
-	"k8s.io/kubernetes/pkg/kubectl/util/rbac"
-	resourcehelper "k8s.io/kubernetes/pkg/kubectl/util/resource"
-	"k8s.io/kubernetes/pkg/kubectl/util/slice"
-	storageutil "k8s.io/kubernetes/pkg/kubectl/util/storage"
 )
 
 // Each level has 2 spaces for PrefixWriter
@@ -2291,7 +2291,7 @@ type IngressDescriber struct {
 }
 
 func (i *IngressDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
-	c := i.ExtensionsV1beta1().Ingresses(namespace)
+	c := i.NetworkingV1beta1().Ingresses(namespace)
 	ing, err := c.Get(name, metav1.GetOptions{})
 	if err != nil {
 		return "", err
@@ -2299,7 +2299,7 @@ func (i *IngressDescriber) Describe(namespace, name string, describerSettings de
 	return i.describeIngress(ing, describerSettings)
 }
 
-func (i *IngressDescriber) describeBackend(ns string, backend *extensionsv1beta1.IngressBackend) string {
+func (i *IngressDescriber) describeBackend(ns string, backend *networkingv1beta1.IngressBackend) string {
 	endpoints, _ := i.CoreV1().Endpoints(ns).Get(backend.ServiceName, metav1.GetOptions{})
 	service, _ := i.CoreV1().Services(ns).Get(backend.ServiceName, metav1.GetOptions{})
 	spName := ""
@@ -2319,7 +2319,7 @@ func (i *IngressDescriber) describeBackend(ns string, backend *extensionsv1beta1
 	return formatEndpoints(endpoints, sets.NewString(spName))
 }
 
-func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, describerSettings describe.DescriberSettings) (string, error) {
+func (i *IngressDescriber) describeIngress(ing *networkingv1beta1.Ingress, describerSettings describe.DescriberSettings) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
@@ -2330,7 +2330,7 @@ func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, descr
 		if def == nil {
 			// Ingresses that don't specify a default backend inherit the
 			// default backend in the kube-system namespace.
-			def = &extensionsv1beta1.IngressBackend{
+			def = &networkingv1beta1.IngressBackend{
 				ServiceName: "default-http-backend",
 				ServicePort: intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 			}
@@ -2372,7 +2372,7 @@ func (i *IngressDescriber) describeIngress(ing *extensionsv1beta1.Ingress, descr
 	})
 }
 
-func describeIngressTLS(w PrefixWriter, ingTLS []extensionsv1beta1.IngressTLS) {
+func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 	w.Write(LEVEL_0, "TLS:\n")
 	for _, t := range ingTLS {
 		if t.SecretName == "" {
@@ -3856,6 +3856,11 @@ func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, er
 		if len(psp.Spec.AllowedFlexVolumes) > 0 {
 			w.Write(LEVEL_1, "Allowed FlexVolume Types:\t%s\n", flexVolumesToString(psp.Spec.AllowedFlexVolumes))
 		}
+
+		if len(psp.Spec.AllowedCSIDrivers) > 0 {
+			w.Write(LEVEL_1, "Allowed CSI Drivers:\t%s\n", csiDriversToString(psp.Spec.AllowedCSIDrivers))
+		}
+
 		if len(psp.Spec.AllowedUnsafeSysctls) > 0 {
 			w.Write(LEVEL_1, "Allowed Unsafe Sysctls:\t%s\n", sysctlsToString(psp.Spec.AllowedUnsafeSysctls))
 		}
@@ -3919,6 +3924,14 @@ func flexVolumesToString(flexVolumes []policyv1beta1.AllowedFlexVolume) string {
 		volumes = append(volumes, "driver="+flexVolume.Driver)
 	}
 	return stringOrDefaultValue(strings.Join(volumes, ","), "<all>")
+}
+
+func csiDriversToString(csiDrivers []policyv1beta1.AllowedCSIDriver) string {
+	drivers := []string{}
+	for _, csiDriver := range csiDrivers {
+		drivers = append(drivers, "driver="+csiDriver.Name)
+	}
+	return stringOrDefaultValue(strings.Join(drivers, ","), "<all>")
 }
 
 func sysctlsToString(sysctls []string) string {
@@ -4494,7 +4507,7 @@ func extractCSRStatus(csr *certificatesv1beta1.CertificateSigningRequest) (strin
 }
 
 // backendStringer behaves just like a string interface and converts the given backend to a string.
-func backendStringer(backend *extensionsv1beta1.IngressBackend) string {
+func backendStringer(backend *networkingv1beta1.IngressBackend) string {
 	if backend == nil {
 		return ""
 	}

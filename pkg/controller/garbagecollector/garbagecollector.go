@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	// import known versions
@@ -66,7 +65,7 @@ type GarbageCollector struct {
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
-	sharedInformers  informers.SharedInformerFactory
+	sharedInformers  controller.InformerFactory
 
 	workerLock sync.RWMutex
 }
@@ -76,7 +75,7 @@ func NewGarbageCollector(
 	mapper resettableRESTMapper,
 	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
-	sharedInformers informers.SharedInformerFactory,
+	sharedInformers controller.InformerFactory,
 	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
@@ -90,7 +89,6 @@ func NewGarbageCollector(
 		absentOwnerCache: absentOwnerCache,
 	}
 	gb := &GraphBuilder{
-		dynamicClient:    dynamicClient,
 		informersStarted: informersStarted,
 		restMapper:       mapper,
 		graphChanges:     workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
@@ -621,13 +619,9 @@ func (gc *GarbageCollector) attemptToOrphanWorker() bool {
 // GraphHasUID returns if the GraphBuilder has a particular UID store in its
 // uidToNode graph. It's useful for debugging.
 // This method is used by integration tests.
-func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
-	for _, u := range UIDs {
-		if _, ok := gc.dependencyGraphBuilder.uidToNode.Read(u); ok {
-			return true
-		}
-	}
-	return false
+func (gc *GarbageCollector) GraphHasUID(u types.UID) bool {
+	_, ok := gc.dependencyGraphBuilder.uidToNode.Read(u)
+	return ok
 }
 
 // GetDeletableResources returns all resources from discoveryClient that the

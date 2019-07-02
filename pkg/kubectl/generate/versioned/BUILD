@@ -27,7 +27,6 @@ go_library(
     deps = [
         "//pkg/kubectl/generate:go_default_library",
         "//pkg/kubectl/util:go_default_library",
-        "//pkg/kubectl/util/hash:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
@@ -49,6 +48,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/client-go/discovery:go_default_library",
+        "//staging/src/k8s.io/kubectl/pkg/util/hash:go_default_library",
     ],
 )
 

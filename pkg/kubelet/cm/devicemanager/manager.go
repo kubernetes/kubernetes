@@ -28,10 +28,12 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -40,8 +42,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	watcher "k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	"k8s.io/kubernetes/pkg/util/selinux"
 )
 
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
@@ -206,6 +209,11 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 
 	socketPath := filepath.Join(m.socketdir, m.socketname)
 	os.MkdirAll(m.socketdir, 0755)
+	if selinux.SELinuxEnabled() {
+		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
+			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", m.socketdir, err)
+		}
+	}
 
 	// Removes all stale sockets in m.socketdir. Device plugins can monitor
 	// this and use it as a signal to re-register with the new Kubelet.
@@ -234,7 +242,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 }
 
 // GetWatcherHandler returns the plugin handler
-func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
+func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	if f, err := os.Create(m.socketdir + "DEPRECATION"); err != nil {
 		klog.Errorf("Failed to create deprecation file at %s", m.socketdir)
 	} else {
@@ -242,7 +250,7 @@ func (m *ManagerImpl) GetWatcherHandler() watcher.PluginHandler {
 		klog.V(4).Infof("created deprecation file %s", f.Name())
 	}
 
-	return watcher.PluginHandler(m)
+	return cache.PluginHandler(m)
 }
 
 // ValidatePlugin validates a plugin if the version is correct and the name has the format of an extended resource
@@ -831,4 +839,18 @@ func (m *ManagerImpl) GetDevices(podUID, containerName string) []*podresourcesap
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	return m.podDevices.getContainerDevices(podUID, containerName)
+}
+
+// ShouldResetExtendedResourceCapacity returns whether the extended resources should be zeroed or not,
+// depending on whether the node has been recreated. Absence of the checkpoint file strongly indicates the node
+// has been recreated.
+func (m *ManagerImpl) ShouldResetExtendedResourceCapacity() bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePlugins) {
+		checkpoints, err := m.checkpointManager.ListCheckpoints()
+		if err != nil {
+			return false
+		}
+		return len(checkpoints) == 0
+	}
+	return false
 }

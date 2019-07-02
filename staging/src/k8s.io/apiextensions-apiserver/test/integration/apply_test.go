@@ -27,12 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestApplyBasic(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
 
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {

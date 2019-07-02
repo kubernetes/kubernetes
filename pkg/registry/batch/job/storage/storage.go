@@ -37,6 +37,7 @@ type JobStorage struct {
 	Status *StatusREST
 }
 
+// NewStorage creates a new JobStorage against etcd.
 func NewStorage(optsGetter generic.RESTOptionsGetter) JobStorage {
 	jobRest, jobStatusRest := NewREST(optsGetter)
 
@@ -89,6 +90,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new Job object.
 func (r *StatusREST) New() runtime.Object {
 	return &batch.Job{}
 }

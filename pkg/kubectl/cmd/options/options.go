@@ -19,8 +19,8 @@ package options
 import (
 	"io"
 
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 
 	"github.com/spf13/cobra"
 )

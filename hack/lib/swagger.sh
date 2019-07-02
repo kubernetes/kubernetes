@@ -20,9 +20,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# The root of the build/dist directory
-KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
-
 # Generates types_swagger_doc_generated file for the given group version.
 # $1: Name of the group version
 # $2: Path to the directory where types.go for that group version exists. This
@@ -30,13 +27,15 @@ KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 kube::swagger::gen_types_swagger_doc() {
   local group_version=$1
   local gv_dir=$2
-  local TMPFILE="${TMPDIR:-/tmp}/types_swagger_doc_generated.$(date +%s).go"
+  local TMPFILE
+  TMPFILE="${TMPDIR:-/tmp}/types_swagger_doc_generated.$(date +%s).go"
 
   echo "Generating swagger type docs for ${group_version} at ${gv_dir}"
 
-  echo -e "$(cat hack/boilerplate/boilerplate.generatego.txt)\n" > "${TMPFILE}"
-  echo "package ${group_version##*/}" >> "${TMPFILE}"
-  cat >> "${TMPFILE}" <<EOF
+  {
+    echo -e "$(cat hack/boilerplate/boilerplate.generatego.txt)\n"
+    echo "package ${group_version##*/}"
+    cat <<EOF
 
 // This file contains a collection of methods that can be used from go-restful to
 // generate Swagger API documentation for its models. Please read this PR for more
@@ -50,6 +49,7 @@ kube::swagger::gen_types_swagger_doc() {
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 EOF
+  } > "${TMPFILE}"
 
   go run cmd/genswaggertypedocs/swagger_type_docs.go -s \
     "${gv_dir}/types.go" \
@@ -59,5 +59,5 @@ EOF
   echo "// AUTO-GENERATED FUNCTIONS END HERE" >> "${TMPFILE}"
 
   gofmt -w -s "${TMPFILE}"
-  mv "${TMPFILE}" ""${gv_dir}"/types_swagger_doc_generated.go"
+  mv "${TMPFILE}" "${gv_dir}/types_swagger_doc_generated.go"
 }

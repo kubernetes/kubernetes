@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,6 +56,13 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
+
+// EmptyFramework is an empty framework used in tests.
+// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
+var EmptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, EmptyPluginConfig)
+
+// EmptyPluginConfig is an empty plugin config used in tests.
+var EmptyPluginConfig = []kubeschedulerconfig.PluginConfig{}
 
 type fakeBinder struct {
 	b func(binding *v1.Binding) error
@@ -152,7 +159,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(pod *v1.Pod, ml algorithm.NodeLister, pc *framework.PluginContext) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -193,10 +200,13 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Storage().V1beta1().CSINodes(),
 		eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"}),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
 		EmptyPluginRegistry,
+		nil,
+		EmptyPluginConfig,
 		WithBindTimeoutSeconds(defaultBindTimeout))
 
 	if err != nil {
@@ -274,7 +284,6 @@ func TestScheduler(t *testing.T) {
 			var gotAssumedPod *v1.Pod
 			var gotBinding *v1.Binding
 
-			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 			s := NewFromConfig(&factory.Config{
 				SchedulerCache: &fakecache.Cache{
 					ForgetFunc: func(pod *v1.Pod) {
@@ -300,7 +309,7 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Framework:    fwk,
+				Framework:    EmptyFramework,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "scheduler"}),
 				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 			})
@@ -638,15 +647,14 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, recorder record.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
-	framework, _ := framework.NewFramework(EmptyPluginRegistry, nil)
 	algo := core.NewGenericScheduler(
 		scache,
-		internalqueue.NewSchedulingQueue(nil),
+		internalqueue.NewSchedulingQueue(nil, nil),
 		predicateMap,
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyPriorityMetadataProducer,
-		framework,
+		EmptyFramework,
 		[]algorithm.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -654,6 +662,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
+		false,
 	)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
@@ -677,7 +686,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		Recorder:            &record.FakeRecorder{},
 		PodConditionUpdater: fakePodConditionUpdater{},
 		PodPreemptor:        fakePodPreemptor{},
-		Framework:           framework,
+		Framework:           EmptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
 
@@ -691,10 +700,10 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	framework, _ := framework.NewFramework(EmptyPluginRegistry, nil)
+	framework, _ := framework.NewFramework(EmptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
 	algo := core.NewGenericScheduler(
 		scache,
-		internalqueue.NewSchedulingQueue(nil),
+		internalqueue.NewSchedulingQueue(nil, nil),
 		predicateMap,
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
@@ -707,6 +716,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		false,
 		false,
 		schedulerapi.DefaultPercentageOfNodesToScore,
+		false,
 	)
 	bindingChan := make(chan *v1.Binding, 2)
 

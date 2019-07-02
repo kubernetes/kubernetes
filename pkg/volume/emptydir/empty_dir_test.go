@@ -163,7 +163,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 

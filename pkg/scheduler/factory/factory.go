@@ -32,24 +32,29 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
-	storageinformers "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
-	storagelisters "k8s.io/client-go/listers/storage/v1"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
+	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/api/validation"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -181,7 +186,9 @@ type configFactory struct {
 	// a means to list all PodDisruptionBudgets
 	pdbLister policylisters.PodDisruptionBudgetLister
 	// a means to list all StorageClasses
-	storageClassLister storagelisters.StorageClassLister
+	storageClassLister storagelistersv1.StorageClassLister
+	// a means to list all CSINodes
+	csiNodeLister storagelistersv1beta1.CSINodeLister
 	// framework has a set of plugins and the context used for running them.
 	framework framework.Framework
 
@@ -216,6 +223,8 @@ type configFactory struct {
 	bindTimeoutSeconds int64
 	// queue for pods that need scheduling
 	podQueue internalqueue.SchedulingQueue
+
+	enableNonPreempting bool
 }
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
@@ -231,13 +240,16 @@ type ConfigFactoryArgs struct {
 	StatefulSetInformer            appsinformers.StatefulSetInformer
 	ServiceInformer                coreinformers.ServiceInformer
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
-	StorageClassInformer           storageinformers.StorageClassInformer
+	StorageClassInformer           storageinformersv1.StorageClassInformer
+	CSINodeInformer                storageinformersv1beta1.CSINodeInformer
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
+	Plugins                        *config.Plugins
+	PluginConfig                   []config.PluginConfig
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only
@@ -248,21 +260,27 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		stopEverything = wait.NeverStop
 	}
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
-	// TODO(bsalamat): config files should be passed to the framework.
-	framework, err := framework.NewFramework(args.Registry, nil)
+
+	framework, err := framework.NewFramework(args.Registry, args.Plugins, args.PluginConfig)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
-	var storageClassLister storagelisters.StorageClassLister
+	var storageClassLister storagelistersv1.StorageClassLister
 	if args.StorageClassInformer != nil {
 		storageClassLister = args.StorageClassInformer.Lister()
 	}
+
+	var csiNodeLister storagelistersv1beta1.CSINodeLister
+	if args.CSINodeInformer != nil {
+		csiNodeLister = args.CSINodeInformer.Lister()
+	}
+
 	c := &configFactory{
 		client:                         args.Client,
 		podLister:                      schedulerCache,
-		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything),
+		podQueue:                       internalqueue.NewSchedulingQueue(stopEverything, framework),
 		nodeLister:                     args.NodeInformer.Lister(),
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
@@ -272,6 +290,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		statefulSetLister:              args.StatefulSetInformer.Lister(),
 		pdbLister:                      args.PdbInformer.Lister(),
 		storageClassLister:             storageClassLister,
+		csiNodeLister:                  csiNodeLister,
 		framework:                      framework,
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
@@ -280,6 +299,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) Configurator {
 		disablePreemption:              args.DisablePreemption,
 		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
 		bindTimeoutSeconds:             args.BindTimeoutSeconds,
+		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority),
 	}
 	// Setup volume binder
 	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
@@ -384,19 +404,26 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 	var extenders []algorithm.SchedulerExtender
 	if len(policy.ExtenderConfigs) != 0 {
 		ignoredExtendedResources := sets.NewString()
+		var ignorableExtenders []algorithm.SchedulerExtender
 		for ii := range policy.ExtenderConfigs {
 			klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
 			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
 			if err != nil {
 				return nil, err
 			}
-			extenders = append(extenders, extender)
+			if !extender.IsIgnorable() {
+				extenders = append(extenders, extender)
+			} else {
+				ignorableExtenders = append(ignorableExtenders, extender)
+			}
 			for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
 				if r.IgnoredByScheduler {
 					ignoredExtendedResources.Insert(string(r.Name))
 				}
 			}
 		}
+		// place ignorable extenders to the tail of extenders
+		extenders = append(extenders, ignorableExtenders...)
 		predicates.RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtendedResources)
 	}
 	// Providing HardPodAffinitySymmetricWeight in the policy config is the new and preferred way of providing the value.
@@ -456,6 +483,7 @@ func (c *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		c.alwaysCheckAllPredicates,
 		c.disablePreemption,
 		c.percentageOfNodesToScore,
+		c.enableNonPreempting,
 	)
 
 	return &Config{
@@ -682,7 +710,9 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 				pod, err := client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
-						podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle)
+						if err := podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle); err != nil {
+							klog.Error(err)
+						}
 					}
 					break
 				}

@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -43,31 +43,39 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
+	// PodStartupLatencyThreshold holds the latency threashold for pod startup
 	PodStartupLatencyThreshold = 5 * time.Second
-	MinSaturationThreshold     = 2 * time.Minute
+	// MinSaturationThreshold holds the minimum staturation threashold
+	MinSaturationThreshold = 2 * time.Minute
+	// MinPodsPerSecondThroughput holds the minimum pod/sec throughput
 	MinPodsPerSecondThroughput = 8
-	DensityPollInterval        = 10 * time.Second
-	MinPodStartupMeasurements  = 500
+	// DensityPollInterval holds the desity of polling interval
+	DensityPollInterval = 10 * time.Second
+	// MinPodStartupMeasurements holds the minimum number of measurements related to pod-startup
+	MinPodStartupMeasurements = 500
 )
 
-// Maximum container failures this test tolerates before failing.
+// MaxContainerFailures holds the maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
 
-// Maximum no. of missing measurements related to pod-startup that the test tolerates.
+// MaxMissingPodStartupMeasurements holds the maximum number of missing measurements related to pod-startup that the test tolerates.
 var MaxMissingPodStartupMeasurements = 0
 
 // Number of nodes in the cluster (computed inside BeforeEach).
 var nodeCount = 0
 
+// DensityTestConfig holds the configurations for e2e scalability tests
 type DensityTestConfig struct {
 	Configs      []testutils.RunObjectConfig
 	ClientSets   []clientset.Interface
@@ -145,7 +153,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 	controllerMem = math.MaxUint64
 	schedulerCPU := math.MaxFloat32
 	schedulerMem = math.MaxUint64
-	framework.Logf("Setting resource constraints for provider: %s", framework.TestContext.Provider)
+	e2elog.Logf("Setting resource constraints for provider: %s", framework.TestContext.Provider)
 	if framework.ProviderIs("kubemark") {
 		if numNodes <= 5 {
 			apiserverCPU = 0.35
@@ -249,8 +257,8 @@ func computeAverage(sample []float64) float64 {
 }
 
 func computeQuantile(sample []float64, quantile float64) float64 {
-	Expect(sort.Float64sAreSorted(sample)).To(Equal(true))
-	Expect(quantile >= 0.0 && quantile <= 1.0).To(Equal(true))
+	gomega.Expect(sort.Float64sAreSorted(sample)).To(gomega.Equal(true))
+	gomega.Expect(quantile >= 0.0 && quantile <= 1.0).To(gomega.Equal(true))
 	index := int(quantile*float64(len(sample))) - 1
 	if index < 0 {
 		return math.NaN()
@@ -283,7 +291,7 @@ func logPodStartupStatus(
 		}
 		// Log status of the pods.
 		startupStatus := testutils.ComputeRCStartupStatus(podStore.List(), expectedPods)
-		framework.Logf(startupStatus.String("Density"))
+		e2elog.Logf(startupStatus.String("Density"))
 		// Compute scheduling throughput for the latest time period.
 		throughput := float64(startupStatus.Scheduled-lastScheduledCount) / float64(period/time.Second)
 		*scheduleThroughputs = append(*scheduleThroughputs, throughput)
@@ -294,7 +302,7 @@ func logPodStartupStatus(
 // runDensityTest will perform a density test and return the time it took for
 // all pods to start
 func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer, scheduleThroughputs *[]float64) time.Duration {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 
 	// Create all secrets, configmaps and daemons.
 	dtc.runSecretConfigs(testPhaseDurations.StartPhase(250, "secrets creation"))
@@ -315,7 +323,7 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	for i := range dtc.Configs {
 		config := dtc.Configs[i]
 		go func() {
-			defer GinkgoRecover()
+			defer ginkgo.GinkgoRecover()
 			// Call wg.Done() in defer to avoid blocking whole test
 			// in case of error from RunRC.
 			defer wg.Done()
@@ -328,8 +336,8 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	startupTime := time.Since(startTime)
 	close(logStopCh)
 	close(schedulerProfilingStopCh)
-	framework.Logf("E2E startup time for %d pods: %v", dtc.PodCount, startupTime)
-	framework.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(dtc.PodCount)/float32(startupTime/time.Second))
+	e2elog.Logf("E2E startup time for %d pods: %v", dtc.PodCount, startupTime)
+	e2elog.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(dtc.PodCount)/float32(startupTime/time.Second))
 	replicationCtrlStartupPhase.End()
 
 	// Grabbing scheduler memory profile after cluster saturation finished.
@@ -340,7 +348,7 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	printPodAllocationPhase := testPhaseDurations.StartPhase(400, "printing pod allocation")
 	defer printPodAllocationPhase.End()
 	// Print some data about Pod to Node allocation
-	By("Printing Pod to Node allocation data")
+	ginkgo.By("Printing Pod to Node allocation data")
 	podList, err := dtc.ClientSets[0].CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	pausePodAllocation := make(map[string]int)
@@ -358,24 +366,24 @@ func runDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTi
 	}
 	sort.Strings(nodeNames)
 	for _, node := range nodeNames {
-		framework.Logf("%v: %v pause pods, system pods: %v", node, pausePodAllocation[node], systemPodAllocation[node])
+		e2elog.Logf("%v: %v pause pods, system pods: %v", node, pausePodAllocation[node], systemPodAllocation[node])
 	}
 	defer printPodAllocationPhase.End()
 	return startupTime
 }
 
 func cleanupDensityTest(dtc DensityTestConfig, testPhaseDurations *timer.TestPhaseTimer) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	podCleanupPhase := testPhaseDurations.StartPhase(900, "latency pods deletion")
 	defer podCleanupPhase.End()
-	By("Deleting created Collections")
+	ginkgo.By("Deleting created Collections")
 	numberOfClients := len(dtc.ClientSets)
 	// We explicitly delete all pods to have API calls necessary for deletion accounted in metrics.
 	for i := range dtc.Configs {
 		name := dtc.Configs[i].GetName()
 		namespace := dtc.Configs[i].GetNamespace()
 		kind := dtc.Configs[i].GetKind()
-		By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
+		ginkgo.By(fmt.Sprintf("Cleaning up only the %v, garbage collector will clean up the pods", kind))
 		err := framework.DeleteResourceAndWaitForGC(dtc.ClientSets[i%numberOfClients], kind, namespace, name)
 		framework.ExpectNoError(err)
 	}
@@ -400,7 +408,7 @@ var _ = SIGDescribe("Density", func() {
 	var uuid string
 	var e2eStartupTime time.Duration
 	var totalPods int
-	var nodeCpuCapacity int64
+	var nodeCPUCapacity int64
 	var nodeMemCapacity int64
 	var nodes *v1.NodeList
 	var scheduleThroughputs []float64
@@ -412,7 +420,7 @@ var _ = SIGDescribe("Density", func() {
 	var etcdMetricsCollector *framework.EtcdMetricsCollector
 
 	// Gathers data prior to framework namespace teardown
-	AfterEach(func() {
+	ginkgo.AfterEach(func() {
 		// Stop apiserver CPU profile gatherer and gather memory allocations profile.
 		close(profileGathererStopCh)
 		wg := sync.WaitGroup{}
@@ -424,14 +432,14 @@ var _ = SIGDescribe("Density", func() {
 		if saturationThreshold < MinSaturationThreshold {
 			saturationThreshold = MinSaturationThreshold
 		}
-		Expect(e2eStartupTime).NotTo(BeNumerically(">", saturationThreshold))
+		gomega.Expect(e2eStartupTime).NotTo(gomega.BeNumerically(">", saturationThreshold))
 		saturationData := saturationTime{
 			TimeToSaturate: e2eStartupTime,
 			NumberOfNodes:  nodeCount,
 			NumberOfPods:   totalPods,
 			Throughput:     float32(totalPods) / float32(e2eStartupTime/time.Second),
 		}
-		framework.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
+		e2elog.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
 
 		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
@@ -470,9 +478,9 @@ var _ = SIGDescribe("Density", func() {
 		framework.PrintSummaries(summaries, testCaseBaseName)
 
 		// Fail if there were some high-latency requests.
-		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0), "There should be no high-latency requests")
+		gomega.Expect(highLatencyRequests).NotTo(gomega.BeNumerically(">", 0), "There should be no high-latency requests")
 		// Fail if more than the allowed threshold of measurements were missing in the latencyTest.
-		Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(Equal(true))
+		gomega.Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(gomega.Equal(true))
 	})
 
 	options := framework.Options{
@@ -484,7 +492,7 @@ var _ = SIGDescribe("Density", func() {
 	f := framework.NewFramework(testCaseBaseName, options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
@@ -503,10 +511,10 @@ var _ = SIGDescribe("Density", func() {
 
 		_, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
 		nodeCount = len(nodes.Items)
-		Expect(nodeCount).NotTo(BeZero())
+		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 
 		// Compute node capacity, leaving some slack for addon pods.
-		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
+		nodeCPUCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
 		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value() - 100*1024*1024
 
 		// Terminating a namespace (deleting the remaining objects from it - which
@@ -521,7 +529,7 @@ var _ = SIGDescribe("Density", func() {
 		framework.ExpectNoError(framework.ResetMetrics(c))
 		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
 
-		framework.Logf("Listing nodes for easy debugging:\n")
+		e2elog.Logf("Listing nodes for easy debugging:\n")
 		for _, node := range nodes.Items {
 			var internalIP, externalIP string
 			for _, address := range node.Status.Addresses {
@@ -532,7 +540,7 @@ var _ = SIGDescribe("Density", func() {
 					externalIP = address.Address
 				}
 			}
-			framework.Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
+			e2elog.Logf("Name: %v, clusterIP: %v, externalIP: %v", node.ObjectMeta.Name, internalIP, externalIP)
 		}
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
@@ -609,7 +617,7 @@ var _ = SIGDescribe("Density", func() {
 			name += " with quotas"
 		}
 		itArg := testArg
-		It(name, func() {
+		ginkgo.It(name, func() {
 			nodePrepPhase := testPhaseDurations.StartPhase(100, "node preparation")
 			defer nodePrepPhase.End()
 			nodePreparer := framework.NewE2ETestNodePreparer(
@@ -661,7 +669,7 @@ var _ = SIGDescribe("Density", func() {
 						Client:    clients[i],
 						Name:      secretName,
 						Namespace: nsName,
-						LogFunc:   framework.Logf,
+						LogFunc:   e2elog.Logf,
 					})
 					secretNames = append(secretNames, secretName)
 				}
@@ -673,7 +681,7 @@ var _ = SIGDescribe("Density", func() {
 						Client:    clients[i],
 						Name:      configMapName,
 						Namespace: nsName,
-						LogFunc:   framework.Logf,
+						LogFunc:   e2elog.Logf,
 					})
 					configMapNames = append(configMapNames, configMapName)
 				}
@@ -689,11 +697,11 @@ var _ = SIGDescribe("Density", func() {
 					Timeout:                        timeout,
 					PodStatusFile:                  fileHndl,
 					Replicas:                       (totalPods + numberOfCollections - 1) / numberOfCollections,
-					CpuRequest:                     nodeCpuCapacity / 100,
+					CpuRequest:                     nodeCPUCapacity / 100,
 					MemRequest:                     nodeMemCapacity / 100,
 					MaxContainerFailures:           &MaxContainerFailures,
 					Silent:                         true,
-					LogFunc:                        framework.Logf,
+					LogFunc:                        e2elog.Logf,
 					SecretNames:                    secretNames,
 					ConfigMapNames:                 configMapNames,
 					ServiceAccountTokenProjections: itArg.svcacctTokenProjectionsPerPod,
@@ -721,7 +729,7 @@ var _ = SIGDescribe("Density", func() {
 				case batch.Kind("Job"):
 					configs[i] = &testutils.JobConfig{RCConfig: *baseConfig}
 				default:
-					framework.Failf("Unsupported kind: %v", itArg.kind)
+					e2elog.Failf("Unsupported kind: %v", itArg.kind)
 				}
 			}
 
@@ -745,7 +753,7 @@ var _ = SIGDescribe("Density", func() {
 						Client:    f.ClientSet,
 						Name:      fmt.Sprintf("density-daemon-%v", i),
 						Namespace: f.Namespace.Name,
-						LogFunc:   framework.Logf,
+						LogFunc:   e2elog.Logf,
 					})
 			}
 			e2eStartupTime = runDensityTest(dConfig, testPhaseDurations, &scheduleThroughputs)
@@ -755,7 +763,7 @@ var _ = SIGDescribe("Density", func() {
 				// Pick latencyPodsIterations so that:
 				// latencyPodsIterations * nodeCount >= MinPodStartupMeasurements.
 				latencyPodsIterations := (MinPodStartupMeasurements + nodeCount - 1) / nodeCount
-				By(fmt.Sprintf("Scheduling additional %d Pods to measure startup latencies", latencyPodsIterations*nodeCount))
+				ginkgo.By(fmt.Sprintf("Scheduling additional %d Pods to measure startup latencies", latencyPodsIterations*nodeCount))
 
 				createTimes := make(map[string]metav1.Time, 0)
 				nodeNames := make(map[string]string, 0)
@@ -767,7 +775,7 @@ var _ = SIGDescribe("Density", func() {
 				checkPod := func(p *v1.Pod) {
 					mutex.Lock()
 					defer mutex.Unlock()
-					defer GinkgoRecover()
+					defer ginkgo.GinkgoRecover()
 
 					if p.Status.Phase == v1.PodRunning {
 						if _, found := watchTimes[p.Name]; !found {
@@ -785,7 +793,7 @@ var _ = SIGDescribe("Density", func() {
 							if startTime != metav1.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
-								framework.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
+								e2elog.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
 							}
 						}
 					}
@@ -815,17 +823,17 @@ var _ = SIGDescribe("Density", func() {
 							AddFunc: func(obj interface{}) {
 								p, ok := obj.(*v1.Pod)
 								if !ok {
-									framework.Logf("Failed to cast observed object to *v1.Pod.")
+									e2elog.Logf("Failed to cast observed object to *v1.Pod.")
 								}
-								Expect(ok).To(Equal(true))
+								gomega.Expect(ok).To(gomega.Equal(true))
 								go checkPod(p)
 							},
 							UpdateFunc: func(oldObj, newObj interface{}) {
 								p, ok := newObj.(*v1.Pod)
 								if !ok {
-									framework.Logf("Failed to cast observed object to *v1.Pod.")
+									e2elog.Logf("Failed to cast observed object to *v1.Pod.")
 								}
-								Expect(ok).To(Equal(true))
+								gomega.Expect(ok).To(gomega.Equal(true))
 								go checkPod(p)
 							},
 						},
@@ -836,7 +844,7 @@ var _ = SIGDescribe("Density", func() {
 				}
 				for latencyPodsIteration := 0; latencyPodsIteration < latencyPodsIterations; latencyPodsIteration++ {
 					podIndexOffset := latencyPodsIteration * nodeCount
-					framework.Logf("Creating %d latency pods in range [%d, %d]", nodeCount, podIndexOffset+1, podIndexOffset+nodeCount)
+					e2elog.Logf("Creating %d latency pods in range [%d, %d]", nodeCount, podIndexOffset+1, podIndexOffset+nodeCount)
 
 					watchTimesLen := len(watchTimes)
 
@@ -849,7 +857,7 @@ var _ = SIGDescribe("Density", func() {
 					// Thanks to it we trigger increasing priority function by scheduling
 					// a pod to a node, which in turn will result in spreading latency pods
 					// more evenly between nodes.
-					cpuRequest := *resource.NewMilliQuantity(nodeCpuCapacity/5, resource.DecimalSI)
+					cpuRequest := *resource.NewMilliQuantity(nodeCPUCapacity/5, resource.DecimalSI)
 					memRequest := *resource.NewQuantity(nodeMemCapacity/5, resource.DecimalSI)
 					if podsPerNode > 30 {
 						// This is to make them schedulable on high-density tests
@@ -870,11 +878,11 @@ var _ = SIGDescribe("Density", func() {
 
 					latencyMeasurementPhase := testPhaseDurations.StartPhase(801+latencyPodsIteration*10, "pod startup latencies measurement")
 					defer latencyMeasurementPhase.End()
-					By("Waiting for all Pods begin observed by the watch...")
+					ginkgo.By("Waiting for all Pods begin observed by the watch...")
 					waitTimeout := 10 * time.Minute
 					for start := time.Now(); len(watchTimes) < watchTimesLen+nodeCount; time.Sleep(10 * time.Second) {
 						if time.Since(start) < waitTimeout {
-							framework.Failf("Timeout reached waiting for all Pods being observed by the watch.")
+							e2elog.Failf("Timeout reached waiting for all Pods being observed by the watch.")
 						}
 					}
 
@@ -886,17 +894,17 @@ var _ = SIGDescribe("Density", func() {
 						}
 						for node, count := range nodeToLatencyPods {
 							if count > 1 {
-								framework.Logf("%d latency pods scheduled on %s", count, node)
+								e2elog.Logf("%d latency pods scheduled on %s", count, node)
 							}
 						}
 					}
 					latencyMeasurementPhase.End()
 
-					By("Removing additional replication controllers")
+					ginkgo.By("Removing additional replication controllers")
 					podDeletionPhase := testPhaseDurations.StartPhase(802+latencyPodsIteration*10, "latency pods deletion")
 					defer podDeletionPhase.End()
 					deleteRC := func(i int) {
-						defer GinkgoRecover()
+						defer ginkgo.GinkgoRecover()
 						name := additionalPodsPrefix + "-" + strconv.Itoa(podIndexOffset+i+1)
 						framework.ExpectNoError(framework.DeleteRCAndWaitForGC(c, rcNameToNsMap[name], name))
 					}
@@ -934,22 +942,22 @@ var _ = SIGDescribe("Density", func() {
 				for name, create := range createTimes {
 					sched, ok := scheduleTimes[name]
 					if !ok {
-						framework.Logf("Failed to find schedule time for %v", name)
+						e2elog.Logf("Failed to find schedule time for %v", name)
 						missingMeasurements++
 					}
 					run, ok := runTimes[name]
 					if !ok {
-						framework.Logf("Failed to find run time for %v", name)
+						e2elog.Logf("Failed to find run time for %v", name)
 						missingMeasurements++
 					}
 					watch, ok := watchTimes[name]
 					if !ok {
-						framework.Logf("Failed to find watch time for %v", name)
+						e2elog.Logf("Failed to find watch time for %v", name)
 						missingMeasurements++
 					}
 					node, ok := nodeNames[name]
 					if !ok {
-						framework.Logf("Failed to find node for %v", name)
+						e2elog.Logf("Failed to find node for %v", name)
 						missingMeasurements++
 					}
 
@@ -997,7 +1005,7 @@ var _ = SIGDescribe("Density", func() {
 })
 
 func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns, image, podType string, cpuRequest, memRequest resource.Quantity) {
-	defer GinkgoRecover()
+	defer ginkgo.GinkgoRecover()
 	defer wg.Done()
 	labels := map[string]string{
 		"type": podType,
@@ -1034,6 +1042,6 @@ func createRunningPodFromRC(wg *sync.WaitGroup, c clientset.Interface, name, ns,
 		},
 	}
 	framework.ExpectNoError(testutils.CreateRCWithRetries(c, ns, rc))
-	framework.ExpectNoError(framework.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
-	framework.Logf("Found pod '%s' running", name)
+	framework.ExpectNoError(e2epod.WaitForControlledPodsRunning(c, ns, name, api.Kind("ReplicationController")))
+	e2elog.Logf("Found pod '%s' running", name)
 }

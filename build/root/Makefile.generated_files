@@ -69,7 +69,7 @@ $(META_DIR)/$(GO_PKGDEPS_FILE): FORCE
 	    --prune  k8s.io/kubernetes/staging            \
 	    --prune  k8s.io/kubernetes/vendor             \
 	    k8s.io/kubernetes/vendor/k8s.io/...           \
-	    github.com/jteeuwen/go-bindata/go-bindata/... \
+	    github.com/go-bindata/go-bindata/go-bindata/... \
 	    > $@.tmp
 	if ! cmp -s $@.tmp $@; then                       \
 	    if [[ "$(DBG_CODEGEN)" == 1 ]]; then          \
@@ -522,6 +522,6 @@ gen_bindata: $(BINDATA_GEN) FORCE
 # have to be rebuilt.  In that case, make will forever see the dependency as
 # newer than the binary, and try to rebuild it over and over.  So we touch it,
 # and make is happy.
-$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/jteeuwen/go-bindata/go-bindata)
-	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/jteeuwen/go-bindata/go-bindata
+$(BINDATA_GEN): $(k8s.io/kubernetes/vendor/github.com/go-bindata/go-bindata/go-bindata)
+	KUBE_BUILD_PLATFORMS="" hack/make-rules/build.sh ./vendor/github.com/go-bindata/go-bindata/go-bindata
 	touch $@

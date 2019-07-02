@@ -26,6 +26,7 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
@@ -142,7 +143,7 @@ func checkIfNvidiaGPUsExistOnNode() bool {
 	// Cannot use `lspci` because it is not installed on all distros by default.
 	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
 	if err != nil {
-		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
+		e2elog.Logf("check for nvidia GPUs failed. Got Error: %v", err)
 		return false
 	}
 	return true
@@ -163,14 +164,14 @@ func logDevicePluginMetrics() {
 					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
 						continue
 					}
-					framework.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
+					e2elog.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
 				}
 			}
 		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginRegistrationCountKey:
 			for _, sample := range samples {
 				resource := string(sample.Metric["resource_name"])
 				count := sample.Value
-				framework.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
+				e2elog.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
 			}
 		}
 	}

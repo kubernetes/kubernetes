@@ -137,8 +137,8 @@ readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 # NOTE: All functions that return lists should use newlines.
 # bash functions can't return arrays, and spaces are tricky, so newline
 # separators are the preferred pattern.
-# To transform a string of newline-separated items to an array, use mapfile -t:
-# mapfile -t FOO <<< "$(kube::golang::dups a b c a)"
+# To transform a string of newline-separated items to an array, use kube::util::read-array:
+# kube::util::read-array FOO < <(kube::golang::dups a b c a)
 #
 # ALWAYS remember to quote your subshells. Not doing so will break in
 # bash 4.3, and potentially cause other issues.
@@ -163,6 +163,10 @@ kube::golang::dedup() {
 # to readonly.
 # The configured vars will only contain platforms allowed by the
 # KUBE_SUPPORTED* vars at the top of this file.
+declare -a KUBE_SERVER_PLATFORMS
+declare -a KUBE_CLIENT_PLATFORMS
+declare -a KUBE_NODE_PLATFORMS
+declare -a KUBE_TEST_PLATFORMS
 kube::golang::setup_platforms() {
   if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
     # KUBE_BUILD_PLATFORMS needs to be read into an array before the next
@@ -172,50 +176,56 @@ kube::golang::setup_platforms() {
 
     # Deduplicate to ensure the intersection trick with kube::golang::dups
     # is not defeated by duplicates in user input.
-    mapfile -t platforms <<< "$(kube::golang::dedup "${platforms[@]}")"
+    kube::util::read-array platforms < <(kube::golang::dedup "${platforms[@]}")
 
     # Use kube::golang::dups to restrict the builds to the platforms in
     # KUBE_SUPPORTED_*_PLATFORMS. Items should only appear at most once in each
     # set, so if they appear twice after the merge they are in the intersection.
-    mapfile -t KUBE_SERVER_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_SERVER_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_SERVER_PLATFORMS
 
-    mapfile -t KUBE_NODE_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_NODE_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_NODE_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_NODE_PLATFORMS
 
-    mapfile -t KUBE_TEST_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_TEST_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_TEST_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_TEST_PLATFORMS
 
-    mapfile -t KUBE_CLIENT_PLATFORMS <<< "$(kube::golang::dups \
+    kube::util::read-array KUBE_CLIENT_PLATFORMS < <(kube::golang::dups \
         "${platforms[@]}" \
         "${KUBE_SUPPORTED_CLIENT_PLATFORMS[@]}" \
-      )"
+      )
     readonly KUBE_CLIENT_PLATFORMS
 
   elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
-    readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
-    readonly KUBE_NODE_PLATFORMS=(linux/amd64)
+    KUBE_SERVER_PLATFORMS=(linux/amd64)
+    readonly KUBE_SERVER_PLATFORMS
+    KUBE_NODE_PLATFORMS=(linux/amd64)
+    readonly KUBE_NODE_PLATFORMS
     if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
-      readonly KUBE_TEST_PLATFORMS=(
+      KUBE_TEST_PLATFORMS=(
         darwin/amd64
         linux/amd64
       )
-      readonly KUBE_CLIENT_PLATFORMS=(
+      readonly KUBE_TEST_PLATFORMS
+      KUBE_CLIENT_PLATFORMS=(
         darwin/amd64
         linux/amd64
       )
+      readonly KUBE_CLIENT_PLATFORMS
     else
-      readonly KUBE_TEST_PLATFORMS=(linux/amd64)
-      readonly KUBE_CLIENT_PLATFORMS=(linux/amd64)
+      KUBE_TEST_PLATFORMS=(linux/amd64)
+      readonly KUBE_TEST_PLATFORMS
+      KUBE_CLIENT_PLATFORMS=(linux/amd64)
+      readonly KUBE_CLIENT_PLATFORMS
     fi
   else
     KUBE_SERVER_PLATFORMS=("${KUBE_SUPPORTED_SERVER_PLATFORMS[@]}")
@@ -292,7 +302,7 @@ kube::golang::server_test_targets() {
 IFS=" " read -ra KUBE_TEST_SERVER_TARGETS <<< "$(kube::golang::server_test_targets)"
 readonly KUBE_TEST_SERVER_TARGETS
 readonly KUBE_TEST_SERVER_BINARIES=("${KUBE_TEST_SERVER_TARGETS[@]##*/}")
-readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
+readonly KUBE_TEST_SERVER_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]:+"${KUBE_SERVER_PLATFORMS[@]}"}")
 
 # Gigabytes necessary for parallel platform builds.
 # As of January 2018, RAM usage is exceeding 30G

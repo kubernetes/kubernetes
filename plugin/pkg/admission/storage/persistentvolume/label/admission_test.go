@@ -23,11 +23,12 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -754,9 +755,9 @@ func Test_PVLAdmission(t *testing.T) {
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
 			setPVLabeler(testcase.handler, testcase.pvlabeler)
-			handler := admission.NewChainHandler(testcase.handler)
+			handler := admissiontesting.WithReinvocationTesting(t, admission.NewChainHandler(testcase.handler))
 
-			err := handler.Admit(admission.NewAttributesRecord(testcase.preAdmissionPV, nil, api.Kind("PersistentVolume").WithVersion("version"), testcase.preAdmissionPV.Namespace, testcase.preAdmissionPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, false, nil), nil)
+			err := handler.Admit(admission.NewAttributesRecord(testcase.preAdmissionPV, nil, api.Kind("PersistentVolume").WithVersion("version"), testcase.preAdmissionPV.Namespace, testcase.preAdmissionPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 			if !reflect.DeepEqual(err, testcase.err) {
 				t.Logf("expected error: %q", testcase.err)
 				t.Logf("actual error: %q", err)

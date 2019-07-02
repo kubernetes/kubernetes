@@ -31,7 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -43,11 +43,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -794,7 +795,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 }
 
 func TestUpdateNodeStatusWithLease(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
@@ -1027,7 +1028,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithoutNodeLease(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, false)()
 
 	cases := []struct {
 		desc                  string
@@ -1134,7 +1135,7 @@ func TestUpdateNodeStatusAndVolumesInUseWithoutNodeLease(t *testing.T) {
 }
 
 func TestUpdateNodeStatusAndVolumesInUseWithNodeLease(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeLease, true)()
 
 	cases := []struct {
 		desc                  string
@@ -1736,17 +1737,21 @@ func TestUpdateDefaultLabels(t *testing.T) {
 func TestReconcileExtendedResource(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	testKubelet.kubelet.kubeClient = nil // ensure only the heartbeat client is used
+	testKubelet.kubelet.containerManager = cm.NewStubContainerManagerWithExtendedResource(true /* shouldResetExtendedResourceCapacity*/)
+	testKubeletNoReset := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	extendedResourceName1 := v1.ResourceName("test.com/resource1")
 	extendedResourceName2 := v1.ResourceName("test.com/resource2")
 
 	cases := []struct {
 		name         string
+		testKubelet  *TestKubelet
 		existingNode *v1.Node
 		expectedNode *v1.Node
 		needsUpdate  bool
 	}{
 		{
-			name: "no update needed without extended resource",
+			name:        "no update needed without extended resource",
+			testKubelet: testKubelet,
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -1778,7 +1783,41 @@ func TestReconcileExtendedResource(t *testing.T) {
 			needsUpdate: false,
 		},
 		{
-			name: "extended resource capacity is zeroed",
+			name:        "extended resource capacity is not zeroed due to presence of checkpoint file",
+			testKubelet: testKubelet,
+			existingNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			expectedNode: &v1.Node{
+				Status: v1.NodeStatus{
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
+						v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+						v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
+					},
+				},
+			},
+			needsUpdate: false,
+		},
+		{
+			name:        "extended resource capacity is zeroed",
+			testKubelet: testKubeletNoReset,
 			existingNode: &v1.Node{
 				Status: v1.NodeStatus{
 					Capacity: v1.ResourceList{
@@ -1949,7 +1988,7 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	// Make node to be unschedulable.
 	kubelet.registerSchedulable = false
 
-	forEachFeatureGate(t, []utilfeature.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
+	forEachFeatureGate(t, []featuregate.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
 		// Reset kubelet status for each test.
 		kubelet.registrationCompleted = false
 

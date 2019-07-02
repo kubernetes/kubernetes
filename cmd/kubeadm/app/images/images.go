@@ -30,7 +30,7 @@ func GetGenericImage(prefix, image, tag string) string {
 }
 
 // GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
-// including the control-plane components ad kube-proxy. If specified, the HyperKube image will be used.
+// including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
 func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.UseHyperKubeImage {
 		image = constants.HyperKube

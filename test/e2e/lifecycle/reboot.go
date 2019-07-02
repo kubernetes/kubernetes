@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -30,10 +30,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -55,7 +58,7 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 
 	ginkgo.BeforeEach(func() {
 		// These tests requires SSH to nodes, so the provider check should be identical to there
-		// (the limiting factor is the implementation of util.go's framework.GetSigner(...)).
+		// (the limiting factor is the implementation of util.go's e2essh.GetSigner(...)).
 
 		// Cluster must support node reboot
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
@@ -68,10 +71,10 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 			namespaceName := metav1.NamespaceSystem
 			ginkgo.By(fmt.Sprintf("Collecting events from namespace %q.", namespaceName))
 			events, err := f.ClientSet.CoreV1().Events(namespaceName).List(metav1.ListOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			framework.ExpectNoError(err)
 
 			for _, e := range events.Items {
-				framework.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
+				e2elog.Logf("event for %v: %v %v: %v", e.InvolvedObject.Name, e.Source, e.Reason, e.Message)
 			}
 		}
 		// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -135,7 +138,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	nodelist := framework.GetReadySchedulableNodesOrDie(c)
 	if hook != nil {
 		defer func() {
-			framework.Logf("Executing termination hook on nodes")
+			e2elog.Logf("Executing termination hook on nodes")
 			hook(framework.TestContext.Provider, nodelist)
 		}()
 	}
@@ -162,10 +165,10 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 		for ix := range nodelist.Items {
 			n := nodelist.Items[ix]
 			if !result[ix] {
-				framework.Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
+				e2elog.Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
 			}
 		}
-		framework.Failf("Test failed; at least one node failed to reboot in the time given.")
+		e2elog.Failf("Test failed; at least one node failed to reboot in the time given.")
 	}
 }
 
@@ -176,9 +179,9 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 			prefix = "Retrieving log for the last terminated container"
 		}
 		if err != nil {
-			framework.Logf("%s %s, err: %v:\n%s\n", prefix, id, err, log)
+			e2elog.Logf("%s %s, err: %v:\n%s\n", prefix, id, err, log)
 		} else {
-			framework.Logf("%s %s:\n%s\n", prefix, id, log)
+			e2elog.Logf("%s %s:\n%s\n", prefix, id, log)
 		}
 	}
 	podNameSet := sets.NewString(podNames...)
@@ -192,11 +195,11 @@ func printStatusAndLogsForNotReadyPods(c clientset.Interface, ns string, podName
 		if ok, _ := testutils.PodRunningReady(p); ok {
 			continue
 		}
-		framework.Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
+		e2elog.Logf("Status for not ready pod %s/%s: %+v", p.Namespace, p.Name, p.Status)
 		// Print the log of the containers if pod is not running and ready.
 		for _, container := range p.Status.ContainerStatuses {
 			cIdentifer := fmt.Sprintf("%s/%s/%s", p.Namespace, p.Name, container.Name)
-			log, err := framework.GetPodLogs(c, p.Namespace, p.Name, container.Name)
+			log, err := e2epod.GetPodLogs(c, p.Namespace, p.Name, container.Name)
 			printFn(cIdentifer, log, err, false)
 			// Get log from the previous container.
 			if container.RestartCount > 0 {
@@ -221,21 +224,21 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 	ns := metav1.NamespaceSystem
 	ps, err := testutils.NewPodStore(c, ns, labels.Everything(), fields.OneTermEqualSelector(api.PodHostField, name))
 	if err != nil {
-		framework.Logf("Couldn't initialize pod store: %v", err)
+		e2elog.Logf("Couldn't initialize pod store: %v", err)
 		return false
 	}
 	defer ps.Stop()
 
 	// Get the node initially.
-	framework.Logf("Getting %s", name)
+	e2elog.Logf("Getting %s", name)
 	node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 	if err != nil {
-		framework.Logf("Couldn't get node %s", name)
+		e2elog.Logf("Couldn't get node %s", name)
 		return false
 	}
 
 	// Node sanity check: ensure it is "ready".
-	if !framework.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
+	if !e2enode.WaitForNodeToBeReady(c, name, framework.NodeReadyInitialTimeout) {
 		return false
 	}
 
@@ -255,40 +258,40 @@ func rebootNode(c clientset.Interface, provider, name, rebootCmd string) bool {
 			podNames = append(podNames, p.ObjectMeta.Name)
 		}
 	}
-	framework.Logf("Node %s has %d assigned pods with no liveness probes: %v", name, len(podNames), podNames)
+	e2elog.Logf("Node %s has %d assigned pods with no liveness probes: %v", name, len(podNames), podNames)
 
 	// For each pod, we do a sanity check to ensure it's running / healthy
 	// or succeeded now, as that's what we'll be checking later.
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, framework.PodReadyBeforeTimeout) {
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, pods)
 		return false
 	}
 
 	// Reboot the node.
-	if err = framework.IssueSSHCommand(rebootCmd, provider, node); err != nil {
-		framework.Logf("Error while issuing ssh command: %v", err)
+	if err = e2essh.IssueSSHCommand(rebootCmd, provider, node); err != nil {
+		e2elog.Logf("Error while issuing ssh command: %v", err)
 		return false
 	}
 
 	// Wait for some kind of "not ready" status.
-	if !framework.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
+	if !e2enode.WaitForNodeToBeNotReady(c, name, rebootNodeNotReadyTimeout) {
 		return false
 	}
 
 	// Wait for some kind of "ready" status.
-	if !framework.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
+	if !e2enode.WaitForNodeToBeReady(c, name, rebootNodeReadyAgainTimeout) {
 		return false
 	}
 
 	// Ensure all of the pods that we found on this node before the reboot are
 	// running / healthy, or succeeded.
-	if !framework.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
+	if !e2epod.CheckPodsRunningReadyOrSucceeded(c, ns, podNames, rebootPodReadyAgainTimeout) {
 		newPods := ps.List()
 		printStatusAndLogsForNotReadyPods(c, ns, podNames, newPods)
 		return false
 	}
 
-	framework.Logf("Reboot successful on node %s", name)
+	e2elog.Logf("Reboot successful on node %s", name)
 	return true
 }
 
@@ -298,8 +301,8 @@ func catLogHook(logPath string) terminationHook {
 	return func(provider string, nodes *v1.NodeList) {
 		for _, n := range nodes.Items {
 			cmd := fmt.Sprintf("cat %v && rm %v", logPath, logPath)
-			if _, err := framework.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
-				framework.Logf("Error while issuing ssh command: %v", err)
+			if _, err := e2essh.IssueSSHCommandWithResult(cmd, provider, &n); err != nil {
+				e2elog.Logf("Error while issuing ssh command: %v", err)
 			}
 		}
 

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/typed"
 	"sigs.k8s.io/structured-merge-diff/value"
@@ -93,7 +94,7 @@ func (c *typeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, err
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	t := c.parser.Type(gvk)
 	if t == nil {
-		return nil, fmt.Errorf("no corresponding type for %v", gvk)
+		return nil, newNoCorrespondingTypeError(gvk)
 	}
 	return t.FromUnstructured(u)
 }
@@ -108,7 +109,7 @@ func (c *typeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
 	gvk := unstructured.GetObjectKind().GroupVersionKind()
 	t := c.parser.Type(gvk)
 	if t == nil {
-		return nil, fmt.Errorf("no corresponding type for %v", gvk)
+		return nil, newNoCorrespondingTypeError(gvk)
 	}
 	return t.FromYAML(typed.YAMLObject(string(from)))
 }
@@ -124,4 +125,24 @@ func valueToObject(value *value.Value) (runtime.Object, error) {
 		return nil, fmt.Errorf("failed to convert typed to unstructured: want map, got %T", vu)
 	}
 	return &unstructured.Unstructured{Object: u}, nil
+}
+
+type noCorrespondingTypeErr struct {
+	gvk schema.GroupVersionKind
+}
+
+func newNoCorrespondingTypeError(gvk schema.GroupVersionKind) error {
+	return &noCorrespondingTypeErr{gvk: gvk}
+}
+
+func (k *noCorrespondingTypeErr) Error() string {
+	return fmt.Sprintf("no corresponding type for %v", k.gvk)
+}
+
+func isNoCorrespondingTypeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	_, ok := err.(*noCorrespondingTypeErr)
+	return ok
 }

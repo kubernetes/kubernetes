@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -61,14 +62,14 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 				defer wg.Done()
 				defer ginkgo.GinkgoRecover()
 				wave := fmt.Sprintf("wave%v", strconv.Itoa(i))
-				framework.Logf("Starting logging soak, wave = %v", wave)
+				e2elog.Logf("Starting logging soak, wave = %v", wave)
 				RunLogPodsWithSleepOf(f, kbRateInSeconds, wave, totalLogTime)
-				framework.Logf("Completed logging soak, wave %v", i)
+				e2elog.Logf("Completed logging soak, wave %v", i)
 			}()
 			// Niceness.
 			time.Sleep(loggingSoak.TimeBetweenWaves)
 		}
-		framework.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
+		e2elog.Logf("Waiting on all %v logging soak waves to complete", loggingSoak.Scale)
 		wg.Wait()
 	})
 })
@@ -122,8 +123,8 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	pods, err := logSoakVerification.WaitFor(totalPods, timeout+largeClusterForgiveness)
 
 	if err != nil {
-		framework.Failf("Error in wait... %v", err)
+		e2elog.Failf("Error in wait... %v", err)
 	} else if len(pods) < totalPods {
-		framework.Failf("Only got %v out of %v", len(pods), totalPods)
+		e2elog.Failf("Only got %v out of %v", len(pods), totalPods)
 	}
 }

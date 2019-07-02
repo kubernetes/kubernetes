@@ -241,7 +241,7 @@ func TestMakeMounts(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			fm := &mount.FakeMounter{}
+			fhu := &mount.FakeHostUtil{}
 			fsp := &subpath.FakeSubpath{}
 			pod := v1.Pod{
 				Spec: v1.PodSpec{
@@ -249,7 +249,7 @@ func TestMakeMounts(t *testing.T) {
 				},
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fm, fsp, nil)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes, fhu, fsp, nil)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {

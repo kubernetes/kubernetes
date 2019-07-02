@@ -79,22 +79,30 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-beta-73-11647-64-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-73-11647-163-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
+
+# KUBELET_TEST_ARGS are extra arguments passed to kubelet.
+KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
 CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-}
 LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-}
+if [[ "${CONTAINER_RUNTIME}" == "containerd" ]]; then
+  CONTAINER_RUNTIME_NAME=${KUBE_CONTAINER_RUNTIME_NAME:-containerd}
+  CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-unix:///run/containerd/containerd.sock}
+  LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-ctr -n=k8s.io images import}
+  KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS} --runtime-cgroups=/system.slice/containerd.service"
+fi
+
 # MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
 MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 # MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
 NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
-# KUBELET_TEST_ARGS are extra arguments passed to kubelet.
-KUBELET_TEST_ARGS=${KUBE_KUBELET_EXTRA_ARGS:-}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
 # Enable network deletion by default (for kube-down), unless we're using 'default' network.
@@ -212,8 +220,6 @@ METADATA_CONCEALMENT_NO_FIREWALL="${METADATA_CONCEALMENT_NO_FIREWALL:-false}" # 
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
   # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},cloud.google.com/metadata-proxy-ready=true"
-  # TODO(liggitt): remove this in v1.16
-  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
   # Add to the provider custom variables.
   PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT METADATA_CONCEALMENT_NO_FIREWALL"
 fi
@@ -254,6 +260,7 @@ CLUSTER_DNS_CORE_DNS="${CLUSTER_DNS_CORE_DNS:-true}"
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
 DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
 DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
+DNS_MEMORY_LIMIT="${KUBE_DNS_MEMORY_LIMIT:-170Mi}"
 
 # Optional: Enable DNS horizontal autoscaler
 ENABLE_DNS_HORIZONTAL_AUTOSCALER="${KUBE_ENABLE_DNS_HORIZONTAL_AUTOSCALER:-true}"
@@ -276,6 +283,7 @@ NODE_PROBLEM_DETECTOR_TAR_HASH="${NODE_PROBLEM_DETECTOR_TAR_HASH:-}"
 NODE_PROBLEM_DETECTOR_RELEASE_PATH="${NODE_PROBLEM_DETECTOR_RELEASE_PATH:-}"
 NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
 
+CNI_STORAGE_PATH="${CNI_STORAGE_PATH:-https://storage.googleapis.com/kubernetes-release/network-plugins}"
 CNI_VERSION="${CNI_VERSION:-}"
 CNI_SHA1="${CNI_SHA1:-}"
 
@@ -443,12 +451,6 @@ KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 
 # Optional: duration of cluster signed certificates.
 CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-}"
-
-# Optional: enable pod priority
-ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
-if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
-fi
 
 # Optional: enable certificate rotation of the kubelet certificates.
 ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"

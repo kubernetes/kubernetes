@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -31,6 +31,8 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
@@ -38,7 +40,7 @@ import (
 )
 
 // makePodToVerifyHugePages returns a pod that verifies specified cgroup with hugetlb
-func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity) *apiv1.Pod {
+func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity) *v1.Pod {
 	// convert the cgroup name to its literal form
 	cgroupFsName := ""
 	cgroupName := cm.NewCgroupName(cm.RootCgroupName, defaultNodeAllocatableCgroup, baseName)
@@ -50,19 +52,19 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.limit_in_bytes
 	command := fmt.Sprintf("expected=%v; actual=$(cat /tmp/hugetlb/%v/hugetlb.2MB.limit_in_bytes); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), cgroupFsName)
-	framework.Logf("Pod to run command: %v", command)
-	pod := &apiv1.Pod{
+	e2elog.Logf("Pod to run command: %v", command)
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
 		},
-		Spec: apiv1.PodSpec{
-			RestartPolicy: apiv1.RestartPolicyNever,
-			Containers: []apiv1.Container{
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers: []v1.Container{
 				{
 					Image:   busyboxImage,
 					Name:    "container" + string(uuid.NewUUID()),
 					Command: []string{"sh", "-c", command},
-					VolumeMounts: []apiv1.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "sysfscgroup",
 							MountPath: "/tmp",
@@ -70,11 +72,11 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 					},
 				},
 			},
-			Volumes: []apiv1.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name: "sysfscgroup",
-					VolumeSource: apiv1.VolumeSource{
-						HostPath: &apiv1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
 					},
 				},
 			},
@@ -119,7 +121,7 @@ func configureHugePages() error {
 	if err != nil {
 		return err
 	}
-	framework.Logf("HugePages_Total is set to %v", numHugePages)
+	e2elog.Logf("HugePages_Total is set to %v", numHugePages)
 	if numHugePages == 50 {
 		return nil
 	}
@@ -145,13 +147,13 @@ func pollResourceAsString(f *framework.Framework, resourceName string) string {
 	node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	amount := amountOfResourceAsString(node, resourceName)
-	framework.Logf("amount of %v: %v", resourceName, amount)
+	e2elog.Logf("amount of %v: %v", resourceName, amount)
 	return amount
 }
 
 // amountOfResourceAsString returns the amount of resourceName advertised by a node
-func amountOfResourceAsString(node *apiv1.Node, resourceName string) string {
-	val, ok := node.Status.Capacity[apiv1.ResourceName(resourceName)]
+func amountOfResourceAsString(node *v1.Node, resourceName string) string {
+	val, ok := node.Status.Capacity[v1.ResourceName(resourceName)]
 	if !ok {
 		return ""
 	}
@@ -161,21 +163,21 @@ func amountOfResourceAsString(node *apiv1.Node, resourceName string) string {
 func runHugePagesTests(f *framework.Framework) {
 	It("should assign hugepages as expected based on the Pod spec", func() {
 		By("by running a G pod that requests hugepages")
-		pod := f.PodClient().Create(&apiv1.Pod{
+		pod := f.PodClient().Create(&v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod" + string(uuid.NewUUID()),
 				Namespace: f.Namespace.Name,
 			},
-			Spec: apiv1.PodSpec{
-				Containers: []apiv1.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Image: imageutils.GetPauseImageName(),
 						Name:  "container" + string(uuid.NewUUID()),
-						Resources: apiv1.ResourceRequirements{
-							Limits: apiv1.ResourceList{
-								apiv1.ResourceName("cpu"):           resource.MustParse("10m"),
-								apiv1.ResourceName("memory"):        resource.MustParse("100Mi"),
-								apiv1.ResourceName("hugepages-2Mi"): resource.MustParse("50Mi"),
+						Resources: v1.ResourceRequirements{
+							Limits: v1.ResourceList{
+								v1.ResourceName("cpu"):           resource.MustParse("10m"),
+								v1.ResourceName("memory"):        resource.MustParse("100Mi"),
+								v1.ResourceName("hugepages-2Mi"): resource.MustParse("50Mi"),
 							},
 						},
 					},
@@ -186,8 +188,8 @@ func runHugePagesTests(f *framework.Framework) {
 		By("checking if the expected hugetlb settings were applied")
 		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
 		f.PodClient().Create(verifyPod)
-		err := framework.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
-		Expect(err).NotTo(HaveOccurred())
+		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
+		framework.ExpectNoError(err)
 	})
 }
 

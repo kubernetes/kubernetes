@@ -81,6 +81,21 @@ type ListMeta struct {
 	// identical to the value in the first response, unless you have received this token from an error
 	// message.
 	Continue string `json:"continue,omitempty" protobuf:"bytes,3,opt,name=continue"`
+
+	// remainingItemCount is the number of subsequent items in the list which are not included in this
+	// list response. If the list request contained label or field selectors, then the number of
+	// remaining items is unknown and the field will be left unset and omitted during serialization.
+	// If the list is complete (either because it is not chunking or because this is the last chunk),
+	// then there are no more remaining items and this field will be left unset and omitted during
+	// serialization.
+	// Servers older than v1.15 do not set this field.
+	// The intended use of the remainingItemCount is *estimating* the size of a collection. Clients
+	// should not rely on the remainingItemCount to be set or to be exact.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
+	// +optional
+	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
 }
 
 // These are internal finalizer values for Kubernetes-like APIs, must be qualified name unless defined here
@@ -226,19 +241,6 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
-	// An initializer is a controller which enforces some system invariant at object creation time.
-	// This field is a list of initializers that have not yet acted on this object. If nil or empty,
-	// this object has been completely initialized. Otherwise, the object is considered uninitialized
-	// and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to
-	// observe uninitialized objects.
-	//
-	// When an object is created, the system will populate this list with the current set of initializers.
-	// Only privileged users may set or modify this list. Once it is empty, it may not be modified further
-	// by any user.
-	//
-	// DEPRECATED - initializers are an alpha field and will be removed in v1.15.
-	Initializers *Initializers `json:"initializers,omitempty" protobuf:"bytes,16,opt,name=initializers"`
-
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
@@ -265,26 +267,6 @@ type ObjectMeta struct {
 	//
 	// +optional
 	ManagedFields []ManagedFieldsEntry `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
-}
-
-// Initializers tracks the progress of initialization.
-type Initializers struct {
-	// Pending is a list of initializers that must execute in order before this object is visible.
-	// When the last pending initializer is removed, and no failing result is set, the initializers
-	// struct will be set to nil and the object is considered as initialized and visible to all
-	// clients.
-	// +patchMergeKey=name
-	// +patchStrategy=merge
-	Pending []Initializer `json:"pending" protobuf:"bytes,1,rep,name=pending" patchStrategy:"merge" patchMergeKey:"name"`
-	// If result is set with the Failure field, the object will be persisted to storage and then deleted,
-	// ensuring that other clients can observe the deletion.
-	Result *Status `json:"result,omitempty" protobuf:"bytes,2,opt,name=result"`
-}
-
-// Initializer is information about an initializer that has not yet completed.
-type Initializer struct {
-	// name of the process that is responsible for initializing this object.
-	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 const (
@@ -1150,8 +1132,8 @@ type Fields struct {
 
 // Table is a tabular representation of a set of API resources. The server transforms the
 // object into a set of preferred columns for quickly reviewing the objects.
-// +protobuf=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +protobuf=false
 type Table struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
@@ -1301,5 +1283,5 @@ type PartialObjectMetadataList struct {
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// items contains each of the included items.
-	Items []*PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
+	Items []PartialObjectMetadata `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

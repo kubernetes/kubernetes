@@ -383,6 +383,12 @@ items:
     verbs:
     - update
   - apiGroups:
+    - '*'
+    resources:
+    - '*/scale'
+    verbs:
+    - get
+  - apiGroups:
     - ""
     resources:
     - events
@@ -789,6 +795,14 @@ items:
     - ""
     resources:
     - endpoints
+    verbs:
+    - create
+    - delete
+    - get
+    - update
+  - apiGroups:
+    - ""
+    resources:
     - services
     verbs:
     - create
@@ -1117,6 +1131,7 @@ items:
     resources:
     - services/status
     verbs:
+    - patch
     - update
   - apiGroups:
     - ""

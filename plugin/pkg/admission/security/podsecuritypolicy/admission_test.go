@@ -24,21 +24,25 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
+	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -49,7 +53,7 @@ import (
 const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.
-func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *PodSecurityPolicyPlugin {
+func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authorizer) *Plugin {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	store := informerFactory.Policy().V1beta1().PodSecurityPolicies().Informer().GetStore()
 	for _, psp := range psps {
@@ -59,7 +63,7 @@ func NewTestAdmission(psps []*policy.PodSecurityPolicy, authz authorizer.Authori
 	if authz == nil {
 		authz = &TestAuthorizer{}
 	}
-	return &PodSecurityPolicyPlugin{
+	return &Plugin{
 		Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		authz:           authz,
@@ -473,7 +477,7 @@ func TestAdmitPreferNonmutating(t *testing.T) {
 func TestFailClosedOnInvalidPod(t *testing.T) {
 	plugin := NewTestAdmission(nil, nil)
 	pod := &v1.Pod{}
-	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{})
+	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{})
 
 	err := plugin.Admit(attrs, nil)
 	if err == nil {
@@ -624,6 +628,8 @@ func TestAdmitCaps(t *testing.T) {
 }
 
 func TestAdmitVolumes(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+
 	val := reflect.ValueOf(kapi.VolumeSource{})
 
 	for i := 0; i < val.NumField(); i++ {
@@ -1776,10 +1782,10 @@ func testPSPAdmitAdvanced(testCaseName string, op kadmission.Operation, psps []*
 	originalPod := pod.DeepCopy()
 	plugin := NewTestAdmission(psps, authz)
 
-	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, false, userInfo)
+	attrs := kadmission.NewAttributesRecord(pod, oldPod, kapi.Kind("Pod").WithVersion("version"), pod.Namespace, "", kapi.Resource("pods").WithVersion("version"), "", op, nil, false, userInfo)
 	annotations := make(map[string]string)
 	attrs = &fakeAttributes{attrs, annotations}
-	err := plugin.Admit(attrs, nil)
+	err := admissiontesting.WithReinvocationTesting(t, plugin).Admit(attrs, nil)
 
 	if shouldPassAdmit && err != nil {
 		t.Errorf("%s: expected no errors on Admit but received %v", testCaseName, err)
@@ -1957,7 +1963,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 	}
 
 	for k, v := range testCases {
-		admit := &PodSecurityPolicyPlugin{
+		admit := &Plugin{
 			Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 			strategyFactory: kpsp.NewSimpleStrategyFactory(),
 		}
@@ -2240,7 +2246,7 @@ func TestPolicyAuthorizationErrors(t *testing.T) {
 			pod.Spec.SecurityContext.HostPID = true
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, false, &user.DefaultInfo{Name: userName})
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), ns, "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &metav1.CreateOptions{}, false, &user.DefaultInfo{Name: userName})
 
 			allowedPod, _, validationErrs, err := plugin.computeSecurityContext(attrs, pod, true, "")
 			assert.Nil(t, allowedPod)
@@ -2333,7 +2339,7 @@ func TestPreferValidatedPSP(t *testing.T) {
 			pod.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation = &allowPrivilegeEscalation
 
 			plugin := NewTestAdmission(tc.inPolicies, authz)
-			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, false, &user.DefaultInfo{Name: "test"})
+			attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "ns", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Update, &metav1.UpdateOptions{}, false, &user.DefaultInfo{Name: "test"})
 
 			_, pspName, validationErrs, err := plugin.computeSecurityContext(attrs, pod, false, tc.validatedPSPHint)
 			assert.NoError(t, err)

@@ -65,6 +65,7 @@ ENABLE_CLUSTER_DNS=${KUBE_ENABLE_CLUSTER_DNS:-true}
 ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
 DNS_SERVER_IP=${KUBE_DNS_SERVER_IP:-10.0.0.10}
 LOCAL_DNS_IP=${KUBE_LOCAL_DNS_IP:-169.254.20.10}
+DNS_MEMORY_LIMIT=${KUBE_DNS_MEMORY_LIMIT:-170Mi}
 DNS_DOMAIN=${KUBE_DNS_NAME:-"cluster.local"}
 KUBECTL=${KUBECTL:-"${KUBE_ROOT}/cluster/kubectl.sh"}
 WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-60}
@@ -80,8 +81,6 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-"etcd3"}
 STORAGE_MEDIA_TYPE=${STORAGE_MEDIA_TYPE:-""}
 # preserve etcd data. you also need to set ETCD_DIR.
 PRESERVE_ETCD="${PRESERVE_ETCD:-false}"
-# enable Pod priority and preemption
-ENABLE_POD_PRIORITY_PREEMPTION=${ENABLE_POD_PRIORITY_PREEMPTION:-""}
 
 # enable kubernetes dashboard
 ENABLE_CLUSTER_DASHBOARD=${KUBE_ENABLE_CLUSTER_DASHBOARD:-false}
@@ -105,7 +104,7 @@ export KUBE_PANIC_WATCH_DECODE_ERROR
 
 # Default list of admission Controllers to invoke prior to persisting objects in cluster
 # The order defined here does not matter.
-ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
+ENABLE_ADMISSION_PLUGINS=${ENABLE_ADMISSION_PLUGINS:-"NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,Priority,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,ResourceQuota"}
 DISABLE_ADMISSION_PLUGINS=${DISABLE_ADMISSION_PLUGINS:-""}
 ADMISSION_CONTROL_CONFIG_FILE=${ADMISSION_CONTROL_CONFIG_FILE:-""}
 
@@ -128,11 +127,6 @@ if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
         echo "Cloud config ${CLOUD_CONFIG} doesn't exist"
         exit 1
     fi
-fi
-
-# set feature gates if enable Pod priority and preemption
-if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
 fi
 
 # warn if users are running with swap allowed
@@ -250,7 +244,7 @@ if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
   # default cgroup driver to match what is reported by docker to simplify local development
   if [[ -z ${CGROUP_DRIVER} ]]; then
     # match driver with docker runtime reported value (they must match)
-    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" | cut -f3- -d' ')
+    CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
   if [[ -f /var/log/docker.log && ! -f "${LOG_DIR}/docker.log" ]]; then
@@ -348,23 +342,23 @@ cleanup()
   # fi
 
   # Check if the API server is still running
-  [[ -n "${APISERVER_PID-}" ]] && mapfile -t APISERVER_PIDS < <(pgrep -P "${APISERVER_PID}" ; ps -o pid= -p "${APISERVER_PID}")
+  [[ -n "${APISERVER_PID-}" ]] && kube::util::read-array APISERVER_PIDS < <(pgrep -P "${APISERVER_PID}" ; ps -o pid= -p "${APISERVER_PID}")
   [[ -n "${APISERVER_PIDS-}" ]] && sudo kill "${APISERVER_PIDS[@]}" 2>/dev/null
 
   # Check if the controller-manager is still running
-  [[ -n "${CTLRMGR_PID-}" ]] && mapfile -t CTLRMGR_PIDS < <(pgrep -P "${CTLRMGR_PID}" ; ps -o pid= -p "${CTLRMGR_PID}")
+  [[ -n "${CTLRMGR_PID-}" ]] && kube::util::read-array CTLRMGR_PIDS < <(pgrep -P "${CTLRMGR_PID}" ; ps -o pid= -p "${CTLRMGR_PID}")
   [[ -n "${CTLRMGR_PIDS-}" ]] && sudo kill "${CTLRMGR_PIDS[@]}" 2>/dev/null
 
   # Check if the kubelet is still running
-  [[ -n "${KUBELET_PID-}" ]] && mapfile -t KUBELET_PIDS < <(pgrep -P "${KUBELET_PID}" ; ps -o pid= -p "${KUBELET_PID}")
+  [[ -n "${KUBELET_PID-}" ]] && kube::util::read-array KUBELET_PIDS < <(pgrep -P "${KUBELET_PID}" ; ps -o pid= -p "${KUBELET_PID}")
   [[ -n "${KUBELET_PIDS-}" ]] && sudo kill "${KUBELET_PIDS[@]}" 2>/dev/null
 
   # Check if the proxy is still running
-  [[ -n "${PROXY_PID-}" ]] && mapfile -t PROXY_PIDS < <(pgrep -P "${PROXY_PID}" ; ps -o pid= -p "${PROXY_PID}")
+  [[ -n "${PROXY_PID-}" ]] && kube::util::read-array PROXY_PIDS < <(pgrep -P "${PROXY_PID}" ; ps -o pid= -p "${PROXY_PID}")
   [[ -n "${PROXY_PIDS-}" ]] && sudo kill "${PROXY_PIDS[@]}" 2>/dev/null
 
   # Check if the scheduler is still running
-  [[ -n "${SCHEDULER_PID-}" ]] && mapfile -t SCHEDULER_PIDS < <(pgrep -P "${SCHEDULER_PID}" ; ps -o pid= -p "${SCHEDULER_PID}")
+  [[ -n "${SCHEDULER_PID-}" ]] && kube::util::read-array SCHEDULER_PIDS < <(pgrep -P "${SCHEDULER_PID}" ; ps -o pid= -p "${SCHEDULER_PID}")
   [[ -n "${SCHEDULER_PIDS-}" ]] && sudo kill "${SCHEDULER_PIDS[@]}" 2>/dev/null
 
   # Check if the etcd is still running
@@ -492,13 +486,6 @@ function start_apiserver {
     if [[ -n "${NODE_ADMISSION}" ]]; then
       security_admission=",NodeRestriction"
     fi
-    if [ "${ENABLE_POD_PRIORITY_PREEMPTION}" == true ]; then
-      security_admission=",Priority"
-      if [[ -n "${RUNTIME_CONFIG}" ]]; then
-          RUNTIME_CONFIG+=","
-      fi
-      RUNTIME_CONFIG+="scheduling.k8s.io/v1alpha1=true"
-    fi
 
     # Append security_admission plugin
     ENABLE_ADMISSION_PLUGINS="${ENABLE_ADMISSION_PLUGINS}${security_admission}"
@@ -553,7 +540,8 @@ EOF
     fi
 
     APISERVER_LOG=${LOG_DIR}/kube-apiserver.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" apiserver "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
+    # shellcheck disable=SC2086
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-apiserver "${authorizer_arg}" "${priv_arg}" ${runtime_config} \
       ${cloud_config_arg} \
       "${advertise_address}" \
       "${node_port_range}" \
@@ -631,7 +619,7 @@ function start_controller_manager {
     fi
 
     CTLRMGR_LOG=${LOG_DIR}/kube-controller-manager.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" controller-manager \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-controller-manager \
       --v="${LOG_LEVEL}" \
       --vmodule="${LOG_SPEC}" \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -685,11 +673,6 @@ function start_cloud_controller_manager {
 function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
-
-    priv_arg=""
-    if [[ -n "${ALLOW_PRIVILEGED}" ]]; then
-      priv_arg="--allow-privileged=${ALLOW_PRIVILEGED}"
-    fi
 
     cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
@@ -751,7 +734,6 @@ function start_kubelet {
 
     # shellcheck disable=SC2206
     all_kubelet_flags=(
-      ${priv_arg:+"$priv_arg"}
       "--v=${LOG_LEVEL}"
       "--vmodule=${LOG_SPEC}"
       "--chaos-chance=${CHAOS_CHANCE}"
@@ -825,7 +807,7 @@ EOF
     fi
 
     # shellcheck disable=SC2024
-    sudo "${GO_OUT}/hyperkube" proxy \
+    sudo "${GO_OUT}/hyperkube" kube-proxy \
       --v="${LOG_LEVEL}" \
       --config=/tmp/kube-proxy.yaml \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${PROXY_LOG}" 2>&1 &
@@ -835,7 +817,7 @@ EOF
 function start_kubescheduler {
 
     SCHEDULER_LOG=${LOG_DIR}/kube-scheduler.log
-    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" scheduler \
+    ${CONTROLPLANE_SUDO} "${GO_OUT}/hyperkube" kube-scheduler \
       --v="${LOG_LEVEL}" \
       --leader-elect=false \
       --kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
@@ -849,6 +831,7 @@ function start_kubedns {
         cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
         ${SED} -i -e "s/{{ pillar\['dns_domain'\] }}/${DNS_DOMAIN}/g" kube-dns.yaml
         ${SED} -i -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" kube-dns.yaml
+        ${SED} -i -e "s/{{ pillar\['dns_memory_limit'\] }}/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
         # TODO update to dns role once we have one.
         # use kubectl to create kubedns addon
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml
@@ -859,9 +842,9 @@ function start_kubedns {
 
 function start_nodelocaldns {
   cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
-  sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
-  sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
-  sed -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
+  ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
+  ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
+  ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
   # use kubectl to create nodelocaldns addon
   ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
   echo "NodeLocalDNS addon successfully deployed."

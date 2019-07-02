@@ -25,18 +25,16 @@ import (
 	"testing"
 
 	autoscaling "k8s.io/api/autoscaling/v1"
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
-	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	"k8s.io/client-go/dynamic"
+
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 )
 
 var labelSelectorPath = ".status.labelSelector"
@@ -148,7 +146,6 @@ func NewNoxuSubresourceInstance(namespace, name, version string) *unstructured.U
 }
 
 func TestStatusSubresource(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -261,7 +258,6 @@ func TestStatusSubresource(t *testing.T) {
 }
 
 func TestScaleSubresource(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	groupResource := schema.GroupResource{
 		Group:    "mygroup.example.com",
 		Resource: "noxus",
@@ -407,7 +403,6 @@ func TestScaleSubresource(t *testing.T) {
 }
 
 func TestValidationSchemaWithStatus(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -455,7 +450,6 @@ func TestValidationSchemaWithStatus(t *testing.T) {
 }
 
 func TestValidateOnlyStatus(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -534,7 +528,7 @@ func TestValidateOnlyStatus(t *testing.T) {
 			}
 			createdNoxuInstance, err = noxuResourceClient.UpdateStatus(createdNoxuInstance, metav1.UpdateOptions{})
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 
 			// update with .status.num = 15, expecting an error
@@ -562,7 +556,6 @@ func TestValidateOnlyStatus(t *testing.T) {
 }
 
 func TestSubresourcesDiscovery(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, config, _, err := fixtures.StartDefaultServer(t)
 	if err != nil {
 		t.Fatal(err)
@@ -654,7 +647,6 @@ func TestSubresourcesDiscovery(t *testing.T) {
 }
 
 func TestGeneration(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	tearDown, apiExtensionClient, dynamicClient, err := fixtures.StartDefaultServerWithClients(t)
 	if err != nil {
 		t.Fatal(err)
@@ -728,7 +720,6 @@ func TestGeneration(t *testing.T) {
 }
 
 func TestSubresourcePatch(t *testing.T) {
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiextensionsfeatures.CustomResourceWebhookConversion, true)()
 	groupResource := schema.GroupResource{
 		Group:    "mygroup.example.com",
 		Resource: "noxus",

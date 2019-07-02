@@ -24,13 +24,14 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 	"sigs.k8s.io/yaml"
 )
 
+// ViewLastAppliedOptions defines options for the `apply view-last-applied` command.`
 type ViewLastAppliedOptions struct {
 	FilenameOptions              resource.FilenameOptions
 	Selector                     string
@@ -57,6 +58,7 @@ var (
 		kubectl apply view-last-applied -f deploy.yaml -o json`))
 )
 
+// NewViewLastAppliedOptions takes option arguments from a CLI stream and returns it at ViewLastAppliedOptions type.
 func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastAppliedOptions {
 	return &ViewLastAppliedOptions{
 		OutputFormat: "yaml",
@@ -65,6 +67,7 @@ func NewViewLastAppliedOptions(ioStreams genericclioptions.IOStreams) *ViewLastA
 	}
 }
 
+// NewCmdApplyViewLastApplied creates the cobra CLI `apply` subcommand `view-last-applied`.`
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	options := NewViewLastAppliedOptions(ioStreams)
 
@@ -90,6 +93,7 @@ func NewCmdApplyViewLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	return cmd
 }
 
+// Complete checks an object for last-applied-configuration annotations.
 func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string) error {
 	cmdNamespace, enforceNamespace, err := f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -134,10 +138,12 @@ func (o *ViewLastAppliedOptions) Complete(cmd *cobra.Command, f cmdutil.Factory,
 	return nil
 }
 
+// Validate checks ViewLastAppliedOptions for validity.
 func (o *ViewLastAppliedOptions) Validate(cmd *cobra.Command) error {
 	return nil
 }
 
+// RunApplyViewLastApplied executes the `view-last-applied` command according to ViewLastAppliedOptions.
 func (o *ViewLastAppliedOptions) RunApplyViewLastApplied(cmd *cobra.Command) error {
 	for _, str := range o.LastAppliedConfigurationList {
 		switch o.OutputFormat {

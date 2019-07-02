@@ -190,6 +190,7 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error getting SSH client to %s@%s: '%v'", user, host, err)
 	}
+	defer client.Close()
 	session, err := client.NewSession()
 	if err != nil {
 		return "", "", 0, fmt.Errorf("error creating session to %s@%s: '%v'", user, host, err)

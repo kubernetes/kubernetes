@@ -151,6 +151,7 @@ func NewVolumeManager(
 	volumePluginMgr *volume.VolumePluginMgr,
 	kubeContainerRuntime container.Runtime,
 	mounter mount.Interface,
+	hostutil mount.HostUtils,
 	kubeletPodsDir string,
 	recorder record.EventRecorder,
 	checkNodeCapabilitiesBeforeMount bool,
@@ -190,6 +191,7 @@ func NewVolumeManager(
 		vm.desiredStateOfWorldPopulator.HasAddedPods,
 		vm.operationExecutor,
 		mounter,
+		hostutil,
 		volumePluginMgr,
 		kubeletPodsDir)
 

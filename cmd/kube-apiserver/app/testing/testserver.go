@@ -25,10 +25,13 @@ import (
 	"runtime"
 	"time"
 
-	pflag "github.com/spf13/pflag"
+	"github.com/spf13/pflag"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -43,6 +46,8 @@ type TearDownFunc func()
 type TestServerInstanceOptions struct {
 	// DisableStorageCleanup Disable the automatic storage cleanup
 	DisableStorageCleanup bool
+	// Injected health
+	InjectedHealthzChecker healthz.HealthzChecker
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -142,6 +147,12 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)
 	t.Logf("Starting kube-apiserver on port %d...", s.SecureServing.BindPort)
 	server, err := app.CreateServerChain(completedOptions, stopCh)
+
+	if instanceOptions.InjectedHealthzChecker != nil {
+		t.Logf("Adding health check with delay %v %v", s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker.Name())
+		server.AddDelayedHealthzChecks(s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker)
+	}
+
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
 	}
@@ -158,6 +169,8 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err != nil {
 		return result, fmt.Errorf("failed to create a client: %v", err)
 	}
+
+	// wait until healthz endpoint returns ok
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		select {
 		case err := <-errCh:
@@ -177,8 +190,30 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 		return result, fmt.Errorf("failed to wait for /healthz to return ok: %v", err)
 	}
 
+	// wait until default namespace is created
+	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		select {
+		case err := <-errCh:
+			return false, err
+		default:
+		}
+
+		if _, err := client.CoreV1().Namespaces().Get("default", metav1.GetOptions{}); err != nil {
+			if !errors.IsNotFound(err) {
+				t.Logf("Unable to get default namespace: %v", err)
+			}
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return result, fmt.Errorf("failed to wait for default namespace to be created: %v", err)
+	}
+
 	// from here the caller must call tearDown
 	result.ClientConfig = server.LoopbackClientConfig
+	result.ClientConfig.QPS = 1000
+	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
 	result.TearDownFn = tearDown
 

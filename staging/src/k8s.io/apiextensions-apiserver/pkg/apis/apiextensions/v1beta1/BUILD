@@ -55,11 +55,15 @@ go_test(
     name = "go_default_test",
     srcs = [
         "conversion_test.go",
+        "defaults_test.go",
         "marshal_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

@@ -77,12 +77,12 @@ func (v *sioVolume) CanMount() error {
 	return nil
 }
 
-func (v *sioVolume) SetUp(fsGroup *int64) error {
-	return v.SetUpAt(v.GetPath(), fsGroup)
+func (v *sioVolume) SetUp(mounterArgs volume.MounterArgs) error {
+	return v.SetUpAt(v.GetPath(), mounterArgs)
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (v *sioVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
@@ -154,9 +154,9 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	if !v.readOnly && fsGroup != nil {
+	if !v.readOnly && mounterArgs.FsGroup != nil {
 		klog.V(4).Info(log("applying  value FSGroup ownership"))
-		volume.SetVolumeOwnership(v, fsGroup)
+		volume.SetVolumeOwnership(v, mounterArgs.FsGroup)
 	}
 
 	klog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
@@ -201,7 +201,12 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	klog.V(4).Info(log("dir %s unmounted successfully", dir))
 
 	// detach/unmap
-	deviceBusy, err := mounter.DeviceOpened(dev)
+	kvh, ok := v.plugin.host.(volume.KubeletVolumeHost)
+	if !ok {
+		return fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
+	}
+	hu := kvh.GetHostUtil()
+	deviceBusy, err := hu.DeviceOpened(dev)
 	if err != nil {
 		klog.Error(log("teardown unable to get status for device %s: %v", dev, err))
 		return err

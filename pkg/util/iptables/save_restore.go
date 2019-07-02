@@ -61,7 +61,11 @@ func GetChainLines(table Table, save []byte) map[Chain][]byte {
 		} else if line[0] == ':' && len(line) > 1 {
 			// We assume that the <line> contains space - chain lines have 3 fields,
 			// space delimited. If there is no space, this line will panic.
-			chain := Chain(line[1:bytes.Index(line, spaceBytes)])
+			spaceIndex := bytes.Index(line, spaceBytes)
+			if spaceIndex == -1 {
+				panic(fmt.Sprintf("Unexpected chain line in iptables-save output: %v", string(line)))
+			}
+			chain := Chain(line[1:spaceIndex])
 			chainsMap[chain] = line
 		}
 	}

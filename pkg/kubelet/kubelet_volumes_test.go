@@ -439,11 +439,11 @@ func (f *stubVolume) CanMount() error {
 	return nil
 }
 
-func (f *stubVolume) SetUp(fsGroup *int64) error {
+func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	return nil
 }
 
-func (f *stubVolume) SetUpAt(dir string, fsGroup *int64) error {
+func (f *stubVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	return nil
 }
 

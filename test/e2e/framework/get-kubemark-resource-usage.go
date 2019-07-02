@@ -20,6 +20,9 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 // KubemarkResourceUsage is a struct for tracking the resource usage of kubemark.
@@ -30,7 +33,7 @@ type KubemarkResourceUsage struct {
 }
 
 func getMasterUsageByPrefix(prefix string) (string, error) {
-	sshResult, err := SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), GetMasterHost()+":22", TestContext.Provider)
+	sshResult, err := e2essh.SSH(fmt.Sprintf("ps ax -o %%cpu,rss,command | tail -n +2 | grep %v | sed 's/\\s+/ /g'", prefix), GetMasterHost()+":22", TestContext.Provider)
 	if err != nil {
 		return "", err
 	}
@@ -44,7 +47,7 @@ func GetKubemarkMasterComponentsResourceUsage() map[string]*KubemarkResourceUsag
 	// Get kubernetes component resource usage
 	sshResult, err := getMasterUsageByPrefix("kube")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
+		e2elog.Logf("Error when trying to SSH to master machine. Skipping probe. %v", err)
 		return nil
 	}
 	scanner := bufio.NewScanner(strings.NewReader(sshResult))
@@ -62,7 +65,7 @@ func GetKubemarkMasterComponentsResourceUsage() map[string]*KubemarkResourceUsag
 	// Get etcd resource usage
 	sshResult, err = getMasterUsageByPrefix("bin/etcd")
 	if err != nil {
-		Logf("Error when trying to SSH to master machine. Skipping probe")
+		e2elog.Logf("Error when trying to SSH to master machine. Skipping probe")
 		return nil
 	}
 	scanner = bufio.NewScanner(strings.NewReader(sshResult))

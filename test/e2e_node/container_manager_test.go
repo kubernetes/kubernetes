@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -154,16 +155,16 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					if CurrentGinkgoTestDescription().Failed {
 						By("Dump all running containers")
 						runtime, _, err := getCRIClient()
-						Expect(err).NotTo(HaveOccurred())
+						framework.ExpectNoError(err)
 						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},
 						})
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("Running containers:")
+						framework.ExpectNoError(err)
+						e2elog.Logf("Running containers:")
 						for _, c := range containers {
-							framework.Logf("%+v", c)
+							e2elog.Logf("%+v", c)
 						}
 					}
 				})

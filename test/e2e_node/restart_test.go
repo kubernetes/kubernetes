@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"fmt"
 	"os/exec"
@@ -40,7 +41,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		podList, err := f.PodClient().List(metav1.ListOptions{})
 		if err != nil {
-			framework.Logf("Failed to list pods on node: %v", err)
+			e2elog.Logf("Failed to list pods on node: %v", err)
 			continue
 		}
 
@@ -51,7 +52,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 			}
 			runningPods = append(runningPods, &pod)
 		}
-		framework.Logf("Running pod count %d", len(runningPods))
+		e2elog.Logf("Running pod count %d", len(runningPods))
 		if len(runningPods) >= pod_count {
 			break
 		}
@@ -90,7 +91,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 				// startTimeout fit on the node and the node is now saturated.
 				runningPods := waitForPods(f, podCount, startTimeout)
 				if len(runningPods) < minPods {
-					framework.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
+					e2elog.Failf("Failed to start %d pods, cannot test that restarting container runtime doesn't leak IPs", minPods)
 				}
 
 				for i := 0; i < restartCount; i += 1 {
@@ -113,7 +114,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 						return nil
 					}, 1*time.Minute, 2*time.Second).Should(BeNil())
 					if stdout, err := exec.Command("sudo", "kill", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
-						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
+						e2elog.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
 					// Assume that container runtime will be restarted by systemd/supervisord etc.
 					time.Sleep(20 * time.Second)
@@ -122,12 +123,12 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 				By("Checking currently Running/Ready pods")
 				postRestartRunningPods := waitForPods(f, len(runningPods), recoverTimeout)
 				if len(postRestartRunningPods) == 0 {
-					framework.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
+					e2elog.Failf("Failed to start *any* pods after container runtime restart, this might indicate an IP leak")
 				}
 				By("Confirm no containers have terminated")
 				for _, pod := range postRestartRunningPods {
 					if c := testutils.TerminatedContainers(pod); len(c) != 0 {
-						framework.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
+						e2elog.Failf("Pod %q has failed containers %+v after container runtime restart, this might indicate an IP leak", pod.Name, c)
 					}
 				}
 				By(fmt.Sprintf("Container runtime restart test passed with %d pods", len(postRestartRunningPods)))

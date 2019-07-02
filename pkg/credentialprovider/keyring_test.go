@@ -470,7 +470,7 @@ func (d *testProvider) LazyProvide(image string) *DockerConfigEntry {
 
 // Provide implements dockerConfigProvider
 func (d *testProvider) Provide(image string) DockerConfig {
-	d.Count += 1
+	d.Count++
 	return DockerConfig{}
 }
 

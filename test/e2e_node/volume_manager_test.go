@@ -23,11 +23,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
@@ -71,8 +71,8 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 							},
 						},
 					})
-					err := framework.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
-					Expect(err).NotTo(HaveOccurred())
+					err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, memoryBackedPod.Name, f.Namespace.Name)
+					framework.ExpectNoError(err)
 				})
 				By("Verifying the memory backed volume was removed from node", func() {
 					volumePath := fmt.Sprintf("/tmp/%s/volumes/kubernetes.io~empty-dir/%s", string(memoryBackedPod.UID), volumeName)
@@ -112,7 +112,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 								},
 							},
 						})
-						err = framework.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
+						err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, f.Namespace.Name)
 						gp := int64(1)
 						f.PodClient().Delete(pod.Name, &metav1.DeleteOptions{GracePeriodSeconds: &gp})
 						if err == nil {
@@ -120,7 +120,7 @@ var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
 						}
 						<-time.After(10 * time.Second)
 					}
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 				})
 			})
 		})

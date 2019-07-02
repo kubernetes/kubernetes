@@ -54,6 +54,8 @@ type csiAttacher struct {
 // volume.Attacher methods
 var _ volume.Attacher = &csiAttacher{}
 
+var _ volume.Detacher = &csiAttacher{}
+
 var _ volume.DeviceMounter = &csiAttacher{}
 
 func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string, error) {
@@ -69,8 +71,26 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 	}
 
 	node := string(nodeName)
-	pvName := spec.PersistentVolume.GetName()
 	attachID := getAttachmentName(pvSrc.VolumeHandle, pvSrc.Driver, node)
+
+	var vaSrc storage.VolumeAttachmentSource
+	if spec.InlineVolumeSpecForCSIMigration {
+		// inline PV scenario - use PV spec to populate VA source.
+		// The volume spec will be populated by CSI translation API
+		// for inline volumes. This allows fields required by the CSI
+		// attacher such as AccessMode and MountOptions (in addition to
+		// fields in the CSI persistent volume source) to be populated
+		// as part of CSI translation for inline volumes.
+		vaSrc = storage.VolumeAttachmentSource{
+			InlineVolumeSpec: &spec.PersistentVolume.Spec,
+		}
+	} else {
+		// regular PV scenario - use PV name to populate VA source
+		pvName := spec.PersistentVolume.GetName()
+		vaSrc = storage.VolumeAttachmentSource{
+			PersistentVolumeName: &pvName,
+		}
+	}
 
 	attachment := &storage.VolumeAttachment{
 		ObjectMeta: meta.ObjectMeta{
@@ -79,9 +99,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		Spec: storage.VolumeAttachmentSpec{
 			NodeName: node,
 			Attacher: pvSrc.Driver,
-			Source: storage.VolumeAttachmentSource{
-				PersistentVolumeName: &pvName,
-			},
+			Source:   vaSrc,
 		},
 	}
 
@@ -151,9 +169,13 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 	if err != nil {
 		return "", fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
-
+	var watcherClosed bool
 	ch := watcher.ResultChan()
-	defer watcher.Stop()
+	defer func() {
+		if !watcherClosed {
+			watcher.Stop()
+		}
+	}()
 
 	for {
 		select {
@@ -179,8 +201,11 @@ func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID str
 				return "", errors.New("volume attachment has been deleted")
 
 			case watch.Error:
+				// close the watcher to avoid keeping the watcher too log
+				watcher.Stop()
+				watcherClosed = true
 				// start another cycle
-				c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
+				return c.waitForVolumeAttachmentInternal(volumeHandle, attachID, timer, timeout)
 			}
 
 		case <-timer.C:
@@ -308,7 +333,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	if err = saveVolumeData(dataDir, volDataFileName, data); err != nil {
 		klog.Error(log("failed to save volume info data: %v", err))
-		if cleanerr := os.RemoveAll(dataDir); err != nil {
+		if cleanerr := os.RemoveAll(dataDir); cleanerr != nil {
 			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, cleanerr))
 		}
 		return err

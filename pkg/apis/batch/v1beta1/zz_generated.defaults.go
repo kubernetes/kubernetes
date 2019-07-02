@@ -131,9 +131,6 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Containers {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Containers[i]
@@ -176,10 +173,8 @@ func SetObjectDefaults_CronJob(in *v1beta1.CronJob) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
+	v1.SetDefaults_ResourceList(&in.Spec.JobTemplate.Spec.Template.Spec.Overhead)
 }
 
 func SetObjectDefaults_CronJobList(in *v1beta1.CronJobList) {
@@ -283,9 +278,6 @@ func SetObjectDefaults_JobTemplate(in *v1beta1.JobTemplate) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
 	for i := range in.Template.Spec.Template.Spec.Containers {
 		a := &in.Template.Spec.Template.Spec.Containers[i]
@@ -328,8 +320,6 @@ func SetObjectDefaults_JobTemplate(in *v1beta1.JobTemplate) {
 				}
 			}
 		}
-		if a.SecurityContext != nil {
-			v1.SetDefaults_SecurityContext(a.SecurityContext)
-		}
 	}
+	v1.SetDefaults_ResourceList(&in.Template.Spec.Template.Spec.Overhead)
 }

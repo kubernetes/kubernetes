@@ -26,6 +26,8 @@ import (
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -47,6 +49,14 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring job reaches completions")
 		err = jobutil.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods for job exist")
+		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		gomega.Expect(len(pods.Items)).To(gomega.Equal(int(completions)), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
+		for _, pod := range pods.Items {
+			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
+		}
 	})
 
 	// Pods sometimes fail, but eventually succeed.
@@ -120,7 +130,7 @@ var _ = SIGDescribe("Job", func() {
 
 		ginkgo.By("Ensuring job was deleted")
 		_, err = jobutil.GetJob(f.ClientSet, f.Namespace.Name, job.Name)
-		gomega.Expect(err).To(gomega.HaveOccurred(), "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
+		framework.ExpectError(err, "failed to ensure job %s was deleted in namespace: %s", job.Name, f.Namespace.Name)
 		gomega.Expect(errors.IsNotFound(err)).To(gomega.BeTrue())
 	})
 
@@ -148,7 +158,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		ginkgo.By("Checking that the Job readopts the Pod")
-		gomega.Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", jobutil.JobTimeout,
+		gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "adopted", jobutil.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
 				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef == nil {
@@ -167,7 +177,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		ginkgo.By("Checking that the Job releases the Pod")
-		gomega.Expect(framework.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", jobutil.JobTimeout,
+		gomega.Expect(e2epod.WaitForPodCondition(f.ClientSet, pod.Namespace, pod.Name, "released", jobutil.JobTimeout,
 			func(pod *v1.Pod) (bool, error) {
 				controllerRef := metav1.GetControllerOf(pod)
 				if controllerRef != nil {
@@ -197,7 +207,7 @@ var _ = SIGDescribe("Job", func() {
 		// updates we need to allow more than backoff+1
 		// TODO revert this back to above when https://github.com/kubernetes/kubernetes/issues/64787 gets fixed
 		if len(pods.Items) < backoff+1 {
-			framework.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
+			e2elog.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
 		}
 		for _, pod := range pods.Items {
 			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodFailed))

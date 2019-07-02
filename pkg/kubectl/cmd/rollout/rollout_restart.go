@@ -25,12 +25,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
+	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/kubectl/util/templates"
 )
 
 // RestartOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -54,11 +54,14 @@ var (
 	restartLong = templates.LongDesc(`
 		Restart a resource.
 
-	        A deployment with the "RolloutStrategy" will be rolling restarted.`)
+	        Resource will be rollout restarted.`)
 
 	restartExample = templates.Examples(`
 		# Restart a deployment
-		kubectl rollout restart deployment/nginx`)
+		kubectl rollout restart deployment/nginx
+
+		# Restart a daemonset
+		kubectl rollout restart daemonset/abc`)
 )
 
 // NewRolloutRestartOptions returns an initialized RestartOptions instance
@@ -73,7 +76,7 @@ func NewRolloutRestartOptions(streams genericclioptions.IOStreams) *RestartOptio
 func NewCmdRolloutRestart(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	o := NewRolloutRestartOptions(streams)
 
-	validArgs := []string{"deployment"}
+	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
 	cmd := &cobra.Command{
 		Use:                   "restart RESOURCE",

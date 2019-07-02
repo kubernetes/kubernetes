@@ -34,9 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
@@ -53,7 +53,7 @@ import (
 )
 
 func TestDisabledSubpath(t *testing.T) {
-	fm := &mount.FakeMounter{}
+	fhu := &mount.FakeHostUtil{}
 	fsp := &subpath.FakeSubpath{}
 	pod := v1.Pod{
 		Spec: v1.PodSpec{
@@ -95,9 +95,9 @@ func TestDisabledSubpath(t *testing.T) {
 		},
 	}
 
-	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
 	for name, test := range cases {
-		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fm, fsp, nil)
+		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", "", podVolumes, fhu, fsp, nil)
 		if err != nil && !test.expectError {
 			t.Errorf("test %v failed: %v", name, err)
 		}

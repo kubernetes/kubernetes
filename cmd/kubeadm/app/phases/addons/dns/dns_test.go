@@ -25,13 +25,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -47,7 +46,7 @@ func TestCreateServiceAccount(t *testing.T) {
 		},
 		{
 			"duplication errors should be ignored",
-			apierrors.NewAlreadyExists(api.Resource(""), ""),
+			apierrors.NewAlreadyExists(schema.GroupResource{}, ""),
 			false,
 		},
 		{
@@ -580,7 +579,7 @@ func TestDeploymentsHaveSystemClusterCriticalPriorityClassName(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			deploymentBytes, _ := kubeadmutil.ParseTemplate(testCase.manifest, testCase.data)
 			deployment := &apps.Deployment{}
-			if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), deploymentBytes, deployment); err != nil {
+			if err := runtime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), deploymentBytes, deployment); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			if deployment.Spec.Template.Spec.PriorityClassName != "system-cluster-critical" {
