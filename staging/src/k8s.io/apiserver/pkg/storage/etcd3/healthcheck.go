@@ -14,4 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd // import "k8s.io/apiserver/pkg/storage/etcd"
+package etcd3
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// etcdHealth encodes data returned from etcd /healthz handler.
+type etcdHealth struct {
+	// Note this has to be public so the json library can modify it.
+	Health string `json:"health"`
+}
+
+// EtcdHealthCheck decodes data returned from etcd /healthz handler.
+func EtcdHealthCheck(data []byte) error {
+	obj := etcdHealth{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	if obj.Health != "true" {
+		return fmt.Errorf("Unhealthy status: %s", obj.Health)
+	}
+	return nil
+}
