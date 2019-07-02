@@ -144,6 +144,10 @@ message CSINodeDriver {
   // This can be empty if driver does not support topology.
   // +optional
   repeated string topologyKeys = 3;
+
+  // allocatable represents the volume resources of a node that are available for scheduling.
+  // +optional
+  optional VolumeNodeResources allocatable = 4;
 }
 
 // CSINodeList is a collection of CSINode objects.
@@ -328,5 +332,15 @@ message VolumeError {
   // information.
   // +optional
   optional string message = 2;
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+message VolumeNodeResources {
+  // Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+  // A volume that is both attached and mounted on a node is considered to be used once, not twice.
+  // The same rule applies for a unique volume that is shared among multiple pods on the same node.
+  // If this field is nil, then the supported number of volumes on this node is unbounded.
+  // +optional
+  optional int32 count = 1;
 }
 

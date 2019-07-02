@@ -21,15 +21,17 @@ import (
 )
 
 // Prune removes object fields in obj which are not specified in s. It skips TypeMeta and ObjectMeta fields
-// if XEmbeddedResource is set to true, or for the root if root=true.
-func Prune(obj interface{}, s *structuralschema.Structural, root bool) {
-	if root {
+// if XEmbeddedResource is set to true, or for the root if isResourceRoot=true.
+func Prune(obj interface{}, s *structuralschema.Structural, isResourceRoot bool) {
+	if isResourceRoot {
 		if s == nil {
 			s = &structuralschema.Structural{}
 		}
-		clone := *s
-		clone.XEmbeddedResource = true
-		s = &clone
+		if !s.XEmbeddedResource {
+			clone := *s
+			clone.XEmbeddedResource = true
+			s = &clone
+		}
 	}
 	prune(obj, s)
 }

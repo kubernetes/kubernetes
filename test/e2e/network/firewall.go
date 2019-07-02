@@ -77,7 +77,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		gomega.Expect(nodeList).NotTo(gomega.BeNil())
 		nodesNames := jig.GetNodesNames(framework.MaxNodesForEndpointsTests)
 		if len(nodesNames) <= 0 {
-			framework.Failf("Expect at least 1 node, got: %v", nodesNames)
+			e2elog.Failf("Expect at least 1 node, got: %v", nodesNames)
 		}
 		nodesSet := sets.NewString(nodesNames...)
 
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 	ginkgo.It("should have correct firewall rules for e2e cluster", func() {
 		nodes := framework.GetReadySchedulableNodesOrDie(cs)
 		if len(nodes.Items) <= 0 {
-			framework.Failf("Expect at least 1 node, got: %v", len(nodes.Items))
+			e2elog.Failf("Expect at least 1 node, got: %v", len(nodes.Items))
 		}
 
 		ginkgo.By("Checking if e2e firewall rules are correct")
@@ -191,7 +191,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
 		nodeAddrs := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
 		if len(nodeAddrs) == 0 {
-			framework.Failf("did not find any node addresses")
+			e2elog.Failf("did not find any node addresses")
 		}
 
 		masterAddresses := framework.GetAllMasterAddresses(cs)
@@ -208,9 +208,9 @@ var _ = SIGDescribe("Firewall rule", func() {
 func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
 	result := framework.PokeHTTP(ip, port, "/", &framework.HTTPPokeParams{Timeout: timeout})
 	if result.Status == framework.HTTPError {
-		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
+		e2elog.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
 	}
 	if result.Code != 0 {
-		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
+		e2elog.Failf("Was unexpectedly able to reach %s:%d", ip, port)
 	}
 }

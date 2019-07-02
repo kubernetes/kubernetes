@@ -204,7 +204,7 @@ const (
 	addonNsName           = metav1.NamespaceSystem
 )
 
-var serveHostnameImage = imageutils.GetE2EImage(imageutils.ServeHostname)
+var serveHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
 type stringPair struct {
 	data, fileName string

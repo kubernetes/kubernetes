@@ -173,7 +173,7 @@ func (c *PodClient) DeleteSync(name string, options *metav1.DeleteOptions, timeo
 func (c *PodClient) DeleteSyncInNamespace(name string, namespace string, options *metav1.DeleteOptions, timeout time.Duration) {
 	err := c.Delete(name, options)
 	if err != nil && !errors.IsNotFound(err) {
-		Failf("Failed to delete pod %q: %v", name, err)
+		e2elog.Failf("Failed to delete pod %q: %v", name, err)
 	}
 	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.ClientSet, namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)

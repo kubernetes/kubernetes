@@ -338,7 +338,7 @@ func (pm *basicManager) getOrphanedMirrorPodNames() []string {
 func (pm *basicManager) DeleteOrphanedMirrorPods() {
 	podFullNames := pm.getOrphanedMirrorPodNames()
 	for _, podFullName := range podFullNames {
-		pm.MirrorClient.DeleteMirrorPod(podFullName)
+		pm.MirrorClient.DeleteMirrorPod(podFullName, nil)
 	}
 }
 

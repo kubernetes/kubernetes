@@ -328,7 +328,7 @@ func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 	totalRequestedMemResource := resource.Requests.Memory().Value()
 	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
-		framework.Failf("Expect error of invalid, got : %v", err)
+		e2elog.Failf("Expect error of invalid, got : %v", err)
 	}
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {

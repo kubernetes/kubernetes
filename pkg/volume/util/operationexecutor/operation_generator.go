@@ -106,7 +106,7 @@ type OperationGenerator interface {
 	GenerateVolumesAreAttachedFunc(attachedVolumes []AttachedVolume, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the UnMountDevice function needed to perform the unmount of a device
-	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error)
+	GenerateUnmountDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.HostUtils) (volumetypes.GeneratedOperations, error)
 
 	// Generates the function needed to check if the attach_detach controller has attached the volume plugin
 	GenerateVerifyControllerAttachedVolumeFunc(volumeToMount VolumeToMount, nodeName types.NodeName, actualStateOfWorld ActualStateOfWorldAttacherUpdater) (volumetypes.GeneratedOperations, error)
@@ -118,7 +118,7 @@ type OperationGenerator interface {
 	GenerateUnmapVolumeFunc(volumeToUnmount MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) (volumetypes.GeneratedOperations, error)
 
 	// Generates the UnmapDevice function needed to perform the unmap of a device
-	GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) (volumetypes.GeneratedOperations, error)
+	GenerateUnmapDeviceFunc(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.HostUtils) (volumetypes.GeneratedOperations, error)
 
 	// GetVolumePluginMgr returns volume plugin manager
 	GetVolumePluginMgr() *volume.VolumePluginMgr
@@ -888,7 +888,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+	hostutil mount.HostUtils) (volumetypes.GeneratedOperations, error) {
 
 	var pluginName string
 	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
@@ -942,10 +942,10 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 			return deviceToDetach.GenerateError("UnmountDevice failed", unmountDeviceErr)
 		}
 		// Before logging that UnmountDevice succeeded and moving on,
-		// use mounter.PathIsDevice to check if the path is a device,
-		// if so use mounter.DeviceOpened to check if the device is in use anywhere
+		// use hostutil.PathIsDevice to check if the path is a device,
+		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
-		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, mounter)
+		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return nil, deviceOpenedErr
 		}
@@ -1080,8 +1080,12 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// kubelet, so evaluate it on the host and expect that it links to a device in /dev,
 		// which will be available to containerized kubelet. If still it does not exist,
 		// AttachFileDevice will fail. If kubelet is not containerized, eval it anyway.
-		mounter := og.GetVolumePluginMgr().Host.GetMounter(blockVolumePlugin.GetPluginName())
-		devicePath, err = mounter.EvalHostSymlinks(devicePath)
+		kvh, ok := og.GetVolumePluginMgr().Host.(volume.KubeletVolumeHost)
+		if !ok {
+			return volumeToMount.GenerateError("MapVolume type assertion error", fmt.Errorf("volume host does not implement KubeletVolumeHost interface"))
+		}
+		hu := kvh.GetHostUtil()
+		devicePath, err = hu.EvalHostSymlinks(devicePath)
 		if err != nil {
 			return volumeToMount.GenerateError("MapVolume.EvalHostSymlinks failed", err)
 		}
@@ -1258,7 +1262,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	deviceToDetach AttachedVolume,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater,
-	mounter mount.Interface) (volumetypes.GeneratedOperations, error) {
+	hostutil mount.HostUtils) (volumetypes.GeneratedOperations, error) {
 
 	var blockVolumePlugin volume.BlockVolumePlugin
 	var err error
@@ -1344,10 +1348,10 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		}
 
 		// Before logging that UnmapDevice succeeded and moving on,
-		// use mounter.PathIsDevice to check if the path is a device,
-		// if so use mounter.DeviceOpened to check if the device is in use anywhere
+		// use hostutil.PathIsDevice to check if the path is a device,
+		// if so use hostutil.DeviceOpened to check if the device is in use anywhere
 		// else on the system. Retry if it returns true.
-		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, mounter)
+		deviceOpened, deviceOpenedErr := isDeviceOpened(deviceToDetach, hostutil)
 		if deviceOpenedErr != nil {
 			return nil, deviceOpenedErr
 		}
@@ -1726,8 +1730,8 @@ func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) erro
 }
 
 // isDeviceOpened checks the device status if the device is in use anywhere else on the system
-func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (bool, error) {
-	isDevicePath, devicePathErr := mounter.PathIsDevice(deviceToDetach.DevicePath)
+func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil mount.HostUtils) (bool, error) {
+	isDevicePath, devicePathErr := hostUtil.PathIsDevice(deviceToDetach.DevicePath)
 	var deviceOpened bool
 	var deviceOpenedErr error
 	if !isDevicePath && devicePathErr == nil ||
@@ -1739,7 +1743,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, mounter mount.Interface) (boo
 	} else if devicePathErr != nil {
 		return false, deviceToDetach.GenerateErrorDetailed("PathIsDevice failed", devicePathErr)
 	} else {
-		deviceOpened, deviceOpenedErr = mounter.DeviceOpened(deviceToDetach.DevicePath)
+		deviceOpened, deviceOpenedErr = hostUtil.DeviceOpened(deviceToDetach.DevicePath)
 		if deviceOpenedErr != nil {
 			return false, deviceToDetach.GenerateErrorDetailed("DeviceOpened failed", deviceOpenedErr)
 		}

@@ -123,8 +123,8 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 	pods, err := logSoakVerification.WaitFor(totalPods, timeout+largeClusterForgiveness)
 
 	if err != nil {
-		framework.Failf("Error in wait... %v", err)
+		e2elog.Failf("Error in wait... %v", err)
 	} else if len(pods) < totalPods {
-		framework.Failf("Only got %v out of %v", len(pods), totalPods)
+		e2elog.Failf("Only got %v out of %v", len(pods), totalPods)
 	}
 }

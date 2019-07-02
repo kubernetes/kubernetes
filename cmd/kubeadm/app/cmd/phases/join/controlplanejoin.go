@@ -24,14 +24,14 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
-var controlPlaneJoinExample = normalizer.Examples(`
+var controlPlaneJoinExample = cmdutil.Examples(`
 	# Joins a machine as a control plane instance
 	kubeadm join phase control-plane-join all
 `)
@@ -40,7 +40,6 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
 		options.ControlPlane,
-		options.ExperimentalControlPlane,
 		options.NodeName,
 	}
 	if name != "mark-control-plane" {

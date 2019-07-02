@@ -65,75 +65,87 @@ func (*Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
-// DeviceOpened checks if block device in use. I tis a noop for unsupported systems
-func (*Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, nil
-}
-
-// PathIsDevice checks if pathname refers to a device. It is a noop for unsupported
-// systems
-func (*Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, nil
-}
-
-// GetDeviceNameFromMount finds the device name from its global mount point using the
-// given mountpath and plugin location. It is a noop of unsupported platforms
-func (*Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return "", nil
-}
-
-// MakeRShared checks if path is shared and bind-mounts it as rshared if needed.
-// It is a noop on unsupported platforms
-func (*Mounter) MakeRShared(path string) error {
-	return nil
-}
-
-// GetFileType checks for file/directory/socket/block/character devices.
-// Always returns an error and "fake" filetype on unsupported platforms
-func (*Mounter) GetFileType(_ string) (mount.FileType, error) {
-	return mount.FileType("fake"), errors.New("not implemented")
-}
-
-// MakeDir creates a new directory. Noop on unsupported platforms
-func (*Mounter) MakeDir(pathname string) error {
-	return nil
-}
-
-// MakeFile creats an empty file. Noop on unsupported platforms
-func (*Mounter) MakeFile(pathname string) error {
-	return nil
-}
-
-// ExistsPath checks if pathname exists. Always returns an error on unsupported
-// platforms
-func (*Mounter) ExistsPath(pathname string) (bool, error) {
-	return true, errors.New("not implemented")
-}
-
-// EvalHostSymlinks returns the path name after evaluating symlinks. Always
-// returns an error on unsupported platforms
-func (*Mounter) EvalHostSymlinks(pathname string) (string, error) {
-	return "", errors.New("not implemented")
-}
-
 // GetMountRefs finds all mount references to the path, returns a
 // list of paths. Always returns an error on unsupported platforms
 func (*Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return nil, errors.New("not implemented")
 }
 
+type hostUtil struct {
+}
+
+// hostUtil implements mount.HostUtils
+var _ = mount.HostUtils(&hostUtil{})
+
+// NewHostUtil returns a new implementation of mount.HostUtils for unsupported
+// platforms
+func NewHostUtil(ne *nsenter.Nsenter, rootDir string) mount.HostUtils {
+	return &hostUtil{}
+}
+
+// DeviceOpened checks if block device in use. I tis a noop for unsupported systems
+func (*hostUtil) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+
+// PathIsDevice checks if pathname refers to a device. It is a noop for unsupported
+// systems
+func (*hostUtil) PathIsDevice(pathname string) (bool, error) {
+	return true, nil
+}
+
+// GetDeviceNameFromMount finds the device name from its global mount point using the
+// given mountpath and plugin location. It is a noop of unsupported platforms
+func (*hostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
+	return "", nil
+}
+
+// MakeRShared checks if path is shared and bind-mounts it as rshared if needed.
+// It is a noop on unsupported platforms
+func (*hostUtil) MakeRShared(path string) error {
+	return nil
+}
+
+// GetFileType checks for file/directory/socket/block/character devices.
+// Always returns an error and "fake" filetype on unsupported platforms
+func (*hostUtil) GetFileType(_ string) (mount.FileType, error) {
+	return mount.FileType("fake"), errors.New("not implemented")
+}
+
+// MakeDir creates a new directory. Noop on unsupported platforms
+func (*hostUtil) MakeDir(pathname string) error {
+	return nil
+}
+
+// MakeFile creats an empty file. Noop on unsupported platforms
+func (*hostUtil) MakeFile(pathname string) error {
+	return nil
+}
+
+// ExistsPath checks if pathname exists. Always returns an error on unsupported
+// platforms
+func (*hostUtil) ExistsPath(pathname string) (bool, error) {
+	return true, errors.New("not implemented")
+}
+
+// EvalHostSymlinks returns the path name after evaluating symlinks. Always
+// returns an error on unsupported platforms
+func (*hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
 // GetFSGroup returns FSGroup of pathname. Always returns an error on unsupported platforms
-func (*Mounter) GetFSGroup(pathname string) (int64, error) {
+func (*hostUtil) GetFSGroup(pathname string) (int64, error) {
 	return -1, errors.New("not implemented")
 }
 
 // GetSELinuxSupport tests if pathname is on a mount that supports SELinux.
 // Always returns an error on unsupported platforms
-func (*Mounter) GetSELinuxSupport(pathname string) (bool, error) {
+func (*hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
 	return false, errors.New("not implemented")
 }
 
 // GetMode returns permissions of pathname. Always returns an error on unsupported platforms
-func (*Mounter) GetMode(pathname string) (os.FileMode, error) {
+func (*hostUtil) GetMode(pathname string) (os.FileMode, error) {
 	return 0, errors.New("not implemented")
 }

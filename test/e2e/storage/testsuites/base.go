@@ -226,7 +226,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
 	default:
-		framework.Failf("genericVolumeTestResource doesn't support: %s", volType)
+		e2elog.Failf("genericVolumeTestResource doesn't support: %s", volType)
 	}
 
 	if r.volSource == nil {
@@ -246,13 +246,13 @@ func (r *genericVolumeTestResource) cleanupResource() {
 		case testpatterns.PreprovisionedPV:
 			ginkgo.By("Deleting pv and pvc")
 			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
-				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 			}
 		case testpatterns.DynamicPV:
 			ginkgo.By("Deleting pvc")
 			// We only delete the PVC so that PV (and disk) can be cleaned up by dynamic provisioner
 			if r.pv != nil && r.pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
-				framework.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
+				e2elog.Failf("Test framework does not currently support Dynamically Provisioned Persistent Volume %v specified with reclaim policy that isnt %v",
 					r.pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.pvc != nil {
@@ -264,7 +264,7 @@ func (r *genericVolumeTestResource) cleanupResource() {
 				}
 			}
 		default:
-			framework.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
+			e2elog.Failf("Found PVC (%v) or PV (%v) but not running Preprovisioned or Dynamic test pattern", r.pvc, r.pv)
 		}
 	}
 
@@ -600,7 +600,7 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 
 		for op, count := range newInTreeOps {
 			if count != oldInTreeOps[op] {
-				framework.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
+				e2elog.Failf("In-tree plugin %v migrated to CSI Driver, however found %v %v metrics for in-tree plugin", pluginName, count-oldInTreeOps[op], op)
 			}
 		}
 		// We don't check for migrated metrics because some negative test cases

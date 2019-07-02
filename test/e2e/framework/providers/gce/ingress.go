@@ -788,12 +788,12 @@ func (cont *IngressController) CreateStaticIP(name string) string {
 				e2elog.Logf("Failed to delete static ip %v: %v", name, delErr)
 			}
 		}
-		framework.Failf("Failed to allocate static ip %v: %v", name, err)
+		e2elog.Failf("Failed to allocate static ip %v: %v", name, err)
 	}
 
 	ip, err := gceCloud.GetGlobalAddress(name)
 	if err != nil {
-		framework.Failf("Failed to get newly created static ip %v: %v", name, err)
+		e2elog.Failf("Failed to get newly created static ip %v: %v", name, err)
 	}
 
 	cont.staticIPName = ip.Name

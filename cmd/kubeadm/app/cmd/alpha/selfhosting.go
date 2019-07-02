@@ -20,7 +20,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -38,21 +40,17 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
-
-	"os"
-	"time"
 )
 
 var (
-	selfhostingLongDesc = normalizer.LongDesc(`
+	selfhostingLongDesc = cmdutil.LongDesc(`
 		Convert static Pod files for control plane components into self-hosted DaemonSets configured via the Kubernetes API.
 
 		See the documentation for self-hosting limitations.
 
 		` + cmdutil.AlphaDisclaimer)
 
-	selfhostingExample = normalizer.Examples(`
+	selfhostingExample = cmdutil.Examples(`
 		# Convert a static Pod-hosted control plane into a self-hosted one.
 
 		kubeadm alpha phase self-hosting convert-from-staticpods

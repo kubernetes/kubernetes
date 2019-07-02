@@ -206,7 +206,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		sDriver, ok := driver.(SnapshottableTestDriver)
 		if !ok {
-			framework.Failf("Driver %q has CapDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+			e2elog.Failf("Driver %q has CapDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
 		}
 
 		init()
@@ -259,7 +259,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		// typically this claim has already been deleted
 		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+			e2elog.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
 	}()
 
@@ -669,13 +669,13 @@ func prepareDataSourceForProvisioning(
 		e2elog.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 		err = dynamicClient.Resource(snapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
+			e2elog.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
 		}
 
 		e2elog.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(updatedClaim.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
+			e2elog.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
 		e2elog.Logf("deleting SnapshotClass %s", snapshotClass.GetName())

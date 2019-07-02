@@ -145,3 +145,48 @@ func asArgs(fn, defaultFn func(*pflag.FlagSet)) []string {
 	})
 	return args
 }
+
+func TestValidateKubeletFlags(t *testing.T) {
+	tests := []struct {
+		name   string
+		error  bool
+		labels map[string]string
+	}{
+		{
+			name:  "Invalid kubernetes.io label",
+			error: true,
+			labels: map[string]string{
+				"beta.kubernetes.io/metadata-proxy-ready": "true",
+			},
+		},
+		{
+			name:  "Valid label outside of kubernetes.io and k8s.io",
+			error: false,
+			labels: map[string]string{
+				"cloud.google.com/metadata-proxy-ready": "true",
+			},
+		},
+		{
+			name:   "Empty label list",
+			error:  false,
+			labels: map[string]string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateKubeletFlags(&KubeletFlags{
+				NodeLabels: tt.labels,
+			})
+
+			if tt.error && err == nil {
+				t.Errorf("ValidateKubeletFlags should have failed with labels: %+v", tt.labels)
+			}
+
+			if !tt.error && err != nil {
+				t.Errorf("ValidateKubeletFlags should not have failed with labels: %+v", tt.labels)
+			}
+		})
+	}
+
+}

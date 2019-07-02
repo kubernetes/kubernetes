@@ -482,14 +482,14 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		cmd := "touch /volume_mount/mypath/foo/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			framework.Failf("expected to be able to write to subpath")
+			e2elog.Failf("expected to be able to write to subpath")
 		}
 
 		ginkgo.By("test for file in mounted path")
 		cmd = "test -f /subpath_mount/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			framework.Failf("expected to be able to verify file")
+			e2elog.Failf("expected to be able to verify file")
 		}
 
 		ginkgo.By("updating the annotation value")
@@ -629,13 +629,13 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		cmd := "test -f /volume_mount/foo/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			framework.Failf("expected to be able to verify old file exists")
+			e2elog.Failf("expected to be able to verify old file exists")
 		}
 
 		cmd = "test ! -f /volume_mount/newsubpath/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			framework.Failf("expected to be able to verify new file does not exist")
+			e2elog.Failf("expected to be able to verify new file does not exist")
 		}
 	})
 })

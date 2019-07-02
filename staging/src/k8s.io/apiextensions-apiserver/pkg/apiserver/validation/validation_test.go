@@ -364,3 +364,60 @@ func TestValidateCustomResource(t *testing.T) {
 		})
 	}
 }
+
+func TestItemsProperty(t *testing.T) {
+	type args struct {
+		schema apiextensions.JSONSchemaProps
+		object interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{"items in object", args{
+			apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"spec": {
+						Properties: map[string]apiextensions.JSONSchemaProps{
+							"replicas": {
+								Type: "integer",
+							},
+						},
+					},
+				},
+			},
+			map[string]interface{}{"spec": map[string]interface{}{"replicas": 1, "items": []string{"1", "2"}}},
+		}, false},
+		{"items in array", args{
+			apiextensions.JSONSchemaProps{
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"secrets": {
+						Type: "array",
+						Items: &apiextensions.JSONSchemaPropsOrArray{
+							Schema: &apiextensions.JSONSchemaProps{
+								Type: "string",
+							},
+						},
+					},
+				},
+			},
+			map[string]interface{}{"secrets": []string{"1", "2"}},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			validator, _, err := NewSchemaValidator(&apiextensions.CustomResourceValidation{OpenAPIV3Schema: &tt.args.schema})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := ValidateCustomResource(tt.args.object, validator); (err != nil) != tt.wantErr {
+				if err == nil {
+					t.Error("expected error, but didn't get one")
+				} else {
+					t.Errorf("unexpected validation error: %v", err)
+				}
+			}
+		})
+	}
+}

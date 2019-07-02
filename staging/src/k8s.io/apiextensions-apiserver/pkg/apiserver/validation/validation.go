@@ -34,7 +34,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 			return nil, nil, err
 		}
 	}
-	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default), openapiSchema, nil
+	return validate.NewSchemaValidator(openapiSchema, nil, "", strfmt.Default, validate.DisableObjectArrayTypeCheck(true)), openapiSchema, nil
 }
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.

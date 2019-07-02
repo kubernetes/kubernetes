@@ -3434,17 +3434,15 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *core.Po
 }
 
 func podSpecHasContainer(spec *core.PodSpec, containerName string) bool {
-	for _, c := range spec.InitContainers {
+	var hasContainer bool
+	podshelper.VisitContainersWithPath(spec, func(c *core.Container, _ *field.Path) bool {
 		if c.Name == containerName {
-			return true
+			hasContainer = true
+			return false
 		}
-	}
-	for _, c := range spec.Containers {
-		if c.Name == containerName {
-			return true
-		}
-	}
-	return false
+		return true
+	})
+	return hasContainer
 }
 
 const (

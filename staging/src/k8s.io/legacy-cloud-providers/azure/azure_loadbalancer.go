@@ -30,7 +30,7 @@ import (
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-07-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
 
@@ -1543,7 +1543,10 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 
 func (az *Cloud) getPublicIPAddressResourceGroup(service *v1.Service) string {
 	if resourceGroup, found := service.Annotations[ServiceAnnotationLoadBalancerResourceGroup]; found {
-		return resourceGroup
+		resourceGroupName := strings.TrimSpace(resourceGroup)
+		if len(resourceGroupName) > 0 {
+			return resourceGroupName
+		}
 	}
 
 	return az.ResourceGroup

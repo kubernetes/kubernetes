@@ -98,8 +98,6 @@ func NewCmdNode() *cobra.Command {
 	// upgrade node config command is subject to GA deprecation policy, so we should deprecate it
 	// and keep it here for one year or three releases - the longer of the two - starting from v1.15 included
 	cmd.AddCommand(NewCmdUpgradeNodeConfig())
-	// upgrade node experimental control plane can be removed, but we are keeping it for one more cycle
-	cmd.AddCommand(NewCmdUpgradeControlPlane())
 
 	return cmd
 }
@@ -220,40 +218,6 @@ func NewCmdUpgradeNodeConfig() *cobra.Command {
 
 	// initialize the workflow runner with the list of phases
 	nodeRunner.AppendPhase(phases.NewKubeletConfigPhase())
-
-	// sets the data builder function, that will be used by the runner
-	// both when running the entire workflow or single phases
-	nodeRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newNodeData(cmd, args, nodeOptions)
-	})
-
-	return cmd
-}
-
-// NewCmdUpgradeControlPlane returns the cobra.Command for upgrading the controlplane instance on this node
-// TODO: to remove when 1.16 is released
-func NewCmdUpgradeControlPlane() *cobra.Command {
-	nodeOptions := newNodeOptions()
-	nodeRunner := workflow.NewRunner()
-
-	cmd := &cobra.Command{
-		Use:        "experimental-control-plane",
-		Short:      "Upgrade the control plane instance deployed on this node. IMPORTANT. This command should be executed after executing `kubeadm upgrade apply` on another control plane instance",
-		Deprecated: "this command is deprecated. Use \"kubeadm upgrade node\" instead",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := nodeRunner.Run(args)
-			kubeadmutil.CheckErr(err)
-		},
-	}
-
-	// adds flags to the node command
-	options.AddKubeConfigFlag(cmd.Flags(), &nodeOptions.kubeConfigPath)
-	cmd.Flags().BoolVar(&nodeOptions.dryRun, options.DryRun, nodeOptions.dryRun, "Do not change any state, just output the actions that would be performed.")
-	cmd.Flags().BoolVar(&nodeOptions.etcdUpgrade, options.EtcdUpgrade, nodeOptions.etcdUpgrade, "Perform the upgrade of etcd.")
-	cmd.Flags().BoolVar(&nodeOptions.renewCerts, options.CertificateRenewal, nodeOptions.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
-
-	// initialize the workflow runner with the list of phases
-	nodeRunner.AppendPhase(phases.NewControlPlane())
 
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases

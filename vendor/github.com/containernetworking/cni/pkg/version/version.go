@@ -15,6 +15,7 @@
 package version
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/containernetworking/cni/pkg/types"
@@ -24,7 +25,7 @@ import (
 
 // Current reports the version of the CNI spec implemented by this library
 func Current() string {
-	return "0.3.1"
+	return "0.4.0"
 }
 
 // Legacy PluginInfo describes a plugin that is backwards compatible with the
@@ -35,7 +36,7 @@ func Current() string {
 // Any future CNI spec versions which meet this definition should be added to
 // this list.
 var Legacy = PluginSupports("0.1.0", "0.2.0")
-var All = PluginSupports("0.1.0", "0.2.0", "0.3.0", "0.3.1")
+var All = PluginSupports("0.1.0", "0.2.0", "0.3.0", "0.3.1", "0.4.0")
 
 var resultFactories = []struct {
 	supportedVersions []string
@@ -58,4 +59,25 @@ func NewResult(version string, resultBytes []byte) (types.Result, error) {
 	}
 
 	return nil, fmt.Errorf("unsupported CNI result version %q", version)
+}
+
+// ParsePrevResult parses a prevResult in a NetConf structure and sets
+// the NetConf's PrevResult member to the parsed Result object.
+func ParsePrevResult(conf *types.NetConf) error {
+	if conf.RawPrevResult == nil {
+		return nil
+	}
+
+	resultBytes, err := json.Marshal(conf.RawPrevResult)
+	if err != nil {
+		return fmt.Errorf("could not serialize prevResult: %v", err)
+	}
+
+	conf.RawPrevResult = nil
+	conf.PrevResult, err = NewResult(conf.CNIVersion, resultBytes)
+	if err != nil {
+		return fmt.Errorf("could not parse prevResult: %v", err)
+	}
+
+	return nil
 }

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"reflect"
-	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -342,68 +340,11 @@ func MarshalInitConfigurationToBytes(cfg *kubeadmapi.InitConfiguration, gv schem
 	// Exception: If the specified groupversion is targeting the internal type, don't print embedded ClusterConfiguration contents
 	// This is mostly used for unit testing. In a real scenario the internal version of the API is never marshalled as-is.
 	if gv.Version != runtime.APIVersionInternal {
-		clusterbytes, err := MarshalClusterConfigurationToBytes(&cfg.ClusterConfiguration, gv)
+		clusterbytes, err := kubeadmutil.MarshalToYamlForCodecs(&cfg.ClusterConfiguration, gv, kubeadmscheme.Codecs)
 		if err != nil {
 			return []byte{}, err
 		}
 		allFiles = append(allFiles, clusterbytes)
 	}
 	return bytes.Join(allFiles, []byte(kubeadmconstants.YAMLDocumentSeparator)), nil
-}
-
-// MarshalClusterConfigurationToBytes marshals the internal ClusterConfiguration object to bytes. It writes the embedded
-// ComponentConfiguration objects out as separate YAML documents
-func MarshalClusterConfigurationToBytes(clustercfg *kubeadmapi.ClusterConfiguration, gv schema.GroupVersion) ([]byte, error) {
-	clusterbytes, err := kubeadmutil.MarshalToYamlForCodecs(clustercfg, gv, kubeadmscheme.Codecs)
-	if err != nil {
-		return []byte{}, err
-	}
-	allFiles := [][]byte{clusterbytes}
-	componentConfigContent := map[string][]byte{}
-	defaultedcfg := defaultedInternalConfig()
-
-	for kind, registration := range componentconfigs.Known {
-		// If the ComponentConfig struct for the current registration is nil, skip it when marshalling
-		realobj, ok := registration.GetFromInternalConfig(clustercfg)
-		if !ok {
-			continue
-		}
-
-		defaultedobj, ok := registration.GetFromInternalConfig(defaultedcfg)
-		// Invalid: The caller asked to not print the componentconfigs if defaulted, but defaultComponentConfigs() wasn't able to create default objects to use for reference
-		if !ok {
-			return []byte{}, errors.New("couldn't create a default componentconfig object")
-		}
-
-		// If the real ComponentConfig object differs from the default, print it out. If not, there's no need to print it out, so skip it
-		if !reflect.DeepEqual(realobj, defaultedobj) {
-			contentBytes, err := registration.Marshal(realobj)
-			if err != nil {
-				return []byte{}, err
-			}
-			componentConfigContent[string(kind)] = contentBytes
-		}
-	}
-
-	// Sort the ComponentConfig files by kind when marshalling
-	sortedComponentConfigFiles := consistentOrderByteSlice(componentConfigContent)
-	allFiles = append(allFiles, sortedComponentConfigFiles...)
-	return bytes.Join(allFiles, []byte(kubeadmconstants.YAMLDocumentSeparator)), nil
-}
-
-// consistentOrderByteSlice takes a map of a string key and a byte slice, and returns a byte slice of byte slices
-// with consistent ordering, where the keys in the map determine the ordering of the return value. This has to be
-// done as the order of a for...range loop over a map in go is undeterministic, and could otherwise lead to flakes
-// in e.g. unit tests when marshalling content with a random order
-func consistentOrderByteSlice(content map[string][]byte) [][]byte {
-	keys := []string{}
-	sortedContent := [][]byte{}
-	for key := range content {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		sortedContent = append(sortedContent, content[key])
-	}
-	return sortedContent
 }

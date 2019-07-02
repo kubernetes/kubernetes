@@ -322,7 +322,7 @@ func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-// ValidateURLs validates the URLs given in the string slice, makes sure they are parseable. Optionally, it can enforcs HTTPS usage.
+// ValidateURLs validates the URLs given in the string slice, makes sure they are parsable. Optionally, it can enforces HTTPS usage.
 func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, urlstr := range urls {
@@ -437,7 +437,6 @@ func isAllowedFlag(flagName string) bool {
 		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.ExperimentalUploadCerts,
 		"print-join-command", "rootfs", "v")
 	if knownFlags.Has(flagName) {
 		return true

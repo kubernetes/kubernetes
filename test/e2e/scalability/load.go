@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// DEPRECATED.
+// We already migrated all periodic and presubmit tests to ClusterLoader2.
+// We are still keeping this file for optional functionality, but once
+// this is supported in ClusterLoader2 tests, this test will be removed
+// (hopefully in 1.16 release).
+// Please don't add new functionality to this file and instead see:
+// https://github.com/kubernetes/perf-tests/tree/master/clusterloader2
+
 package scalability
 
 import (
@@ -176,24 +184,25 @@ var _ = SIGDescribe("Load capacity", func() {
 		quotas           bool
 	}
 
+	serveHostnameCmd := []string{"/agnhost", "serve-hostname"}
 	loadTests := []Load{
 		// The container will consume 1 cpu and 512mb of memory.
 		{podsPerNode: 3, image: "jess/stress", command: []string{"stress", "-c", "1", "-m", "2"}, kind: api.Kind("ReplicationController")},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: api.Kind("ReplicationController")},
 		// Tests for other resource types
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment")},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: batch.Kind("Job")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: extensions.Kind("Deployment")},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: batch.Kind("Job")},
 		// Test scheduling when daemons are preset
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: api.Kind("ReplicationController"), daemonsPerNode: 2},
 		// Test with secrets
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: extensions.Kind("Deployment"), secretsPerPod: 2},
 		// Test with configmaps
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: extensions.Kind("Deployment"), configMapsPerPod: 2},
 		// Special test case which randomizes created resources
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: randomKind},
 		// Test with quotas
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: api.Kind("ReplicationController"), quotas: true},
-		{podsPerNode: 30, image: framework.ServeHostnameImage, kind: randomKind, quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: api.Kind("ReplicationController"), quotas: true},
+		{podsPerNode: 30, image: framework.ServeHostnameImage, command: serveHostnameCmd, kind: randomKind, quotas: true},
 	}
 
 	isCanonical := func(test *Load) bool {
@@ -489,6 +498,7 @@ func generateConfigs(
 	return configs, secretConfigs, configMapConfigs
 }
 
+// GenerateConfigsForGroup generates the configuration needed for a group
 func GenerateConfigsForGroup(
 	nss []*v1.Namespace,
 	groupName string,
@@ -577,7 +587,7 @@ func GenerateConfigsForGroup(
 		case batch.Kind("Job"):
 			config = &testutils.JobConfig{RCConfig: *baseConfig}
 		default:
-			framework.Failf("Unsupported kind for config creation: %v", kind)
+			e2elog.Failf("Unsupported kind for config creation: %v", kind)
 		}
 		configs = append(configs, config)
 	}
@@ -720,6 +730,7 @@ func deleteResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, deleti
 		fmt.Sprintf("deleting %v %s", config.GetKind(), config.GetName()))
 }
 
+// CreateNamespaces creates a namespace
 func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix string, testPhase *timer.Phase) ([]*v1.Namespace, error) {
 	defer testPhase.End()
 	namespaces := []*v1.Namespace{}
@@ -733,6 +744,7 @@ func CreateNamespaces(f *framework.Framework, namespaceCount int, namePrefix str
 	return namespaces, nil
 }
 
+// CreateQuotas creates quotas
 func CreateQuotas(f *framework.Framework, namespaces []*v1.Namespace, podCount int, testPhase *timer.Phase) error {
 	defer testPhase.End()
 	quotaTemplate := &v1.ResourceQuota{

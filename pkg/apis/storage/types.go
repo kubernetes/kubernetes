@@ -355,6 +355,20 @@ type CSINodeDriver struct {
 	// This can be empty if driver does not support topology.
 	// +optional
 	TopologyKeys []string
+
+	// allocatable represents the volume resources of a node that are available for scheduling.
+	// +optional
+	Allocatable *VolumeNodeResources
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+type VolumeNodeResources struct {
+	// Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+	// A volume that is both attached and mounted on a node is considered to be used once, not twice.
+	// The same rule applies for a unique volume that is shared among multiple pods on the same node.
+	// If this field is nil, then the supported number of volumes on this node is unbounded.
+	// +optional
+	Count *int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"sync"
 
-	corev1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,33 +44,33 @@ var (
 )
 
 // privilegedPSP creates a PodSecurityPolicy that allows everything.
-func privilegedPSP(name string) *policy.PodSecurityPolicy {
+func privilegedPSP(name string) *policyv1beta1.PodSecurityPolicy {
 	allowPrivilegeEscalation := true
-	return &policy.PodSecurityPolicy{
+	return &policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
 			Annotations: map[string]string{seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny},
 		},
-		Spec: policy.PodSecurityPolicySpec{
+		Spec: policyv1beta1.PodSecurityPolicySpec{
 			Privileged:               true,
 			AllowPrivilegeEscalation: &allowPrivilegeEscalation,
-			AllowedCapabilities:      []corev1.Capability{"*"},
-			Volumes:                  []policy.FSType{policy.All},
+			AllowedCapabilities:      []v1.Capability{"*"},
+			Volumes:                  []policyv1beta1.FSType{policyv1beta1.All},
 			HostNetwork:              true,
-			HostPorts:                []policy.HostPortRange{{Min: 0, Max: 65535}},
+			HostPorts:                []policyv1beta1.HostPortRange{{Min: 0, Max: 65535}},
 			HostIPC:                  true,
 			HostPID:                  true,
-			RunAsUser: policy.RunAsUserStrategyOptions{
-				Rule: policy.RunAsUserStrategyRunAsAny,
+			RunAsUser: policyv1beta1.RunAsUserStrategyOptions{
+				Rule: policyv1beta1.RunAsUserStrategyRunAsAny,
 			},
-			SELinux: policy.SELinuxStrategyOptions{
-				Rule: policy.SELinuxStrategyRunAsAny,
+			SELinux: policyv1beta1.SELinuxStrategyOptions{
+				Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 			},
-			SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
-				Rule: policy.SupplementalGroupsStrategyRunAsAny,
+			SupplementalGroups: policyv1beta1.SupplementalGroupsStrategyOptions{
+				Rule: policyv1beta1.SupplementalGroupsStrategyRunAsAny,
 			},
-			FSGroup: policy.FSGroupStrategyOptions{
-				Rule: policy.FSGroupStrategyRunAsAny,
+			FSGroup: policyv1beta1.FSGroupStrategyOptions{
+				Rule: policyv1beta1.FSGroupStrategyRunAsAny,
 			},
 			ReadOnlyRootFilesystem: false,
 			AllowedUnsafeSysctls:   []string{"*"},

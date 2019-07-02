@@ -82,7 +82,7 @@ func runCleanupNode(c workflow.RunData) error {
 		klog.Errorf("[reset] Failed to remove containers: %v", err)
 	}
 
-	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes")
+	r.AddDirsToClean("/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes", "/var/lib/cni")
 
 	// Remove contents from the config and pki directories
 	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")

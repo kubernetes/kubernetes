@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -97,6 +97,7 @@ func createConfiguratorWithPodInformer(
 		ServiceInformer:                informerFactory.Core().V1().Services(),
 		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		Registry:                       pluginRegistry,
 		Plugins:                        plugins,
 		PluginConfig:                   pluginConfig,
@@ -156,8 +157,7 @@ func initTestScheduler(
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
 ) *testContext {
-	// Pod preemption is enabled by default scheduler configuration, but preemption only happens when PodPriority
-	// feature gate is enabled at the same time.
+	// Pod preemption is enabled by default scheduler configuration.
 	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerframework.NewRegistry(),
 		nil, []schedulerconfig.PluginConfig{}, false, time.Second)
 }
@@ -216,6 +216,7 @@ func initTestSchedulerWithOptions(
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
 		context.informerFactory.Core().V1().Services(),
 		context.informerFactory.Storage().V1().StorageClasses(),
+		context.informerFactory.Storage().V1beta1().CSINodes(),
 	)
 
 	// set setPodInformer if provided.

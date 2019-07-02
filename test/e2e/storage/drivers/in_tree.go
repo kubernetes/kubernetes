@@ -202,7 +202,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.DynamicPV:
 		// Do nothing
 	default:
-		framework.Failf("Unsupported volType:%v is specified", volType)
+		e2elog.Failf("Unsupported volType:%v is specified", volType)
 	}
 	return nil
 }
@@ -317,14 +317,14 @@ func (v *glusterVolume) DeleteVolume() {
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			framework.Failf("Gluster delete endpoints failed: %v", err)
+			e2elog.Failf("Gluster delete endpoints failed: %v", err)
 		}
 		e2elog.Logf("Gluster endpoints %q not found, assuming deleted", name)
 	}
 	e2elog.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = framework.DeletePodWithWait(f, cs, v.serverPod)
 	if err != nil {
-		framework.Failf("Gluster server pod delete failed: %v", err)
+		e2elog.Failf("Gluster server pod delete failed: %v", err)
 	}
 }
 
@@ -1738,7 +1738,7 @@ func (l *localDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
 		}
 	default:
-		framework.Failf("Unsupported volType: %v is specified", volType)
+		e2elog.Failf("Unsupported volType: %v is specified", volType)
 	}
 	return nil
 }
@@ -1750,11 +1750,11 @@ func (v *localVolume) DeleteVolume() {
 func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity {
 	nodeKey := "kubernetes.io/hostname"
 	if node.Labels == nil {
-		framework.Failf("Node does not have labels")
+		e2elog.Failf("Node does not have labels")
 	}
 	nodeValue, found := node.Labels[nodeKey]
 	if !found {
-		framework.Failf("Node does not have required label %q", nodeKey)
+		e2elog.Failf("Node does not have required label %q", nodeKey)
 	}
 	return &v1.VolumeNodeAffinity{
 		Required: &v1.NodeSelector{

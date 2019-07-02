@@ -69,6 +69,7 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
+        "//test/e2e/framework/statefulset:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

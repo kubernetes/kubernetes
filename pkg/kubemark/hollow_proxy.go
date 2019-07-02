@@ -107,17 +107,16 @@ func NewHollowProxyOrDie(
 	}
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Client:            client,
-			EventClient:       eventClient,
-			IptInterface:      iptInterface,
-			Proxier:           proxier,
-			Broadcaster:       broadcaster,
-			Recorder:          recorder,
-			ProxyMode:         "fake",
-			NodeRef:           nodeRef,
-			OOMScoreAdj:       utilpointer.Int32Ptr(0),
-			ResourceContainer: "",
-			ConfigSyncPeriod:  30 * time.Second,
+			Client:           client,
+			EventClient:      eventClient,
+			IptInterface:     iptInterface,
+			Proxier:          proxier,
+			Broadcaster:      broadcaster,
+			Recorder:         recorder,
+			ProxyMode:        "fake",
+			NodeRef:          nodeRef,
+			OOMScoreAdj:      utilpointer.Int32Ptr(0),
+			ConfigSyncPeriod: 30 * time.Second,
 		},
 	}, nil
 }

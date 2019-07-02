@@ -17,11 +17,35 @@ limitations under the License.
 package metrics
 
 import (
+	"sync"
+	"sync/atomic"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
+
+var (
+	showHiddenOnce sync.Once
+	showHidden     atomic.Value
+)
+
+// SetShowHidden will enable showing hidden metrics. This will no-opt
+// after the initial call
+func SetShowHidden() {
+	showHiddenOnce.Do(func() {
+		showHidden.Store(true)
+	})
+}
+
+// ShouldShowHidden returns whether showing hidden deprecated metrics
+// is enabled. While the primary usecase for this is internal (to determine
+// registration behavior) this can also be used to introspect
+func ShouldShowHidden() bool {
+	return showHidden.Load() != nil && showHidden.Load().(bool)
+}
 
 // Registerable is an interface for a collector metric which we
 // will register with KubeRegistry.

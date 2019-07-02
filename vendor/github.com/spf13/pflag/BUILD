@@ -26,6 +26,8 @@ go_library(
         "string.go",
         "string_array.go",
         "string_slice.go",
+        "string_to_int.go",
+        "string_to_string.go",
         "uint.go",
         "uint16.go",
         "uint32.go",

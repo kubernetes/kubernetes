@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/printers"
-	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 // HumanPrintFlags provides default flags necessary for printing.
@@ -96,7 +95,6 @@ func (f *HumanPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePrint
 		ColumnLabels:  columnLabels,
 		ShowLabels:    showLabels,
 	})
-	printersinternal.AddHandlers(p)
 
 	// TODO(juanvallejo): handle sorting here
 

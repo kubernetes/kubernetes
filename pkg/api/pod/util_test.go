@@ -34,6 +34,92 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
+func TestVisitContainers(t *testing.T) {
+	testCases := []struct {
+		description string
+		haveSpec    *api.PodSpec
+		wantNames   []string
+	}{
+		{
+			"empty podspec",
+			&api.PodSpec{},
+			[]string{},
+		},
+		{
+			"regular containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+			},
+			[]string{"c1", "c2"},
+		},
+		{
+			"init containers",
+			&api.PodSpec{
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2"},
+		},
+		{
+			"regular and init containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+		{
+			"dropping fields",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2", SecurityContext: &api.SecurityContext{}},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2", SecurityContext: &api.SecurityContext{}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2"},
+		},
+	}
+
+	for _, tc := range testCases {
+		gotNames := []string{}
+		VisitContainers(tc.haveSpec, func(c *api.Container) bool {
+			gotNames = append(gotNames, c.Name)
+			if c.SecurityContext != nil {
+				c.SecurityContext = nil
+			}
+			return true
+		})
+		if !reflect.DeepEqual(gotNames, tc.wantNames) {
+			t.Errorf("VisitContainers() for test case %q visited containers %q, wanted to visit %q", tc.description, gotNames, tc.wantNames)
+		}
+		for _, c := range tc.haveSpec.Containers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+		for _, c := range tc.haveSpec.InitContainers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for init container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
+	}
+}
+
 func TestPodSecrets(t *testing.T) {
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
@@ -699,122 +785,6 @@ func TestDropProcMount(t *testing.T) {
 						// new pod should not have ProcMount
 						if procMountInUse(&newPod.Spec) {
 							t.Errorf("new pod had ProcMount: %#v", &newPod.Spec)
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
-func TestDropPodPriority(t *testing.T) {
-	podPriority := int32(1000)
-	podWithoutPriority := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          nil,
-				PriorityClassName: "",
-			},
-		}
-	}
-	podWithPriority := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          &podPriority,
-				PriorityClassName: "",
-			},
-		}
-	}
-	podWithPriorityClassOnly := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          nil,
-				PriorityClassName: "HighPriorityClass",
-			},
-		}
-	}
-	podWithBothPriorityFields := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				Priority:          &podPriority,
-				PriorityClassName: "HighPriorityClass",
-			},
-		}
-	}
-	podInfo := []struct {
-		description    string
-		hasPodPriority bool
-		pod            func() *api.Pod
-	}{
-		{
-			description:    "pod With no PodPriority fields set",
-			hasPodPriority: false,
-			pod:            podWithoutPriority,
-		},
-		{
-			description:    "feature disabled and pod With PodPriority field set but class name not set",
-			hasPodPriority: true,
-			pod:            podWithPriority,
-		},
-		{
-			description:    "feature disabled and pod With PodPriority ClassName field set but PortPriority not set",
-			hasPodPriority: true,
-			pod:            podWithPriorityClassOnly,
-		},
-		{
-			description:    "feature disabled and pod With both PodPriority ClassName and PodPriority fields set",
-			hasPodPriority: true,
-			pod:            podWithBothPriorityFields,
-		},
-		{
-			description:    "is nil",
-			hasPodPriority: false,
-			pod:            func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasPodPriority, oldPod := oldPodInfo.hasPodPriority, oldPodInfo.pod()
-				newPodHasPodPriority, newPod := newPodInfo.hasPodPriority, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodPriority, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasPodPriority:
-						// new pod should not be changed if the feature is enabled, or if the old pod had PodPriority
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasPodPriority:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have PodPriority
-						if !reflect.DeepEqual(newPod, podWithoutPriority()) {
-							t.Errorf("new pod had PodPriority: %v", diff.ObjectReflectDiff(newPod, podWithoutPriority()))
 						}
 					default:
 						// new pod should not need to be changed

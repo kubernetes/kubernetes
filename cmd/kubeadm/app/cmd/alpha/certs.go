@@ -38,11 +38,10 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	genericCertRenewLongDesc = normalizer.LongDesc(`
+	genericCertRenewLongDesc = cmdutil.LongDesc(`
 	Renew the %s.
 
 	Renewals run unconditionally, regardless of certificate expiration date; extra attributes such as SANs will 
@@ -55,12 +54,12 @@ var (
 	eventually re-distribute the renewed certificate in case the file is used elsewhere.
 `)
 
-	allLongDesc = normalizer.LongDesc(`
+	allLongDesc = cmdutil.LongDesc(`
     Renew all known certificates necessary to run the control plane. Renewals are run unconditionally, regardless
     of expiration date. Renewals can also be run individually for more control.
 `)
 
-	expirationLongDesc = normalizer.LongDesc(`
+	expirationLongDesc = cmdutil.LongDesc(`
 	Checks expiration for the certificates in the local PKI managed by kubeadm.
 `)
 
@@ -68,7 +67,7 @@ var (
 	This command will print out a secure randomly-generated certificate key that can be used with
 	the "init" command.
 
-	You can also use "kubeadm init --experimental-upload-certs" without specifying a certificate key and it will
+	You can also use "kubeadm init --upload-certs" without specifying a certificate key and it will
 	generate and print one for you.
 `)
 )

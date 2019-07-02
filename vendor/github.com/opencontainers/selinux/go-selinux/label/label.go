@@ -9,7 +9,7 @@ func InitLabels(options []string) (string, string, error) {
 	return "", "", nil
 }
 
-func GetROMountLabel() string {
+func ROMountLabel() string {
 	return ""
 }
 
@@ -25,7 +25,27 @@ func SetProcessLabel(processLabel string) error {
 	return nil
 }
 
-func GetFileLabel(path string) (string, error) {
+func ProcessLabel() (string, error) {
+	return "", nil
+}
+
+func SetSocketLabel(processLabel string) error {
+	return nil
+}
+
+func SocketLabel() (string, error) {
+	return "", nil
+}
+
+func SetKeyLabel(processLabel string) error {
+	return nil
+}
+
+func KeyLabel() (string, error) {
+	return "", nil
+}
+
+func FileLabel(path string) (string, error) {
 	return "", nil
 }
 
@@ -41,11 +61,16 @@ func Relabel(path string, fileLabel string, shared bool) error {
 	return nil
 }
 
-func GetPidLabel(pid int) (string, error) {
+func PidLabel(pid int) (string, error) {
 	return "", nil
 }
 
 func Init() {
+}
+
+// ClearLabels clears all reserved labels
+func ClearLabels() {
+	return
 }
 
 func ReserveLabel(label string) error {
@@ -58,8 +83,8 @@ func ReleaseLabel(label string) error {
 
 // DupSecOpt takes a process label and returns security options that
 // can be used to set duplicate labels on future container processes
-func DupSecOpt(src string) []string {
-	return nil
+func DupSecOpt(src string) ([]string, error) {
+	return nil, nil
 }
 
 // DisableSecOpt returns a security opt that can disable labeling

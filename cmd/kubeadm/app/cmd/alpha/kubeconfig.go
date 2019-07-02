@@ -28,19 +28,18 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/util/normalizer"
 )
 
 var (
-	kubeconfigLongDesc = normalizer.LongDesc(`
+	kubeconfigLongDesc = cmdutil.LongDesc(`
 	Kubeconfig file utilities.
 	` + cmdutil.AlphaDisclaimer)
 
-	userKubeconfigLongDesc = normalizer.LongDesc(`
+	userKubeconfigLongDesc = cmdutil.LongDesc(`
 	Output a kubeconfig file for an additional user.
 	` + cmdutil.AlphaDisclaimer)
 
-	userKubeconfigExample = normalizer.Examples(`
+	userKubeconfigExample = cmdutil.Examples(`
 	# Output a kubeconfig file for an additional user named foo
 	kubeadm alpha kubeconfig user --client-name=foo
 	`)

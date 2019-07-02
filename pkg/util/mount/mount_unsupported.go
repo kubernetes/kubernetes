@@ -58,24 +58,8 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, unsupportedErr
 }
 
-func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginMountDir string) (string, error) {
-	return "", unsupportedErr
-}
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return "", unsupportedErr
-}
-
-func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
-	return false, unsupportedErr
-}
-
-func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return true, unsupportedErr
-}
-
-func (mounter *Mounter) MakeRShared(path string) error {
-	return unsupportedErr
+func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
@@ -86,38 +70,65 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 	return true, unsupportedErr
 }
 
-func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
-	return FileType("fake"), unsupportedErr
-}
-
-func (mounter *Mounter) MakeDir(pathname string) error {
-	return unsupportedErr
-}
-
-func (mounter *Mounter) MakeFile(pathname string) error {
-	return unsupportedErr
-}
-
-func (mounter *Mounter) ExistsPath(pathname string) (bool, error) {
-	return true, errors.New("not implemented")
-}
-
-func (mounter *Mounter) EvalHostSymlinks(pathname string) (string, error) {
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
 	return "", unsupportedErr
 }
 
-func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	return nil, errors.New("not implemented")
+type hostUtil struct{}
+
+func NewHostUtil() HostUtils {
+	return &hostUtil{}
 }
 
-func (mounter *Mounter) GetFSGroup(pathname string) (int64, error) {
-	return -1, errors.New("not implemented")
+// DeviceOpened determines if the device is in use elsewhere
+func (hu *hostUtil) DeviceOpened(pathname string) (bool, error) {
+	return false, unsupportedErr
 }
 
-func (mounter *Mounter) GetSELinuxSupport(pathname string) (bool, error) {
-	return false, errors.New("not implemented")
+// PathIsDevice determines if a path is a device.
+func (hu *hostUtil) PathIsDevice(pathname string) (bool, error) {
+	return true, unsupportedErr
 }
 
-func (mounter *Mounter) GetMode(pathname string) (os.FileMode, error) {
-	return 0, errors.New("not implemented")
+// GetDeviceNameFromMount finds the device name by checking the mount path
+// to get the global mount path within its plugin directory
+func (hu *hostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+	return "", unsupportedErr
+}
+
+func (hu *hostUtil) MakeRShared(path string) error {
+	return unsupportedErr
+}
+
+func (hu *hostUtil) GetFileType(pathname string) (FileType, error) {
+	return FileType("fake"), unsupportedErr
+}
+
+func (hu *hostUtil) MakeFile(pathname string) error {
+	return unsupportedErr
+}
+
+func (hu *hostUtil) MakeDir(pathname string) error {
+	return unsupportedErr
+}
+
+func (hu *hostUtil) ExistsPath(pathname string) (bool, error) {
+	return true, unsupportedErr
+}
+
+// EvalHostSymlinks returns the path name after evaluating symlinks
+func (hu *hostUtil) EvalHostSymlinks(pathname string) (string, error) {
+	return "", unsupportedErr
+}
+
+func (hu *hostUtil) GetFSGroup(pathname string) (int64, error) {
+	return -1, unsupportedErr
+}
+
+func (hu *hostUtil) GetSELinuxSupport(pathname string) (bool, error) {
+	return false, unsupportedErr
+}
+
+func (hu *hostUtil) GetMode(pathname string) (os.FileMode, error) {
+	return 0, unsupportedErr
 }

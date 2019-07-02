@@ -22,6 +22,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -71,11 +72,11 @@ var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
 			// checks that all the control-plane nodes are in the apiEndpoints list
 			for _, cp := range controlPlanes.Items {
 				if _, ok := d[cp.Name]; !ok {
-					framework.Failf("failed to get apiEndpoints for control-plane %s in %s", cp.Name, kubeadmConfigClusterStatusConfigMapKey)
+					e2elog.Failf("failed to get apiEndpoints for control-plane %s in %s", cp.Name, kubeadmConfigClusterStatusConfigMapKey)
 				}
 			}
 		} else {
-			framework.Failf("failed to get apiEndpoints from %s", kubeadmConfigClusterStatusConfigMapKey)
+			e2elog.Failf("failed to get apiEndpoints from %s", kubeadmConfigClusterStatusConfigMapKey)
 		}
 	})
 
@@ -111,7 +112,7 @@ func unmarshalYaml(data string) map[interface{}]interface{} {
 	m := make(map[interface{}]interface{})
 	err := yaml.Unmarshal([]byte(data), &m)
 	if err != nil {
-		framework.Failf("error parsing %s ConfigMap: %v", kubeadmConfigName, err)
+		e2elog.Failf("error parsing %s ConfigMap: %v", kubeadmConfigName, err)
 	}
 	return m
 }

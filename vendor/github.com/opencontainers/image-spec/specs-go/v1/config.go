@@ -37,7 +37,7 @@ type ImageConfig struct {
 	// Cmd defines the default arguments to the entrypoint of the container.
 	Cmd []string `json:"Cmd,omitempty"`
 
-	// Volumes is a set of directories which should be created as data volumes in a container running this image.
+	// Volumes is a set of directories describing where the process is likely write data specific to a container instance.
 	Volumes map[string]struct{} `json:"Volumes,omitempty"`
 
 	// WorkingDir sets the current working directory of the entrypoint process in the container.

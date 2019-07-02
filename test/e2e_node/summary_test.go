@@ -391,7 +391,7 @@ func summaryObjectID(element interface{}) string {
 	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
-		framework.Failf("Unknown type: %T", el)
+		e2elog.Failf("Unknown type: %T", el)
 		return "???"
 	}
 }

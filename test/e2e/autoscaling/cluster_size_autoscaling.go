@@ -29,8 +29,8 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
-	schedulerapi "k8s.io/api/scheduling/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -210,7 +210,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It(fmt.Sprintf("Should scale up GPU pool from 0 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
 		framework.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
-			framework.Failf("TEST_GPU_TYPE not defined")
+			e2elog.Failf("TEST_GPU_TYPE not defined")
 			return
 		}
 
@@ -237,7 +237,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It(fmt.Sprintf("Should scale up GPU pool from 1 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
 		framework.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
-			framework.Failf("TEST_GPU_TYPE not defined")
+			e2elog.Failf("TEST_GPU_TYPE not defined")
 			return
 		}
 
@@ -267,7 +267,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It(fmt.Sprintf("Should not scale GPU pool up if pod does not require GPUs [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
 		framework.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
-			framework.Failf("TEST_GPU_TYPE not defined")
+			e2elog.Failf("TEST_GPU_TYPE not defined")
 			return
 		}
 
@@ -296,7 +296,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	ginkgo.It(fmt.Sprintf("Should scale down GPU pool from 1 [GpuType:%s] [Feature:ClusterSizeAutoscalingGpu]", gpuType), func() {
 		framework.SkipUnlessProviderIs("gke")
 		if gpuType == "" {
-			framework.Failf("TEST_GPU_TYPE not defined")
+			e2elog.Failf("TEST_GPU_TYPE not defined")
 			return
 		}
 
@@ -498,7 +498,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer func() {
 			errs := framework.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)
 			if len(errs) > 0 {
-				framework.Failf("failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv, pvc = nil, nil
 			if diskName != "" {
@@ -1015,12 +1015,12 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 
 	ginkgo.By("Create a PodDisruptionBudget")
 	minAvailable := intstr.FromInt(numPods - pdbSize)
-	pdb := &policy.PodDisruptionBudget{
+	pdb := &policyv1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
 			Namespace: namespace,
 		},
-		Spec: policy.PodDisruptionBudgetSpec{
+		Spec: policyv1beta1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
 			MinAvailable: &minAvailable,
 		},
@@ -1300,7 +1300,7 @@ func reserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 			return framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, id)
 		}
 	}
-	framework.Failf("Failed to reserve memory within timeout")
+	e2elog.Failf("Failed to reserve memory within timeout")
 	return nil
 }
 
@@ -1871,7 +1871,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 			}
 		}
 		if finalErr != nil {
-			framework.Failf("Error during PodDisruptionBudget cleanup: %v", finalErr)
+			e2elog.Failf("Error during PodDisruptionBudget cleanup: %v", finalErr)
 		}
 	}
 
@@ -1891,12 +1891,12 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		labelMap := map[string]string{"k8s-app": pdbData.label}
 		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
 		minAvailable := intstr.FromInt(pdbData.minAvailable)
-		pdb := &policy.PodDisruptionBudget{
+		pdb := &policyv1beta1.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pdbName,
 				Namespace: "kube-system",
 			},
-			Spec: policy.PodDisruptionBudgetSpec{
+			Spec: policyv1beta1.PodDisruptionBudgetSpec{
 				Selector:     &metav1.LabelSelector{MatchLabels: labelMap},
 				MinAvailable: &minAvailable,
 			},
@@ -1917,7 +1917,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 		highPriorityClassName:       1000,
 	}
 	for className, priority := range priorityClasses {
-		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulerapi.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
+		_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: className}, Value: priority})
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}

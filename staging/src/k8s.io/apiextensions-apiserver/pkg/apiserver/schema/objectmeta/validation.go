@@ -28,15 +28,17 @@ import (
 )
 
 // Validate validates embedded ObjectMeta and TypeMeta.
-// It also validate those at the root if includeRoot is true.
-func Validate(pth *field.Path, obj interface{}, s *structuralschema.Structural, includeRoot bool) field.ErrorList {
-	if includeRoot {
+// It also validate those at the root if isResourceRoot is true.
+func Validate(pth *field.Path, obj interface{}, s *structuralschema.Structural, isResourceRoot bool) field.ErrorList {
+	if isResourceRoot {
 		if s == nil {
 			s = &structuralschema.Structural{}
 		}
-		clone := *s
-		clone.XEmbeddedResource = true
-		s = &clone
+		if !s.XEmbeddedResource {
+			clone := *s
+			clone.XEmbeddedResource = true
+			s = &clone
+		}
 	}
 	return validate(pth, obj, s)
 }

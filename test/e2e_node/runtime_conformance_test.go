@@ -144,7 +144,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 						if i < flakeRetry {
 							e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
 						} else {
-							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
+							e2elog.Failf("All %d attempts failed: %v", flakeRetry, err)
 						}
 					}
 				})

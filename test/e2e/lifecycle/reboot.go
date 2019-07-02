@@ -168,7 +168,7 @@ func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 				e2elog.Logf("Node %s failed reboot test.", n.ObjectMeta.Name)
 			}
 		}
-		framework.Failf("Test failed; at least one node failed to reboot in the time given.")
+		e2elog.Failf("Test failed; at least one node failed to reboot in the time given.")
 	}
 }
 

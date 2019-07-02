@@ -302,27 +302,6 @@ message GroupVersionResource {
   optional string resource = 3;
 }
 
-// Initializer is information about an initializer that has not yet completed.
-message Initializer {
-  // name of the process that is responsible for initializing this object.
-  optional string name = 1;
-}
-
-// Initializers tracks the progress of initialization.
-message Initializers {
-  // Pending is a list of initializers that must execute in order before this object is visible.
-  // When the last pending initializer is removed, and no failing result is set, the initializers
-  // struct will be set to nil and the object is considered as initialized and visible to all
-  // clients.
-  // +patchMergeKey=name
-  // +patchStrategy=merge
-  repeated Initializer pending = 1;
-
-  // If result is set with the Failure field, the object will be persisted to storage and then deleted,
-  // ensuring that other clients can observe the deletion.
-  optional Status result = 2;
-}
-
 // A label selector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
@@ -671,19 +650,6 @@ message ObjectMeta {
   // +patchMergeKey=uid
   // +patchStrategy=merge
   repeated OwnerReference ownerReferences = 13;
-
-  // An initializer is a controller which enforces some system invariant at object creation time.
-  // This field is a list of initializers that have not yet acted on this object. If nil or empty,
-  // this object has been completely initialized. Otherwise, the object is considered uninitialized
-  // and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to
-  // observe uninitialized objects.
-  //
-  // When an object is created, the system will populate this list with the current set of initializers.
-  // Only privileged users may set or modify this list. Once it is empty, it may not be modified further
-  // by any user.
-  //
-  // DEPRECATED - initializers are an alpha field and will be removed in v1.15.
-  optional Initializers initializers = 16;
 
   // Must be empty before the object is deleted from the registry. Each entry
   // is an identifier for the responsible component that will remove the entry

@@ -68,15 +68,16 @@ func WriteJSON(data interface{}) ([]byte, error) {
 // ReadJSON reads json data, prefers finding an appropriate interface to short-circuit the unmarshaller
 // so it takes the fastes option available
 func ReadJSON(data []byte, value interface{}) error {
+	trimmedData := bytes.Trim(data, "\x00")
 	if d, ok := value.(ejUnmarshaler); ok {
-		jl := &jlexer.Lexer{Data: data}
+		jl := &jlexer.Lexer{Data: trimmedData}
 		d.UnmarshalEasyJSON(jl)
 		return jl.Error()
 	}
 	if d, ok := value.(json.Unmarshaler); ok {
-		return d.UnmarshalJSON(data)
+		return d.UnmarshalJSON(trimmedData)
 	}
-	return json.Unmarshal(data, value)
+	return json.Unmarshal(trimmedData, value)
 }
 
 // DynamicJSONToStruct converts an untyped json structure into a struct

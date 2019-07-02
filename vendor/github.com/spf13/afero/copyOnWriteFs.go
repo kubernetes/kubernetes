@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var _ Lstater = (*CopyOnWriteFs)(nil)
+
 // The CopyOnWriteFs is a union filesystem: a read only base file system with
 // a possibly writeable layer on top. Changes to the file system will only
 // be made in the overlay: Changing an existing file in the base layer which
@@ -76,16 +78,53 @@ func (u *CopyOnWriteFs) Chmod(name string, mode os.FileMode) error {
 func (u *CopyOnWriteFs) Stat(name string) (os.FileInfo, error) {
 	fi, err := u.layer.Stat(name)
 	if err != nil {
-		origErr := err
-		if e, ok := err.(*os.PathError); ok {
-			err = e.Err
-		}
-		if err == syscall.ENOENT || err == syscall.ENOTDIR {
+		isNotExist := u.isNotExist(err)
+		if isNotExist {
 			return u.base.Stat(name)
 		}
-		return nil, origErr
+		return nil, err
 	}
 	return fi, nil
+}
+
+func (u *CopyOnWriteFs) LstatIfPossible(name string) (os.FileInfo, bool, error) {
+	llayer, ok1 := u.layer.(Lstater)
+	lbase, ok2 := u.base.(Lstater)
+
+	if ok1 {
+		fi, b, err := llayer.LstatIfPossible(name)
+		if err == nil {
+			return fi, b, nil
+		}
+
+		if !u.isNotExist(err) {
+			return nil, b, err
+		}
+	}
+
+	if ok2 {
+		fi, b, err := lbase.LstatIfPossible(name)
+		if err == nil {
+			return fi, b, nil
+		}
+		if !u.isNotExist(err) {
+			return nil, b, err
+		}
+	}
+
+	fi, err := u.Stat(name)
+
+	return fi, false, err
+}
+
+func (u *CopyOnWriteFs) isNotExist(err error) bool {
+	if e, ok := err.(*os.PathError); ok {
+		err = e.Err
+	}
+	if err == os.ErrNotExist || err == syscall.ENOENT || err == syscall.ENOTDIR {
+		return true
+	}
+	return false
 }
 
 // Renaming files present only in the base layer is not permitted
@@ -219,7 +258,7 @@ func (u *CopyOnWriteFs) Open(name string) (File, error) {
 		return nil, fmt.Errorf("BaseErr: %v\nOverlayErr: %v", bErr, lErr)
 	}
 
-	return &UnionFile{base: bfile, layer: lfile}, nil
+	return &UnionFile{Base: bfile, Layer: lfile}, nil
 }
 
 func (u *CopyOnWriteFs) Mkdir(name string, perm os.FileMode) error {
@@ -228,7 +267,7 @@ func (u *CopyOnWriteFs) Mkdir(name string, perm os.FileMode) error {
 		return u.layer.MkdirAll(name, perm)
 	}
 	if dir {
-		return syscall.EEXIST
+		return ErrFileExists
 	}
 	return u.layer.MkdirAll(name, perm)
 }
@@ -243,7 +282,8 @@ func (u *CopyOnWriteFs) MkdirAll(name string, perm os.FileMode) error {
 		return u.layer.MkdirAll(name, perm)
 	}
 	if dir {
-		return syscall.EEXIST
+		// This is in line with how os.MkdirAll behaves.
+		return nil
 	}
 	return u.layer.MkdirAll(name, perm)
 }

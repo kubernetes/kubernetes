@@ -118,6 +118,9 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 			return nil, err
 		}
 		klog.V(1).Infof("[reset] Detected and using CRI socket: %s", criSocketPath)
+	} else {
+		criSocketPath = options.criSocketPath
+		klog.V(1).Infof("[reset] Using specified CRI socket: %s", criSocketPath)
 	}
 
 	return &resetData{

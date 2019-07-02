@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "api_object_versioner_test.go",
         "compact_test.go",
         "event_test.go",
         "lease_manager_test.go",
@@ -33,8 +34,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/apis/example/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/tests:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
@@ -52,6 +52,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "api_object_versioner.go",
         "compact.go",
         "errors.go",
         "event.go",
@@ -68,11 +69,11 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
@@ -94,7 +95,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/metrics:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/preflight:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

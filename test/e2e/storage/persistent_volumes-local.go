@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -51,7 +52,6 @@ type localTestConfig struct {
 	node0        *v1.Node
 	client       clientset.Interface
 	scName       string
-	ssTester     *framework.StatefulSetTester
 	discoveryDir string
 	hostExec     utils.HostExec
 	ltrMgr       utils.LocalTestResourceManager
@@ -164,7 +164,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		// Choose the first node
 		node0 := &nodes.Items[0]
 
-		ssTester := framework.NewStatefulSetTester(f.ClientSet)
 		hostExec := utils.NewHostExec(f)
 		ltrMgr := utils.NewLocalResourceManager("local-volume-test", hostExec, hostBase)
 		config = &localTestConfig{
@@ -173,7 +172,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			nodes:        nodes.Items[:maxLen],
 			node0:        node0,
 			scName:       scName,
-			ssTester:     ssTester,
 			discoveryDir: filepath.Join(hostBase, f.Namespace.Name),
 			hostExec:     hostExec,
 			ltrMgr:       ltrMgr,
@@ -829,7 +827,7 @@ func cleanupLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume) {
 		ginkgo.By("Cleaning up PVC and PV")
 		errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
 		if len(errs) > 0 {
-			framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
+			e2elog.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 }
@@ -870,11 +868,11 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 	// TODO: hostname may not be the best option
 	nodeKey := "kubernetes.io/hostname"
 	if volume.ltr.Node.Labels == nil {
-		framework.Failf("Node does not have labels")
+		e2elog.Failf("Node does not have labels")
 	}
 	nodeValue, found := volume.ltr.Node.Labels[nodeKey]
 	if !found {
-		framework.Failf("Node does not have required label %q", nodeKey)
+		e2elog.Failf("Node does not have required label %q", nodeKey)
 	}
 
 	pvConfig := framework.PersistentVolumeConfig{
@@ -1153,12 +1151,12 @@ func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount in
 	ss, err := config.client.AppsV1().StatefulSets(config.ns).Create(spec)
 	framework.ExpectNoError(err)
 
-	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)
+	e2esset.WaitForRunningAndReady(config.client, ssReplicas, ss)
 	return ss
 }
 
 func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti bool) {
-	pods := config.ssTester.GetPodList(ss)
+	pods := e2esset.GetPodList(config.client, ss)
 
 	nodes := sets.NewString()
 	for _, pod := range pods.Items {

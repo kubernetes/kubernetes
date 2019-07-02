@@ -129,7 +129,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			// typically this claim has already been deleted
 			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil && !apierrs.IsNotFound(err) {
-				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
 		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
@@ -162,7 +162,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			// typically this snapshot has already been deleted
 			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
 			if err != nil && !apierrs.IsNotFound(err) {
-				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
+				e2elog.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
 			}
 		}()
 		err = WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)

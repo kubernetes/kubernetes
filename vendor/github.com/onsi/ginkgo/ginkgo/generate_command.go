@@ -108,10 +108,8 @@ func generateSpec(args []string, agouti, noDot, internal bool) {
 func generateSpecForSubject(subject string, agouti, noDot, internal bool) error {
 	packageName, specFilePrefix, formattedName := getPackageAndFormattedName()
 	if subject != "" {
-		subject = strings.Split(subject, ".go")[0]
-		subject = strings.Split(subject, "_test")[0]
-		specFilePrefix = subject
-		formattedName = prettifyPackageName(subject)
+		specFilePrefix = formatSubject(subject)
+		formattedName = prettifyPackageName(specFilePrefix)
 	}
 
 	data := specData{
@@ -150,6 +148,14 @@ func generateSpecForSubject(subject string, agouti, noDot, internal bool) error 
 	specTemplate.Execute(f, data)
 	goFmt(targetFile)
 	return nil
+}
+
+func formatSubject(name string) string {
+	name = strings.Replace(name, "-", "_", -1)
+	name = strings.Replace(name, " ", "_", -1)
+	name = strings.Split(name, ".go")[0]
+	name = strings.Split(name, "_test")[0]
+	return name
 }
 
 func getPackageImportPath() string {

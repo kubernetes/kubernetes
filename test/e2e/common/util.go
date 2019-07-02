@@ -29,18 +29,23 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 )
 
+// Suite represents test suite.
 type Suite string
 
 const (
-	E2E     Suite = "e2e"
+	// E2E represents a test suite for e2e.
+	E2E Suite = "e2e"
+	// NodeE2E represents a test suite for node e2e.
 	NodeE2E Suite = "node e2e"
 )
 
+// CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
 // CommonImageWhiteList is the list of images used in common test. These images should be prepulled
@@ -49,14 +54,11 @@ var CurrentSuite Suite
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
 var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Agnhost),
-	imageutils.GetE2EImage(imageutils.AuditProxy),
 	imageutils.GetE2EImage(imageutils.BusyBox),
-	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
 	imageutils.GetE2EImage(imageutils.Mounttest),
 	imageutils.GetE2EImage(imageutils.MounttestUser),
 	imageutils.GetE2EImage(imageutils.Nginx),
-	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
@@ -94,15 +96,16 @@ func init() {
 	}
 }
 
+// SubstituteImageName replaces image name in content.
 func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
 	if err != nil {
-		framework.Failf("Failed Parse the template: %v", err)
+		e2elog.Failf("Failed Parse the template: %v", err)
 	}
 	err = tmpl.Execute(contentWithImageName, testImages)
 	if err != nil {
-		framework.Failf("Failed executing template: %v", err)
+		e2elog.Failf("Failed executing template: %v", err)
 	}
 	return contentWithImageName.String()
 }
@@ -125,6 +128,7 @@ func svcByName(name string, port int) *v1.Service {
 	}
 }
 
+// NewSVCByName creates a service by name.
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
 	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
@@ -138,6 +142,7 @@ func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
+// RestartNodes restarts specific nodes.
 func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Build mapping from zone to nodes in that zone.
 	nodeNamesByZone := make(map[string][]string)

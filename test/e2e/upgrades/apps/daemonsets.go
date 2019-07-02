@@ -19,7 +19,7 @@ package upgrades
 import (
 	"github.com/onsi/ginkgo"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,7 +33,7 @@ import (
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after
 // a cluster upgrade.
 type DaemonSetUpgradeTest struct {
-	daemonSet *apps.DaemonSet
+	daemonSet *appsv1.DaemonSet
 }
 
 // Name returns the tracking name of the test.
@@ -47,12 +47,12 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ns := f.Namespace
 
-	t.daemonSet = &apps.DaemonSet{
+	t.daemonSet = &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns.Name,
 			Name:      daemonSetName,
 		},
-		Spec: apps.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelSet,
 			},
@@ -68,6 +68,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 						{
 							Name:            daemonSetName,
 							Image:           image,
+							Args:            []string{"serve-hostname"},
 							Ports:           []v1.ContainerPort{{ContainerPort: 9376}},
 							SecurityContext: &v1.SecurityContext{},
 						},
@@ -80,7 +81,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Creating a DaemonSet")
 	var err error
 	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
-		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
+		e2elog.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
@@ -113,7 +114,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	framework.ExpectNoError(err)
 	if !res {
-		framework.Failf("expected DaemonSet pod to be running on all nodes, it was not")
+		e2elog.Failf("expected DaemonSet pod to be running on all nodes, it was not")
 	}
 
 	// DaemonSet resource itself should be good
@@ -121,7 +122,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	res, err = checkDaemonStatus(f, t.daemonSet.Namespace, t.daemonSet.Name)
 	framework.ExpectNoError(err)
 	if !res {
-		framework.Failf("expected DaemonSet to be in a good state, it was not")
+		e2elog.Failf("expected DaemonSet to be in a good state, it was not")
 	}
 }
 

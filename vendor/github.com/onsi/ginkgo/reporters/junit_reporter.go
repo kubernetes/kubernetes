@@ -121,7 +121,7 @@ func (reporter *JUnitReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 
 func (reporter *JUnitReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	reporter.suite.Tests = summary.NumberOfSpecsThatWillBeRun
-	reporter.suite.Time = math.Trunc(summary.RunTime.Seconds() * 1000 / 1000)
+	reporter.suite.Time = math.Trunc(summary.RunTime.Seconds()*1000) / 1000
 	reporter.suite.Failures = summary.NumberOfFailedSpecs
 	reporter.suite.Errors = 0
 	file, err := os.Create(reporter.filename)

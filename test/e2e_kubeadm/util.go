@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -167,7 +168,7 @@ func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subjec
 			},
 		}
 	default:
-		framework.Failf("invalid subjectKind %s", subjectKind)
+		e2elog.Failf("invalid subjectKind %s", subjectKind)
 	}
 
 	s, err := c.AuthorizationV1().SubjectAccessReviews().Create(sar)

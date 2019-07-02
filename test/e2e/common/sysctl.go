@@ -94,7 +94,6 @@ var _ = framework.KubeDescribe("Sysctls [NodeFeature:Sysctls]", func() {
 		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded))
 
 		ginkgo.By("Getting logs from the pod")
-		ginkgo.By("Getting logs from the pod")
 		log, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err)
 
