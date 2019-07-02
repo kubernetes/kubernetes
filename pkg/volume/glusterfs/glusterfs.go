@@ -95,6 +95,9 @@ const (
 	glusterTypeAnn          = "gluster.org/type"
 	glusterDescAnn          = "Gluster-Internal: Dynamically provisioned PV"
 	heketiVolIDAnn          = "gluster.kubernetes.io/heketi-volume-id"
+
+	// Error string returned by heketi
+	errIDNotFound = "Id not found"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -668,8 +671,11 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	}
 	err = cli.VolumeDelete(volumeID)
 	if err != nil {
-		klog.Errorf("failed to delete volume %s: %v", volumeName, err)
-		return err
+		if dstrings.TrimSpace(err.Error()) != errIDNotFound {
+			klog.Errorf("failed to delete volume %s: %v", volumeName, err)
+			return fmt.Errorf("failed to delete volume %s: %v", volumeName, err)
+		}
+		klog.V(2).Infof("volume %s not present in heketi, ignoring", volumeName)
 	}
 	klog.V(2).Infof("volume %s deleted successfully", volumeName)
 
