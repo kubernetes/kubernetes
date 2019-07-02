@@ -220,11 +220,14 @@ func isCreated(pod *v1.Pod) bool {
 // 1) The pod is in a pending state
 // 2) The pod is at a different revision than the update revision
 // 3) The update strategy is rolling
+// 4) The pod should be updated
 func isStatefullyStuck(set *apps.StatefulSet, pod *v1.Pod, currentRevision, updateRevision *apps.ControllerRevision) bool {
 	return isPending(pod) &&
 		getPodRevision(pod) == currentRevision.Name &&
 		currentRevision.Name != updateRevision.Name &&
-		set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType
+		set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
+		set.Spec.UpdateStrategy.RollingUpdate.Partition != nil &&
+		getOrdinal(pod) >= int(*set.Spec.UpdateStrategy.RollingUpdate.Partition)
 }
 
 // isPending returns true if a pod is in a Phase of PodPending

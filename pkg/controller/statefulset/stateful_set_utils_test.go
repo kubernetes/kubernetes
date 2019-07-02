@@ -213,10 +213,8 @@ func TestIsStatefullyStuck(t *testing.T) {
 	pod.Status = v1.PodStatus{
 		Phase: v1.PodPending,
 	}
+	// pod.ObjectMeta.
 	setPodRevision(pod, "1")
-	pod.ObjectMeta.Generation = 1
-
-	set.ObjectMeta.Generation = 2
 	set.SetLabels(map[string]string{
 		apps.StatefulSetRevisionLabel: "2",
 	})
@@ -240,7 +238,13 @@ func TestIsStatefullyStuck(t *testing.T) {
 		Revision: 2,
 	}
 
-	set.Spec.UpdateStrategy.Type = apps.RollingUpdateStatefulSetStrategyType
+	ordinal := int32(1)
+	set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
+		Type: apps.RollingUpdateStatefulSetStrategyType,
+		RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+			Partition: &ordinal,
+		},
+	}
 	if !isStatefullyStuck(set, pod, currentRevision, updateRevision) {
 		t.Error("Pod should be in a stuck state")
 	}
