@@ -264,6 +264,7 @@ kube::golang::test_targets() {
     cmd/linkcheck
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
+    cluster/images/conformance/go-runner
   )
   echo "${targets[@]}"
 }
