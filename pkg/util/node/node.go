@@ -175,7 +175,7 @@ func PatchNodeCIDR(c clientset.Interface, node types.NodeName, cidr string) erro
 	return nil
 }
 
-// PatchNodeCIDR patches the specified node's CIDR to the given value.
+// PatchNodeCIDRs patches the specified node.CIDR=cidrs[0] and node.CIDRs to the given value.
 func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) error {
 	rawCidrs, err := json.Marshal(cidrs)
 	if err != nil {
@@ -189,7 +189,7 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 
 	// set the pod cidrs list and set the old pod cidr field
 	patchBytes := []byte(fmt.Sprintf(`{"spec":{"podCIDR":%s , "podCIDRs":%s}}`, rawCidr, rawCidrs))
-
+	klog.V(4).Infof("cidrs patch bytes are:%s", string(patchBytes))
 	if _, err := c.CoreV1().Nodes().Patch(string(node), types.StrategicMergePatchType, patchBytes); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}

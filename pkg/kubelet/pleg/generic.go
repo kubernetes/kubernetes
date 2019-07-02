@@ -344,22 +344,22 @@ func (g *GenericPLEG) cacheEnabled() bool {
 	return g.cache != nil
 }
 
-// getPodIP preserves an older cached status' pod IP if the new status has no pod IP
+// getPodIP preserves an older cached status' pod IP if the new status has no pod IPs
 // and its sandboxes have exited
-func (g *GenericPLEG) getPodIP(pid types.UID, status *kubecontainer.PodStatus) string {
-	if status.IP != "" {
-		return status.IP
+func (g *GenericPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) []string {
+	if len(status.IPs) != 0 {
+		return status.IPs
 	}
 
 	oldStatus, err := g.cache.Get(pid)
-	if err != nil || oldStatus.IP == "" {
-		return ""
+	if err != nil || len(oldStatus.IPs) == 0 {
+		return nil
 	}
 
 	for _, sandboxStatus := range status.SandboxStatuses {
 		// If at least one sandbox is ready, then use this status update's pod IP
 		if sandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			return status.IP
+			return status.IPs
 		}
 	}
 
@@ -369,14 +369,14 @@ func (g *GenericPLEG) getPodIP(pid types.UID, status *kubecontainer.PodStatus) s
 		// running then use the new pod IP
 		for _, containerStatus := range status.ContainerStatuses {
 			if containerStatus.State == kubecontainer.ContainerStateCreated || containerStatus.State == kubecontainer.ContainerStateRunning {
-				return status.IP
+				return status.IPs
 			}
 		}
 	}
 
 	// For pods with no ready containers or sandboxes (like exited pods)
 	// use the old status' pod IP
-	return oldStatus.IP
+	return oldStatus.IPs
 }
 
 func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
@@ -398,7 +398,7 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 		// When a pod is torn down, kubelet may race with PLEG and retrieve
 		// a pod status after network teardown, but the kubernetes API expects
 		// the completed pod's IP to be available after the pod is dead.
-		status.IP = g.getPodIP(pid, status)
+		status.IPs = g.getPodIPs(pid, status)
 	}
 
 	g.cache.Set(pod.ID, status, err, timestamp)

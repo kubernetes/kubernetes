@@ -36,6 +36,7 @@ go_library(
             "//pkg/kubelet/dockershim/network:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
+            "//pkg/features:go_default_library",
             "//pkg/kubelet/apis/config:go_default_library",
             "//pkg/kubelet/container:go_default_library",
             "//pkg/kubelet/dockershim/network:go_default_library",
@@ -48,6 +49,7 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
             "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
             "//vendor/github.com/containernetworking/cni/pkg/types/020:go_default_library",
@@ -55,6 +57,7 @@ go_library(
             "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/k8s.io/klog:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
+            "//vendor/k8s.io/utils/net:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:nacl": [
             "//pkg/kubelet/apis/config:go_default_library",
@@ -105,6 +108,7 @@ go_test(
             "//pkg/util/bandwidth:go_default_library",
             "//pkg/util/iptables/testing:go_default_library",
             "//pkg/util/sysctl/testing:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/mock:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
