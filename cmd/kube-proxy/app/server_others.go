@@ -73,7 +73,7 @@ func newProxyServer(
 
 	protocol := utiliptables.ProtocolIpv4
 	if net.ParseIP(config.BindAddress).To4() == nil {
-		klog.V(0).Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
+		klog.Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
 		protocol = utiliptables.ProtocolIpv6
 	}
 
@@ -140,7 +140,7 @@ func newProxyServer(
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if proxyMode == proxyModeIPTables {
-		klog.V(0).Info("Using iptables Proxier.")
+		klog.Info("Using iptables Proxier.")
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -167,7 +167,7 @@ func newProxyServer(
 		}
 		metrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
-		klog.V(0).Info("Using ipvs Proxier.")
+		klog.Info("Using ipvs Proxier.")
 		proxier, err = ipvs.NewProxier(
 			iptInterface,
 			ipvsInterface,
@@ -193,7 +193,7 @@ func newProxyServer(
 		}
 		metrics.RegisterMetrics()
 	} else {
-		klog.V(0).Info("Using userspace Proxier.")
+		klog.Info("Using userspace Proxier.")
 
 		// TODO this has side effects that should only happen when Run() is invoked.
 		proxier, err = userspace.NewProxier(

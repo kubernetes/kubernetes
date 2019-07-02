@@ -98,7 +98,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
-		klog.V(0).Info("Using Kernelspace Proxier.")
+		klog.Info("Using Kernelspace Proxier.")
 		proxier, err = winkernel.NewProxier(
 			config.IPTables.SyncPeriod.Duration,
 			config.IPTables.MinSyncPeriod.Duration,
@@ -115,7 +115,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else {
-		klog.V(0).Info("Using userspace Proxier.")
+		klog.Info("Using userspace Proxier.")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)
