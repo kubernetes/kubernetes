@@ -293,12 +293,12 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	}
 }
 
-// TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff tests scenario when
-// AddUnschedulableIfNotPresent is called asynchronously pods in and before
-// current scheduling cycle will be put back to activeQueue if we were trying
-// to schedule them when we received move request.
+// TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff tests the scenarios when
+// AddUnschedulableIfNotPresent is called asynchronously.
+// Pods in and before current scheduling cycle will be put back to activeQueue
+// if we were trying to schedule them when we received move request.
 func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
-	q := NewPriorityQueue(nil, nil)
+	q := NewPriorityQueueWithClock(nil, clock.NewFakeClock(time.Now()), nil)
 	totalNum := 10
 	expectedPods := make([]v1.Pod, 0, totalNum)
 	for i := 0; i < totalNum; i++ {
@@ -348,7 +348,9 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 			},
 		}
 
-		q.AddUnschedulableIfNotPresent(unschedulablePod, oldCycle)
+		if err := q.AddUnschedulableIfNotPresent(unschedulablePod, oldCycle); err != nil {
+			t.Errorf("Failed to call AddUnschedulableIfNotPresent(%v): %v", unschedulablePod.Name, err)
+		}
 	}
 
 	// Since there was a move request at the same cycle as "oldCycle", these pods
