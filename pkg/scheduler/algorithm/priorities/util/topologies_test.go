@@ -109,3 +109,152 @@ func TestPodMatchesTermsNamespaceAndSelector(t *testing.T) {
 	}
 
 }
+
+func TestNodesHaveSameTopologyKey(t *testing.T) {
+	tests := []struct {
+		name         string
+		nodeA, nodeB *v1.Node
+		topologyKey  string
+		expected     bool
+	}{
+		{
+			name: "nodeA{'a':'a'} vs. empty label in nodeB",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "a",
+					},
+				},
+			},
+			nodeB:       &v1.Node{},
+			expected:    false,
+			topologyKey: "a",
+		},
+		{
+			name: "nodeA{'a':'a'} vs. nodeB{'a':'a'}",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "a",
+					},
+				},
+			},
+			nodeB: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "a",
+					},
+				},
+			},
+			expected:    true,
+			topologyKey: "a",
+		},
+		{
+			name: "nodeA{'a':''} vs. empty label in nodeB",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			nodeB:       &v1.Node{},
+			expected:    false,
+			topologyKey: "a",
+		},
+		{
+			name: "nodeA{'a':''} vs. nodeB{'a':''}",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			nodeB: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			expected:    true,
+			topologyKey: "a",
+		},
+		{
+			name: "nodeA{'a':'a'} vs. nodeB{'a':'a'} by key{'b'}",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "a",
+					},
+				},
+			},
+			nodeB: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "a",
+					},
+				},
+			},
+			expected:    false,
+			topologyKey: "b",
+		},
+		{
+			name: "topologyKey empty",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			nodeB: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			expected:    false,
+			topologyKey: "",
+		},
+		{
+			name: "nodeA label nil vs. nodeB{'a':''} by key('a')",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			nodeB: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			expected:    false,
+			topologyKey: "a",
+		},
+		{
+			name: "nodeA{'a':''}  vs. nodeB label is nil by key('a')",
+			nodeA: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "",
+					},
+				},
+			},
+			nodeB: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			expected:    false,
+			topologyKey: "a",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := NodesHaveSameTopologyKey(test.nodeA, test.nodeB, test.topologyKey)
+			assert.Equalf(t, test.expected, got, "Failed to test: %s", test.name)
+		})
+	}
+}

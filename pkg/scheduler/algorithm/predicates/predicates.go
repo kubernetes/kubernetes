@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -1178,17 +1177,15 @@ func EssentialPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedule
 
 // PodAffinityChecker contains information to check pod affinity.
 type PodAffinityChecker struct {
-	info         NodeInfo
-	podLister    algorithm.PodLister
-	topologyInfo internalcache.NodeTopologyInfo
+	info      NodeInfo
+	podLister algorithm.PodLister
 }
 
 // NewPodAffinityPredicate creates a PodAffinityChecker.
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, topologyInfo internalcache.NodeTopologyInfo) FitPredicate {
+func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) FitPredicate {
 	checker := &PodAffinityChecker{
-		info:         info,
-		podLister:    podLister,
-		topologyInfo: topologyInfo,
+		info:      info,
+		podLister: podLister,
 	}
 	return checker.InterPodAffinityMatches
 }
@@ -1250,18 +1247,7 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, 
 		if len(term.TopologyKey) == 0 {
 			return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 		}
-
-		topologyValue, ok := targetPodNode.Labels[term.TopologyKey]
-		if !ok {
-			return false, true, nil
-		}
-
-		nodeSet, ok := c.topologyInfo[internalcache.TopologyPair{Key: term.TopologyKey, Value: topologyValue}]
-		if !ok {
-			return false, true, nil
-		}
-
-		if !nodeSet.Has(nodeInfo.Node().Name) {
+		if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNode, term.TopologyKey) {
 			return false, true, nil
 		}
 	}
