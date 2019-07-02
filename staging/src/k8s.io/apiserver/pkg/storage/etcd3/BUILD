@@ -97,6 +97,7 @@ filegroup(
         ":package-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/metrics:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/preflight:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:all-srcs",
     ],
     tags = ["automanaged"],
 )

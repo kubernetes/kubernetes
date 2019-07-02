@@ -40,7 +40,7 @@ import (
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -63,8 +63,8 @@ import (
 )
 
 // setUp is a convience function for setting up for (most) tests.
-func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
+	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := &Config{
 		GenericConfig: genericapiserver.NewConfig(legacyscheme.Codecs),
@@ -197,7 +197,7 @@ func TestCertificatesRestStorageStrategies(t *testing.T) {
 	}
 }
 
-func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
+func newMaster(t *testing.T) (*Master, *etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
 	master, err := config.Complete().New(genericapiserver.NewEmptyDelegate())

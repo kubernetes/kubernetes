@@ -20,7 +20,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/storage/etcd/testing:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd/util:all-srcs",
     ],
     tags = ["automanaged"],
