@@ -297,7 +297,7 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) 
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
-	if schema == nil {
+	if schema == nil || (v2 && schema.XPreserveUnknownFields) {
 		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
@@ -311,7 +311,7 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) 
 		ret.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).
 			WithDescription(swaggerPartialObjectMetadataDescriptions["metadata"]))
 		addTypeMetaProperties(ret)
-		addEmbeddedProperties(ret)
+		addEmbeddedProperties(ret, v2)
 	}
 	ret.AddExtension(endpoints.ROUTE_META_GVK, []interface{}{
 		map[string]interface{}{
@@ -324,23 +324,28 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) 
 	return ret
 }
 
-func addEmbeddedProperties(s *spec.Schema) {
+func addEmbeddedProperties(s *spec.Schema, v2 bool) {
 	if s == nil {
 		return
 	}
 
 	for k := range s.Properties {
 		v := s.Properties[k]
-		addEmbeddedProperties(&v)
+		addEmbeddedProperties(&v, v2)
 		s.Properties[k] = v
 	}
 	if s.Items != nil {
-		addEmbeddedProperties(s.Items.Schema)
+		addEmbeddedProperties(s.Items.Schema, v2)
 	}
 	if s.AdditionalProperties != nil {
-		addEmbeddedProperties(s.AdditionalProperties.Schema)
+		addEmbeddedProperties(s.AdditionalProperties.Schema, v2)
 	}
 
+	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-preserve-unknown-fields"); ok && isTrue && v2 {
+		// don't add metadata properties if we're publishing to openapi v2 and are allowing unknown fields.
+		// adding these metadata properties makes kubectl refuse to validate unknown fields.
+		return
+	}
 	if isTrue, ok := s.VendorExtensible.Extensions.GetBool("x-kubernetes-embedded-resource"); ok && isTrue {
 		s.SetProperty("apiVersion", withDescription(getDefinition(typeMetaType).SchemaProps.Properties["apiVersion"],
 			"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
