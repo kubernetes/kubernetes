@@ -109,7 +109,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		if c != nil {
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
 			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			clientPod, pv, pvc, node = nil, nil, nil, ""
 			if diskName != "" {

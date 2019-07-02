@@ -21,9 +21,10 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -46,12 +47,12 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 				container2Name := "container2"
 				container2Domain := "contoso.org"
 
-				pod := &corev1.Pod{
+				pod := &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: podName,
 					},
-					Spec: corev1.PodSpec{
-						Containers: []corev1.Container{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
 							{
 								Name:  container1Name,
 								Image: imageutils.GetPauseImageName(),
@@ -59,15 +60,15 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 							{
 								Name:  container2Name,
 								Image: imageutils.GetPauseImageName(),
-								SecurityContext: &corev1.SecurityContext{
-									WindowsOptions: &corev1.WindowsSecurityContextOptions{
+								SecurityContext: &v1.SecurityContext{
+									WindowsOptions: &v1.WindowsSecurityContextOptions{
 										GMSACredentialSpec: generateDummyCredSpecs(container2Domain),
 									},
 								},
 							},
 						},
-						SecurityContext: &corev1.PodSecurityContext{
-							WindowsOptions: &corev1.WindowsSecurityContextOptions{
+						SecurityContext: &v1.PodSecurityContext{
+							WindowsOptions: &v1.WindowsSecurityContextOptions{
 								GMSACredentialSpec: generateDummyCredSpecs(podDomain),
 							},
 						},
@@ -98,12 +99,12 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 					}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 
 					if !strings.HasPrefix(output, domain) {
-						framework.Failf("Expected %q to start with %q", output, domain)
+						e2elog.Failf("Expected %q to start with %q", output, domain)
 					}
 
 					expectedSubstr := "The command completed successfully"
 					if !strings.Contains(output, expectedSubstr) {
-						framework.Failf("Expected %q to contain %q", output, expectedSubstr)
+						e2elog.Failf("Expected %q to contain %q", output, expectedSubstr)
 					}
 				}
 

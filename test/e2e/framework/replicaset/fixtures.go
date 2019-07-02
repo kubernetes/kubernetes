@@ -17,14 +17,14 @@ limitations under the License.
 package replicaset
 
 import (
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NewReplicaSet returns a new ReplicaSet.
-func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]string, imageName, image string) *apps.ReplicaSet {
-	return &apps.ReplicaSet{
+func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]string, imageName, image string) *appsv1.ReplicaSet {
+	return &appsv1.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
 			APIVersion: "apps/v1",
@@ -33,7 +33,7 @@ func NewReplicaSet(name, namespace string, replicas int32, podLabels map[string]
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: podLabels,
 			},

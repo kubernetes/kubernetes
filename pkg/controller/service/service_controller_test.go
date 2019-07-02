@@ -25,12 +25,13 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -82,7 +83,6 @@ func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
 	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
 
-	controller.init()
 	cloud.Calls = nil     // ignore any cloud calls made in init()
 	client.ClearActions() // ignore any client calls made in init()
 
@@ -833,6 +833,16 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 }
 
+// Test cases:
+// index    finalizer    timestamp    wantLB  |  clean-up
+//   0         0           0            0     |   false    (No finalizer, no clean up)
+//   1         0           0            1     |   false    (Ignored as same with case 0)
+//   2         0           1            0     |   false    (Ignored as same with case 0)
+//   3         0           1            1     |   false    (Ignored as same with case 0)
+//   4         1           0            0     |   true
+//   5         1           0            1     |   false
+//   6         1           1            0     |   true    (Service is deleted, needs clean up)
+//   7         1           1            1     |   true    (Ignored as same with case 6)
 func TestNeedsCleanup(t *testing.T) {
 	testCases := []struct {
 		desc               string
@@ -840,26 +850,30 @@ func TestNeedsCleanup(t *testing.T) {
 		expectNeedsCleanup bool
 	}{
 		{
-			desc:               "service without finalizer without timestamp",
+			desc:               "service without finalizer",
 			svc:                &v1.Service{},
 			expectNeedsCleanup: false,
 		},
 		{
-			desc: "service without finalizer with timestamp",
-			svc: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					DeletionTimestamp: &metav1.Time{
-						Time: time.Now(),
-					},
-				},
-			},
-			expectNeedsCleanup: false,
-		},
-		{
-			desc: "service with finalizer without timestamp",
+			desc: "service with finalizer without timestamp without LB",
 			svc: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeNodePort,
+				},
+			},
+			expectNeedsCleanup: true,
+		},
+		{
+			desc: "service with finalizer without timestamp with LB",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeLoadBalancer,
 				},
 			},
 			expectNeedsCleanup: false,
@@ -868,10 +882,10 @@ func TestNeedsCleanup(t *testing.T) {
 			desc: "service with finalizer with timestamp",
 			svc: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
+					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
 					DeletionTimestamp: &metav1.Time{
 						Time: time.Now(),
 					},
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer, "unrelated"},
 				},
 			},
 			expectNeedsCleanup: true,
@@ -983,6 +997,50 @@ func TestNeedsUpdate(t *testing.T) {
 				oldSvc = defaultExternalService()
 				newSvc = defaultExternalService()
 				newSvc.Spec.HealthCheckNodePort = 30123
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If TargetGroup is different 1",
+			updateFn: func() {
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.Parse("20"),
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("21")
+			},
+			expectedNeedsUpdate: true,
+		},
+		{
+			testName: "If TargetGroup is different 2",
+			updateFn: func() {
+				oldSvc = &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "tcp-service",
+						Namespace: "default",
+					},
+					Spec: v1.ServiceSpec{
+						Ports: []v1.ServicePort{{
+							Port:       80,
+							Protocol:   v1.ProtocolTCP,
+							TargetPort: intstr.Parse("22"),
+						}},
+						Type: v1.ServiceTypeLoadBalancer,
+					},
+				}
+				newSvc = oldSvc.DeepCopy()
+				newSvc.Spec.Ports[0].TargetPort = intstr.Parse("dns")
 			},
 			expectedNeedsUpdate: true,
 		},

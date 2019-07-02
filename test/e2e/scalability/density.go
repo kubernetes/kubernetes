@@ -14,6 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// DEPRECATED.
+// We already migrated all periodic and presubmit tests to ClusterLoader2.
+// We are still keeping this file for optional functionality, but once
+// this is supported in ClusterLoader2 tests, this test will be removed
+// (hopefully in 1.16 release).
+// Please don't add new functionality to this file and instead see:
+// https://github.com/kubernetes/perf-tests/tree/master/clusterloader2
+
 package scalability
 
 import (
@@ -54,22 +62,28 @@ import (
 )
 
 const (
+	// PodStartupLatencyThreshold holds the latency threashold for pod startup
 	PodStartupLatencyThreshold = 5 * time.Second
-	MinSaturationThreshold     = 2 * time.Minute
+	// MinSaturationThreshold holds the minimum staturation threashold
+	MinSaturationThreshold = 2 * time.Minute
+	// MinPodsPerSecondThroughput holds the minimum pod/sec throughput
 	MinPodsPerSecondThroughput = 8
-	DensityPollInterval        = 10 * time.Second
-	MinPodStartupMeasurements  = 500
+	// DensityPollInterval holds the desity of polling interval
+	DensityPollInterval = 10 * time.Second
+	// MinPodStartupMeasurements holds the minimum number of measurements related to pod-startup
+	MinPodStartupMeasurements = 500
 )
 
-// Maximum container failures this test tolerates before failing.
+// MaxContainerFailures holds the maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
 
-// Maximum no. of missing measurements related to pod-startup that the test tolerates.
+// MaxMissingPodStartupMeasurements holds the maximum number of missing measurements related to pod-startup that the test tolerates.
 var MaxMissingPodStartupMeasurements = 0
 
 // Number of nodes in the cluster (computed inside BeforeEach).
 var nodeCount = 0
 
+// DensityTestConfig holds the configurations for e2e scalability tests
 type DensityTestConfig struct {
 	Configs      []testutils.RunObjectConfig
 	ClientSets   []clientset.Interface
@@ -402,7 +416,7 @@ var _ = SIGDescribe("Density", func() {
 	var uuid string
 	var e2eStartupTime time.Duration
 	var totalPods int
-	var nodeCpuCapacity int64
+	var nodeCPUCapacity int64
 	var nodeMemCapacity int64
 	var nodes *v1.NodeList
 	var scheduleThroughputs []float64
@@ -508,7 +522,7 @@ var _ = SIGDescribe("Density", func() {
 		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 
 		// Compute node capacity, leaving some slack for addon pods.
-		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
+		nodeCPUCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue() - 100
 		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value() - 100*1024*1024
 
 		// Terminating a namespace (deleting the remaining objects from it - which
@@ -691,7 +705,7 @@ var _ = SIGDescribe("Density", func() {
 					Timeout:                        timeout,
 					PodStatusFile:                  fileHndl,
 					Replicas:                       (totalPods + numberOfCollections - 1) / numberOfCollections,
-					CpuRequest:                     nodeCpuCapacity / 100,
+					CpuRequest:                     nodeCPUCapacity / 100,
 					MemRequest:                     nodeMemCapacity / 100,
 					MaxContainerFailures:           &MaxContainerFailures,
 					Silent:                         true,
@@ -723,7 +737,7 @@ var _ = SIGDescribe("Density", func() {
 				case batch.Kind("Job"):
 					configs[i] = &testutils.JobConfig{RCConfig: *baseConfig}
 				default:
-					framework.Failf("Unsupported kind: %v", itArg.kind)
+					e2elog.Failf("Unsupported kind: %v", itArg.kind)
 				}
 			}
 
@@ -787,7 +801,7 @@ var _ = SIGDescribe("Density", func() {
 							if startTime != metav1.NewTime(time.Time{}) {
 								runTimes[p.Name] = startTime
 							} else {
-								framework.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
+								e2elog.Failf("Pod %v is reported to be running, but none of its containers is", p.Name)
 							}
 						}
 					}
@@ -851,7 +865,7 @@ var _ = SIGDescribe("Density", func() {
 					// Thanks to it we trigger increasing priority function by scheduling
 					// a pod to a node, which in turn will result in spreading latency pods
 					// more evenly between nodes.
-					cpuRequest := *resource.NewMilliQuantity(nodeCpuCapacity/5, resource.DecimalSI)
+					cpuRequest := *resource.NewMilliQuantity(nodeCPUCapacity/5, resource.DecimalSI)
 					memRequest := *resource.NewQuantity(nodeMemCapacity/5, resource.DecimalSI)
 					if podsPerNode > 30 {
 						// This is to make them schedulable on high-density tests
@@ -876,7 +890,7 @@ var _ = SIGDescribe("Density", func() {
 					waitTimeout := 10 * time.Minute
 					for start := time.Now(); len(watchTimes) < watchTimesLen+nodeCount; time.Sleep(10 * time.Second) {
 						if time.Since(start) < waitTimeout {
-							framework.Failf("Timeout reached waiting for all Pods being observed by the watch.")
+							e2elog.Failf("Timeout reached waiting for all Pods being observed by the watch.")
 						}
 					}
 

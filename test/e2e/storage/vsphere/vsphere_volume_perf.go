@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	storageV1 "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -89,7 +89,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 
 	ginkgo.It("vcp performance tests", func() {
 		scList := getTestStorageClasses(client, policyName, datastoreName)
-		defer func(scList []*storageV1.StorageClass) {
+		defer func(scList []*storagev1.StorageClass) {
 			for _, sc := range scList {
 				client.StorageV1().StorageClasses().Delete(sc.Name, nil)
 			}
@@ -113,7 +113,7 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 	})
 })
 
-func getTestStorageClasses(client clientset.Interface, policyName, datastoreName string) []*storageV1.StorageClass {
+func getTestStorageClasses(client clientset.Interface, policyName, datastoreName string) []*storagev1.StorageClass {
 	const (
 		storageclass1 = "sc-default"
 		storageclass2 = "sc-vsan"
@@ -121,11 +121,11 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 		storageclass4 = "sc-user-specified-ds"
 	)
 	scNames := []string{storageclass1, storageclass2, storageclass3, storageclass4}
-	scArrays := make([]*storageV1.StorageClass, len(scNames))
+	scArrays := make([]*storagev1.StorageClass, len(scNames))
 	for index, scname := range scNames {
 		// Create vSphere Storage Class
 		ginkgo.By(fmt.Sprintf("Creating Storage Class : %v", scname))
-		var sc *storageV1.StorageClass
+		var sc *storagev1.StorageClass
 		var err error
 		switch scname {
 		case storageclass1:
@@ -155,7 +155,7 @@ func getTestStorageClasses(client clientset.Interface, policyName, datastoreName
 }
 
 // invokeVolumeLifeCyclePerformance peforms full volume life cycle management and records latency for each operation
-func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.Interface, namespace string, sc []*storageV1.StorageClass, volumesPerPod int, volumeCount int, nodeSelectorList []*NodeSelector) (latency map[string]float64) {
+func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.Interface, namespace string, sc []*storagev1.StorageClass, volumesPerPod int, volumeCount int, nodeSelectorList []*NodeSelector) (latency map[string]float64) {
 	var (
 		totalpvclaims [][]*v1.PersistentVolumeClaim
 		totalpvs      [][]*v1.PersistentVolume

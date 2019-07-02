@@ -336,25 +336,25 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		replicationController, err := rc.clientSet.CoreV1().ReplicationControllers(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if replicationController == nil {
-			framework.Failf(rcIsNil)
+			e2elog.Failf(rcIsNil)
 		}
 		return int(replicationController.Status.ReadyReplicas)
 	case KindDeployment:
 		deployment, err := rc.clientSet.AppsV1().Deployments(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if deployment == nil {
-			framework.Failf(deploymentIsNil)
+			e2elog.Failf(deploymentIsNil)
 		}
 		return int(deployment.Status.ReadyReplicas)
 	case KindReplicaSet:
 		rs, err := rc.clientSet.AppsV1().ReplicaSets(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if rs == nil {
-			framework.Failf(rsIsNil)
+			e2elog.Failf(rsIsNil)
 		}
 		return int(rs.Status.ReadyReplicas)
 	default:
-		framework.Failf(invalidKind)
+		e2elog.Failf(invalidKind)
 	}
 	return 0
 }
@@ -488,7 +488,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		framework.ExpectNoError(replicaset.RunReplicaSet(rsConfig))
 		break
 	default:
-		framework.Failf(invalidKind)
+		e2elog.Failf(invalidKind)
 	}
 
 	ginkgo.By(fmt.Sprintf("Running controller"))

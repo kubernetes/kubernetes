@@ -172,6 +172,10 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 
 	// This test verifies that MatchInterPodAffinity (anti-affinity) is respected as expected.
 	ginkgo.It("validates pod anti-affinity works properly when new replica pod is scheduled", func() {
+		// check if there are at least 2 worker nodes available, else skip this test.
+		if len(nodeList.Items) < 2 {
+			framework.Skipf("Skipping as the test requires at least two worker nodes, current number of nodes: %d", len(nodeList.Items))
+		}
 		ginkgo.By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, "host-port")

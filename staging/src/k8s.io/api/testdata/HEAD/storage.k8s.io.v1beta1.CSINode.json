@@ -47,7 +47,10 @@
         "nodeID": "25",
         "topologyKeys": [
           "26"
-        ]
+        ],
+        "allocatable": {
+          "count": -1821918122
+        }
       }
     ]
   }

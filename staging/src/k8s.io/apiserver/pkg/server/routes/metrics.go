@@ -22,7 +22,7 @@ import (
 
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
-	etcdmetrics "k8s.io/apiserver/pkg/storage/etcd/metrics"
+	etcd3metrics "k8s.io/apiserver/pkg/storage/etcd3/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -47,7 +47,7 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 	c.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
 			apimetrics.Reset()
-			etcdmetrics.Reset()
+			etcd3metrics.Reset()
 			io.WriteString(w, "metrics reset\n")
 			return
 		}
@@ -58,5 +58,5 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 // register apiserver and etcd metrics
 func register() {
 	apimetrics.Register()
-	etcdmetrics.Register()
+	etcd3metrics.Register()
 }

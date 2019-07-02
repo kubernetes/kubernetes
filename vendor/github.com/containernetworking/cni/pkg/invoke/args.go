@@ -15,6 +15,7 @@
 package invoke
 
 import (
+	"fmt"
 	"os"
 	"strings"
 )
@@ -22,6 +23,8 @@ import (
 type CNIArgs interface {
 	// For use with os/exec; i.e., return nil to inherit the
 	// environment from this process
+	// For use in delegation; inherit the environment from this
+	// process and allow overrides
 	AsEnv() []string
 }
 
@@ -57,17 +60,17 @@ func (args *Args) AsEnv() []string {
 		pluginArgsStr = stringify(args.PluginArgs)
 	}
 
-	// Ensure that the custom values are first, so any value present in
-	// the process environment won't override them.
-	env = append([]string{
-		"CNI_COMMAND=" + args.Command,
-		"CNI_CONTAINERID=" + args.ContainerID,
-		"CNI_NETNS=" + args.NetNS,
-		"CNI_ARGS=" + pluginArgsStr,
-		"CNI_IFNAME=" + args.IfName,
-		"CNI_PATH=" + args.Path,
-	}, env...)
-	return env
+	// Duplicated values which come first will be overrided, so we must put the
+	// custom values in the end to avoid being overrided by the process environments.
+	env = append(env,
+		"CNI_COMMAND="+args.Command,
+		"CNI_CONTAINERID="+args.ContainerID,
+		"CNI_NETNS="+args.NetNS,
+		"CNI_ARGS="+pluginArgsStr,
+		"CNI_IFNAME="+args.IfName,
+		"CNI_PATH="+args.Path,
+	)
+	return dedupEnv(env)
 }
 
 // taken from rkt/networking/net_plugin.go
@@ -79,4 +82,47 @@ func stringify(pluginArgs [][2]string) string {
 	}
 
 	return strings.Join(entries, ";")
+}
+
+// DelegateArgs implements the CNIArgs interface
+// used for delegation to inherit from environments
+// and allow some overrides like CNI_COMMAND
+var _ CNIArgs = &DelegateArgs{}
+
+type DelegateArgs struct {
+	Command string
+}
+
+func (d *DelegateArgs) AsEnv() []string {
+	env := os.Environ()
+
+	// The custom values should come in the end to override the existing
+	// process environment of the same key.
+	env = append(env,
+		"CNI_COMMAND="+d.Command,
+	)
+	return dedupEnv(env)
+}
+
+// dedupEnv returns a copy of env with any duplicates removed, in favor of later values.
+// Items not of the normal environment "key=value" form are preserved unchanged.
+func dedupEnv(env []string) []string {
+	out := make([]string, 0, len(env))
+	envMap := map[string]string{}
+
+	for _, kv := range env {
+		// find the first "=" in environment, if not, just keep it
+		eq := strings.Index(kv, "=")
+		if eq < 0 {
+			out = append(out, kv)
+			continue
+		}
+		envMap[kv[:eq]] = kv[eq+1:]
+	}
+
+	for k, v := range envMap {
+		out = append(out, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return out
 }

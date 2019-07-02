@@ -251,7 +251,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	// check if PV's DeletionTimeStamp is set, if so, return error.
 	if utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection) {
 		if volume.ObjectMeta.DeletionTimestamp != nil {
-			return fmt.Errorf("the volume is marked for deletion")
+			return fmt.Errorf("the volume is marked for deletion %q", volume.Name)
 		}
 	}
 
@@ -856,20 +856,21 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 
 	// Save the volume only if something was changed
 	if dirty {
-		return ctrl.updateBindVolumeToClaim(volumeClone, claim, true)
+		return ctrl.updateBindVolumeToClaim(volumeClone, true)
 	}
 
 	klog.V(4).Infof("updating PersistentVolume[%s]: already bound to %q", volume.Name, claimToClaimKey(claim))
 	return volume, nil
 }
 
-// bindVolumeToClaim modifies given volume to be bound to a claim and saves it to
+// updateBindVolumeToClaim modifies given volume to be bound to a claim and saves it to
 // API server. The claim is not modified in this method!
-func (ctrl *PersistentVolumeController) updateBindVolumeToClaim(volumeClone *v1.PersistentVolume, claim *v1.PersistentVolumeClaim, updateCache bool) (*v1.PersistentVolume, error) {
-	klog.V(2).Infof("claim %q bound to volume %q", claimToClaimKey(claim), volumeClone.Name)
+func (ctrl *PersistentVolumeController) updateBindVolumeToClaim(volumeClone *v1.PersistentVolume, updateCache bool) (*v1.PersistentVolume, error) {
+	claimKey := claimrefToClaimKey(volumeClone.Spec.ClaimRef)
+	klog.V(2).Infof("claim %q bound to volume %q", claimKey, volumeClone.Name)
 	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(volumeClone)
 	if err != nil {
-		klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volumeClone.Name, claimToClaimKey(claim), err)
+		klog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volumeClone.Name, claimKey, err)
 		return newVol, err
 	}
 	if updateCache {
@@ -879,7 +880,7 @@ func (ctrl *PersistentVolumeController) updateBindVolumeToClaim(volumeClone *v1.
 			return newVol, err
 		}
 	}
-	klog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", newVol.Name, claimToClaimKey(claim))
+	klog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", newVol.Name, claimKey)
 	return newVol, nil
 }
 

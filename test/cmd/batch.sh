@@ -27,14 +27,14 @@ run_job_tests() {
 
   ### Create a new namespace
   # Pre-condition: the test-jobs namespace does not exist
-  kube::test::get_object_assert 'namespaces' '{{range.items}}{{ if eq $id_field \"test-jobs\" }}found{{end}}{{end}}:' ':'
+  kube::test::get_object_assert 'namespaces' "{{range.items}}{{ if eq ${id_field:?} \\\"test-jobs\\\" }}found{{end}}{{end}}:" ':'
   # Command
   kubectl create namespace test-jobs
   # Post-condition: namespace 'test-jobs' is created.
   kube::test::get_object_assert 'namespaces/test-jobs' "{{$id_field}}" 'test-jobs'
 
   ### Create a cronjob in a specific namespace
-  kubectl run pi --schedule="59 23 31 2 *" --namespace=test-jobs --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  kubectl run pi --schedule="59 23 31 2 *" --namespace=test-jobs --generator=cronjob/v1beta1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]:?}"
   # Post-Condition: assertion object exists
   kube::test::get_object_assert 'cronjob/pi --namespace=test-jobs' "{{$id_field}}" 'pi'
   kubectl get cronjob/pi --namespace=test-jobs

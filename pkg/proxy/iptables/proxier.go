@@ -556,7 +556,7 @@ func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints)
 	}
 }
 
-// OnEndpointsDelete is called whever deletion of an existing endpoints
+// OnEndpointsDelete is called whenever deletion of an existing endpoints
 // object is observed.
 func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	proxier.OnEndpointsUpdate(endpoints, nil)
@@ -1220,16 +1220,6 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		// For LBs with externalTrafficPolicy=Local, we need to re-route any local traffic to the service chain masqueraded.
-		// Masqueraded traffic in this scenario is okay since source IP preservation only applies to external traffic anyways.
-		args = append(args[:0], "-A", string(svcXlbChain))
-		writeLine(proxier.natRules, append(args,
-			"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s LB IP"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(KubeMarkMasqChain))...)
-		writeLine(proxier.natRules, append(args,
-			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)
-
 		// First rule in the chain redirects all pod -> external VIP traffic to the
 		// Service's ClusterIP instead. This happens whether or not we have local
 		// endpoints; only if clusterCIDR is specified
@@ -1243,6 +1233,17 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			writeLine(proxier.natRules, args...)
 		}
+
+		// Next, redirect all src-type=LOCAL -> LB IP to the service chain for externalTrafficPolicy=Local
+		// This allows traffic originating from the host to be redirected to the service correctly,
+		// otherwise traffic to LB IPs are dropped if there are no local endpoints.
+		args = append(args[:0], "-A", string(svcXlbChain))
+		writeLine(proxier.natRules, append(args,
+			"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s LB IP"`, svcNameString),
+			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(KubeMarkMasqChain))...)
+		writeLine(proxier.natRules, append(args,
+			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
+			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)
 
 		numLocalEndpoints := len(localEndpointChains)
 		if numLocalEndpoints == 0 {

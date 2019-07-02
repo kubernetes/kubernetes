@@ -78,6 +78,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CronJob object.
 func (r *StatusREST) New() runtime.Object {
 	return &batch.CronJob{}
 }

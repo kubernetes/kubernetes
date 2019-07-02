@@ -118,7 +118,7 @@ func (p *esLogProvider) Init() error {
 		return err
 	}
 	if int(statusCode) != 200 {
-		framework.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
+		e2elog.Failf("Elasticsearch cluster has a bad status: %v", statusCode)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.

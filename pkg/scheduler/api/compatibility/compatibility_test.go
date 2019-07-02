@@ -1109,6 +1109,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			ServiceInformer:                informerFactory.Core().V1().Services(),
 			PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+			CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			DisablePreemption:              false,
 			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,

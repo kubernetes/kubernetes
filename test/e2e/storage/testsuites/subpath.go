@@ -130,7 +130,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 				},
 			}
 		default:
-			framework.Failf("SubPath test doesn't support: %s", volType)
+			e2elog.Failf("SubPath test doesn't support: %s", volType)
 		}
 
 		subPath := f.Namespace.Name

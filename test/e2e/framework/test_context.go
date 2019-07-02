@@ -161,7 +161,7 @@ type TestContextType struct {
 	// The DNS Domain of the cluster.
 	ClusterDNSDomain string
 
-	// The configration of NodeKiller.
+	// The configuration of NodeKiller.
 	NodeKiller NodeKillerConfig
 }
 

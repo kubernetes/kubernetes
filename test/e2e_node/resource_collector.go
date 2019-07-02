@@ -96,7 +96,7 @@ func (r *ResourceCollector) Start() {
 			kubeletstatsv1alpha1.SystemContainerRuntime: runtimeContainer,
 		}
 	} else {
-		framework.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
+		e2elog.Failf("Failed to get runtime container name in test-e2e-node resource collector.")
 	}
 
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {

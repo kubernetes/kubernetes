@@ -165,11 +165,11 @@ func (c *Cron) runWithRecovery(j Job) {
 	j.Run()
 }
 
-// Run the scheduler.. this is private just due to the need to synchronize
+// Run the scheduler. this is private just due to the need to synchronize
 // access to the 'running' state variable.
 func (c *Cron) run() {
 	// Figure out the next activation times for each entry.
-	now := time.Now().In(c.location)
+	now := c.now()
 	for _, entry := range c.entries {
 		entry.Next = entry.Schedule.Next(now)
 	}
@@ -178,45 +178,46 @@ func (c *Cron) run() {
 		// Determine the next entry to run.
 		sort.Sort(byTime(c.entries))
 
-		var effective time.Time
+		var timer *time.Timer
 		if len(c.entries) == 0 || c.entries[0].Next.IsZero() {
 			// If there are no entries yet, just sleep - it still handles new entries
 			// and stop requests.
-			effective = now.AddDate(10, 0, 0)
+			timer = time.NewTimer(100000 * time.Hour)
 		} else {
-			effective = c.entries[0].Next
+			timer = time.NewTimer(c.entries[0].Next.Sub(now))
 		}
 
-		timer := time.NewTimer(effective.Sub(now))
-		select {
-		case now = <-timer.C:
-			now = now.In(c.location)
-			// Run every entry whose next time was this effective time.
-			for _, e := range c.entries {
-				if e.Next != effective {
-					break
+		for {
+			select {
+			case now = <-timer.C:
+				now = now.In(c.location)
+				// Run every entry whose next time was less than now
+				for _, e := range c.entries {
+					if e.Next.After(now) || e.Next.IsZero() {
+						break
+					}
+					go c.runWithRecovery(e.Job)
+					e.Prev = e.Next
+					e.Next = e.Schedule.Next(now)
 				}
-				go c.runWithRecovery(e.Job)
-				e.Prev = e.Next
-				e.Next = e.Schedule.Next(now)
+
+			case newEntry := <-c.add:
+				timer.Stop()
+				now = c.now()
+				newEntry.Next = newEntry.Schedule.Next(now)
+				c.entries = append(c.entries, newEntry)
+
+			case <-c.snapshot:
+				c.snapshot <- c.entrySnapshot()
+				continue
+
+			case <-c.stop:
+				timer.Stop()
+				return
 			}
-			continue
 
-		case newEntry := <-c.add:
-			c.entries = append(c.entries, newEntry)
-			newEntry.Next = newEntry.Schedule.Next(time.Now().In(c.location))
-
-		case <-c.snapshot:
-			c.snapshot <- c.entrySnapshot()
-
-		case <-c.stop:
-			timer.Stop()
-			return
+			break
 		}
-
-		// 'now' should be updated after newEntry and snapshot cases.
-		now = time.Now().In(c.location)
-		timer.Stop()
 	}
 }
 
@@ -250,4 +251,9 @@ func (c *Cron) entrySnapshot() []*Entry {
 		})
 	}
 	return entries
+}
+
+// now returns current time in c location
+func (c *Cron) now() time.Time {
+	return time.Now().In(c.location)
 }

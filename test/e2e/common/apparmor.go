@@ -19,7 +19,7 @@ package common
 import (
 	"fmt"
 
-	api "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -58,7 +58,7 @@ func LoadAppArmorProfiles(f *framework.Framework) {
 // CreateAppArmorTestPod creates a pod that tests apparmor profile enforcement. The pod exits with
 // an error code if the profile is incorrectly enforced. If runOnce is true the pod will exit after
 // a single test, otherwise it will repeat the test every 1 second until failure.
-func CreateAppArmorTestPod(f *framework.Framework, unconfined bool, runOnce bool) *api.Pod {
+func CreateAppArmorTestPod(f *framework.Framework, unconfined bool, runOnce bool) *v1.Pod {
 	profile := "localhost/" + appArmorProfilePrefix + f.Namespace.Name
 	testCmd := fmt.Sprintf(`
 if touch %[1]s; then
@@ -92,9 +92,9 @@ sleep 1
 done`, testCmd)
 	}
 
-	loaderAffinity := &api.Affinity{
-		PodAffinity: &api.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{{
+	loaderAffinity := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{{
 				Namespaces: []string{f.Namespace.Name},
 				LabelSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{loaderLabelKey: loaderLabelValue},
@@ -104,7 +104,7 @@ done`, testCmd)
 		},
 	}
 
-	pod := &api.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-apparmor-",
 			Annotations: map[string]string{
@@ -114,14 +114,14 @@ done`, testCmd)
 				"test": "apparmor",
 			},
 		},
-		Spec: api.PodSpec{
+		Spec: v1.PodSpec{
 			Affinity: loaderAffinity,
-			Containers: []api.Container{{
+			Containers: []v1.Container{{
 				Name:    "test",
 				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 				Command: []string{"sh", "-c", testCmd},
 			}},
-			RestartPolicy: api.RestartPolicyNever,
+			RestartPolicy: v1.RestartPolicyNever,
 		},
 	}
 
@@ -157,7 +157,7 @@ profile %s flags=(attach_disconnected) {
 }
 `, profileName, appArmorDeniedPath, appArmorAllowedPath)
 
-	cm := &api.ConfigMap{
+	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "apparmor-profiles",
 			Namespace: f.Namespace.Name,
@@ -173,26 +173,26 @@ profile %s flags=(attach_disconnected) {
 func createAppArmorProfileLoader(f *framework.Framework) {
 	True := true
 	One := int32(1)
-	loader := &api.ReplicationController{
+	loader := &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "apparmor-loader",
 			Namespace: f.Namespace.Name,
 		},
-		Spec: api.ReplicationControllerSpec{
+		Spec: v1.ReplicationControllerSpec{
 			Replicas: &One,
-			Template: &api.PodTemplateSpec{
+			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{loaderLabelKey: loaderLabelValue},
 				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
 						Name:  "apparmor-loader",
 						Image: imageutils.GetE2EImage(imageutils.AppArmorLoader),
 						Args:  []string{"-poll", "10s", "/profiles"},
-						SecurityContext: &api.SecurityContext{
+						SecurityContext: &v1.SecurityContext{
 							Privileged: &True,
 						},
-						VolumeMounts: []api.VolumeMount{{
+						VolumeMounts: []v1.VolumeMount{{
 							Name:      "sys",
 							MountPath: "/sys",
 							ReadOnly:  true,
@@ -206,25 +206,25 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 							ReadOnly:  true,
 						}},
 					}},
-					Volumes: []api.Volume{{
+					Volumes: []v1.Volume{{
 						Name: "sys",
-						VolumeSource: api.VolumeSource{
-							HostPath: &api.HostPathVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
 								Path: "/sys",
 							},
 						},
 					}, {
 						Name: "apparmor-includes",
-						VolumeSource: api.VolumeSource{
-							HostPath: &api.HostPathVolumeSource{
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
 								Path: "/etc/apparmor.d",
 							},
 						},
 					}, {
 						Name: "profiles",
-						VolumeSource: api.VolumeSource{
-							ConfigMap: &api.ConfigMapVolumeSource{
-								LocalObjectReference: api.LocalObjectReference{
+						VolumeSource: v1.VolumeSource{
+							ConfigMap: &v1.ConfigMapVolumeSource{
+								LocalObjectReference: v1.LocalObjectReference{
 									Name: "apparmor-profiles",
 								},
 							},
@@ -241,7 +241,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 	getRunningLoaderPod(f)
 }
 
-func getRunningLoaderPod(f *framework.Framework) *api.Pod {
+func getRunningLoaderPod(f *framework.Framework) *v1.Pod {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{loaderLabelKey: loaderLabelValue}))
 	pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, label)
 	framework.ExpectNoError(err, "Failed to schedule apparmor-loader Pod")

@@ -154,10 +154,10 @@ func (i *indexedWatchers) terminateAll(objectType reflect.Type, done func(*cache
 		klog.Warningf("Terminating all watchers from cacher %v", objectType)
 	}
 	i.allWatchers.terminateAll(done)
-	for index, watchers := range i.valueWatchers {
+	for _, watchers := range i.valueWatchers {
 		watchers.terminateAll(done)
-		delete(i.valueWatchers, index)
 	}
+	i.valueWatchers = map[string]watchersMap{}
 }
 
 // As we don't need a high precision here, we keep all watchers timeout within a

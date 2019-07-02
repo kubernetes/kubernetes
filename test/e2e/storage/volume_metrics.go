@@ -58,7 +58,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		defaultScName, err = framework.GetDefaultStorageClassName(c)
 		if err != nil {
-			framework.Failf(err.Error())
+			e2elog.Failf(err.Error())
 		}
 		test := testsuites.StorageClassTest{
 			Name:      "default",
@@ -70,7 +70,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		metricsGrabber, err = metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
 
 		if err != nil {
-			framework.Failf("Error creating metrics grabber : %v", err)
+			e2elog.Failf("Error creating metrics grabber : %v", err)
 		}
 	})
 
@@ -456,10 +456,10 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		ginkgo.AfterEach(func() {
 			if err := framework.DeletePersistentVolume(c, pv.Name); err != nil {
-				framework.Failf("Error deleting pv: %v", err)
+				e2elog.Failf("Error deleting pv: %v", err)
 			}
 			if err := framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace); err != nil {
-				framework.Failf("Error deleting pvc: %v", err)
+				e2elog.Failf("Error deleting pvc: %v", err)
 			}
 
 			// Clear original metric values.

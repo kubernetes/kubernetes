@@ -92,11 +92,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 				metav1.NamespacePublic,
 			})
 		if err != nil {
-			framework.Failf("Error deleting orphaned namespaces: %v", err)
+			e2elog.Failf("Error deleting orphaned namespaces: %v", err)
 		}
 		klog.Infof("Waiting for deletion of the following namespaces: %v", deleted)
 		if err := framework.WaitForNamespacesDeleted(c, deleted, framework.NamespaceCleanupTimeout); err != nil {
-			framework.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
+			e2elog.Failf("Failed to delete orphaned namespaces %v: %v", deleted, err)
 		}
 	}
 
@@ -123,7 +123,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.DumpAllNamespaceInfo(c, metav1.NamespaceSystem)
 		framework.LogFailedContainers(c, metav1.NamespaceSystem, e2elog.Logf)
 		runKubernetesServiceTestContainer(c, metav1.NamespaceDefault)
-		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
+		e2elog.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
 	if err := framework.WaitForDaemonSets(c, metav1.NamespaceSystem, int32(framework.TestContext.AllowedNotReadyNodes), framework.TestContext.SystemDaemonsetStartupTimeout); err != nil {

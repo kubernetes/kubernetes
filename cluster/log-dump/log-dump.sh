@@ -494,7 +494,7 @@ function dump_nodes_with_logexporter() {
     if find_non_logexported_nodes; then
       break
     else
-      echo "Attempt ${retry} failed to list marker files for succeessful nodes"
+      echo "Attempt ${retry} failed to list marker files for successful nodes"
       if [[ "${retry}" == 10 ]]; then
         echo "Final attempt to list marker files failed.. falling back to logdump through SSH"
         "${KUBECTL}" delete namespace "${logexporter_namespace}" || true

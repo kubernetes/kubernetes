@@ -80,7 +80,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 				Error()
 			if err != nil {
 				if ctx.Err() != nil {
-					framework.Failf("Request to kubernetes-dashboard failed: %v", err)
+					e2elog.Failf("Request to kubernetes-dashboard failed: %v", err)
 					return true, err
 				}
 				e2elog.Logf("Request to kubernetes-dashboard failed: %v", err)

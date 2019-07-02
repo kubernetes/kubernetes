@@ -359,7 +359,7 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	}, 10*time.Minute, 10*time.Second).Should(BeTrue())
 
 	if len(watchTimes) < testArg.podsNr {
-		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
+		e2elog.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
 	}
 
 	// Analyze results

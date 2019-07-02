@@ -142,7 +142,6 @@ pkg/kubectl/describe/versioned
 pkg/kubectl/generate
 pkg/kubectl/generate/versioned
 pkg/kubectl/metricsutil
-pkg/kubectl/util/templates
 pkg/kubelet
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
@@ -170,8 +169,6 @@ pkg/kubelet/metrics
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/prober/results
-pkg/kubelet/prober/testing
 pkg/kubelet/qos
 pkg/kubelet/remote
 pkg/kubelet/stats
@@ -190,10 +187,7 @@ pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/v1/evaluator/core
-pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
-pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
-pkg/registry/apps/daemonset/storage
 pkg/registry/apps/deployment/storage
 pkg/registry/apps/replicaset
 pkg/registry/apps/replicaset/storage
@@ -206,11 +200,8 @@ pkg/registry/authorization/localsubjectaccessreview
 pkg/registry/authorization/rest
 pkg/registry/authorization/selfsubjectaccessreview
 pkg/registry/authorization/subjectaccessreview
-pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/autoscaling/rest
-pkg/registry/batch/cronjob/storage
 pkg/registry/batch/job
-pkg/registry/batch/job/storage
 pkg/registry/batch/rest
 pkg/registry/certificates/certificates
 pkg/registry/certificates/certificates/storage
@@ -464,11 +455,8 @@ staging/src/k8s.io/apiserver/pkg/server/httplog
 staging/src/k8s.io/apiserver/pkg/server/options
 staging/src/k8s.io/apiserver/pkg/server/storage
 staging/src/k8s.io/apiserver/pkg/storage
-staging/src/k8s.io/apiserver/pkg/storage/etcd/etcdtest
-staging/src/k8s.io/apiserver/pkg/storage/etcd/metrics
-staging/src/k8s.io/apiserver/pkg/storage/etcd/testing
-staging/src/k8s.io/apiserver/pkg/storage/etcd/testing/testingcert
 staging/src/k8s.io/apiserver/pkg/storage/etcd/util
+staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert
 staging/src/k8s.io/apiserver/pkg/storage/storagebackend
 staging/src/k8s.io/apiserver/pkg/storage/testing
 staging/src/k8s.io/apiserver/pkg/storage/tests
@@ -550,6 +538,7 @@ staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
 staging/src/k8s.io/kube-aggregator/pkg/controllers/autoregister
 staging/src/k8s.io/kube-proxy/config/v1alpha1
+staging/src/k8s.io/kubectl/pkg/util/templates
 staging/src/k8s.io/kubelet/config/v1beta1
 staging/src/k8s.io/legacy-cloud-providers/vsphere
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
@@ -570,7 +559,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
 test/e2e/lifecycle/bootstrap
-test/e2e/scalability
 test/e2e/storage/vsphere
 test/e2e_kubeadm
 test/e2e_node

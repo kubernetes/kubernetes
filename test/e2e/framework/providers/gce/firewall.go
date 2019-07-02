@@ -43,7 +43,7 @@ func MakeFirewallNameForLBService(name string) string {
 // ConstructFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructFirewallForLBService(svc *v1.Service, nodeTag string) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
+		e2elog.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeFirewallNameForLBService(cloudprovider.DefaultLoadBalancerName(svc))
@@ -71,7 +71,7 @@ func MakeHealthCheckFirewallNameForLBService(clusterID, name string, isNodesHeal
 // ConstructHealthCheckFirewallForLBService returns the expected GCE firewall rule for a loadbalancer type service
 func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service, nodeTag string, isNodesHealthCheck bool) *compute.Firewall {
 	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
-		framework.Failf("can not construct firewall rule for non-loadbalancer type service")
+		e2elog.Failf("can not construct firewall rule for non-loadbalancer type service")
 	}
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), isNodesHealthCheck)
@@ -217,7 +217,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-" + instancePrefix + "-http-alt",
+		Name:         nodeTag + "-http-alt",
 		SourceRanges: []string{"0.0.0.0/0"},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{
@@ -232,7 +232,7 @@ func GetE2eFirewalls(masterName, masterTag, nodeTag, network, clusterIPRange str
 		},
 	})
 	fws = append(fws, &compute.Firewall{
-		Name:         nodeTag + "-" + instancePrefix + "-nodeports",
+		Name:         nodeTag + "-nodeports",
 		SourceRanges: []string{"0.0.0.0/0"},
 		TargetTags:   []string{nodeTag},
 		Allowed: []*compute.FirewallAllowed{

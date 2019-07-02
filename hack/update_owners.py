@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -71,7 +71,7 @@ def get_test_names_from_local_files():
 
 def load_owners(fname):
     owners = {}
-    with pathlib.Path.open(fname) as f:
+    with pathlib.Path(fname).open() as f:
         for n, cols in enumerate(csv.reader(f)):
             if n == 0:
                 continue  # header
@@ -85,7 +85,7 @@ def load_owners(fname):
 
 
 def write_owners(fname, owners):
-    with pathlib.Path.open(fname, 'w') as f:
+    with pathlib.Path(fname).open(mode='w') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['name', 'owner', 'auto-assigned', 'sig'])
         items = sorted(owners.items())
@@ -175,7 +175,7 @@ def main():
 
     prefixes = sig_prefixes(owners)
 
-    with pathlib.Path.open(OWNERS_JSON_PATH, 'w') as f:
+    with pathlib.Path(OWNERS_JSON_PATH).open(mode='w') as f:
         f.write(prefixes + '\n')
 
     if options.print_sig_prefixes:
@@ -205,11 +205,11 @@ def main():
         owners.pop(name)
 
     if not options.addonly:
-        print('# UNEXPECTED MAINTAINERS ',)
+        print('# UNEXPECTED MAINTAINERS ')
         print('(randomly assigned, but not in kubernetes-maintainers)')
         for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
             if random_assignment and owner not in maintainers:
-                print('%-16s %s', (owner, name))
+                print('%-16s %s' % (owner,name))
                 owners.pop(name)
 
     owner_counts = collections.Counter(
@@ -228,7 +228,7 @@ def main():
     if options.user.lower() == 'random':
         print('# Tests per maintainer:')
         for owner, count in owner_counts.most_common():
-            print('%-20s %3d', (owner, count))
+            print('%-20s %3d' % (owner,count))
 
     write_owners(OWNERS_PATH, owners)
 

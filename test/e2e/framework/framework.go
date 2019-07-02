@@ -333,7 +333,7 @@ func (f *Framework) AfterEach() {
 			for namespaceKey, namespaceErr := range nsDeletionErrors {
 				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s (%#v)", namespaceKey, namespaceErr, namespaceErr))
 			}
-			Failf(strings.Join(messages, ","))
+			e2elog.Failf(strings.Join(messages, ","))
 		}
 	}()
 
@@ -390,7 +390,7 @@ func (f *Framework) AfterEach() {
 	// This is explicitly done at the very end of the test, to avoid
 	// e.g. not removing namespace in case of this failure.
 	if err := AllNodesReady(f.ClientSet, 3*time.Minute); err != nil {
-		Failf("All nodes should be ready after test, %v", err)
+		e2elog.Failf("All nodes should be ready after test, %v", err)
 	}
 }
 
@@ -847,7 +847,7 @@ func (cl *ClusterVerification) WaitFor(atLeast int, timeout time.Duration) ([]v1
 func (cl *ClusterVerification) WaitForOrFail(atLeast int, timeout time.Duration) {
 	pods, err := cl.WaitFor(atLeast, timeout)
 	if err != nil || len(pods) < atLeast {
-		Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
+		e2elog.Failf("Verified %v of %v pods , error : %v", len(pods), atLeast, err)
 	}
 }
 
@@ -860,7 +860,7 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	pods, err := cl.podState.filter(cl.client, cl.namespace)
 	if err == nil {
 		if len(pods) == 0 {
-			Failf("No pods matched the filter.")
+			e2elog.Failf("No pods matched the filter.")
 		}
 		e2elog.Logf("ForEach: Found %v pods from the filter.  Now looping through them.", len(pods))
 		for _, p := range pods {

@@ -351,12 +351,25 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path) field.Error
 	return allErrs
 }
 
+// validateCSINodeDriverAllocatable tests if Allocatable in CSINodeDriver has valid volume limits.
+func validateCSINodeDriverAllocatable(a *storage.VolumeNodeResources, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if a == nil || a.Count == nil {
+		return allErrs
+	}
+
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*a.Count), fldPath.Child("count"))...)
+	return allErrs
+}
+
 // validateCSINodeDriver tests if CSINodeDriver has valid entries
 func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"))...)
 	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"))...)
+	allErrs = append(allErrs, validateCSINodeDriverAllocatable(driver.Allocatable, fldPath.Child("allocatable"))...)
 
 	// check for duplicate entries for the same driver in specs
 	if driverNamesInSpecs.Has(driver.Name) {

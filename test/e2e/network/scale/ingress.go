@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +73,7 @@ type IngressScaleFramework struct {
 	NumIngressesTest []int
 	OutputFile       string
 
-	ScaleTestDeploy *apps.Deployment
+	ScaleTestDeploy *appsv1.Deployment
 	ScaleTestSvcs   []*v1.Service
 	ScaleTestIngs   []*networkingv1beta1.Ingress
 
@@ -438,12 +438,12 @@ func generateScaleTestServiceSpec(suffix string) *v1.Service {
 	}
 }
 
-func generateScaleTestBackendDeploymentSpec(numReplicas int32) *apps.Deployment {
-	return &apps.Deployment{
+func generateScaleTestBackendDeploymentSpec(numReplicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: scaleTestBackendName,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &numReplicas,
 			Selector: &metav1.LabelSelector{MatchLabels: scaleTestLabels},
 			Template: v1.PodTemplateSpec{

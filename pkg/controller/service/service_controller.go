@@ -75,7 +75,7 @@ type cachedService struct {
 }
 
 type serviceCache struct {
-	mu         sync.Mutex // protects serviceMap
+	mu         sync.RWMutex // protects serviceMap
 	serviceMap map[string]*cachedService
 }
 
@@ -136,6 +136,8 @@ func New(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(cur interface{}) {
 				svc, ok := cur.(*v1.Service)
+				// Check cleanup here can provide a remedy when controller failed to handle
+				// changes before it exiting (e.g. crashing, restart, etc.).
 				if ok && (wantsLoadBalancer(svc) || needsCleanup(svc)) {
 					s.enqueueService(cur)
 				}
@@ -375,8 +377,8 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBal
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
 // already know about.
 func (s *serviceCache) ListKeys() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	keys := make([]string, 0, len(s.serviceMap))
 	for k := range s.serviceMap {
 		keys = append(keys, k)
@@ -386,8 +388,8 @@ func (s *serviceCache) ListKeys() []string {
 
 // GetByKey returns the value stored in the serviceMap under the given key
 func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	if v, ok := s.serviceMap[key]; ok {
 		return v, true, nil
 	}
@@ -397,8 +399,8 @@ func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
 // ListKeys implements the interface required by DeltaFIFO to list the keys we
 // already know about.
 func (s *serviceCache) allServices() []*v1.Service {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	services := make([]*v1.Service, 0, len(s.serviceMap))
 	for _, v := range s.serviceMap {
 		services = append(services, v.state)
@@ -407,8 +409,8 @@ func (s *serviceCache) allServices() []*v1.Service {
 }
 
 func (s *serviceCache) get(serviceName string) (*cachedService, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	service, ok := s.serviceMap[serviceName]
 	return service, ok
 }
@@ -438,7 +440,20 @@ func (s *serviceCache) delete(serviceName string) {
 
 // needsCleanup checks if load balancer needs to be cleaned up as indicated by finalizer.
 func needsCleanup(service *v1.Service) bool {
-	return service.ObjectMeta.DeletionTimestamp != nil && servicehelper.HasLBFinalizer(service)
+	if !servicehelper.HasLBFinalizer(service) {
+		return false
+	}
+
+	if service.ObjectMeta.DeletionTimestamp != nil {
+		return true
+	}
+
+	// Service doesn't want loadBalancer but owns loadBalancer finalizer also need to be cleaned up.
+	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return true
+	}
+
+	return false
 }
 
 // needsUpdate checks if load balancer needs to be updated due to change in attributes.
@@ -565,8 +580,9 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 		return false
 	}
 
-	// We don't check TargetPort; that is not relevant for load balancing
-	// TODO: Should we blank it out?  Or just check it anyway?
+	if x.TargetPort != y.TargetPort {
+		return false
+	}
 
 	return true
 }

@@ -169,7 +169,7 @@ func NewRuntimeOperationMonitor(c clientset.Interface) *RuntimeOperationMonitor 
 	}
 	nodes, err := m.client.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
+		e2elog.Failf("RuntimeOperationMonitor: unable to get list of nodes: %v", err)
 	}
 	for _, node := range nodes.Items {
 		m.nodesRuntimeOps[node.Name] = make(NodeRuntimeOperationErrorRate)
@@ -599,6 +599,9 @@ func (r *resourceCollector) collectStats(oldStatsMap map[string]*kubeletstatsv1a
 		}
 
 		if oldStats, ok := oldStatsMap[name]; ok {
+			if oldStats.CPU == nil || cStats.CPU == nil || oldStats.Memory == nil || cStats.Memory == nil {
+				continue
+			}
 			if oldStats.CPU.Time.Equal(&cStats.CPU.Time) {
 				// No change -> skip this stat.
 				continue
@@ -684,7 +687,7 @@ func (r *ResourceMonitor) Start() {
 	// It should be OK to monitor unschedulable Nodes
 	nodes, err := r.client.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
-		Failf("ResourceMonitor: unable to get list of nodes: %v", err)
+		e2elog.Failf("ResourceMonitor: unable to get list of nodes: %v", err)
 	}
 	r.collectors = make(map[string]*resourceCollector, 0)
 	for _, node := range nodes.Items {

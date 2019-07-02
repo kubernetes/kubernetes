@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		e2elog.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
 		initialDelay := probeTestInitialDelaySeconds * time.Second
 		if readyTime.Sub(startedTime) < initialDelay {
-			framework.Failf("Pod became ready before it's %v initial delay", initialDelay)
+			e2elog.Failf("Pod became ready before it's %v initial delay", initialDelay)
 		}
 
 		restartCount := getRestartCount(p)
@@ -443,7 +443,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 			e2elog.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))
 			if restartCount < lastRestartCount {
-				framework.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
+				e2elog.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
 					ns, pod.Name, lastRestartCount, restartCount)
 			}
 		}
@@ -459,7 +459,7 @@ func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
 		int(observedRestarts) < expectNumRestarts) {
-		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
+		e2elog.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
 			ns, pod.Name, expectNumRestarts, observedRestarts)
 	}
 }

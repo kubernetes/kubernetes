@@ -299,7 +299,7 @@ func sortQuery(u *url.URL) {
 	if len(q) > 0 {
 		arKeys := make([]string, len(q))
 		i := 0
-		for k, _ := range q {
+		for k := range q {
 			arKeys[i] = k
 			i++
 		}

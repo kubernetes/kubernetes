@@ -149,9 +149,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, node := range nodeList.Items {
 			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
 			gomega.Expect(found).To(gomega.Equal(true))
-			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
-			if nodeMaxAllocatable < allocatable.MilliValue() {
-				nodeMaxAllocatable = allocatable.MilliValue()
+			nodeToAllocatableMap[node.Name] = allocatable.Value()
+			if nodeMaxAllocatable < allocatable.Value() {
+				nodeMaxAllocatable = allocatable.Value()
 			}
 		}
 		framework.WaitForStableCluster(cs, masterNodes)
@@ -161,19 +161,20 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				e2elog.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				e2elog.Logf("Pod %v requesting local ephemeral resource =%v on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
 				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
 			}
 		}
 
 		var podsNeededForSaturation int
+		var ephemeralStoragePerPod int64
 
-		milliEphemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
+		ephemeralStoragePerPod = nodeMaxAllocatable / maxNumberOfPods
 
-		e2elog.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
+		e2elog.Logf("Using pod capacity: %v", ephemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
-			e2elog.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
-			podsNeededForSaturation += (int)(leftAllocatable / milliEphemeralStoragePerPod)
+			e2elog.Logf("Node: %v has local ephemeral resource allocatable: %v", name, leftAllocatable)
+			podsNeededForSaturation += (int)(leftAllocatable / ephemeralStoragePerPod)
 		}
 
 		ginkgo.By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster local ephemeral resource and trying to start another one", podsNeededForSaturation))
@@ -189,10 +190,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					Labels: map[string]string{"name": ""},
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+							v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 						},
 						Requests: v1.ResourceList{
-							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+							v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 						},
 					},
 				}), true, e2elog.Logf))
@@ -203,7 +204,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
+					v1.ResourceEphemeralStorage: *resource.NewQuantity(ephemeralStoragePerPod, "DecimalSI"),
 				},
 			},
 		}
@@ -684,7 +685,7 @@ func getRequestedCPU(pod v1.Pod) int64 {
 func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
-		result += container.Resources.Requests.StorageEphemeral().MilliValue()
+		result += container.Resources.Requests.StorageEphemeral().Value()
 	}
 	return result
 }

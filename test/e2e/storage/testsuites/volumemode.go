@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -145,7 +146,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				l.pvc.Spec.VolumeMode = &pattern.VolMode
 			}
 		default:
-			framework.Failf("Volume mode test doesn't support: %s", pattern.VolType)
+			e2elog.Failf("Volume mode test doesn't support: %s", pattern.VolType)
 		}
 	}
 
@@ -295,7 +296,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 			// TODO(mkimuram): Add more tests
 		}
 	default:
-		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
+		e2elog.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
 
 }

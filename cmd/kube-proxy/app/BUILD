@@ -40,7 +40,6 @@ go_library(
         "//pkg/util/ipvs:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/oom:go_default_library",
-        "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",

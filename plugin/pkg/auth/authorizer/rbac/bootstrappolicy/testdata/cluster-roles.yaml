@@ -802,6 +802,14 @@ items:
     - subjectaccessreviews
     verbs:
     - create
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csinodes
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
@@ -958,6 +966,12 @@ items:
     - list
     - watch
   - apiGroups:
+    - storage.k8s.io
+    resources:
+    - volumeattachments
+    verbs:
+    - get
+  - apiGroups:
     - ""
     resources:
     - persistentvolumeclaims/status
@@ -971,12 +985,6 @@ items:
     - serviceaccounts/token
     verbs:
     - create
-  - apiGroups:
-    - storage.k8s.io
-    resources:
-    - volumeattachments
-    verbs:
-    - get
   - apiGroups:
     - storage.k8s.io
     resources:

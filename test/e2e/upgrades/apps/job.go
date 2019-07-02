@@ -17,7 +17,7 @@ limitations under the License.
 package upgrades
 
 import (
-	batch "k8s.io/api/batch/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
@@ -28,7 +28,7 @@ import (
 
 // JobUpgradeTest is a test harness for batch Jobs.
 type JobUpgradeTest struct {
-	job       *batch.Job
+	job       *batchv1.Job
 	namespace string
 }
 

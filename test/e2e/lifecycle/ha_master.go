@@ -83,7 +83,7 @@ func findRegionForZone(zone string) string {
 	region, err := exec.Command("gcloud", "compute", "zones", "list", zone, "--quiet", "--format=csv[no-heading](region)").Output()
 	framework.ExpectNoError(err)
 	if string(region) == "" {
-		framework.Failf("Region not found; zone: %s", zone)
+		e2elog.Failf("Region not found; zone: %s", zone)
 	}
 	return string(region)
 }

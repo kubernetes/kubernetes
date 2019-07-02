@@ -19,8 +19,10 @@ package e2e
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -90,6 +92,11 @@ func init() {
 		AssetNames: generated.AssetNames,
 	})
 
+}
+
+func TestMain(m *testing.M) {
+	rand.Seed(time.Now().UnixNano())
+	os.Exit(m.Run())
 }
 
 func TestE2E(t *testing.T) {

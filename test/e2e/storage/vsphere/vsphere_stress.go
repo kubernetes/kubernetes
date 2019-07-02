@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
-	storageV1 "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -77,11 +77,11 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 	})
 
 	ginkgo.It("vsphere stress tests", func() {
-		scArrays := make([]*storageV1.StorageClass, len(scNames))
+		scArrays := make([]*storagev1.StorageClass, len(scNames))
 		for index, scname := range scNames {
 			// Create vSphere Storage Class
 			ginkgo.By(fmt.Sprintf("Creating Storage Class : %v", scname))
-			var sc *storageV1.StorageClass
+			var sc *storagev1.StorageClass
 			var err error
 			switch scname {
 			case storageclass1:
@@ -121,7 +121,7 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 })
 
 // goroutine to perform volume lifecycle operations in parallel
-func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.Interface, namespace string, instanceId string, sc *storageV1.StorageClass, iterations int, wg *sync.WaitGroup) {
+func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.Interface, namespace string, instanceId string, sc *storagev1.StorageClass, iterations int, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer ginkgo.GinkgoRecover()
 

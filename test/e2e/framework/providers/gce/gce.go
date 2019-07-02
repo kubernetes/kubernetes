@@ -262,7 +262,7 @@ func (p *Provider) CleanupServiceResources(c clientset.Interface, loadBalancerNa
 		}
 		return true, nil
 	}); pollErr != nil {
-		framework.Failf("Failed to cleanup service GCE resources.")
+		e2elog.Failf("Failed to cleanup service GCE resources.")
 	}
 }
 
@@ -332,7 +332,7 @@ func GetInstanceTags(cloudConfig framework.CloudConfig, instanceName string) *co
 	res, err := gceCloud.ComputeServices().GA.Instances.Get(cloudConfig.ProjectID, cloudConfig.Zone,
 		instanceName).Do()
 	if err != nil {
-		framework.Failf("Failed to get instance tags for %v: %v", instanceName, err)
+		e2elog.Failf("Failed to get instance tags for %v: %v", instanceName, err)
 	}
 	return res.Tags
 }
@@ -346,7 +346,7 @@ func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone strin
 		cloudConfig.ProjectID, zone, instanceName,
 		&compute.Tags{Fingerprint: resTags.Fingerprint, Items: tags}).Do()
 	if err != nil {
-		framework.Failf("failed to set instance tags: %v", err)
+		e2elog.Failf("failed to set instance tags: %v", err)
 	}
 	e2elog.Logf("Sent request to set tags %v on instance: %v", tags, instanceName)
 	return resTags.Items

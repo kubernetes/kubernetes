@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -119,7 +120,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		nodeSelector := fields.OneTermEqualSelector("metadata.name", nodeName)
 		nodeList, err := cs.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: nodeSelector.String()})
 		if err != nil || len(nodeList.Items) != 1 {
-			framework.Failf("expected no err, got %v; expected len(nodes) = 1, got %v", err, len(nodeList.Items))
+			e2elog.Failf("expected no err, got %v; expected len(nodes) = 1, got %v", err, len(nodeList.Items))
 		}
 		node := nodeList.Items[0]
 
@@ -139,7 +140,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 			}
 
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
-				framework.Failf("Current e2e test has failed, so return from here.")
+				e2elog.Failf("Current e2e test has failed, so return from here.")
 				return
 			}
 
@@ -156,7 +157,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 
 		ginkgo.By(fmt.Sprintf("Expecting to see node %q becomes NotReady", nodeName))
 		if !e2enode.WaitForNodeToBeNotReady(cs, nodeName, time.Minute*3) {
-			framework.Failf("node %q doesn't turn to NotReady after 3 minutes", nodeName)
+			e2elog.Failf("node %q doesn't turn to NotReady after 3 minutes", nodeName)
 		}
 		ginkgo.By("Expecting to see unreachable=:NoExecute taint is applied")
 		err = framework.WaitForNodeHasTaintOrNot(cs, nodeName, taint, true, time.Second*30)
@@ -188,7 +189,7 @@ var _ = SIGDescribe("TaintBasedEvictions [Serial]", func() {
 		seconds, err := getTolerationSeconds(livePod1.Spec.Tolerations)
 		framework.ExpectNoError(err)
 		if seconds != 200 {
-			framework.Failf("expect tolerationSeconds of pod1 is 200, but got %v", seconds)
+			e2elog.Failf("expect tolerationSeconds of pod1 is 200, but got %v", seconds)
 		}
 	})
 })

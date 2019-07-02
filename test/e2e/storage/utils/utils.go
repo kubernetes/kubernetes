@@ -150,7 +150,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 
 	if kOp == KStop {
 		if ok := e2enode.WaitForNodeToBeNotReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
-			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
+			e2elog.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
 		}
 	}
 	if kOp == KRestart {
@@ -170,7 +170,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	if kOp == KStart || kOp == KRestart {
 		// For kubelet start and restart operations, Wait until Node becomes Ready
 		if ok := e2enode.WaitForNodeToBeReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
-			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
+			e2elog.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 		}
 	}
 }
