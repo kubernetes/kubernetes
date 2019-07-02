@@ -1513,6 +1513,7 @@ func InitAwsDriver() testsuites.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext3",
+				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[testsuites.Capability]bool{
@@ -1579,11 +1580,17 @@ func (a *awsDriver) GetClaimSize() string {
 }
 
 func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	return &testsuites.PerTestConfig{
+	config := &testsuites.PerTestConfig{
 		Driver:    a,
 		Prefix:    "aws",
 		Framework: f,
-	}, func() {}
+	}
+	if framework.NodeOSDistroIs("windows") {
+		config.ClientNodeSelector = map[string]string{
+			"beta.kubernetes.io/os": "windows",
+		}
+	}
+	return config, func() {}
 }
 
 // TODO: Fix authorization error in attach operation and uncomment below
