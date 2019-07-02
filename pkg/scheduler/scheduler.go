@@ -419,20 +419,21 @@ func (sched *Scheduler) bind(assumed *v1.Pod, targetNode string, pluginContext *
 	bindingStart := time.Now()
 	bindStatus := sched.config.Framework.RunBindPlugins(pluginContext, assumed, targetNode)
 	var err error
-	if bindStatus != nil && bindStatus.Code() == framework.Skip {
-		// All bind plugins chooses to skip binding of this pod, call original binding func.
-
-		// If binding succeeded then PodScheduled condition will be updated in apiserver so that
-		// it's atomic with setting host.
-		err = sched.config.GetBinder(assumed).Bind(&v1.Binding{
-			ObjectMeta: metav1.ObjectMeta{Namespace: assumed.Namespace, Name: assumed.Name, UID: assumed.UID},
-			Target: v1.ObjectReference{
-				Kind: "Node",
-				Name: targetNode,
-			},
-		})
-	} else if !bindStatus.IsSuccess() {
-		err = fmt.Errorf("scheduler RunBindPlugins failed for pod %v/%v: code %d, err %v", assumed.Namespace, assumed.Name, bindStatus.Code(), err)
+	if !bindStatus.IsSuccess() {
+		if bindStatus.Code() == framework.Skip {
+			// All bind plugins chose to skip binding of this pod, call original binding function.
+			// If binding succeeds then PodScheduled condition will be updated in apiserver so that
+			// it's atomic with setting host.
+			err = sched.config.GetBinder(assumed).Bind(&v1.Binding{
+				ObjectMeta: metav1.ObjectMeta{Namespace: assumed.Namespace, Name: assumed.Name, UID: assumed.UID},
+				Target: v1.ObjectReference{
+					Kind: "Node",
+					Name: targetNode,
+				},
+			})
+		} else {
+			err = fmt.Errorf("Bind failure, code: %d: %v", bindStatus.Code(), bindStatus.Message())
+		}
 	}
 	if finErr := sched.config.SchedulerCache.FinishBinding(assumed); finErr != nil {
 		klog.Errorf("scheduler cache FinishBinding failed: %v", finErr)

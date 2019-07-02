@@ -201,7 +201,9 @@ type BindPlugin interface {
 	// Bind plugins will not be called until all pre-bind plugins have completed. Each
 	// bind plugin is called in the configured order. A bind plugin may choose whether
 	// or not to handle the given Pod. If a bind plugin chooses to handle a Pod, the
-	// remaining bind plugins are skipped.
+	// remaining bind plugins are skipped. When a bind plugin does not handle a pod,
+	// it must return Skip in its Status code. If a bind plugin returns an Error, the
+	// pod is rejected and will not be bound.
 	Bind(pc *PluginContext, p *v1.Pod, nodeName string) *Status
 }
 
