@@ -22,7 +22,7 @@ import (
 	"time"
 
 	autoscaling "k8s.io/api/autoscaling/v2beta2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -333,7 +333,7 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 // GetExternalPerPodMetricReplicas calculates the desired replica count based on a
 // target metric value per pod (as a milli-value) for the external metric in the
 // given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
+func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32, targetUtilizationPerPod int64, metricName, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, utilization int64, timestamp time.Time, err error) {
 	metricLabelSelector, err := metav1.LabelSelectorAsSelector(metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, err
@@ -347,13 +347,13 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(currentReplicas int3
 		utilization = utilization + val
 	}
 
-	replicaCount = currentReplicas
+	replicaCount = statusReplicas
 	usageRatio := float64(utilization) / (float64(targetUtilizationPerPod) * float64(replicaCount))
 	if math.Abs(1.0-usageRatio) > c.tolerance {
 		// update number of replicas if the change is large enough
 		replicaCount = int32(math.Ceil(float64(utilization) / float64(targetUtilizationPerPod)))
 	}
-	utilization = int64(math.Ceil(float64(utilization) / float64(currentReplicas)))
+	utilization = int64(math.Ceil(float64(utilization) / float64(statusReplicas)))
 	return replicaCount, utilization, timestamp, nil
 }
 
