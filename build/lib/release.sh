@@ -192,7 +192,7 @@ function kube::release::package_node_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/node/bin/"
 
-    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+    cp -R "${KUBE_ROOT}/vendor/ALL_LICENSES" "${release_stage}/"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -262,7 +262,7 @@ function kube::release::package_server_tarballs() {
     cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
 
-    cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+    cp -R "${KUBE_ROOT}/vendor/ALL_LICENSES" "${release_stage}/"
 
     cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
@@ -611,7 +611,7 @@ EOF
 
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
   cp "${KUBE_ROOT}/README.md" "${release_stage}/"
-  cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
+  cp -R "${KUBE_ROOT}/vendor/ALL_LICENSES" "${release_stage}/"
 
   echo "${KUBE_GIT_VERSION}" > "${release_stage}/version"
 

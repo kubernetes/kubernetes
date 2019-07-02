@@ -72,12 +72,20 @@ pkg_tar(
     ],
 )
 
+filegroup(
+    name = "all-licenses-files",
+    srcs = glob([
+        "vendor/ALL_LICENSES/*",
+    ]),
+    visibility = ["//visibility:private"],
+)
+
 # Included in node and server tarballs.
 filegroup(
     name = "license-targets",
     srcs = [
+        ":all-licenses-files",
         ":kubernetes-src.tar.gz",
-        "//:Godeps/LICENSES",
     ],
     visibility = ["//visibility:private"],
 )
@@ -295,7 +303,7 @@ pkg_tar(
 pkg_tar(
     name = "kubernetes",
     srcs = [
-        "//:Godeps/LICENSES",
+        ":all-licenses-files",
         "//:README.md",
         "//:version",
         "//cluster:all-srcs",

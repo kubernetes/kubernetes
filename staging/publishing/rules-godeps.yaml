@@ -193,7 +193,7 @@ rules:
     go build .
     # re-create vendor/ and try again
     godep restore
-    rm -rf vendor/ Godeps/
+    rm -rf vendor/
     godep save ./...
     go build .
 - destination: sample-controller
@@ -238,7 +238,7 @@ rules:
 
     # re-create vendor/ and try again
     godep restore
-    rm -rf vendor/ Godeps/
+    rm -rf vendor/
     godep save ./...
     go build .
 - destination: apiextensions-apiserver

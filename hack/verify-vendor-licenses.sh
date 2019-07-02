@@ -33,16 +33,25 @@ function cleanup {
 }
 kube::util::trap_add cleanup EXIT
 
-cp -r "${KUBE_ROOT}/Godeps" "${_tmpdir}/Godeps"
+#ln -s all subfolder except ALL_LICENSES in vendor
+mkdir -p "${_tmpdir}/vendor"
+for child in "${KUBE_ROOT}/vendor"/*
+do
+  if [[ "${child}" == "${KUBE_ROOT}/vendor/ALL_LICENSES" ]] ; then
+    continue
+  else
+     ln -s "${child}" "${_tmpdir}/vendor"
+  fi
+done
+
 ln -s "${KUBE_ROOT}/LICENSE" "${_tmpdir}"
-ln -s "${KUBE_ROOT}/vendor" "${_tmpdir}"
 ln -s "${KUBE_ROOT}/staging" "${_tmpdir}"
 
 # Update vendor Licenses
 LICENSE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-vendor-licenses.sh"
 
 # Compare vendor Licenses
-if ! _out="$(diff -Naupr "${KUBE_ROOT}/Godeps/LICENSES" "${_tmpdir}/Godeps/LICENSES")"; then
+if ! _out="$(diff -Naupr "${KUBE_ROOT}/vendor/ALL_LICENSES" "${_tmpdir}/vendor/ALL_LICENSES")"; then
   echo "Your vendor licenses file is out of date. Run hack/update-vendor-licenses.sh and commit the results." >&2
   echo "${_out}" >&2
   exit 1
