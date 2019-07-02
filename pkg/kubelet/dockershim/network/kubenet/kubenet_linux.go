@@ -19,6 +19,7 @@ limitations under the License.
 package kubenet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -95,9 +96,10 @@ type kubenetNetworkPlugin struct {
 	nonMasqueradeCIDR string
 	podCidr           string
 	gateway           net.IP
+	cacheDir          string
 }
 
-func NewPlugin(networkPluginDirs []string) network.NetworkPlugin {
+func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	protocol := utiliptables.ProtocolIpv4
 	execer := utilexec.New()
 	dbus := utildbus.New()
@@ -112,6 +114,7 @@ func NewPlugin(networkPluginDirs []string) network.NetworkPlugin {
 		hostportSyncer:    hostport.NewHostportSyncer(iptInterface),
 		hostportManager:   hostport.NewHostportManager(iptInterface),
 		nonMasqueradeCIDR: "10.0.0.0/8",
+		cacheDir:          cacheDir,
 	}
 }
 
@@ -557,6 +560,7 @@ func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubeco
 		ContainerID: id.ID,
 		NetNS:       netnsPath,
 		IfName:      ifName,
+		CacheDir:    plugin.cacheDir,
 	}, nil
 }
 
@@ -570,7 +574,7 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	// The network plugin can take up to 3 seconds to execute,
 	// so yield the lock while it runs.
 	plugin.mu.Unlock()
-	res, err := plugin.cniConfig.AddNetwork(config, rt)
+	res, err := plugin.cniConfig.AddNetwork(context.TODO(), config, rt)
 	plugin.mu.Lock()
 	if err != nil {
 		return nil, fmt.Errorf("Error adding container to network: %v", err)
@@ -585,7 +589,7 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	klog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	err = plugin.cniConfig.DelNetwork(config, rt)
+	err = plugin.cniConfig.DelNetwork(context.TODO(), config, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
