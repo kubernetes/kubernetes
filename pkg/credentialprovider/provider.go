@@ -37,22 +37,6 @@ type DockerConfigProvider interface {
 	// implementation depends on information in the image name to return
 	// credentials; implementations are safe to ignore the image.
 	Provide(image string) DockerConfig
-	// LazyProvide gets called after URL matches have been
-	// performed, so the location used as the key in DockerConfig would be
-	// redundant.
-	// The image is passed in as context in the event that the
-	// implementation depends on information in the image name to return
-	// credentials; implementations are safe to ignore the image.
-	LazyProvide(image string) *DockerConfigEntry
-}
-
-//LazyProvide returns an Lazy AuthConfig
-func LazyProvide(creds LazyAuthConfiguration, image string) AuthConfig {
-	if creds.Provider != nil {
-		entry := *creds.Provider.LazyProvide(image)
-		return DockerConfigEntryToLazyAuthConfiguration(entry).AuthConfig
-	}
-	return creds.AuthConfig
 }
 
 // A DockerConfigProvider that simply reads the .dockercfg file
@@ -85,7 +69,7 @@ func (d *defaultDockerConfigProvider) Enabled() bool {
 	return true
 }
 
-// LazyProvide implements dockerConfigProvider
+// Provide implements dockerConfigProvider
 func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	// Read the standard Docker credentials from .dockercfg
 	if cfg, err := ReadDockerConfigFile(); err == nil {
@@ -96,19 +80,9 @@ func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	return DockerConfig{}
 }
 
-// LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *defaultDockerConfigProvider) LazyProvide(image string) *DockerConfigEntry {
-	return nil
-}
-
 // Enabled implements dockerConfigProvider
 func (d *CachingDockerConfigProvider) Enabled() bool {
 	return d.Provider.Enabled()
-}
-
-// LazyProvide implements dockerConfigProvider. Should never be called.
-func (d *CachingDockerConfigProvider) LazyProvide(image string) *DockerConfigEntry {
-	return nil
 }
 
 // Provide implements dockerConfigProvider

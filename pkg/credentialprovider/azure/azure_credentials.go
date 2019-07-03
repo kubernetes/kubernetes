@@ -259,6 +259,3 @@ func parseACRLoginServerFromImage(image string) string {
 	}
 	return ""
 }
-func (a *acrProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
-}
