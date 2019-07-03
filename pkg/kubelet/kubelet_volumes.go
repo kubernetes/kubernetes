@@ -91,13 +91,17 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
 // running and that have no containers running.  Note that we roll up logs here since it runs in the main loop.
-func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
+func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecontainer.Pod, desiredPods map[types.UID]empty) error {
 	allPods := sets.NewString()
 	for _, pod := range pods {
 		allPods.Insert(string(pod.UID))
 	}
 	for _, pod := range runningPods {
 		allPods.Insert(string(pod.ID))
+	}
+	for uid := range desiredPods {
+		// if the Pod is not in desiredPods, it should be in the process of being killed
+		allPods.Insert(string(uid))
 	}
 
 	found, err := kl.listPodsFromDisk()

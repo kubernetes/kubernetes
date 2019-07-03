@@ -1035,20 +1035,14 @@ func (kl *Kubelet) HandlePodCleanups() error {
 
 	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
 	// Note that we just killed the unwanted pods. This may not have reflected
-	// in the cache. We need to bypass the cache to get the latest set of
-	// running pods to clean up the volumes.
-	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningPods, err = kl.containerRuntime.GetPods(false)
-	if err != nil {
-		klog.Errorf("Error listing containers: %#v", err)
-		return err
-	}
+	// in the cache. Getting the latest set of running pods to clean up the volumes, considering the
+	// intersection with desired Pods.
 
 	// Remove any orphaned volumes.
 	// Note that we pass all pods (including terminated pods) to the function,
 	// so that we don't remove volumes associated with terminated but not yet
 	// deleted pods.
-	err = kl.cleanupOrphanedPodDirs(allPods, runningPods)
+	err = kl.cleanupOrphanedPodDirs(allPods, runningPods, desiredPods)
 	if err != nil {
 		// We want all cleanup tasks to be run even if one of them failed. So
 		// we just log an error here and continue other cleanup tasks.
