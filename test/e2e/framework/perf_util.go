@@ -28,9 +28,11 @@ import (
 
 // currentAPICallMetricsVersion is the current apicall performance metrics version. We should
 // bump up the version each time we make incompatible change to the metrics.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 const currentAPICallMetricsVersion = "v1"
 
 // APICallToPerfData transforms APIResponsiveness to PerfData.
+// TODO(alejandrox1): this is already present in test/e2e/framework/metrics.
 func APICallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 	perfData := &perftype.PerfData{Version: currentAPICallMetricsVersion}
 	for _, apicall := range apicalls.APICalls {
@@ -67,17 +69,6 @@ func latencyToPerfData(l LatencyMetric, name string) perftype.DataItem {
 			"Metric": name,
 		},
 	}
-}
-
-// PodStartupLatencyToPerfData transforms PodStartupLatency to PerfData.
-func PodStartupLatencyToPerfData(latency *PodStartupLatency) *perftype.PerfData {
-	perfData := &perftype.PerfData{Version: currentAPICallMetricsVersion}
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.CreateToScheduleLatency, "create_to_schedule"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.ScheduleToRunLatency, "schedule_to_run"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.RunToWatchLatency, "run_to_watch"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.ScheduleToWatchLatency, "schedule_to_watch"))
-	perfData.DataItems = append(perfData.DataItems, latencyToPerfData(latency.E2ELatency, "pod_startup"))
-	return perfData
 }
 
 // CurrentKubeletPerfMetricsVersion is the current kubelet performance metrics

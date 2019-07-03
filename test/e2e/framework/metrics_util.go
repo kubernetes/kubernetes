@@ -34,10 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
-	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/system"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/prometheus/common/expfmt"
@@ -67,195 +65,12 @@ const (
 	caFunctionMetricLabel = "function"
 )
 
-// MetricsForE2E is metrics collection of components.
-type MetricsForE2E metrics.Collection
-
-func (m *MetricsForE2E) filterMetrics() {
-	apiServerMetrics := make(metrics.APIServerMetrics)
-	for _, metric := range interestingAPIServerMetrics {
-		apiServerMetrics[metric] = (*m).APIServerMetrics[metric]
-	}
-	controllerManagerMetrics := make(metrics.ControllerManagerMetrics)
-	for _, metric := range interestingControllerManagerMetrics {
-		controllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
-	}
-	kubeletMetrics := make(map[string]metrics.KubeletMetrics)
-	for kubelet, grabbed := range (*m).KubeletMetrics {
-		kubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
-		for _, metric := range interestingKubeletMetrics {
-			kubeletMetrics[kubelet][metric] = grabbed[metric]
-		}
-	}
-	(*m).APIServerMetrics = apiServerMetrics
-	(*m).ControllerManagerMetrics = controllerManagerMetrics
-	(*m).KubeletMetrics = kubeletMetrics
-}
-
-func printSample(sample *model.Sample) string {
-	buf := make([]string, 0)
-	// Id is a VERY special label. For 'normal' container it's useless, but it's necessary
-	// for 'system' containers (e.g. /docker-daemon, /kubelet, etc.). We know if that's the
-	// case by checking if there's a label "kubernetes_container_name" present. It's hacky
-	// but it works...
-	_, normalContainer := sample.Metric["kubernetes_container_name"]
-	for k, v := range sample.Metric {
-		if strings.HasPrefix(string(k), "__") {
-			continue
-		}
-
-		if string(k) == "id" && normalContainer {
-			continue
-		}
-		buf = append(buf, fmt.Sprintf("%v=%v", string(k), v))
-	}
-	return fmt.Sprintf("[%v] = %v", strings.Join(buf, ","), sample.Value)
-}
-
-// PrintHumanReadable returns e2e metrics with JSON format.
-func (m *MetricsForE2E) PrintHumanReadable() string {
-	buf := bytes.Buffer{}
-	for _, interestingMetric := range interestingAPIServerMetrics {
-		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
-		for _, sample := range (*m).APIServerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
-		}
-	}
-	for _, interestingMetric := range interestingControllerManagerMetrics {
-		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
-		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
-		}
-	}
-	for _, interestingMetric := range interestingClusterAutoscalerMetrics {
-		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
-		for _, sample := range (*m).ClusterAutoscalerMetrics[interestingMetric] {
-			buf.WriteString(fmt.Sprintf("\t%v\n", printSample(sample)))
-		}
-	}
-	for kubelet, grabbed := range (*m).KubeletMetrics {
-		buf.WriteString(fmt.Sprintf("For %v:\n", kubelet))
-		for _, interestingMetric := range interestingKubeletMetrics {
-			buf.WriteString(fmt.Sprintf("\tFor %v:\n", interestingMetric))
-			for _, sample := range grabbed[interestingMetric] {
-				buf.WriteString(fmt.Sprintf("\t\t%v\n", printSample(sample)))
-			}
-		}
-	}
-	return buf.String()
-}
-
-// PrintJSON returns e2e metrics with JSON format.
-func (m *MetricsForE2E) PrintJSON() string {
-	m.filterMetrics()
-	return PrettyPrintJSON(m)
-}
-
-// SummaryKind returns the summary of e2e metrics.
-func (m *MetricsForE2E) SummaryKind() string {
-	return "MetricsForE2E"
-}
-
-var schedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
-
-var interestingAPIServerMetrics = []string{
-	"apiserver_request_total",
-	// TODO(krzysied): apiserver_request_latencies_summary is a deprecated metric.
-	// It should be replaced with new metric.
-	"apiserver_request_latencies_summary",
-	"apiserver_init_events_total",
-}
-
-var interestingControllerManagerMetrics = []string{
-	"garbage_collector_attempt_to_delete_queue_latency",
-	"garbage_collector_attempt_to_delete_work_duration",
-	"garbage_collector_attempt_to_orphan_queue_latency",
-	"garbage_collector_attempt_to_orphan_work_duration",
-	"garbage_collector_dirty_processing_latency_microseconds",
-	"garbage_collector_event_processing_latency_microseconds",
-	"garbage_collector_graph_changes_queue_latency",
-	"garbage_collector_graph_changes_work_duration",
-	"garbage_collector_orphan_processing_latency_microseconds",
-
-	"namespace_queue_latency",
-	"namespace_queue_latency_sum",
-	"namespace_queue_latency_count",
-	"namespace_retries",
-	"namespace_work_duration",
-	"namespace_work_duration_sum",
-	"namespace_work_duration_count",
-}
-
-var interestingKubeletMetrics = []string{
-	"kubelet_docker_operations_errors_total",
-	"kubelet_docker_operations_duration_seconds",
-	"kubelet_pod_start_duration_seconds",
-	"kubelet_pod_worker_duration_seconds",
-	"kubelet_pod_worker_start_duration_seconds",
-}
-
-var interestingClusterAutoscalerMetrics = []string{
-	"function_duration_seconds",
-	"errors_total",
-	"evicted_pods_total",
-}
-
 // LatencyMetric is a struct for dashboard metrics.
 type LatencyMetric struct {
 	Perc50  time.Duration `json:"Perc50"`
 	Perc90  time.Duration `json:"Perc90"`
 	Perc99  time.Duration `json:"Perc99"`
 	Perc100 time.Duration `json:"Perc100"`
-}
-
-// PodStartupLatency is a struct for managing latency of pod startup.
-type PodStartupLatency struct {
-	CreateToScheduleLatency LatencyMetric `json:"createToScheduleLatency"`
-	ScheduleToRunLatency    LatencyMetric `json:"scheduleToRunLatency"`
-	RunToWatchLatency       LatencyMetric `json:"runToWatchLatency"`
-	ScheduleToWatchLatency  LatencyMetric `json:"scheduleToWatchLatency"`
-	E2ELatency              LatencyMetric `json:"e2eLatency"`
-}
-
-// SummaryKind returns the summary of pod startup latency.
-func (l *PodStartupLatency) SummaryKind() string {
-	return "PodStartupLatency"
-}
-
-// PrintHumanReadable returns pod startup letency with JSON format.
-func (l *PodStartupLatency) PrintHumanReadable() string {
-	return PrettyPrintJSON(l)
-}
-
-// PrintJSON returns pod startup letency with JSON format.
-func (l *PodStartupLatency) PrintJSON() string {
-	return PrettyPrintJSON(PodStartupLatencyToPerfData(l))
-}
-
-// SchedulingMetrics is a struct for managing scheduling metrics.
-type SchedulingMetrics struct {
-	PredicateEvaluationLatency  LatencyMetric `json:"predicateEvaluationLatency"`
-	PriorityEvaluationLatency   LatencyMetric `json:"priorityEvaluationLatency"`
-	PreemptionEvaluationLatency LatencyMetric `json:"preemptionEvaluationLatency"`
-	BindingLatency              LatencyMetric `json:"bindingLatency"`
-	ThroughputAverage           float64       `json:"throughputAverage"`
-	ThroughputPerc50            float64       `json:"throughputPerc50"`
-	ThroughputPerc90            float64       `json:"throughputPerc90"`
-	ThroughputPerc99            float64       `json:"throughputPerc99"`
-}
-
-// SummaryKind returns the summary of scheduling metrics.
-func (l *SchedulingMetrics) SummaryKind() string {
-	return "SchedulingMetrics"
-}
-
-// PrintHumanReadable returns scheduling metrics with JSON format.
-func (l *SchedulingMetrics) PrintHumanReadable() string {
-	return PrettyPrintJSON(l)
-}
-
-// PrintJSON returns scheduling metrics with JSON format.
-func (l *SchedulingMetrics) PrintJSON() string {
-	return PrettyPrintJSON(l)
 }
 
 // Histogram is a struct for managing histogram.
@@ -667,57 +482,6 @@ func sendRestRequestToScheduler(c clientset.Interface, op string) (string, error
 	return responseText, nil
 }
 
-// Retrieves scheduler latency metrics.
-func getSchedulingLatency(c clientset.Interface) (*SchedulingMetrics, error) {
-	result := SchedulingMetrics{}
-	data, err := sendRestRequestToScheduler(c, "GET")
-	if err != nil {
-		return nil, err
-	}
-
-	samples, err := extractMetricSamples(data)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, sample := range samples {
-		if sample.Metric[model.MetricNameLabel] != schedulingLatencyMetricName {
-			continue
-		}
-
-		var metric *LatencyMetric
-		switch sample.Metric[schedulermetric.OperationLabel] {
-		case schedulermetric.PredicateEvaluation:
-			metric = &result.PredicateEvaluationLatency
-		case schedulermetric.PriorityEvaluation:
-			metric = &result.PriorityEvaluationLatency
-		case schedulermetric.PreemptionEvaluation:
-			metric = &result.PreemptionEvaluationLatency
-		case schedulermetric.Binding:
-			metric = &result.BindingLatency
-		}
-		if metric == nil {
-			continue
-		}
-
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
-		if err != nil {
-			return nil, err
-		}
-		setQuantile(metric, quantile, time.Duration(int64(float64(sample.Value)*float64(time.Second))))
-	}
-	return &result, nil
-}
-
-// VerifySchedulerLatency verifies (currently just by logging them) the scheduling latencies.
-func VerifySchedulerLatency(c clientset.Interface) (*SchedulingMetrics, error) {
-	latency, err := getSchedulingLatency(c)
-	if err != nil {
-		return nil, err
-	}
-	return latency, nil
-}
-
 // ResetSchedulerMetrics sends a DELETE request to kube-scheduler for resetting metrics.
 func ResetSchedulerMetrics(c clientset.Interface) error {
 	responseText, err := sendRestRequestToScheduler(c, "DELETE")
@@ -783,74 +547,4 @@ func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 		}
 		samples = append(samples, v...)
 	}
-}
-
-// PodLatencyData encapsulates pod startup latency information.
-type PodLatencyData struct {
-	// Name of the pod
-	Name string
-	// Node this pod was running on
-	Node string
-	// Latency information related to pod startuptime
-	Latency time.Duration
-}
-
-// LatencySlice is an array of PodLatencyData which encapsulates pod startup latency information.
-type LatencySlice []PodLatencyData
-
-func (a LatencySlice) Len() int           { return len(a) }
-func (a LatencySlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a LatencySlice) Less(i, j int) bool { return a[i].Latency < a[j].Latency }
-
-// ExtractLatencyMetrics returns latency metrics for each percentile(50th, 90th and 99th).
-func ExtractLatencyMetrics(latencies []PodLatencyData) LatencyMetric {
-	length := len(latencies)
-	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
-	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
-	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
-	perc100 := latencies[length-1].Latency
-	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99, Perc100: perc100}
-}
-
-// LogSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
-// If latencyDataLag is nil then it will be populated from latencyData
-func LogSuspiciousLatency(latencyData []PodLatencyData, latencyDataLag []PodLatencyData, nodeCount int, c clientset.Interface) {
-	if latencyDataLag == nil {
-		latencyDataLag = latencyData
-	}
-	for _, l := range latencyData {
-		if l.Latency > NodeStartupThreshold {
-			HighLatencyKubeletOperations(c, 1*time.Second, l.Node, e2elog.Logf)
-		}
-	}
-	e2elog.Logf("Approx throughput: %v pods/min",
-		float64(nodeCount)/(latencyDataLag[len(latencyDataLag)-1].Latency.Minutes()))
-}
-
-// PrintLatencies outputs latencies to log with readable format.
-func PrintLatencies(latencies []PodLatencyData, header string) {
-	metrics := ExtractLatencyMetrics(latencies)
-	e2elog.Logf("10%% %s: %v", header, latencies[(len(latencies)*9)/10:])
-	e2elog.Logf("perc50: %v, perc90: %v, perc99: %v", metrics.Perc50, metrics.Perc90, metrics.Perc99)
-}
-
-func (m *MetricsForE2E) computeClusterAutoscalerMetricsDelta(before metrics.Collection) {
-	if beforeSamples, found := before.ClusterAutoscalerMetrics[caFunctionMetric]; found {
-		if afterSamples, found := m.ClusterAutoscalerMetrics[caFunctionMetric]; found {
-			beforeSamplesMap := make(map[string]*model.Sample)
-			for _, bSample := range beforeSamples {
-				beforeSamplesMap[makeKey(bSample.Metric[caFunctionMetricLabel], bSample.Metric["le"])] = bSample
-			}
-			for _, aSample := range afterSamples {
-				if bSample, found := beforeSamplesMap[makeKey(aSample.Metric[caFunctionMetricLabel], aSample.Metric["le"])]; found {
-					aSample.Value = aSample.Value - bSample.Value
-				}
-
-			}
-		}
-	}
-}
-
-func makeKey(a, b model.LabelValue) string {
-	return string(a) + "___" + string(b)
 }

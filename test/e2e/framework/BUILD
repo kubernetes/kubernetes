@@ -48,7 +48,6 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/registry/core/service/portallocator:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/security/podsecuritypolicy/seccomp:go_default_library",
         "//pkg/util/system:go_default_library",

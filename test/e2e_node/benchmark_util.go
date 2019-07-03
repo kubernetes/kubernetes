@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 )
@@ -128,7 +129,7 @@ func getLatencyPerfData(latency framework.LatencyMetric, testInfo map[string]str
 }
 
 // getThroughputPerfData returns perf data of pod creation startup throughput.
-func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
+func getThroughputPerfData(batchLag time.Duration, e2eLags []e2emetrics.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
 		Version: framework.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
