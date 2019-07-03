@@ -64,94 +64,163 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	)
 }
 
-// helper creates a NodeNode with a set of PodCIDRs
-func makeNodeWithCIDRs(podCIDRs []string) *api.Node {
-	return &api.Node{
+// helper creates a NodeNode with a set of PodCIDRs, Spec.ConfigSource, Status.Config
+func makeNode(podCIDRs []string, addSpecDynamicConfig bool, addStatusDynamicConfig bool) *api.Node {
+	node := &api.Node{
 		Spec: api.NodeSpec{
 			PodCIDRs: podCIDRs,
 		},
 	}
+	if addSpecDynamicConfig {
+		node.Spec.ConfigSource = &api.NodeConfigSource{}
+	}
+	if addStatusDynamicConfig {
+		node.Status = api.NodeStatus{
+			Config: &api.NodeConfigStatus{},
+		}
+	}
+
+	return node
 }
 
-func TestDropPodCIDRs(t *testing.T) {
+func TestDropFields(t *testing.T) {
 	testCases := []struct {
-		name            string
-		node            *api.Node
-		oldNode         *api.Node
-		compareNode     *api.Node
-		enableDualStack bool
+		name                    string
+		node                    *api.Node
+		oldNode                 *api.Node
+		compareNode             *api.Node
+		enableDualStack         bool
+		enableNodeDynamicConfig bool
 	}{
 		{
 			name:            "nil pod cidrs",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs(nil),
+			node:            makeNode(nil, false, false),
 			oldNode:         nil,
-			compareNode:     makeNodeWithCIDRs(nil),
+			compareNode:     makeNode(nil, false, false),
 		},
 		{
 			name:            "empty pod ips",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{}),
+			node:            makeNode([]string{}, false, false),
 			oldNode:         nil,
-			compareNode:     makeNodeWithCIDRs([]string{}),
+			compareNode:     makeNode([]string{}, false, false),
 		},
 		{
 			name:            "single family ipv6",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{"2000::/10"}),
-			compareNode:     makeNodeWithCIDRs([]string{"2000::/10"}),
+			node:            makeNode([]string{"2000::/10"}, false, false),
+			compareNode:     makeNode([]string{"2000::/10"}, false, false),
 		},
 		{
 			name:            "single family ipv4",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{"10.0.0.0/8"}),
-			compareNode:     makeNodeWithCIDRs([]string{"10.0.0.0/8"}),
+			node:            makeNode([]string{"10.0.0.0/8"}, false, false),
+			compareNode:     makeNode([]string{"10.0.0.0/8"}, false, false),
 		},
 		{
 			name:            "dualstack 4-6",
 			enableDualStack: true,
-			node:            makeNodeWithCIDRs([]string{"10.0.0.0/8", "2000::/10"}),
-			compareNode:     makeNodeWithCIDRs([]string{"10.0.0.0/8", "2000::/10"}),
+			node:            makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
+			compareNode:     makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
 		},
 		{
 			name:            "dualstack 6-4",
 			enableDualStack: true,
-			node:            makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
-			compareNode:     makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
+			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 		},
 		{
 			name:            "not dualstack 6-4=>4only",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
+			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 			oldNode:         nil,
-			compareNode:     makeNodeWithCIDRs([]string{"2000::/10"}),
+			compareNode:     makeNode([]string{"2000::/10"}, false, false),
 		},
 		{
 			name:            "not dualstack 6-4=>as is (used in old)",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
-			oldNode:         makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
-			compareNode:     makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
+			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			oldNode:         makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 		},
 		{
 			name:            "not dualstack 6-4=>6only",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
+			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 			oldNode:         nil,
-			compareNode:     makeNodeWithCIDRs([]string{"2000::/10"}),
+			compareNode:     makeNode([]string{"2000::/10"}, false, false),
 		},
 		{
 			name:            "not dualstack 6-4=>as is (used in old)",
 			enableDualStack: false,
-			node:            makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
-			oldNode:         makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
-			compareNode:     makeNodeWithCIDRs([]string{"2000::/10", "10.0.0.0/8"}),
+			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			oldNode:         makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+		},
+		{
+			name:                    "new with no Spec.ConfigSource and no Status.Config , enableNodeDynamicConfig disabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: false,
+			node:                    makeNode(nil, false, false),
+			oldNode:                 nil,
+			compareNode:             makeNode(nil, false, false),
+		},
+		{
+			name:                    "new with Spec.ConfigSource and no Status.Config, enableNodeDynamicConfig disabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: false,
+			node:                    makeNode(nil, true, false),
+			oldNode:                 nil,
+			compareNode:             makeNode(nil, false, false),
+		},
+		{
+			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig disabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: false,
+			node:                    makeNode(nil, true, true),
+			oldNode:                 nil,
+			compareNode:             makeNode(nil, false, false),
+		},
+		{
+			name:                    "update with Spec.ConfigSource and Status.Config (old has none), enableNodeDynamicConfig disabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: false,
+			node:                    makeNode(nil, true, true),
+			oldNode:                 makeNode(nil, false, false),
+			compareNode:             makeNode(nil, false, true),
+		},
+		{
+			name:                    "update with Spec.ConfigSource and Status.Config (old has them), enableNodeDynamicConfig disabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: false,
+			node:                    makeNode(nil, true, true),
+			oldNode:                 makeNode(nil, true, true),
+			compareNode:             makeNode(nil, true, true),
+		},
+		{
+			name:                    "update with Spec.ConfigSource and Status.Config (old has Status.Config), enableNodeDynamicConfig disabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: false,
+			node:                    makeNode(nil, true, true),
+			oldNode:                 makeNode(nil, false, true),
+			compareNode:             makeNode(nil, false, true),
+		},
+		{
+			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig enabled",
+			enableDualStack:         false,
+			enableNodeDynamicConfig: true,
+			node:                    makeNode(nil, true, true),
+			oldNode:                 nil,
+			compareNode:             makeNode(nil, true, true),
 		},
 	}
 
 	for _, tc := range testCases {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, tc.enableNodeDynamicConfig)()
+
 			dropDisabledFields(tc.node, tc.oldNode)
 
 			old := tc.oldNode.DeepCopy()
