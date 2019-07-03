@@ -869,7 +869,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			"baz": "blah",
 		}
 		headlessSvcName := "test"
-		var ss *apps.StatefulSet
+		var ss *appsv1.StatefulSet
 
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Creating service " + headlessSvcName + " in namespace " + ns)
@@ -883,11 +883,11 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.DumpDebugInfo(c, ns)
 			}
 			e2elog.Logf("Deleting all statefulset in ns %v", ns)
-			framework.DeleteAllStatefulSets(c, ns)
+			e2esset.DeleteAllStatefulSets(c, ns)
 		})
 
 		ginkgo.It("should redeploy after update", func() {
-			ss = &apps.StatefulSet{
+			ss = &appsv1.StatefulSet{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "StatefulSet",
 					APIVersion: "apps/v1",
@@ -896,7 +896,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Name:      ssName,
 					Namespace: ns,
 				},
-				Spec: apps.StatefulSetSpec{
+				Spec: appsv1.StatefulSetSpec{
 					Selector: &metav1.LabelSelector{
 						MatchLabels: labels,
 					},
@@ -931,13 +931,12 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
 			framework.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 1
-			sst := framework.NewStatefulSetTester(c)
 
-			_, err := c.AppsV1().StatefulSets(ns).Create(ss)
+			ss, err := c.AppsV1().StatefulSets(ns).Create(ss)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("Updating stateful set template: update init container"))
-			ss, err = framework.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *apps.StatefulSet) {
+			ss, err = e2esset.UpdateStatefulSetWithRetries(c, ns, ss.Name, func(update *appsv1.StatefulSet) {
 				update.Spec.Template.Spec.InitContainers = []v1.Container{
 					{
 						Name:    "busybox",
@@ -948,7 +947,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 				}
 			})
 			framework.ExpectNoError(err)
-			sst.WaitForRunningAndReady(1, ss)
+			e2esset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
 		})
 	})
 })
