@@ -3865,7 +3865,11 @@ func describePodSecurityPolicy(psp *policyv1beta1.PodSecurityPolicy) (string, er
 		w.Write(LEVEL_0, "\nSettings:\n")
 
 		w.Write(LEVEL_1, "Allow Privileged:\t%t\n", psp.Spec.Privileged)
-		w.Write(LEVEL_1, "Allow Privilege Escalation:\t%v\n", psp.Spec.AllowPrivilegeEscalation)
+		if psp.Spec.AllowPrivilegeEscalation != nil {
+			w.Write(LEVEL_1, "Allow Privilege Escalation:\t%t\n", *psp.Spec.AllowPrivilegeEscalation)
+		} else {
+			w.Write(LEVEL_1, "Allow Privilege Escalation:\t<unset>\n")
+		}
 		w.Write(LEVEL_1, "Default Add Capabilities:\t%v\n", capsToString(psp.Spec.DefaultAddCapabilities))
 		w.Write(LEVEL_1, "Required Drop Capabilities:\t%s\n", capsToString(psp.Spec.RequiredDropCapabilities))
 		w.Write(LEVEL_1, "Allowed Capabilities:\t%s\n", capsToString(psp.Spec.AllowedCapabilities))
