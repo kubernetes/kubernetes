@@ -108,10 +108,10 @@ func (hr *HandlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 			klog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return "", err
 		}
-		if status.IP == "" {
+		if len(status.IPs) == 0 {
 			return "", fmt.Errorf("failed to find networking container: %v", status)
 		}
-		host = status.IP
+		host = status.IPs[0]
 	}
 	var port int
 	if handler.HTTPGet.Port.Type == intstr.String && len(handler.HTTPGet.Port.StrVal) == 0 {

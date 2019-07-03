@@ -117,6 +117,31 @@ func (az *Cloud) ListVirtualMachines(resourceGroup string) ([]compute.VirtualMac
 	return az.ListVirtualMachinesWithRetry(resourceGroup)
 }
 
+// getPrivateIPsForMachine is wrapper for optional backoff getting private ips
+// list of a node by name
+func (az *Cloud) getPrivateIPsForMachine(nodeName types.NodeName) ([]string, error) {
+	if az.Config.shouldOmitCloudProviderBackoff() {
+		return az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
+	}
+
+	return az.getPrivateIPsForMachineWithRetry(nodeName)
+}
+
+func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]string, error) {
+	var privateIPs []string
+	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+		var retryErr error
+		privateIPs, retryErr = az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
+		if retryErr != nil {
+			klog.Errorf("GetPrivateIPsByNodeName(%s): backoff failure, will retry,err=%v", nodeName, retryErr)
+			return false, nil
+		}
+		klog.V(2).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
+		return true, nil
+	})
+	return privateIPs, err
+}
+
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error) {
 	if az.Config.shouldOmitCloudProviderBackoff() {
 		return az.vmSet.GetIPByNodeName(string(nodeName))

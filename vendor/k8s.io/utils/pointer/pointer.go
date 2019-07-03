@@ -56,7 +56,7 @@ func Int64Ptr(i int64) *int64 {
 	return &i
 }
 
-// Int32PtrDerefOr dereference the int32 ptr and returns it i not nil,
+// Int32PtrDerefOr dereference the int32 ptr and returns it if not nil,
 // else returns def.
 func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 	if ptr != nil {

@@ -10326,7 +10326,7 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				PodCIDR: "192.168.0.0/16",
+				PodCIDRs: []string{"192.168.0.0/16"},
 			},
 		},
 	}
@@ -10533,7 +10533,24 @@ func TestValidateNode(t *testing.T) {
 				},
 			},
 			Spec: core.NodeSpec{
-				PodCIDR: "192.168.0.0",
+				PodCIDRs: []string{"192.168.0.0"},
+			},
+		},
+		"duplicate-pod-cidr": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "abc",
+			},
+			Status: core.NodeStatus{
+				Addresses: []core.NodeAddress{
+					{Type: core.NodeExternalIP, Address: "something"},
+				},
+				Capacity: core.ResourceList{
+					core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+					core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"10.0.0.1/16", "10.0.0.1/16"},
 			},
 		},
 	}
@@ -10616,14 +10633,14 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 			},
 			Spec: core.NodeSpec{
-				PodCIDR: "",
+				PodCIDRs: []string{},
 			},
 		}, core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: core.NodeSpec{
-				PodCIDR: "192.168.0.0/16",
+				PodCIDRs: []string{"192.168.0.0/16"},
 			},
 		}, true},
 		{core.Node{
@@ -10631,14 +10648,14 @@ func TestValidateNodeUpdate(t *testing.T) {
 				Name: "foo",
 			},
 			Spec: core.NodeSpec{
-				PodCIDR: "192.123.0.0/16",
+				PodCIDRs: []string{"192.123.0.0/16"},
 			},
 		}, core.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "foo",
 			},
 			Spec: core.NodeSpec{
-				PodCIDR: "192.168.0.0/16",
+				PodCIDRs: []string{"192.168.0.0/16"},
 			},
 		}, false},
 		{core.Node{
@@ -10923,6 +10940,66 @@ func TestValidateNodeUpdate(t *testing.T) {
 			},
 			Spec: core.NodeSpec{
 				ProviderID: "provider:///new",
+			},
+		}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-as-is",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16"},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-as-is",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16"},
+			},
+		}, true},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-as-is-2",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16", "2000::/10"},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-as-is-2",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16", "2000::/10"},
+			},
+		}, true},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-not-same-length",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16", "192.167.0.0/16", "2000::/10"},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-not-same-length",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16", "2000::/10"},
+			},
+		}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-not-same",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"192.168.0.0/16", "2000::/10"},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pod-cidrs-not-same",
+			},
+			Spec: core.NodeSpec{
+				PodCIDRs: []string{"2000::/10", "192.168.0.0/16"},
 			},
 		}, false},
 	}
@@ -13539,6 +13616,191 @@ func TestValidateOverhead(t *testing.T) {
 	for _, tc := range errorCase {
 		if errs := validateOverhead(tc.overhead, field.NewPath("resources")); len(errs) == 0 {
 			t.Errorf("%q expected error", tc.Name)
+		}
+	}
+}
+
+// helper creates a pod with name, namespace and IPs
+func makePod(podName string, podNamespace string, podIPs []core.PodIP) core.Pod {
+	return core.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName, Namespace: podNamespace},
+		Spec: core.PodSpec{
+			Containers: []core.Container{
+				{
+					Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+				},
+			},
+			RestartPolicy: core.RestartPolicyAlways,
+			DNSPolicy:     core.DNSClusterFirst,
+		},
+		Status: core.PodStatus{
+			PodIPs: podIPs,
+		},
+	}
+}
+func TestPodIPsValidation(t *testing.T) {
+	testCases := []struct {
+		pod         core.Pod
+		expectError bool
+	}{
+		{
+			expectError: false,
+			pod:         makePod("nil-ips", "ns", nil),
+		},
+		{
+			expectError: false,
+			pod:         makePod("empty-podips-list", "ns", []core.PodIP{}),
+		},
+		{
+			expectError: false,
+			pod:         makePod("single-ip-family-6", "ns", []core.PodIP{{IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePod("single-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePod("dual-stack-4-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: false,
+			pod:         makePod("dual-stack-6-4", "ns", []core.PodIP{{IP: "::1"}, {IP: "1.1.1.1"}}),
+		},
+		/* failure cases start here */
+		{
+			expectError: true,
+			pod:         makePod("invalid-pod-ip", "ns", []core.PodIP{{IP: "this-is-not-an-ip"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePod("dualstack-same-ip-family-6", "ns", []core.PodIP{{IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePod("dualstack-same-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePod("dualstack-repeated-ip-family-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::2"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePod("dualstack-repeated-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "2.2.2.2"}}),
+		},
+
+		{
+			expectError: true,
+			pod:         makePod("dualstack-duplicate-ip-family-4", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "1.1.1.1"}, {IP: "::1"}}),
+		},
+		{
+			expectError: true,
+			pod:         makePod("dualstack-duplicate-ip-family-6", "ns", []core.PodIP{{IP: "1.1.1.1"}, {IP: "::1"}, {IP: "::1"}}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		errs := ValidatePod(&testCase.pod)
+		if len(errs) == 0 && testCase.expectError {
+			t.Errorf("expected failure for %s, but there were none", testCase.pod.Name)
+			return
+		}
+		if len(errs) != 0 && !testCase.expectError {
+			t.Errorf("expected success for %s, but there were errors: %v", testCase.pod.Name, errs)
+			return
+		}
+	}
+}
+
+// makes a node with pod cidr and a name
+func makeNode(nodeName string, podCIDRs []string) core.Node {
+	return core.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: nodeName,
+		},
+		Status: core.NodeStatus{
+			Addresses: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "something"},
+			},
+			Capacity: core.ResourceList{
+				core.ResourceName(core.ResourceCPU):    resource.MustParse("10"),
+				core.ResourceName(core.ResourceMemory): resource.MustParse("0"),
+			},
+		},
+		Spec: core.NodeSpec{
+			PodCIDRs: podCIDRs,
+		},
+	}
+}
+func TestValidateNodeCIDRs(t *testing.T) {
+	testCases := []struct {
+		expectError bool
+		node        core.Node
+	}{
+		{
+			expectError: false,
+			node:        makeNode("nil-pod-cidr", nil),
+		},
+		{
+			expectError: false,
+			node:        makeNode("empty-pod-cidr", []string{}),
+		},
+		{
+			expectError: false,
+			node:        makeNode("single-pod-cidr-4", []string{"192.168.0.0/16"}),
+		},
+		{
+			expectError: false,
+			node:        makeNode("single-pod-cidr-6", []string{"2000::/10"}),
+		},
+
+		{
+			expectError: false,
+			node:        makeNode("multi-pod-cidr-6-4", []string{"2000::/10", "192.168.0.0/16"}),
+		},
+		{
+			expectError: false,
+			node:        makeNode("multi-pod-cidr-4-6", []string{"192.168.0.0/16", "2000::/10"}),
+		},
+		// error cases starts here
+		{
+			expectError: true,
+			node:        makeNode("invalid-pod-cidr", []string{"this-is-not-a-valid-cidr"}),
+		},
+		{
+			expectError: true,
+			node:        makeNode("duplicate-pod-cidr-4", []string{"10.0.0.1/16", "10.0.0.1/16"}),
+		},
+		{
+			expectError: true,
+			node:        makeNode("duplicate-pod-cidr-6", []string{"2000::/10", "2000::/10"}),
+		},
+		{
+			expectError: true,
+			node:        makeNode("not-a-dualstack-no-v4", []string{"2000::/10", "3000::/10"}),
+		},
+		{
+			expectError: true,
+			node:        makeNode("not-a-dualstack-no-v6", []string{"10.0.0.0/16", "10.1.0.0/16"}),
+		},
+		{
+			expectError: true,
+			node:        makeNode("not-a-dualstack-repeated-v6", []string{"2000::/10", "10.0.0.0/16", "3000::/10"}),
+		},
+		{
+			expectError: true,
+			node:        makeNode("not-a-dualstack-repeated-v4", []string{"10.0.0.0/16", "3000::/10", "10.1.0.0/16"}),
+		},
+	}
+	for _, testCase := range testCases {
+		errs := ValidateNode(&testCase.node)
+		if len(errs) == 0 && testCase.expectError {
+			t.Errorf("expected failure for %s, but there were none", testCase.node.Name)
+			return
+		}
+		if len(errs) != 0 && !testCase.expectError {
+			t.Errorf("expected success for %s, but there were errors: %v", testCase.node.Name, errs)
+			return
 		}
 	}
 }

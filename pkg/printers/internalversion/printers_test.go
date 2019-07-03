@@ -1703,8 +1703,49 @@ func TestPrintPodwide(t *testing.T) {
 							Status: api.ConditionTrue,
 						},
 					},
-					Phase: "podPhase",
-					PodIP: "1.1.1.1",
+					Phase:  "podPhase",
+					PodIPs: []api.PodIP{{IP: "1.1.1.1"}},
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+					NominatedNodeName: "node1",
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+		},
+		{
+			// Test when the NodeName and PodIP are not none
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   "test1",
+					ReadinessGates: []api.PodReadinessGate{
+						{
+							ConditionType: api.PodConditionType(condition1),
+						},
+						{
+							ConditionType: api.PodConditionType(condition2),
+						},
+						{
+							ConditionType: api.PodConditionType(condition3),
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodConditionType(condition1),
+							Status: api.ConditionFalse,
+						},
+						{
+							Type:   api.PodConditionType(condition2),
+							Status: api.ConditionTrue,
+						},
+					},
+					Phase:  "podPhase",
+					PodIPs: []api.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{RestartCount: 3},
@@ -1724,7 +1765,6 @@ func TestPrintPodwide(t *testing.T) {
 				},
 				Status: api.PodStatus{
 					Phase: "podPhase",
-					PodIP: "",
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},

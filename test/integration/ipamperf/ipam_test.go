@@ -52,7 +52,7 @@ func setupAllocator(apiURL string, config *Config, clusterCIDR, serviceCIDR *net
 	sharedInformer := informers.NewSharedInformerFactory(clientSet, 1*time.Hour)
 	ipamController, err := nodeipam.NewNodeIpamController(
 		sharedInformer.Core().V1().Nodes(), config.Cloud, clientSet,
-		clusterCIDR, serviceCIDR, subnetMaskSize, config.AllocatorType,
+		[]*net.IPNet{clusterCIDR}, serviceCIDR, subnetMaskSize, config.AllocatorType,
 	)
 	if err != nil {
 		return nil, shutdownFunc, err

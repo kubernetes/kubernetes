@@ -2084,6 +2084,13 @@ message NodeSpec {
   // +optional
   optional string podCIDR = 1;
 
+  // podCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. If this
+  // field is specified, the 0th entry must match the podCIDR field. It may contain at most 1 value for
+  // each of IPv4 and IPv6.
+  // +optional
+  // +patchStrategy=merge
+  repeated string podCIDRs = 7;
+
   // ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
   // +optional
   optional string providerID = 3;
@@ -2842,6 +2849,14 @@ message PodExecOptions {
   repeated string command = 6;
 }
 
+// IP address information for entries in the (plural) PodIPs field.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within the cluster.
+message PodIP {
+  // ip is an IP address (IPv4 or IPv6) assigned to the pod
+  optional string ip = 1;
+}
+
 // PodList is a list of Pods.
 message PodList {
   // Standard list metadata.
@@ -3287,6 +3302,14 @@ message PodStatus {
   // Empty if not yet allocated.
   // +optional
   optional string podIP = 6;
+
+  // podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must
+  // match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list
+  // is empty if no IPs have been allocated yet.
+  // +optional
+  // +patchStrategy=merge
+  // +patchMergeKey=ip
+  repeated PodIP podIPs = 12;
 
   // RFC 3339 date and time at which the object was acknowledged by the Kubelet.
   // This is before the Kubelet pulled the container image(s) for the pod.

@@ -3126,6 +3126,14 @@ type PodDNSConfigOption struct {
 	Value *string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
 }
 
+// IP address information for entries in the (plural) PodIPs field.
+// Each entry includes:
+//    IP: An IP address allocated to the pod. Routable at least within the cluster.
+type PodIP struct {
+	// ip is an IP address (IPv4 or IPv6) assigned to the pod
+	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
+}
+
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
@@ -3180,6 +3188,14 @@ type PodStatus struct {
 	// Empty if not yet allocated.
 	// +optional
 	PodIP string `json:"podIP,omitempty" protobuf:"bytes,6,opt,name=podIP"`
+
+	// podIPs holds the IP addresses allocated to the pod. If this field is specified, the 0th entry must
+	// match the podIP field. Pods may be allocated at most 1 value for each of IPv4 and IPv6. This list
+	// is empty if no IPs have been allocated yet.
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=ip
+	PodIPs []PodIP `json:"podIPs,omitempty" protobuf:"bytes,12,rep,name=podIPs" patchStrategy:"merge" patchMergeKey:"ip"`
 
 	// RFC 3339 date and time at which the object was acknowledged by the Kubelet.
 	// This is before the Kubelet pulled the container image(s) for the pod.
@@ -3901,6 +3917,14 @@ type NodeSpec struct {
 	// PodCIDR represents the pod IP range assigned to the node.
 	// +optional
 	PodCIDR string `json:"podCIDR,omitempty" protobuf:"bytes,1,opt,name=podCIDR"`
+
+	// podCIDRs represents the IP ranges assigned to the node for usage by Pods on that node. If this
+	// field is specified, the 0th entry must match the podCIDR field. It may contain at most 1 value for
+	// each of IPv4 and IPv6.
+	// +optional
+	// +patchStrategy=merge
+	PodCIDRs []string `json:"podCIDRs,omitempty" protobuf:"bytes,7,opt,name=podCIDRs" patchStrategy:"merge"`
+
 	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	// +optional
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`

@@ -447,6 +447,12 @@ const (
 	//
 	// Enables PodOverhead, for accounting pod overheads which are specific to a given RuntimeClass
 	PodOverhead featuregate.Feature = "PodOverhead"
+
+	// owner: @khenidak
+	// alpha: v1.15
+	//
+	// Enables ipv6 dual stack
+	IPv6DualStack featuregate.Feature = "IPv6DualStack"
 )
 
 func init() {
@@ -522,6 +528,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
+	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

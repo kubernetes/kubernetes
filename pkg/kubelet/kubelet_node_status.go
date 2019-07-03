@@ -22,11 +22,10 @@ import (
 	"net"
 	goruntime "runtime"
 	"sort"
+	"strings"
 	"time"
 
-	"k8s.io/klog"
-
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
@@ -417,11 +417,12 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	}
 
 	podCIDRChanged := false
-	if node.Spec.PodCIDR != "" {
+	if len(node.Spec.PodCIDRs) != 0 {
 		// Pod CIDR could have been updated before, so we cannot rely on
 		// node.Spec.PodCIDR being non-empty. We also need to know if pod CIDR is
 		// actually changed.
-		if podCIDRChanged, err = kl.updatePodCIDR(node.Spec.PodCIDR); err != nil {
+		podCIDRs := strings.Join(node.Spec.PodCIDRs, ",")
+		if podCIDRChanged, err = kl.updatePodCIDR(podCIDRs); err != nil {
 			klog.Errorf(err.Error())
 		}
 	}

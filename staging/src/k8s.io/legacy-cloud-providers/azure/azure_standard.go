@@ -460,6 +460,29 @@ func (as *availabilitySet) GetIPByNodeName(name string) (string, string, error) 
 	return privateIP, publicIP, nil
 }
 
+// returns a list of private ips assigned to node
+// TODO (khenidak): This should read all nics, not just the primary
+// allowing users to split ipv4/v6 on multiple nics
+func (as *availabilitySet) GetPrivateIPsByNodeName(name string) ([]string, error) {
+	ips := make([]string, 0)
+	nic, err := as.GetPrimaryInterface(name)
+	if err != nil {
+		return ips, err
+	}
+
+	if nic.IPConfigurations == nil {
+		return ips, fmt.Errorf("nic.IPConfigurations for nic (nicname=%q) is nil", *nic.Name)
+	}
+
+	for _, ipConfig := range *(nic.IPConfigurations) {
+		if ipConfig.PrivateIPAddress != nil {
+			ips = append(ips, *(ipConfig.PrivateIPAddress))
+		}
+	}
+
+	return ips, nil
+}
+
 // getAgentPoolAvailabiliySets lists the virtual machines for the resource group and then builds
 // a list of availability sets that match the nodes available to k8s.
 func (as *availabilitySet) getAgentPoolAvailabiliySets(nodes []*v1.Node) (agentPoolAvailabilitySets *[]string, err error) {

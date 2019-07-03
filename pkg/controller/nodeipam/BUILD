@@ -19,6 +19,7 @@ go_test(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

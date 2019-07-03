@@ -879,6 +879,10 @@ func (f *fakeVMSet) GetInstanceTypeByNodeName(name string) (string, error) {
 	return "", fmt.Errorf("unimplemented")
 }
 
+func (f *fakeVMSet) GetPrivateIPsByNodeName(nodeName string) ([]string, error) {
+	return []string{}, fmt.Errorf("unimplemented")
+}
+
 func (f *fakeVMSet) GetIPByNodeName(name string) (string, string, error) {
 	ip, found := f.NodeToIP[name]
 	if !found {

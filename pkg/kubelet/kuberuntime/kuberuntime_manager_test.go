@@ -114,18 +114,29 @@ func makeFakePodSandbox(t *testing.T, m *kubeGenericRuntimeManager, template san
 	assert.NoError(t, err, "generatePodSandboxConfig for sandbox template %+v", template)
 
 	podSandboxID := apitest.BuildSandboxName(config.Metadata)
-	return &apitest.FakePodSandbox{
+	podSandBoxStatus := &apitest.FakePodSandbox{
 		PodSandboxStatus: runtimeapi.PodSandboxStatus{
 			Id:        podSandboxID,
 			Metadata:  config.Metadata,
 			State:     template.state,
 			CreatedAt: template.createdAt,
 			Network: &runtimeapi.PodSandboxNetworkStatus{
-				Ip: apitest.FakePodSandboxIP,
+				Ip: apitest.FakePodSandboxIPs[0],
 			},
 			Labels: config.Labels,
 		},
 	}
+	// assign additional IPs
+	additionalIPs := apitest.FakePodSandboxIPs[1:]
+	additionalPodIPs := make([]*runtimeapi.PodIP, 0, len(additionalIPs))
+	for _, ip := range additionalIPs {
+		additionalPodIPs = append(additionalPodIPs, &runtimeapi.PodIP{
+			Ip: ip,
+		})
+	}
+	podSandBoxStatus.Network.AdditionalIps = additionalPodIPs
+	return podSandBoxStatus
+
 }
 
 // makeFakePodSandboxes creates a group of fake pod sandboxes based on the sandbox templates.
@@ -311,7 +322,7 @@ func TestGetPodStatus(t *testing.T) {
 	assert.Equal(t, pod.UID, podStatus.ID)
 	assert.Equal(t, pod.Name, podStatus.Name)
 	assert.Equal(t, pod.Namespace, podStatus.Namespace)
-	assert.Equal(t, apitest.FakePodSandboxIP, podStatus.IP)
+	assert.Equal(t, apitest.FakePodSandboxIPs, podStatus.IPs)
 }
 
 func TestGetPods(t *testing.T) {

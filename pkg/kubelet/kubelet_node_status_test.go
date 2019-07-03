@@ -23,6 +23,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1004,11 +1005,12 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Report node status if it is still within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
 	assert.Equal(t, "", kubelet.runtimeState.podCIDR(), "Pod CIDR should be empty")
-	podCIDR := "10.0.0.0/24"
-	updatedNode.Spec.PodCIDR = podCIDR
+	podCIDRs := []string{"10.0.0.0/24", "2000::/10"}
+	updatedNode.Spec.PodCIDR = podCIDRs[0]
+	updatedNode.Spec.PodCIDRs = podCIDRs
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{*updatedNode}}).ReactionChain
 	assert.NoError(t, kubelet.updateNodeStatus())
-	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
+	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should be updated now")
 	// 2 more action (There were 7 actions before).
 	actions = kubeClient.Actions()
 	assert.Len(t, actions, 9)
@@ -1019,7 +1021,8 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Update node status when keeping the pod CIDR.
 	// Do not report node status if it is within the duration of nodeStatusReportFrequency.
 	clock.Step(10 * time.Second)
-	assert.Equal(t, podCIDR, kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+	assert.Equal(t, strings.Join(podCIDRs, ","), kubelet.runtimeState.podCIDR(), "Pod CIDR should already be updated")
+
 	assert.NoError(t, kubelet.updateNodeStatus())
 	// Only 1 more action (There were 9 actions before).
 	actions = kubeClient.Actions()
