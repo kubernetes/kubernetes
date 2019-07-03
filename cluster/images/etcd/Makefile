@@ -97,6 +97,7 @@ ifeq ($(ARCH),amd64)
 		curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$$version/etcd-v$$version-linux-amd64.tar.gz | tar -xz -C $$etcd_release_tmp_dir --strip-components=1; \
 		cp $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		cp $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
+		chmod +x $(TEMP_DIR)/etcd-$$version; \
 		cp $(TEMP_DIR)/etcdctl $(TEMP_DIR)/etcdctl-$$version; \
 	done
 else
