@@ -53,9 +53,9 @@ var _ = SIGDescribe("Job", func() {
 		ginkgo.By("Ensuring pods for job exist")
 		pods, err := jobutil.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
 		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(int(completions)), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
+		framework.ExpectEqual(len(pods.Items), int(completions), "failed to ensure sufficient pod for job: got %d, want %d", len(pods.Items), completions)
 		for _, pod := range pods.Items {
-			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodSucceeded), "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
+			framework.ExpectEqual(pod.Status.Phase, v1.PodSucceeded, "failed to ensure pod status: pod %s status %s", pod.Name, pod.Status.Phase)
 		}
 	})
 
@@ -234,7 +234,7 @@ var _ = SIGDescribe("Job", func() {
 			e2elog.Failf("Not enough pod created expected at least %d, got %#v", backoff+1, pods.Items)
 		}
 		for _, pod := range pods.Items {
-			gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodFailed))
+			framework.ExpectEqual(pod.Status.Phase, v1.PodFailed)
 		}
 	})
 })
