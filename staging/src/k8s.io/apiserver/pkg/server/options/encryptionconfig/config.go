@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
@@ -44,7 +47,112 @@ const (
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
 	kmsPluginConnectionTimeout   = 3 * time.Second
+	kmsPluginHealthzTTL          = 3 * time.Second
 )
+
+type kmsPluginHealthzResponse struct {
+	err      error
+	received time.Time
+}
+
+type kmsPluginProbe struct {
+	name string
+	envelope.Service
+	lastResponse *kmsPluginHealthzResponse
+	l            *sync.Mutex
+}
+
+func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthzChecker {
+	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
+		return h.Check()
+	})
+}
+
+// GetKMSPluginHealthzCheckers extracts KMSPluginProbes from the EncryptionConfig.
+func GetKMSPluginHealthzCheckers(filepath string) ([]healthz.HealthzChecker, error) {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
+	}
+	defer f.Close()
+	var result []healthz.HealthzChecker
+	probes, err := getKMSPluginProbes(f)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, p := range probes {
+		probe := p
+		result = append(result, probe.toHealthzCheck(i))
+	}
+	return result, nil
+}
+
+func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
+	var result []*kmsPluginProbe
+
+	configFileContents, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return result, fmt.Errorf("could not read content of encryption provider configuration: %v", err)
+	}
+
+	config, err := loadConfig(configFileContents)
+	if err != nil {
+		return result, fmt.Errorf("error while parsing encrypiton provider configuration: %v", err)
+	}
+
+	for _, r := range config.Resources {
+		for _, p := range r.Providers {
+			if p.KMS != nil {
+				timeout := kmsPluginConnectionTimeout
+				if p.KMS.Timeout != nil {
+					if p.KMS.Timeout.Duration <= 0 {
+						return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, timeout should be a positive value", p.KMS.Name)
+					}
+					timeout = p.KMS.Timeout.Duration
+				}
+
+				s, err := envelope.NewGRPCService(p.KMS.Endpoint, timeout)
+				if err != nil {
+					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
+				}
+
+				result = append(result, &kmsPluginProbe{
+					name:         p.KMS.Name,
+					Service:      s,
+					l:            &sync.Mutex{},
+					lastResponse: &kmsPluginHealthzResponse{},
+				})
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// Check encrypts and decrypts test data against KMS-Plugin's gRPC endpoint.
+func (h *kmsPluginProbe) Check() error {
+	h.l.Lock()
+	defer h.l.Unlock()
+
+	if (time.Now().Sub(h.lastResponse.received)) < kmsPluginHealthzTTL {
+		return h.lastResponse.err
+	}
+
+	p, err := h.Service.Encrypt([]byte("ping"))
+	if err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		return fmt.Errorf("failed to perform encrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+	}
+
+	if _, err := h.Service.Decrypt(p); err != nil {
+		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+		return fmt.Errorf("failed to perform decrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+	}
+
+	h.lastResponse = &kmsPluginHealthzResponse{err: nil, received: time.Now()}
+	return nil
+}
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
 func GetTransformerOverrides(filepath string) (map[schema.GroupResource]value.Transformer, error) {
