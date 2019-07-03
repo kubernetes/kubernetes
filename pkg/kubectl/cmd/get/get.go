@@ -41,6 +41,7 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -439,7 +440,11 @@ func (o *GetOptions) transformRequests(req *rest.Request) {
 // TODO: remove the need to pass these arguments, like other commands.
 func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	if len(o.Raw) > 0 {
-		return o.raw(f)
+		restClient, err := f.RESTClient()
+		if err != nil {
+			return err
+		}
+		return rawhttp.RawGet(restClient, o.IOStreams, o.Raw)
 	}
 	if o.Watch || o.WatchOnly {
 		return o.watch(f, cmd, args)
@@ -577,27 +582,6 @@ type trackingWriterWrapper struct {
 func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
 	t.Written += len(p)
 	return t.Delegate.Write(p)
-}
-
-// raw makes a simple HTTP request to the provided path on the server using the default
-// credentials.
-func (o *GetOptions) raw(f cmdutil.Factory) error {
-	restClient, err := f.RESTClient()
-	if err != nil {
-		return err
-	}
-
-	stream, err := restClient.Get().RequestURI(o.Raw).Stream()
-	if err != nil {
-		return err
-	}
-	defer stream.Close()
-
-	_, err = io.Copy(o.Out, stream)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	return nil
 }
 
 // watch starts a client-side watch of one or more resources.

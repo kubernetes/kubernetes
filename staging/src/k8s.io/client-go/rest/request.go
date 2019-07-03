@@ -649,6 +649,9 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.body != nil {
+		req.Body = ioutil.NopCloser(r.body)
+	}
 	if r.ctx != nil {
 		req = req.WithContext(r.ctx)
 	}
