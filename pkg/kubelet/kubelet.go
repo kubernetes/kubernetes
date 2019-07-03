@@ -1525,6 +1525,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	for _, ipInfo := range apiPodStatus.PodIPs {
 		podStatus.IPs = append(podStatus.IPs, ipInfo.IP)
 	}
+
+	if len(podStatus.IPs) == 0 && len(apiPodStatus.PodIP) > 0 {
+		podStatus.IPs = []string{apiPodStatus.PodIP}
+	}
+
 	// Record the time it takes for the pod to become running.
 	existingStatus, ok := kl.statusManager.GetPodStatus(pod.UID)
 	if !ok || existingStatus.Phase == v1.PodPending && apiPodStatus.Phase == v1.PodRunning &&
