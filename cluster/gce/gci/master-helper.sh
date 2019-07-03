@@ -62,25 +62,27 @@ function replicate-master-instance() {
   kube_env="$(echo "${kube_env}" | grep -v "ETCD_PEER_CERT")"
   kube_env="$(echo -e "${kube_env}\nETCD_PEER_CERT: '${ETCD_PEER_CERT_BASE64}'")"
 
-  ETCD_APISERVER_CA_KEY="$(echo "${kube_env}" | grep "ETCD_APISERVER_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
-  ETCD_APISERVER_CA_CERT="$(echo "${kube_env}" | grep "ETCD_APISERVER_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
+  local master_certs="$(get-metadata "${existing_master_zone}" "${existing_master_name}" kube-master-certs)"
+
+  ETCD_APISERVER_CA_KEY="$(echo "${master_certs}" | grep "ETCD_APISERVER_CA_KEY" |  sed "s/^.*: '//" | sed "s/'$//")"
+  ETCD_APISERVER_CA_CERT="$(echo "${master_certs}" | grep "ETCD_APISERVER_CA_CERT" |  sed "s/^.*: '//" | sed "s/'$//")"
   create-etcd-apiserver-certs "etcd-${REPLICA_NAME}" "${REPLICA_NAME}" "${ETCD_APISERVER_CA_CERT}" "${ETCD_APISERVER_CA_KEY}"
 
-  kube_env="$(echo "${kube_env}" | grep -v "ETCD_APISERVER_SERVER_KEY")"
-  kube_env="$(echo -e "${kube_env}\nETCD_APISERVER_SERVER_KEY: '${ETCD_APISERVER_SERVER_KEY_BASE64}'")"
-  kube_env="$(echo "${kube_env}" | grep -v "ETCD_APISERVER_SERVER_CERT")"
-  kube_env="$(echo -e "${kube_env}\nETCD_APISERVER_SERVER_CERT: '${ETCD_APISERVER_SERVER_CERT_BASE64}'")"
-  kube_env="$(echo "${kube_env}" | grep -v "ETCD_APISERVER_CLIENT_KEY")"
-  kube_env="$(echo -e "${kube_env}\nETCD_APISERVER_CLIENT_KEY: '${ETCD_APISERVER_CLIENT_KEY_BASE64}'")"
-  kube_env="$(echo "${kube_env}" | grep -v "ETCD_APISERVER_CLIENT_CERT")"
-  kube_env="$(echo -e "${kube_env}\nETCD_APISERVER_CLIENT_CERT: '${ETCD_APISERVER_CLIENT_CERT_BASE64}'")"
+  master_certs="$(echo "${master_certs}" | grep -v "ETCD_APISERVER_SERVER_KEY")"
+  master_certs="$(echo -e "${master_certs}\nETCD_APISERVER_SERVER_KEY: '${ETCD_APISERVER_SERVER_KEY_BASE64}'")"
+  master_certs="$(echo "${master_certs}" | grep -v "ETCD_APISERVER_SERVER_CERT")"
+  master_certs="$(echo -e "${master_certs}\nETCD_APISERVER_SERVER_CERT: '${ETCD_APISERVER_SERVER_CERT_BASE64}'")"
+  master_certs="$(echo "${master_certs}" | grep -v "ETCD_APISERVER_CLIENT_KEY")"
+  master_certs="$(echo -e "${master_certs}\nETCD_APISERVER_CLIENT_KEY: '${ETCD_APISERVER_CLIENT_KEY_BASE64}'")"
+  master_certs="$(echo "${master_certs}" | grep -v "ETCD_APISERVER_CLIENT_CERT")"
+  master_certs="$(echo -e "${master_certs}\nETCD_APISERVER_CLIENT_CERT: '${ETCD_APISERVER_CLIENT_CERT_BASE64}'")"
 
   echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
+  echo "${master_certs}" > ${KUBE_TEMP}/kube-master-certs.yaml
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > "${KUBE_TEMP}/cluster-name.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-update-strategy > "${KUBE_TEMP}/gci-update.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-ensure-gke-docker > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
   get-metadata "${existing_master_zone}" "${existing_master_name}" gci-docker-version > "${KUBE_TEMP}/gci-docker-version.txt"
-  get-metadata "${existing_master_zone}" "${existing_master_name}" kube-master-certs > "${KUBE_TEMP}/kube-master-certs.yaml"
   get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-location > "${KUBE_TEMP}/cluster-location.txt"
 
   create-master-instance-internal "${REPLICA_NAME}"
