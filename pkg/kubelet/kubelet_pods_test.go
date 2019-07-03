@@ -1306,6 +1306,57 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
+			name:               "test_duplicated_keys",
+			ns:                 "test",
+			enableServiceLinks: &falseValue,
+			container: &v1.Container{
+				EnvFrom: []v1.EnvFromSource{
+					{
+						ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-config-map"}},
+					},
+					{
+						SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: "test-secret"}},
+					},
+				},
+			},
+			masterServiceNs: "",
+			configMap: &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test-configmap",
+				},
+				Data: map[string]string{
+					"test":  "abc",
+					"test2": "5678",
+				},
+			},
+			secret: &v1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test",
+					Name:      "test-secret",
+				},
+				Data: map[string][]byte{
+					"test":  []byte("1234"),
+					"test3": []byte("9012"),
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{
+					Name:  "test",
+					Value: "1234",
+				},
+				{
+					Name:  "test2",
+					Value: "5678",
+				},
+				{
+					Name:  "test3",
+					Value: "9012",
+				},
+			},
+			expectedEvent: "Warning DuplicatedEnvironmentVariableNames Keys [test] from the EnvFrom secret test/test-secret were already defined by other configMap or secret. Use test/test-secret.",
+		},
+		{
 			name:               "secret",
 			ns:                 "test1",
 			enableServiceLinks: &falseValue,

@@ -631,6 +631,7 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 			}
 
 			invalidKeys := []string{}
+			duplicatedKeys := []string{}
 			for k, v := range secret.Data {
 				if len(envFrom.Prefix) > 0 {
 					k = envFrom.Prefix + k
@@ -639,11 +640,19 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *v1.Pod, container *v1.Container
 					invalidKeys = append(invalidKeys, k)
 					continue
 				}
+				_, ok := tmpEnv[k]
+				if ok {
+					duplicatedKeys = append(duplicatedKeys, k)
+				}
 				tmpEnv[k] = string(v)
 			}
 			if len(invalidKeys) > 0 {
 				sort.Strings(invalidKeys)
 				kl.recorder.Eventf(pod, v1.EventTypeWarning, "InvalidEnvironmentVariableNames", "Keys [%s] from the EnvFrom secret %s/%s were skipped since they are considered invalid environment variable names.", strings.Join(invalidKeys, ", "), pod.Namespace, name)
+			}
+			if len(duplicatedKeys) > 0 {
+				sort.Strings(duplicatedKeys)
+				kl.recorder.Eventf(pod, v1.EventTypeWarning, "DuplicatedEnvironmentVariableNames", "Keys [%s] from the EnvFrom secret %s/%s were already defined by other configMap or secret. Use %s/%s.", strings.Join(duplicatedKeys, ", "), pod.Namespace, name, pod.Namespace, name)
 			}
 		}
 	}
