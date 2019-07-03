@@ -619,6 +619,9 @@ function build-linux-node-labels {
   if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${master}" != "true" ]]; then
     node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
   fi
+  if [[ -n "${MASTER_NODE_LABELS:-}" && "${master}" == "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${MASTER_NODE_LABELS}"
+  fi
   echo $node_labels
 }
 
