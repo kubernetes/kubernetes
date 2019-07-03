@@ -109,7 +109,14 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 	})
 
-	ginkgo.It("Should verify mounted devices can be resized", func() {
+	/*
+		Release: v1.16
+		Testname: Mounted Volume Expand: verify resized mounted devices
+		Description: Create a deployement with selected PVC. Check for bound PVC and expand it. After the cloud provider
+		             finish the resize. Create a pod with deployment and delete the pod, WHen the deployment create a new
+		             pod and file system finish the resizing, the pvc SHOULD NOT have conditions.
+	*/
+	framework.ConformanceIt("should verify mounted devices can be resized", func() {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 
 		// The reason we use a node selector is because we do not want pod to move to different node when pod is deleted.
