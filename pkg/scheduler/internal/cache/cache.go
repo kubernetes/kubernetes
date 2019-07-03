@@ -715,7 +715,7 @@ func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 
 	n, ok := cache.nodes[nodeName]
 	if !ok {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache", nodeName)
+		return nil, fmt.Errorf("error retrieving node %q from cache", nodeName)
 	}
 
 	return n.info.Node(), nil

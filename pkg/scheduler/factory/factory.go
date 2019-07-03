@@ -354,7 +354,7 @@ func (c *configFactory) Create() (*Config, error) {
 
 // Creates a scheduler from the name of a registered algorithm provider.
 func (c *configFactory) CreateFromProvider(providerName string) (*Config, error) {
-	klog.V(2).Infof("Creating scheduler from algorithm provider '%v'", providerName)
+	klog.V(2).Infof("Creating scheduler from algorithm provider %q", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -373,7 +373,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 
 	predicateKeys := sets.NewString()
 	if policy.Predicates == nil {
-		klog.V(2).Infof("Using predicates from algorithm provider '%v'", DefaultProvider)
+		klog.V(2).Infof("Using predicates from algorithm provider %q", DefaultProvider)
 		provider, err := GetAlgorithmProvider(DefaultProvider)
 		if err != nil {
 			return nil, err
@@ -388,7 +388,7 @@ func (c *configFactory) CreateFromConfig(policy schedulerapi.Policy) (*Config, e
 
 	priorityKeys := sets.NewString()
 	if policy.Priorities == nil {
-		klog.V(2).Infof("Using priorities from algorithm provider '%v'", DefaultProvider)
+		klog.V(2).Infof("Using priorities from algorithm provider %q", DefaultProvider)
 		provider, err := GetAlgorithmProvider(DefaultProvider)
 		if err != nil {
 			return nil, err
