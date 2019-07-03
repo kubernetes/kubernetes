@@ -85,7 +85,7 @@ avoid Fluentd pods scheduling there.
 
 ## Running EFK stack in production
 
-The configurations provided here, for Elasticsearch, Fluentd & Kibana (EFK),
+The configurations provided here for Elasticsearch, Fluentd & Kibana (EFK),
 are a starting point and should not be considered to be production ready.
 
 If you like to run these tools in a production environment you could use the

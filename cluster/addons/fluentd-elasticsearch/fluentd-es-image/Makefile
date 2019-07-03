@@ -16,7 +16,7 @@
 
 PREFIX = quay.io/fluentd_elasticsearch
 IMAGE = fluentd
-TAG = v2.5.2
+TAG = v2.6.0
 
 build:
 	docker build  --tag ${PREFIX}/${IMAGE}:${TAG} .
