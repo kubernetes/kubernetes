@@ -606,8 +606,12 @@ func (cache *schedulerCache) RemoveCSINode(csiNode *storagev1beta1.CSINode) erro
 	if !ok {
 		return fmt.Errorf("node %v is not found", csiNode.Name)
 	}
-	n.info.SetCSINode(nil)
-	cache.moveNodeInfoToHead(csiNode.Name)
+	if len(n.info.Pods()) == 0 && n.info.Node() == nil {
+		cache.removeNodeInfoFromList(csiNode.Name)
+	} else {
+		n.info.SetCSINode(nil)
+		cache.moveNodeInfoToHead(csiNode.Name)
+	}
 	return nil
 }
 
