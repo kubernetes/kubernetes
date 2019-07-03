@@ -53,7 +53,7 @@ MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version from https://github.com/coreos/etcd/releases for the current ETCD_VERSION.
 GOLANG_VERSION?=1.10.4
-GOARM=7
+GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
@@ -97,13 +97,18 @@ else
 
 	# Download etcd in a golang container and cross-compile it statically
 	# For each release create a tmp dir 'etcd_release_tmp_dir' and unpack the release tar there.
+	arch_prefix=""
+        ifeq ($(ARCH),arm)
+		arch_prefix="GOARM=$(GOARM)"
+        endif
+
 	for version in $(BUNDLED_ETCD_VERSIONS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
 		docker run --interactive -v $${etcd_release_tmp_dir}:/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
 			"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
 			&& cd /go/src/github.com/coreos/etcd \
 			&& git checkout v$${version} \
-			&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
+			&& $(arch_prefix) GOARCH=$(ARCH) ./build \
 			&& cp -f bin/$(ARCH)/etcd* bin/etcd* /etcdbin; echo 'done'"; \
 		cp $$etcd_release_tmp_dir/etcd $$etcd_release_tmp_dir/etcdctl $(TEMP_DIR)/; \
 		cp $(TEMP_DIR)/etcd $(TEMP_DIR)/etcd-$$version; \
