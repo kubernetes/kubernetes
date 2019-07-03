@@ -149,6 +149,7 @@ var (
 		"CPUCFSQuotaPeriod.Duration",
 		"CPUManagerPolicy",
 		"CPUManagerReconcilePeriod.Duration",
+		"TopologyManagerPolicy",
 		"QOSReserved[*]",
 		"CgroupDriver",
 		"CgroupRoot",

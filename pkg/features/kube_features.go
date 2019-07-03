@@ -162,6 +162,12 @@ const (
 	// Enable nodes to change CPUCFSQuotaPeriod
 	CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
 
+	// owner: @lmdaly
+	// alpha: v1.16
+	//
+	// Enable resource managers to make NUMA aligned decisions
+	TopologyManager featuregate.Feature = "TopologyManager"
+
 	// owner: @sjenning
 	// beta: v1.11
 	//
@@ -485,6 +491,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AttachVolumeLimit:                           {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                  {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: featuregate.Alpha},
+	TopologyManager:                             {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: featuregate.Alpha},
 	MountContainers:                             {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:                           {Default: true, PreRelease: featuregate.Beta},
