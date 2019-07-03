@@ -80,12 +80,6 @@ func (p *ecrProvider) Enabled() bool {
 	return true
 }
 
-// LazyProvide is lazy
-// TODO: the LazyProvide methods will be removed in a future PR
-func (p *ecrProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
-}
-
 // Provide returns a DockerConfig with credentials from the cache if they are
 // found, or from ECR
 func (p *ecrProvider) Provide(image string) credentialprovider.DockerConfig {

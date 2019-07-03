@@ -129,11 +129,6 @@ func (g *metadataProvider) Enabled() bool {
 	return onGCEVM()
 }
 
-// LazyProvide implements DockerConfigProvider. Should never be called.
-func (g *dockerConfigKeyProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
-}
-
 // Provide implements DockerConfigProvider
 func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
 	// Read the contents of the google-dockercfg metadata key and
@@ -145,11 +140,6 @@ func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.Docke
 	}
 
 	return credentialprovider.DockerConfig{}
-}
-
-// LazyProvide implements DockerConfigProvider. Should never be called.
-func (g *dockerConfigUrlKeyProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
 }
 
 // Provide implements DockerConfigProvider
@@ -255,11 +245,6 @@ func (g *containerRegistryProvider) Enabled() bool {
 // that is returned by GCE metadata.
 type tokenBlob struct {
 	AccessToken string `json:"access_token"`
-}
-
-// LazyProvide implements DockerConfigProvider. Should never be called.
-func (g *containerRegistryProvider) LazyProvide(image string) *credentialprovider.DockerConfigEntry {
-	return nil
 }
 
 // Provide implements DockerConfigProvider
