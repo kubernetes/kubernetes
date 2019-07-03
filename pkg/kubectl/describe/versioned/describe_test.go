@@ -2683,6 +2683,7 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 	expected := []string{
 		"Name:\\s*mypsp",
 		"Allow Privileged:\\s*false",
+		"Allow Privilege Escalation:\\s*false",
 		"Default Add Capabilities:\\s*<none>",
 		"Required Drop Capabilities:\\s*<none>",
 		"Allowed Capabilities:\\s*<none>",
@@ -2704,13 +2705,15 @@ func TestDescribePodSecurityPolicy(t *testing.T) {
 		"Supplemental Groups Strategy: RunAsAny",
 	}
 
+	falseVal := false
 	fake := fake.NewSimpleClientset(&policyv1beta1.PodSecurityPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "mypsp",
 		},
 		Spec: policyv1beta1.PodSecurityPolicySpec{
-			AllowedUnsafeSysctls: []string{"kernel.*", "net.ipv4.ip_local_port_range"},
-			ForbiddenSysctls:     []string{"net.ipv4.ip_default_ttl"},
+			AllowPrivilegeEscalation: &falseVal,
+			AllowedUnsafeSysctls:     []string{"kernel.*", "net.ipv4.ip_local_port_range"},
+			ForbiddenSysctls:         []string{"net.ipv4.ip_default_ttl"},
 			SELinux: policyv1beta1.SELinuxStrategyOptions{
 				Rule: policyv1beta1.SELinuxStrategyRunAsAny,
 			},
