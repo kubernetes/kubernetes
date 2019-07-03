@@ -135,14 +135,12 @@ import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 
-import (
-	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
-)
+import context "golang.org/x/net/context"
+import grpc "google.golang.org/grpc"
 
 import strings "strings"
 import reflect "reflect"
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import io "io"
 
@@ -11068,7 +11066,7 @@ func (this *LinuxPodSandboxConfig) String() string {
 	for k := range this.Sysctls {
 		keysForSysctls = append(keysForSysctls, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForSysctls)
+	sortkeys.Strings(keysForSysctls)
 	mapStringForSysctls := "map[string]string{"
 	for _, k := range keysForSysctls {
 		mapStringForSysctls += fmt.Sprintf("%v: %v,", k, this.Sysctls[k])
@@ -11103,7 +11101,7 @@ func (this *PodSandboxConfig) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -11113,7 +11111,7 @@ func (this *PodSandboxConfig) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -11251,7 +11249,7 @@ func (this *PodSandboxStatus) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -11261,7 +11259,7 @@ func (this *PodSandboxStatus) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -11289,7 +11287,7 @@ func (this *PodSandboxStatusResponse) String() string {
 	for k := range this.Info {
 		keysForInfo = append(keysForInfo, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForInfo)
+	sortkeys.Strings(keysForInfo)
 	mapStringForInfo := "map[string]string{"
 	for _, k := range keysForInfo {
 		mapStringForInfo += fmt.Sprintf("%v: %v,", k, this.Info[k])
@@ -11320,7 +11318,7 @@ func (this *PodSandboxFilter) String() string {
 	for k := range this.LabelSelector {
 		keysForLabelSelector = append(keysForLabelSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabelSelector)
+	sortkeys.Strings(keysForLabelSelector)
 	mapStringForLabelSelector := "map[string]string{"
 	for _, k := range keysForLabelSelector {
 		mapStringForLabelSelector += fmt.Sprintf("%v: %v,", k, this.LabelSelector[k])
@@ -11352,7 +11350,7 @@ func (this *PodSandbox) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -11362,7 +11360,7 @@ func (this *PodSandbox) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -11551,7 +11549,7 @@ func (this *ContainerConfig) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -11561,7 +11559,7 @@ func (this *ContainerConfig) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -11686,7 +11684,7 @@ func (this *ContainerFilter) String() string {
 	for k := range this.LabelSelector {
 		keysForLabelSelector = append(keysForLabelSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabelSelector)
+	sortkeys.Strings(keysForLabelSelector)
 	mapStringForLabelSelector := "map[string]string{"
 	for _, k := range keysForLabelSelector {
 		mapStringForLabelSelector += fmt.Sprintf("%v: %v,", k, this.LabelSelector[k])
@@ -11719,7 +11717,7 @@ func (this *Container) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -11729,7 +11727,7 @@ func (this *Container) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -11778,7 +11776,7 @@ func (this *ContainerStatus) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -11788,7 +11786,7 @@ func (this *ContainerStatus) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -11822,7 +11820,7 @@ func (this *ContainerStatusResponse) String() string {
 	for k := range this.Info {
 		keysForInfo = append(keysForInfo, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForInfo)
+	sortkeys.Strings(keysForInfo)
 	mapStringForInfo := "map[string]string{"
 	for _, k := range keysForInfo {
 		mapStringForInfo += fmt.Sprintf("%v: %v,", k, this.Info[k])
@@ -12013,7 +12011,7 @@ func (this *ImageStatusResponse) String() string {
 	for k := range this.Info {
 		keysForInfo = append(keysForInfo, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForInfo)
+	sortkeys.Strings(keysForInfo)
 	mapStringForInfo := "map[string]string{"
 	for _, k := range keysForInfo {
 		mapStringForInfo += fmt.Sprintf("%v: %v,", k, this.Info[k])
@@ -12162,7 +12160,7 @@ func (this *StatusResponse) String() string {
 	for k := range this.Info {
 		keysForInfo = append(keysForInfo, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForInfo)
+	sortkeys.Strings(keysForInfo)
 	mapStringForInfo := "map[string]string{"
 	for _, k := range keysForInfo {
 		mapStringForInfo += fmt.Sprintf("%v: %v,", k, this.Info[k])
@@ -12265,7 +12263,7 @@ func (this *ContainerStatsFilter) String() string {
 	for k := range this.LabelSelector {
 		keysForLabelSelector = append(keysForLabelSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabelSelector)
+	sortkeys.Strings(keysForLabelSelector)
 	mapStringForLabelSelector := "map[string]string{"
 	for _, k := range keysForLabelSelector {
 		mapStringForLabelSelector += fmt.Sprintf("%v: %v,", k, this.LabelSelector[k])
@@ -12297,7 +12295,7 @@ func (this *ContainerAttributes) String() string {
 	for k := range this.Labels {
 		keysForLabels = append(keysForLabels, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLabels)
+	sortkeys.Strings(keysForLabels)
 	mapStringForLabels := "map[string]string{"
 	for _, k := range keysForLabels {
 		mapStringForLabels += fmt.Sprintf("%v: %v,", k, this.Labels[k])
@@ -12307,7 +12305,7 @@ func (this *ContainerAttributes) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])

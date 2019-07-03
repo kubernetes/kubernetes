@@ -35,7 +35,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -173,7 +173,7 @@ func (m *ImageReviewSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Annotations {
 			keysForAnnotations = append(keysForAnnotations, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+		sortkeys.Strings(keysForAnnotations)
 		for _, k := range keysForAnnotations {
 			dAtA[i] = 0x12
 			i++
@@ -229,7 +229,7 @@ func (m *ImageReviewStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.AuditAnnotations {
 			keysForAuditAnnotations = append(keysForAuditAnnotations, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAuditAnnotations)
+		sortkeys.Strings(keysForAuditAnnotations)
 		for _, k := range keysForAuditAnnotations {
 			dAtA[i] = 0x1a
 			i++
@@ -360,7 +360,7 @@ func (this *ImageReviewSpec) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
@@ -382,7 +382,7 @@ func (this *ImageReviewStatus) String() string {
 	for k := range this.AuditAnnotations {
 		keysForAuditAnnotations = append(keysForAuditAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAuditAnnotations)
+	sortkeys.Strings(keysForAuditAnnotations)
 	mapStringForAuditAnnotations := "map[string]string{"
 	for _, k := range keysForAuditAnnotations {
 		mapStringForAuditAnnotations += fmt.Sprintf("%v: %v,", k, this.AuditAnnotations[k])
