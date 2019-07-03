@@ -104,6 +104,7 @@ func getControlPlanePhaseFlags(name string) []string {
 	if name == "all" || name == kubeadmconstants.KubeAPIServer {
 		flags = append(flags,
 			options.APIServerAdvertiseAddress,
+			options.ControlPlaneEndpoint,
 			options.APIServerBindPort,
 			options.APIServerExtraArgs,
 			options.FeatureGatesString,
