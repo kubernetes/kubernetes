@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/util/system"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 )
 
 // ResourceConstraint is a struct to hold constraints.
@@ -72,7 +73,7 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 
 // PrintJSON prints resource usage summary in JSON.
 func (s *ResourceUsageSummary) PrintJSON() string {
-	return PrettyPrintJSON(*s)
+	return e2emetrics.PrettyPrintJSON(*s)
 }
 
 // SummaryKind returns string of ResourceUsageSummary

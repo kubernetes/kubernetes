@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	nodeperftype "k8s.io/kubernetes/test/e2e_node/perftype"
 )
@@ -46,7 +47,7 @@ func dumpDataToFile(data interface{}, labels map[string]string, prefix string) {
 	fileName := path.Join(framework.TestContext.ReportDir, fmt.Sprintf("%s-%s-%s.json", prefix, framework.TestContext.ReportPrefix, testName))
 	labels["timestamp"] = strconv.FormatInt(time.Now().UTC().Unix(), 10)
 	e2elog.Logf("Dumping perf data for test %q to %q.", testName, fileName)
-	if err := ioutil.WriteFile(fileName, []byte(framework.PrettyPrintJSON(data)), 0644); err != nil {
+	if err := ioutil.WriteFile(fileName, []byte(e2emetrics.PrettyPrintJSON(data)), 0644); err != nil {
 		e2elog.Logf("Failed to write perf data for test %q to %q: %v", testName, fileName, err)
 	}
 }
@@ -81,7 +82,7 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]metav1
 	timeSeries.ResourceData = rc.GetResourceTimeSeries()
 
 	if framework.TestContext.ReportDir == "" {
-		e2elog.Logf("%s %s\n%s", TimeSeriesTag, framework.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
+		e2elog.Logf("%s %s\n%s", TimeSeriesTag, e2emetrics.PrettyPrintJSON(timeSeries), TimeSeriesEnd)
 		return
 	}
 	dumpDataToFile(timeSeries, timeSeries.Labels, "time_series")
@@ -105,7 +106,7 @@ func getCumulatedPodTimeSeries(timePerPod map[string]metav1.Time) []int64 {
 }
 
 // getLatencyPerfData returns perf data of pod startup latency.
-func getLatencyPerfData(latency framework.LatencyMetric, testInfo map[string]string) *perftype.PerfData {
+func getLatencyPerfData(latency e2emetrics.LatencyMetric, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
 		Version: framework.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
@@ -128,7 +129,7 @@ func getLatencyPerfData(latency framework.LatencyMetric, testInfo map[string]str
 }
 
 // getThroughputPerfData returns perf data of pod creation startup throughput.
-func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
+func getThroughputPerfData(batchLag time.Duration, e2eLags []e2emetrics.PodLatencyData, podsNr int, testInfo map[string]string) *perftype.PerfData {
 	return &perftype.PerfData{
 		Version: framework.CurrentKubeletPerfMetricsVersion,
 		DataItems: []perftype.DataItem{
