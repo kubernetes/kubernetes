@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -158,7 +159,9 @@ func TestCleanupPods(t *testing.T) {
 	m.AddPod(&podToCleanup)
 	m.AddPod(&podToKeep)
 
-	m.CleanupPods([]*v1.Pod{&podToKeep})
+	desiredPods := map[types.UID]sets.Empty{}
+	desiredPods[podToKeep.UID] = sets.Empty{}
+	m.CleanupPods(desiredPods)
 
 	removedProbes := []probeKey{
 		{"pod_cleanup", "prober1", readiness},
@@ -197,7 +200,7 @@ func TestCleanupRepeated(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		m.CleanupPods([]*v1.Pod{})
+		m.CleanupPods(map[types.UID]sets.Empty{})
 	}
 }
 
