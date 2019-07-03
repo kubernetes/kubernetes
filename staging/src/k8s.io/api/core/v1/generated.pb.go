@@ -236,7 +236,7 @@ import k8s_io_apimachinery_pkg_runtime "k8s.io/apimachinery/pkg/runtime"
 
 import k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -1666,7 +1666,7 @@ func (m *CSIPersistentVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.VolumeAttributes {
 			keysForVolumeAttributes = append(keysForVolumeAttributes, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForVolumeAttributes)
+		sortkeys.Strings(keysForVolumeAttributes)
 		for _, k := range keysForVolumeAttributes {
 			dAtA[i] = 0x2a
 			i++
@@ -1766,7 +1766,7 @@ func (m *CSIVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.VolumeAttributes {
 			keysForVolumeAttributes = append(keysForVolumeAttributes, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForVolumeAttributes)
+		sortkeys.Strings(keysForVolumeAttributes)
 		for _, k := range keysForVolumeAttributes {
 			dAtA[i] = 0x22
 			i++
@@ -2219,7 +2219,7 @@ func (m *ConfigMap) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Data {
 			keysForData = append(keysForData, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForData)
+		sortkeys.Strings(keysForData)
 		for _, k := range keysForData {
 			dAtA[i] = 0x12
 			i++
@@ -2241,7 +2241,7 @@ func (m *ConfigMap) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.BinaryData {
 			keysForBinaryData = append(keysForBinaryData, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForBinaryData)
+		sortkeys.Strings(keysForBinaryData)
 		for _, k := range keysForBinaryData {
 			dAtA[i] = 0x1a
 			i++
@@ -3877,7 +3877,7 @@ func (m *FlexPersistentVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Options {
 			keysForOptions = append(keysForOptions, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForOptions)
+		sortkeys.Strings(keysForOptions)
 		for _, k := range keysForOptions {
 			dAtA[i] = 0x2a
 			i++
@@ -3943,7 +3943,7 @@ func (m *FlexVolumeSource) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Options {
 			keysForOptions = append(keysForOptions, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForOptions)
+		sortkeys.Strings(keysForOptions)
 		for _, k := range keysForOptions {
 			dAtA[i] = 0x2a
 			i++
@@ -4630,7 +4630,7 @@ func (m *LimitRangeItem) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Max {
 			keysForMax = append(keysForMax, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForMax)
+		sortkeys.Strings(keysForMax)
 		for _, k := range keysForMax {
 			dAtA[i] = 0x12
 			i++
@@ -4661,7 +4661,7 @@ func (m *LimitRangeItem) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Min {
 			keysForMin = append(keysForMin, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForMin)
+		sortkeys.Strings(keysForMin)
 		for _, k := range keysForMin {
 			dAtA[i] = 0x1a
 			i++
@@ -4692,7 +4692,7 @@ func (m *LimitRangeItem) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Default {
 			keysForDefault = append(keysForDefault, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForDefault)
+		sortkeys.Strings(keysForDefault)
 		for _, k := range keysForDefault {
 			dAtA[i] = 0x22
 			i++
@@ -4723,7 +4723,7 @@ func (m *LimitRangeItem) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.DefaultRequest {
 			keysForDefaultRequest = append(keysForDefaultRequest, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForDefaultRequest)
+		sortkeys.Strings(keysForDefaultRequest)
 		for _, k := range keysForDefaultRequest {
 			dAtA[i] = 0x2a
 			i++
@@ -4754,7 +4754,7 @@ func (m *LimitRangeItem) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.MaxLimitRequestRatio {
 			keysForMaxLimitRequestRatio = append(keysForMaxLimitRequestRatio, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForMaxLimitRequestRatio)
+		sortkeys.Strings(keysForMaxLimitRequestRatio)
 		for _, k := range keysForMaxLimitRequestRatio {
 			dAtA[i] = 0x32
 			i++
@@ -5508,7 +5508,7 @@ func (m *NodeResources) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Capacity {
 			keysForCapacity = append(keysForCapacity, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		sortkeys.Strings(keysForCapacity)
 		for _, k := range keysForCapacity {
 			dAtA[i] = 0xa
 			i++
@@ -5745,7 +5745,7 @@ func (m *NodeStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Capacity {
 			keysForCapacity = append(keysForCapacity, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		sortkeys.Strings(keysForCapacity)
 		for _, k := range keysForCapacity {
 			dAtA[i] = 0xa
 			i++
@@ -5776,7 +5776,7 @@ func (m *NodeStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Allocatable {
 			keysForAllocatable = append(keysForAllocatable, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAllocatable)
+		sortkeys.Strings(keysForAllocatable)
 		for _, k := range keysForAllocatable {
 			dAtA[i] = 0x12
 			i++
@@ -6316,7 +6316,7 @@ func (m *PersistentVolumeClaimStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Capacity {
 			keysForCapacity = append(keysForCapacity, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		sortkeys.Strings(keysForCapacity)
 		for _, k := range keysForCapacity {
 			dAtA[i] = 0x1a
 			i++
@@ -6697,7 +6697,7 @@ func (m *PersistentVolumeSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Capacity {
 			keysForCapacity = append(keysForCapacity, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+		sortkeys.Strings(keysForCapacity)
 		for _, k := range keysForCapacity {
 			dAtA[i] = 0xa
 			i++
@@ -7660,7 +7660,7 @@ func (m *PodSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.NodeSelector {
 			keysForNodeSelector = append(keysForNodeSelector, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForNodeSelector)
+		sortkeys.Strings(keysForNodeSelector)
 		for _, k := range keysForNodeSelector {
 			dAtA[i] = 0x3a
 			i++
@@ -7903,7 +7903,7 @@ func (m *PodSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Overhead {
 			keysForOverhead = append(keysForOverhead, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForOverhead)
+		sortkeys.Strings(keysForOverhead)
 		for _, k := range keysForOverhead {
 			dAtA[i] = 0x82
 			i++
@@ -8754,7 +8754,7 @@ func (m *ReplicationControllerSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Selector {
 			keysForSelector = append(keysForSelector, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForSelector)
+		sortkeys.Strings(keysForSelector)
 		for _, k := range keysForSelector {
 			dAtA[i] = 0x12
 			i++
@@ -8966,7 +8966,7 @@ func (m *ResourceQuotaSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Hard {
 			keysForHard = append(keysForHard, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForHard)
+		sortkeys.Strings(keysForHard)
 		for _, k := range keysForHard {
 			dAtA[i] = 0xa
 			i++
@@ -9040,7 +9040,7 @@ func (m *ResourceQuotaStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Hard {
 			keysForHard = append(keysForHard, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForHard)
+		sortkeys.Strings(keysForHard)
 		for _, k := range keysForHard {
 			dAtA[i] = 0xa
 			i++
@@ -9071,7 +9071,7 @@ func (m *ResourceQuotaStatus) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Used {
 			keysForUsed = append(keysForUsed, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForUsed)
+		sortkeys.Strings(keysForUsed)
 		for _, k := range keysForUsed {
 			dAtA[i] = 0x12
 			i++
@@ -9120,7 +9120,7 @@ func (m *ResourceRequirements) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Limits {
 			keysForLimits = append(keysForLimits, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForLimits)
+		sortkeys.Strings(keysForLimits)
 		for _, k := range keysForLimits {
 			dAtA[i] = 0xa
 			i++
@@ -9151,7 +9151,7 @@ func (m *ResourceRequirements) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Requests {
 			keysForRequests = append(keysForRequests, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForRequests)
+		sortkeys.Strings(keysForRequests)
 		for _, k := range keysForRequests {
 			dAtA[i] = 0x12
 			i++
@@ -9457,7 +9457,7 @@ func (m *Secret) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Data {
 			keysForData = append(keysForData, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForData)
+		sortkeys.Strings(keysForData)
 		for _, k := range keysForData {
 			dAtA[i] = 0x12
 			i++
@@ -9489,7 +9489,7 @@ func (m *Secret) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.StringData {
 			keysForStringData = append(keysForStringData, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForStringData)
+		sortkeys.Strings(keysForStringData)
 		for _, k := range keysForStringData {
 			dAtA[i] = 0x22
 			i++
@@ -10179,7 +10179,7 @@ func (m *ServiceSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Selector {
 			keysForSelector = append(keysForSelector, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForSelector)
+		sortkeys.Strings(keysForSelector)
 		for _, k := range keysForSelector {
 			dAtA[i] = 0x12
 			i++
@@ -15034,7 +15034,7 @@ func (this *CSIPersistentVolumeSource) String() string {
 	for k := range this.VolumeAttributes {
 		keysForVolumeAttributes = append(keysForVolumeAttributes, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForVolumeAttributes)
+	sortkeys.Strings(keysForVolumeAttributes)
 	mapStringForVolumeAttributes := "map[string]string{"
 	for _, k := range keysForVolumeAttributes {
 		mapStringForVolumeAttributes += fmt.Sprintf("%v: %v,", k, this.VolumeAttributes[k])
@@ -15062,7 +15062,7 @@ func (this *CSIVolumeSource) String() string {
 	for k := range this.VolumeAttributes {
 		keysForVolumeAttributes = append(keysForVolumeAttributes, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForVolumeAttributes)
+	sortkeys.Strings(keysForVolumeAttributes)
 	mapStringForVolumeAttributes := "map[string]string{"
 	for _, k := range keysForVolumeAttributes {
 		mapStringForVolumeAttributes += fmt.Sprintf("%v: %v,", k, this.VolumeAttributes[k])
@@ -15198,7 +15198,7 @@ func (this *ConfigMap) String() string {
 	for k := range this.Data {
 		keysForData = append(keysForData, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForData)
+	sortkeys.Strings(keysForData)
 	mapStringForData := "map[string]string{"
 	for _, k := range keysForData {
 		mapStringForData += fmt.Sprintf("%v: %v,", k, this.Data[k])
@@ -15208,7 +15208,7 @@ func (this *ConfigMap) String() string {
 	for k := range this.BinaryData {
 		keysForBinaryData = append(keysForBinaryData, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForBinaryData)
+	sortkeys.Strings(keysForBinaryData)
 	mapStringForBinaryData := "map[string][]byte{"
 	for _, k := range keysForBinaryData {
 		mapStringForBinaryData += fmt.Sprintf("%v: %v,", k, this.BinaryData[k])
@@ -15657,7 +15657,7 @@ func (this *FlexPersistentVolumeSource) String() string {
 	for k := range this.Options {
 		keysForOptions = append(keysForOptions, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForOptions)
+	sortkeys.Strings(keysForOptions)
 	mapStringForOptions := "map[string]string{"
 	for _, k := range keysForOptions {
 		mapStringForOptions += fmt.Sprintf("%v: %v,", k, this.Options[k])
@@ -15681,7 +15681,7 @@ func (this *FlexVolumeSource) String() string {
 	for k := range this.Options {
 		keysForOptions = append(keysForOptions, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForOptions)
+	sortkeys.Strings(keysForOptions)
 	mapStringForOptions := "map[string]string{"
 	for _, k := range keysForOptions {
 		mapStringForOptions += fmt.Sprintf("%v: %v,", k, this.Options[k])
@@ -15899,7 +15899,7 @@ func (this *LimitRangeItem) String() string {
 	for k := range this.Max {
 		keysForMax = append(keysForMax, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForMax)
+	sortkeys.Strings(keysForMax)
 	mapStringForMax := "ResourceList{"
 	for _, k := range keysForMax {
 		mapStringForMax += fmt.Sprintf("%v: %v,", k, this.Max[ResourceName(k)])
@@ -15909,7 +15909,7 @@ func (this *LimitRangeItem) String() string {
 	for k := range this.Min {
 		keysForMin = append(keysForMin, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForMin)
+	sortkeys.Strings(keysForMin)
 	mapStringForMin := "ResourceList{"
 	for _, k := range keysForMin {
 		mapStringForMin += fmt.Sprintf("%v: %v,", k, this.Min[ResourceName(k)])
@@ -15919,7 +15919,7 @@ func (this *LimitRangeItem) String() string {
 	for k := range this.Default {
 		keysForDefault = append(keysForDefault, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForDefault)
+	sortkeys.Strings(keysForDefault)
 	mapStringForDefault := "ResourceList{"
 	for _, k := range keysForDefault {
 		mapStringForDefault += fmt.Sprintf("%v: %v,", k, this.Default[ResourceName(k)])
@@ -15929,7 +15929,7 @@ func (this *LimitRangeItem) String() string {
 	for k := range this.DefaultRequest {
 		keysForDefaultRequest = append(keysForDefaultRequest, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForDefaultRequest)
+	sortkeys.Strings(keysForDefaultRequest)
 	mapStringForDefaultRequest := "ResourceList{"
 	for _, k := range keysForDefaultRequest {
 		mapStringForDefaultRequest += fmt.Sprintf("%v: %v,", k, this.DefaultRequest[ResourceName(k)])
@@ -15939,7 +15939,7 @@ func (this *LimitRangeItem) String() string {
 	for k := range this.MaxLimitRequestRatio {
 		keysForMaxLimitRequestRatio = append(keysForMaxLimitRequestRatio, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForMaxLimitRequestRatio)
+	sortkeys.Strings(keysForMaxLimitRequestRatio)
 	mapStringForMaxLimitRequestRatio := "ResourceList{"
 	for _, k := range keysForMaxLimitRequestRatio {
 		mapStringForMaxLimitRequestRatio += fmt.Sprintf("%v: %v,", k, this.MaxLimitRequestRatio[ResourceName(k)])
@@ -16196,7 +16196,7 @@ func (this *NodeResources) String() string {
 	for k := range this.Capacity {
 		keysForCapacity = append(keysForCapacity, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	sortkeys.Strings(keysForCapacity)
 	mapStringForCapacity := "ResourceList{"
 	for _, k := range keysForCapacity {
 		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[ResourceName(k)])
@@ -16265,7 +16265,7 @@ func (this *NodeStatus) String() string {
 	for k := range this.Capacity {
 		keysForCapacity = append(keysForCapacity, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	sortkeys.Strings(keysForCapacity)
 	mapStringForCapacity := "ResourceList{"
 	for _, k := range keysForCapacity {
 		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[ResourceName(k)])
@@ -16275,7 +16275,7 @@ func (this *NodeStatus) String() string {
 	for k := range this.Allocatable {
 		keysForAllocatable = append(keysForAllocatable, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAllocatable)
+	sortkeys.Strings(keysForAllocatable)
 	mapStringForAllocatable := "ResourceList{"
 	for _, k := range keysForAllocatable {
 		mapStringForAllocatable += fmt.Sprintf("%v: %v,", k, this.Allocatable[ResourceName(k)])
@@ -16417,7 +16417,7 @@ func (this *PersistentVolumeClaimStatus) String() string {
 	for k := range this.Capacity {
 		keysForCapacity = append(keysForCapacity, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	sortkeys.Strings(keysForCapacity)
 	mapStringForCapacity := "ResourceList{"
 	for _, k := range keysForCapacity {
 		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[ResourceName(k)])
@@ -16493,7 +16493,7 @@ func (this *PersistentVolumeSpec) String() string {
 	for k := range this.Capacity {
 		keysForCapacity = append(keysForCapacity, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForCapacity)
+	sortkeys.Strings(keysForCapacity)
 	mapStringForCapacity := "ResourceList{"
 	for _, k := range keysForCapacity {
 		mapStringForCapacity += fmt.Sprintf("%v: %v,", k, this.Capacity[ResourceName(k)])
@@ -16752,7 +16752,7 @@ func (this *PodSpec) String() string {
 	for k := range this.NodeSelector {
 		keysForNodeSelector = append(keysForNodeSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForNodeSelector)
+	sortkeys.Strings(keysForNodeSelector)
 	mapStringForNodeSelector := "map[string]string{"
 	for _, k := range keysForNodeSelector {
 		mapStringForNodeSelector += fmt.Sprintf("%v: %v,", k, this.NodeSelector[k])
@@ -16762,7 +16762,7 @@ func (this *PodSpec) String() string {
 	for k := range this.Overhead {
 		keysForOverhead = append(keysForOverhead, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForOverhead)
+	sortkeys.Strings(keysForOverhead)
 	mapStringForOverhead := "ResourceList{"
 	for _, k := range keysForOverhead {
 		mapStringForOverhead += fmt.Sprintf("%v: %v,", k, this.Overhead[ResourceName(k)])
@@ -17048,7 +17048,7 @@ func (this *ReplicationControllerSpec) String() string {
 	for k := range this.Selector {
 		keysForSelector = append(keysForSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForSelector)
+	sortkeys.Strings(keysForSelector)
 	mapStringForSelector := "map[string]string{"
 	for _, k := range keysForSelector {
 		mapStringForSelector += fmt.Sprintf("%v: %v,", k, this.Selector[k])
@@ -17121,7 +17121,7 @@ func (this *ResourceQuotaSpec) String() string {
 	for k := range this.Hard {
 		keysForHard = append(keysForHard, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForHard)
+	sortkeys.Strings(keysForHard)
 	mapStringForHard := "ResourceList{"
 	for _, k := range keysForHard {
 		mapStringForHard += fmt.Sprintf("%v: %v,", k, this.Hard[ResourceName(k)])
@@ -17143,7 +17143,7 @@ func (this *ResourceQuotaStatus) String() string {
 	for k := range this.Hard {
 		keysForHard = append(keysForHard, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForHard)
+	sortkeys.Strings(keysForHard)
 	mapStringForHard := "ResourceList{"
 	for _, k := range keysForHard {
 		mapStringForHard += fmt.Sprintf("%v: %v,", k, this.Hard[ResourceName(k)])
@@ -17153,7 +17153,7 @@ func (this *ResourceQuotaStatus) String() string {
 	for k := range this.Used {
 		keysForUsed = append(keysForUsed, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForUsed)
+	sortkeys.Strings(keysForUsed)
 	mapStringForUsed := "ResourceList{"
 	for _, k := range keysForUsed {
 		mapStringForUsed += fmt.Sprintf("%v: %v,", k, this.Used[ResourceName(k)])
@@ -17174,7 +17174,7 @@ func (this *ResourceRequirements) String() string {
 	for k := range this.Limits {
 		keysForLimits = append(keysForLimits, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForLimits)
+	sortkeys.Strings(keysForLimits)
 	mapStringForLimits := "ResourceList{"
 	for _, k := range keysForLimits {
 		mapStringForLimits += fmt.Sprintf("%v: %v,", k, this.Limits[ResourceName(k)])
@@ -17184,7 +17184,7 @@ func (this *ResourceRequirements) String() string {
 	for k := range this.Requests {
 		keysForRequests = append(keysForRequests, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForRequests)
+	sortkeys.Strings(keysForRequests)
 	mapStringForRequests := "ResourceList{"
 	for _, k := range keysForRequests {
 		mapStringForRequests += fmt.Sprintf("%v: %v,", k, this.Requests[ResourceName(k)])
@@ -17278,7 +17278,7 @@ func (this *Secret) String() string {
 	for k := range this.Data {
 		keysForData = append(keysForData, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForData)
+	sortkeys.Strings(keysForData)
 	mapStringForData := "map[string][]byte{"
 	for _, k := range keysForData {
 		mapStringForData += fmt.Sprintf("%v: %v,", k, this.Data[k])
@@ -17288,7 +17288,7 @@ func (this *Secret) String() string {
 	for k := range this.StringData {
 		keysForStringData = append(keysForStringData, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForStringData)
+	sortkeys.Strings(keysForStringData)
 	mapStringForStringData := "map[string]string{"
 	for _, k := range keysForStringData {
 		mapStringForStringData += fmt.Sprintf("%v: %v,", k, this.StringData[k])
@@ -17493,7 +17493,7 @@ func (this *ServiceSpec) String() string {
 	for k := range this.Selector {
 		keysForSelector = append(keysForSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForSelector)
+	sortkeys.Strings(keysForSelector)
 	mapStringForSelector := "map[string]string{"
 	for _, k := range keysForSelector {
 		mapStringForSelector += fmt.Sprintf("%v: %v,", k, this.Selector[k])

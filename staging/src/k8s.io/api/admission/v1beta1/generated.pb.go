@@ -38,7 +38,7 @@ import k8s_io_apimachinery_pkg_apis_meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v
 
 import k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -247,7 +247,7 @@ func (m *AdmissionResponse) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.AuditAnnotations {
 			keysForAuditAnnotations = append(keysForAuditAnnotations, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForAuditAnnotations)
+		sortkeys.Strings(keysForAuditAnnotations)
 		for _, k := range keysForAuditAnnotations {
 			dAtA[i] = 0x32
 			i++
@@ -443,7 +443,7 @@ func (this *AdmissionResponse) String() string {
 	for k := range this.AuditAnnotations {
 		keysForAuditAnnotations = append(keysForAuditAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAuditAnnotations)
+	sortkeys.Strings(keysForAuditAnnotations)
 	mapStringForAuditAnnotations := "map[string]string{"
 	for _, k := range keysForAuditAnnotations {
 		mapStringForAuditAnnotations += fmt.Sprintf("%v: %v,", k, this.AuditAnnotations[k])

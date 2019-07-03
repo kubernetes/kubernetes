@@ -38,7 +38,7 @@ import math "math"
 
 import k8s_io_apimachinery_pkg_apis_meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -247,7 +247,7 @@ func (m *CarpSpec) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.NodeSelector {
 			keysForNodeSelector = append(keysForNodeSelector, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForNodeSelector)
+		sortkeys.Strings(keysForNodeSelector)
 		for _, k := range keysForNodeSelector {
 			dAtA[i] = 0x3a
 			i++
@@ -556,7 +556,7 @@ func (this *CarpSpec) String() string {
 	for k := range this.NodeSelector {
 		keysForNodeSelector = append(keysForNodeSelector, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForNodeSelector)
+	sortkeys.Strings(keysForNodeSelector)
 	mapStringForNodeSelector := "map[string]string{"
 	for _, k := range keysForNodeSelector {
 		mapStringForNodeSelector += fmt.Sprintf("%v: %v,", k, this.NodeSelector[k])

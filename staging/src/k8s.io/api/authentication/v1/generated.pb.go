@@ -42,7 +42,7 @@ import math "math"
 
 import k8s_io_apimachinery_pkg_types "k8s.io/apimachinery/pkg/types"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -469,7 +469,7 @@ func (m *UserInfo) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Extra {
 			keysForExtra = append(keysForExtra, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForExtra)
+		sortkeys.Strings(keysForExtra)
 		for _, k := range keysForExtra {
 			dAtA[i] = 0x22
 			i++
@@ -747,7 +747,7 @@ func (this *UserInfo) String() string {
 	for k := range this.Extra {
 		keysForExtra = append(keysForExtra, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForExtra)
+	sortkeys.Strings(keysForExtra)
 	mapStringForExtra := "map[string]ExtraValue{"
 	for _, k := range keysForExtra {
 		mapStringForExtra += fmt.Sprintf("%v: %v,", k, this.Extra[k])

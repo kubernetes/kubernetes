@@ -5,7 +5,7 @@ module k8s.io/metrics
 go 1.12
 
 require (
-	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
+	github.com/gogo/protobuf v1.0.0
 	github.com/stretchr/testify v1.3.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

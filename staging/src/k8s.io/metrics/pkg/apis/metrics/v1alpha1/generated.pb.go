@@ -40,7 +40,7 @@ import k8s_io_apimachinery_pkg_api_resource "k8s.io/apimachinery/pkg/api/resourc
 
 import k8s_io_api_core_v1 "k8s.io/api/core/v1"
 
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import strings "strings"
 import reflect "reflect"
@@ -109,7 +109,7 @@ func (m *ContainerMetrics) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Usage {
 			keysForUsage = append(keysForUsage, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForUsage)
+		sortkeys.Strings(keysForUsage)
 		for _, k := range keysForUsage {
 			dAtA[i] = 0x12
 			i++
@@ -182,7 +182,7 @@ func (m *NodeMetrics) MarshalTo(dAtA []byte) (int, error) {
 		for k := range m.Usage {
 			keysForUsage = append(keysForUsage, string(k))
 		}
-		github_com_gogo_protobuf_sortkeys.Strings(keysForUsage)
+		sortkeys.Strings(keysForUsage)
 		for _, k := range keysForUsage {
 			dAtA[i] = 0x22
 			i++
@@ -455,7 +455,7 @@ func (this *ContainerMetrics) String() string {
 	for k := range this.Usage {
 		keysForUsage = append(keysForUsage, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForUsage)
+	sortkeys.Strings(keysForUsage)
 	mapStringForUsage := "k8s_io_api_core_v1.ResourceList{"
 	for _, k := range keysForUsage {
 		mapStringForUsage += fmt.Sprintf("%v: %v,", k, this.Usage[k8s_io_api_core_v1.ResourceName(k)])
@@ -476,7 +476,7 @@ func (this *NodeMetrics) String() string {
 	for k := range this.Usage {
 		keysForUsage = append(keysForUsage, string(k))
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForUsage)
+	sortkeys.Strings(keysForUsage)
 	mapStringForUsage := "k8s_io_api_core_v1.ResourceList{"
 	for _, k := range keysForUsage {
 		mapStringForUsage += fmt.Sprintf("%v: %v,", k, this.Usage[k8s_io_api_core_v1.ResourceName(k)])

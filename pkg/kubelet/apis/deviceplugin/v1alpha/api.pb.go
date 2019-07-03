@@ -40,14 +40,12 @@ import fmt "fmt"
 import math "math"
 import _ "github.com/gogo/protobuf/gogoproto"
 
-import (
-	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
-)
+import context "golang.org/x/net/context"
+import grpc "google.golang.org/grpc"
 
 import strings "strings"
 import reflect "reflect"
-import github_com_gogo_protobuf_sortkeys "github.com/gogo/protobuf/sortkeys"
+import sortkeys "github.com/gogo/protobuf/sortkeys"
 
 import io "io"
 
@@ -1032,7 +1030,7 @@ func (this *AllocateResponse) String() string {
 	for k := range this.Envs {
 		keysForEnvs = append(keysForEnvs, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForEnvs)
+	sortkeys.Strings(keysForEnvs)
 	mapStringForEnvs := "map[string]string{"
 	for _, k := range keysForEnvs {
 		mapStringForEnvs += fmt.Sprintf("%v: %v,", k, this.Envs[k])
@@ -1042,7 +1040,7 @@ func (this *AllocateResponse) String() string {
 	for k := range this.Annotations {
 		keysForAnnotations = append(keysForAnnotations, k)
 	}
-	github_com_gogo_protobuf_sortkeys.Strings(keysForAnnotations)
+	sortkeys.Strings(keysForAnnotations)
 	mapStringForAnnotations := "map[string]string{"
 	for _, k := range keysForAnnotations {
 		mapStringForAnnotations += fmt.Sprintf("%v: %v,", k, this.Annotations[k])
