@@ -47,6 +47,7 @@ import (
 var (
 	printerColumnDatatypes                = sets.NewString("integer", "number", "string", "boolean", "date")
 	customResourceColumnDefinitionFormats = sets.NewString("int32", "int64", "float", "double", "byte", "date", "date-time", "password")
+	openapiV3Types                        = sets.NewString("string", "number", "integer", "boolean", "array", "object")
 )
 
 // ValidateCustomResourceDefinition statically validates
@@ -1156,4 +1157,76 @@ func validateAPIApproval(newCRD, oldCRD *apiextensions.CustomResourceDefinition,
 	default:
 		return field.ErrorList{field.Invalid(field.NewPath("metadata", "annotations").Key(v1beta1.KubeAPIApprovedAnnotation), newCRD.Annotations[v1beta1.KubeAPIApprovedAnnotation], reason)}
 	}
+}
+
+// SchemaHasInvalidTypes returns true if it contains invalid offending openapi-v3 specification.
+func SchemaHasInvalidTypes(s *apiextensions.JSONSchemaProps) bool {
+	if s == nil {
+		return false
+	}
+
+	if len(s.Type) > 0 && !openapiV3Types.Has(s.Type) {
+		return true
+	}
+
+	if s.Items != nil {
+		if s.Items != nil && SchemaHasInvalidTypes(s.Items.Schema) {
+			return true
+		}
+		for _, s := range s.Items.JSONSchemas {
+			if SchemaHasInvalidTypes(&s) {
+				return true
+			}
+		}
+	}
+	for _, s := range s.AllOf {
+		if SchemaHasInvalidTypes(&s) {
+			return true
+		}
+	}
+	for _, s := range s.AnyOf {
+		if SchemaHasInvalidTypes(&s) {
+			return true
+		}
+	}
+	for _, s := range s.OneOf {
+		if SchemaHasInvalidTypes(&s) {
+			return true
+		}
+	}
+	if SchemaHasInvalidTypes(s.Not) {
+		return true
+	}
+	for _, s := range s.Properties {
+		if SchemaHasInvalidTypes(&s) {
+			return true
+		}
+	}
+	if s.AdditionalProperties != nil {
+		if SchemaHasInvalidTypes(s.AdditionalProperties.Schema) {
+			return true
+		}
+	}
+	for _, s := range s.PatternProperties {
+		if SchemaHasInvalidTypes(&s) {
+			return true
+		}
+	}
+	if s.AdditionalItems != nil {
+		if SchemaHasInvalidTypes(s.AdditionalItems.Schema) {
+			return true
+		}
+	}
+	for _, s := range s.Definitions {
+		if SchemaHasInvalidTypes(&s) {
+			return true
+		}
+	}
+	for _, d := range s.Dependencies {
+		if SchemaHasInvalidTypes(d.Schema) {
+			return true
+		}
+	}
+
+	return false
 }

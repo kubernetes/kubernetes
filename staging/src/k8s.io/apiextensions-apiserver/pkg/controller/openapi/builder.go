@@ -22,10 +22,11 @@ import (
 	"strings"
 	"sync"
 
-	restful "github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -68,11 +69,12 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string) (
 	if err != nil {
 		return nil, err
 	}
+
 	if s != nil && s.OpenAPIV3Schema != nil {
-		ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema)
-		if err == nil && len(structuralschema.ValidateStructural(ss, nil)) == 0 {
-			// skip non-structural schemas
-			schema = ss.Unfold()
+		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
+			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
+				schema = ss.Unfold()
+			}
 		}
 	}
 
