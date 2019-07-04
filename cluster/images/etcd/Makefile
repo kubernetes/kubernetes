@@ -49,10 +49,11 @@ PUSH_REGISTRY?=staging-k8s.gcr.io
 
 MANIFEST_IMAGE := $(PUSH_REGISTRY)/etcd
 
-SELINUX_ENABLED := $(shell cat /sys/fs/selinux/enforce 2> /dev/null || echo 0)
-
 # Install binaries matching base distro permissions
 BIN_INSTALL := install -m 0555
+
+# Hosts running SELinux need :z added to volume mounts
+SELINUX_ENABLED := $(shell cat /sys/fs/selinux/enforce 2> /dev/null || echo 0)
 
 ifeq ($(SELINUX_ENABLED),1)
   DOCKER_VOL_OPTS?=:z
