@@ -42,9 +42,7 @@ import (
 var (
 	iptablesCleanupInstructions = dedent.Dedent(`
 		The reset process does not reset or clean up iptables rules or IPVS tables.
-		If you wish to reset iptables, you must do so manually.
-		For example:
-		iptables -F && iptables -t nat -F && iptables -t mangle -F && iptables -X
+		If you wish to reset iptables, you must do so manually by using the "iptables" command.
 
 		If your cluster was setup to utilize IPVS, run ipvsadm --clear (or similar)
 		to reset your system's IPVS tables.
