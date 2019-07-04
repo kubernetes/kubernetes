@@ -30,7 +30,6 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("Events", func() {
@@ -83,7 +82,7 @@ var _ = SIGDescribe("Events", func() {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{"time": value}))
 		options := metav1.ListOptions{LabelSelector: selector.String()}
 		pods, err := podClient.List(options)
-		gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pods.Items), 1)
 
 		ginkgo.By("retrieving the pod")
 		podWithUID, err := podClient.Get(pod.Name, metav1.GetOptions{})

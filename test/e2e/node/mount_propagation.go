@@ -172,7 +172,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 				shouldBeVisible := mounts.Has(mountName)
 				if shouldBeVisible {
 					framework.ExpectNoError(err, "%s: failed to run %q", msg, cmd)
-					gomega.Expect(stdout).To(gomega.Equal(mountName), msg)
+					framework.ExpectEqual(stdout, mountName, msg)
 				} else {
 					// We *expect* cat to return error here
 					framework.ExpectError(err, msg)
