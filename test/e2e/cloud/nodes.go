@@ -57,7 +57,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
 		gomega.Expect(err).To(gomega.BeNil())
-		gomega.Expect(len(newNodes)).To(gomega.Equal(len(origNodes.Items) - 1))
+		framework.ExpectEqual(len(newNodes), len(origNodes.Items)-1)
 
 		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
