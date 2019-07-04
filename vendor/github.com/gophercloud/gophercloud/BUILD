@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "auth_options.go",
+        "auth_result.go",
         "doc.go",
         "endpoint_search.go",
         "errors.go",
