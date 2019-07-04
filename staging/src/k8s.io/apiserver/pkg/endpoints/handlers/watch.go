@@ -225,6 +225,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				// End of results.
 				return
 			}
+			metrics.WatchEvents.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
 			obj := s.Fixup(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
