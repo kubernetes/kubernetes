@@ -36,7 +36,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -108,7 +107,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, node := range nodeList.Items {
 			e2elog.Logf("Node: %v", node)
 			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
-			gomega.Expect(found).To(gomega.Equal(true))
+			framework.ExpectEqual(found, true)
 			totalPodCapacity += podCapacity.Value()
 		}
 
@@ -148,7 +147,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
-			gomega.Expect(found).To(gomega.Equal(true))
+			framework.ExpectEqual(found, true)
 			nodeToAllocatableMap[node.Name] = allocatable.Value()
 			if nodeMaxAllocatable < allocatable.Value() {
 				nodeMaxAllocatable = allocatable.Value()
@@ -248,7 +247,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
 			// Find allocatable amount of CPU.
 			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
-			gomega.Expect(found).To(gomega.Equal(true))
+			framework.ExpectEqual(found, true)
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
 				nodeMaxAllocatable = allocatable.MilliValue()
@@ -384,7 +383,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -471,7 +470,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, labelPodName))
 		labelPod, err := cs.CoreV1().Pods(ns).Get(labelPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(labelPod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(labelPod.Spec.NodeName, nodeName)
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -514,7 +513,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(e2epod.WaitForPodNotPending(cs, ns, tolerationPodName))
 		deployedPod, err := cs.CoreV1().Pods(ns).Get(tolerationPodName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(deployedPod.Spec.NodeName).To(gomega.Equal(nodeName))
+		framework.ExpectEqual(deployedPod.Spec.NodeName, nodeName)
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -716,7 +715,7 @@ func WaitForSchedulerAfterAction(f *framework.Framework, action common.Action, n
 	}
 	success, err := common.ObserveEventAfterAction(f, predicate, action)
 	framework.ExpectNoError(err)
-	gomega.Expect(success).To(gomega.Equal(true))
+	framework.ExpectEqual(success, true)
 }
 
 // TODO: upgrade calls in PodAffinity tests when we're able to run them
@@ -734,8 +733,8 @@ func verifyResult(c clientset.Interface, expectedScheduled int, expectedNotSched
 		return ""
 	}
 
-	gomega.Expect(len(notScheduledPods)).To(gomega.Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	gomega.Expect(len(scheduledPods)).To(gomega.Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	framework.ExpectEqual(len(scheduledPods), expectedScheduled, printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 // verifyReplicasResult is wrapper of verifyResult for a group pods with same "name: labelName" label, which means they belong to same RC
@@ -752,8 +751,8 @@ func verifyReplicasResult(c clientset.Interface, expectedScheduled int, expected
 		return ""
 	}
 
-	gomega.Expect(len(notScheduledPods)).To(gomega.Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	gomega.Expect(len(scheduledPods)).To(gomega.Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	framework.ExpectEqual(len(notScheduledPods), expectedNotScheduled, printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	framework.ExpectEqual(len(scheduledPods), expectedScheduled, printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 func getPodsByLabels(c clientset.Interface, ns string, labelsMap map[string]string) *v1.PodList {

@@ -181,7 +181,7 @@ var _ = framework.KubeDescribe("EquivalenceCache [Serial]", func() {
 		defer framework.DeleteRCAndWaitForGC(f.ClientSet, ns, "host-port")
 		podList, err := cs.CoreV1().Pods(ns).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(len(podList.Items)).To(gomega.Equal(2))
+		framework.ExpectEqual(len(podList.Items), 2)
 		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
 		gomega.Expect(nodeNames[0]).ToNot(gomega.Equal(nodeNames[1]))
 
