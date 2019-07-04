@@ -23,7 +23,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 )
 
-type ContainerFailures struct {
+type containerFailures struct {
 	status   *v1.ContainerStateTerminated
 	Restarts int
 }
@@ -44,7 +44,7 @@ func PodRunningReady(p *v1.Pod) (bool, error) {
 	return true, nil
 }
 
-func PodRunningReadyOrSucceeded(p *v1.Pod) (bool, error) {
+func podRunningReadyOrSucceeded(p *v1.Pod) (bool, error) {
 	// Check if the phase is succeeded.
 	if p.Status.Phase == v1.PodSucceeded {
 		return true, nil
@@ -52,13 +52,13 @@ func PodRunningReadyOrSucceeded(p *v1.Pod) (bool, error) {
 	return PodRunningReady(p)
 }
 
-// FailedContainers inspects all containers in a pod and returns failure
+// failedContainers inspects all containers in a pod and returns failure
 // information for containers that have failed or been restarted.
 // A map is returned where the key is the containerID and the value is a
 // struct containing the restart and failure information
-func FailedContainers(pod *v1.Pod) map[string]ContainerFailures {
-	var state ContainerFailures
-	states := make(map[string]ContainerFailures)
+func failedContainers(pod *v1.Pod) map[string]containerFailures {
+	var state containerFailures
+	states := make(map[string]containerFailures)
 
 	statuses := pod.Status.ContainerStatuses
 	if len(statuses) == 0 {
@@ -66,14 +66,14 @@ func FailedContainers(pod *v1.Pod) map[string]ContainerFailures {
 	}
 	for _, status := range statuses {
 		if status.State.Terminated != nil {
-			states[status.ContainerID] = ContainerFailures{status: status.State.Terminated}
+			states[status.ContainerID] = containerFailures{status: status.State.Terminated}
 		} else if status.LastTerminationState.Terminated != nil {
-			states[status.ContainerID] = ContainerFailures{status: status.LastTerminationState.Terminated}
+			states[status.ContainerID] = containerFailures{status: status.LastTerminationState.Terminated}
 		}
 		if status.RestartCount > 0 {
 			var ok bool
 			if state, ok = states[status.ContainerID]; !ok {
-				state = ContainerFailures{}
+				state = containerFailures{}
 			}
 			state.Restarts = int(status.RestartCount)
 			states[status.ContainerID] = state
