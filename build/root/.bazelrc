@@ -1,5 +1,8 @@
 startup --expand_configs_in_place
 
+# Force us to use python2
+build --host_force_python=PY2
+
 # Show us information about failures.
 build --verbose_failures
 test --test_output=errors
