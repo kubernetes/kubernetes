@@ -657,7 +657,7 @@ type RCStartupStatus struct {
 	Pending               int
 	Unknown               int
 	Inactive              int
-	FailedContainers      int
+	failedContainers      int
 	Created               []*v1.Pod
 	ContainerRestartNodes sets.String
 }
@@ -693,8 +693,8 @@ func ComputeRCStartupStatus(pods []*v1.Pod, expected int) RCStartupStatus {
 			} else {
 				startupStatus.RunningButNotReady++
 			}
-			for _, v := range FailedContainers(p) {
-				startupStatus.FailedContainers = startupStatus.FailedContainers + v.Restarts
+			for _, v := range failedContainers(p) {
+				startupStatus.failedContainers = startupStatus.failedContainers + v.Restarts
 				startupStatus.ContainerRestartNodes.Insert(p.Spec.NodeName)
 			}
 		} else if p.Status.Phase == v1.PodPending {
@@ -758,7 +758,7 @@ func (config *RCConfig) start() error {
 			fmt.Fprintf(config.PodStatusFile, "%d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown, %d, runningButNotReady\n", startupStatus.Running, startupStatus.Pending, startupStatus.Waiting, startupStatus.Inactive, startupStatus.Unknown, startupStatus.RunningButNotReady)
 		}
 
-		if startupStatus.FailedContainers > maxContainerFailures {
+		if startupStatus.failedContainers > maxContainerFailures {
 			if config.NodeDumpFunc != nil {
 				config.NodeDumpFunc(config.Client, startupStatus.ContainerRestartNodes.List(), config.RCConfigLog)
 			}
@@ -766,7 +766,7 @@ func (config *RCConfig) start() error {
 				// Get the logs from the failed containers to help diagnose what caused them to fail
 				config.ContainerDumpFunc(config.Client, config.Namespace, config.RCConfigLog)
 			}
-			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.FailedContainers, maxContainerFailures)
+			return fmt.Errorf("%d containers failed which is more than allowed %d", startupStatus.failedContainers, maxContainerFailures)
 		}
 		if len(pods) < len(oldPods) || len(pods) > config.Replicas {
 			// This failure mode includes:
