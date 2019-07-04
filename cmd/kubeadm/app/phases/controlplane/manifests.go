@@ -36,6 +36,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	utilsnet "k8s.io/utils/net"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
@@ -240,7 +241,7 @@ func getAuthzModes(authzModeExtraArgs string) string {
 func calcNodeCidrSize(podSubnet string) string {
 	maskSize := "24"
 	if ip, podCidr, err := net.ParseCIDR(podSubnet); err == nil {
-		if ip.To4() == nil {
+		if utilsnet.IsIPv6(ip) {
 			var nodeCidrSize int
 			podNetSize, totalBits := podCidr.Mask.Size()
 			switch {
