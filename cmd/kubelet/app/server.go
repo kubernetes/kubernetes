@@ -118,7 +118,6 @@ func NewKubeletCommand() *cobra.Command {
 	if err != nil {
 		klog.Fatal(err)
 	}
-
 	cmd := &cobra.Command{
 		Use: componentKubelet,
 		Long: `The kubelet is the primary "node agent" that runs on each
@@ -174,7 +173,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// short-circuit on verflag
 			verflag.PrintAndExitIfRequested()
-			utilflag.PrintFlags(cleanFlagSet)
 
 			// set feature gates from initial flags-based config
 			if err := utilfeature.DefaultMutableFeatureGate.SetFromMap(kubeletConfig.FeatureGates); err != nil {
@@ -192,7 +190,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 
 			// load kubelet config file, if provided
 			if configFile := kubeletFlags.KubeletConfigFile; len(configFile) > 0 {
-				kubeletConfig, err = loadConfigFile(configFile)
+				config, err := loadConfigFile(configFile)
+				*kubeletConfig = *config
 				if err != nil {
 					klog.Fatal(err)
 				}
@@ -213,7 +212,6 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			if err := kubeletconfigvalidation.ValidateKubeletConfiguration(kubeletConfig); err != nil {
 				klog.Fatal(err)
 			}
-
 			// use dynamic kubelet config, if enabled
 			var kubeletConfigController *dynamickubeletconfig.Controller
 			if dynamicConfigDir := kubeletFlags.DynamicConfigDir.Value(); len(dynamicConfigDir) > 0 {
@@ -239,7 +237,8 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 					}
 				}
 			}
-
+			// load kubelet config file which will overwrite kubeletConfig
+			utilflag.PrintFlags(cleanFlagSet)
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
 				KubeletFlags:         *kubeletFlags,
