@@ -410,6 +410,9 @@ func TestGetPods(t *testing.T) {
 func TestKillPod(t *testing.T) {
 	// Tests that KillPod also kills Ephemeral Containers
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+	// Tests that KillPod also kills Sidecar Containers
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarLifecycle, true)()
+	sidecar := v1.LifecycleTypeSidecar
 
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -429,6 +432,13 @@ func TestKillPod(t *testing.T) {
 				{
 					Name:  "foo2",
 					Image: "busybox",
+				},
+				{
+					Name:  "foo3",
+					Image: "busybox",
+					Lifecycle: &v1.Lifecycle{
+						Type: &sidecar,
+					},
 				},
 			},
 			EphemeralContainers: []v1.EphemeralContainer{
@@ -466,7 +476,7 @@ func TestKillPod(t *testing.T) {
 		ID:         pod.UID,
 		Name:       pod.Name,
 		Namespace:  pod.Namespace,
-		Containers: []*kubecontainer.Container{containers[0], containers[1], containers[2]},
+		Containers: []*kubecontainer.Container{containers[0], containers[1], containers[2], containers[3]},
 		Sandboxes: []*kubecontainer.Container{
 			{
 				ID: kubecontainer.ContainerID{
@@ -479,7 +489,7 @@ func TestKillPod(t *testing.T) {
 
 	err = m.KillPod(pod, runningPod, nil)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(fakeRuntime.Containers))
+	assert.Equal(t, 4, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
 	for _, sandbox := range fakeRuntime.Sandboxes {
 		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_NOTREADY, sandbox.State)
