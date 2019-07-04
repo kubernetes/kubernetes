@@ -16,6 +16,4 @@ FROM BASEIMAGE
 
 EXPOSE 2379 2380 4001 7001
 COPY etcd* etcdctl* /usr/local/bin/
-RUN chmod +x /usr/local/bin/etcd* /usr/local/bin/etcdctl*
 COPY migrate-if-needed.sh migrate /usr/local/bin/
-RUN chmod +x /usr/local/bin/migrate-if-needed.sh /usr/local/bin/migrate
