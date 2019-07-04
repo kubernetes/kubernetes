@@ -33,11 +33,11 @@ import (
 
 var (
 	dumpTree = flag.Bool("dump", false, "print AST")
-	dumpJson = flag.Bool("json", false, "output test list as JSON")
+	dumpJSON = flag.Bool("json", false, "output test list as JSON")
 	warn     = flag.Bool("warn", false, "print warnings")
 )
 
-type Test struct {
+type test struct {
 	Loc      string
 	Name     string
 	TestName string
@@ -46,7 +46,7 @@ type Test struct {
 // collect extracts test metadata from a file.
 // If src is nil, it reads filename for the code, otherwise it
 // uses src (which may be a string, byte[], or io.Reader).
-func collect(filename string, src interface{}) []Test {
+func collect(filename string, src interface{}) []test {
 	// Create the AST by parsing src.
 	fset := token.NewFileSet() // positions are relative to fset
 	f, err := parser.ParseFile(fset, filename, src, parser.ParseComments)
@@ -77,7 +77,7 @@ func collect(filename string, src interface{}) []Test {
 			}
 			name := funcdecl.Name.Name
 			if strings.HasPrefix(name, "Test") {
-				tests = append(tests, Test{fset.Position(funcdecl.Pos()).String(), testPath, name})
+				tests = append(tests, test{fset.Position(funcdecl.Pos()).String(), testPath, name})
 			}
 		}
 	}
@@ -105,11 +105,11 @@ func isSprintf(n ast.Expr) bool {
 type walker struct {
 	path  string
 	fset  *token.FileSet
-	tests *[]Test
+	tests *[]test
 	vals  map[string]string
 }
 
-func makeWalker(path string, fset *token.FileSet, tests *[]Test) *walker {
+func makeWalker(path string, fset *token.FileSet, tests *[]test) *walker {
 	return &walker{path, fset, tests, make(map[string]string)}
 }
 
@@ -198,7 +198,7 @@ func (w *walker) Visit(n ast.Node) ast.Visitor {
 			if w.path == "[k8s.io]" && *warn {
 				log.Printf("It without matching Describe: %s\n", w.fset.Position(n.Pos()))
 			}
-			*w.tests = append(*w.tests, Test{w.fset.Position(n.Pos()).String(), w.path, name})
+			*w.tests = append(*w.tests, test{w.fset.Position(n.Pos()).String(), w.path, name})
 			return nil // Stop walking
 		}
 	case *ast.AssignStmt:
@@ -226,7 +226,7 @@ func (w *walker) Visit(n ast.Node) ast.Visitor {
 }
 
 type testList struct {
-	tests []Test
+	tests []test
 }
 
 // handlePath walks the filesystem recursively, collecting tests
@@ -262,7 +262,7 @@ func main() {
 			log.Fatalf("Error walking: %v", err)
 		}
 	}
-	if *dumpJson {
+	if *dumpJSON {
 		json, err := json.Marshal(tests.tests)
 		if err != nil {
 			log.Fatal(err)
