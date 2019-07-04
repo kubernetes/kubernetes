@@ -77,7 +77,7 @@ func hasNoPodsPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata,
 	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func numericPriority(meta algorithmpredicates.PredicateMetadata, pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
 	for _, node := range nodes {
 		score, err := strconv.Atoi(node.Name)
@@ -92,11 +92,11 @@ func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.N
 	return result, nil
 }
 
-func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func reverseNumericPriority(meta algorithmpredicates.PredicateMetadata, pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []schedulerapi.HostPriority{}
-	result, err := numericPriority(pod, nodeNameToInfo, nodes)
+	result, err := numericPriority(nil, pod, nodeNameToInfo, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -416,9 +416,9 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:               map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
 			prioritizers:             []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			alwaysCheckAllPredicates: true,
-			nodes:                    []string{"1"},
-			pod:                      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			name:                     "test alwaysCheckAllPredicates is true",
+			nodes: []string{"1"},
+			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			name:  "test alwaysCheckAllPredicates is true",
 			wErr: &FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 1,
@@ -506,7 +506,7 @@ func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
-	_, predicateMap, err := scheduler.findNodesThatFit(&v1.Pod{}, nodes)
+	_, predicateMap, err := scheduler.findNodesThatFit(nil, &v1.Pod{}, nodes)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -536,7 +536,8 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(predicates, nodes)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, predicateMap, err := scheduler.findNodesThatFit(pod, nodes)
+
+	_, predicateMap, err := scheduler.findNodesThatFit(nil, pod, nodes)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -718,7 +719,11 @@ func TestZeroRequest(t *testing.T) {
 				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
 			metaData := metaDataProducer(test.pod, nodeNameToInfo)
 
-			list, err := PrioritizeNodes(
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeNameToInfo)
+			pm := algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{test.pod}, v1.DefaultHardPodAffinitySymmetricWeight, topologyInfo)
+			meta := pm(test.pod, nodeNameToInfo)
+
+			list, err := PrioritizeNodes(meta,
 				test.pod, nodeNameToInfo, metaData, priorityConfigs,
 				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 			if err != nil {
@@ -781,7 +786,8 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) algorithmpredicates.PredicateMetadata {
-	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p})(p, nodeInfo)
+	topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfo)
+	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p}, v1.DefaultHardPodAffinitySymmetricWeight, topologyInfo)(p, nodeInfo)
 }
 
 var smallContainers = []v1.Container{
@@ -985,10 +991,15 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				node.ObjectMeta.Labels = map[string]string{"hostname": node.Name}
 				nodes = append(nodes, node)
 			}
-			if test.addAffinityPredicate {
-				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
-			}
+
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
+
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeNameToInfo)
+
+			if test.addAffinityPredicate {
+				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods), topologyInfo)
+			}
+
 			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
 			// doesn't have it yet.
 			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
@@ -1606,7 +1617,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 10,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number not more than 50",
+			name: "set percentageOfNodesToScore and nodes number not more than 50",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              10,
 			wantNumNodes:             10,
@@ -1617,7 +1628,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 420,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number more than 50",
+			name: "set percentageOfNodesToScore and nodes number more than 50",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              1000,
 			wantNumNodes:             400,
@@ -1628,7 +1639,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 			wantNumNodes: 300,
 		},
 		{
-			name:                     "set percentageOfNodesToScore and nodes number more than 50*125",
+			name: "set percentageOfNodesToScore and nodes number more than 50*125",
 			percentageOfNodesToScore: 40,
 			numAllNodes:              6000,
 			wantNumNodes:             2400,

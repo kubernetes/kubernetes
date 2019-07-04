@@ -198,23 +198,24 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 }
 
 func newPairsMaps(topologyInfo *internalcache.NodeTopologyInfo) *pairsMaps {
+	var pm *pairsMaps
 	if topologyInfo == nil {
-		return &pairsMaps{pairToScore: make(map[internalcache.TopologyPair]*int64)}
+		pm = &pairsMaps{pairToScore: make(map[internalcache.TopologyPair]*int64)}
 	} else {
 		maps := make(map[internalcache.TopologyPair]*int64, len(*topologyInfo))
 		for pair := range *topologyInfo {
 			maps[pair] = new(int64)
 		}
-		return &pairsMaps{pairToScore: maps}
+		pm = &pairsMaps{pairToScore: maps}
 	}
+	return pm
 }
 
 func (pairsMaps *pairsMaps) addTopologyPair(pair internalcache.TopologyPair, weight int64) {
 	if _, ok := pairsMaps.pairToScore[pair]; ok {
 		atomic.AddInt64(pairsMaps.pairToScore[pair], weight)
 	} else {
-		var w int64 = 0
-		pairsMaps.pairToScore[pair] = &w
+		pairsMaps.pairToScore[pair] = new(int64)
 	}
 }
 

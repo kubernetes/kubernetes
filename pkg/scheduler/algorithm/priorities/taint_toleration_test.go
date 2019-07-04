@@ -228,8 +228,9 @@ func TestTaintAndToleration(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+
 			ttp := priorityFunction(ComputeTaintTolerationPriorityMap, ComputeTaintTolerationPriorityReduce, nil)
-			list, err := ttp(test.pod, nodeNameToInfo, test.nodes)
+			list, err := ttp(nil, test.pod, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"encoding/hex"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -165,7 +166,8 @@ func TestImageLocalityPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			list, err := priorityFunction(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)})(test.pod, nodeNameToInfo, test.nodes)
+
+			list, err := priorityFunction(ImageLocalityPriorityMap, nil, &priorityMetadata{totalNumNodes: len(test.nodes)})(nil, test.pod, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

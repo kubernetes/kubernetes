@@ -230,7 +230,8 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 		newPod := buildResourcesPod("", test.requested)
 
 		nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(scheduledPods, nodes)
-		list, err := priorityFunction(RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap, nil, nil)(newPod, nodeNameToInfo, nodes)
+
+		list, err := priorityFunction(RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap, nil, nil)(nil, newPod, nodeNameToInfo, nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

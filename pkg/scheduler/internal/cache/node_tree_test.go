@@ -202,7 +202,7 @@ func TestNodeTree_RemoveNode(t *testing.T) {
 			existingNodes: allNodes[:7],
 			nodesToRemove: allNodes[1:4],
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
+				"": {[]string{"node-0"}, 0},
 				"region-1:\x00:zone-2": {[]string{"node-4"}, 0},
 				"region-1:\x00:zone-3": {[]string{"node-5"}, 0},
 				"region-2:\x00:zone-2": {[]string{"node-6"}, 0},
@@ -293,7 +293,7 @@ func TestNodeTree_UpdateNode(t *testing.T) {
 				},
 			},
 			expectedTree: map[string]*nodeArray{
-				"":                     {[]string{"node-0"}, 0},
+				"": {[]string{"node-0"}, 0},
 				"region-1:\x00:zone-2": {[]string{"node-new"}, 0},
 			},
 		},

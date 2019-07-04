@@ -26,6 +26,9 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
+
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
 type FakeNodeListInfo []*v1.Node
@@ -517,7 +520,12 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				podLister:             schedulertesting.FakePodLister(test.pods),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
-			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
+
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeNameToInfo)
+			pm := predicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{test.pod}, v1.DefaultHardPodAffinitySymmetricWeight, topologyInfo)
+			meta := pm(test.pod, nodeNameToInfo)
+
+			list, err := interPodAffinity.CalculateInterPodAffinityPriority(meta, test.pod, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -601,13 +609,18 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeNameToInfo)
+			pm := predicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{test.pod}, test.hardPodAffinityWeight, topologyInfo)
+			meta := pm(test.pod, nodeNameToInfo)
+
 			ipa := InterPodAffinity{
 				info:                  FakeNodeListInfo(test.nodes),
 				nodeLister:            schedulertesting.FakeNodeLister(test.nodes),
 				podLister:             schedulertesting.FakePodLister(test.pods),
 				hardPodAffinityWeight: test.hardPodAffinityWeight,
 			}
-			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
+			list, err := ipa.CalculateInterPodAffinityPriority(meta, test.pod, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

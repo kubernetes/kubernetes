@@ -422,7 +422,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 					function = priorityFunction(BalancedResourceAllocationMap, nil, nil)
 				}
 
-				list, err := function(test.pod, nodeNameToInfo, test.nodes)
+				list, err := function(nil, test.pod, nodeNameToInfo, test.nodes)
 
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)

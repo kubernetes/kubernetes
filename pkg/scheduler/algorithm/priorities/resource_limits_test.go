@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -152,7 +151,7 @@ func TestResourceLimitsPriority(t *testing.T) {
 					function = priorityFunction(ResourceLimitsPriorityMap, nil, nil)
 				}
 
-				list, err := function(test.pod, nodeNameToInfo, test.nodes)
+				list, err := function(nil, test.pod, nodeNameToInfo, test.nodes)
 
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)

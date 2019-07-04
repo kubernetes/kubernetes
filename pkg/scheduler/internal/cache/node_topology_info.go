@@ -20,6 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // TopologyPair is a key/value pair, used to describe labels of a node
@@ -100,4 +101,21 @@ func (t NodeTopologyInfo) removeTopologyPair(pair TopologyPair, nodeName string)
 			delete(t, pair)
 		}
 	}
+}
+
+// CreateNodeTopologyInfo creates nodeTopologyInfo based on nodeInfoMap which sused for test
+func CreateNodeTopologyInfo(nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) NodeTopologyInfo {
+	if nodeInfoMap == nil {
+		return nil
+	}
+	nodeTopologyInfo := make(NodeTopologyInfo)
+	for name, info := range nodeInfoMap {
+		for k, v := range info.Node().Labels {
+			nodeTopologyInfo.addTopologyPair(TopologyPair{
+				Key:   k,
+				Value: v,
+			}, name)
+		}
+	}
+	return nodeTopologyInfo
 }

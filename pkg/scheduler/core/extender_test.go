@@ -99,7 +99,7 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.H
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func machine2Prioritizer(meta predicates.PredicateMetadata, _ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	result := []schedulerapi.HostPriority{}
 	for _, node := range nodes {
 		score := 1

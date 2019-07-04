@@ -357,6 +357,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
 			getMeta := func(lister schedulertesting.FakePodLister) (*predicateMetadata, map[string]*schedulernodeinfo.NodeInfo) {
 				nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(lister, test.nodes)
+				topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfoMap)
 				// nodeList is a list of non-pointer nodes to feed to FakeNodeListInfo.
 				nodeList := []v1.Node{}
 				for _, n := range test.nodes {
@@ -364,7 +365,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 				}
 				_, precompute := NewServiceAffinityPredicate(lister, schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
-				pmf := PredicateMetadataFactory{lister}
+				pmf := PredicateMetadataFactory{lister, v1.DefaultHardPodAffinitySymmetricWeight, topologyInfo}
 				meta := pmf.GetMetadata(test.pendingPod, nodeInfoMap)
 				return meta.(*predicateMetadata), nodeInfoMap
 			}
@@ -777,8 +778,9 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
+			topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfoMap)
 
-			gotAffinityPodsMaps, gotAntiAffinityPodsMaps, err := getTPMapMatchingIncomingAffinityAntiAffinity(tt.pod, nodeInfoMap)
+			gotAffinityPodsMaps, gotAntiAffinityPodsMaps, _, err := getTPMapMatchingIncomingAffinityAntiAffinity(tt.pod, nodeInfoMap, topologyInfo)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getTPMapMatchingIncomingAffinityAntiAffinity() error = %v, wantErr %v", err, tt.wantErr)
 				return

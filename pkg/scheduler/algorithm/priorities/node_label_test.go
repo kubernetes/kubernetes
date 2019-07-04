@@ -113,7 +113,8 @@ func TestNewNodeLabelPriority(t *testing.T) {
 				label:    test.label,
 				presence: test.presence,
 			}
-			list, err := priorityFunction(labelPrioritizer.CalculateNodeLabelPriorityMap, nil, nil)(nil, nodeNameToInfo, test.nodes)
+
+			list, err := priorityFunction(labelPrioritizer.CalculateNodeLabelPriorityMap, nil, nil)(nil, nil, nodeNameToInfo, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

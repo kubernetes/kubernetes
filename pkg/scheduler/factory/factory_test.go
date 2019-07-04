@@ -239,11 +239,11 @@ func PredicateTwo(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sche
 	return true, nil, nil
 }
 
-func PriorityOne(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(meta predicates.PredicateMetadata, pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(meta predicates.PredicateMetadata, pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
@@ -451,12 +451,12 @@ func TestInvalidFactoryArgs(t *testing.T) {
 		expectErr                      string
 	}{
 		{
-			name:                           "symmetric weight below range",
+			name: "symmetric weight below range",
 			hardPodAffinitySymmetricWeight: -1,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: -1, must be in the range 0-100",
 		},
 		{
-			name:                           "symmetric weight above range",
+			name: "symmetric weight above range",
 			hardPodAffinitySymmetricWeight: 101,
 			expectErr:                      "invalid hardPodAffinitySymmetricWeight: 101, must be in the range 0-100",
 		},

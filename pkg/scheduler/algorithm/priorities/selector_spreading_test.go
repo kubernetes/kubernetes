@@ -354,7 +354,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			metaData := metaDataProducer(test.pod, nodeNameToInfo)
 
 			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
+			list, err := ttp(nil, test.pod, nodeNameToInfo, makeNodeList(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v \n", err)
 			}
@@ -588,8 +588,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				schedulertesting.FakeReplicaSetLister(test.rss),
 				schedulertesting.FakeStatefulSetLister(test.sss))
 			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+
 			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
+			list, err := ttp(nil, test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -775,8 +776,9 @@ func TestZoneSpreadPriority(t *testing.T) {
 				schedulertesting.FakeReplicaSetLister(rss),
 				schedulertesting.FakeStatefulSetLister(sss))
 			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+
 			ttp := priorityFunction(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
+			list, err := ttp(nil, test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

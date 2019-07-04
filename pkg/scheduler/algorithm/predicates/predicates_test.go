@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -87,8 +88,9 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulernodeinfo.Resource) *v1.Po
 }
 
 func GetPredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
-	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
-	return pm.GetMetadata(p, nodeInfo)
+	topologyInfo := internalcache.CreateNodeTopologyInfo(nodeInfo)
+	pm := NewPredicateMetadataFactory(schedulertesting.FakePodLister{p}, v1.DefaultHardPodAffinitySymmetricWeight, topologyInfo)
+	return pm(p, nodeInfo)
 }
 
 func TestPodFitsResources(t *testing.T) {
@@ -347,9 +349,9 @@ func TestPodFitsResources(t *testing.T) {
 				schedulernodeinfo.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{extendedResourceB: 1}}),
 			nodeInfo: schedulernodeinfo.NewNodeInfo(
 				newResourcePod(schedulernodeinfo.Resource{MilliCPU: 0, Memory: 0})),
-			fits:                     true,
+			fits: true,
 			ignoredExtendedResources: sets.NewString(string(extendedResourceB)),
-			name:                     "skip checking ignored extended resource",
+			name: "skip checking ignored extended resource",
 		},
 	}
 
@@ -2981,7 +2983,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"machine3": false,
 			},
 			nodesExpectAffinityFailureReasons: [][]PredicateFailureReason{nil, nil, {ErrPodAffinityNotMatch, ErrPodAffinityRulesNotMatch}},
-			name:                              "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that matches the affinity rules",
+			name: "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that matches the affinity rules",
 		},
 		{
 			pod: &v1.Pod{
