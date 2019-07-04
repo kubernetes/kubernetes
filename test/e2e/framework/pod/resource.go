@@ -672,13 +672,13 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
-				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionTrue))
+				framework.ExpectEqual(scheduledCondition != nil, true)
+				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionTrue)
 				scheduledPods = append(scheduledPods, pod)
 			} else {
 				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				gomega.Expect(scheduledCondition != nil).To(gomega.Equal(true))
-				gomega.Expect(scheduledCondition.Status).To(gomega.Equal(v1.ConditionFalse))
+				framework.ExpectEqual(scheduledCondition != nil, true)
+				framework.ExpectEqual(scheduledCondition.Status, v1.ConditionFalse)
 				if scheduledCondition.Reason == "Unschedulable" {
 
 					notScheduledPods = append(notScheduledPods, pod)

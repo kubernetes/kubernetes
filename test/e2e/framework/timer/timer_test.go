@@ -64,9 +64,9 @@ func TestTimer(t *testing.T) {
 			}
 		]
 	}`))
-	gomega.Expect(timer.PrintHumanReadable()).To(gomega.Equal(`Phase 001-one: 5.5s so far
+	framework.ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 5.5s so far
 Phase 033-two: 3.5s
-`))
+`)
 
 	setCurrentTimeSinceEpoch(7*time.Second + 500*time.Millisecond)
 	phaseOne.End()
@@ -86,7 +86,7 @@ Phase 033-two: 3.5s
 			}
 		]
 	}`))
-	gomega.Expect(timer.PrintHumanReadable()).To(gomega.Equal(`Phase 001-one: 6.5s
+	framework.ExpectEqual(timer.PrintHumanReadable(), `Phase 001-one: 6.5s
 Phase 033-two: 3.5s
-`))
+`)
 }

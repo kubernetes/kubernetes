@@ -1349,7 +1349,7 @@ func RandomSuffix() string {
 
 // ExpectEqual expects the specified two are the same, otherwise an exception raises
 func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.Expect(actual).To(gomega.Equal(extra), explain...)
+	framework.ExpectEqual(actual, extra, explain...)
 }
 
 // ExpectError expects an error happens, otherwise an exception raises
