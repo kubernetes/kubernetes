@@ -340,7 +340,7 @@ type ListOptions struct {
 	// If the feature gate WatchBookmarks is not enabled in apiserver,
 	// this field is ignored.
 	//
-	// This field is alpha and can be changed or removed without notice.
+	// This field is beta.
 	//
 	// +optional
 	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty" protobuf:"varint,9,opt,name=allowWatchBookmarks"`
