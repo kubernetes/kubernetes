@@ -818,7 +818,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer disableAutoscaler(extraPoolName, 0, 1)
 
 		ngNodes := getPoolNodes(f, extraPoolName)
-		gomega.Expect(len(ngNodes)).To(gomega.Equal(extraNodes))
+		framework.ExpectEqual(len(ngNodes), extraNodes)
 		for _, node := range ngNodes {
 			ginkgo.By(fmt.Sprintf("Target node for scale-down: %s", node.Name))
 		}
@@ -1921,7 +1921,7 @@ func createPriorityClasses(f *framework.Framework) func() {
 		if err != nil {
 			klog.Errorf("Error creating priority class: %v", err)
 		}
-		gomega.Expect(err == nil || errors.IsAlreadyExists(err)).To(gomega.Equal(true))
+		framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
 	}
 
 	return func() {
