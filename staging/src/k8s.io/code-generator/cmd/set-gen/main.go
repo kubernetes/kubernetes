@@ -32,10 +32,11 @@ import (
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/set-gen/generators"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 func main() {
+	klog.InitFlags(nil)
 	arguments := args.Default()
 
 	// Override defaults.
@@ -48,8 +49,8 @@ func main() {
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {
-		glog.Errorf("Error: %v", err)
+		klog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
-	glog.V(2).Info("Completed successfully.")
+	klog.V(2).Info("Completed successfully.")
 }

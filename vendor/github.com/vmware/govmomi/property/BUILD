@@ -7,6 +7,7 @@ go_library(
         "filter.go",
         "wait.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/property",
     importpath = "github.com/vmware/govmomi/property",
     visibility = ["//visibility:public"],
     deps = [

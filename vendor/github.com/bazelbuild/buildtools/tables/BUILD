@@ -6,6 +6,7 @@ go_library(
         "jsonparser.go",
         "tables.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/bazelbuild/buildtools/tables",
     importpath = "github.com/bazelbuild/buildtools/tables",
     visibility = ["//visibility:public"],
 )

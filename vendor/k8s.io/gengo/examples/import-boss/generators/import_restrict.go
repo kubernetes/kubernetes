@@ -33,7 +33,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
@@ -202,19 +202,19 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 			return fmt.Errorf("regexp `%s` in file %q doesn't compile: %v", r.SelectorRegexp, actualPath, err)
 		}
 		for v := range f.Imports {
-			glog.V(4).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
+			klog.V(4).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
 			if !re.MatchString(v) {
 				continue
 			}
 			for _, forbidden := range r.ForbiddenPrefixes {
-				glog.V(4).Infof("Checking %v against %v\n", v, forbidden)
+				klog.V(4).Infof("Checking %v against %v\n", v, forbidden)
 				if strings.HasPrefix(v, forbidden) {
 					return fmt.Errorf("import %v has forbidden prefix %v", v, forbidden)
 				}
 			}
 			found := false
 			for _, allowed := range r.AllowedPrefixes {
-				glog.V(4).Infof("Checking %v against %v\n", v, allowed)
+				klog.V(4).Infof("Checking %v against %v\n", v, allowed)
 				if strings.HasPrefix(v, allowed) {
 					found = true
 					break
@@ -226,7 +226,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 		}
 	}
 	if len(rules.Rules) > 0 {
-		glog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
+		klog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
 	}
 
 	return nil

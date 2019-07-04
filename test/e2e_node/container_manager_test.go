@@ -26,13 +26,14 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -75,7 +76,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 
 var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
-	Describe("Validate OOM score adjustments", func() {
+	Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		Context("once the node is setup", func() {
 			It("container runtime's oom-score-adj should be -999", func() {
 				runtimePids, err := getPidsForProcess(framework.TestContext.ContainerRuntimeProcessName, framework.TestContext.ContainerRuntimePidFile)
@@ -154,16 +155,16 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					if CurrentGinkgoTestDescription().Failed {
 						By("Dump all running containers")
 						runtime, _, err := getCRIClient()
-						Expect(err).NotTo(HaveOccurred())
+						framework.ExpectNoError(err)
 						containers, err := runtime.ListContainers(&runtimeapi.ContainerFilter{
 							State: &runtimeapi.ContainerStateValue{
 								State: runtimeapi.ContainerState_CONTAINER_RUNNING,
 							},
 						})
-						Expect(err).NotTo(HaveOccurred())
-						framework.Logf("Running containers:")
+						framework.ExpectNoError(err)
+						e2elog.Logf("Running containers:")
 						for _, c := range containers {
-							framework.Logf("%+v", c)
+							e2elog.Logf("%+v", c)
 						}
 					}
 				})
@@ -178,7 +179,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
 							{
-								Image: imageutils.GetE2EImage(imageutils.NginxSlim),
+								Image: imageutils.GetE2EImage(imageutils.Nginx),
 								Name:  podName,
 								Resources: v1.ResourceRequirements{
 									Limits: v1.ResourceList{

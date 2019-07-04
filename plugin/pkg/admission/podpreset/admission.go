@@ -22,26 +22,28 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/ref"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
+	settingsv1alpha1listers "k8s.io/client-go/listers/settings/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/settings"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	settingslisters "k8s.io/kubernetes/pkg/client/listers/settings/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/apis/core/pods"
+	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 const (
 	annotationPrefix = "podpreset.admission.kubernetes.io"
-	PluginName       = "PodPreset"
+	// PluginName is a string with the name of the plugin
+	PluginName = "PodPreset"
 )
 
 // Register registers a plugin
@@ -51,47 +53,50 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// podPresetPlugin is an implementation of admission.Interface.
-type podPresetPlugin struct {
+// Plugin is an implementation of admission.Interface.
+type Plugin struct {
 	*admission.Handler
-	client internalclientset.Interface
+	client kubernetes.Interface
 
-	lister settingslisters.PodPresetLister
+	lister settingsv1alpha1listers.PodPresetLister
 }
 
-var _ admission.MutationInterface = &podPresetPlugin{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&podPresetPlugin{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&podPresetPlugin{})
+var _ admission.MutationInterface = &Plugin{}
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&Plugin{})
+var _ = genericadmissioninitializer.WantsExternalKubeClientSet(&Plugin{})
 
 // NewPlugin creates a new pod preset admission plugin.
-func NewPlugin() *podPresetPlugin {
-	return &podPresetPlugin{
+func NewPlugin() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
-func (plugin *podPresetPlugin) ValidateInitialization() error {
-	if plugin.client == nil {
+// ValidateInitialization validates the Plugin was initialized properly
+func (p *Plugin) ValidateInitialization() error {
+	if p.client == nil {
 		return fmt.Errorf("%s requires a client", PluginName)
 	}
-	if plugin.lister == nil {
+	if p.lister == nil {
 		return fmt.Errorf("%s requires a lister", PluginName)
 	}
 	return nil
 }
 
-func (a *podPresetPlugin) SetInternalKubeClientSet(client internalclientset.Interface) {
-	a.client = client
+// SetExternalKubeClientSet registers the client into Plugin
+func (p *Plugin) SetExternalKubeClientSet(client kubernetes.Interface) {
+	p.client = client
 }
 
-func (a *podPresetPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	podPresetInformer := f.Settings().InternalVersion().PodPresets()
-	a.lister = podPresetInformer.Lister()
-	a.SetReadyFunc(podPresetInformer.Informer().HasSynced)
+// SetExternalKubeInformerFactory registers an informer factory into Plugin
+func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	podPresetInformer := f.Settings().V1alpha1().PodPresets()
+	p.lister = podPresetInformer.Lister()
+	p.SetReadyFunc(podPresetInformer.Informer().HasSynced)
 }
 
 // Admit injects a pod with the specific fields for each pod preset it matches.
-func (c *podPresetPlugin) Admit(a admission.Attributes) error {
+func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than CREATE.
 	if len(a.GetSubresource()) != 0 || a.GetResource().GroupResource() != api.Resource("pods") || a.GetOperation() != admission.Create {
@@ -109,13 +114,13 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 
 	// Ignore if exclusion annotation is present
 	if podAnnotations := pod.GetAnnotations(); podAnnotations != nil {
-		glog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
+		klog.V(5).Infof("Looking at pod annotations, found: %v", podAnnotations)
 		if podAnnotations[api.PodPresetOptOutAnnotationKey] == "true" {
 			return nil
 		}
 	}
 
-	list, err := c.lister.PodPresets(a.GetNamespace()).List(labels.Everything())
+	list, err := p.lister.PodPresets(a.GetNamespace()).List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("listing pod presets failed: %v", err)
 	}
@@ -138,21 +143,21 @@ func (c *podPresetPlugin) Admit(a admission.Attributes) error {
 	err = safeToApplyPodPresetsOnPod(pod, matchingPPs)
 	if err != nil {
 		// conflict, ignore the error, but raise an event
-		glog.Warningf("conflict occurred while applying podpresets: %s on pod: %v err: %v",
+		klog.Warningf("conflict occurred while applying podpresets: %s on pod: %v err: %v",
 			strings.Join(presetNames, ","), pod.GetGenerateName(), err)
 		return nil
 	}
 
 	applyPodPresetsOnPod(pod, matchingPPs)
 
-	glog.Infof("applied podpresets: %s successfully on Pod: %+v ", strings.Join(presetNames, ","), pod.GetGenerateName())
+	klog.Infof("applied podpresets: %s successfully on Pod: %+v ", strings.Join(presetNames, ","), pod.GetGenerateName())
 
 	return nil
 }
 
 // filterPodPresets returns list of PodPresets which match given Pod.
-func filterPodPresets(list []*settings.PodPreset, pod *api.Pod) ([]*settings.PodPreset, error) {
-	var matchingPPs []*settings.PodPreset
+func filterPodPresets(list []*settingsv1alpha1.PodPreset, pod *api.Pod) ([]*settingsv1alpha1.PodPreset, error) {
+	var matchingPPs []*settingsv1alpha1.PodPreset
 
 	for _, pp := range list {
 		selector, err := metav1.LabelSelectorAsSelector(&pp.Spec.Selector)
@@ -164,7 +169,7 @@ func filterPodPresets(list []*settings.PodPreset, pod *api.Pod) ([]*settings.Pod
 		if !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
-		glog.V(4).Infof("PodPreset %s matches pod %s labels", pp.GetName(), pod.GetName())
+		klog.V(4).Infof("PodPreset %s matches pod %s labels", pp.GetName(), pod.GetName())
 		matchingPPs = append(matchingPPs, pp)
 	}
 	return matchingPPs, nil
@@ -172,7 +177,7 @@ func filterPodPresets(list []*settings.PodPreset, pod *api.Pod) ([]*settings.Pod
 
 // safeToApplyPodPresetsOnPod determines if there is any conflict in information
 // injected by given PodPresets in the Pod.
-func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settings.PodPreset) error {
+func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.PodPreset) error {
 	var errs []error
 
 	// volumes attribute is defined at the Pod level, so determine if volumes
@@ -180,17 +185,19 @@ func safeToApplyPodPresetsOnPod(pod *api.Pod, podPresets []*settings.PodPreset) 
 	if _, err := mergeVolumes(pod.Spec.Volumes, podPresets); err != nil {
 		errs = append(errs, err)
 	}
-	for _, ctr := range pod.Spec.Containers {
-		if err := safeToApplyPodPresetsOnContainer(&ctr, podPresets); err != nil {
+	pods.VisitContainersWithPath(&pod.Spec, func(c *api.Container, _ *field.Path) bool {
+		if err := safeToApplyPodPresetsOnContainer(c, podPresets); err != nil {
 			errs = append(errs, err)
 		}
-	}
+		return true
+	})
+
 	return utilerrors.NewAggregate(errs)
 }
 
 // safeToApplyPodPresetsOnContainer determines if there is any conflict in
 // information injected by given PodPresets in the given container.
-func safeToApplyPodPresetsOnContainer(ctr *api.Container, podPresets []*settings.PodPreset) error {
+func safeToApplyPodPresetsOnContainer(ctr *api.Container, podPresets []*settingsv1alpha1.PodPreset) error {
 	var errs []error
 	// check if it is safe to merge env vars and volume mounts from given podpresets and
 	// container's existing env vars.
@@ -206,7 +213,7 @@ func safeToApplyPodPresetsOnContainer(ctr *api.Container, podPresets []*settings
 
 // mergeEnv merges a list of env vars with the env vars injected by given list podPresets.
 // It returns an error if it detects any conflict during the merge.
-func mergeEnv(envVars []api.EnvVar, podPresets []*settings.PodPreset) ([]api.EnvVar, error) {
+func mergeEnv(envVars []api.EnvVar, podPresets []*settingsv1alpha1.PodPreset) ([]api.EnvVar, error) {
 	origEnv := map[string]api.EnvVar{}
 	for _, v := range envVars {
 		origEnv[v.Name] = v
@@ -219,16 +226,21 @@ func mergeEnv(envVars []api.EnvVar, podPresets []*settings.PodPreset) ([]api.Env
 
 	for _, pp := range podPresets {
 		for _, v := range pp.Spec.Env {
+			internalEnv := api.EnvVar{}
+			if err := apiscorev1.Convert_v1_EnvVar_To_core_EnvVar(&v, &internalEnv, nil); err != nil {
+				return nil, err
+			}
+
 			found, ok := origEnv[v.Name]
 			if !ok {
 				// if we don't already have it append it and continue
-				origEnv[v.Name] = v
-				mergedEnv = append(mergedEnv, v)
+				origEnv[v.Name] = internalEnv
+				mergedEnv = append(mergedEnv, internalEnv)
 				continue
 			}
 
 			// make sure they are identical or throw an error
-			if !reflect.DeepEqual(found, v) {
+			if !reflect.DeepEqual(found, internalEnv) {
 				errs = append(errs, fmt.Errorf("merging env for %s has a conflict on %s: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), v.Name, v, found))
 			}
 		}
@@ -242,12 +254,54 @@ func mergeEnv(envVars []api.EnvVar, podPresets []*settings.PodPreset) ([]api.Env
 	return mergedEnv, err
 }
 
-func mergeEnvFrom(envSources []api.EnvFromSource, podPresets []*settings.PodPreset) ([]api.EnvFromSource, error) {
+type envFromMergeKey struct {
+	prefix           string
+	configMapRefName string
+	secretRefName    string
+}
+
+func newEnvFromMergeKey(e api.EnvFromSource) envFromMergeKey {
+	k := envFromMergeKey{prefix: e.Prefix}
+	if e.ConfigMapRef != nil {
+		k.configMapRefName = e.ConfigMapRef.Name
+	}
+	if e.SecretRef != nil {
+		k.secretRefName = e.SecretRef.Name
+	}
+	return k
+}
+
+func mergeEnvFrom(envSources []api.EnvFromSource, podPresets []*settingsv1alpha1.PodPreset) ([]api.EnvFromSource, error) {
 	var mergedEnvFrom []api.EnvFromSource
 
+	// merge envFrom using a identify key to ensure Admit reinvocations are idempotent
+	origEnvSources := map[envFromMergeKey]api.EnvFromSource{}
+	for _, envSource := range envSources {
+		origEnvSources[newEnvFromMergeKey(envSource)] = envSource
+	}
 	mergedEnvFrom = append(mergedEnvFrom, envSources...)
+	var errs []error
 	for _, pp := range podPresets {
-		mergedEnvFrom = append(mergedEnvFrom, pp.Spec.EnvFrom...)
+		for _, envFromSource := range pp.Spec.EnvFrom {
+			internalEnvFrom := api.EnvFromSource{}
+			if err := apiscorev1.Convert_v1_EnvFromSource_To_core_EnvFromSource(&envFromSource, &internalEnvFrom, nil); err != nil {
+				return nil, err
+			}
+			found, ok := origEnvSources[newEnvFromMergeKey(internalEnvFrom)]
+			if !ok {
+				mergedEnvFrom = append(mergedEnvFrom, internalEnvFrom)
+				continue
+			}
+			if !reflect.DeepEqual(found, internalEnvFrom) {
+				errs = append(errs, fmt.Errorf("merging envFrom for %s has a conflict: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), internalEnvFrom, found))
+			}
+		}
+
+	}
+
+	err := utilerrors.NewAggregate(errs)
+	if err != nil {
+		return nil, err
 	}
 
 	return mergedEnvFrom, nil
@@ -255,7 +309,7 @@ func mergeEnvFrom(envSources []api.EnvFromSource, podPresets []*settings.PodPres
 
 // mergeVolumeMounts merges given list of VolumeMounts with the volumeMounts
 // injected by given podPresets. It returns an error if it detects any conflict during the merge.
-func mergeVolumeMounts(volumeMounts []api.VolumeMount, podPresets []*settings.PodPreset) ([]api.VolumeMount, error) {
+func mergeVolumeMounts(volumeMounts []api.VolumeMount, podPresets []*settingsv1alpha1.PodPreset) ([]api.VolumeMount, error) {
 
 	origVolumeMounts := map[string]api.VolumeMount{}
 	volumeMountsByPath := map[string]api.VolumeMount{}
@@ -271,15 +325,19 @@ func mergeVolumeMounts(volumeMounts []api.VolumeMount, podPresets []*settings.Po
 
 	for _, pp := range podPresets {
 		for _, v := range pp.Spec.VolumeMounts {
+			internalVolumeMount := api.VolumeMount{}
+			if err := apiscorev1.Convert_v1_VolumeMount_To_core_VolumeMount(&v, &internalVolumeMount, nil); err != nil {
+				return nil, err
+			}
 			found, ok := origVolumeMounts[v.Name]
 			if !ok {
 				// if we don't already have it append it and continue
-				origVolumeMounts[v.Name] = v
-				mergedVolumeMounts = append(mergedVolumeMounts, v)
+				origVolumeMounts[v.Name] = internalVolumeMount
+				mergedVolumeMounts = append(mergedVolumeMounts, internalVolumeMount)
 			} else {
 				// make sure they are identical or throw an error
 				// shall we throw an error for identical volumeMounts ?
-				if !reflect.DeepEqual(found, v) {
+				if !reflect.DeepEqual(found, internalVolumeMount) {
 					errs = append(errs, fmt.Errorf("merging volume mounts for %s has a conflict on %s: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), v.Name, v, found))
 				}
 			}
@@ -287,10 +345,10 @@ func mergeVolumeMounts(volumeMounts []api.VolumeMount, podPresets []*settings.Po
 			found, ok = volumeMountsByPath[v.MountPath]
 			if !ok {
 				// if we don't already have it append it and continue
-				volumeMountsByPath[v.MountPath] = v
+				volumeMountsByPath[v.MountPath] = internalVolumeMount
 			} else {
 				// make sure they are identical or throw an error
-				if !reflect.DeepEqual(found, v) {
+				if !reflect.DeepEqual(found, internalVolumeMount) {
 					errs = append(errs, fmt.Errorf("merging volume mounts for %s has a conflict on mount path %s: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), v.MountPath, v, found))
 				}
 			}
@@ -307,7 +365,7 @@ func mergeVolumeMounts(volumeMounts []api.VolumeMount, podPresets []*settings.Po
 
 // mergeVolumes merges given list of Volumes with the volumes injected by given
 // podPresets. It returns an error if it detects any conflict during the merge.
-func mergeVolumes(volumes []api.Volume, podPresets []*settings.PodPreset) ([]api.Volume, error) {
+func mergeVolumes(volumes []api.Volume, podPresets []*settingsv1alpha1.PodPreset) ([]api.Volume, error) {
 	origVolumes := map[string]api.Volume{}
 	for _, v := range volumes {
 		origVolumes[v.Name] = v
@@ -320,16 +378,20 @@ func mergeVolumes(volumes []api.Volume, podPresets []*settings.PodPreset) ([]api
 
 	for _, pp := range podPresets {
 		for _, v := range pp.Spec.Volumes {
+			internalVolume := api.Volume{}
+			if err := apiscorev1.Convert_v1_Volume_To_core_Volume(&v, &internalVolume, nil); err != nil {
+				return nil, err
+			}
 			found, ok := origVolumes[v.Name]
 			if !ok {
 				// if we don't already have it append it and continue
-				origVolumes[v.Name] = v
-				mergedVolumes = append(mergedVolumes, v)
+				origVolumes[v.Name] = internalVolume
+				mergedVolumes = append(mergedVolumes, internalVolume)
 				continue
 			}
 
 			// make sure they are identical or throw an error
-			if !reflect.DeepEqual(found, v) {
+			if !reflect.DeepEqual(found, internalVolume) {
 				errs = append(errs, fmt.Errorf("merging volumes for %s has a conflict on %s: \n%#v\ndoes not match\n%#v\n in container", pp.GetName(), v.Name, v, found))
 			}
 		}
@@ -347,32 +409,10 @@ func mergeVolumes(volumes []api.Volume, podPresets []*settings.PodPreset) ([]api
 	return mergedVolumes, err
 }
 
-func (c *podPresetPlugin) addEvent(pod *api.Pod, pip *settings.PodPreset, message string) {
-	ref, err := ref.GetReference(legacyscheme.Scheme, pod)
-	if err != nil {
-		glog.Errorf("pip %s: get reference for pod %s failed: %v", pip.GetName(), pod.GetName(), err)
-		return
-	}
-
-	e := &api.Event{
-		InvolvedObject: *ref,
-		Message:        message,
-		Source: api.EventSource{
-			Component: fmt.Sprintf("pip %s", pip.GetName()),
-		},
-		Type: "Warning",
-	}
-
-	if _, err := c.client.Core().Events(pod.GetNamespace()).Create(e); err != nil {
-		glog.Errorf("pip %s: creating pod event failed: %v", pip.GetName(), err)
-		return
-	}
-}
-
 // applyPodPresetsOnPod updates the PodSpec with merged information from all the
 // applicable PodPresets. It ignores the errors of merge functions because merge
 // errors have already been checked in safeToApplyPodPresetsOnPod function.
-func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settings.PodPreset) {
+func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settingsv1alpha1.PodPreset) {
 	if len(podPresets) == 0 {
 		return
 	}
@@ -383,6 +423,10 @@ func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settings.PodPreset) {
 	for i, ctr := range pod.Spec.Containers {
 		applyPodPresetsOnContainer(&ctr, podPresets)
 		pod.Spec.Containers[i] = ctr
+	}
+	for i, iCtr := range pod.Spec.InitContainers {
+		applyPodPresetsOnContainer(&iCtr, podPresets)
+		pod.Spec.InitContainers[i] = iCtr
 	}
 
 	// add annotation
@@ -398,7 +442,7 @@ func applyPodPresetsOnPod(pod *api.Pod, podPresets []*settings.PodPreset) {
 // applyPodPresetsOnContainer injects envVars, VolumeMounts and envFrom from
 // given podPresets in to the given container. It ignores conflict errors
 // because it assumes those have been checked already by the caller.
-func applyPodPresetsOnContainer(ctr *api.Container, podPresets []*settings.PodPreset) {
+func applyPodPresetsOnContainer(ctr *api.Container, podPresets []*settingsv1alpha1.PodPreset) {
 	envVars, _ := mergeEnv(ctr.Env, podPresets)
 	ctr.Env = envVars
 

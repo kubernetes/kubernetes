@@ -11,6 +11,7 @@ package reporters
 import (
 	"encoding/xml"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 
@@ -21,8 +22,10 @@ import (
 type JUnitTestSuite struct {
 	XMLName   xml.Name        `xml:"testsuite"`
 	TestCases []JUnitTestCase `xml:"testcase"`
+	Name      string          `xml:"name,attr"`
 	Tests     int             `xml:"tests,attr"`
 	Failures  int             `xml:"failures,attr"`
+	Errors    int             `xml:"errors,attr"`
 	Time      float64         `xml:"time,attr"`
 }
 
@@ -59,6 +62,7 @@ func NewJUnitReporter(filename string) *JUnitReporter {
 
 func (reporter *JUnitReporter) SpecSuiteWillBegin(config config.GinkgoConfigType, summary *types.SuiteSummary) {
 	reporter.suite = JUnitTestSuite{
+		Name:      summary.SuiteDescription,
 		TestCases: []JUnitTestCase{},
 	}
 	reporter.testSuiteName = summary.SuiteDescription
@@ -117,8 +121,9 @@ func (reporter *JUnitReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 
 func (reporter *JUnitReporter) SpecSuiteDidEnd(summary *types.SuiteSummary) {
 	reporter.suite.Tests = summary.NumberOfSpecsThatWillBeRun
-	reporter.suite.Time = summary.RunTime.Seconds()
+	reporter.suite.Time = math.Trunc(summary.RunTime.Seconds()*1000) / 1000
 	reporter.suite.Failures = summary.NumberOfFailedSpecs
+	reporter.suite.Errors = 0
 	file, err := os.Create(reporter.filename)
 	if err != nil {
 		fmt.Printf("Failed to create JUnit report file: %s\n\t%s", reporter.filename, err.Error())

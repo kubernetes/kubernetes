@@ -24,30 +24,30 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
-	bootstrapapi "k8s.io/client-go/tools/bootstrap/token/api"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 	bootstraputil "k8s.io/kubernetes/test/e2e/lifecycle/bootstrap"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-type bootstrapSecrets []*api.Secret
+type bootstrapSecrets []*corev1.Secret
 
-func (b bootstrapSecrets) List(selector labels.Selector) (ret []*api.Secret, err error) {
+func (b bootstrapSecrets) List(selector labels.Selector) (ret []*corev1.Secret, err error) {
 	return b, nil
 }
 
-func (b bootstrapSecrets) Get(name string) (*api.Secret, error) {
+func (b bootstrapSecrets) Get(name string) (*corev1.Secret, error) {
 	return b[0], nil
 }
 
 // TestBootstrapTokenAuth tests the bootstrap token auth provider
 func TestBootstrapTokenAuth(t *testing.T) {
-	tokenId, err := bootstraputil.GenerateTokenId()
+	tokenID, err := bootstraputil.GenerateTokenId()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,38 +55,38 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	var bootstrapSecretValid = &api.Secret{
+	var bootstrapSecretValid = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
 			Name:      bootstrapapi.BootstrapTokenSecretPrefix,
 		},
-		Type: api.SecretTypeBootstrapToken,
+		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenId),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte(secret),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
-	var bootstrapSecretInvalid = &api.Secret{
+	var bootstrapSecretInvalid = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
 			Name:      bootstrapapi.BootstrapTokenSecretPrefix,
 		},
-		Type: api.SecretTypeBootstrapToken,
+		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenId),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte("invalid"),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 		},
 	}
-	var expiredBootstrapToken = &api.Secret{
+	var expiredBootstrapToken = &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: metav1.NamespaceSystem,
 			Name:      bootstrapapi.BootstrapTokenSecretPrefix,
 		},
-		Type: api.SecretTypeBootstrapToken,
+		Type: corev1.SecretTypeBootstrapToken,
 		Data: map[string][]byte{
-			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenId),
+			bootstrapapi.BootstrapTokenIDKey:               []byte(tokenID),
 			bootstrapapi.BootstrapTokenSecretKey:           []byte("invalid"),
 			bootstrapapi.BootstrapTokenUsageAuthentication: []byte("true"),
 			bootstrapapi.BootstrapTokenExpirationKey:       []byte(bootstraputil.TimeStringFromNow(-time.Hour)),
@@ -101,7 +101,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 	tests := []struct {
 		name    string
 		request request
-		secret  *api.Secret
+		secret  *corev1.Secret
 	}{
 		{
 			name:    "valid token",
@@ -134,7 +134,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		previousResourceVersion := make(map[string]float64)
 		transport := http.DefaultTransport
 
-		token := tokenId + "." + secret
+		token := tokenID + "." + secret
 		var bodyStr string
 		if test.request.body != "" {
 			sub := ""

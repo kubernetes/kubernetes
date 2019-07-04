@@ -4,15 +4,16 @@ go_library(
     name = "go_default_library",
     srcs = [
         "block.go",
+        "doc.go",
         "html.go",
         "inline.go",
         "latex.go",
         "markdown.go",
         "smartypants.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/russross/blackfriday",
     importpath = "github.com/russross/blackfriday",
     visibility = ["//visibility:public"],
-    deps = ["//vendor/github.com/shurcooL/sanitized_anchor_name:go_default_library"],
 )
 
 filegroup(

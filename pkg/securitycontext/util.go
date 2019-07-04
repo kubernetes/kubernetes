@@ -17,9 +17,6 @@ limitations under the License.
 package securitycontext
 
 import (
-	"fmt"
-	"strings"
-
 	"k8s.io/api/core/v1"
 )
 
@@ -47,32 +44,15 @@ func HasCapabilitiesRequest(container *v1.Container) bool {
 	return len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0
 }
 
-const expectedSELinuxFields = 4
-
-// ParseSELinuxOptions parses a string containing a full SELinux context
-// (user, role, type, and level) into an SELinuxOptions object.  If the
-// context is malformed, an error is returned.
-func ParseSELinuxOptions(context string) (*v1.SELinuxOptions, error) {
-	fields := strings.SplitN(context, ":", expectedSELinuxFields)
-
-	if len(fields) != expectedSELinuxFields {
-		return nil, fmt.Errorf("expected %v fields in selinux; got %v (context: %v)", expectedSELinuxFields, len(fields), context)
-	}
-
-	return &v1.SELinuxOptions{
-		User:  fields[0],
-		Role:  fields[1],
-		Type:  fields[2],
-		Level: fields[3],
-	}, nil
-}
-
+// DetermineEffectiveSecurityContext returns a synthesized SecurityContext for reading effective configurations
+// from the provided pod's and container's security context. Container's fields take precedence in cases where both
+// are set
 func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1.SecurityContext {
 	effectiveSc := securityContextFromPodSecurityContext(pod)
 	containerSc := container.SecurityContext
 
 	if effectiveSc == nil && containerSc == nil {
-		return nil
+		return &v1.SecurityContext{}
 	}
 	if effectiveSc != nil && containerSc == nil {
 		return effectiveSc
@@ -84,6 +64,18 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 	if containerSc.SELinuxOptions != nil {
 		effectiveSc.SELinuxOptions = new(v1.SELinuxOptions)
 		*effectiveSc.SELinuxOptions = *containerSc.SELinuxOptions
+	}
+
+	if containerSc.WindowsOptions != nil {
+		// only override fields that are set at the container level, not the whole thing
+		if effectiveSc.WindowsOptions == nil {
+			effectiveSc.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		}
+		if containerSc.WindowsOptions.GMSACredentialSpecName != nil || containerSc.WindowsOptions.GMSACredentialSpec != nil {
+			// both GMSA fields go hand in hand
+			effectiveSc.WindowsOptions.GMSACredentialSpecName = containerSc.WindowsOptions.GMSACredentialSpecName
+			effectiveSc.WindowsOptions.GMSACredentialSpec = containerSc.WindowsOptions.GMSACredentialSpec
+		}
 	}
 
 	if containerSc.Capabilities != nil {
@@ -121,6 +113,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
 	}
 
+	if containerSc.ProcMount != nil {
+		effectiveSc.ProcMount = new(v1.ProcMountType)
+		*effectiveSc.ProcMount = *containerSc.ProcMount
+	}
+
 	return effectiveSc
 }
 
@@ -135,6 +132,12 @@ func securityContextFromPodSecurityContext(pod *v1.Pod) *v1.SecurityContext {
 		synthesized.SELinuxOptions = &v1.SELinuxOptions{}
 		*synthesized.SELinuxOptions = *pod.Spec.SecurityContext.SELinuxOptions
 	}
+
+	if pod.Spec.SecurityContext.WindowsOptions != nil {
+		synthesized.WindowsOptions = &v1.WindowsSecurityContextOptions{}
+		*synthesized.WindowsOptions = *pod.Spec.SecurityContext.WindowsOptions
+	}
+
 	if pod.Spec.SecurityContext.RunAsUser != nil {
 		synthesized.RunAsUser = new(int64)
 		*synthesized.RunAsUser = *pod.Spec.SecurityContext.RunAsUser
@@ -166,4 +169,53 @@ func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
 
 	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
 	return !*sc.AllowPrivilegeEscalation
+}
+
+var (
+	// These *must* be kept in sync with moby/moby.
+	// https://github.com/moby/moby/blob/master/oci/defaults.go#L116-L134
+	// @jessfraz will watch changes to those files upstream.
+	defaultMaskedPaths = []string{
+		"/proc/acpi",
+		"/proc/kcore",
+		"/proc/keys",
+		"/proc/latency_stats",
+		"/proc/timer_list",
+		"/proc/timer_stats",
+		"/proc/sched_debug",
+		"/proc/scsi",
+		"/sys/firmware",
+	}
+	defaultReadonlyPaths = []string{
+		"/proc/asound",
+		"/proc/bus",
+		"/proc/fs",
+		"/proc/irq",
+		"/proc/sys",
+		"/proc/sysrq-trigger",
+	}
+)
+
+// ConvertToRuntimeMaskedPaths converts the ProcMountType to the specified or default
+// masked paths.
+func ConvertToRuntimeMaskedPaths(opt *v1.ProcMountType) []string {
+	if opt != nil && *opt == v1.UnmaskedProcMount {
+		// Unmasked proc mount should have no paths set as masked.
+		return []string{}
+	}
+
+	// Otherwise, add the default masked paths to the runtime security context.
+	return defaultMaskedPaths
+}
+
+// ConvertToRuntimeReadonlyPaths converts the ProcMountType to the specified or default
+// readonly paths.
+func ConvertToRuntimeReadonlyPaths(opt *v1.ProcMountType) []string {
+	if opt != nil && *opt == v1.UnmaskedProcMount {
+		// Unmasked proc mount should have no paths set as readonly.
+		return []string{}
+	}
+
+	// Otherwise, add the default readonly paths to the runtime security context.
+	return defaultReadonlyPaths
 }

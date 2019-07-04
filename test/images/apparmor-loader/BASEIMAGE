@@ -1,0 +1,4 @@
+amd64=alpine:3.8
+arm=arm32v6/alpine:3.8
+arm64=arm64v8/alpine:3.8
+ppc64le=ppc64le/alpine:3.8

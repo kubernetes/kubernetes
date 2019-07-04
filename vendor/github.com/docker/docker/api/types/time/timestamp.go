@@ -1,4 +1,4 @@
-package time
+package time // import "github.com/docker/docker/api/types/time"
 
 import (
 	"fmt"
@@ -29,10 +29,8 @@ func GetTimestamp(value string, reference time.Time) (string, error) {
 	}
 
 	var format string
-	var parseInLocation bool
-
 	// if the string has a Z or a + or three dashes use parse otherwise use parseinlocation
-	parseInLocation = !(strings.ContainsAny(value, "zZ+") || strings.Count(value, "-") == 3)
+	parseInLocation := !(strings.ContainsAny(value, "zZ+") || strings.Count(value, "-") == 3)
 
 	if strings.Contains(value, ".") {
 		if parseInLocation {
@@ -84,11 +82,14 @@ func GetTimestamp(value string, reference time.Time) (string, error) {
 	}
 
 	if err != nil {
-		// if there is a `-` then it's an RFC3339 like timestamp otherwise assume unixtimestamp
+		// if there is a `-` then it's an RFC3339 like timestamp
 		if strings.Contains(value, "-") {
 			return "", err // was probably an RFC3339 like timestamp but the parser failed with an error
 		}
-		return value, nil // unixtimestamp in and out case (meaning: the value passed at the command line is already in the right format for passing to the server)
+		if _, _, err := parseTimestamp(value); err != nil {
+			return "", fmt.Errorf("failed to parse value as time or duration: %q", value)
+		}
+		return value, nil // unix timestamp in and out case (meaning: the value passed at the command line is already in the right format for passing to the server)
 	}
 
 	return fmt.Sprintf("%d.%09d", t.Unix(), int64(t.Nanosecond())), nil
@@ -106,6 +107,10 @@ func ParseTimestamps(value string, def int64) (int64, int64, error) {
 	if value == "" {
 		return def, 0, nil
 	}
+	return parseTimestamp(value)
+}
+
+func parseTimestamp(value string) (int64, int64, error) {
 	sa := strings.SplitN(value, ".", 2)
 	s, err := strconv.ParseInt(sa[0], 10, 64)
 	if err != nil {

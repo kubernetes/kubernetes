@@ -19,7 +19,6 @@ package client
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -35,11 +34,19 @@ type LogClient struct {
 	jsonclient.JSONClient
 }
 
+// CheckLogClient is an interface that allows (just) checking of various log contents.
+type CheckLogClient interface {
+	BaseURI() string
+	GetSTH(context.Context) (*ct.SignedTreeHead, error)
+	GetSTHConsistency(ctx context.Context, first, second uint64) ([][]byte, error)
+	GetProofByHash(ctx context.Context, hash []byte, treeSize uint64) (*ct.GetProofByHashResponse, error)
+}
+
 // New constructs a new LogClient instance.
 // |uri| is the base URI of the CT log instance to interact with, e.g.
-// http://ct.googleapis.com/pilot
+// https://ct.googleapis.com/pilot
 // |hc| is the underlying client to be used for HTTP requests to the CT log.
-// |opts| can be used to provide a customer logger interface and a public key
+// |opts| can be used to provide a custom logger interface and a public key
 // for signature verification.
 func New(uri string, hc *http.Client, opts jsonclient.Options) (*LogClient, error) {
 	logClient, err := jsonclient.New(uri, hc, opts)
@@ -169,35 +176,16 @@ func (c *LogClient) GetSTH(ctx context.Context) (*ct.SignedTreeHead, error) {
 		}
 		return nil, err
 	}
-	sth := ct.SignedTreeHead{
-		TreeSize:  resp.TreeSize,
-		Timestamp: resp.Timestamp,
-	}
 
-	if len(resp.SHA256RootHash) != sha256.Size {
-		return nil, RspError{
-			Err:        fmt.Errorf("sha256_root_hash is invalid length, expected %d got %d", sha256.Size, len(resp.SHA256RootHash)),
-			StatusCode: httpRsp.StatusCode,
-			Body:       body,
-		}
-	}
-	copy(sth.SHA256RootHash[:], resp.SHA256RootHash)
-
-	var ds ct.DigitallySigned
-	if rest, err := tls.Unmarshal(resp.TreeHeadSignature, &ds); err != nil {
-		return nil, RspError{Err: err, StatusCode: httpRsp.StatusCode, Body: body}
-	} else if len(rest) > 0 {
-		return nil, RspError{
-			Err:        fmt.Errorf("trailing data (%d bytes) after DigitallySigned", len(rest)),
-			StatusCode: httpRsp.StatusCode,
-			Body:       body,
-		}
-	}
-	sth.TreeHeadSignature = ds
-	if err := c.VerifySTHSignature(sth); err != nil {
+	sth, err := resp.ToSignedTreeHead()
+	if err != nil {
 		return nil, RspError{Err: err, StatusCode: httpRsp.StatusCode, Body: body}
 	}
-	return &sth, nil
+
+	if err := c.VerifySTHSignature(*sth); err != nil {
+		return nil, RspError{Err: err, StatusCode: httpRsp.StatusCode, Body: body}
+	}
+	return sth, nil
 }
 
 // VerifySTHSignature checks the signature in sth, returning any error encountered or nil if verification is
@@ -280,4 +268,22 @@ func (c *LogClient) GetAcceptedRoots(ctx context.Context) ([]ct.ASN1Cert, error)
 		roots = append(roots, ct.ASN1Cert{Data: cert})
 	}
 	return roots, nil
+}
+
+// GetEntryAndProof returns a log entry and audit path for the index of a leaf.
+func (c *LogClient) GetEntryAndProof(ctx context.Context, index, treeSize uint64) (*ct.GetEntryAndProofResponse, error) {
+	base10 := 10
+	params := map[string]string{
+		"leaf_index": strconv.FormatUint(index, base10),
+		"tree_size":  strconv.FormatUint(treeSize, base10),
+	}
+	var resp ct.GetEntryAndProofResponse
+	httpRsp, body, err := c.GetAndParse(ctx, ct.GetEntryAndProofPath, params, &resp)
+	if err != nil {
+		if httpRsp != nil {
+			return nil, RspError{Err: err, StatusCode: httpRsp.StatusCode, Body: body}
+		}
+		return nil, err
+	}
+	return &resp, nil
 }

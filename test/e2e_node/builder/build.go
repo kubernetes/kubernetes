@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/test/utils"
 )
 
@@ -37,11 +37,12 @@ var buildTargets = []string{
 	"cluster/gce/gci/mounter",
 }
 
+// BuildGo builds k8s binaries.
 func BuildGo() error {
-	glog.Infof("Building k8s binaries...")
+	klog.Infof("Building k8s binaries...")
 	k8sRoot, err := utils.GetK8sRootDir()
 	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes root directory %v.", err)
+		return fmt.Errorf("failed to locate kubernetes root directory %v", err)
 	}
 	targets := strings.Join(buildTargets, " ")
 	cmd := exec.Command("make", "-C", k8sRoot, fmt.Sprintf("WHAT=%s", targets))
@@ -49,7 +50,7 @@ func BuildGo() error {
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to build go packages %v\n", err)
+		return fmt.Errorf("failed to build go packages %v", err)
 	}
 	return nil
 }
@@ -62,14 +63,14 @@ func getK8sBin(bin string) (string, error) {
 			return "", err
 		}
 		if _, err := os.Stat(filepath.Join(*k8sBinDir, bin)); err != nil {
-			return "", fmt.Errorf("Could not find %s under directory %s.", bin, absPath)
+			return "", fmt.Errorf("Could not find %s under directory %s", bin, absPath)
 		}
 		return filepath.Join(absPath, bin), nil
 	}
 
 	path, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
-		return "", fmt.Errorf("Could not find absolute path of directory containing the tests %s.", filepath.Dir(os.Args[0]))
+		return "", fmt.Errorf("Could not find absolute path of directory containing the tests %s", filepath.Dir(os.Args[0]))
 	}
 	if _, err := os.Stat(filepath.Join(path, bin)); err == nil {
 		return filepath.Join(path, bin), nil
@@ -87,10 +88,11 @@ func getK8sBin(bin string) (string, error) {
 	return "", fmt.Errorf("unable to locate %s, Can be defined using --k8s-path", bin)
 }
 
+// GetKubeletServerBin returns the path of kubelet binary.
 func GetKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
-		glog.Fatalf("Could not locate kubelet binary %v.", err)
+		klog.Fatalf("Could not locate kubelet binary %v.", err)
 	}
 	return bin
 }

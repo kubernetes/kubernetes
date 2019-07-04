@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"strings"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 const (
@@ -129,6 +129,8 @@ func GetVolumeFSType(v api.Volume) (policy.FSType, error) {
 		return policy.PortworxVolume, nil
 	case v.ScaleIO != nil:
 		return policy.ScaleIO, nil
+	case v.CSI != nil:
+		return policy.CSI, nil
 	}
 
 	return "", fmt.Errorf("unknown volume type for volume: %#v", v)
@@ -175,23 +177,27 @@ func GroupFallsInRange(id int64, rng policy.IDRange) bool {
 
 // AllowsHostVolumePath is a utility for checking if a PSP allows the host volume path.
 // This only checks the path. You should still check to make sure the host volume fs type is allowed.
-func AllowsHostVolumePath(psp *policy.PodSecurityPolicy, hostPath string) bool {
+func AllowsHostVolumePath(psp *policy.PodSecurityPolicy, hostPath string) (pathIsAllowed, mustBeReadOnly bool) {
 	if psp == nil {
-		return false
+		return false, false
 	}
 
 	// If no allowed paths are specified then allow any path
 	if len(psp.Spec.AllowedHostPaths) == 0 {
-		return true
+		return true, false
 	}
 
 	for _, allowedPath := range psp.Spec.AllowedHostPaths {
 		if hasPathPrefix(hostPath, allowedPath.PathPrefix) {
-			return true
+			if !allowedPath.ReadOnly {
+				return true, allowedPath.ReadOnly
+			}
+			pathIsAllowed = true
+			mustBeReadOnly = true
 		}
 	}
 
-	return false
+	return pathIsAllowed, mustBeReadOnly
 }
 
 // hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary

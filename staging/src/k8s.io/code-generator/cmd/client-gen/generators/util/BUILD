@@ -15,6 +15,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["tags.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/code-generator/cmd/client-gen/generators/util",
     importpath = "k8s.io/code-generator/cmd/client-gen/generators/util",
     deps = ["//vendor/k8s.io/gengo/types:go_default_library"],
 )

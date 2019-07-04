@@ -21,6 +21,7 @@ limitations under the License.
 package resourcequota
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -63,6 +64,13 @@ func (in *LimitedResource) DeepCopyInto(out *LimitedResource) {
 		in, out := &in.MatchContains, &out.MatchContains
 		*out = make([]string, len(*in))
 		copy(*out, *in)
+	}
+	if in.MatchScopes != nil {
+		in, out := &in.MatchScopes, &out.MatchScopes
+		*out = make([]v1.ScopedResourceSelectorRequirement, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	return
 }

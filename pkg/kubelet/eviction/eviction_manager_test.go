@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
@@ -180,7 +182,6 @@ type podToMake struct {
 
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.PodPriority): true})
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -231,14 +232,14 @@ func TestMemoryPressure(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
@@ -398,10 +399,8 @@ func parseQuantity(value string) resource.Quantity {
 }
 
 func TestDiskPressureNodeFs(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{
-		string(features.LocalStorageCapacityIsolation): true,
-		string(features.PodPriority):                   true,
-	})
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
@@ -452,14 +451,14 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("16Gi", "200Gi", podStats)}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
@@ -599,7 +598,6 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 // TestMinReclaim verifies that min-reclaim works as desired.
 func TestMinReclaim(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.PodPriority): true})
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -645,14 +643,14 @@ func TestMinReclaim(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
@@ -738,10 +736,8 @@ func TestMinReclaim(t *testing.T) {
 }
 
 func TestNodeReclaimFuncs(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{
-		string(features.PodPriority):                   true,
-		string(features.LocalStorageCapacityIsolation): true,
-	})
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LocalStorageCapacityIsolation, true)()
+
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
@@ -787,14 +783,14 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("16Gi", "200Gi", podStats)}
 	diskGC := &mockDiskGC{fakeSummaryProvider: summaryProvider, err: nil}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
@@ -917,7 +913,6 @@ func TestNodeReclaimFuncs(t *testing.T) {
 }
 
 func TestInodePressureNodeFsInodes(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.PodPriority): true})
 	podMaker := func(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
 		pod := newPod(name, priority, []v1.Container{
 			newContainer(name, requests, limits),
@@ -992,14 +987,14 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("3Mi", "4Mi", podStats)}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
@@ -1139,7 +1134,6 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 // TestCriticalPodsAreNotEvicted
 func TestCriticalPodsAreNotEvicted(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.PodPriority): true})
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -1163,6 +1157,11 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	podToEvict := pods[0]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
+	}
+	mirrorPodFunc := func(staticPod *v1.Pod) (*v1.Pod, bool) {
+		mirrorPod := staticPod.DeepCopy()
+		mirrorPod.Annotations[kubelettypes.ConfigSourceAnnotationKey] = kubelettypes.ApiserverSource
+		return mirrorPod, true
 	}
 
 	fakeClock := clock.NewFakeClock(time.Now())
@@ -1196,20 +1195,21 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		mirrorPodFunc:                mirrorPodFunc,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
 
 	// Enable critical pod annotation feature gate
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.ExperimentalCriticalPodAnnotation): true})
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, true)()
 	// induce soft threshold
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("1500Mi", podStats)
@@ -1254,7 +1254,7 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	}
 
 	// Disable critical pod annotation feature gate
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.ExperimentalCriticalPodAnnotation): false})
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExperimentalCriticalPodAnnotation, false)()
 
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
@@ -1274,7 +1274,6 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 // TestAllocatableMemoryPressure
 func TestAllocatableMemoryPressure(t *testing.T) {
-	utilfeature.DefaultFeatureGate.SetFromMap(map[string]bool{string(features.PodPriority): true})
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
@@ -1317,14 +1316,14 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("4Gi", podStats)}
 	manager := &managerImpl{
-		clock:           fakeClock,
-		killPodFunc:     podKiller.killPodNow,
-		imageGC:         diskGC,
-		containerGC:     diskGC,
-		config:          config,
-		recorder:        &record.FakeRecorder{},
-		summaryProvider: summaryProvider,
-		nodeRef:         nodeRef,
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
 	}
@@ -1433,4 +1432,75 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
+}
+
+func TestUpdateMemcgThreshold(t *testing.T) {
+	activePodsFunc := func() []*v1.Pod {
+		return []*v1.Pod{}
+	}
+
+	fakeClock := clock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	diskGC := &mockDiskGC{err: nil}
+	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []evictionapi.Threshold{
+			{
+				Signal:   evictionapi.SignalMemoryAvailable,
+				Operator: evictionapi.OpLessThan,
+				Value: evictionapi.ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
+			},
+		},
+		PodCgroupRoot: "kubepods",
+	}
+	summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", map[*v1.Pod]statsapi.PodStats{})}
+
+	thresholdNotifier := &MockThresholdNotifier{}
+	thresholdNotifier.On("UpdateThreshold", summaryProvider.result).Return(nil).Twice()
+
+	manager := &managerImpl{
+		clock:                        fakeClock,
+		killPodFunc:                  podKiller.killPodNow,
+		imageGC:                      diskGC,
+		containerGC:                  diskGC,
+		config:                       config,
+		recorder:                     &record.FakeRecorder{},
+		summaryProvider:              summaryProvider,
+		nodeRef:                      nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
+	}
+
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+	// The UpdateThreshold method should have been called once, since this is the first run.
+	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
+
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+	// The UpdateThreshold method should not have been called again, since not enough time has passed
+	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
+
+	fakeClock.Step(2 * notifierRefreshInterval)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+	// The UpdateThreshold method should be called again since enough time has passed
+	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 2)
+
+	// new memory threshold notifier that returns an error
+	thresholdNotifier = &MockThresholdNotifier{}
+	thresholdNotifier.On("UpdateThreshold", summaryProvider.result).Return(fmt.Errorf("error updating threshold"))
+	thresholdNotifier.On("Description").Return("mock thresholdNotifier").Once()
+	manager.thresholdNotifiers = []ThresholdNotifier{thresholdNotifier}
+
+	fakeClock.Step(2 * notifierRefreshInterval)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+	// The UpdateThreshold method should be called because at least notifierRefreshInterval time has passed.
+	// The Description method should be called because UpdateThreshold returned an error
+	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
+	thresholdNotifier.AssertNumberOfCalls(t, "Description", 1)
 }

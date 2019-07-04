@@ -22,7 +22,6 @@ syntax = 'proto2';
 package k8s.io.api.apps.v1beta1;
 
 import "k8s.io/api/core/v1/generated.proto";
-import "k8s.io/api/policy/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -144,6 +143,7 @@ message DeploymentSpec {
 
   // The deployment strategy to use to replace existing pods with new ones.
   // +optional
+  // +patchStrategy=retainKeys
   optional DeploymentStrategy strategy = 4;
 
   // Minimum number of seconds for which a newly created pod should be ready
@@ -263,7 +263,7 @@ message RollingUpdateDeployment {
   // the rolling update starts, such that the total number of old and new pods do not exceed
   // 130% of desired pods. Once old pods have been killed,
   // new ReplicaSet can be scaled up further, ensuring that total number of pods running
-  // at any time during the update is atmost 130% of desired pods.
+  // at any time during the update is at most 130% of desired pods.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }

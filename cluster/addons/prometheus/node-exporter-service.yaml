@@ -17,4 +17,4 @@ spec:
       protocol: TCP
       targetPort: 9100
   selector:
-    k8s-app: node-exporter 
+    k8s-app: node-exporter

@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
+	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/testapigroup"
@@ -532,9 +532,6 @@ func TestAccessorMethods(t *testing.T) {
 		{accessor: "DeletionGracePeriodSeconds", nilVal: reflect.ValueOf((*int64)(nil))},
 		{accessor: "Labels", val: map[string]string{"foo": "bar"}},
 		{accessor: "Annotations", val: map[string]string{"foo": "bar"}},
-		{accessor: "Initializers", val: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "foo"}}}},
-		{accessor: "Initializers", val: &metav1.Initializers{}},
-		{accessor: "Initializers", nilVal: reflect.ValueOf((*metav1.Initializers)(nil))},
 		{accessor: "Finalizers", val: []string{"foo"}},
 		{accessor: "OwnerReferences", val: []metav1.OwnerReference{{Name: "foo"}}},
 		{accessor: "ClusterName", val: "foo"},

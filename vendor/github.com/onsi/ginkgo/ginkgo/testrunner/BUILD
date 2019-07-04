@@ -3,10 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "build_args.go",
+        "build_args_old.go",
         "log_writer.go",
         "run_result.go",
         "test_runner.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/onsi/ginkgo/ginkgo/testrunner",
     importpath = "github.com/onsi/ginkgo/ginkgo/testrunner",
     visibility = ["//visibility:public"],
     deps = [
@@ -14,6 +17,7 @@ go_library(
         "//vendor/github.com/onsi/ginkgo/ginkgo/testsuite:go_default_library",
         "//vendor/github.com/onsi/ginkgo/internal/remote:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
     ],
 )

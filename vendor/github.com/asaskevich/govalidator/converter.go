@@ -3,6 +3,7 @@ package govalidator
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 )
 
@@ -30,20 +31,34 @@ func ToFloat(str string) (float64, error) {
 	return res, err
 }
 
-// ToInt convert the input string to an integer, or 0 if the input is not an integer.
-func ToInt(str string) (int64, error) {
-	res, err := strconv.ParseInt(str, 0, 64)
-	if err != nil {
+// ToInt convert the input string or any int type to an integer type 64, or 0 if the input is not an integer.
+func ToInt(value interface{}) (res int64, err error) {
+	val := reflect.ValueOf(value)
+
+	switch value.(type) {
+	case int, int8, int16, int32, int64:
+		res = val.Int()
+	case uint, uint8, uint16, uint32, uint64:
+		res = int64(val.Uint())
+	case string:
+		if IsInt(val.String()) {
+			res, err = strconv.ParseInt(val.String(), 0, 64)
+			if err != nil {
+				res = 0
+			}
+		} else {
+			err = fmt.Errorf("math: square root of negative number %g", value)
+			res = 0
+		}
+	default:
+		err = fmt.Errorf("math: square root of negative number %g", value)
 		res = 0
 	}
-	return res, err
+
+	return
 }
 
 // ToBoolean convert the input string to a boolean.
 func ToBoolean(str string) (bool, error) {
-	res, err := strconv.ParseBool(str)
-	if err != nil {
-		res = false
-	}
-	return res, err
+	return strconv.ParseBool(str)
 }

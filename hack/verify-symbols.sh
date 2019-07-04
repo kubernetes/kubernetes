@@ -18,26 +18,41 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-make -C "${KUBE_ROOT}" WHAT=cmd/hyperkube
+kube::util::ensure-temp-dir
+OUTPUT="${KUBE_TEMP}"/symbols-output
+cleanup() {
+	rm -rf "${OUTPUT}"
+}
+trap "cleanup" EXIT SIGINT
+mkdir -p "${OUTPUT}"
+
+GOLDFLAGS="-w" make -C "${KUBE_ROOT}" WHAT=cmd/hyperkube
 
 # Add other BADSYMBOLS here.
 BADSYMBOLS=(
   "httptest"
   "testify"
   "testing[.]"
+  "TestOnlySetFatalOnDecodeError"
+  "TrackStorageCleanup"
 )
 
 # b/c hyperkube binds everything simply check that for bad symbols
-SYMBOLS="$(nm ${KUBE_OUTPUT_HOSTBIN}/hyperkube)"
+go tool nm "${KUBE_OUTPUT_HOSTBIN}/hyperkube" > "${OUTPUT}/hyperkube-symbols"
+
+if ! grep -q "NewHyperKubeCommand" "${OUTPUT}/hyperkube-symbols"; then
+  echo "No symbols found in hyperkube binary."
+  exit 1
+fi
 
 RESULT=0
 for BADSYMBOL in "${BADSYMBOLS[@]}"; do
-  if FOUND=$(echo "$SYMBOLS" | grep "$BADSYMBOL"); then
+  if FOUND=$(grep "${BADSYMBOL}" < "${OUTPUT}/hyperkube-symbols"); then
     echo "Found bad symbol '${BADSYMBOL}':"
     echo "$FOUND"
     RESULT=1

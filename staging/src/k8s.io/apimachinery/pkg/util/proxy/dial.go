@@ -17,32 +17,34 @@ limitations under the License.
 package proxy
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
 	"net/url"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/third_party/forked/golang/netutil"
 )
 
-func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
+func DialURL(ctx context.Context, url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 	dialAddr := netutil.CanonicalAddr(url)
 
 	dialer, err := utilnet.DialerFor(transport)
 	if err != nil {
-		glog.V(5).Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
+		klog.V(5).Infof("Unable to unwrap transport %T to get dialer: %v", transport, err)
 	}
 
 	switch url.Scheme {
 	case "http":
 		if dialer != nil {
-			return dialer("tcp", dialAddr)
+			return dialer(ctx, "tcp", dialAddr)
 		}
-		return net.Dial("tcp", dialAddr)
+		var d net.Dialer
+		return d.DialContext(ctx, "tcp", dialAddr)
 	case "https":
 		// Get the tls config from the transport if we recognize it
 		var tlsConfig *tls.Config
@@ -50,19 +52,19 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 		var err error
 		tlsConfig, err = utilnet.TLSClientConfig(transport)
 		if err != nil {
-			glog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
+			klog.V(5).Infof("Unable to unwrap transport %T to get at TLS config: %v", transport, err)
 		}
 
 		if dialer != nil {
 			// We have a dialer; use it to open the connection, then
 			// create a tls client using the connection.
-			netConn, err := dialer("tcp", dialAddr)
+			netConn, err := dialer(ctx, "tcp", dialAddr)
 			if err != nil {
 				return nil, err
 			}
 			if tlsConfig == nil {
 				// tls.Client requires non-nil config
-				glog.Warningf("using custom dialer with no TLSClientConfig. Defaulting to InsecureSkipVerify")
+				klog.Warningf("using custom dialer with no TLSClientConfig. Defaulting to InsecureSkipVerify")
 				// tls.Handshake() requires ServerName or InsecureSkipVerify
 				tlsConfig = &tls.Config{
 					InsecureSkipVerify: true,
@@ -86,7 +88,7 @@ func DialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
 			}
 
 		} else {
-			// Dial
+			// Dial. This Dial method does not allow to pass a context unfortunately
 			tlsConn, err = tls.Dial("tcp", dialAddr, tlsConfig)
 			if err != nil {
 				return nil, err

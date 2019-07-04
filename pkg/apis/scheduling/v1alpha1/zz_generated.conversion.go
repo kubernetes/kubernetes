@@ -23,9 +23,11 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	v1 "k8s.io/api/core/v1"
 	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -35,13 +37,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_PriorityClass_To_scheduling_PriorityClass,
-		Convert_scheduling_PriorityClass_To_v1alpha1_PriorityClass,
-		Convert_v1alpha1_PriorityClassList_To_scheduling_PriorityClassList,
-		Convert_scheduling_PriorityClassList_To_v1alpha1_PriorityClassList,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.PriorityClass)(nil), (*scheduling.PriorityClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PriorityClass_To_scheduling_PriorityClass(a.(*v1alpha1.PriorityClass), b.(*scheduling.PriorityClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PriorityClass)(nil), (*v1alpha1.PriorityClass)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PriorityClass_To_v1alpha1_PriorityClass(a.(*scheduling.PriorityClass), b.(*v1alpha1.PriorityClass), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1alpha1.PriorityClassList)(nil), (*scheduling.PriorityClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_PriorityClassList_To_scheduling_PriorityClassList(a.(*v1alpha1.PriorityClassList), b.(*scheduling.PriorityClassList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*scheduling.PriorityClassList)(nil), (*v1alpha1.PriorityClassList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_scheduling_PriorityClassList_To_v1alpha1_PriorityClassList(a.(*scheduling.PriorityClassList), b.(*v1alpha1.PriorityClassList), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_PriorityClass_To_scheduling_PriorityClass(in *v1alpha1.PriorityClass, out *scheduling.PriorityClass, s conversion.Scope) error {
@@ -49,6 +66,7 @@ func autoConvert_v1alpha1_PriorityClass_To_scheduling_PriorityClass(in *v1alpha1
 	out.Value = in.Value
 	out.GlobalDefault = in.GlobalDefault
 	out.Description = in.Description
+	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 
@@ -62,6 +80,7 @@ func autoConvert_scheduling_PriorityClass_To_v1alpha1_PriorityClass(in *scheduli
 	out.Value = in.Value
 	out.GlobalDefault = in.GlobalDefault
 	out.Description = in.Description
+	out.PreemptionPolicy = (*v1.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	return nil
 }
 

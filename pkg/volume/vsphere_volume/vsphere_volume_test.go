@@ -19,15 +19,18 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
+	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/legacy-cloud-providers/vsphere"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -59,11 +62,7 @@ func TestCanSupport(t *testing.T) {
 type fakePDManager struct {
 }
 
-func getFakeDeviceName(host volume.VolumeHost, volPath string) string {
-	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "device", volPath)
-}
-
-func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error) {
+func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner, selectedZone []string) (volSpec *VolumeSpec, err error) {
 	volSpec = &VolumeSpec{
 		Path:              "[local] test-volume-name.vmdk",
 		Size:              100,
@@ -118,13 +117,13 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got a nil Mounter")
 	}
 
-	mntPath := path.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~vsphere-volume/vol1")
+	mntPath := filepath.Join(tmpDir, "pods/poduid/volumes/kubernetes.io~vsphere-volume/vol1")
 	path := mounter.GetPath()
 	if path != mntPath {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(nil); err != nil {
+	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -149,14 +148,14 @@ func TestPlugin(t *testing.T) {
 
 	// Test Provisioner
 	options := volume.VolumeOptions{
-		PVC: volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
+		PVC:                           volumetest.CreateTestPVC("100Mi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*vsphereVolumePlugin).newProvisionerInternal(options, &fakePDManager{})
 	if err != nil {
 		t.Errorf("newProvisionerInternal() failed: %v", err)
 	}
-	persistentSpec, err := provisioner.Provision()
+	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
 	}
@@ -186,5 +185,51 @@ func TestPlugin(t *testing.T) {
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)
+	}
+}
+
+func TestUnsupportedCloudProvider(t *testing.T) {
+	// Initial setup to test volume plugin
+	tmpDir, err := utiltesting.MkTmpdir("vsphereVolumeTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	testcases := []struct {
+		name          string
+		cloudProvider cloudprovider.Interface
+		success       bool
+	}{
+		{name: "nil cloudprovider", cloudProvider: nil},
+		{name: "vSphere", cloudProvider: &vsphere.VSphere{}, success: true},
+		{name: "fake cloudprovider", cloudProvider: &fake.Cloud{}},
+	}
+
+	for _, tc := range testcases {
+		t.Logf("test case: %v", tc.name)
+
+		plugMgr := volume.VolumePluginMgr{}
+		plugMgr.InitPlugins(ProbeVolumePlugins(), nil, /* prober */
+			volumetest.NewFakeVolumeHostWithCloudProvider(tmpDir, nil, nil, tc.cloudProvider))
+
+		plug, err := plugMgr.FindAttachablePluginByName("kubernetes.io/vsphere-volume")
+		if err != nil {
+			t.Errorf("Can't find the plugin by name")
+		}
+
+		_, err = plug.NewAttacher()
+		if !tc.success && err == nil {
+			t.Errorf("expected error when creating attacher due to incorrect cloud provider, but got none")
+		} else if tc.success && err != nil {
+			t.Errorf("expected no error when creating attacher, but got error: %v", err)
+		}
+
+		_, err = plug.NewDetacher()
+		if !tc.success && err == nil {
+			t.Errorf("expected error when creating detacher due to incorrect cloud provider, but got none")
+		} else if tc.success && err != nil {
+			t.Errorf("expected no error when creating detacher, but got error: %v", err)
+		}
 	}
 }

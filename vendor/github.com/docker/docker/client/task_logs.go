@@ -1,11 +1,10 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
+	"context"
 	"io"
 	"net/url"
 	"time"
-
-	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api/types"
 	timetypes "github.com/docker/docker/api/types/time"

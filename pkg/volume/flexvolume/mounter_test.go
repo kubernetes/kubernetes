@@ -23,9 +23,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/test/utils/harness"
 )
 
-func TestSetUpAt(t *testing.T) {
+func TestSetUpAt(tt *testing.T) {
+	t := harness.For(tt)
+	defer t.Close()
+
 	spec := fakeVolumeSpec()
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -39,21 +44,21 @@ func TestSetUpAt(t *testing.T) {
 	}
 	mounter := &mount.FakeMounter{}
 
-	plugin, rootDir := testPlugin()
+	plugin, rootDir := testPlugin(t)
 	plugin.unsupportedCommands = []string{"unsupportedCmd"}
 	plugin.runner = fakeRunner(
-		// first call without fsGroup
+		// first call without mounterArgs.FsGroup
 		assertDriverCall(t, successOutput(), mountCmd, rootDir+"/mount-dir",
-			specJson(plugin, spec, map[string]string{
+			specJSON(plugin, spec, map[string]string{
 				optionKeyPodName:            "my-pod",
 				optionKeyPodNamespace:       "my-ns",
 				optionKeyPodUID:             "my-uid",
 				optionKeyServiceAccountName: "my-sa",
 			})),
 
-		// second test has fsGroup
+		// second test has mounterArgs.FsGroup
 		assertDriverCall(t, notSupportedOutput(), mountCmd, rootDir+"/mount-dir",
-			specJson(plugin, spec, map[string]string{
+			specJSON(plugin, spec, map[string]string{
 				optionFSGroup:               "42",
 				optionKeyPodName:            "my-pod",
 				optionKeyPodNamespace:       "my-ns",
@@ -61,12 +66,14 @@ func TestSetUpAt(t *testing.T) {
 				optionKeyServiceAccountName: "my-sa",
 			})),
 		assertDriverCall(t, fakeVolumeNameOutput("sdx"), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
+			specJSON(plugin, spec, nil)),
 	)
 
 	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
-	m.SetUpAt(rootDir+"/mount-dir", nil)
+	var mounterArgs volume.MounterArgs
+	m.SetUpAt(rootDir+"/mount-dir", mounterArgs)
 
-	fsGroup := int64(42)
-	m.SetUpAt(rootDir+"/mount-dir", &fsGroup)
+	group := int64(42)
+	mounterArgs.FsGroup = &group
+	m.SetUpAt(rootDir+"/mount-dir", mounterArgs)
 }

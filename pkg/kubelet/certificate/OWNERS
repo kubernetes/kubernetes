@@ -1,7 +1,9 @@
-reviewers:
-- mikedanese
-- liggitt
-- awly
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
-- mikedanese
-- liggitt
+- sig-auth-certificates-approvers
+reviewers:
+- sig-auth-certificates-reviewers
+labels:
+- sig/auth
+

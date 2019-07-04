@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
+	"strings"
 
 	"github.com/google/uuid"
-
+	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/methods"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -176,6 +177,9 @@ func (f *Folder) CreateStoragePod(c *types.CreateStoragePod) soap.HasFault {
 
 		pod.Name = c.Name
 		pod.ChildType = []string{"Datastore"}
+		pod.Summary = new(types.StoragePodSummary)
+		pod.PodStorageDrsEntry = new(types.PodStorageDrsEntry)
+		pod.PodStorageDrsEntry.StorageDrsConfig.PodConfig.Enabled = true
 
 		f.putChild(pod)
 
@@ -190,7 +194,10 @@ func (f *Folder) CreateStoragePod(c *types.CreateStoragePod) soap.HasFault {
 }
 
 func (p *StoragePod) MoveIntoFolderTask(c *types.MoveIntoFolder_Task) soap.HasFault {
-	return (&Folder{Folder: p.Folder}).MoveIntoFolderTask(c)
+	f := &Folder{Folder: p.Folder}
+	res := f.MoveIntoFolderTask(c)
+	p.ChildEntity = append(p.ChildEntity, f.ChildEntity...)
+	return res
 }
 
 func (f *Folder) CreateDatacenter(ctx *Context, c *types.CreateDatacenter) soap.HasFault {
@@ -249,9 +256,26 @@ type createVM struct {
 	register bool
 }
 
+// hostsWithDatastore returns hosts that have access to the given datastore path
+func hostsWithDatastore(hosts []types.ManagedObjectReference, path string) []types.ManagedObjectReference {
+	attached := hosts[:0]
+	var p object.DatastorePath
+	p.FromString(path)
+
+	for _, host := range hosts {
+		h := Map.Get(host).(*HostSystem)
+		if Map.FindByName(p.Datastore, h.Datastore) != nil {
+			attached = append(attached, host)
+		}
+	}
+
+	return attached
+}
+
 func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 	vm, err := NewVirtualMachine(c.Folder.Self, &c.req.Config)
 	if err != nil {
+		c.Folder.removeChild(vm)
 		return nil, err
 	}
 
@@ -269,7 +293,7 @@ func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 			hosts = cr.Host
 		}
 
-		// Assuming for now that all hosts have access to the datastore
+		hosts = hostsWithDatastore(hosts, c.req.Config.Files.VmPathName)
 		host := hosts[rand.Intn(len(hosts))]
 		vm.Runtime.Host = &host
 	} else {
@@ -289,13 +313,13 @@ func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 
 	err = vm.create(&c.req.Config, c.register)
 	if err != nil {
+		c.Folder.removeChild(vm)
 		return nil, err
 	}
 
-	c.Folder.putChild(vm)
-
 	host := Map.Get(*vm.Runtime.Host).(*HostSystem)
 	Map.AppendReference(host, &host.Vm, vm.Self)
+	vm.EnvironmentBrowser = *hostParent(&host.HostSystem).EnvironmentBrowser
 
 	for i := range vm.Datastore {
 		ds := Map.Get(vm.Datastore[i]).(*Datastore)
@@ -331,6 +355,8 @@ func (c *createVM) Run(task *Task) (types.AnyType, types.BaseMethodFault) {
 			VmEvent: event,
 		},
 	)
+
+	vm.RefreshStorageInfo(c.ctx, nil)
 
 	return vm.Reference(), nil
 }
@@ -514,6 +540,17 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 			}
 		}
 
+		dvs.AddDVPortgroupTask(&types.AddDVPortgroup_Task{
+			Spec: []types.DVPortgroupConfigSpec{{
+				Name: dvs.Name + "-DVUplinks" + strings.TrimPrefix(dvs.Self.Value, "dvs"),
+				DefaultPortConfig: &types.VMwareDVSPortSetting{
+					Vlan: &types.VmwareDistributedVirtualSwitchTrunkVlanSpec{
+						VlanId: []types.NumericRange{{Start: 0, End: 4094}},
+					},
+				},
+			}},
+		})
+
 		return dvs.Reference(), nil
 	})
 
@@ -526,4 +563,46 @@ func (f *Folder) CreateDVSTask(req *types.CreateDVS_Task) soap.HasFault {
 
 func (f *Folder) RenameTask(r *types.Rename_Task) soap.HasFault {
 	return RenameTask(f, r)
+}
+
+func (f *Folder) DestroyTask(req *types.Destroy_Task) soap.HasFault {
+	type destroyer interface {
+		mo.Reference
+		DestroyTask(*types.Destroy_Task) soap.HasFault
+	}
+
+	task := CreateTask(f, "destroy", func(*Task) (types.AnyType, types.BaseMethodFault) {
+		// Attempt to destroy all children
+		for _, c := range f.ChildEntity {
+			obj, ok := Map.Get(c).(destroyer)
+			if !ok {
+				continue
+			}
+
+			var fault types.BaseMethodFault
+			Map.WithLock(obj, func() {
+				id := obj.DestroyTask(&types.Destroy_Task{
+					This: c,
+				}).(*methods.Destroy_TaskBody).Res.Returnval
+
+				t := Map.Get(id).(*Task)
+				if t.Info.Error != nil {
+					fault = t.Info.Error.Fault // For example, can't destroy a powered on VM
+				}
+			})
+			if fault != nil {
+				return nil, fault
+			}
+		}
+
+		// Remove the folder itself
+		Map.Get(*f.Parent).(*Folder).removeChild(f.Self)
+		return nil, nil
+	})
+
+	return &methods.Destroy_TaskBody{
+		Res: &types.Destroy_TaskResponse{
+			Returnval: task.Run(),
+		},
+	}
 }

@@ -311,7 +311,7 @@ func (f *fakeSio) Devs() (map[string]string, error) {
 	return f.devs, nil
 }
 
-func (f *fakeSio) GetVolumeRefs(volId sioVolumeID) (int, error) {
+func (f *fakeSio) GetVolumeRefs(volID sioVolumeID) (int, error) {
 	if f.volume == nil {
 		return 0, nil
 	}

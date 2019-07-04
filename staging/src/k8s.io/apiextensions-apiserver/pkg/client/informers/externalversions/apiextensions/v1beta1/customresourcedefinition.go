@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	apiextensions_v1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	clientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	internalinterfaces "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/internalinterfaces"
 	v1beta1 "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1beta1"
@@ -69,7 +69,7 @@ func NewFilteredCustomResourceDefinitionInformer(client clientset.Interface, res
 				return client.ApiextensionsV1beta1().CustomResourceDefinitions().Watch(options)
 			},
 		},
-		&apiextensions_v1beta1.CustomResourceDefinition{},
+		&apiextensionsv1beta1.CustomResourceDefinition{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *customResourceDefinitionInformer) defaultInformer(client clientset.Inte
 }
 
 func (f *customResourceDefinitionInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiextensions_v1beta1.CustomResourceDefinition{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiextensionsv1beta1.CustomResourceDefinition{}, f.defaultInformer)
 }
 
 func (f *customResourceDefinitionInformer) Lister() v1beta1.CustomResourceDefinitionLister {

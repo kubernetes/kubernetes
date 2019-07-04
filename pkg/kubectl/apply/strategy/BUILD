@@ -16,7 +16,7 @@ go_library(
 )
 
 go_test(
-    name = "go_default_xtest",
+    name = "go_default_test",
     srcs = [
         "merge_conflict_test.go",
         "merge_map_list_test.go",
@@ -31,21 +31,21 @@ go_test(
         "utils_test.go",
     ],
     data = [
-        ":swagger-spec",
-        "//api/openapi-spec:swagger-spec",
+        ":openapi-spec",
+        "//api/openapi-spec",
     ],
+    embed = [":go_default_library"],
     deps = [
-        ":go_default_library",
         "//pkg/kubectl/apply:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
@@ -64,7 +64,7 @@ filegroup(
 )
 
 filegroup(
-    name = "swagger-spec",
+    name = "openapi-spec",
     srcs = glob([
         "**/*.json",
     ]),

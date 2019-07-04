@@ -113,17 +113,19 @@ func (ba *BearerAuthorizer) WithAuthorization() PrepareDecorator {
 		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
 			r, err := p.Prepare(r)
 			if err == nil {
-				refresher, ok := ba.tokenProvider.(adal.Refresher)
-				if ok {
-					err := refresher.EnsureFresh()
-					if err != nil {
-						var resp *http.Response
-						if tokError, ok := err.(adal.TokenRefreshError); ok {
-							resp = tokError.Response()
-						}
-						return r, NewErrorWithError(err, "azure.BearerAuthorizer", "WithAuthorization", resp,
-							"Failed to refresh the Token for request to %s", r.URL)
+				// the ordering is important here, prefer RefresherWithContext if available
+				if refresher, ok := ba.tokenProvider.(adal.RefresherWithContext); ok {
+					err = refresher.EnsureFreshWithContext(r.Context())
+				} else if refresher, ok := ba.tokenProvider.(adal.Refresher); ok {
+					err = refresher.EnsureFresh()
+				}
+				if err != nil {
+					var resp *http.Response
+					if tokError, ok := err.(adal.TokenRefreshError); ok {
+						resp = tokError.Response()
 					}
+					return r, NewErrorWithError(err, "azure.BearerAuthorizer", "WithAuthorization", resp,
+						"Failed to refresh the Token for request to %s", r.URL)
 				}
 				return Prepare(r, WithHeader(headerAuthorization, fmt.Sprintf("Bearer %s", ba.tokenProvider.OAuthToken())))
 			}

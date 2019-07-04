@@ -9,6 +9,7 @@ go_library(
         "util.go",
         "yaml_docs.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/spf13/cobra/doc",
     importpath = "github.com/spf13/cobra/doc",
     visibility = ["//visibility:public"],
     deps = [

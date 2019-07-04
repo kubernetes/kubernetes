@@ -94,14 +94,10 @@ func (c *RESTClient) request(verb string) *restclient.Request {
 
 	ns := c.NegotiatedSerializer
 	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	internalVersion := schema.GroupVersion{
-		Group:   c.GroupVersion.Group,
-		Version: runtime.APIVersionInternal,
-	}
 	serializers := restclient.Serializers{
 		// TODO this was hardcoded before, but it doesn't look right
 		Encoder: ns.EncoderForVersion(info.Serializer, c.GroupVersion),
-		Decoder: ns.DecoderToVersion(info.Serializer, internalVersion),
+		Decoder: ns.DecoderToVersion(info.Serializer, c.GroupVersion),
 	}
 	if info.StreamSerializer != nil {
 		serializers.StreamingSerializer = info.StreamSerializer.Serializer

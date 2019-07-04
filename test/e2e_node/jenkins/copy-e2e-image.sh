@@ -37,8 +37,8 @@ TO_PROJECT=$3
 TO_IMAGE=$4
 
 echo "Copying image $FROM_IMAGE from project $FROM_PROJECT to project $TO_PROJECT as image $TO_IMAGE..."
-gcloud compute --project $TO_PROJECT disks create $TO_IMAGE --image=https://www.googleapis.com/compute/v1/projects/$FROM_PROJECT/global/images/$FROM_IMAGE
-gcloud compute --project $TO_PROJECT images create $TO_IMAGE \
-  --source-disk=$TO_IMAGE \
+gcloud compute --project "${TO_PROJECT}" disks create "${TO_IMAGE}" --image=https://www.googleapis.com/compute/v1/projects/"${FROM_PROJECT}/global/images/""${FROM_IMAGE}"
+gcloud compute --project "${TO_PROJECT}" images create "${TO_IMAGE}" \
+  --source-disk="${TO_IMAGE}" \
   --description="Cloned from projects/$2/global/images/$1 by $USER on $(date)"
-gcloud -q compute --project $TO_PROJECT disks delete $TO_IMAGE
+gcloud -q compute --project "${TO_PROJECT}" disks delete "${TO_IMAGE}"

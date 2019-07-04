@@ -15,6 +15,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["deep_equal.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apimachinery/third_party/forked/golang/reflect",
     importpath = "k8s.io/apimachinery/third_party/forked/golang/reflect",
 )
 

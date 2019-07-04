@@ -28,14 +28,10 @@ import (
 func (in *EmbeddedTest) DeepCopyInto(out *EmbeddedTest) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.Object == nil {
-		out.Object = nil
-	} else {
+	if in.Object != nil {
 		out.Object = in.Object.DeepCopyObject()
 	}
-	if in.EmptyObject == nil {
-		out.EmptyObject = nil
-	} else {
+	if in.EmptyObject != nil {
 		out.EmptyObject = in.EmptyObject.DeepCopyObject()
 	}
 	return
@@ -284,12 +280,8 @@ func (in *ExternalTestType1) DeepCopyInto(out *ExternalTestType1) {
 	}
 	if in.O != nil {
 		in, out := &in.O, &out.O
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(ExternalTestType2)
-			**out = **in
-		}
+		*out = new(ExternalTestType2)
+		**out = **in
 	}
 	if in.P != nil {
 		in, out := &in.P, &out.P
@@ -370,9 +362,7 @@ func (in *InternalComplex) DeepCopyObject() runtime.Object {
 func (in *InternalExtensionType) DeepCopyInto(out *InternalExtensionType) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.Extension == nil {
-		out.Extension = nil
-	} else {
+	if in.Extension != nil {
 		out.Extension = in.Extension.DeepCopyObject()
 	}
 	return
@@ -400,9 +390,7 @@ func (in *InternalExtensionType) DeepCopyObject() runtime.Object {
 func (in *InternalOptionalExtensionType) DeepCopyInto(out *InternalOptionalExtensionType) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	if in.Extension == nil {
-		out.Extension = nil
-	} else {
+	if in.Extension != nil {
 		out.Extension = in.Extension.DeepCopyObject()
 	}
 	return
@@ -459,9 +447,7 @@ func (in *ObjectTest) DeepCopyInto(out *ObjectTest) {
 		in, out := &in.Items, &out.Items
 		*out = make([]runtime.Object, len(*in))
 		for i := range *in {
-			if (*in)[i] == nil {
-				(*out)[i] = nil
-			} else {
+			if (*in)[i] != nil {
 				(*out)[i] = (*in)[i].DeepCopyObject()
 			}
 		}
@@ -539,12 +525,8 @@ func (in *TestType1) DeepCopyInto(out *TestType1) {
 	}
 	if in.O != nil {
 		in, out := &in.O, &out.O
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(TestType2)
-			**out = **in
-		}
+		*out = new(TestType2)
+		**out = **in
 	}
 	if in.P != nil {
 		in, out := &in.P, &out.P

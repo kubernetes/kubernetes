@@ -3,9 +3,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "volumes_create.go",
-        "volumes_list.go",
+        "volume_create.go",
+        "volume_list.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/docker/docker/api/types/volume",
     importpath = "github.com/docker/docker/api/types/volume",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/docker/docker/api/types:go_default_library"],

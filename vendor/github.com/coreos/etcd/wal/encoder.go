@@ -103,7 +103,7 @@ func encodeFrameSize(dataBytes int) (lenField uint64, padBytes int) {
 	if padBytes != 0 {
 		lenField |= uint64(0x80|padBytes) << 56
 	}
-	return
+	return lenField, padBytes
 }
 
 func (e *encoder) flush() error {

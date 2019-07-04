@@ -6,6 +6,7 @@ go_library(
         "errors.go",
         "member.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/etcd/etcdserver/api/v2http/httptypes",
     importpath = "github.com/coreos/etcd/etcdserver/api/v2http/httptypes",
     visibility = ["//visibility:public"],
     deps = [

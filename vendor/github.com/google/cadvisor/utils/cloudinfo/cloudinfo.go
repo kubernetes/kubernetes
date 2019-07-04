@@ -18,12 +18,36 @@ package cloudinfo
 
 import (
 	info "github.com/google/cadvisor/info/v1"
+	"k8s.io/klog"
 )
 
 type CloudInfo interface {
 	GetCloudProvider() info.CloudProvider
 	GetInstanceType() info.InstanceType
 	GetInstanceID() info.InstanceID
+}
+
+// CloudProvider is an abstraction for providing cloud-specific information.
+type CloudProvider interface {
+	// IsActiveProvider determines whether this is the cloud provider operating
+	// this instance.
+	IsActiveProvider() bool
+	// GetInstanceType gets the type of instance this process is running on.
+	// The behavior is undefined if this is not the active provider.
+	GetInstanceType() info.InstanceType
+	// GetInstanceType gets the ID of the instance this process is running on.
+	// The behavior is undefined if this is not the active provider.
+	GetInstanceID() info.InstanceID
+}
+
+var providers = map[info.CloudProvider]CloudProvider{}
+
+// RegisterCloudProvider registers the given cloud provider
+func RegisterCloudProvider(name info.CloudProvider, provider CloudProvider) {
+	if _, alreadyRegistered := providers[name]; alreadyRegistered {
+		klog.Warningf("Duplicate registration of CloudProvider %s", name)
+	}
+	providers[name] = provider
 }
 
 type realCloudInfo struct {
@@ -33,13 +57,21 @@ type realCloudInfo struct {
 }
 
 func NewRealCloudInfo() CloudInfo {
-	cloudProvider := detectCloudProvider()
-	instanceType := detectInstanceType(cloudProvider)
-	instanceID := detectInstanceID(cloudProvider)
+	for name, provider := range providers {
+		if provider.IsActiveProvider() {
+			return &realCloudInfo{
+				cloudProvider: name,
+				instanceType:  provider.GetInstanceType(),
+				instanceID:    provider.GetInstanceID(),
+			}
+		}
+	}
+
+	// No registered active provider.
 	return &realCloudInfo{
-		cloudProvider: cloudProvider,
-		instanceType:  instanceType,
-		instanceID:    instanceID,
+		cloudProvider: info.UnknownProvider,
+		instanceType:  info.UnknownInstance,
+		instanceID:    info.UnNamedInstance,
 	}
 }
 
@@ -53,51 +85,4 @@ func (self *realCloudInfo) GetInstanceType() info.InstanceType {
 
 func (self *realCloudInfo) GetInstanceID() info.InstanceID {
 	return self.instanceID
-}
-
-func detectCloudProvider() info.CloudProvider {
-	switch {
-	case onGCE():
-		return info.GCE
-	case onAWS():
-		return info.AWS
-	case onAzure():
-		return info.Azure
-	case onBaremetal():
-		return info.Baremetal
-	}
-	return info.UnknownProvider
-}
-
-func detectInstanceType(cloudProvider info.CloudProvider) info.InstanceType {
-	switch cloudProvider {
-	case info.GCE:
-		return getGceInstanceType()
-	case info.AWS:
-		return getAwsInstanceType()
-	case info.Azure:
-		return getAzureInstanceType()
-	case info.Baremetal:
-		return info.NoInstance
-	}
-	return info.UnknownInstance
-}
-
-func detectInstanceID(cloudProvider info.CloudProvider) info.InstanceID {
-	switch cloudProvider {
-	case info.GCE:
-		return getGceInstanceID()
-	case info.AWS:
-		return getAwsInstanceID()
-	case info.Azure:
-		return getAzureInstanceID()
-	case info.Baremetal:
-		return info.UnNamedInstance
-	}
-	return info.UnNamedInstance
-}
-
-// TODO: Implement method.
-func onBaremetal() bool {
-	return false
 }

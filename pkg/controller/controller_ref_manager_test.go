@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,7 +32,6 @@ var (
 	productionLabel         = map[string]string{"type": "production"}
 	testLabel               = map[string]string{"type": "testing"}
 	productionLabelSelector = labels.Set{"type": "production"}.AsSelector()
-	testLabelSelector       = labels.Set{"type": "testing"}.AsSelector()
 	controllerUID           = "123"
 )
 
@@ -52,7 +51,7 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 		},
 	}
 	if owner != nil {
-		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, v1beta1.SchemeGroupVersion.WithKind("Fake"))}
+		pod.OwnerReferences = []metav1.OwnerReference{*metav1.NewControllerRef(owner, apps.SchemeGroupVersion.WithKind("Fake"))}
 	}
 	return pod
 }
@@ -60,12 +59,10 @@ func newPod(podName string, label map[string]string, owner metav1.Object) *v1.Po
 func TestClaimPods(t *testing.T) {
 	controllerKind := schema.GroupVersionKind{}
 	type test struct {
-		name     string
-		manager  *PodControllerRefManager
-		pods     []*v1.Pod
-		filters  []func(*v1.Pod) bool
-		claimed  []*v1.Pod
-		released []*v1.Pod
+		name    string
+		manager *PodControllerRefManager
+		pods    []*v1.Pod
+		claimed []*v1.Pod
 	}
 	var tests = []test{
 		{

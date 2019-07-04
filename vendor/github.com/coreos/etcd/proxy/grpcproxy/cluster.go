@@ -15,17 +15,17 @@
 package grpcproxy
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/clientv3/naming"
+	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 
-	"golang.org/x/net/context"
 	"golang.org/x/time/rate"
-	"google.golang.org/grpc"
 	gnaming "google.golang.org/grpc/naming"
 )
 
@@ -89,7 +89,7 @@ func (cp *clusterProxy) monitor(wa gnaming.Watcher) {
 		ups, err := wa.Next()
 		if err != nil {
 			plog.Warningf("clusterProxy watcher error (%v)", err)
-			if grpc.ErrorDesc(err) == naming.ErrWatcherClosed.Error() {
+			if rpctypes.ErrorDesc(err) == naming.ErrWatcherClosed.Error() {
 				return
 			}
 		}

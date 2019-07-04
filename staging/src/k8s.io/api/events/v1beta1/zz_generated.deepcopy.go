@@ -33,22 +33,14 @@ func (in *Event) DeepCopyInto(out *Event) {
 	in.EventTime.DeepCopyInto(&out.EventTime)
 	if in.Series != nil {
 		in, out := &in.Series, &out.Series
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(EventSeries)
-			(*in).DeepCopyInto(*out)
-		}
+		*out = new(EventSeries)
+		(*in).DeepCopyInto(*out)
 	}
 	out.Regarding = in.Regarding
 	if in.Related != nil {
 		in, out := &in.Related, &out.Related
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(v1.ObjectReference)
-			**out = **in
-		}
+		*out = new(v1.ObjectReference)
+		**out = **in
 	}
 	out.DeprecatedSource = in.DeprecatedSource
 	in.DeprecatedFirstTimestamp.DeepCopyInto(&out.DeprecatedFirstTimestamp)
@@ -78,7 +70,7 @@ func (in *Event) DeepCopyObject() runtime.Object {
 func (in *EventList) DeepCopyInto(out *EventList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Event, len(*in))

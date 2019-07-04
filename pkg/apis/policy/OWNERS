@@ -1,8 +1,10 @@
-approvers:
-- sig-apps-api-approvers
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# approval on api packages bubbles to api-approvers
 reviewers:
-- sig-apps-reviewers
-- pweil-
-- liggitt
-- tallclair
-- php-coder
+- sig-apps-api-approvers
+- sig-auth-policy-approvers
+- sig-auth-policy-reviewers
+labels:
+- sig/auth
+

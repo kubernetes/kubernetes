@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -79,7 +79,7 @@ func NewCRDFinalizer(
 		crdLister:      crdInformer.Lister(),
 		crdSynced:      crdInformer.Informer().HasSynced,
 		crClientGetter: crClientGetter,
-		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "CustomResourceDefinition-CRDFinalizer"),
+		queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "crd_finalizer"),
 	}
 
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -116,6 +116,10 @@ func (c *CRDFinalizer) sync(key string) error {
 		Message: "CustomResource deletion is in progress",
 	})
 	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -143,12 +147,21 @@ func (c *CRDFinalizer) sync(key string) error {
 
 	apiextensions.CRDRemoveFinalizer(crd, apiextensions.CustomResourceCleanupFinalizer)
 	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
+		// deleted or changed in the meantime, we'll get called again
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 
 	// and now issue another delete, which should clean it all up if no finalizers remain or no-op if they do
-	return c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
+	// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
+	err = c.crdClient.CustomResourceDefinitions().Delete(crd.Name, nil)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefinition) (apiextensions.CustomResourceDefinitionCondition, error) {
@@ -191,7 +204,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		// don't retry deleting the same namespace
 		deletedNamespaces.Insert(metadata.GetNamespace())
 		nsCtx := genericapirequest.WithNamespace(ctx, metadata.GetNamespace())
-		if _, err := crClient.DeleteCollection(nsCtx, nil, nil); err != nil {
+		if _, err := crClient.DeleteCollection(nsCtx, rest.ValidateAllObjectFunc, nil, nil); err != nil {
 			deleteErrors = append(deleteErrors, err)
 			continue
 		}
@@ -216,7 +229,7 @@ func (c *CRDFinalizer) deleteInstances(crd *apiextensions.CustomResourceDefiniti
 		if len(listObj.(*unstructured.UnstructuredList).Items) == 0 {
 			return true, nil
 		}
-		glog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
+		klog.V(2).Infof("%s.%s waiting for %d items to be removed", crd.Status.AcceptedNames.Plural, crd.Spec.Group, len(listObj.(*unstructured.UnstructuredList).Items))
 		return false, nil
 	})
 	if err != nil {
@@ -239,8 +252,8 @@ func (c *CRDFinalizer) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	glog.Infof("Starting CRDFinalizer")
-	defer glog.Infof("Shutting down CRDFinalizer")
+	klog.Infof("Starting CRDFinalizer")
+	defer klog.Infof("Shutting down CRDFinalizer")
 
 	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
 		return

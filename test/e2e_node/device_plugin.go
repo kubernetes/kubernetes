@@ -17,8 +17,6 @@ limitations under the License.
 package e2e_node
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -26,13 +24,17 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/uuid"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	dputil "k8s.io/kubernetes/test/e2e/framework/deviceplugin"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
-	dm "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	resapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,35 +42,51 @@ import (
 
 const (
 	// fake resource name
-	resourceName = "fake.com/resource"
+	resourceName            = "example.com/resource"
+	envVarNamePluginSockDir = "PLUGIN_SOCK_DIR"
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", func() {
+var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
+	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
+})
 
+func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
+	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	Context("DevicePlugin", func() {
-		It("Verifies the Kubelet device plugin functionality.", func() {
-			By("Start stub device plugin")
-			// fake devices for e2e test
-			devs := []*pluginapi.Device{
-				{ID: "Dev-1", Health: pluginapi.Healthy},
-				{ID: "Dev-2", Health: pluginapi.Healthy},
+		By("Enabling support for Kubelet Plugins Watcher")
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
 			}
-
-			socketPath := pluginapi.DevicePluginPath + "dp." + fmt.Sprintf("%d", time.Now().Unix())
-
-			dp1 := dm.NewDevicePluginStub(devs, socketPath)
-			dp1.SetAllocFunc(stubAllocFunc)
-			err := dp1.Start()
+			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
+		})
+		It("Verifies the Kubelet device plugin functionality.", func() {
+			By("Wait for node is ready to start with")
+			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+			dp := dputil.GetSampleDevicePluginPod()
+			for i := range dp.Spec.Containers[0].Env {
+				if dp.Spec.Containers[0].Env[i].Name == envVarNamePluginSockDir {
+					dp.Spec.Containers[0].Env[i].Value = pluginSockDir
+				}
+			}
+			e2elog.Logf("env %v", dp.Spec.Containers[0].Env)
+			dp.Spec.NodeName = framework.TestContext.NodeName
+			By("Create sample device plugin pod")
+			devicePluginPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)
 			framework.ExpectNoError(err)
 
-			By("Register resources")
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
-			framework.ExpectNoError(err)
+			By("Waiting for devices to become available on the local node")
+			Eventually(func() bool {
+				return dputil.NumberOfSampleResources(getLocalNode(f)) > 0
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
+			e2elog.Logf("Successfully created device plugin pod")
 
-			By("Waiting for the resource exported by the stub device plugin to become available on the local node")
-			devsLen := int64(len(devs))
+			By("Waiting for the resource exported by the sample device plugin to become available on the local node")
+			// TODO(vikasc): Instead of hard-coding number of devices, provide number of devices in the sample-device-plugin using configmap
+			// and then use the same here
+			devsLen := int64(2)
 			Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
@@ -83,6 +101,26 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 			devId1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devId1).To(Not(Equal("")))
 
+			podResources, err := getNodeDevices()
+			var resourcesForOurPod *resapi.PodResources
+			e2elog.Logf("pod resources %v", podResources)
+			Expect(err).To(BeNil())
+			Expect(len(podResources.PodResources)).To(Equal(2))
+			for _, res := range podResources.GetPodResources() {
+				if res.Name == pod1.Name {
+					resourcesForOurPod = res
+				}
+			}
+			e2elog.Logf("resourcesForOurPod %v", resourcesForOurPod)
+			Expect(resourcesForOurPod).NotTo(BeNil())
+			Expect(resourcesForOurPod.Name).To(Equal(pod1.Name))
+			Expect(resourcesForOurPod.Namespace).To(Equal(pod1.Namespace))
+			Expect(len(resourcesForOurPod.Containers)).To(Equal(1))
+			Expect(resourcesForOurPod.Containers[0].Name).To(Equal(pod1.Spec.Containers[0].Name))
+			Expect(len(resourcesForOurPod.Containers[0].Devices)).To(Equal(1))
+			Expect(resourcesForOurPod.Containers[0].Devices[0].ResourceName).To(Equal(resourceName))
+			Expect(len(resourcesForOurPod.Containers[0].Devices[0].DeviceIds)).To(Equal(1))
+
 			pod1, err = f.PodClient().Get(pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
@@ -92,25 +130,44 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 			devIdAfterRestart := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devIdAfterRestart).To(Equal(devId1))
 
+			restartTime := time.Now()
 			By("Restarting Kubelet")
 			restartKubelet()
+
+			// We need to wait for node to be ready before re-registering stub device plugin.
+			// Otherwise, Kubelet DeviceManager may remove the re-registered sockets after it starts.
+			By("Wait for node is ready")
+			Eventually(func() bool {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				for _, cond := range node.Status.Conditions {
+					if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue && cond.LastHeartbeatTime.After(restartTime) {
+						return true
+					}
+				}
+				return false
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
+
+			By("Re-Register resources and deleting the pods and waiting for container removal")
+			getOptions := metav1.GetOptions{}
+			gp := int64(0)
+			deleteOptions := metav1.DeleteOptions{
+				GracePeriodSeconds: &gp,
+			}
+			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(dp.Name, &deleteOptions)
+			framework.ExpectNoError(err)
+			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+			_, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Get(dp.Name, getOptions)
+			e2elog.Logf("Trying to get dp pod after deletion. err must be non-nil. err: %v", err)
+			framework.ExpectError(err)
+
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)
+			framework.ExpectNoError(err)
 
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
 			By("Confirming that after a kubelet restart, fake-device assignement is kept")
 			devIdRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
-
-			By("Wait for node is ready")
-			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
-
-			By("Re-Register resources after kubelet restart")
-			dp1 = dm.NewDevicePluginStub(devs, socketPath)
-			dp1.SetAllocFunc(stubAllocFunc)
-			err = dp1.Start()
-			framework.ExpectNoError(err)
-
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
-			framework.ExpectNoError(err)
 
 			By("Waiting for resource to become available on the local node after re-registration")
 			Eventually(func() bool {
@@ -128,9 +185,10 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 
 			Expect(devId1).To(Not(Equal(devId2)))
 
-			By("Deleting device plugin.")
-			err = dp1.Stop()
+			By("By deleting the pods and waiting for container removal")
+			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(dp.Name, &deleteOptions)
 			framework.ExpectNoError(err)
+			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
 			By("Waiting for stub device plugin to become unhealthy on the local node")
 			Eventually(func() int64 {
@@ -149,12 +207,7 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 			Expect(devIdRestart2).To(Equal(devId2))
 
 			By("Re-register resources")
-			dp1 = dm.NewDevicePluginStub(devs, socketPath)
-			dp1.SetAllocFunc(stubAllocFunc)
-			err = dp1.Start()
-			framework.ExpectNoError(err)
-
-			err = dp1.Register(pluginapi.KubeletSocket, resourceName, false)
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)
 			framework.ExpectNoError(err)
 
 			By("Waiting for the resource exported by the stub device plugin to become healthy on the local node")
@@ -164,9 +217,10 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 				return numberOfDevicesAllocatable(node, resourceName)
 			}, 30*time.Second, framework.Poll).Should(Equal(devsLen))
 
-			By("Deleting device plugin again.")
-			err = dp1.Stop()
+			By("by deleting the pods and waiting for container removal")
+			err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(dp.Name, &deleteOptions)
 			framework.ExpectNoError(err)
+			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 
 			By("Waiting for stub device plugin to become unavailable on the local node")
 			Eventually(func() bool {
@@ -175,24 +229,12 @@ var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePlugin] [Serial]", 
 				return numberOfDevicesCapacity(node, resourceName) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 
-			By("Restarting Kubelet second time.")
-			restartKubelet()
-
-			By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet Eventually.")
-			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
-			devIdRestart1 = parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
-			Expect(devIdRestart1).To(Equal(devId1))
-
-			ensurePodContainerRestart(f, pod2.Name, pod2.Name)
-			devIdRestart2 = parseLog(f, pod2.Name, pod2.Name, deviceIDRE)
-			Expect(devIdRestart2).To(Equal(devId2))
-
 			// Cleanup
 			f.PodClient().DeleteSync(pod1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(pod2.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 		})
 	})
-})
+}
 
 // makeBusyboxPod returns a simple Pod spec with a busybox container
 // that requests resourceName and runs the specified command.
@@ -224,7 +266,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 	var currentCount int32
 	p, err := f.PodClient().Get(podName, metav1.GetOptions{})
 	if err != nil || len(p.Status.ContainerStatuses) < 1 {
-		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
+		e2elog.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
 	}
 	initialCount = p.Status.ContainerStatuses[0].RestartCount
 	Eventually(func() bool {
@@ -233,19 +275,19 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 			return false
 		}
 		currentCount = p.Status.ContainerStatuses[0].RestartCount
-		framework.Logf("initial %v, current %v", initialCount, currentCount)
+		e2elog.Logf("initial %v, current %v", initialCount, currentCount)
 		return currentCount > initialCount
-	}, 2*time.Minute, framework.Poll).Should(BeTrue())
+	}, 5*time.Minute, framework.Poll).Should(BeTrue())
 }
 
 // parseLog returns the matching string for the specified regular expression parsed from the container logs.
 func parseLog(f *framework.Framework, podName string, contName string, re string) string {
-	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
+	logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
 	if err != nil {
-		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+		e2elog.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}
 
-	framework.Logf("got pod logs: %v", logs)
+	e2elog.Logf("got pod logs: %v", logs)
 	regex := regexp.MustCompile(re)
 	matches := regex.FindStringSubmatch(logs)
 	if len(matches) < 2 {
@@ -273,42 +315,4 @@ func numberOfDevicesAllocatable(node *v1.Node, resourceName string) int64 {
 	}
 
 	return val.Value()
-}
-
-// stubAllocFunc will pass to stub device plugin
-func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
-	var responses pluginapi.AllocateResponse
-	for _, req := range r.ContainerRequests {
-		response := &pluginapi.ContainerAllocateResponse{}
-		for _, requestID := range req.DevicesIDs {
-			dev, ok := devs[requestID]
-			if !ok {
-				return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
-			}
-
-			if dev.Health != pluginapi.Healthy {
-				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", requestID)
-			}
-
-			// create fake device file
-			fpath := filepath.Join("/tmp", dev.ID)
-
-			// clean first
-			os.RemoveAll(fpath)
-			f, err := os.Create(fpath)
-			if err != nil && !os.IsExist(err) {
-				return nil, fmt.Errorf("failed to create fake device file: %s", err)
-			}
-
-			f.Close()
-
-			response.Mounts = append(response.Mounts, &pluginapi.Mount{
-				ContainerPath: fpath,
-				HostPath:      fpath,
-			})
-		}
-		responses.ContainerResponses = append(responses.ContainerResponses, response)
-	}
-
-	return &responses, nil
 }

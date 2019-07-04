@@ -85,63 +85,6 @@ func TestIsStandardContainerResource(t *testing.T) {
 	}
 }
 
-func TestAddToNodeAddresses(t *testing.T) {
-	testCases := []struct {
-		existing []core.NodeAddress
-		toAdd    []core.NodeAddress
-		expected []core.NodeAddress
-	}{
-		{
-			existing: []core.NodeAddress{},
-			toAdd:    []core.NodeAddress{},
-			expected: []core.NodeAddress{},
-		},
-		{
-			existing: []core.NodeAddress{},
-			toAdd: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-			expected: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-		},
-		{
-			existing: []core.NodeAddress{},
-			toAdd: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-			},
-			expected: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-			},
-		},
-		{
-			existing: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeInternalIP, Address: "10.1.1.1"},
-			},
-			toAdd: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-			expected: []core.NodeAddress{
-				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: core.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: core.NodeHostName, Address: "localhost"},
-			},
-		},
-	}
-
-	for i, tc := range testCases {
-		AddToNodeAddresses(&tc.existing, tc.toAdd...)
-		if !Semantic.DeepEqual(tc.expected, tc.existing) {
-			t.Errorf("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
-		}
-	}
-}
-
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
 	if !containsAccessMode(modes, core.ReadOnlyMany) {
@@ -235,53 +178,6 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 		}
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
-		}
-	}
-}
-
-func TestSysctlsFromPodAnnotation(t *testing.T) {
-	type Test struct {
-		annotation  string
-		expectValue []core.Sysctl
-		expectErr   bool
-	}
-	for i, test := range []Test{
-		{
-			annotation:  "",
-			expectValue: nil,
-		},
-		{
-			annotation: "foo.bar",
-			expectErr:  true,
-		},
-		{
-			annotation: "=123",
-			expectErr:  true,
-		},
-		{
-			annotation:  "foo.bar=",
-			expectValue: []core.Sysctl{{Name: "foo.bar", Value: ""}},
-		},
-		{
-			annotation:  "foo.bar=42",
-			expectValue: []core.Sysctl{{Name: "foo.bar", Value: "42"}},
-		},
-		{
-			annotation: "foo.bar=42,",
-			expectErr:  true,
-		},
-		{
-			annotation:  "foo.bar=42,abc.def=1",
-			expectValue: []core.Sysctl{{Name: "foo.bar", Value: "42"}, {Name: "abc.def", Value: "1"}},
-		},
-	} {
-		sysctls, err := SysctlsFromPodAnnotation(test.annotation)
-		if test.expectErr && err == nil {
-			t.Errorf("[%v]expected error but got none", i)
-		} else if !test.expectErr && err != nil {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		} else if !reflect.DeepEqual(sysctls, test.expectValue) {
-			t.Errorf("[%v]expect value %v but got %v", i, test.expectValue, sysctls)
 		}
 	}
 }

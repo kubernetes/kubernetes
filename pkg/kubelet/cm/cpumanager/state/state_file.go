@@ -19,8 +19,8 @@ package state
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/golang/glog"
 	"io/ioutil"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"os"
 	"sync"
@@ -79,7 +79,7 @@ func (sf *stateFile) tryRestoreState() error {
 	// If the state file does not exist or has zero length, write a new file.
 	if os.IsNotExist(err) || len(content) == 0 {
 		sf.storeState()
-		glog.Infof("[cpumanager] state file: created new state file \"%s\"", sf.stateFilePath)
+		klog.Infof("[cpumanager] state file: created new state file \"%s\"", sf.stateFilePath)
 		return nil
 	}
 
@@ -92,7 +92,7 @@ func (sf *stateFile) tryRestoreState() error {
 	var readState stateFileData
 
 	if err = json.Unmarshal(content, &readState); err != nil {
-		glog.Errorf("[cpumanager] state file: could not unmarshal, corrupted state file - \"%s\"", sf.stateFilePath)
+		klog.Errorf("[cpumanager] state file: could not unmarshal, corrupted state file - \"%s\"", sf.stateFilePath)
 		return err
 	}
 
@@ -101,13 +101,13 @@ func (sf *stateFile) tryRestoreState() error {
 	}
 
 	if tmpDefaultCPUSet, err = cpuset.Parse(readState.DefaultCPUSet); err != nil {
-		glog.Errorf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readState.DefaultCPUSet)
+		klog.Errorf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readState.DefaultCPUSet)
 		return err
 	}
 
 	for containerID, cpuString := range readState.Entries {
 		if tmpContainerCPUSet, err = cpuset.Parse(cpuString); err != nil {
-			glog.Errorf("[cpumanager] state file: could not parse state file - container id: %s, cpuset: \"%s\"", containerID, cpuString)
+			klog.Errorf("[cpumanager] state file: could not parse state file - container id: %s, cpuset: \"%s\"", containerID, cpuString)
 			return err
 		}
 		tmpAssignments[containerID] = tmpContainerCPUSet
@@ -116,8 +116,8 @@ func (sf *stateFile) tryRestoreState() error {
 	sf.cache.SetDefaultCPUSet(tmpDefaultCPUSet)
 	sf.cache.SetCPUAssignments(tmpAssignments)
 
-	glog.V(2).Infof("[cpumanager] state file: restored state from state file \"%s\"", sf.stateFilePath)
-	glog.V(2).Infof("[cpumanager] state file: defaultCPUSet: %s", tmpDefaultCPUSet.String())
+	klog.V(2).Infof("[cpumanager] state file: restored state from state file \"%s\"", sf.stateFilePath)
+	klog.V(2).Infof("[cpumanager] state file: defaultCPUSet: %s", tmpDefaultCPUSet.String())
 
 	return nil
 }

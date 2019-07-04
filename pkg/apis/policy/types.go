@@ -22,13 +22,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-const (
-	// SysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
-	// allowed safe and unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
-	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
-	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
-)
-
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" pods selected by
@@ -70,6 +63,7 @@ type PodDisruptionBudgetStatus struct {
 	// the list automatically by PodDisruptionBudget controller after some time.
 	// If everything goes smooth this map should be empty for the most of the time.
 	// Large number of entries in the map may indicate problems with pod deletions.
+	// +optional
 	DisruptedPods map[string]metav1.Time
 
 	// Number of pod disruptions that are currently allowed.
@@ -85,7 +79,6 @@ type PodDisruptionBudgetStatus struct {
 	ExpectedPods int32
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
@@ -112,8 +105,6 @@ type PodDisruptionBudgetList struct {
 	Items []PodDisruptionBudget
 }
 
-// +genclient
-// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
@@ -131,8 +122,6 @@ type Eviction struct {
 	DeleteOptions *metav1.DeleteOptions
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
@@ -188,6 +177,10 @@ type PodSecurityPolicySpec struct {
 	SELinux SELinuxStrategyOptions
 	// RunAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
 	RunAsUser RunAsUserStrategyOptions
+	// RunAsGroup is the strategy that will dictate the allowable RunAsGroup values that may be set.
+	// If this field is omitted, the pod's RunAsGroup can take any value. This field requires the
+	// RunAsGroup feature gate to be enabled.
+	RunAsGroup *RunAsGroupStrategyOptions
 	// SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
 	SupplementalGroups SupplementalGroupsStrategyOptions
 	// FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
@@ -215,6 +208,39 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "Volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume
+	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
+	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
+	// This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.
+	// +optional
+	AllowedCSIDrivers []AllowedCSIDriver
+	// AllowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
+	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
+	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
+	// Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
+	//
+	// Examples:
+	// e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
+	// e.g. "foo.*" allows "foo.bar", "foo.baz", etc.
+	// +optional
+	AllowedUnsafeSysctls []string
+	// ForbiddenSysctls is a list of explicitly forbidden sysctls, defaults to none.
+	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
+	// as a prefix of forbidden sysctls. Single * means all sysctls are forbidden.
+	//
+	// Examples:
+	// e.g. "foo/*" forbids "foo/bar", "foo/baz", etc.
+	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
+	// +optional
+	ForbiddenSysctls []string
+	// AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+	// Empty or nil indicates that only the DefaultProcMountType may be used.
+	// +optional
+	AllowedProcMountTypes []api.ProcMountType
+	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
+	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
+	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
+	// +optional
+	RuntimeClass *RuntimeClassStrategyOptions
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -228,6 +254,9 @@ type AllowedHostPath struct {
 	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
 	// `/foo` would not allow `/food` or `/etc/foo`
 	PathPrefix string
+
+	// when set to true, will allow host volumes matching the pathPrefix only if all volume mounts are readOnly.
+	ReadOnly bool
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
@@ -284,6 +313,12 @@ type AllowedFlexVolume struct {
 	Driver string
 }
 
+// AllowedCSIDriver represents a single inline CSI Driver that is allowed to be used.
+type AllowedCSIDriver struct {
+	// Name is the registered name of the CSI driver
+	Name string
+}
+
 // SELinuxStrategyOptions defines the strategy type and any options used to create the strategy.
 type SELinuxStrategyOptions struct {
 	// Rule is the strategy that will dictate the allowable labels that may be set.
@@ -315,6 +350,16 @@ type RunAsUserStrategyOptions struct {
 	Ranges []IDRange
 }
 
+// RunAsGroupStrategyOptions defines the strategy type and any options used to create the strategy.
+type RunAsGroupStrategyOptions struct {
+	// Rule is the strategy that will dictate the allowable RunAsGroup values that may be set.
+	Rule RunAsGroupStrategy
+	// Ranges are the allowed ranges of gids that may be used. If you would like to force a single gid
+	// then supply a single range with the same start and end. Required for MustRunAs.
+	// +optional
+	Ranges []IDRange
+}
+
 // IDRange provides a min/max of an allowed range of IDs.
 type IDRange struct {
 	// Min is the start of the range, inclusive.
@@ -336,6 +381,20 @@ const (
 	RunAsUserStrategyRunAsAny RunAsUserStrategy = "RunAsAny"
 )
 
+// RunAsGroupStrategy denotes strategy types for generating RunAsGroup values for a
+// SecurityContext.
+type RunAsGroupStrategy string
+
+const (
+	// RunAsGroupStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when RunAsGroup are specified, they have to fall in the defined range.
+	RunAsGroupStrategyMayRunAs RunAsGroupStrategy = "MayRunAs"
+	// RunAsGroupStrategyMustRunAs means that container must run as a particular gid.
+	RunAsGroupStrategyMustRunAs RunAsGroupStrategy = "MustRunAs"
+	// RunAsGroupStrategyRunAsAny means that container may make requests for any gid.
+	RunAsGroupStrategyRunAsAny RunAsGroupStrategy = "RunAsAny"
+)
+
 // FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
 type FSGroupStrategyOptions struct {
 	// Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
@@ -352,6 +411,9 @@ type FSGroupStrategyOptions struct {
 type FSGroupStrategyType string
 
 const (
+	// FSGroupStrategyMayRunAs means that container does not need to have FSGroup of X applied.
+	// However, when FSGroups are specified, they have to fall in the defined range.
+	FSGroupStrategyMayRunAs FSGroupStrategyType = "MayRunAs"
 	// FSGroupStrategyMustRunAs means that container must have FSGroup of X applied.
 	FSGroupStrategyMustRunAs FSGroupStrategyType = "MustRunAs"
 	// FSGroupStrategyRunAsAny means that container may make requests for any FSGroup labels.
@@ -374,11 +436,33 @@ type SupplementalGroupsStrategyOptions struct {
 type SupplementalGroupsStrategyType string
 
 const (
+	// SupplementalGroupsStrategyMayRunAs means that container does not need to run with a particular gid.
+	// However, when gids are specified, they have to fall in the defined range.
+	SupplementalGroupsStrategyMayRunAs SupplementalGroupsStrategyType = "MayRunAs"
 	// SupplementalGroupsStrategyMustRunAs means that container must run as a particular gid.
 	SupplementalGroupsStrategyMustRunAs SupplementalGroupsStrategyType = "MustRunAs"
 	// SupplementalGroupsStrategyRunAsAny means that container may make requests for any gid.
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
+
+// RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
+// for a pod.
+type RuntimeClassStrategyOptions struct {
+	// allowedRuntimeClassNames is a whitelist of RuntimeClass names that may be specified on a pod.
+	// A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
+	// list. An empty list requires the RuntimeClassName field to be unset.
+	AllowedRuntimeClassNames []string
+	// defaultRuntimeClassName is the default RuntimeClassName to set on the pod.
+	// The default MUST be allowed by the allowedRuntimeClassNames list.
+	// A value of nil does not mutate the Pod.
+	// +optional
+	DefaultRuntimeClassName *string
+}
+
+// AllowAllRuntimeClassNames can be used as a value for the
+// RuntimeClassStrategyOptions.allowedRuntimeClassNames field and means that any runtimeClassName is
+// allowed.
+const AllowAllRuntimeClassNames = "*"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

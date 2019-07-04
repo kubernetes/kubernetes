@@ -1,7 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
 approvers:
 - pmorie
 - saad-ali
 - rootfs
+- humblec
 reviewers:
 - saad-ali
 - jsafrane
@@ -9,4 +12,4 @@ reviewers:
 - humblec
 - jingxu97
 - msau42
-- mtanino 
+- mtanino

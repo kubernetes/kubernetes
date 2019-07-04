@@ -20,13 +20,15 @@ package util
 type DeviceUtil interface {
 	FindMultipathDeviceForDevice(disk string) string
 	FindSlaveDevicesOnMultipath(disk string) []string
+	GetISCSIPortalHostMapForTarget(targetIqn string) (map[string]int, error)
+	FindDevicesForISCSILun(targetIqn string, lun int) ([]string, error)
 }
 
 type deviceHandler struct {
-	get_io IoUtil
+	getIo IoUtil
 }
 
 //NewDeviceHandler Create a new IoHandler implementation
 func NewDeviceHandler(io IoUtil) DeviceUtil {
-	return &deviceHandler{get_io: io}
+	return &deviceHandler{getIo: io}
 }

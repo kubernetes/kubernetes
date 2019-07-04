@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - BenTheElder
+  - mkumatag
+  - tallclair
+approvers:
+  - BenTheElder
+  - mkumatag
+  - tallclair
+labels:
+- sig/release

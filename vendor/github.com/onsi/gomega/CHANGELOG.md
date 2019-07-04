@@ -1,4 +1,68 @@
-## HEAD
+## 1.5.0
+
+### Features
+
+- Added MatchKeys matchers [8b909fc]
+
+### Fixes and Minor Improvements
+
+- Add type aliases to remove stuttering [03b0461]
+- Don't run session_test.go on windows (#324) [5533ce8]
+
+## 1.4.3
+
+### Fixes:
+
+- ensure file name and line numbers are correctly reported for XUnit [6fff58f]
+- Fixed matcher for content-type (#305) [69d9b43]
+
+## 1.4.2
+
+### Fixes:
+
+- Add go.mod and go.sum files to define the gomega go module [f3de367, a085d30]
+- Work around go vet issue with Go v1.11 (#300) [40dd6ad]
+- Better output when using with go XUnit-style tests, fixes #255 (#297) [29a4b97]
+- Fix MatchJSON fail to parse json.RawMessage (#298) [ae19f1b]
+- show threshold in failure message of BeNumericallyMatcher (#293) [4bbecc8]
+
+## 1.4.1
+
+### Fixes:
+
+- Update documentation formatting and examples (#289) [9be8410]
+- allow 'Receive' matcher to be used with concrete types (#286) [41673fd]
+- Fix data race in ghttp server (#283) [7ac6b01]
+- Travis badge should only show master [cc102ab]
+
+## 1.4.0
+
+### Features
+- Make string pretty diff user configurable (#273) [eb112ce, 649b44d]
+
+### Fixes
+- Use httputil.DumpRequest to pretty-print unhandled requests (#278) [a4ff0fc, b7d1a52]
+- fix typo floa32 > float32 (#272) [041ae3b, 6e33911]
+- Fix link to documentation on adding your own matchers (#270) [bb2c830, fcebc62]
+- Use setters and getters to avoid race condition (#262) [13057c3, a9c79f1]
+- Avoid sending a signal if the process is not alive (#259) [b8043e5, 4fc1762]
+- Improve message from AssignableToTypeOf when expected value is nil (#281) [9c1fb20]
+
+## 1.3.0
+
+Improvements:
+
+- The `Equal` matcher matches byte slices more performantly.
+- Improved how `MatchError` matches error strings.
+- `MatchXML` ignores the order of xml node attributes.
+- Improve support for XUnit style golang tests. ([#254](https://github.com/onsi/gomega/issues/254))
+
+Bug Fixes:
+
+- Diff generation now handles multi-byte sequences correctly.
+- Multiple goroutines can now call `gexec.Build` concurrently.
+
+## 1.2.0
 
 Improvements:
 
@@ -14,6 +78,8 @@ Improvements:
 - `ghttp` servers can take an `io.Writer`.  `ghttp` will write a line to the writer when each request arrives.
 - Added `WithTransform` matcher to allow munging input data before feeding into the relevant matcher
 - Added boolean `And`, `Or`, and `Not` matchers to allow creating composite matchers
+- Added `gbytes.TimeoutCloser`, `gbytes.TimeoutReader`, and `gbytes.TimeoutWriter` - these are convenience wrappers that timeout if the underlying Closer/Reader/Writer does not return within the alloted time.
+- Added `gbytes.BufferReader` - this constructs a `gbytes.Buffer` that asynchronously reads the passed-in `io.Reader` into its buffer.
 
 Bug Fixes:
 - gexec: `session.Wait` now uses `EventuallyWithOffset` to get the right line number in the failure.

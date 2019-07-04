@@ -1,6 +1,6 @@
 # Italian translation.
 # Copyright (C) 2017
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the Kubernetes package.
 # FIRST AUTHOR evolution85@gmail.com, 2017.
 #
 msgid ""

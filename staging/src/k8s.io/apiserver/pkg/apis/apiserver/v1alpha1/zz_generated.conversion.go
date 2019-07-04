@@ -34,13 +34,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_AdmissionConfiguration_To_apiserver_AdmissionConfiguration,
-		Convert_apiserver_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration,
-		Convert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginConfiguration,
-		Convert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*AdmissionConfiguration)(nil), (*apiserver.AdmissionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AdmissionConfiguration_To_apiserver_AdmissionConfiguration(a.(*AdmissionConfiguration), b.(*apiserver.AdmissionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.AdmissionConfiguration)(nil), (*AdmissionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_AdmissionConfiguration_To_v1alpha1_AdmissionConfiguration(a.(*apiserver.AdmissionConfiguration), b.(*AdmissionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*AdmissionPluginConfiguration)(nil), (*apiserver.AdmissionPluginConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_AdmissionPluginConfiguration_To_apiserver_AdmissionPluginConfiguration(a.(*AdmissionPluginConfiguration), b.(*apiserver.AdmissionPluginConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiserver.AdmissionPluginConfiguration)(nil), (*AdmissionPluginConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiserver_AdmissionPluginConfiguration_To_v1alpha1_AdmissionPluginConfiguration(a.(*apiserver.AdmissionPluginConfiguration), b.(*AdmissionPluginConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_AdmissionConfiguration_To_apiserver_AdmissionConfiguration(in *AdmissionConfiguration, out *apiserver.AdmissionConfiguration, s conversion.Scope) error {

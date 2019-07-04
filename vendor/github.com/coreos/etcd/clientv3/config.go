@@ -15,10 +15,10 @@
 package clientv3
 
 import (
+	"context"
 	"crypto/tls"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -33,12 +33,12 @@ type Config struct {
 	// DialTimeout is the timeout for failing to establish a connection.
 	DialTimeout time.Duration `json:"dial-timeout"`
 
-	// DialKeepAliveTime is the time in seconds after which client pings the server to see if
+	// DialKeepAliveTime is the time after which client pings the server to see if
 	// transport is alive.
 	DialKeepAliveTime time.Duration `json:"dial-keep-alive-time"`
 
-	// DialKeepAliveTimeout is the time in seconds that the client waits for a response for the
-	// keep-alive probe.  If the response is not received in this time, the connection is closed.
+	// DialKeepAliveTimeout is the time that the client waits for a response for the
+	// keep-alive probe. If the response is not received in this time, the connection is closed.
 	DialKeepAliveTimeout time.Duration `json:"dial-keep-alive-timeout"`
 
 	// MaxCallSendMsgSize is the client-side request send limit in bytes.

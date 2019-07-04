@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +83,20 @@ func (u *UnexpectedObjectError) Error() string {
 func FromObject(obj runtime.Object) error {
 	switch t := obj.(type) {
 	case *metav1.Status:
-		return &StatusError{*t}
+		return &StatusError{ErrStatus: *t}
+	case runtime.Unstructured:
+		var status metav1.Status
+		obj := t.UnstructuredContent()
+		if !reflect.DeepEqual(obj["kind"], "Status") {
+			break
+		}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(t.UnstructuredContent(), &status); err != nil {
+			return err
+		}
+		if status.APIVersion != "v1" && status.APIVersion != "meta.k8s.io/v1" {
+			break
+		}
+		return &StatusError{ErrStatus: status}
 	}
 	return &UnexpectedObjectError{obj}
 }
@@ -167,6 +181,20 @@ func NewConflict(qualifiedResource schema.GroupResource, name string, err error)
 			Name:  name,
 		},
 		Message: fmt.Sprintf("Operation cannot be fulfilled on %s %q: %v", qualifiedResource.String(), name, err),
+	}}
+}
+
+// NewApplyConflict returns an error including details on the requests apply conflicts
+func NewApplyConflict(causes []metav1.StatusCause, message string) *StatusError {
+	return &StatusError{ErrStatus: metav1.Status{
+		Status: metav1.StatusFailure,
+		Code:   http.StatusConflict,
+		Reason: metav1.StatusReasonConflict,
+		Details: &metav1.StatusDetails{
+			// TODO: Get obj details here?
+			Causes: causes,
+		},
+		Message: message,
 	}}
 }
 
@@ -327,6 +355,17 @@ func NewTooManyRequestsError(message string) *StatusError {
 	}}
 }
 
+// NewRequestEntityTooLargeError returns an error indicating that the request
+// entity was too large.
+func NewRequestEntityTooLargeError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusRequestEntityTooLarge,
+		Reason:  metav1.StatusReasonRequestEntityTooLarge,
+		Message: fmt.Sprintf("Request entity too large: %s", message),
+	}}
+}
+
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
 func NewGenericServerResponse(code int, verb string, qualifiedResource schema.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
 	reason := metav1.StatusReasonUnknown
@@ -355,7 +394,11 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	case http.StatusNotAcceptable:
 		reason = metav1.StatusReasonNotAcceptable
 		// the server message has details about what types are acceptable
-		message = serverMessage
+		if len(serverMessage) == 0 || serverMessage == "unknown" {
+			message = "the server was unable to respond with a content type that the client supports"
+		} else {
+			message = serverMessage
+		}
 	case http.StatusUnsupportedMediaType:
 		reason = metav1.StatusReasonUnsupportedMediaType
 		// the server message has details about what types are acceptable
@@ -513,6 +556,19 @@ func IsTooManyRequests(err error) bool {
 	return false
 }
 
+// IsRequestEntityTooLargeError determines if err is an error which indicates
+// the request entity is too large.
+func IsRequestEntityTooLargeError(err error) bool {
+	if ReasonForError(err) == metav1.StatusReasonRequestEntityTooLarge {
+		return true
+	}
+	switch t := err.(type) {
+	case APIStatus:
+		return t.Status().Code == http.StatusRequestEntityTooLarge
+	}
+	return false
+}
+
 // IsUnexpectedServerError returns true if the server response was not in the expected API format,
 // and may be the result of another HTTP actor.
 func IsUnexpectedServerError(err error) bool {
@@ -564,4 +620,47 @@ func ReasonForError(err error) metav1.StatusReason {
 		return t.Status().Reason
 	}
 	return metav1.StatusReasonUnknown
+}
+
+// ErrorReporter converts generic errors into runtime.Object errors without
+// requiring the caller to take a dependency on meta/v1 (where Status lives).
+// This prevents circular dependencies in core watch code.
+type ErrorReporter struct {
+	code   int
+	verb   string
+	reason string
+}
+
+// NewClientErrorReporter will respond with valid v1.Status objects that report
+// unexpected server responses. Primarily used by watch to report errors when
+// we attempt to decode a response from the server and it is not in the form
+// we expect. Because watch is a dependency of the core api, we can't return
+// meta/v1.Status in that package and so much inject this interface to convert a
+// generic error as appropriate. The reason is passed as a unique status cause
+// on the returned status, otherwise the generic "ClientError" is returned.
+func NewClientErrorReporter(code int, verb string, reason string) *ErrorReporter {
+	return &ErrorReporter{
+		code:   code,
+		verb:   verb,
+		reason: reason,
+	}
+}
+
+// AsObject returns a valid error runtime.Object (a v1.Status) for the given
+// error, using the code and verb of the reporter type. The error is set to
+// indicate that this was an unexpected server response.
+func (r *ErrorReporter) AsObject(err error) runtime.Object {
+	status := NewGenericServerResponse(r.code, r.verb, schema.GroupResource{}, "", err.Error(), 0, true)
+	if status.ErrStatus.Details == nil {
+		status.ErrStatus.Details = &metav1.StatusDetails{}
+	}
+	reason := r.reason
+	if len(reason) == 0 {
+		reason = "ClientError"
+	}
+	status.ErrStatus.Details.Causes = append(status.ErrStatus.Details.Causes, metav1.StatusCause{
+		Type:    metav1.CauseType(reason),
+		Message: err.Error(),
+	})
+	return &status.ErrStatus
 }

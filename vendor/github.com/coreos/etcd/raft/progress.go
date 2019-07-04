@@ -48,6 +48,7 @@ type Progress struct {
 	// When in ProgressStateSnapshot, leader should have sent out snapshot
 	// before and stops sending any replication message.
 	State ProgressStateType
+
 	// Paused is used in ProgressStateProbe.
 	// When Paused is true, raft should pause sending replication message to this peer.
 	Paused bool
@@ -76,6 +77,9 @@ type Progress struct {
 	// be freed by calling inflights.freeTo with the index of the last
 	// received entry.
 	ins *inflights
+
+	// IsLearner is true if this progress is tracked for a learner.
+	IsLearner bool
 }
 
 func (pr *Progress) resetState(state ProgressStateType) {
@@ -243,7 +247,8 @@ func (in *inflights) freeTo(to uint64) {
 		return
 	}
 
-	i, idx := 0, in.start
+	idx := in.start
+	var i int
 	for i = 0; i < in.count; i++ {
 		if to < in.buffer[idx] { // found the first large inflight
 			break

@@ -23,6 +23,7 @@ package v1
 import (
 	unsafe "unsafe"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration"
@@ -34,21 +35,68 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1_APIService_To_apiregistration_APIService,
-		Convert_apiregistration_APIService_To_v1_APIService,
-		Convert_v1_APIServiceCondition_To_apiregistration_APIServiceCondition,
-		Convert_apiregistration_APIServiceCondition_To_v1_APIServiceCondition,
-		Convert_v1_APIServiceList_To_apiregistration_APIServiceList,
-		Convert_apiregistration_APIServiceList_To_v1_APIServiceList,
-		Convert_v1_APIServiceSpec_To_apiregistration_APIServiceSpec,
-		Convert_apiregistration_APIServiceSpec_To_v1_APIServiceSpec,
-		Convert_v1_APIServiceStatus_To_apiregistration_APIServiceStatus,
-		Convert_apiregistration_APIServiceStatus_To_v1_APIServiceStatus,
-		Convert_v1_ServiceReference_To_apiregistration_ServiceReference,
-		Convert_apiregistration_ServiceReference_To_v1_ServiceReference,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*APIService)(nil), (*apiregistration.APIService)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_APIService_To_apiregistration_APIService(a.(*APIService), b.(*apiregistration.APIService), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiregistration.APIService)(nil), (*APIService)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiregistration_APIService_To_v1_APIService(a.(*apiregistration.APIService), b.(*APIService), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*APIServiceCondition)(nil), (*apiregistration.APIServiceCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_APIServiceCondition_To_apiregistration_APIServiceCondition(a.(*APIServiceCondition), b.(*apiregistration.APIServiceCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceCondition)(nil), (*APIServiceCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiregistration_APIServiceCondition_To_v1_APIServiceCondition(a.(*apiregistration.APIServiceCondition), b.(*APIServiceCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*APIServiceList)(nil), (*apiregistration.APIServiceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_APIServiceList_To_apiregistration_APIServiceList(a.(*APIServiceList), b.(*apiregistration.APIServiceList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceList)(nil), (*APIServiceList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiregistration_APIServiceList_To_v1_APIServiceList(a.(*apiregistration.APIServiceList), b.(*APIServiceList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*APIServiceSpec)(nil), (*apiregistration.APIServiceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_APIServiceSpec_To_apiregistration_APIServiceSpec(a.(*APIServiceSpec), b.(*apiregistration.APIServiceSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceSpec)(nil), (*APIServiceSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiregistration_APIServiceSpec_To_v1_APIServiceSpec(a.(*apiregistration.APIServiceSpec), b.(*APIServiceSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*APIServiceStatus)(nil), (*apiregistration.APIServiceStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_APIServiceStatus_To_apiregistration_APIServiceStatus(a.(*APIServiceStatus), b.(*apiregistration.APIServiceStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiregistration.APIServiceStatus)(nil), (*APIServiceStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiregistration_APIServiceStatus_To_v1_APIServiceStatus(a.(*apiregistration.APIServiceStatus), b.(*APIServiceStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*ServiceReference)(nil), (*apiregistration.ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ServiceReference_To_apiregistration_ServiceReference(a.(*ServiceReference), b.(*apiregistration.ServiceReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*apiregistration.ServiceReference)(nil), (*ServiceReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_apiregistration_ServiceReference_To_v1_ServiceReference(a.(*apiregistration.ServiceReference), b.(*ServiceReference), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1_APIService_To_apiregistration_APIService(in *APIService, out *apiregistration.APIService, s conversion.Scope) error {
@@ -113,7 +161,17 @@ func Convert_apiregistration_APIServiceCondition_To_v1_APIServiceCondition(in *a
 
 func autoConvert_v1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceList, out *apiregistration.APIServiceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]apiregistration.APIService)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]apiregistration.APIService, len(*in))
+		for i := range *in {
+			if err := Convert_v1_APIService_To_apiregistration_APIService(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -124,7 +182,17 @@ func Convert_v1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceL
 
 func autoConvert_apiregistration_APIServiceList_To_v1_APIServiceList(in *apiregistration.APIServiceList, out *APIServiceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]APIService)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]APIService, len(*in))
+		for i := range *in {
+			if err := Convert_apiregistration_APIService_To_v1_APIService(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -134,7 +202,15 @@ func Convert_apiregistration_APIServiceList_To_v1_APIServiceList(in *apiregistra
 }
 
 func autoConvert_v1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceSpec, out *apiregistration.APIServiceSpec, s conversion.Scope) error {
-	out.Service = (*apiregistration.ServiceReference)(unsafe.Pointer(in.Service))
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		*out = new(apiregistration.ServiceReference)
+		if err := Convert_v1_ServiceReference_To_apiregistration_ServiceReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Service = nil
+	}
 	out.Group = in.Group
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
@@ -150,7 +226,15 @@ func Convert_v1_APIServiceSpec_To_apiregistration_APIServiceSpec(in *APIServiceS
 }
 
 func autoConvert_apiregistration_APIServiceSpec_To_v1_APIServiceSpec(in *apiregistration.APIServiceSpec, out *APIServiceSpec, s conversion.Scope) error {
-	out.Service = (*ServiceReference)(unsafe.Pointer(in.Service))
+	if in.Service != nil {
+		in, out := &in.Service, &out.Service
+		*out = new(ServiceReference)
+		if err := Convert_apiregistration_ServiceReference_To_v1_ServiceReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Service = nil
+	}
 	out.Group = in.Group
 	out.Version = in.Version
 	out.InsecureSkipTLSVerify = in.InsecureSkipTLSVerify
@@ -188,6 +272,9 @@ func Convert_apiregistration_APIServiceStatus_To_v1_APIServiceStatus(in *apiregi
 func autoConvert_v1_ServiceReference_To_apiregistration_ServiceReference(in *ServiceReference, out *apiregistration.ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
+	if err := metav1.Convert_Pointer_int32_To_int32(&in.Port, &out.Port, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -199,6 +286,9 @@ func Convert_v1_ServiceReference_To_apiregistration_ServiceReference(in *Service
 func autoConvert_apiregistration_ServiceReference_To_v1_ServiceReference(in *apiregistration.ServiceReference, out *ServiceReference, s conversion.Scope) error {
 	out.Namespace = in.Namespace
 	out.Name = in.Name
+	if err := metav1.Convert_int32_To_Pointer_int32(&in.Port, &out.Port, s); err != nil {
+		return err
+	}
 	return nil
 }
 

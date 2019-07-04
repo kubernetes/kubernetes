@@ -24,13 +24,17 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 	pod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{APIVersion: testapi.Extensions.GroupVersion().String()},
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:    label,
 			Namespace: metav1.NamespaceDefault,
@@ -49,8 +53,8 @@ func newPod(podName string, nodeName string, label map[string]string) *v1.Pod {
 }
 
 func TestIsPodUpdated(t *testing.T) {
-	templateGeneration := int64Ptr(12345)
-	badGeneration := int64Ptr(12345)
+	templateGeneration := utilpointer.Int64Ptr(12345)
+	badGeneration := utilpointer.Int64Ptr(12345)
 	hash := "55555"
 	labels := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration), extensions.DefaultDaemonSetUniqueLabelKey: hash}
 	labelsNoHash := map[string]string{extensions.DaemonSetTemplateGenerationKey: fmt.Sprint(templateGeneration)}
@@ -146,8 +150,8 @@ func TestCreatePodTemplate(t *testing.T) {
 		hash               string
 		expectUniqueLabel  bool
 	}{
-		{int64Ptr(1), "", false},
-		{int64Ptr(2), "3242341807", true},
+		{utilpointer.Int64Ptr(1), "", false},
+		{utilpointer.Int64Ptr(2), "3242341807", true},
 	}
 	for _, test := range tests {
 		podTemplateSpec := v1.PodTemplateSpec{}
@@ -166,12 +170,7 @@ func TestCreatePodTemplate(t *testing.T) {
 	}
 }
 
-func int64Ptr(i int) *int64 {
-	li := int64(i)
-	return &li
-}
-
-func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
+func TestReplaceDaemonSetPodNodeNameNodeAffinity(t *testing.T) {
 	tests := []struct {
 		affinity *v1.Affinity
 		hostname string
@@ -185,9 +184,46 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -206,7 +242,7 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -224,7 +260,7 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 							Preference: v1.NodeSelectorTerm{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      v1.LabelHostname,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -235,55 +271,9 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"host_1"},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			affinity: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "not-host-label",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"label_value_1", "label_value_2"},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			hostname: "host_1",
-			expected: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "not-host-label",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{"label_value_1", "label_value_2"},
-									},
-								},
-							},
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -300,9 +290,9 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
+								MatchFields: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1", "host_2"},
 									},
@@ -318,9 +308,153 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 						NodeSelectorTerms: []v1.NodeSelectorTerm{
 							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: nil,
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
 								MatchExpressions: []v1.NodeSelectorRequirement{
 									{
-										Key:      kubeletapis.LabelHostname,
+										Key:      "hostname",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_2"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpNotIn,
+										Values:   []string{"host_2"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"host_1"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			affinity: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										// NOTE: Only `metadata.name` is valid key in `MatchFields` in 1.11;
+										//       added this case for compatibility: the feature works as normal
+										//       when new Keys introduced.
+										Key:      "metadata.foo",
+										Operator: v1.NodeSelectorOpIn,
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			hostname: "host_1",
+			expected: &v1.Affinity{
+				NodeAffinity: &v1.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{
+							{
+								MatchFields: []v1.NodeSelectorRequirement{
+									{
+										Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
 										Operator: v1.NodeSelectorOpIn,
 										Values:   []string{"host_1"},
 									},
@@ -333,10 +467,124 @@ func TestReplaceDaemonSetPodHostnameNodeAffinity(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		got := ReplaceDaemonSetPodHostnameNodeAffinity(test.affinity, test.hostname)
+	for i, test := range tests {
+		got := ReplaceDaemonSetPodNodeNameNodeAffinity(test.affinity, test.hostname)
 		if !reflect.DeepEqual(test.expected, got) {
-			t.Errorf("Failed to append NodeAffinity, got: %v, expected: %v", got, test.expected)
+			t.Errorf("Failed to append NodeAffinity in case %d, got: %v, expected: %v",
+				i, got, test.expected)
 		}
 	}
+}
+
+func forEachFeatureGate(t *testing.T, tf func(t *testing.T), gates ...featuregate.Feature) {
+	for _, fg := range gates {
+		for _, f := range []bool{true, false} {
+			func() {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
+				t.Run(fmt.Sprintf("%v (%t)", fg, f), tf)
+			}()
+		}
+	}
+}
+
+func TestGetTargetNodeName(t *testing.T) {
+	testFun := func(t *testing.T) {
+		tests := []struct {
+			pod         *v1.Pod
+			nodeName    string
+			expectedErr bool
+		}{
+			{
+				pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod1",
+						Namespace: "default",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				},
+				nodeName: "node-1",
+			},
+			{
+				pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod2",
+						Namespace: "default",
+					},
+					Spec: v1.PodSpec{
+						Affinity: &v1.Affinity{
+							NodeAffinity: &v1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+									NodeSelectorTerms: []v1.NodeSelectorTerm{
+										{
+											MatchFields: []v1.NodeSelectorRequirement{
+												{
+													Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+													Operator: v1.NodeSelectorOpIn,
+													Values:   []string{"node-1"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				nodeName: "node-1",
+			},
+			{
+				pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod3",
+						Namespace: "default",
+					},
+					Spec: v1.PodSpec{
+						Affinity: &v1.Affinity{
+							NodeAffinity: &v1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+									NodeSelectorTerms: []v1.NodeSelectorTerm{
+										{
+											MatchFields: []v1.NodeSelectorRequirement{
+												{
+													Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+													Operator: v1.NodeSelectorOpIn,
+													Values:   []string{"node-1", "node-2"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				expectedErr: true,
+			},
+			{
+				pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod4",
+						Namespace: "default",
+					},
+					Spec: v1.PodSpec{},
+				},
+				expectedErr: true,
+			},
+		}
+
+		for _, test := range tests {
+			got, err := GetTargetNodeName(test.pod)
+			if test.expectedErr != (err != nil) {
+				t.Errorf("Unexpected error, expectedErr: %v, err: %v", test.expectedErr, err)
+			} else if !test.expectedErr {
+				if test.nodeName != got {
+					t.Errorf("Failed to get target node name, got: %v, expected: %v", got, test.nodeName)
+				}
+			}
+		}
+	}
+
+	forEachFeatureGate(t, testFun, features.ScheduleDaemonSetPods)
 }

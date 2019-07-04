@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/utils/pointer"
 )
 
 func TestValidatePodDisruptionBudgetSpec(t *testing.T) {
@@ -120,114 +122,6 @@ func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
 	}
 }
 
-func TestValidatePodDisruptionBudgetUpdate(t *testing.T) {
-	c1 := intstr.FromString("10%")
-	c2 := intstr.FromInt(1)
-	c3 := intstr.FromInt(2)
-	oldPdb := &policy.PodDisruptionBudget{}
-	pdb := &policy.PodDisruptionBudget{}
-	testCases := []struct {
-		generations []int64
-		name        string
-		specs       []policy.PodDisruptionBudgetSpec
-		status      []policy.PodDisruptionBudgetStatus
-		ok          bool
-	}{
-		{
-			name:        "only update status",
-			generations: []int64{int64(2), int64(3)},
-			specs: []policy.PodDisruptionBudgetSpec{
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c2,
-				},
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c2,
-				},
-			},
-			status: []policy.PodDisruptionBudgetStatus{
-				{
-					PodDisruptionsAllowed: 10,
-					CurrentHealthy:        5,
-					ExpectedPods:          2,
-				},
-				{
-					PodDisruptionsAllowed: 8,
-					CurrentHealthy:        5,
-					DesiredHealthy:        3,
-				},
-			},
-			ok: true,
-		},
-		{
-			name:        "only update pdb spec",
-			generations: []int64{int64(2), int64(3)},
-			specs: []policy.PodDisruptionBudgetSpec{
-				{
-					MaxUnavailable: &c2,
-				},
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c3,
-				},
-			},
-			status: []policy.PodDisruptionBudgetStatus{
-				{
-					PodDisruptionsAllowed: 10,
-				},
-				{
-					PodDisruptionsAllowed: 10,
-				},
-			},
-			ok: false,
-		},
-		{
-			name:        "update spec and status",
-			generations: []int64{int64(2), int64(3)},
-			specs: []policy.PodDisruptionBudgetSpec{
-				{
-					MaxUnavailable: &c2,
-				},
-				{
-					MinAvailable:   &c1,
-					MaxUnavailable: &c3,
-				},
-			},
-			status: []policy.PodDisruptionBudgetStatus{
-				{
-					PodDisruptionsAllowed: 10,
-					CurrentHealthy:        5,
-					ExpectedPods:          2,
-				},
-				{
-					PodDisruptionsAllowed: 8,
-					CurrentHealthy:        5,
-					DesiredHealthy:        3,
-				},
-			},
-			ok: false,
-		},
-	}
-
-	for i, tc := range testCases {
-		oldPdb.Spec = tc.specs[0]
-		oldPdb.Generation = tc.generations[0]
-		oldPdb.Status = tc.status[0]
-
-		pdb.Spec = tc.specs[1]
-		pdb.Generation = tc.generations[1]
-		oldPdb.Status = tc.status[1]
-
-		errs := ValidatePodDisruptionBudgetUpdate(oldPdb, pdb)
-		if tc.ok && len(errs) > 0 {
-			t.Errorf("[%d:%s] unexpected errors: %v", i, tc.name, errs)
-		} else if !tc.ok && len(errs) == 0 {
-			t.Errorf("[%d:%s] expected errors: %v", i, tc.name, errs)
-		}
-	}
-}
-
 func TestValidatePodSecurityPolicy(t *testing.T) {
 	validPSP := func() *policy.PodSecurityPolicy {
 		return &policy.PodSecurityPolicy{
@@ -241,6 +135,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 				},
 				RunAsUser: policy.RunAsUserStrategyOptions{
 					Rule: policy.RunAsUserStrategyRunAsAny,
+				},
+				RunAsGroup: &policy.RunAsGroupStrategyOptions{
+					Rule: policy.RunAsGroupStrategyRunAsAny,
 				},
 				FSGroup: policy.FSGroupStrategyOptions{
 					Rule: policy.FSGroupStrategyRunAsAny,
@@ -259,11 +156,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	noUserOptions := validPSP()
 	noUserOptions.Spec.RunAsUser.Rule = ""
 
+	noGroupOptions := validPSP()
+	noGroupOptions.Spec.RunAsGroup.Rule = ""
+
 	noSELinuxOptions := validPSP()
 	noSELinuxOptions.Spec.SELinux.Rule = ""
 
 	invalidUserStratType := validPSP()
 	invalidUserStratType.Spec.RunAsUser.Rule = "invalid"
+
+	invalidGroupStratType := validPSP()
+	invalidGroupStratType.Spec.RunAsGroup.Rule = "invalid"
 
 	invalidSELinuxStratType := validPSP()
 	invalidSELinuxStratType.Spec.SELinux.Rule = "invalid"
@@ -271,6 +174,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidUIDPSP := validPSP()
 	invalidUIDPSP.Spec.RunAsUser.Rule = policy.RunAsUserStrategyMustRunAs
 	invalidUIDPSP.Spec.RunAsUser.Ranges = []policy.IDRange{{Min: -1, Max: 1}}
+
+	invalidGIDPSP := validPSP()
+	invalidGIDPSP.Spec.RunAsGroup.Rule = policy.RunAsGroupStrategyMustRunAs
+	invalidGIDPSP.Spec.RunAsGroup.Ranges = []policy.IDRange{{Min: -1, Max: 1}}
 
 	missingObjectMetaName := validPSP()
 	missingObjectMetaName.ObjectMeta.Name = ""
@@ -323,8 +230,19 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
 	}
 
-	invalidSysctlPattern := validPSP()
-	invalidSysctlPattern.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
+	invalidAllowedUnsafeSysctlPattern := validPSP()
+	invalidAllowedUnsafeSysctlPattern.Spec.AllowedUnsafeSysctls = []string{"a.*.b"}
+
+	invalidForbiddenSysctlPattern := validPSP()
+	invalidForbiddenSysctlPattern.Spec.ForbiddenSysctls = []string{"a.*.b"}
+
+	invalidOverlappingSysctls := validPSP()
+	invalidOverlappingSysctls.Spec.ForbiddenSysctls = []string{"kernel.*", "net.ipv4.ip_local_port_range"}
+	invalidOverlappingSysctls.Spec.AllowedUnsafeSysctls = []string{"kernel.shmmax", "net.ipv4.ip_local_port_range"}
+
+	invalidDuplicatedSysctls := validPSP()
+	invalidDuplicatedSysctls.Spec.ForbiddenSysctls = []string{"net.ipv4.ip_local_port_range"}
+	invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.ip_local_port_range"}
 
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
@@ -360,6 +278,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	nonEmptyFlexVolumes := validPSP()
 	nonEmptyFlexVolumes.Spec.AllowedFlexVolumes = []policy.AllowedFlexVolume{{Driver: "example/driver"}}
 
+	invalidProcMount := validPSP()
+	invalidProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.ProcMountType("bogus")}
+
+	allowedCSIDriverPSP := validPSP()
+	allowedCSIDriverPSP.Spec.Volumes = []policy.FSType{policy.CSI}
+	allowedCSIDriverPSP.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{}}
+
 	type testCase struct {
 		psp         *policy.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -371,6 +296,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: `supported values: "MustRunAs", "MustRunAsNonRoot", "RunAsAny"`,
 		},
+		"no group options": {
+			psp:         noGroupOptions,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: `supported values: "MustRunAs", "RunAsAny", "MayRunAs"`,
+		},
 		"no selinux options": {
 			psp:         noSELinuxOptions,
 			errorType:   field.ErrorTypeNotSupported,
@@ -379,17 +309,22 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"no fsgroup options": {
 			psp:         noFSGroupOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"no sup group options": {
 			psp:         noSupplementalGroupsOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid user strategy type": {
 			psp:         invalidUserStratType,
 			errorType:   field.ErrorTypeNotSupported,
 			errorDetail: `supported values: "MustRunAs", "MustRunAsNonRoot", "RunAsAny"`,
+		},
+		"invalid group strategy type": {
+			psp:         invalidGroupStratType,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: `supported values: "MustRunAs", "RunAsAny", "MayRunAs"`,
 		},
 		"invalid selinux strategy type": {
 			psp:         invalidSELinuxStratType,
@@ -399,15 +334,20 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"invalid sup group strategy type": {
 			psp:         invalidSupGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid fs group strategy type": {
 			psp:         invalidFSGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
+			errorDetail: `supported values: "MayRunAs", "MustRunAs", "RunAsAny"`,
 		},
 		"invalid uid": {
 			psp:         invalidUIDPSP,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "min cannot be negative",
+		},
+		"invalid gid": {
+			psp:         invalidGIDPSP,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "min cannot be negative",
 		},
@@ -456,10 +396,25 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "invalid AppArmor profile name: \"not-good\"",
 		},
-		"invalid sysctl pattern": {
-			psp:         invalidSysctlPattern,
+		"invalid allowed unsafe sysctl pattern": {
+			psp:         invalidAllowedUnsafeSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid forbidden sysctl pattern": {
+			psp:         invalidForbiddenSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
+		"invalid overlapping sysctl pattern": {
+			psp:         invalidOverlappingSysctls,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("sysctl overlaps with %s", invalidOverlappingSysctls.Spec.ForbiddenSysctls[0]),
+		},
+		"invalid duplicated sysctls": {
+			psp:         invalidDuplicatedSysctls,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("sysctl overlaps with %s", invalidDuplicatedSysctls.Spec.AllowedUnsafeSysctls[0]),
 		},
 		"invalid seccomp default profile": {
 			psp:         invalidSeccompDefault,
@@ -495,6 +450,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         emptyFlexDriver,
 			errorType:   field.ErrorTypeRequired,
 			errorDetail: "must specify a driver",
+		},
+		"CSI policy with empty allowed driver list": {
+			psp:       allowedCSIDriverPSP,
+			errorType: field.ErrorTypeRequired,
+		},
+		"invalid allowedProcMountTypes": {
+			psp:         invalidProcMount,
+			errorType:   field.ErrorTypeNotSupported,
+			errorDetail: `supported values: "Default", "Unmasked"`,
 		},
 	}
 
@@ -561,8 +525,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
 	}
 
-	withSysctl := validPSP()
-	withSysctl.Annotations[policy.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+	withForbiddenSysctl := validPSP()
+	withForbiddenSysctl.Spec.ForbiddenSysctls = []string{"net.*"}
+
+	withAllowedUnsafeSysctl := validPSP()
+	withAllowedUnsafeSysctl.Spec.AllowedUnsafeSysctls = []string{"net.ipv4.tcp_max_syn_backlog"}
 
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
@@ -586,6 +553,18 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	flexvolumeWhenAllVolumesAllowed.Spec.AllowedFlexVolumes = []policy.AllowedFlexVolume{
 		{Driver: "example/driver2"},
 	}
+
+	validProcMount := validPSP()
+	validProcMount.Spec.AllowedProcMountTypes = []api.ProcMountType{api.DefaultProcMount, api.UnmaskedProcMount}
+
+	allowedCSIDriversWithCSIFsType := validPSP()
+	allowedCSIDriversWithCSIFsType.Spec.Volumes = []policy.FSType{policy.CSI}
+	allowedCSIDriversWithCSIFsType.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "foo"}}
+
+	allowedCSIDriversWithAllFsTypes := validPSP()
+	allowedCSIDriversWithAllFsTypes.Spec.Volumes = []policy.FSType{policy.All}
+	allowedCSIDriversWithAllFsTypes.Spec.AllowedCSIDrivers = []policy.AllowedCSIDriver{{Name: "bar"}}
+
 	successCases := map[string]struct {
 		psp *policy.PodSecurityPolicy
 	}{
@@ -607,8 +586,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"valid AppArmor annotations": {
 			psp: validAppArmor,
 		},
-		"with network sysctls": {
-			psp: withSysctl,
+		"with network sysctls forbidden": {
+			psp: withForbiddenSysctl,
+		},
+		"with unsafe net.ipv4.tcp_max_syn_backlog sysctl allowed": {
+			psp: withAllowedUnsafeSysctl,
 		},
 		"valid seccomp annotations": {
 			psp: validSeccomp,
@@ -621,6 +603,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"allow white-listed flexVolume when all volumes are allowed": {
 			psp: flexvolumeWhenAllVolumesAllowed,
+		},
+		"valid allowedProcMountTypes": {
+			psp: validProcMount,
+		},
+		"allowed CSI drivers when FSType policy is set to CSI": {
+			psp: allowedCSIDriversWithCSIFsType,
+		},
+		"allowed CSI drivers when FSType policy is set to All": {
+			psp: allowedCSIDriversWithAllFsTypes,
 		},
 	}
 
@@ -647,6 +638,9 @@ func TestValidatePSPVolumes(t *testing.T) {
 				},
 				RunAsUser: policy.RunAsUserStrategyOptions{
 					Rule: policy.RunAsUserStrategyRunAsAny,
+				},
+				RunAsGroup: &policy.RunAsGroupStrategyOptions{
+					Rule: policy.RunAsGroupStrategyRunAsAny,
 				},
 				FSGroup: policy.FSGroupStrategyOptions{
 					Rule: policy.FSGroupStrategyRunAsAny,
@@ -724,7 +718,7 @@ func TestIsValidSysctlPattern(t *testing.T) {
 	}
 }
 
-func Test_validatePSPRunAsUser(t *testing.T) {
+func TestValidatePSPRunAsUser(t *testing.T) {
 	var testCases = []struct {
 		name              string
 		runAsUserStrategy policy.RunAsUserStrategyOptions
@@ -747,6 +741,197 @@ func Test_validatePSPRunAsUser(t *testing.T) {
 			}
 			if actualErrors != expectedErrors {
 				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPFSGroup(t *testing.T) {
+	var testCases = []struct {
+		name            string
+		fsGroupStrategy policy.FSGroupStrategyOptions
+		fail            bool
+	}{
+		{"Invalid FSGroupStrategy", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyType("someInvalidStrategy")}, true},
+		{"FSGroupStrategyMustRunAs", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyMustRunAs}, false},
+		{"FSGroupStrategyMayRunAs", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyMayRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"FSGroupStrategyRunAsAny", policy.FSGroupStrategyOptions{Rule: policy.FSGroupStrategyRunAsAny}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPFSGroup(field.NewPath("Status"), &testCase.fsGroupStrategy)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPSupplementalGroup(t *testing.T) {
+	var testCases = []struct {
+		name                      string
+		supplementalGroupStrategy policy.SupplementalGroupsStrategyOptions
+		fail                      bool
+	}{
+		{"Invalid SupplementalGroupStrategy", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyType("someInvalidStrategy")}, true},
+		{"SupplementalGroupsStrategyMustRunAs", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyMustRunAs}, false},
+		{"SupplementalGroupsStrategyMayRunAs", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyMayRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"SupplementalGroupsStrategyRunAsAny", policy.SupplementalGroupsStrategyOptions{Rule: policy.SupplementalGroupsStrategyRunAsAny}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPSupplementalGroup(field.NewPath("Status"), &testCase.supplementalGroupStrategy)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPRunAsGroup(t *testing.T) {
+	var testCases = []struct {
+		name       string
+		runAsGroup policy.RunAsGroupStrategyOptions
+		fail       bool
+	}{
+		{"RunAsGroupStrategyMayRunAs", policy.RunAsGroupStrategyOptions{Rule: policy.RunAsGroupStrategyMayRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"RunAsGroupStrategyMustRunAs", policy.RunAsGroupStrategyOptions{Rule: policy.RunAsGroupStrategyMustRunAs, Ranges: []policy.IDRange{{Min: 1, Max: 5}}}, false},
+		{"RunAsGroupStrategyRunAsAny", policy.RunAsGroupStrategyOptions{Rule: policy.RunAsGroupStrategyRunAsAny}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPRunAsGroup(field.NewPath("Status"), &testCase.runAsGroup)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidatePSPSELinux(t *testing.T) {
+	var testCases = []struct {
+		name    string
+		selinux policy.SELinuxStrategyOptions
+		fail    bool
+	}{
+		{"SELinuxStrategyMustRunAs",
+			policy.SELinuxStrategyOptions{
+				Rule:           policy.SELinuxStrategyMustRunAs,
+				SELinuxOptions: &api.SELinuxOptions{Level: "s9:z0,z1"}}, false},
+		{"SELinuxStrategyMustRunAs",
+			policy.SELinuxStrategyOptions{
+				Rule:           policy.SELinuxStrategyMustRunAs,
+				SELinuxOptions: &api.SELinuxOptions{Level: "s0"}}, false},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			errList := validatePSPSELinux(field.NewPath("Status"), &testCase.selinux)
+			actualErrors := len(errList)
+			expectedErrors := 1
+			if !testCase.fail {
+				expectedErrors = 0
+			}
+			if actualErrors != expectedErrors {
+				t.Errorf("In testCase %v, expected %v errors, got %v errors", testCase.name, expectedErrors, actualErrors)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeClassStrategy(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		strategy     *policy.RuntimeClassStrategyOptions
+		expectErrors bool
+	}{{
+		name:     "nil strategy",
+		strategy: nil,
+	}, {
+		name:     "empty strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{},
+	}, {
+		name: "allow all strategy",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*"},
+		},
+	}, {
+		name: "valid defaulting & allow all",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			AllowedRuntimeClassNames: []string{"*"},
+		},
+	}, {
+		name: "valid defaulting & allow explicit",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("native"),
+			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
+		},
+	}, {
+		name: "valid whitelisting",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"foo", "native", "sandboxed"},
+		},
+	}, {
+		name: "invalid default name",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName: pointer.StringPtr("foo bar"),
+		},
+		expectErrors: true,
+	}, {
+		name: "disallowed default",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName:  pointer.StringPtr("foo"),
+			AllowedRuntimeClassNames: []string{"native", "sandboxed"},
+		},
+		expectErrors: true,
+	}, {
+		name: "nothing allowed default",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			DefaultRuntimeClassName: pointer.StringPtr("foo"),
+		},
+		expectErrors: true,
+	}, {
+		name: "invalid whitelist name",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"native", "sandboxed", "foo*"},
+		},
+		expectErrors: true,
+	}, {
+		name: "duplicate whitelist names",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"native", "sandboxed", "native"},
+		},
+		expectErrors: true,
+	}, {
+		name: "allow all redundant whitelist",
+		strategy: &policy.RuntimeClassStrategyOptions{
+			AllowedRuntimeClassNames: []string{"*", "sandboxed", "native"},
+		},
+		expectErrors: true,
+	}}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			errs := validateRuntimeClassStrategy(field.NewPath(""), test.strategy)
+			if test.expectErrors {
+				assert.NotEmpty(t, errs)
+			} else {
+				assert.Empty(t, errs)
 			}
 		})
 	}

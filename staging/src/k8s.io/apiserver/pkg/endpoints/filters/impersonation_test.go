@@ -70,6 +70,10 @@ func (impersonateAuthorizer) Authorize(a authorizer.Attributes) (authorized auth
 		return authorizer.DecisionAllow, "", nil
 	}
 
+	if len(user.GetGroups()) > 1 && (user.GetGroups()[1] == "escaped-scopes" || user.GetGroups()[1] == "almost-escaped-scopes") {
+		return authorizer.DecisionAllow, "", nil
+	}
+
 	if len(user.GetGroups()) > 1 && user.GetGroups()[1] == "extra-setter-particular-scopes" &&
 		a.GetVerb() == "impersonate" && a.GetResource() == "userextras" && a.GetSubresource() == "scopes" && a.GetName() == "scope-a" {
 		return authorizer.DecisionAllow, "", nil
@@ -221,6 +225,36 @@ func TestImpersonationFilter(t *testing.T) {
 				Name:   "system:admin",
 				Groups: []string{"system:authenticated"},
 				Extra:  map[string][]string{"scopes": {"scope-a", "scope-b"}},
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "percent-escaped-userextras",
+			user: &user.DefaultInfo{
+				Name:   "dev",
+				Groups: []string{"wheel", "escaped-scopes"},
+			},
+			impersonationUser:       "system:admin",
+			impersonationUserExtras: map[string][]string{"example.com%2fescaped%e1%9b%84scopes": {"scope-a", "scope-b"}},
+			expectedUser: &user.DefaultInfo{
+				Name:   "system:admin",
+				Groups: []string{"system:authenticated"},
+				Extra:  map[string][]string{"example.com/escapedᛄscopes": {"scope-a", "scope-b"}},
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "almost-percent-escaped-userextras",
+			user: &user.DefaultInfo{
+				Name:   "dev",
+				Groups: []string{"wheel", "almost-escaped-scopes"},
+			},
+			impersonationUser:       "system:admin",
+			impersonationUserExtras: map[string][]string{"almost%zzpercent%xxencoded": {"scope-a", "scope-b"}},
+			expectedUser: &user.DefaultInfo{
+				Name:   "system:admin",
+				Groups: []string{"system:authenticated"},
+				Extra:  map[string][]string{"almost%zzpercent%xxencoded": {"scope-a", "scope-b"}},
 			},
 			expectedCode: http.StatusOK,
 		},

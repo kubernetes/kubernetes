@@ -24,40 +24,41 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 const (
 	dnsReadyTimeout = time.Minute
 )
 
-const queryDnsPythonTemplate string = `
+const queryDNSPythonTemplate string = `
 import socket
 try:
 	socket.gethostbyname('%s')
-	print 'ok'
+	print('ok')
 except:
-	print 'err'`
+	print('err')`
 
 var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
 
 	var c clientset.Interface
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 	})
 
-	It("should create pod that uses dns", func() {
+	ginkgo.It("should create pod that uses dns", func() {
 		mkpath := func(file string) string {
-			return filepath.Join(framework.TestContext.RepoRoot, "examples/cluster-dns", file)
+			return filepath.Join(os.Getenv("GOPATH"), "src/k8s.io/examples/staging/cluster-dns", file)
 		}
 
 		// contrary to the example, this test does not use contexts, for simplicity
@@ -81,8 +82,9 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		namespaces := []*v1.Namespace{nil, nil}
 		for i := range namespaces {
 			var err error
-			namespaces[i], err = f.CreateNamespace(fmt.Sprintf("dnsexample%d", i), nil)
-			Expect(err).NotTo(HaveOccurred())
+			namespaceName := fmt.Sprintf("dnsexample%d", i)
+			namespaces[i], err = f.CreateNamespace(namespaceName, nil)
+			framework.ExpectNoError(err, "failed to create namespace: %s", namespaceName)
 		}
 
 		for _, ns := range namespaces {
@@ -95,7 +97,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// wait for objects
 		for _, ns := range namespaces {
-			framework.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
+			e2epod.WaitForControlledPodsRunning(c, ns.Name, backendRcName, api.Kind("ReplicationController"))
 			framework.WaitForService(c, ns.Name, backendSvcName, true, framework.Poll, framework.ServiceStartTimeout)
 		}
 		// it is not enough that pods are running because they may be set to running, but
@@ -104,13 +106,13 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"name": backendRcName}))
 			options := metav1.ListOptions{LabelSelector: label.String()}
 			pods, err := c.CoreV1().Pods(ns.Name).List(options)
-			Expect(err).NotTo(HaveOccurred())
-			err = framework.PodsResponding(c, ns.Name, backendPodName, false, pods)
-			Expect(err).NotTo(HaveOccurred(), "waiting for all pods to respond")
-			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
+			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
+			err = e2epod.PodsResponding(c, ns.Name, backendPodName, false, pods)
+			framework.ExpectNoError(err, "waiting for all pods to respond")
+			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
 			err = framework.ServiceResponding(c, ns.Name, backendSvcName)
-			Expect(err).NotTo(HaveOccurred(), "waiting for the service to respond")
+			framework.ExpectNoError(err, "waiting for the service to respond")
 		}
 
 		// Now another tricky part:
@@ -126,15 +128,15 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		pods, err := c.CoreV1().Pods(namespaces[0].Name).List(options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
-			framework.Failf("no running pods found")
+			e2elog.Failf("no running pods found")
 		}
 		podName := pods.Items[0].Name
 
-		queryDns := fmt.Sprintf(queryDnsPythonTemplate, backendSvcName+"."+namespaces[0].Name)
-		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDns}, "ok", dnsReadyTimeout)
-		Expect(err).NotTo(HaveOccurred(), "waiting for output from pod exec")
+		queryDNS := fmt.Sprintf(queryDNSPythonTemplate, backendSvcName+"."+namespaces[0].Name)
+		_, err = framework.LookForStringInPodExec(namespaces[0].Name, podName, []string{"python", "-c", queryDNS}, "ok", dnsReadyTimeout)
+		framework.ExpectNoError(err, "waiting for output from pod exec")
 
-		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, "dns-backend.development.svc.cluster.local", fmt.Sprintf("dns-backend.%s.svc.cluster.local", namespaces[0].Name))
+		updatedPodYaml := prepareResourceWithReplacedString(frontendPodYaml, fmt.Sprintf("dns-backend.development.svc.%s", framework.TestContext.ClusterDNSDomain), fmt.Sprintf("dns-backend.%s.svc.%s", namespaces[0].Name, framework.TestContext.ClusterDNSDomain))
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
@@ -144,14 +146,14 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
 		// that we cannot wait for the pods to be running because our pods terminate by themselves.
 		for _, ns := range namespaces {
-			err := framework.WaitForPodNotPending(c, ns.Name, frontendPodName)
+			err := e2epod.WaitForPodNotPending(c, ns.Name, frontendPodName)
 			framework.ExpectNoError(err)
 		}
 
 		// wait for pods to print their result
 		for _, ns := range namespaces {
 			_, err := framework.LookForStringInLog(ns.Name, frontendPodName, frontendPodContainerName, podOutput, framework.PodStartTimeout)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err, "pod %s failed to print result in logs", frontendPodName)
 		}
 	})
 })
@@ -163,10 +165,10 @@ func getNsCmdFlag(ns *v1.Namespace) string {
 // pass enough context with the 'old' parameter so that it replaces what your really intended.
 func prepareResourceWithReplacedString(inputFile, old, new string) string {
 	f, err := os.Open(inputFile)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err, "failed to open file: %s", inputFile)
 	defer f.Close()
 	data, err := ioutil.ReadAll(f)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err, "failed to read from file: %s", inputFile)
 	podYaml := strings.Replace(string(data), old, new, 1)
 	return podYaml
 }

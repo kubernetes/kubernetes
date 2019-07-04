@@ -1,6 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
-load("@io_kubernetes_build//defs:pkg.bzl", "pkg_tar")
-load("@io_kubernetes_build//defs:build.bzl", "release_filegroup")
+load("@io_k8s_repo_infra//defs:pkg.bzl", "pkg_tar")
+load("@io_k8s_repo_infra//defs:build.bzl", "release_filegroup")
 
 go_test(
     name = "go_default_test",
@@ -14,8 +14,8 @@ go_test(
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )
 
@@ -28,12 +28,14 @@ release_filegroup(
         "configure.sh",
         "master.yaml",
         "node.yaml",
+        "shutdown.sh",
     ],
     visibility = ["//visibility:public"],
 )
 
 pkg_tar(
     name = "gci-trusty-manifests",
+    srcs = glob(["gke-internal-configure-helper.sh"]),
     files = {
         "//cluster/gce/gci/mounter": "gci-mounter",
         "configure-helper.sh": "gci-configure-helper.sh",

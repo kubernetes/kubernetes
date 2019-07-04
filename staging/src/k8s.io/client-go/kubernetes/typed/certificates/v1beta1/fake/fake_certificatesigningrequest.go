@@ -59,7 +59,7 @@ func (c *FakeCertificateSigningRequests) List(opts v1.ListOptions) (result *v1be
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.CertificateSigningRequestList{}
+	list := &v1beta1.CertificateSigningRequestList{ListMeta: obj.(*v1beta1.CertificateSigningRequestList).ListMeta}
 	for _, item := range obj.(*v1beta1.CertificateSigningRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -123,7 +123,7 @@ func (c *FakeCertificateSigningRequests) DeleteCollection(options *v1.DeleteOpti
 // Patch applies the patch and returns the patched certificateSigningRequest.
 func (c *FakeCertificateSigningRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.CertificateSigningRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, data, subresources...), &v1beta1.CertificateSigningRequest{})
+		Invokes(testing.NewRootPatchSubresourceAction(certificatesigningrequestsResource, name, pt, data, subresources...), &v1beta1.CertificateSigningRequest{})
 	if obj == nil {
 		return nil, err
 	}

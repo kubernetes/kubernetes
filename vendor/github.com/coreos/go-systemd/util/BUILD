@@ -8,6 +8,7 @@ go_library(
         "util_stub.go",
     ],
     cgo = True,
+    importmap = "k8s.io/kubernetes/vendor/github.com/coreos/go-systemd/util",
     importpath = "github.com/coreos/go-systemd/util",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/pkg/dlopen:go_default_library"],

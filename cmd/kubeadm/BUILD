@@ -5,7 +5,7 @@ load(
     "go_binary",
     "go_library",
 )
-load("//pkg/version:def.bzl", "version_x_defs")
+load("//vendor/k8s.io/client-go/pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "kubeadm",
@@ -18,7 +18,10 @@ go_library(
     name = "go_default_library",
     srcs = ["kubeadm.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm",
-    deps = ["//cmd/kubeadm/app:go_default_library"],
+    deps = [
+        "//cmd/kubeadm/app:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
+    ],
 )
 
 filegroup(

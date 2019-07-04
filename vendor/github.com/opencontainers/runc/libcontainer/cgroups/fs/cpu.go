@@ -46,11 +46,7 @@ func (s *CpuGroup) ApplyDir(path string, cgroup *configs.Cgroup, pid int) error 
 	}
 	// because we are not using d.join we need to place the pid into the procs file
 	// unlike the other subsystems
-	if err := cgroups.WriteCgroupProc(path, pid); err != nil {
-		return err
-	}
-
-	return nil
+	return cgroups.WriteCgroupProc(path, pid)
 }
 
 func (s *CpuGroup) SetRtSched(path string, cgroup *configs.Cgroup) error {
@@ -83,11 +79,7 @@ func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
 			return err
 		}
 	}
-	if err := s.SetRtSched(path, cgroup); err != nil {
-		return err
-	}
-
-	return nil
+	return s.SetRtSched(path, cgroup)
 }
 
 func (s *CpuGroup) Remove(d *cgroupData) error {

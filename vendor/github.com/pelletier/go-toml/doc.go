@@ -17,7 +17,7 @@
 // JSONPath-like queries
 //
 // The package github.com/pelletier/go-toml/query implements a system
-// similar to JSONPath to quickly retrive elements of a TOML document using a
+// similar to JSONPath to quickly retrieve elements of a TOML document using a
 // single expression. See the package documentation for more information.
 //
 package toml

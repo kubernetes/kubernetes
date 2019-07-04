@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -14,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client/metadata"
+	"github.com/aws/aws-sdk-go/internal/sdkio"
 )
 
 const (
@@ -28,6 +28,10 @@ const (
 	// during body reads.
 	ErrCodeResponseTimeout = "ResponseTimeout"
 
+	// ErrCodeInvalidPresignExpire is returned when the expire time provided to
+	// presign is invalid
+	ErrCodeInvalidPresignExpire = "InvalidPresignExpireError"
+
 	// CanceledErrorCode is the error code that will be returned by an
 	// API request that was canceled. Requests given a aws.Context may
 	// return this error when canceled.
@@ -41,8 +45,8 @@ type Request struct {
 	Handlers   Handlers
 
 	Retryer
+	AttemptTime            time.Time
 	Time                   time.Time
-	ExpireTime             time.Duration
 	Operation              *Operation
 	HTTPRequest            *http.Request
 	HTTPResponse           *http.Response
@@ -59,6 +63,11 @@ type Request struct {
 	SignedHeaderVals       http.Header
 	LastSignedAt           time.Time
 	DisableFollowRedirects bool
+
+	// A value greater than 0 instructs the request to be signed as Presigned URL
+	// You should not set this field directly. Instead use Request's
+	// Presign or PresignRequest methods.
+	ExpireTime time.Duration
 
 	context aws.Context
 
@@ -103,6 +112,8 @@ func New(cfg aws.Config, clientInfo metadata.ClientInfo, handlers Handlers,
 		httpReq.URL = &url.URL{}
 		err = awserr.New("InvalidEndpointURL", "invalid endpoint uri", err)
 	}
+
+	SanitizeHostForHeader(httpReq)
 
 	r := &Request{
 		Config:     cfg,
@@ -214,6 +225,9 @@ func (r *Request) SetContext(ctx aws.Context) {
 
 // WillRetry returns if the request's can be retried.
 func (r *Request) WillRetry() bool {
+	if !aws.IsReaderSeekable(r.Body) && r.HTTPRequest.Body != NoBody {
+		return false
+	}
 	return r.Error != nil && aws.BoolValue(r.Retryable) && r.RetryCount < r.MaxRetries()
 }
 
@@ -245,32 +259,36 @@ func (r *Request) SetStringBody(s string) {
 // SetReaderBody will set the request's body reader.
 func (r *Request) SetReaderBody(reader io.ReadSeeker) {
 	r.Body = reader
+	r.BodyStart, _ = reader.Seek(0, sdkio.SeekCurrent) // Get the Bodies current offset.
 	r.ResetBody()
 }
 
 // Presign returns the request's signed URL. Error will be returned
-// if the signing fails.
-func (r *Request) Presign(expireTime time.Duration) (string, error) {
-	r.ExpireTime = expireTime
+// if the signing fails. The expire parameter is only used for presigned Amazon
+// S3 API requests. All other AWS services will use a fixed expiration
+// time of 15 minutes.
+//
+// It is invalid to create a presigned URL with a expire duration 0 or less. An
+// error is returned if expire duration is 0 or less.
+func (r *Request) Presign(expire time.Duration) (string, error) {
+	r = r.copy()
+
+	// Presign requires all headers be hoisted. There is no way to retrieve
+	// the signed headers not hoisted without this. Making the presigned URL
+	// useless.
 	r.NotHoist = false
 
-	if r.Operation.BeforePresignFn != nil {
-		r = r.copy()
-		err := r.Operation.BeforePresignFn(r)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	r.Sign()
-	if r.Error != nil {
-		return "", r.Error
-	}
-	return r.HTTPRequest.URL.String(), nil
+	u, _, err := getPresignedURL(r, expire)
+	return u, err
 }
 
 // PresignRequest behaves just like presign, with the addition of returning a
-// set of headers that were signed.
+// set of headers that were signed. The expire parameter is only used for
+// presigned Amazon S3 API requests. All other AWS services will use a fixed
+// expiration time of 15 minutes.
+//
+// It is invalid to create a presigned URL with a expire duration 0 or less. An
+// error is returned if expire duration is 0 or less.
 //
 // Returns the URL string for the API operation with signature in the query string,
 // and the HTTP headers that were included in the signature. These headers must
@@ -278,12 +296,37 @@ func (r *Request) Presign(expireTime time.Duration) (string, error) {
 //
 // To prevent hoisting any headers to the query string set NotHoist to true on
 // this Request value prior to calling PresignRequest.
-func (r *Request) PresignRequest(expireTime time.Duration) (string, http.Header, error) {
-	r.ExpireTime = expireTime
-	r.Sign()
-	if r.Error != nil {
-		return "", nil, r.Error
+func (r *Request) PresignRequest(expire time.Duration) (string, http.Header, error) {
+	r = r.copy()
+	return getPresignedURL(r, expire)
+}
+
+// IsPresigned returns true if the request represents a presigned API url.
+func (r *Request) IsPresigned() bool {
+	return r.ExpireTime != 0
+}
+
+func getPresignedURL(r *Request, expire time.Duration) (string, http.Header, error) {
+	if expire <= 0 {
+		return "", nil, awserr.New(
+			ErrCodeInvalidPresignExpire,
+			"presigned URL requires an expire duration greater than 0",
+			nil,
+		)
 	}
+
+	r.ExpireTime = expire
+
+	if r.Operation.BeforePresignFn != nil {
+		if err := r.Operation.BeforePresignFn(r); err != nil {
+			return "", nil, err
+		}
+	}
+
+	if err := r.Sign(); err != nil {
+		return "", nil, err
+	}
+
 	return r.HTTPRequest.URL.String(), r.SignedHeaderVals, nil
 }
 
@@ -303,7 +346,7 @@ func debugLogReqError(r *Request, stage string, retrying bool, err error) {
 
 // Build will build the request's object so it can be signed and sent
 // to the service. Build will also validate all the request's parameters.
-// Anny additional build Handlers set on this request will be run
+// Any additional build Handlers set on this request will be run
 // in the order they were set.
 //
 // The request will only be built once. Multiple calls to build will have
@@ -329,9 +372,9 @@ func (r *Request) Build() error {
 	return r.Error
 }
 
-// Sign will sign the request returning error if errors are encountered.
+// Sign will sign the request, returning error if errors are encountered.
 //
-// Send will build the request prior to signing. All Sign Handlers will
+// Sign will build the request prior to signing. All Sign Handlers will
 // be executed in the order they were set.
 func (r *Request) Sign() error {
 	r.Build()
@@ -364,7 +407,7 @@ func (r *Request) getNextRequestBody() (io.ReadCloser, error) {
 	// of the SDK if they used that field.
 	//
 	// Related golang/go#18257
-	l, err := computeBodyLength(r.Body)
+	l, err := aws.SeekerLen(r.Body)
 	if err != nil {
 		return nil, awserr.New(ErrCodeSerialization, "failed to compute request body size", err)
 	}
@@ -382,7 +425,8 @@ func (r *Request) getNextRequestBody() (io.ReadCloser, error) {
 		// Transfer-Encoding: chunked bodies for these methods.
 		//
 		// This would only happen if a aws.ReaderSeekerCloser was used with
-		// a io.Reader that was not also an io.Seeker.
+		// a io.Reader that was not also an io.Seeker, or did not implement
+		// Len() method.
 		switch r.Operation.HTTPMethod {
 		case "GET", "HEAD", "DELETE":
 			body = NoBody
@@ -394,49 +438,13 @@ func (r *Request) getNextRequestBody() (io.ReadCloser, error) {
 	return body, nil
 }
 
-// Attempts to compute the length of the body of the reader using the
-// io.Seeker interface. If the value is not seekable because of being
-// a ReaderSeekerCloser without an unerlying Seeker -1 will be returned.
-// If no error occurs the length of the body will be returned.
-func computeBodyLength(r io.ReadSeeker) (int64, error) {
-	seekable := true
-	// Determine if the seeker is actually seekable. ReaderSeekerCloser
-	// hides the fact that a io.Readers might not actually be seekable.
-	switch v := r.(type) {
-	case aws.ReaderSeekerCloser:
-		seekable = v.IsSeeker()
-	case *aws.ReaderSeekerCloser:
-		seekable = v.IsSeeker()
-	}
-	if !seekable {
-		return -1, nil
-	}
-
-	curOffset, err := r.Seek(0, 1)
-	if err != nil {
-		return 0, err
-	}
-
-	endOffset, err := r.Seek(0, 2)
-	if err != nil {
-		return 0, err
-	}
-
-	_, err = r.Seek(curOffset, 0)
-	if err != nil {
-		return 0, err
-	}
-
-	return endOffset - curOffset, nil
-}
-
 // GetBody will return an io.ReadSeeker of the Request's underlying
 // input body with a concurrency safe wrapper.
 func (r *Request) GetBody() io.ReadSeeker {
 	return r.safeBody
 }
 
-// Send will send the request returning error if errors are encountered.
+// Send will send the request, returning error if errors are encountered.
 //
 // Send will sign the request prior to sending. All Send Handlers will
 // be executed in the order they were set.
@@ -456,79 +464,78 @@ func (r *Request) Send() error {
 		r.Handlers.Complete.Run(r)
 	}()
 
+	if err := r.Error; err != nil {
+		return err
+	}
+
 	for {
-		if aws.BoolValue(r.Retryable) {
-			if r.Config.LogLevel.Matches(aws.LogDebugWithRequestRetries) {
-				r.Config.Logger.Log(fmt.Sprintf("DEBUG: Retrying Request %s/%s, attempt %d",
-					r.ClientInfo.ServiceName, r.Operation.Name, r.RetryCount))
-			}
+		r.Error = nil
+		r.AttemptTime = time.Now()
 
-			// The previous http.Request will have a reference to the r.Body
-			// and the HTTP Client's Transport may still be reading from
-			// the request's body even though the Client's Do returned.
-			r.HTTPRequest = copyHTTPRequest(r.HTTPRequest, nil)
-			r.ResetBody()
-
-			// Closing response body to ensure that no response body is leaked
-			// between retry attempts.
-			if r.HTTPResponse != nil && r.HTTPResponse.Body != nil {
-				r.HTTPResponse.Body.Close()
-			}
+		if err := r.Sign(); err != nil {
+			debugLogReqError(r, "Sign Request", false, err)
+			return err
 		}
 
-		r.Sign()
-		if r.Error != nil {
-			return r.Error
-		}
-
-		r.Retryable = nil
-
-		r.Handlers.Send.Run(r)
-		if r.Error != nil {
-			if !shouldRetryCancel(r) {
-				return r.Error
-			}
-
-			err := r.Error
+		if err := r.sendRequest(); err == nil {
+			return nil
+		} else if !shouldRetryCancel(r.Error) {
+			return err
+		} else {
 			r.Handlers.Retry.Run(r)
 			r.Handlers.AfterRetry.Run(r)
-			if r.Error != nil {
-				debugLogReqError(r, "Send Request", false, err)
+
+			if r.Error != nil || !aws.BoolValue(r.Retryable) {
 				return r.Error
 			}
-			debugLogReqError(r, "Send Request", true, err)
+
+			r.prepareRetry()
 			continue
 		}
-		r.Handlers.UnmarshalMeta.Run(r)
-		r.Handlers.ValidateResponse.Run(r)
-		if r.Error != nil {
-			r.Handlers.UnmarshalError.Run(r)
-			err := r.Error
+	}
+}
 
-			r.Handlers.Retry.Run(r)
-			r.Handlers.AfterRetry.Run(r)
-			if r.Error != nil {
-				debugLogReqError(r, "Validate Response", false, err)
-				return r.Error
-			}
-			debugLogReqError(r, "Validate Response", true, err)
-			continue
-		}
+func (r *Request) prepareRetry() {
+	if r.Config.LogLevel.Matches(aws.LogDebugWithRequestRetries) {
+		r.Config.Logger.Log(fmt.Sprintf("DEBUG: Retrying Request %s/%s, attempt %d",
+			r.ClientInfo.ServiceName, r.Operation.Name, r.RetryCount))
+	}
 
-		r.Handlers.Unmarshal.Run(r)
-		if r.Error != nil {
-			err := r.Error
-			r.Handlers.Retry.Run(r)
-			r.Handlers.AfterRetry.Run(r)
-			if r.Error != nil {
-				debugLogReqError(r, "Unmarshal Response", false, err)
-				return r.Error
-			}
-			debugLogReqError(r, "Unmarshal Response", true, err)
-			continue
-		}
+	// The previous http.Request will have a reference to the r.Body
+	// and the HTTP Client's Transport may still be reading from
+	// the request's body even though the Client's Do returned.
+	r.HTTPRequest = copyHTTPRequest(r.HTTPRequest, nil)
+	r.ResetBody()
 
-		break
+	// Closing response body to ensure that no response body is leaked
+	// between retry attempts.
+	if r.HTTPResponse != nil && r.HTTPResponse.Body != nil {
+		r.HTTPResponse.Body.Close()
+	}
+}
+
+func (r *Request) sendRequest() (sendErr error) {
+	defer r.Handlers.CompleteAttempt.Run(r)
+
+	r.Retryable = nil
+	r.Handlers.Send.Run(r)
+	if r.Error != nil {
+		debugLogReqError(r, "Send Request", r.WillRetry(), r.Error)
+		return r.Error
+	}
+
+	r.Handlers.UnmarshalMeta.Run(r)
+	r.Handlers.ValidateResponse.Run(r)
+	if r.Error != nil {
+		r.Handlers.UnmarshalError.Run(r)
+		debugLogReqError(r, "Validate Response", r.WillRetry(), r.Error)
+		return r.Error
+	}
+
+	r.Handlers.Unmarshal.Run(r)
+	if r.Error != nil {
+		debugLogReqError(r, "Unmarshal Response", r.WillRetry(), r.Error)
+		return r.Error
 	}
 
 	return nil
@@ -554,28 +561,113 @@ func AddToUserAgent(r *Request, s string) {
 	r.HTTPRequest.Header.Set("User-Agent", s)
 }
 
-func shouldRetryCancel(r *Request) bool {
-	awsErr, ok := r.Error.(awserr.Error)
-	timeoutErr := false
-	errStr := r.Error.Error()
-	if ok {
-		if awsErr.Code() == CanceledErrorCode {
+type temporary interface {
+	Temporary() bool
+}
+
+func shouldRetryCancel(err error) bool {
+	switch err := err.(type) {
+	case awserr.Error:
+		if err.Code() == CanceledErrorCode {
 			return false
 		}
-		err := awsErr.OrigErr()
-		netErr, netOK := err.(net.Error)
-		timeoutErr = netOK && netErr.Temporary()
-		if urlErr, ok := err.(*url.Error); !timeoutErr && ok {
-			errStr = urlErr.Err.Error()
+		return shouldRetryCancel(err.OrigErr())
+	case *url.Error:
+		if strings.Contains(err.Error(), "connection refused") {
+			// Refused connections should be retried as the service may not yet
+			// be running on the port. Go TCP dial considers refused
+			// connections as not temporary.
+			return true
 		}
+		// *url.Error only implements Temporary after golang 1.6 but since
+		// url.Error only wraps the error:
+		return shouldRetryCancel(err.Err)
+	case temporary:
+		// If the error is temporary, we want to allow continuation of the
+		// retry process
+		return err.Temporary()
+	case nil:
+		// `awserr.Error.OrigErr()` can be nil, meaning there was an error but
+		// because we don't know the cause, it is marked as retriable. See
+		// TestRequest4xxUnretryable for an example.
+		return true
+	default:
+		switch err.Error() {
+		case "net/http: request canceled",
+			"net/http: request canceled while waiting for connection":
+			// known 1.5 error case when an http request is cancelled
+			return false
+		}
+		// here we don't know the error; so we allow a retry.
+		return true
+	}
+}
+
+// SanitizeHostForHeader removes default port from host and updates request.Host
+func SanitizeHostForHeader(r *http.Request) {
+	host := getHost(r)
+	port := portOnly(host)
+	if port != "" && isDefaultPort(r.URL.Scheme, port) {
+		r.Host = stripPort(host)
+	}
+}
+
+// Returns host from request
+func getHost(r *http.Request) string {
+	if r.Host != "" {
+		return r.Host
 	}
 
-	// There can be two types of canceled errors here.
-	// The first being a net.Error and the other being an error.
-	// If the request was timed out, we want to continue the retry
-	// process. Otherwise, return the canceled error.
-	return timeoutErr ||
-		(errStr != "net/http: request canceled" &&
-			errStr != "net/http: request canceled while waiting for connection")
+	return r.URL.Host
+}
 
+// Hostname returns u.Host, without any port number.
+//
+// If Host is an IPv6 literal with a port number, Hostname returns the
+// IPv6 literal without the square brackets. IPv6 literals may include
+// a zone identifier.
+//
+// Copied from the Go 1.8 standard library (net/url)
+func stripPort(hostport string) string {
+	colon := strings.IndexByte(hostport, ':')
+	if colon == -1 {
+		return hostport
+	}
+	if i := strings.IndexByte(hostport, ']'); i != -1 {
+		return strings.TrimPrefix(hostport[:i], "[")
+	}
+	return hostport[:colon]
+}
+
+// Port returns the port part of u.Host, without the leading colon.
+// If u.Host doesn't contain a port, Port returns an empty string.
+//
+// Copied from the Go 1.8 standard library (net/url)
+func portOnly(hostport string) string {
+	colon := strings.IndexByte(hostport, ':')
+	if colon == -1 {
+		return ""
+	}
+	if i := strings.Index(hostport, "]:"); i != -1 {
+		return hostport[i+len("]:"):]
+	}
+	if strings.Contains(hostport, "]") {
+		return ""
+	}
+	return hostport[colon+len(":"):]
+}
+
+// Returns true if the specified URI is using the standard port
+// (i.e. port 80 for HTTP URIs or 443 for HTTPS URIs)
+func isDefaultPort(scheme, port string) bool {
+	if port == "" {
+		return true
+	}
+
+	lowerCaseScheme := strings.ToLower(scheme)
+	if (lowerCaseScheme == "http" && port == "80") || (lowerCaseScheme == "https" && port == "443") {
+		return true
+	}
+
+	return false
 }

@@ -30,6 +30,7 @@ type recursiveFieldsPrinter struct {
 
 var _ proto.SchemaVisitor = &recursiveFieldsPrinter{}
 var _ fieldsPrinter = &recursiveFieldsPrinter{}
+var visitedReferences = map[string]struct{}{}
 
 // VisitArray is just a passthrough.
 func (f *recursiveFieldsPrinter) VisitArray(a *proto.Array) {
@@ -64,7 +65,12 @@ func (f *recursiveFieldsPrinter) VisitPrimitive(p *proto.Primitive) {
 
 // VisitReference is just a passthrough.
 func (f *recursiveFieldsPrinter) VisitReference(r proto.Reference) {
+	if _, ok := visitedReferences[r.Reference()]; ok {
+		return
+	}
+	visitedReferences[r.Reference()] = struct{}{}
 	r.SubSchema().Accept(f)
+	delete(visitedReferences, r.Reference())
 }
 
 // PrintFields will recursively print all the fields for the given

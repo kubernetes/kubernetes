@@ -26,18 +26,20 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/endpoints"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -53,35 +55,33 @@ const (
 
 var _ = SIGDescribe("Proxy", func() {
 	version := "v1"
-	Context("version "+version, func() {
-		options := framework.FrameworkOptions{
+	ginkgo.Context("version "+version, func() {
+		options := framework.Options{
 			ClientQPS: -1.0,
 		}
 		f := framework.NewFramework("proxy", options, nil)
 		prefix := "/api/" + version
 
 		/*
-			    Testname: proxy-subresource-node-logs-port
-			    Description: Ensure that proxy on node logs works with node proxy
-				subresource and explicit kubelet port.
+			Release : v1.9
+			Testname: Proxy, logs port endpoint
+			Description: Select any node in the cluster to invoke /proxy/nodes/<nodeip>:10250/logs endpoint. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
 
 		/*
-			    Testname: proxy-subresource-node-logs
-			    Description: Ensure that proxy on node logs works with node proxy
-				subresource.
+			Release : v1.9
+			Testname: Proxy, logs endpoint
+			Description:  Select any node in the cluster to invoke /proxy/nodes/<nodeip>//logs endpoint. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
-		It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
-
 		/*
-			    Testname: proxy-service-pod
-			    Description: Ensure that proxy through a service and a pod works with
-				both generic top level prefix proxy and proxy subresource.
+			Release : v1.9
+			Testname: Proxy, logs service endpoint
+			Description: Select any node in the cluster to invoke  /logs endpoint  using the /nodes/proxy subresource from the kubelet port. This endpoint MUST be reachable.
 		*/
 		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()
@@ -116,21 +116,21 @@ var _ = SIGDescribe("Proxy", func() {
 					},
 				},
 			})
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			// Make an RC with a single pod. The 'porter' image is
 			// a simple server which serves the values of the
 			// environmental variables below.
-			By("starting an echo server on multiple ports")
+			ginkgo.By("starting an echo server on multiple ports")
 			pods := []*v1.Pod{}
 			cfg := testutils.RCConfig{
-				Client:         f.ClientSet,
-				InternalClient: f.InternalClientset,
-				Image:          imageutils.GetE2EImage(imageutils.Porter),
-				Name:           service.Name,
-				Namespace:      f.Namespace.Name,
-				Replicas:       1,
-				PollInterval:   time.Second,
+				Client:       f.ClientSet,
+				Image:        imageutils.GetE2EImage(imageutils.Agnhost),
+				Command:      []string{"/agnhost", "porter"},
+				Name:         service.Name,
+				Namespace:    f.Namespace.Name,
+				Replicas:     1,
+				PollInterval: time.Second,
 				Env: map[string]string{
 					"SERVE_PORT_80":   `<a href="/rewriteme">test</a>`,
 					"SERVE_PORT_1080": `<a href="/rewriteme">test</a>`,
@@ -161,10 +161,12 @@ var _ = SIGDescribe("Proxy", func() {
 				Labels:      labels,
 				CreatedPods: &pods,
 			}
-			Expect(framework.RunRC(cfg)).NotTo(HaveOccurred())
-			defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.ScalesGetter, f.Namespace.Name, cfg.Name)
+			err = framework.RunRC(cfg)
+			framework.ExpectNoError(err)
+			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
-			Expect(framework.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)).NotTo(HaveOccurred())
+			err = endpoints.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
+			framework.ExpectNoError(err)
 
 			// table constructors
 			// Try proxying through the service and directly to through the pod.
@@ -210,10 +212,10 @@ var _ = SIGDescribe("Proxy", func() {
 				errs = append(errs, s)
 			}
 			d := time.Since(start)
-			framework.Logf("setup took %v, starting test cases", d)
+			e2elog.Logf("setup took %v, starting test cases", d)
 			numberTestCases := len(expectations)
 			totalAttempts := numberTestCases * proxyAttempts
-			By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
+			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
 
 			for i := 0; i < proxyAttempts; i++ {
 				wg.Add(numberTestCases)
@@ -249,12 +251,12 @@ var _ = SIGDescribe("Proxy", func() {
 			if len(errs) != 0 {
 				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
-					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+					e2elog.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
-					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+					e2elog.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				framework.Failf(strings.Join(errs, "\n"))
+				e2elog.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})
@@ -271,9 +273,9 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
-		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
+		e2elog.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
 	} else {
-		framework.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
+		e2elog.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
 	return
 }
@@ -298,25 +300,25 @@ func pickNode(cs clientset.Interface) (string, error) {
 
 func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	node, err := pickNode(f.ClientSet)
-	Expect(err).NotTo(HaveOccurred())
+	framework.ExpectNoError(err)
 	// TODO: Change it to test whether all requests succeeded when requests
 	// not reaching Kubelet issue is debugged.
 	serviceUnavailableErrors := 0
 	for i := 0; i < proxyAttempts; i++ {
 		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
-			framework.Logf("Failed proxying node logs due to service unavailable: %v", err)
+			e2elog.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
-			Expect(err).NotTo(HaveOccurred())
-			Expect(status).To(Equal(http.StatusOK))
-			Expect(d).To(BeNumerically("<", proxyHTTPCallTimeout))
+			framework.ExpectNoError(err)
+			gomega.Expect(status).To(gomega.Equal(http.StatusOK))
+			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}
 	if serviceUnavailableErrors > 0 {
-		framework.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
+		e2elog.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
-	Expect(serviceUnavailableErrors).To(BeNumerically("<", maxFailures))
+	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
 }

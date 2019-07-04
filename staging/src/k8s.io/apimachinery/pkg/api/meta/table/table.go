@@ -53,7 +53,7 @@ func MetaToTableRow(obj runtime.Object, rowFn func(obj runtime.Object, m metav1.
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells, err = rowFn(obj, m, m.GetName(), translateTimestamp(m.GetCreationTimestamp()))
+	row.Cells, err = rowFn(obj, m, m.GetName(), ConvertToHumanReadableDateType(m.GetCreationTimestamp()))
 	if err != nil {
 		return nil, err
 	}
@@ -61,11 +61,11 @@ func MetaToTableRow(obj runtime.Object, rowFn func(obj runtime.Object, m metav1.
 	return rows, nil
 }
 
-// translateTimestamp returns the elapsed time since timestamp in
+// ConvertToHumanReadableDateType returns the elapsed time since timestamp in
 // human-readable approximation.
-func translateTimestamp(timestamp metav1.Time) string {
+func ConvertToHumanReadableDateType(timestamp metav1.Time) string {
 	if timestamp.IsZero() {
 		return "<unknown>"
 	}
-	return duration.ShortHumanDuration(time.Now().Sub(timestamp.Time))
+	return duration.HumanDuration(time.Since(timestamp.Time))
 }

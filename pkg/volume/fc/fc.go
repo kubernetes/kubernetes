@@ -19,23 +19,24 @@ package fc
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
-	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilstrings "k8s.io/utils/strings"
 )
 
-// This is the primary entrypoint for volume plugins.
+// ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&fcPlugin{nil}}
 }
@@ -85,6 +86,10 @@ func (plugin *fcPlugin) CanSupport(spec *volume.Spec) bool {
 	return (spec.Volume != nil && spec.Volume.FC != nil) || (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FC != nil)
 }
 
+func (plugin *fcPlugin) IsMigratedToCSI() bool {
+	return false
+}
+
 func (plugin *fcPlugin) RequiresRemount() bool {
 	return false
 }
@@ -106,7 +111,7 @@ func (plugin *fcPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 
 func (plugin *fcPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod.UID, &fcUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Mounter, error) {
@@ -137,22 +142,24 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		if err != nil {
 			return nil, err
 		}
-		glog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
+		klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
 		return &fcDiskMounter{
-			fcDisk:     fcDisk,
-			fsType:     fc.FSType,
-			volumeMode: volumeMode,
-			readOnly:   readOnly,
-			mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-			deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+			fcDisk:       fcDisk,
+			fsType:       fc.FSType,
+			volumeMode:   volumeMode,
+			readOnly:     readOnly,
+			mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+			deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
+			mountOptions: []string{},
 		}, nil
 	}
 	return &fcDiskMounter{
-		fcDisk:     fcDisk,
-		fsType:     fc.FSType,
-		readOnly:   readOnly,
-		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
-		deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
+		fcDisk:       fcDisk,
+		fsType:       fc.FSType,
+		readOnly:     readOnly,
+		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		deviceUtil:   util.NewDeviceHandler(util.NewIOHandler()),
+		mountOptions: util.MountOptionFromSpec(spec),
 	}, nil
 
 }
@@ -164,7 +171,7 @@ func (plugin *fcPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ v
 	if pod != nil {
 		uid = pod.UID
 	}
-	return plugin.newBlockVolumeMapperInternal(spec, uid, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
+	return plugin.newBlockVolumeMapperInternal(spec, uid, &fcUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.BlockVolumeMapper, error) {
@@ -196,7 +203,7 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID t
 
 func (plugin *fcPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &FCUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, &fcUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -214,7 +221,7 @@ func (plugin *fcPlugin) newUnmounterInternal(volName string, podUID types.UID, m
 }
 
 func (plugin *fcPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
-	return plugin.newUnmapperInternal(volName, podUID, &FCUtil{})
+	return plugin.newUnmapperInternal(volName, podUID, &fcUtil{})
 }
 
 func (plugin *fcPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager) (volume.BlockVolumeUnmapper, error) {
@@ -237,7 +244,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	//   globalPDPath : plugins/kubernetes.io/fc/50060e801049cfd1-lun-0
 	var globalPDPath string
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	paths, err := mount.GetMountRefs(mounter, mountPath)
+	paths, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return nil, err
 	}
@@ -251,40 +258,20 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	if len(globalPDPath) == 0 {
 		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
 	}
-	arr := strings.Split(globalPDPath, "/")
-	if len(arr) < 1 {
-		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %v", globalPDPath)
+
+	wwns, lun, wwids, err := parsePDName(globalPDPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %s", err)
 	}
-	volumeInfo := arr[len(arr)-1]
 	// Create volume from wwn+lun or wwid
-	var fcVolume *v1.Volume
-	if strings.Contains(volumeInfo, "-lun-") {
-		wwnLun := strings.Split(volumeInfo, "-lun-")
-		if len(wwnLun) < 2 {
-			return nil, fmt.Errorf("failed to retrieve TargetWWN and Lun. volumeInfo is invalid: %v", volumeInfo)
-		}
-		lun, err := strconv.Atoi(wwnLun[1])
-		if err != nil {
-			return nil, err
-		}
-		lun32 := int32(lun)
-		fcVolume = &v1.Volume{
-			Name: volumeName,
-			VolumeSource: v1.VolumeSource{
-				FC: &v1.FCVolumeSource{TargetWWNs: []string{wwnLun[0]}, Lun: &lun32},
-			},
-		}
-		glog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v",
-			fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun)
-	} else {
-		fcVolume = &v1.Volume{
-			Name: volumeName,
-			VolumeSource: v1.VolumeSource{
-				FC: &v1.FCVolumeSource{WWIDs: []string{volumeInfo}},
-			},
-		}
-		glog.V(5).Infof("ConstructVolumeSpec: WWIDs: %v", fcVolume.VolumeSource.FC.WWIDs)
+	fcVolume := &v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			FC: &v1.FCVolumeSource{WWIDs: wwids, Lun: &lun, TargetWWNs: wwns},
+		},
 	}
+	klog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
+		fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun, fcVolume.VolumeSource.FC.WWIDs)
 	return volume.NewSpecFromVolume(fcVolume), nil
 }
 
@@ -302,38 +289,25 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 	if err != nil {
 		return nil, err
 	}
-	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	klog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
 
-	// Retrieve volumePluginDependentPath from globalMapPathUUID
+	// Retrieve globalPDPath from globalMapPathUUID
 	// globalMapPathUUID examples:
 	//   wwn+lun: plugins/kubernetes.io/fc/volumeDevices/50060e801049cfd1-lun-0/{pod uuid}
 	//   wwid: plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000/{pod uuid}
-	arr := strings.Split(globalMapPathUUID, "/")
-	if len(arr) < 2 {
-		return nil, fmt.Errorf("Fail to retrieve volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
-	}
-	l := len(arr) - 2
-	volumeInfo := arr[l]
-
+	globalPDPath := filepath.Dir(globalMapPathUUID)
 	// Create volume from wwn+lun or wwid
-	var fcPV *v1.PersistentVolume
-	if strings.Contains(volumeInfo, "-lun-") {
-		wwnLun := strings.Split(volumeInfo, "-lun-")
-		lun, err := strconv.Atoi(wwnLun[1])
-		if err != nil {
-			return nil, err
-		}
-		lun32 := int32(lun)
-		fcPV = createPersistentVolumeFromFCVolumeSource(volumeName,
-			v1.FCVolumeSource{TargetWWNs: []string{wwnLun[0]}, Lun: &lun32})
-		glog.V(5).Infof("ConstructBlockVolumeSpec: TargetWWNs: %v, Lun: %v",
-			fcPV.Spec.PersistentVolumeSource.FC.TargetWWNs,
-			*fcPV.Spec.PersistentVolumeSource.FC.Lun)
-	} else {
-		fcPV = createPersistentVolumeFromFCVolumeSource(volumeName,
-			v1.FCVolumeSource{WWIDs: []string{volumeInfo}})
-		glog.V(5).Infof("ConstructBlockVolumeSpec: WWIDs: %v", fcPV.Spec.PersistentVolumeSource.FC.WWIDs)
+	wwns, lun, wwids, err := parsePDName(globalPDPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve volume plugin information from globalPDPath: %s", err)
 	}
+	fcPV := createPersistentVolumeFromFCVolumeSource(volumeName,
+		v1.FCVolumeSource{TargetWWNs: wwns, Lun: &lun, WWIDs: wwids})
+	klog.V(5).Infof("ConstructBlockVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
+		fcPV.Spec.PersistentVolumeSource.FC.TargetWWNs,
+		*fcPV.Spec.PersistentVolumeSource.FC.Lun,
+		fcPV.Spec.PersistentVolumeSource.FC.WWIDs)
+
 	return volume.NewSpecFromPersistentVolume(fcPV, false), nil
 }
 
@@ -353,32 +327,31 @@ type fcDisk struct {
 }
 
 func (fc *fcDisk) GetPath() string {
-	name := fcPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(name), fc.volName)
+	return fc.plugin.host.GetPodVolumeDir(fc.podUID, utilstrings.EscapeQualifiedName(fcPluginName), fc.volName)
 }
 
 func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
 	mounter, err := volumeSpecToMounter(spec, fc.plugin.host)
 	if err != nil {
-		glog.Warningf("failed to get fc mounter: %v", err)
+		klog.Warningf("failed to get fc mounter: %v", err)
 		return "", err
 	}
 	return fc.manager.MakeGlobalVDPDName(*mounter.fcDisk), nil
 }
 
 func (fc *fcDisk) fcPodDeviceMapPath() (string, string) {
-	name := fcPluginName
-	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedNameForDisk(name)), fc.volName
+	return fc.plugin.host.GetPodVolumeDeviceDir(fc.podUID, utilstrings.EscapeQualifiedName(fcPluginName)), fc.volName
 }
 
 type fcDiskMounter struct {
 	*fcDisk
-	readOnly   bool
-	fsType     string
-	volumeMode v1.PersistentVolumeMode
-	mounter    *mount.SafeFormatAndMount
-	deviceUtil util.DeviceUtil
+	readOnly     bool
+	fsType       string
+	volumeMode   v1.PersistentVolumeMode
+	mounter      *mount.SafeFormatAndMount
+	deviceUtil   util.DeviceUtil
+	mountOptions []string
 }
 
 var _ volume.Mounter = &fcDiskMounter{}
@@ -398,15 +371,15 @@ func (b *fcDiskMounter) CanMount() error {
 	return nil
 }
 
-func (b *fcDiskMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *fcDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *fcDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(b.manager, *b, dir, b.mounter, fsGroup)
+	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup)
 	if err != nil {
-		glog.Errorf("fc: failed to setup")
+		klog.Errorf("fc: failed to setup")
 	}
 	return err
 }
@@ -426,7 +399,7 @@ func (c *fcDiskUnmounter) TearDown() error {
 }
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
-	return util.UnmountPath(dir, c.mounter)
+	return mount.CleanupMountPoint(dir, c.mounter, false)
 }
 
 // Block Volumes Support
@@ -443,6 +416,10 @@ func (b *fcDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (b *fcDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
+	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+}
+
 type fcDiskUnmapper struct {
 	*fcDisk
 	deviceUtil util.DeviceUtil
@@ -455,12 +432,11 @@ func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	if err != nil {
 		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", mapPath, err)
 	}
-	glog.V(4).Infof("fc: %q is unmounted, deleting the directory", mapPath)
-	err = os.RemoveAll(mapPath)
-	if err != nil {
+	klog.V(4).Infof("fc: %s is unmounted, deleting the directory", mapPath)
+	if err = os.RemoveAll(mapPath); err != nil {
 		return fmt.Errorf("fc: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
-	glog.V(4).Infof("fc: successfully detached disk: %s", mapPath)
+	klog.V(4).Infof("fc: successfully detached disk: %s", mapPath)
 	return nil
 }
 

@@ -80,6 +80,7 @@ func (r *LogREST) Get(ctx context.Context, name string, opts runtime.Object) (ru
 		ContentType:     "text/plain",
 		Flush:           logOpts.Follow,
 		ResponseChecker: genericrest.NewGenericHttpResponseChecker(api.Resource("pods/log"), name),
+		RedirectChecker: genericrest.PreventRedirects,
 	}, nil
 }
 

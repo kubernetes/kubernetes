@@ -17,6 +17,8 @@ limitations under the License.
 package util
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 
@@ -24,18 +26,30 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	utilnet "k8s.io/utils/net"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 const (
+	// IPv4ZeroCIDR is the CIDR block for the whole IPv4 address space
 	IPv4ZeroCIDR = "0.0.0.0/0"
+
+	// IPv6ZeroCIDR is the CIDR block for the whole IPv6 address space
 	IPv6ZeroCIDR = "::/0"
 )
 
+var (
+	// ErrAddressNotAllowed indicates the address is not allowed
+	ErrAddressNotAllowed = errors.New("address not allowed")
+
+	// ErrNoAddresses indicates there are no addresses for the hostname
+	ErrNoAddresses = errors.New("No addresses for hostname")
+)
+
+// IsZeroCIDR checks whether the input CIDR string is either
+// the IPv4 or IPv6 zero CIDR
 func IsZeroCIDR(cidr string) bool {
 	if cidr == IPv4ZeroCIDR || cidr == IPv6ZeroCIDR {
 		return true
@@ -43,6 +57,48 @@ func IsZeroCIDR(cidr string) bool {
 	return false
 }
 
+// IsProxyableIP checks if a given IP address is permitted to be proxied
+func IsProxyableIP(ip string) error {
+	netIP := net.ParseIP(ip)
+	if netIP == nil {
+		return ErrAddressNotAllowed
+	}
+	return isProxyableIP(netIP)
+}
+
+func isProxyableIP(ip net.IP) error {
+	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsInterfaceLocalMulticast() {
+		return ErrAddressNotAllowed
+	}
+	return nil
+}
+
+// Resolver is an interface for net.Resolver
+type Resolver interface {
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
+
+// IsProxyableHostname checks if the IP addresses for a given hostname are permitted to be proxied
+func IsProxyableHostname(ctx context.Context, resolv Resolver, hostname string) error {
+	resp, err := resolv.LookupIPAddr(ctx, hostname)
+	if err != nil {
+		return err
+	}
+
+	if len(resp) == 0 {
+		return ErrNoAddresses
+	}
+
+	for _, host := range resp {
+		if err := isProxyableIP(host.IP); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// IsLocalIP checks if a given IP address is bound to an interface
+// on the local system
 func IsLocalIP(ip string) (bool, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
@@ -60,15 +116,16 @@ func IsLocalIP(ip string) (bool, error) {
 	return false, nil
 }
 
-func ShouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
+// ShouldSkipService checks if a given service should skip proxying
+func ShouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		glog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
-	if service.Spec.Type == api.ServiceTypeExternalName {
-		glog.V(3).Infof("Skipping service %s due to Type=ExternalName", svcName)
+	if service.Spec.Type == v1.ServiceTypeExternalName {
+		klog.V(3).Infof("Skipping service %s due to Type=ExternalName", svcName)
 		return true
 	}
 	return false
@@ -135,7 +192,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
 func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	glog.Errorf("%s (service %s/%s).", errMsg, svcNamespace, svcName)
+	klog.Errorf("%s (service %s/%s).", errMsg, svcNamespace, svcName)
 	if recorder != nil {
 		recorder.Eventf(
 			&v1.ObjectReference{
@@ -145,4 +202,47 @@ func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName,
 				UID:       svcUID,
 			}, v1.EventTypeWarning, "KubeProxyIncorrectIPVersion", errMsg)
 	}
+}
+
+// FilterIncorrectIPVersion filters out the incorrect IP version case from a slice of IP strings.
+func FilterIncorrectIPVersion(ipStrings []string, isIPv6Mode bool) ([]string, []string) {
+	return filterWithCondition(ipStrings, isIPv6Mode, utilnet.IsIPv6String)
+}
+
+// FilterIncorrectCIDRVersion filters out the incorrect IP version case from a slice of CIDR strings.
+func FilterIncorrectCIDRVersion(ipStrings []string, isIPv6Mode bool) ([]string, []string) {
+	return filterWithCondition(ipStrings, isIPv6Mode, utilnet.IsIPv6CIDRString)
+}
+
+func filterWithCondition(strs []string, expectedCondition bool, conditionFunc func(string) bool) ([]string, []string) {
+	var corrects, incorrects []string
+	for _, str := range strs {
+		if conditionFunc(str) != expectedCondition {
+			incorrects = append(incorrects, str)
+		} else {
+			corrects = append(corrects, str)
+		}
+	}
+	return corrects, incorrects
+}
+
+// AppendPortIfNeeded appends the given port to IP address unless it is already in
+// "ipv4:port" or "[ipv6]:port" format.
+func AppendPortIfNeeded(addr string, port int32) string {
+	// Return if address is already in "ipv4:port" or "[ipv6]:port" format.
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+
+	// Simply return for invalid case. This should be caught by validation instead.
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return addr
+	}
+
+	// Append port to address.
+	if ip.To4() != nil {
+		return fmt.Sprintf("%s:%d", addr, port)
+	}
+	return fmt.Sprintf("[%s]:%d", addr, port)
 }

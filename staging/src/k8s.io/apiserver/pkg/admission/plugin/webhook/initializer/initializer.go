@@ -20,40 +20,40 @@ import (
 	"net/url"
 
 	"k8s.io/apiserver/pkg/admission"
-	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 // WantsServiceResolver defines a function that accepts a ServiceResolver for
 // admission plugins that need to make calls to services.
 type WantsServiceResolver interface {
-	SetServiceResolver(webhookconfig.ServiceResolver)
+	SetServiceResolver(webhook.ServiceResolver)
 }
 
 // ServiceResolver knows how to convert a service reference into an actual
 // location.
 type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
+	ResolveEndpoint(namespace, name string, port int32) (*url.URL, error)
 }
 
 // WantsAuthenticationInfoResolverWrapper defines a function that wraps the standard AuthenticationInfoResolver
 // to allow the apiserver to control what is returned as auth info
 type WantsAuthenticationInfoResolverWrapper interface {
-	SetAuthenticationInfoResolverWrapper(webhookconfig.AuthenticationInfoResolverWrapper)
+	SetAuthenticationInfoResolverWrapper(wrapper webhook.AuthenticationInfoResolverWrapper)
 	admission.InitializationValidator
 }
 
 // PluginInitializer is used for initialization of the webhook admission plugin.
 type PluginInitializer struct {
-	serviceResolver                   webhookconfig.ServiceResolver
-	authenticationInfoResolverWrapper webhookconfig.AuthenticationInfoResolverWrapper
+	serviceResolver                   webhook.ServiceResolver
+	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
 
 // NewPluginInitializer constructs new instance of PluginInitializer
 func NewPluginInitializer(
-	authenticationInfoResolverWrapper webhookconfig.AuthenticationInfoResolverWrapper,
-	serviceResolver webhookconfig.ServiceResolver,
+	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	serviceResolver webhook.ServiceResolver,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		authenticationInfoResolverWrapper: authenticationInfoResolverWrapper,

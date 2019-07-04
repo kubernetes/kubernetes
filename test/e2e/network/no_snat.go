@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	// . "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -39,9 +39,6 @@ const (
 
 	testProxyPort = 31235 // Firewall rule allows external traffic on ports 30000-32767. I just picked a random one.
 )
-
-var testPodImage = imageutils.GetE2EImage(imageutils.NoSnatTest)
-var testProxyImage = imageutils.GetE2EImage(imageutils.NoSnatTestProxy)
 
 var (
 	testPod = v1.Pod{
@@ -55,8 +52,8 @@ var (
 			Containers: []v1.Container{
 				{
 					Name:  "no-snat-test",
-					Image: testPodImage,
-					Args:  []string{"--port", strconv.Itoa(testPodPort)},
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"no-snat-test", "--port", strconv.Itoa(testPodPort)},
 					Env: []v1.EnvVar{
 						{
 							Name:      "POD_IP",
@@ -77,8 +74,8 @@ var (
 			Containers: []v1.Container{
 				{
 					Name:  "no-snat-test-proxy",
-					Image: testProxyImage,
-					Args:  []string{"--port", strconv.Itoa(testProxyPort)},
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"no-snat-test-proxy", "--port", strconv.Itoa(testProxyPort)},
 					Ports: []v1.ContainerPort{
 						{
 							ContainerPort: testProxyPort,
@@ -94,11 +91,11 @@ var (
 // Produces a pod spec that passes nip as NODE_IP env var using downward API
 func newTestPod(nodename string, nip string) *v1.Pod {
 	pod := testPod
-	node_ip := v1.EnvVar{
+	nodeIP := v1.EnvVar{
 		Name:  "NODE_IP",
 		Value: nip,
 	}
-	pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, node_ip)
+	pod.Spec.Containers[0].Env = append(pod.Spec.Containers[0].Env, nodeIP)
 	pod.Spec.NodeName = nodename
 	return &pod
 }
@@ -135,12 +132,12 @@ func checknosnatURL(proxy, pip string, ips []string) string {
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
 var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
-	It("Should be able to send traffic between Pods without SNAT", func() {
+	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
 		nc := cs.CoreV1().Nodes()
 
-		By("creating a test pod on each Node")
+		ginkgo.By("creating a test pod on each Node")
 		nodes, err := nc.List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
@@ -167,7 +164,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		// on the master, but do allow this on the nodes.
 		node, err := getSchedulable(nodes.Items)
 		framework.ExpectNoError(err)
-		By("creating a no-snat-test-proxy Pod on Node " + node.Name + " port " + strconv.Itoa(testProxyPort) +
+		ginkgo.By("creating a no-snat-test-proxy Pod on Node " + node.Name + " port " + strconv.Itoa(testProxyPort) +
 			" so we can target our test Pods through this Node's ExternalIP")
 
 		extIP, err := getIP(v1.NodeExternalIP, node)
@@ -177,7 +174,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		_, err = pc.Create(newTestProxyPod(node.Name))
 		framework.ExpectNoError(err)
 
-		By("waiting for all of the no-snat-test pods to be scheduled and running")
+		ginkgo.By("waiting for all of the no-snat-test pods to be scheduled and running")
 		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
 			pods, err := pc.List(metav1.ListOptions{LabelSelector: "no-snat-test"})
 			if err != nil {
@@ -197,7 +194,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		})
 		framework.ExpectNoError(err)
 
-		By("waiting for the no-snat-test-proxy Pod to be scheduled and running")
+		ginkgo.By("waiting for the no-snat-test-proxy Pod to be scheduled and running")
 		err = wait.PollImmediate(10*time.Second, 1*time.Minute, func() (bool, error) {
 			pod, err := pc.Get("no-snat-test-proxy", metav1.GetOptions{})
 			if err != nil {
@@ -213,7 +210,7 @@ var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 		})
 		framework.ExpectNoError(err)
 
-		By("sending traffic from each pod to the others and checking that SNAT does not occur")
+		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
 		pods, err := pc.List(metav1.ListOptions{LabelSelector: "no-snat-test"})
 		framework.ExpectNoError(err)
 

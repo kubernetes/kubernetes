@@ -20,7 +20,7 @@ import (
 
 	info "github.com/google/cadvisor/info/v1"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 type NetlinkReader struct {
@@ -38,7 +38,7 @@ func New() (*NetlinkReader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get netlink family id for task stats: %s", err)
 	}
-	glog.V(4).Infof("Family id for taskstats: %d", id)
+	klog.V(4).Infof("Family id for taskstats: %d", id)
 	return &NetlinkReader{
 		familyId: id,
 		conn:     conn,
@@ -75,6 +75,6 @@ func (self *NetlinkReader) GetCpuLoad(name string, path string) (info.LoadStats,
 	if err != nil {
 		return info.LoadStats{}, err
 	}
-	glog.V(4).Infof("Task stats for %q: %+v", path, stats)
+	klog.V(4).Infof("Task stats for %q: %+v", path, stats)
 	return stats, nil
 }

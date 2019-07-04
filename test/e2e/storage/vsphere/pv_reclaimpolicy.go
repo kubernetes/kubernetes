@@ -20,13 +20,14 @@ import (
 	"strconv"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"k8s.io/api/core/v1"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -41,14 +42,14 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 		nodeInfo   *NodeInfo
 	)
 
-	BeforeEach(func() {
+	ginkgo.BeforeEach(func() {
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
 	utils.SIGDescribe("persistentvolumereclaim:vsphere", func() {
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)
 			nodeInfo = GetReadySchedulableRandomNodeInfo()
@@ -57,7 +58,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			volumePath = ""
 		})
 
-		AfterEach(func() {
+		ginkgo.AfterEach(func() {
 			testCleanupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, volumePath, pv, pvc)
 		})
 
@@ -73,17 +74,17 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			5. Delete PVC
 			6. Verify PV is deleted automatically.
 		*/
-		It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func() {
+		ginkgo.It("should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted", func() {
 			var err error
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			deletePVCAfterBind(c, ns, pvc, pv)
 			pvc = nil
 
-			By("verify pv is deleted")
+			ginkgo.By("verify pv is deleted")
 			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 300*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			pv = nil
 			volumePath = ""
@@ -101,43 +102,45 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			8. Delete the pod.
 			9. Verify PV should be detached from the node and automatically deleted.
 		*/
-		It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func() {
+		ginkgo.It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func() {
 			var err error
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			// Wait for PV and PVC to Bind
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
-			By("Creating the Pod")
+			ginkgo.By("Creating the Pod")
 			pod, err := framework.CreateClientPod(c, ns, pvc)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("Deleting the Claim")
+			ginkgo.By("Deleting the Claim")
 			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 			pvc = nil
 
 			// Verify PV is Present, after PVC is deleted and PV status should be Failed.
 			pv, err := c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
+			err = framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)
+			framework.ExpectNoError(err)
 
-			By("Verify the volume is attached to the node")
+			ginkgo.By("Verify the volume is attached to the node")
 			isVolumeAttached, verifyDiskAttachedError := diskIsAttached(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
-			Expect(verifyDiskAttachedError).NotTo(HaveOccurred())
-			Expect(isVolumeAttached).To(BeTrue())
+			framework.ExpectNoError(verifyDiskAttachedError)
+			gomega.Expect(isVolumeAttached).To(gomega.BeTrue())
 
-			By("Verify the volume is accessible and available in the pod")
+			ginkgo.By("Verify the volume is accessible and available in the pod")
 			verifyVSphereVolumesAccessible(c, pod, []*v1.PersistentVolume{pv})
-			framework.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
+			e2elog.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
 
-			By("Deleting the Pod")
+			ginkgo.By("Deleting the Pod")
 			framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
 
-			By("Verify PV is detached from the node after Pod is deleted")
-			Expect(waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)).NotTo(HaveOccurred())
+			ginkgo.By("Verify PV is detached from the node after Pod is deleted")
+			err = waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)
+			framework.ExpectNoError(err)
 
-			By("Verify PV should be deleted automatically")
+			ginkgo.By("Verify PV should be deleted automatically")
 			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 			pv = nil
 			volumePath = ""
@@ -161,36 +164,36 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			11. Created POD using PVC created in Step 10 and verify volume content is matching.
 		*/
 
-		It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
+		ginkgo.It("should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted", func() {
 			var err error
 			var volumeFileContent = "hello from vsphere cloud provider, Random Content is :" + strconv.FormatInt(time.Now().UnixNano(), 10)
 
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimRetain)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
 			writeContentToVSpherePV(c, pvc, volumeFileContent)
 
-			By("Delete PVC")
+			ginkgo.By("Delete PVC")
 			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 			pvc = nil
 
-			By("Verify PV is retained")
-			framework.Logf("Waiting for PV %v to become Released", pv.Name)
+			ginkgo.By("Verify PV is retained")
+			e2elog.Logf("Waiting for PV %v to become Released", pv.Name)
 			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 3*time.Second, 300*time.Second)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 
-			By("Creating the PV for same volume path")
+			ginkgo.By("Creating the PV for same volume path")
 			pv = getVSpherePersistentVolumeSpec(volumePath, v1.PersistentVolumeReclaimRetain, nil)
 			pv, err = c.CoreV1().PersistentVolumes().Create(pv)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("creating the pvc")
+			ginkgo.By("creating the pvc")
 			pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
-			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("wait for the pv and pvc to bind")
+			ginkgo.By("wait for the pv and pvc to bind")
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 			verifyContentOfVSpherePV(c, pvc, volumeFileContent)
 
@@ -200,19 +203,19 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 
 // Test Setup for persistentvolumereclaim tests for vSphere Provider
 func testSetupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *NodeInfo, ns string, persistentVolumeReclaimPolicy v1.PersistentVolumeReclaimPolicy) (volumePath string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, err error) {
-	By("running testSetupVSpherePersistentVolumeReclaim")
-	By("creating vmdk")
+	ginkgo.By("running testSetupVSpherePersistentVolumeReclaim")
+	ginkgo.By("creating vmdk")
 	volumePath, err = nodeInfo.VSphere.CreateVolume(&VolumeOptions{}, nodeInfo.DataCenterRef)
 	if err != nil {
 		return
 	}
-	By("creating the pv")
+	ginkgo.By("creating the pv")
 	pv = getVSpherePersistentVolumeSpec(volumePath, persistentVolumeReclaimPolicy, nil)
 	pv, err = c.CoreV1().PersistentVolumes().Create(pv)
 	if err != nil {
 		return
 	}
-	By("creating the pvc")
+	ginkgo.By("creating the pvc")
 	pvc = getVSpherePersistentVolumeClaimSpec(ns, nil)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 	return
@@ -220,10 +223,10 @@ func testSetupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *No
 
 // Test Cleanup for persistentvolumereclaim tests for vSphere Provider
 func testCleanupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *NodeInfo, ns string, volumePath string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) {
-	By("running testCleanupVSpherePersistentVolumeReclaim")
+	ginkgo.By("running testCleanupVSpherePersistentVolumeReclaim")
 	if len(volumePath) > 0 {
 		err := nodeInfo.VSphere.DeleteVolume(volumePath, nodeInfo.DataCenterRef)
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 	if pv != nil {
 		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
@@ -237,13 +240,13 @@ func testCleanupVSpherePersistentVolumeReclaim(c clientset.Interface, nodeInfo *
 func deletePVCAfterBind(c clientset.Interface, ns string, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) {
 	var err error
 
-	By("wait for the pv and pvc to bind")
+	ginkgo.By("wait for the pv and pvc to bind")
 	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
-	By("delete pvc")
+	ginkgo.By("delete pvc")
 	framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 	pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Get(pvc.Name, metav1.GetOptions{})
 	if !apierrs.IsNotFound(err) {
-		Expect(err).NotTo(HaveOccurred())
+		framework.ExpectNoError(err)
 	}
 }

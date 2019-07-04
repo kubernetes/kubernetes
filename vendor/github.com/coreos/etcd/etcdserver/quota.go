@@ -14,9 +14,7 @@
 
 package etcdserver
 
-import (
-	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-)
+import pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
 
 const (
 	// DefaultQuotaBytes is the number of bytes the backend Size may
@@ -58,15 +56,20 @@ const (
 )
 
 func NewBackendQuota(s *EtcdServer) Quota {
+	quotaBackendBytes.Set(float64(s.Cfg.QuotaBackendBytes))
+
 	if s.Cfg.QuotaBackendBytes < 0 {
 		// disable quotas if negative
 		plog.Warningf("disabling backend quota")
 		return &passthroughQuota{}
 	}
+
 	if s.Cfg.QuotaBackendBytes == 0 {
 		// use default size if no quota size given
+		quotaBackendBytes.Set(float64(DefaultQuotaBytes))
 		return &backendQuota{s, DefaultQuotaBytes}
 	}
+
 	if s.Cfg.QuotaBackendBytes > MaxQuotaBytes {
 		plog.Warningf("backend quota %v exceeds maximum recommended quota %v", s.Cfg.QuotaBackendBytes, MaxQuotaBytes)
 	}

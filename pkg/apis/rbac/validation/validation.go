@@ -231,18 +231,12 @@ func ValidateRoleBindingSubject(subject rbac.Subject, isNamespaced bool, fldPath
 
 	case rbac.UserKind:
 		// TODO(ericchiang): What other restrictions on user name are there?
-		if len(subject.Name) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, "user name cannot be empty"))
-		}
 		if subject.APIGroup != rbac.GroupName {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{rbac.GroupName}))
 		}
 
 	case rbac.GroupKind:
 		// TODO(ericchiang): What other restrictions on group name are there?
-		if len(subject.Name) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), subject.Name, "group name cannot be empty"))
-		}
 		if subject.APIGroup != rbac.GroupName {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("apiGroup"), subject.APIGroup, []string{rbac.GroupName}))
 		}

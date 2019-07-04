@@ -15,9 +15,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/admissionregistration",
     deps = [
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
@@ -34,7 +34,6 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/admissionregistration/fuzzer:all-srcs",
         "//pkg/apis/admissionregistration/install:all-srcs",
-        "//pkg/apis/admissionregistration/v1alpha1:all-srcs",
         "//pkg/apis/admissionregistration/v1beta1:all-srcs",
         "//pkg/apis/admissionregistration/validation:all-srcs",
     ],

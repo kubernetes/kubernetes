@@ -28,10 +28,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog"
 )
 
 const (
@@ -49,7 +49,7 @@ const (
 
 func init() {
 	if err := restclient.RegisterAuthProviderPlugin("oidc", newOIDCAuthProvider); err != nil {
-		glog.Fatalf("Failed to register oidc auth plugin: %v", err)
+		klog.Fatalf("Failed to register oidc auth plugin: %v", err)
 	}
 }
 
@@ -124,7 +124,7 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	}
 
 	if len(cfg[cfgExtraScopes]) > 0 {
-		glog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
+		klog.V(2).Infof("%s auth provider field depricated, refresh request don't send scopes",
 			cfgExtraScopes)
 	}
 
@@ -279,7 +279,7 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 
 	// Persist new config and if successful, update the in memory config.
 	if err = p.persister.Persist(newCfg); err != nil {
-		return "", fmt.Errorf("could not perist new tokens: %v", err)
+		return "", fmt.Errorf("could not persist new tokens: %v", err)
 	}
 	p.cfg = newCfg
 

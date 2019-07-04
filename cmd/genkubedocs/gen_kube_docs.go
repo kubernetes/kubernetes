@@ -78,7 +78,6 @@ func main() {
 	case "kubeadm":
 		// resets global flags created by kubelet or other commands e.g.
 		// --azure-container-registry-config from pkg/credentialprovider/azure
-		// --google-json-key from pkg/credentialprovider/gcp
 		// --version pkg/version/verflag
 		pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.ExitOnError)
 

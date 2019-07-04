@@ -1,0 +1,5 @@
+amd64=nginx:1.15-alpine
+arm=arm32v6/nginx:1.15-alpine
+arm64=arm64v8/nginx:1.15-alpine
+ppc64le=ppc64le/nginx:1.15-alpine
+s390x=s390x/nginx:1.15-alpine

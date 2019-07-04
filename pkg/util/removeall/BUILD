@@ -12,7 +12,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/util/mount:go_default_library",
-        "//vendor/k8s.io/client-go/util/testing:go_default_library",
+        "//staging/src/k8s.io/client-go/util/testing:go_default_library",
     ],
 )
 

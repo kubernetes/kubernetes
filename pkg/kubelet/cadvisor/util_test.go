@@ -19,17 +19,17 @@ limitations under the License.
 package cadvisor
 
 import (
-	"fmt"
+	"reflect"
+	"testing"
+
+	"github.com/google/cadvisor/container/crio"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
-	"testing"
 )
 
-func TestCapacityFromMachineInfo(t *testing.T) {
+func TestCapacityFromMachineInfoWithHugePagesEnable(t *testing.T) {
 	machineInfo := &info.MachineInfo{
 		NumCores:       2,
 		MemoryCapacity: 2048,
@@ -41,18 +41,17 @@ func TestCapacityFromMachineInfo(t *testing.T) {
 		},
 	}
 
-	// enable the features.HugePages
-	utilfeature.DefaultFeatureGate.Set(fmt.Sprintf("%s=true", features.HugePages))
+	expected := v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(int64(2000), resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(int64(2048), resource.BinarySI),
+		"hugepages-5Ki":   *resource.NewQuantity(int64(51200), resource.BinarySI),
+	}
+	actual := CapacityFromMachineInfo(machineInfo)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("when set hugepages true, got resource list %v, want %v", actual, expected)
+	}
+}
 
-	resourceList := CapacityFromMachineInfo(machineInfo)
-
-	// assert the cpu and memory
-	assert.EqualValues(t, machineInfo.NumCores*1000, resourceList.Cpu().MilliValue(), "unexpected CPU value")
-	assert.EqualValues(t, machineInfo.MemoryCapacity, resourceList.Memory().Value(), "unexpected memory value")
-
-	// assert the hugepage
-	hugePageKey := int64(5 * 1024)
-	value, found := resourceList[v1helper.HugePageResourceName(*resource.NewQuantity(hugePageKey, resource.BinarySI))]
-	assert.True(t, found, "hugepage not found")
-	assert.EqualValues(t, hugePageKey*10, value.Value(), "unexpected hugepage value")
+func TestCrioSocket(t *testing.T) {
+	assert.EqualValues(t, CrioSocket, crio.CrioSocket, "CrioSocket in this package must equal the one in github.com/google/cadvisor/container/crio/client.go")
 }

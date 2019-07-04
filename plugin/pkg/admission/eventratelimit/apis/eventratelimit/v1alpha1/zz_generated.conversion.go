@@ -34,13 +34,28 @@ func init() {
 
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
-func RegisterConversions(scheme *runtime.Scheme) error {
-	return scheme.AddGeneratedConversionFuncs(
-		Convert_v1alpha1_Configuration_To_eventratelimit_Configuration,
-		Convert_eventratelimit_Configuration_To_v1alpha1_Configuration,
-		Convert_v1alpha1_Limit_To_eventratelimit_Limit,
-		Convert_eventratelimit_Limit_To_v1alpha1_Limit,
-	)
+func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*Configuration)(nil), (*eventratelimit.Configuration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Configuration_To_eventratelimit_Configuration(a.(*Configuration), b.(*eventratelimit.Configuration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*eventratelimit.Configuration)(nil), (*Configuration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_eventratelimit_Configuration_To_v1alpha1_Configuration(a.(*eventratelimit.Configuration), b.(*Configuration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*Limit)(nil), (*eventratelimit.Limit)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Limit_To_eventratelimit_Limit(a.(*Limit), b.(*eventratelimit.Limit), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*eventratelimit.Limit)(nil), (*Limit)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_eventratelimit_Limit_To_v1alpha1_Limit(a.(*eventratelimit.Limit), b.(*Limit), scope)
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func autoConvert_v1alpha1_Configuration_To_eventratelimit_Configuration(in *Configuration, out *eventratelimit.Configuration, s conversion.Scope) error {

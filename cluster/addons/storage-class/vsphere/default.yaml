@@ -3,9 +3,8 @@ kind: StorageClass
 metadata:
   name: thin
   annotations:
-    storageclass.beta.kubernetes.io/is-default-class: "true"
+    storageclass.kubernetes.io/is-default-class: "true"
   labels:
-    kubernetes.io/cluster-service: "true"
 provisioner: kubernetes.io/vsphere-volume
 parameters:
     diskformat: thin

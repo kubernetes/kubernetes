@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -28,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -41,24 +40,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	genericprinters "k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
+	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
-func init() {
-	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}, &TestPrintType{})
-	legacyscheme.Scheme.AddKnownTypes(schema.GroupVersion{Group: "", Version: "v1"}, &TestPrintType{})
-}
-
 var testData = TestStruct{
+	TypeMeta:   metav1.TypeMeta{APIVersion: "foo/bar", Kind: "TestStruct"},
 	Key:        "testValue",
 	Map:        map[string]int{"TestSubkey": 1},
 	StringList: []string{"a", "b", "c"},
@@ -76,27 +76,6 @@ type TestStruct struct {
 
 func (in *TestStruct) DeepCopyObject() runtime.Object {
 	panic("never called")
-}
-
-func TestVersionedPrinter(t *testing.T) {
-	original := &TestPrintType{Data: "value"}
-	p := printers.NewVersionedPrinter(
-		printers.ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
-			if obj == original {
-				t.Fatalf("object should not be identical: %#v", obj)
-			}
-			if obj.(*TestPrintType).Data != "value" {
-				t.Fatalf("object was not converted: %#v", obj)
-			}
-			return nil
-		}),
-		legacyscheme.Scheme,
-		legacyscheme.Scheme,
-		schema.GroupVersion{Group: "", Version: "v1"},
-	)
-	if err := p.PrintObj(original, nil); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
 }
 
 func TestPrintUnstructuredObject(t *testing.T) {
@@ -192,7 +171,7 @@ func TestPrintUnstructuredObject(t *testing.T) {
 
 	for _, test := range tests {
 		out.Reset()
-		printer := printers.NewHumanReadablePrinter(nil, test.options).With(AddDefaultHandlers)
+		printer := printers.NewTablePrinter(test.options)
 		printer.PrintObj(test.object, out)
 
 		matches, err := regexp.MatchString(test.expected, out.String())
@@ -253,8 +232,11 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	}
 
 	obj := &v1.Pod{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 	}
+	// our decoder defaults, so we should default our expected object as well
+	legacyscheme.Scheme.Default(obj)
 	buf.Reset()
 	printer.PrintObj(obj, buf)
 	var objOut v1.Pod
@@ -273,12 +255,16 @@ func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc f
 	}
 }
 
+func yamlUnmarshal(data []byte, v interface{}) error {
+	return yaml.Unmarshal(data, v)
+}
+
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &printers.YAMLPrinter{}, yaml.Unmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yamlUnmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &printers.JSONPrinter{}, json.Unmarshal)
+	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
 }
 
 func TestFormatResourceName(t *testing.T) {
@@ -294,30 +280,29 @@ func TestFormatResourceName(t *testing.T) {
 		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
 	}
 	for _, tt := range tests {
-		if got := printers.FormatResourceName(tt.kind, tt.name, true); got != tt.want {
+		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
 			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
 		}
 	}
 }
 
-func PrintCustomType(obj *TestPrintType, w io.Writer, options printers.PrintOptions) error {
+func PrintCustomType(obj *TestPrintType, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
 	data := obj.Data
 	kind := options.Kind
 	if options.WithKind {
 		data = kind.String() + "/" + data
 	}
-	_, err := fmt.Fprintf(w, "%s", data)
-	return err
+	return []metav1beta1.TableRow{{Cells: []interface{}{data}}}, nil
 }
 
-func ErrorPrintHandler(obj *TestPrintType, w io.Writer, options printers.PrintOptions) error {
-	return fmt.Errorf("ErrorPrintHandler error")
+func ErrorPrintHandler(obj *TestPrintType, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+	return nil, fmt.Errorf("ErrorPrintHandler error")
 }
 
 func TestCustomTypePrinting(t *testing.T) {
-	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
-	printer.Handler(columns, nil, PrintCustomType)
+	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	printer.TableHandler(columns, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
@@ -325,16 +310,16 @@ func TestCustomTypePrinting(t *testing.T) {
 	if err != nil {
 		t.Fatalf("An error occurred printing the custom type: %#v", err)
 	}
-	expectedOutput := "DATA\ntest object"
+	expectedOutput := "DATA\ntest object\n"
 	if buffer.String() != expectedOutput {
 		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
 	}
 }
 
 func TestPrintHandlerError(t *testing.T) {
-	columns := []string{"Data"}
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
-	printer.Handler(columns, nil, ErrorPrintHandler)
+	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	printer.TableHandler(columns, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&obj, buffer)
@@ -344,7 +329,7 @@ func TestPrintHandlerError(t *testing.T) {
 }
 
 func TestUnknownTypePrinting(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	buffer := &bytes.Buffer{}
 	err := printer.PrintObj(&TestUnknownType{}, buffer)
 	if err == nil {
@@ -354,7 +339,7 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplatePanic(t *testing.T) {
 	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
-	printer, err := printers.NewGoTemplatePrinter([]byte(tmpl))
+	printer, err := genericprinters.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
@@ -384,23 +369,27 @@ func TestNamePrinter(t *testing.T) {
 			},
 			"pod/foo\n"},
 		"List": {
-			&v1.List{
-				TypeMeta: metav1.TypeMeta{
-					Kind: "List",
+			&unstructured.UnstructuredList{
+				Object: map[string]interface{}{
+					"kind":       "List",
+					"apiVersion": "v1",
 				},
-				Items: []runtime.RawExtension{
+				Items: []unstructured.Unstructured{
 					{
-						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "foo"}}`),
-					},
-					{
-						Raw: []byte(`{"kind": "Pod", "apiVersion": "v1", "metadata": { "name": "bar"}}`),
+						Object: map[string]interface{}{
+							"kind":       "Pod",
+							"apiVersion": "v1",
+							"metadata": map[string]interface{}{
+								"name": "bar",
+							},
+						},
 					},
 				},
 			},
-			"pod/foo\npod/bar\n"},
+			"pod/bar\n"},
 	}
 
-	printFlags := printers.NewPrintFlags("", legacyscheme.Scheme).WithDefaultOutput("name")
+	printFlags := genericclioptions.NewPrintFlags("").WithTypeSetter(legacyscheme.Scheme).WithDefaultOutput("name")
 	printer, err := printFlags.ToPrinter()
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
@@ -423,15 +412,15 @@ func TestNamePrinter(t *testing.T) {
 func TestTemplateStrings(t *testing.T) {
 	// This unit tests the "exists" function as well as the template from update.sh
 	table := map[string]struct {
-		pod    api.Pod
+		pod    v1.Pod
 		expect string
 	}{
-		"nilInfo":   {api.Pod{}, "false"},
-		"emptyInfo": {api.Pod{Status: api.PodStatus{ContainerStatuses: []api.ContainerStatus{}}}, "false"},
+		"nilInfo":   {v1.Pod{}, "false"},
+		"emptyInfo": {v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{}}}, "false"},
 		"fooExists": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
 						},
@@ -441,9 +430,9 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"barExists": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "bar",
 						},
@@ -453,9 +442,9 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"bothExist": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
 						},
@@ -468,16 +457,16 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"barValid": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
 						},
 						{
 							Name: "bar",
-							State: api.ContainerState{
-								Running: &api.ContainerStateRunning{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
 									StartedAt: metav1.Time{},
 								},
 							},
@@ -488,21 +477,21 @@ func TestTemplateStrings(t *testing.T) {
 			"false",
 		},
 		"bothValid": {
-			api.Pod{
-				Status: api.PodStatus{
-					ContainerStatuses: []api.ContainerStatus{
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
 						{
 							Name: "foo",
-							State: api.ContainerState{
-								Running: &api.ContainerStateRunning{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
 									StartedAt: metav1.Time{},
 								},
 							},
 						},
 						{
 							Name: "bar",
-							State: api.ContainerState{
-								Running: &api.ContainerStateRunning{
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
 									StartedAt: metav1.Time{},
 								},
 							},
@@ -515,12 +504,10 @@ func TestTemplateStrings(t *testing.T) {
 	}
 	// The point of this test is to verify that the below template works.
 	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	p, err := printers.NewGoTemplatePrinter([]byte(tmpl))
+	printer, err := genericprinters.NewGoTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
-
-	printer := printers.NewVersionedPrinter(p, legacyscheme.Scheme, legacyscheme.Scheme, schema.GroupVersion{Group: "", Version: "v1"})
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -549,34 +536,28 @@ func TestPrinters(t *testing.T) {
 		jsonpathPrinter  printers.ResourcePrinter
 	)
 
-	templatePrinter, err = printers.NewGoTemplatePrinter([]byte("{{.name}}"))
+	templatePrinter, err = genericprinters.NewGoTemplatePrinter([]byte("{{.name}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter = printers.NewVersionedPrinter(templatePrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
-	templatePrinter2, err = printers.NewGoTemplatePrinter([]byte("{{len .items}}"))
+	templatePrinter2, err = genericprinters.NewGoTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter2 = printers.NewVersionedPrinter(templatePrinter2, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
-	jsonpathPrinter, err = printers.NewJSONPathPrinter("{.metadata.name}")
+	jsonpathPrinter, err = genericprinters.NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
 		t.Fatal(err)
 	}
-	jsonpathPrinter = printers.NewVersionedPrinter(jsonpathPrinter, legacyscheme.Scheme, legacyscheme.Scheme, v1.SchemeGroupVersion)
 
 	genericPrinters := map[string]printers.ResourcePrinter{
-		"json":      &printers.JSONPrinter{},
-		"yaml":      &printers.YAMLPrinter{},
+		// TODO(juanvallejo): move "generic printer" tests to pkg/kubectl/genericclioptions/printers
+		"json":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
+		"yaml":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
 		"template":  templatePrinter,
 		"template2": templatePrinter2,
 		"jsonpath":  jsonpathPrinter,
-		"name": &printers.NamePrinter{
-			Typer:    legacyscheme.Scheme,
-			Decoders: []runtime.Decoder{legacyscheme.Codecs.UniversalDecoder(), unstructured.UnstructuredJSONScheme},
-		},
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},
@@ -609,10 +590,10 @@ func TestPrinters(t *testing.T) {
 
 	// a humanreadable printer deals with internal-versioned objects
 	humanReadablePrinter := map[string]printers.ResourcePrinter{
-		"humanReadable": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+		"humanReadable": printers.NewTablePrinter(printers.PrintOptions{
 			NoHeaders: true,
 		}),
-		"humanReadableHeaders": printers.NewHumanReadablePrinter(nil, printers.PrintOptions{}),
+		"humanReadableHeaders": printers.NewTablePrinter(printers.PrintOptions{}),
 	}
 	AddHandlers((humanReadablePrinter["humanReadable"]).(*printers.HumanReadablePrinter))
 	AddHandlers((humanReadablePrinter["humanReadableHeaders"]).(*printers.HumanReadablePrinter))
@@ -632,7 +613,7 @@ func TestPrinters(t *testing.T) {
 
 func TestPrintEventsResultSorted(t *testing.T) {
 	// Arrange
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	AddHandlers(printer)
 
 	obj := api.EventList{
@@ -677,7 +658,7 @@ func TestPrintEventsResultSorted(t *testing.T) {
 }
 
 func TestPrintNodeStatus(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
 		node   api.Node
@@ -767,7 +748,7 @@ func TestPrintNodeStatus(t *testing.T) {
 }
 
 func TestPrintNodeRole(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{})
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	AddHandlers(printer)
 	table := []struct {
 		node     api.Node
@@ -812,7 +793,7 @@ func TestPrintNodeRole(t *testing.T) {
 }
 
 func TestPrintNodeOSImage(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+	printer := printers.NewTablePrinter(printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -857,7 +838,7 @@ func TestPrintNodeOSImage(t *testing.T) {
 }
 
 func TestPrintNodeKernelVersion(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+	printer := printers.NewTablePrinter(printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -902,7 +883,7 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 }
 
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+	printer := printers.NewTablePrinter(printers.PrintOptions{
 		ColumnLabels: []string{},
 		Wide:         true,
 	})
@@ -947,7 +928,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 }
 
 func TestPrintNodeName(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+	printer := printers.NewTablePrinter(printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -984,7 +965,7 @@ func TestPrintNodeName(t *testing.T) {
 }
 
 func TestPrintNodeExternalIP(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+	printer := printers.NewTablePrinter(printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -1032,7 +1013,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 }
 
 func TestPrintNodeInternalIP(t *testing.T) {
-	printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
+	printer := printers.NewTablePrinter(printers.PrintOptions{
 		Wide: true,
 	})
 	AddHandlers(printer)
@@ -1089,7 +1070,7 @@ func contains(fields []string, field string) bool {
 }
 
 func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
-	ingress := extensions.Ingress{
+	ingress := networking.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "test1",
 			CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
@@ -1097,13 +1078,13 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 				"app_name": "kubectl_test_ingress",
 			},
 		},
-		Spec: extensions.IngressSpec{
-			Backend: &extensions.IngressBackend{
+		Spec: networking.IngressSpec{
+			Backend: &networking.IngressBackend{
 				ServiceName: "svc",
 				ServicePort: intstr.FromInt(93),
 			},
 		},
-		Status: extensions.IngressStatus{
+		Status: networking.IngressStatus{
 			LoadBalancer: api.LoadBalancerStatus{
 				Ingress: []api.LoadBalancerIngress{
 					{
@@ -1115,11 +1096,13 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.NewBuffer([]byte{})
-	table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+	verifyTable(t, table)
+	printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+	if err := printer.PrintObj(table, buff); err != nil {
 		t.Fatal(err)
 	}
 	output := string(buff.Bytes())
@@ -1170,6 +1153,10 @@ func TestPrintHumanReadableService(t *testing.T) {
 					{
 						Port:     8000,
 						Protocol: "TCP",
+					},
+					{
+						Port:     7777,
+						Protocol: "SCTP",
 					},
 				},
 			},
@@ -1244,11 +1231,13 @@ func TestPrintHumanReadableService(t *testing.T) {
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
 			buff := bytes.NewBuffer([]byte{})
-			table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&svc, printers.PrintOptions{Wide: wide})
+			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&svc, printers.PrintOptions{Wide: wide})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+			verifyTable(t, table)
+			printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+			if err := printer.PrintObj(table, buff); err != nil {
 				t.Fatal(err)
 			}
 			output := string(buff.Bytes())
@@ -1307,7 +1296,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Image: "foo/bar",
+									Image:                  "foo/bar",
 									TerminationMessagePath: api.TerminationMessagePathDefault,
 									ImagePullPolicy:        api.PullIfNotPresent,
 								},
@@ -1354,7 +1343,8 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 					Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
 					Ports:     []api.EndpointPort{{Port: 8080}},
 				},
-				}},
+				},
+			},
 			isNamespaced: true,
 		},
 		{
@@ -1385,7 +1375,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 		},
 		{
 			obj: &api.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
+				ObjectMeta: metav1.ObjectMeta{Name: name},
 				Spec:       api.PersistentVolumeSpec{},
 			},
 			isNamespaced: false,
@@ -1429,33 +1419,46 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			},
 			isNamespaced: false,
 		},
+		{
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "Foo",
+					"apiVersion": "example.com/v1",
+					"metadata":   map[string]interface{}{"name": "test", "namespace": namespaceName},
+				},
+			},
+			isNamespaced: true,
+		},
+		{
+			obj: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"kind":       "Foo",
+					"apiVersion": "example.com/v1",
+					"metadata":   map[string]interface{}{"name": "test"},
+				},
+			},
+			isNamespaced: false,
+		},
 	}
 
 	for i, test := range table {
+		printer := printers.NewTablePrinter(printers.PrintOptions{
+			WithNamespace: true,
+			NoHeaders:     true,
+		})
+		AddHandlers(printer)
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(test.obj, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing object: %#v", err)
+		}
 		if test.isNamespaced {
-			// Expect output to include namespace when requested.
-			printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
-				WithNamespace: true,
-			})
-			AddHandlers(printer)
-			buffer := &bytes.Buffer{}
-			err := printer.PrintObj(test.obj, buffer)
-			if err != nil {
-				t.Fatalf("An error occurred printing object: %#v", err)
-			}
-			matched := contains(strings.Fields(buffer.String()), fmt.Sprintf("%s", namespaceName))
-			if !matched {
-				t.Errorf("%d: Expect printing object to contain namespace: %#v", i, test.obj)
+			if !strings.HasPrefix(buffer.String(), namespaceName+" ") {
+				t.Errorf("%d: Expect printing object %T to contain namespace %q, got %s", i, test.obj, namespaceName, buffer.String())
 			}
 		} else {
-			// Expect error when trying to get all namespaces for un-namespaced object.
-			printer := printers.NewHumanReadablePrinter(nil, printers.PrintOptions{
-				WithNamespace: true,
-			})
-			buffer := &bytes.Buffer{}
-			err := printer.PrintObj(test.obj, buffer)
-			if err == nil {
-				t.Errorf("Expected error when printing un-namespaced type")
+			if !strings.HasPrefix(buffer.String(), " ") {
+				t.Errorf("%d: Expect printing object %T to not contain namespace got %s", i, test.obj, buffer.String())
 			}
 		}
 	}
@@ -1492,42 +1495,43 @@ func TestPrintPodTable(t *testing.T) {
 	}{
 		{
 			obj: runningPod, opts: printers.PrintOptions{},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest1\t1/2\tRunning\t6\t<unknown>\n",
+			expect: "NAME    READY   STATUS    RESTARTS   AGE\ntest1   1/2     Running   6          <unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\npod/test1\t1/2\tRunning\t6\t<unknown>\n",
+			expect: "NAME        READY   STATUS    RESTARTS   AGE\npod/test1   1/2     Running   6          <unknown>\n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{ShowLabels: true},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tLABELS\ntest1\t1/2\tRunning\t6\t<unknown>\ta=1,b=2\n",
+			expect: "NAME    READY   STATUS    RESTARTS   AGE         LABELS\ntest1   1/2     Running   6          <unknown>   a=1,b=2\n",
 		},
 		{
 			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\tA\ntest1\t1/2\tRunning\t6\t<unknown>\t1\ntest2\t1/2\tFailed\t6\t<unknown>\t\n",
+			expect: "NAME    READY   STATUS    RESTARTS   AGE         A\ntest1   1/2     Running   6          <unknown>   1\ntest2   1/2     Failed    6          <unknown>   \n",
 		},
 		{
 			obj: runningPod, opts: printers.PrintOptions{NoHeaders: true},
-			expect: "test1\t1/2\tRunning\t6\t<unknown>\n",
+			expect: "test1   1/2   Running   6     <unknown>\n",
 		},
 		{
 			obj: failedPod, opts: printers.PrintOptions{},
-			expect:       "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
+			expect:       "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
 			ignoreLegacy: true, // filtering is not done by the printer in the legacy path
 		},
 		{
 			obj: failedPod, opts: printers.PrintOptions{},
-			expect: "NAME\tREADY\tSTATUS\tRESTARTS\tAGE\ntest2\t1/2\tFailed\t6\t<unknown>\n",
+			expect: "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
 		},
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(test.obj, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(test.obj, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		buf := &bytes.Buffer{}
-		p := printers.NewHumanReadablePrinter(nil, test.opts).With(AddHandlers).AddTabWriter(false)
+		p := printers.NewTablePrinter(test.opts).With(AddHandlers)
 		if err := p.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
@@ -1566,7 +1570,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test container error overwrites pod phase
@@ -1581,7 +1585,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test the same as the above but with Terminated state and the first container overwrites the rest
@@ -1596,7 +1600,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "0/2", "ContainerWaitingReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1611,7 +1615,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test ready is not enough for reporting running
@@ -1627,7 +1631,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod has 2 containers, one is running and the other is completed.
@@ -1643,7 +1647,7 @@ func TestPrintPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test6", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 	}
 
@@ -1662,6 +1666,9 @@ func TestPrintPod(t *testing.T) {
 }
 
 func TestPrintPodwide(t *testing.T) {
+	condition1 := "condition1"
+	condition2 := "condition2"
+	condition3 := "condition3"
 	tests := []struct {
 		pod    api.Pod
 		expect []metav1beta1.TableRow
@@ -1673,10 +1680,31 @@ func TestPrintPodwide(t *testing.T) {
 				Spec: api.PodSpec{
 					Containers: make([]api.Container, 2),
 					NodeName:   "test1",
+					ReadinessGates: []api.PodReadinessGate{
+						{
+							ConditionType: api.PodConditionType(condition1),
+						},
+						{
+							ConditionType: api.PodConditionType(condition2),
+						},
+						{
+							ConditionType: api.PodConditionType(condition3),
+						},
+					},
 				},
 				Status: api.PodStatus{
-					Phase: "podPhase",
-					PodIP: "1.1.1.1",
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodConditionType(condition1),
+							Status: api.ConditionFalse,
+						},
+						{
+							Type:   api.PodConditionType(condition2),
+							Status: api.ConditionTrue,
+						},
+					},
+					Phase:  "podPhase",
+					PodIPs: []api.PodIP{{IP: "1.1.1.1"}},
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{RestartCount: 3},
@@ -1684,7 +1712,48 @@ func TestPrintPodwide(t *testing.T) {
 					NominatedNodeName: "node1",
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "1.1.1.1", "test1", "node1"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
+		},
+		{
+			// Test when the NodeName and PodIP are not none
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "test1"},
+				Spec: api.PodSpec{
+					Containers: make([]api.Container, 2),
+					NodeName:   "test1",
+					ReadinessGates: []api.PodReadinessGate{
+						{
+							ConditionType: api.PodConditionType(condition1),
+						},
+						{
+							ConditionType: api.PodConditionType(condition2),
+						},
+						{
+							ConditionType: api.PodConditionType(condition3),
+						},
+					},
+				},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   api.PodConditionType(condition1),
+							Status: api.ConditionFalse,
+						},
+						{
+							Type:   api.PodConditionType(condition2),
+							Status: api.ConditionTrue,
+						},
+					},
+					Phase:  "podPhase",
+					PodIPs: []api.PodIP{{IP: "1.1.1.1"}, {IP: "2001:db8::"}},
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{RestartCount: 3},
+					},
+					NominatedNodeName: "node1",
+				},
+			},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "1.1.1.1", "test1", "node1", "1/3"}}},
 		},
 		{
 			// Test when the NodeName and PodIP are none
@@ -1696,14 +1765,13 @@ func TestPrintPodwide(t *testing.T) {
 				},
 				Status: api.PodStatus{
 					Phase: "podPhase",
-					PodIP: "",
 					ContainerStatuses: []api.ContainerStatus{
 						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
 						{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{Reason: "ContainerWaitingReason"}}, RestartCount: 3},
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", 6, "<unknown>", "<none>", "<none>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "ContainerWaitingReason", int64(6), "<unknown>", "<none>", "<none>", "<none>", "<none>"}}},
 		},
 	}
 
@@ -1753,7 +1821,7 @@ func TestPrintPodList(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", 6, "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", 1, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/2", "podPhase", int64(6), "<unknown>"}}, {Cells: []interface{}{"test2", "1/1", "podPhase", int64(1), "<unknown>"}}},
 		},
 	}
 
@@ -1790,7 +1858,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Pending should be printed
@@ -1805,7 +1873,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test2", "1/2", "Pending", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Unknown should be printed
@@ -1820,7 +1888,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test3", "1/2", "Unknown", int64(6), "<unknown>"}}},
 		},
 		{
 			// Test pod phase Succeeded shouldn't be printed
@@ -1835,7 +1903,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", 6, "<unknown>"}, Conditions: podSuccessConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test4", "1/2", "Succeeded", int64(6), "<unknown>"}, Conditions: podSuccessConditions}},
 		},
 		{
 			// Test pod phase Failed shouldn't be printed
@@ -1850,15 +1918,16 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 					},
 				},
 			},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", 6, "<unknown>"}, Conditions: podFailedConditions}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test5", "1/2", "Failed", int64(6), "<unknown>"}, Conditions: podFailedConditions}},
 		},
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pod, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -1892,7 +1961,7 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{"col1", "COL2"},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "asd", "zxc"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "asd", "zxc"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1911,15 +1980,16 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pod, printers.PrintOptions{ColumnLabels: test.labelColumns})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{ColumnLabels: test.labelColumns})
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -1934,18 +2004,43 @@ type stringTestList []struct {
 	name, got, exp string
 }
 
-func TestTranslateTimestamp(t *testing.T) {
+func TestTranslateTimestampSince(t *testing.T) {
 	tl := stringTestList{
-		{"a while from now", translateTimestamp(metav1.Time{Time: time.Now().Add(2.1e9)}), "<invalid>"},
-		{"almost now", translateTimestamp(metav1.Time{Time: time.Now().Add(1.9e9)}), "0s"},
-		{"now", translateTimestamp(metav1.Time{Time: time.Now()}), "0s"},
-		{"unknown", translateTimestamp(metav1.Time{}), "<unknown>"},
-		{"30 seconds ago", translateTimestamp(metav1.Time{Time: time.Now().Add(-3e10)}), "30s"},
-		{"5 minutes ago", translateTimestamp(metav1.Time{Time: time.Now().Add(-3e11)}), "5m"},
-		{"an hour ago", translateTimestamp(metav1.Time{Time: time.Now().Add(-6e12)}), "1h"},
-		{"2 days ago", translateTimestamp(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -2)}), "2d"},
-		{"months ago", translateTimestamp(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -90)}), "90d"},
-		{"10 years ago", translateTimestamp(metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}), "10y"},
+		{"a while from now", translateTimestampSince(metav1.Time{Time: time.Now().Add(2.1e9)}), "<invalid>"},
+		{"almost now", translateTimestampSince(metav1.Time{Time: time.Now().Add(1.9e9)}), "0s"},
+		{"now", translateTimestampSince(metav1.Time{Time: time.Now()}), "0s"},
+		{"unknown", translateTimestampSince(metav1.Time{}), "<unknown>"},
+		{"30 seconds ago", translateTimestampSince(metav1.Time{Time: time.Now().Add(-3e10)}), "30s"},
+		{"5 minutes ago", translateTimestampSince(metav1.Time{Time: time.Now().Add(-3e11)}), "5m"},
+		{"an hour ago", translateTimestampSince(metav1.Time{Time: time.Now().Add(-6e12)}), "100m"},
+		{"2 days ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -2)}), "2d"},
+		{"months ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -90)}), "90d"},
+		{"10 years ago", translateTimestampSince(metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}), "10y"},
+	}
+	for _, test := range tl {
+		if test.got != test.exp {
+			t.Errorf("On %v, expected '%v', but got '%v'",
+				test.name, test.exp, test.got)
+		}
+	}
+}
+
+func TestTranslateTimestampUntil(t *testing.T) {
+	// Since this method compares the time with time.Now() internally,
+	// small buffers of 0.1 seconds are added on comparing times to consider method call overhead.
+	// Otherwise, the output strings become shorter than expected.
+	const buf = 1e8
+	tl := stringTestList{
+		{"a while ago", translateTimestampUntil(metav1.Time{Time: time.Now().Add(-2.1e9)}), "<invalid>"},
+		{"almost now", translateTimestampUntil(metav1.Time{Time: time.Now().Add(-1.9e9)}), "0s"},
+		{"now", translateTimestampUntil(metav1.Time{Time: time.Now()}), "0s"},
+		{"unknown", translateTimestampUntil(metav1.Time{}), "<unknown>"},
+		{"in 30 seconds", translateTimestampUntil(metav1.Time{Time: time.Now().Add(3e10 + buf)}), "30s"},
+		{"in 5 minutes", translateTimestampUntil(metav1.Time{Time: time.Now().Add(3e11 + buf)}), "5m"},
+		{"in an hour", translateTimestampUntil(metav1.Time{Time: time.Now().Add(6e12 + buf)}), "100m"},
+		{"in 2 days", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, 2).Add(buf)}), "2d"},
+		{"in months", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().AddDate(0, 0, 90).Add(buf)}), "90d"},
+		{"in 10 years", translateTimestampUntil(metav1.Time{Time: time.Now().UTC().AddDate(10, 0, 0).Add(buf)}), "10y"},
 	}
 	for _, test := range tl {
 		if test.got != test.exp {
@@ -1957,17 +2052,17 @@ func TestTranslateTimestamp(t *testing.T) {
 
 func TestPrintDeployment(t *testing.T) {
 	tests := []struct {
-		deployment extensions.Deployment
+		deployment apps.Deployment
 		expect     string
 		wideExpect string
 	}{
 		{
-			extensions.Deployment{
+			apps.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.DeploymentSpec{
+				Spec: apps.DeploymentSpec{
 					Replicas: 5,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
@@ -1985,34 +2080,38 @@ func TestPrintDeployment(t *testing.T) {
 					},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
-				Status: extensions.DeploymentStatus{
+				Status: apps.DeploymentStatus{
 					Replicas:            10,
 					UpdatedReplicas:     2,
 					AvailableReplicas:   1,
 					UnavailableReplicas: 4,
 				},
 			},
-			"test1\t5\t10\t2\t1\t0s\n",
-			"test1\t5\t10\t2\t1\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1   0/5   2     1     0s\n",
+			"test1   0/5   2     1     0s    fake-container1,fake-container2   fake-image1,fake-image2   foo=bar\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
-		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.deployment, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{Wide: true})
+		verifyTable(t, table)
 		// print deployment with '-o wide' option
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{Wide: true, NoHeaders: true}); err != nil {
+		printer = printers.NewTablePrinter(printers.PrintOptions{Wide: true, NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.wideExpect {
@@ -2024,21 +2123,21 @@ func TestPrintDeployment(t *testing.T) {
 
 func TestPrintDaemonSet(t *testing.T) {
 	tests := []struct {
-		ds         extensions.DaemonSet
+		ds         apps.DaemonSet
 		startsWith string
 	}{
 		{
-			extensions.DaemonSet{
+			apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.DaemonSetSpec{
+				Spec: apps.DaemonSetSpec{
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{Containers: make([]api.Container, 2)},
 					},
 				},
-				Status: extensions.DaemonSetStatus{
+				Status: apps.DaemonSetStatus{
 					CurrentNumberScheduled: 2,
 					DesiredNumberScheduled: 3,
 					NumberReady:            1,
@@ -2046,17 +2145,19 @@ func TestPrintDaemonSet(t *testing.T) {
 					NumberAvailable:        0,
 				},
 			},
-			"test1\t3\t2\t1\t2\t0\t<none>\t0s\n",
+			"test1   3     2     1     2     0     <none>   0s",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.ds, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.ds, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.HasPrefix(buf.String(), test.startsWith) {
@@ -2067,6 +2168,7 @@ func TestPrintDaemonSet(t *testing.T) {
 }
 
 func TestPrintJob(t *testing.T) {
+	now := time.Now()
 	completions := int32(2)
 	tests := []struct {
 		job    batch.Job
@@ -2085,7 +2187,7 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 1,
 				},
 			},
-			"job1\t2\t1\t0s\n",
+			"job1   1/2         0s\n",
 		},
 		{
 			batch.Job{
@@ -2100,21 +2202,56 @@ func TestPrintJob(t *testing.T) {
 					Succeeded: 0,
 				},
 			},
-			"job2\t<none>\t0\t10y\n",
+			"job2   0/1         10y\n",
+		},
+		{
+			batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job3",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded:      0,
+					StartTime:      &metav1.Time{Time: now.Add(time.Minute)},
+					CompletionTime: &metav1.Time{Time: now.Add(31 * time.Minute)},
+				},
+			},
+			"job3   0/1   30m   10y\n",
+		},
+		{
+			batch.Job{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job4",
+					CreationTimestamp: metav1.Time{Time: time.Now().AddDate(-10, 0, 0)},
+				},
+				Spec: batch.JobSpec{
+					Completions: nil,
+				},
+				Status: batch.JobStatus{
+					Succeeded: 0,
+					StartTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+				},
+			},
+			"job4   0/1   20m   10y\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.job, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.job, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -2124,6 +2261,10 @@ func TestPrintHPA(t *testing.T) {
 	minReplicasVal := int32(2)
 	targetUtilizationVal := int32(80)
 	currentUtilizationVal := int32(50)
+	metricLabelSelector, err := metav1.ParseToLabelSelector("label=value")
+	if err != nil {
+		t.Errorf("unable to parse label selector: %v", err)
+	}
 	tests := []struct {
 		hpa      autoscaling.HorizontalPodAutoscaler
 		expected string
@@ -2144,7 +2285,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<none>\t<unset>\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <none>   <unset>   10    4     <unknown>\n",
 		},
 		// external source type, target average value (no current)
 		{
@@ -2161,13 +2302,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:         "some-external-metric",
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2177,7 +2319,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m (avg)\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m (avg)   2     10    4     <unknown>\n",
 		},
 		// external source type, target average value
 		{
@@ -2194,13 +2336,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:         "some-external-metric",
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2212,19 +2355,19 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricStatus{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:          "some-external-metric",
-								CurrentAverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m (avg)\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m (avg)   2     10    4     <unknown>\n",
 		},
 		// external source type, target value (no current)
 		{
@@ -2241,13 +2384,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-service-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:  "some-service-metric",
-								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2257,7 +2401,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// external source type, target value
 		{
@@ -2274,13 +2418,14 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricSource{
-								MetricSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"label": "value",
-									},
+								Metric: autoscaling.MetricIdentifier{
+									Name:     "some-external-metric",
+									Selector: metricLabelSelector,
 								},
-								MetricName:  "some-external-metric",
-								TargetValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2292,14 +2437,18 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ExternalMetricSourceType,
 							External: &autoscaling.ExternalMetricStatus{
-								MetricName:   "some-external-metric",
-								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-external-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									Value: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// pods source type (no current)
 		{
@@ -2316,8 +2465,13 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2327,7 +2481,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// pods source type
 		{
@@ -2344,8 +2498,13 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2357,14 +2516,18 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricStatus{
-								MetricName:          "some-pods-metric",
-								CurrentAverageValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// object source type (no current)
 		{
@@ -2381,12 +2544,17 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ObjectMetricSourceType,
 							Object: &autoscaling.ObjectMetricSource{
-								Target: autoscaling.CrossVersionObjectReference{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								MetricName:  "some-service-metric",
-								TargetValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2396,7 +2564,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// object source type
 		{
@@ -2413,12 +2581,17 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ObjectMetricSourceType,
 							Object: &autoscaling.ObjectMetricSource{
-								Target: autoscaling.CrossVersionObjectReference{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								MetricName:  "some-service-metric",
-								TargetValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:  autoscaling.ValueMetricType,
+									Value: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2430,18 +2603,22 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ObjectMetricSourceType,
 							Object: &autoscaling.ObjectMetricStatus{
-								Target: autoscaling.CrossVersionObjectReference{
+								DescribedObject: autoscaling.CrossVersionObjectReference{
 									Name: "some-service",
 									Kind: "Service",
 								},
-								MetricName:   "some-service-metric",
-								CurrentValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-service-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									Value: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetVal (no current)
 		{
@@ -2458,8 +2635,11 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name:               api.ResourceCPU,
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Name: api.ResourceCPU,
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2469,7 +2649,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/100m   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetVal
 		{
@@ -2486,8 +2666,11 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
-								Name:               api.ResourceCPU,
-								TargetAverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								Name: api.ResourceCPU,
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2499,14 +2682,16 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
-								Name:                api.ResourceCPU,
-								CurrentAverageValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Name: api.ResourceCPU,
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetUtil (no current)
 		{
@@ -2524,7 +2709,10 @@ func TestPrintHPA(t *testing.T) {
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
 								Name: api.ResourceCPU,
-								TargetAverageUtilization: &targetUtilizationVal,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
 							},
 						},
 					},
@@ -2534,7 +2722,7 @@ func TestPrintHPA(t *testing.T) {
 					DesiredReplicas: 5,
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t<unknown>/80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   <unknown>/80%   2     10    4     <unknown>\n",
 		},
 		// resource source type, targetUtil
 		{
@@ -2552,7 +2740,10 @@ func TestPrintHPA(t *testing.T) {
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
 								Name: api.ResourceCPU,
-								TargetAverageUtilization: &targetUtilizationVal,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
 							},
 						},
 					},
@@ -2565,14 +2756,16 @@ func TestPrintHPA(t *testing.T) {
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
 								Name: api.ResourceCPU,
-								CurrentAverageUtilization: &currentUtilizationVal,
-								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
+								Current: autoscaling.MetricValueStatus{
+									AverageUtilization: &currentUtilizationVal,
+									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50%/80%\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50%/80%   2     10    4     <unknown>\n",
 		},
 		// multiple specs
 		{
@@ -2589,22 +2782,35 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "some-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(100, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(100, resource.DecimalSI),
+								},
 							},
 						},
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricSource{
 								Name: api.ResourceCPU,
-								TargetAverageUtilization: &targetUtilizationVal,
+								Target: autoscaling.MetricTarget{
+									Type:               autoscaling.UtilizationMetricType,
+									AverageUtilization: &targetUtilizationVal,
+								},
 							},
 						},
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricSource{
-								MetricName:         "other-pods-metric",
-								TargetAverageValue: *resource.NewMilliQuantity(400, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "other-pods-metric",
+								},
+								Target: autoscaling.MetricTarget{
+									Type:         autoscaling.AverageValueMetricType,
+									AverageValue: resource.NewMilliQuantity(400, resource.DecimalSI),
+								},
 							},
 						},
 					},
@@ -2616,32 +2822,40 @@ func TestPrintHPA(t *testing.T) {
 						{
 							Type: autoscaling.PodsMetricSourceType,
 							Pods: &autoscaling.PodsMetricStatus{
-								MetricName:          "some-pods-metric",
-								CurrentAverageValue: *resource.NewMilliQuantity(50, resource.DecimalSI),
+								Metric: autoscaling.MetricIdentifier{
+									Name: "some-pods-metric",
+								},
+								Current: autoscaling.MetricValueStatus{
+									AverageValue: resource.NewMilliQuantity(50, resource.DecimalSI),
+								},
 							},
 						},
 						{
 							Type: autoscaling.ResourceMetricSourceType,
 							Resource: &autoscaling.ResourceMetricStatus{
 								Name: api.ResourceCPU,
-								CurrentAverageUtilization: &currentUtilizationVal,
-								CurrentAverageValue:       *resource.NewMilliQuantity(40, resource.DecimalSI),
+								Current: autoscaling.MetricValueStatus{
+									AverageUtilization: &currentUtilizationVal,
+									AverageValue:       resource.NewMilliQuantity(40, resource.DecimalSI),
+								},
 							},
 						},
 					},
 				},
 			},
-			"some-hpa\tReplicationController/some-rc\t50m/100m, 50%/80% + 1 more...\t2\t10\t4\t<unknown>\n",
+			"some-hpa   ReplicationController/some-rc   50m/100m, 50%/80% + 1 more...   2     10    4     <unknown>\n",
 		},
 	}
 
 	buff := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.hpa, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.hpa, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buff, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buff); err != nil {
 			t.Fatal(err)
 		}
 		if buff.String() != test.expected {
@@ -2675,7 +2889,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			true,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>", "COL2=zxc,col1=asd"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "COL2=zxc,col1=asd"}}},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2694,15 +2908,16 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			false,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", 6, "<unknown>"}}},
+			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
 		},
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pod, printers.PrintOptions{ShowLabels: test.showLabels})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{ShowLabels: test.showLabels})
 		if err != nil {
 			t.Fatal(err)
 		}
+		verifyTable(t, table)
 		rows := table.Rows
 		for i := range rows {
 			rows[i].Object.Object = nil
@@ -2714,8 +2929,8 @@ func TestPrintPodShowLabels(t *testing.T) {
 }
 
 func TestPrintService(t *testing.T) {
-	single_ExternalIP := []string{"80.11.12.10"}
-	mul_ExternalIP := []string{"80.11.12.10", "80.11.12.11"}
+	singleExternalIP := []string{"80.11.12.10"}
+	mulExternalIP := []string{"80.11.12.10", "80.11.12.11"}
 	tests := []struct {
 		service api.Service
 		expect  string
@@ -2735,7 +2950,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test1\tClusterIP\t10.9.8.7\t<none>\t2233/tcp\t<unknown>\n",
+			"test1   ClusterIP   10.9.8.7   <none>   2233/tcp   <unknown>\n",
 		},
 		{
 			// Test NodePort service
@@ -2753,7 +2968,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test2\tNodePort\t10.9.8.7\t<none>\t8888:9999/tcp\t<unknown>\n",
+			"test2   NodePort   10.9.8.7   <none>   8888:9999/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service
@@ -2770,7 +2985,7 @@ func TestPrintService(t *testing.T) {
 					ClusterIP: "10.9.8.7",
 				},
 			},
-			"test3\tLoadBalancer\t10.9.8.7\t<pending>\t8888/tcp\t<unknown>\n",
+			"test3   LoadBalancer   10.9.8.7   <pending>   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP and no LoadBalancerStatus
@@ -2785,10 +3000,10 @@ func TestPrintService(t *testing.T) {
 						},
 					},
 					ClusterIP:   "10.9.8.7",
-					ExternalIPs: single_ExternalIP,
+					ExternalIPs: singleExternalIP,
 				},
 			},
-			"test4\tLoadBalancer\t10.9.8.7\t80.11.12.10\t8888/tcp\t<unknown>\n",
+			"test4   LoadBalancer   10.9.8.7   80.11.12.10   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service with single ExternalIP
@@ -2803,7 +3018,7 @@ func TestPrintService(t *testing.T) {
 						},
 					},
 					ClusterIP:   "10.9.8.7",
-					ExternalIPs: single_ExternalIP,
+					ExternalIPs: singleExternalIP,
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -2816,7 +3031,7 @@ func TestPrintService(t *testing.T) {
 					},
 				},
 			},
-			"test5\tLoadBalancer\t10.9.8.7\t3.4.5.6,80.11.12.10\t8888/tcp\t<unknown>\n",
+			"test5   LoadBalancer   10.9.8.7   3.4.5.6,80.11.12.10   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test LoadBalancer service with mul ExternalIPs
@@ -2831,7 +3046,7 @@ func TestPrintService(t *testing.T) {
 						},
 					},
 					ClusterIP:   "10.9.8.7",
-					ExternalIPs: mul_ExternalIP,
+					ExternalIPs: mulExternalIP,
 				},
 				Status: api.ServiceStatus{
 					LoadBalancer: api.LoadBalancerStatus{
@@ -2848,7 +3063,7 @@ func TestPrintService(t *testing.T) {
 					},
 				},
 			},
-			"test6\tLoadBalancer\t10.9.8.7\t2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11\t8888/tcp\t<unknown>\n",
+			"test6   LoadBalancer   10.9.8.7   2.3.4.5,3.4.5.6,80.11.12.10,80.11.12.11   8888/tcp   <unknown>\n",
 		},
 		{
 			// Test ExternalName service
@@ -2859,22 +3074,24 @@ func TestPrintService(t *testing.T) {
 					ExternalName: "my.database.example.com",
 				},
 			},
-			"test7\tExternalName\t<none>\tmy.database.example.com\t<none>\t<unknown>\n",
+			"test7   ExternalName   <none>   my.database.example.com   <none>   <unknown>\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.service, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.service, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		// We ignore time
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -2901,7 +3118,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					PodDisruptionsAllowed: 5,
 				},
 			},
-			"pdb1\t22\tN/A\t5\t0s\n",
+			"pdb1   22    N/A   5     0s\n",
 		},
 		{
 			policy.PodDisruptionBudget{
@@ -2917,20 +3134,22 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					PodDisruptionsAllowed: 5,
 				},
 			},
-			"pdb2\tN/A\t11\t5\t0s\n",
+			"pdb2   N/A   11    5     0s\n",
 		}}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pdb, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pdb, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -2957,7 +3176,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 1,
 			},
-			"test1\tdaemonset.apps/foo\t1\t0s\n",
+			"test1   daemonset.apps/foo   1     0s\n",
 		},
 		{
 			apps.ControllerRevision{
@@ -2974,7 +3193,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 2,
 			},
-			"test2\t<none>\t2\t0s\n",
+			"test2   <none>   2     0s\n",
 		},
 		{
 			apps.ControllerRevision{
@@ -2985,7 +3204,7 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 3,
 			},
-			"test3\t<none>\t3\t0s\n",
+			"test3   <none>   3     0s\n",
 		},
 		{
 			apps.ControllerRevision{
@@ -2996,21 +3215,23 @@ func TestPrintControllerRevision(t *testing.T) {
 				},
 				Revision: 4,
 			},
-			"test4\t<none>\t4\t0s\n",
+			"test4   <none>   4     0s\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.history, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.history, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3022,17 +3243,17 @@ func boolP(b bool) *bool {
 
 func TestPrintReplicaSet(t *testing.T) {
 	tests := []struct {
-		replicaSet extensions.ReplicaSet
+		replicaSet apps.ReplicaSet
 		expect     string
 		wideExpect string
 	}{
 		{
-			extensions.ReplicaSet{
+			apps.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              "test1",
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
-				Spec: extensions.ReplicaSetSpec{
+				Spec: apps.ReplicaSetSpec{
 					Replicas: 5,
 					Template: api.PodTemplateSpec{
 						Spec: api.PodSpec{
@@ -3050,45 +3271,197 @@ func TestPrintReplicaSet(t *testing.T) {
 					},
 					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 				},
-				Status: extensions.ReplicaSetStatus{
+				Status: apps.ReplicaSetStatus{
 					Replicas:      5,
 					ReadyReplicas: 2,
 				},
 			},
-			"test1\t5\t5\t2\t0s\n",
-			"test1\t5\t5\t2\t0s\tfake-container1,fake-container2\tfake-image1,fake-image2\tfoo=bar\n",
+			"test1   5     5     2     0s\n",
+			"test1   5     5     2     0s    fake-container1,fake-container2   fake-image1,fake-image2   foo=bar\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.replicaSet, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 
-		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.replicaSet, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
+		verifyTable(t, table)
+		printer = printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true, Wide: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.wideExpect {
-			t.Fatalf("Expected: %s, got: %s", test.wideExpect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.wideExpect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintPersistentVolume(t *testing.T) {
+	myScn := "my-scn"
+
+	claimRef := api.ObjectReference{
+		Name:      "test",
+		Namespace: "default",
+	}
+	tests := []struct {
+		pv     api.PersistentVolume
+		expect string
+	}{
+		{
+			// Test bound
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test1",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:    &claimRef,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("4Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeBound,
+				},
+			},
+			"test1   4Gi   ROX         Bound   default/test               <unknown>\n",
+		},
+		{
+			// // Test failed
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test2",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:    &claimRef,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("4Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeFailed,
+				},
+			},
+			"test2   4Gi   ROX         Failed   default/test               <unknown>\n",
+		},
+		{
+			// Test pending
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test3",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:    &claimRef,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteMany},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumePending,
+				},
+			},
+			"test3   10Gi   RWX         Pending   default/test               <unknown>\n",
+		},
+		{
+			// Test pending, storageClass
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test4",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:         &claimRef,
+					StorageClassName: myScn,
+					AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumePending,
+				},
+			},
+			"test4   10Gi   RWO         Pending   default/test   my-scn         <unknown>\n",
+		},
+		{
+			// Test available
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test5",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:         &claimRef,
+					StorageClassName: myScn,
+					AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeAvailable,
+				},
+			},
+			"test5   10Gi   RWO         Available   default/test   my-scn         <unknown>\n",
+		},
+		{
+			// Test released
+			api.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test6",
+				},
+				Spec: api.PersistentVolumeSpec{
+					ClaimRef:         &claimRef,
+					StorageClassName: myScn,
+					AccessModes:      []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+				Status: api.PersistentVolumeStatus{
+					Phase: api.VolumeReleased,
+				},
+			},
+			"test6   10Gi   RWO         Released   default/test   my-scn         <unknown>\n",
+		},
+	}
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pv, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
 }
 
 func TestPrintPersistentVolumeClaim(t *testing.T) {
+	volumeMode := api.PersistentVolumeFilesystem
 	myScn := "my-scn"
 	tests := []struct {
 		pvc    api.PersistentVolumeClaim
@@ -3102,6 +3475,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 				},
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "my-volume",
+					VolumeMode: &volumeMode,
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Phase:       api.ClaimBound,
@@ -3111,7 +3485,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test1\tBound\tmy-volume\t4Gi\tROX\t\t<unknown>\n",
+			"test1   Bound   my-volume   4Gi   ROX         <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3119,7 +3493,9 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test2",
 				},
-				Spec: api.PersistentVolumeClaimSpec{},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeMode: &volumeMode,
+				},
 				Status: api.PersistentVolumeClaimStatus{
 					Phase:       api.ClaimLost,
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadOnlyMany},
@@ -3128,7 +3504,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test2\tLost\t\t\t\t\t<unknown>\n",
+			"test2   Lost                           <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -3138,6 +3514,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 				},
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "my-volume",
+					VolumeMode: &volumeMode,
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Phase:       api.ClaimPending,
@@ -3147,13 +3524,34 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test3\tPending\tmy-volume\t10Gi\tRWX\t\t<unknown>\n",
+			"test3   Pending   my-volume   10Gi   RWX         <unknown>   Filesystem\n",
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
 			api.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test4",
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName:       "my-volume",
+					StorageClassName: &myScn,
+					VolumeMode:       &volumeMode,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Phase:       api.ClaimPending,
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Capacity: map[api.ResourceName]resource.Quantity{
+						api.ResourceStorage: resource.MustParse("10Gi"),
+					},
+				},
+			},
+			"test4   Pending   my-volume   10Gi   RWO   my-scn   <unknown>   Filesystem\n",
+		},
+		{
+			// Test name, num of containers, restarts, container ready status
+			api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test5",
 				},
 				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName:       "my-volume",
@@ -3167,22 +3565,22 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 					},
 				},
 			},
-			"test4\tPending\tmy-volume\t10Gi\tRWO\tmy-scn\t<unknown>\n",
+			"test5   Pending   my-volume   10Gi   RWO   my-scn   <unknown>   <unset>\n",
 		},
 	}
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.pvc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pvc, printers.PrintOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true, Wide: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			fmt.Println(buf.String())
-			fmt.Println(test.expect)
-			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, but got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3208,7 +3606,7 @@ func TestPrintCronJob(t *testing.T) {
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 			},
-			"cronjob1\t0/5 * * * ?\tFalse\t0\t0s\t0s\n",
+			"cronjob1   0/5 * * * ?   False   0     0s    0s\n",
 		},
 		{
 			batch.CronJob{
@@ -3224,7 +3622,7 @@ func TestPrintCronJob(t *testing.T) {
 					LastScheduleTime: &metav1.Time{Time: time.Now().Add(-3e10)},
 				},
 			},
-			"cronjob2\t0/5 * * * ?\tFalse\t0\t30s\t5m\n",
+			"cronjob2   0/5 * * * ?   False   0     30s   5m\n",
 		},
 		{
 			batch.CronJob{
@@ -3238,21 +3636,23 @@ func TestPrintCronJob(t *testing.T) {
 				},
 				Status: batch.CronJobStatus{},
 			},
-			"cronjob3\t0/5 * * * ?\tFalse\t0\t<none>\t5m\n",
+			"cronjob3   0/5 * * * ?   False   0     <none>   5m\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.cronjob, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.cronjob, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
@@ -3271,7 +3671,7 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/glusterfs",
 			},
-			"sc1\tkubernetes.io/glusterfs\t0s\n",
+			"sc1   kubernetes.io/glusterfs   0s\n",
 		},
 		{
 			storage.StorageClass{
@@ -3281,22 +3681,203 @@ func TestPrintStorageClass(t *testing.T) {
 				},
 				Provisioner: "kubernetes.io/nfs",
 			},
-			"sc2\tkubernetes.io/nfs\t5m\n",
+			"sc2   kubernetes.io/nfs   5m\n",
 		},
 	}
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.sc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if buf.String() != test.expect {
-			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+}
+
+func TestPrintLease(t *testing.T) {
+	holder1 := "holder1"
+	holder2 := "holder2"
+	tests := []struct {
+		sc     coordination.Lease
+		expect string
+	}{
+		{
+			coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "lease1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity: &holder1,
+				},
+			},
+			"lease1   holder1   0s\n",
+		},
+		{
+			coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "lease2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: coordination.LeaseSpec{
+					HolderIdentity: &holder2,
+				},
+			},
+			"lease2   holder2   5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintPriorityClass(t *testing.T) {
+	tests := []struct {
+		pc     scheduling.PriorityClass
+		expect string
+	}{
+		{
+			scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Value: 1,
+			},
+			"pc1   1     false   0s\n",
+		},
+		{
+			scheduling.PriorityClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Value:         1000000000,
+				GlobalDefault: true,
+			},
+			"pc2   1000000000   true   5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintRuntimeClass(t *testing.T) {
+	tests := []struct {
+		rc     nodeapi.RuntimeClass
+		expect string
+	}{
+		{
+			nodeapi.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "rc1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Handler: "h1",
+			},
+			"rc1   h1    0s\n",
+		},
+		{
+			nodeapi.RuntimeClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "rc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Handler: "h2",
+			},
+			"rc2   h2    5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func verifyTable(t *testing.T, table *metav1beta1.Table) {
+	var panicErr interface{}
+	func() {
+		defer func() {
+			panicErr = recover()
+		}()
+		table.DeepCopyObject() // cells are untyped, better check that types are JSON types and can be deep copied
+	}()
+
+	if panicErr != nil {
+		t.Errorf("unexpected panic during deepcopy of table %#v: %v", table, panicErr)
+	}
+}
+
+// VerifyDatesInOrder checks the start of each line for a RFC1123Z date
+// and posts error if all subsequent dates are not equal or increasing
+func VerifyDatesInOrder(
+	resultToTest, rowDelimiter, columnDelimiter string, t *testing.T) {
+	lines := strings.Split(resultToTest, rowDelimiter)
+	var previousTime time.Time
+	for _, str := range lines {
+		columns := strings.Split(str, columnDelimiter)
+		if len(columns) > 0 {
+			currentTime, err := time.Parse(time.RFC1123Z, columns[0])
+			if err == nil {
+				if previousTime.After(currentTime) {
+					t.Errorf(
+						"Output is not sorted by time. %s should be listed after %s. Complete output: %s",
+						previousTime.Format(time.RFC1123Z),
+						currentTime.Format(time.RFC1123Z),
+						resultToTest)
+				}
+				previousTime = currentTime
+			}
+		}
 	}
 }

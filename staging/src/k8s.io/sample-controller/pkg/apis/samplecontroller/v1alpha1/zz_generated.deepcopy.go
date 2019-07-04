@@ -56,7 +56,7 @@ func (in *Foo) DeepCopyObject() runtime.Object {
 func (in *FooList) DeepCopyInto(out *FooList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Foo, len(*in))
@@ -90,12 +90,8 @@ func (in *FooSpec) DeepCopyInto(out *FooSpec) {
 	*out = *in
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
+		*out = new(int32)
+		**out = **in
 	}
 	return
 }

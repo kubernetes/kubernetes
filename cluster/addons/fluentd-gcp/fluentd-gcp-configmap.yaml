@@ -64,16 +64,18 @@ data:
       # reform.var.log.containers.<POD_NAME>_<NAMESPACE_NAME>_<CONTAINER_NAME>-<CONTAINER_ID>.log
       tag reform.*
       read_from_head true
-      format multi_format
-      <pattern>
-        format json
-        time_key time
-        time_format %Y-%m-%dT%H:%M:%S.%NZ
-      </pattern>
-      <pattern>
-        format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
-        time_format %Y-%m-%dT%H:%M:%S.%N%:z
-      </pattern>
+      <parse>
+        @type multi_format
+        <pattern>
+          format json
+          time_key time
+          time_format %Y-%m-%dT%H:%M:%S.%NZ
+        </pattern>
+        <pattern>
+          format /^(?<time>.+) (?<stream>stdout|stderr) [^ ]* (?<log>.*)$/
+          time_format %Y-%m-%dT%H:%M:%S.%N%:z
+        </pattern>
+      </parse>
     </source>
 
     <filter reform.**>
@@ -98,6 +100,8 @@ data:
         # instead of jsonPayload after extracting 'time', 'severity' and
         # 'stream' from the record.
         message ${record['log']}
+        # If 'severity' is not set, assume stderr is ERROR and stdout is INFO.
+        severity ${record['severity'] || if record['stream'] == 'stderr' then 'ERROR' else 'INFO' end}
       </record>
       tag ${if record['stream'] == 'stderr' then 'raw.stderr' else 'raw.stdout' end}
       remove_keys stream,log
@@ -108,8 +112,8 @@ data:
       @type detect_exceptions
 
       remove_tag_prefix raw
-      message log
-      stream stream
+      message message
+      stream "logging.googleapis.com/local_resource_id"
       multiline_flush_interval 5
       max_bytes 500000
       max_lines 1000
@@ -224,20 +228,6 @@ data:
     </source>
 
     # Example:
-    # I1104 10:36:20.242766       5 rescheduler.go:73] Running Rescheduler
-    <source>
-      @type tail
-      format multiline
-      multiline_flush_interval 5s
-      format_firstline /^\w\d{4}/
-      format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
-      time_format %m%d %H:%M:%S.%N
-      path /var/log/rescheduler.log
-      pos_file /var/log/gcp-rescheduler.log.pos
-      tag rescheduler
-    </source>
-
-    # Example:
     # I0603 15:31:05.793605       6 cluster_manager.go:230] Reading config from path /etc/gce.conf
     <source>
       @type tail
@@ -278,7 +268,7 @@ data:
 
     <source>
       @type systemd
-      filters [{ "_SYSTEMD_UNIT": "{{ container_runtime }}.service" }]
+      filters [{ "_SYSTEMD_UNIT": "{{ fluentd_container_runtime_service }}.service" }]
       pos_file /var/log/gcp-journald-container-runtime.pos
       read_from_head true
       tag container-runtime
@@ -314,7 +304,7 @@ data:
       @type grep
       <exclude>
         key _SYSTEMD_UNIT
-        pattern ^(docker|{{ container_runtime }}|kubelet|node-problem-detector)\.service$
+        pattern ^(docker|{{ fluentd_container_runtime_service }}|kubelet|node-problem-detector)\.service$
       </exclude>
     </filter>
     # END_NODE_JOURNAL
@@ -386,6 +376,12 @@ data:
       @type null
     </match>
 
+    # Add a unique insertId to each log entry that doesn't already have it.
+    # This helps guarantee the order and prevent log duplication.
+    <filter **>
+      @type add_insert_ids
+    </filter>
+
     # This section is exclusive for k8s_container logs. These logs come with
     # 'stderr'/'stdout' tags.
     # We use a separate output stanza for 'k8s_node' logs with a smaller buffer
@@ -408,9 +404,9 @@ data:
       buffer_queue_full_action block
       # Set the chunk limit conservatively to avoid exceeding the recommended
       # chunk size of 5MB per write request.
-      buffer_chunk_limit 1M
+      buffer_chunk_limit 512k
       # Cap the combined memory usage of this buffer and the one below to
-      # 1MiB/chunk * (6 + 2) chunks = 8 MiB
+      # 512KiB/chunk * (6 + 2) chunks = 4 MiB
       buffer_queue_limit 6
       # Never wait more than 5 seconds before flushing logs in the non-error case.
       flush_interval 5s
@@ -421,8 +417,9 @@ data:
       # Use multiple threads for processing.
       num_threads 2
       use_grpc true
-      # Use Metadata Agent to get monitored resource.
-      enable_metadata_agent true
+      # Skip timestamp adjustment as this is in a controlled environment with
+      # known timestamp format. This helps with CPU usage.
+      adjust_invalid_timestamps false
     </match>
 
     # Attach local_resource_id for 'k8s_node' monitored resource.
@@ -450,15 +447,16 @@ data:
       buffer_type file
       buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
       buffer_queue_full_action block
-      buffer_chunk_limit 1M
+      buffer_chunk_limit 512k
       buffer_queue_limit 2
       flush_interval 5s
       max_retry_wait 30
       disable_retry_limit
       num_threads 2
       use_grpc true
-      # Use Metadata Agent to get monitored resource.
-      enable_metadata_agent true
+      # Skip timestamp adjustment as this is in a controlled environment with
+      # known timestamp format. This helps with CPU usage.
+      adjust_invalid_timestamps false
     </match>
 metadata:
   name: fluentd-gcp-config-v1.2.5

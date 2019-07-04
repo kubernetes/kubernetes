@@ -20,7 +20,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -59,7 +59,7 @@ func TestMain(m *testing.M) {
 	case string(ipam.IPAMFromClusterAllocatorType):
 		customConfig.AllocatorType = ipam.IPAMFromClusterAllocatorType
 	default:
-		glog.Fatalf("Unknown allocator type: %s", allocator)
+		klog.Fatalf("Unknown allocator type: %s", allocator)
 	}
 
 	framework.EtcdMain(m.Run)

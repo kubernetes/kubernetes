@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "wait.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/task",
     importpath = "github.com/vmware/govmomi/task",
     visibility = ["//visibility:public"],
     deps = [

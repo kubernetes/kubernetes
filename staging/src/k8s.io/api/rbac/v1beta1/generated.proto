@@ -21,11 +21,9 @@ syntax = 'proto2';
 
 package k8s.io.api.rbac.v1beta1;
 
-import "k8s.io/api/rbac/v1alpha1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
@@ -45,6 +43,7 @@ message ClusterRole {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this ClusterRole
+  // +optional
   repeated PolicyRule rules = 2;
 
   // AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
@@ -124,6 +123,7 @@ message Role {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // Rules holds all the PolicyRules for this Role
+  // +optional
   repeated PolicyRule rules = 2;
 }
 

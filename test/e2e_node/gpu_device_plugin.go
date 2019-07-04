@@ -21,10 +21,12 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/gpu"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	. "github.com/onsi/ginkgo"
@@ -32,16 +34,13 @@ import (
 	"github.com/prometheus/common/model"
 )
 
-const (
-	testPodNamePrefix = "nvidia-gpu-"
-)
-
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeature:GPUDevicePlugin][Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
 	Context("DevicePlugin", func() {
 		var devicePluginPod *v1.Pod
+		var err error
 		BeforeEach(func() {
 			By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
@@ -49,14 +48,15 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}
 
 			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			devicePluginPod = f.PodClient().CreateSync(framework.NVIDIADevicePlugin(f.Namespace.Name))
+			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(gpu.NVIDIADevicePlugin())
+			framework.ExpectNoError(err)
 
 			By("Waiting for GPUs to become available on the local node")
 			Eventually(func() bool {
-				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 10*time.Second, framework.Poll).Should(BeTrue())
+				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
 
-			if framework.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
+			if gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				Skip("Not enough GPUs to execute this test (at least two needed)")
 			}
 		})
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
 			By("Creating one GPU pod on a node with at least two GPUs")
 			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"
-			p1 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
+			p1 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
 			devId1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
@@ -87,7 +87,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			By("Restarting Kubelet and waiting for the current running pod to restart")
 			restartKubelet()
 
-			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
+			By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
 			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			Expect(devIdRestart1).To(Equal(devId1))
@@ -96,9 +96,9 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			restartKubelet()
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 			Eventually(func() bool {
-				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 10*time.Second, framework.Poll).Should(BeTrue())
-			p2 := f.PodClient().CreateSync(makeBusyboxPod(framework.NVIDIAGPUResourceName, podRECMD))
+				return gpu.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 5*time.Minute, framework.Poll).Should(BeTrue())
+			p2 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
 			By("Checking that pods got a different GPU")
 			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
@@ -106,12 +106,12 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			Expect(devId1).To(Not(Equal(devId2)))
 
 			By("Deleting device plugin.")
-			f.PodClient().Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
+			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
 			By("Waiting for GPUs to become unavailable on the local node")
 			Eventually(func() bool {
 				node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				return framework.NumberOfNVIDIAGPUs(node) <= 0
+				return gpu.NumberOfNVIDIAGPUs(node) <= 0
 			}, 10*time.Minute, framework.Poll).Should(BeTrue())
 			By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
@@ -143,18 +143,18 @@ func checkIfNvidiaGPUsExistOnNode() bool {
 	// Cannot use `lspci` because it is not installed on all distros by default.
 	err := exec.Command("/bin/sh", "-c", "find /sys/devices/pci* -type f | grep vendor | xargs cat | grep 0x10de").Run()
 	if err != nil {
-		framework.Logf("check for nvidia GPUs failed. Got Error: %v", err)
+		e2elog.Logf("check for nvidia GPUs failed. Got Error: %v", err)
 		return false
 	}
 	return true
 }
 
 func logDevicePluginMetrics() {
-	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName + ":10255")
+	ms, err := metrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	framework.ExpectNoError(err)
 	for msKey, samples := range ms {
 		switch msKey {
-		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationLatencyKey:
+		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationDurationKey:
 			for _, sample := range samples {
 				latency := sample.Value
 				resource := string(sample.Metric["resource_name"])
@@ -164,14 +164,14 @@ func logDevicePluginMetrics() {
 					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
 						continue
 					}
-					framework.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
+					e2elog.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
 				}
 			}
 		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginRegistrationCountKey:
 			for _, sample := range samples {
 				resource := string(sample.Metric["resource_name"])
 				count := sample.Value
-				framework.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
+				e2elog.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
 			}
 		}
 	}

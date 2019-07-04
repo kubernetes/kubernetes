@@ -1,14 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["service.proto"],
-    visibility = ["//visibility:public"],
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["service.pb.go"],
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1",
     importpath = "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1",
     visibility = ["//visibility:public"],
     deps = [

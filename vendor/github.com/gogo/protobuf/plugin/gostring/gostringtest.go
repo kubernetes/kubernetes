@@ -74,7 +74,7 @@ func (p *test) Generate(imports generator.PluginImports, file *generator.FileDes
 			p.P(`_, err := `, parserPkg.Use(), `.ParseExpr(s1)`)
 			p.P(`if err != nil {`)
 			p.In()
-			p.P(`panic(err)`)
+			p.P(`t.Fatal(err)`)
 			p.Out()
 			p.P(`}`)
 			p.Out()

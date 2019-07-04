@@ -1,5 +1,5 @@
 kind: DaemonSet
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 metadata:
   name: calico-node
   namespace: kube-system
@@ -33,7 +33,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: gcr.io/projectcalico-org/node:v2.6.7
+          image: gcr.io/projectcalico-org/node:v3.3.1
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -41,18 +41,22 @@ spec:
               value: "none"
             - name: DATASTORE_TYPE
               value: "kubernetes"
-            - name: FELIX_TYPHAK8SSERVICENAME
-              value: "calico-typha"
             - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
               value: "ACCEPT"
+            - name: FELIX_HEALTHENABLED
+              value: "true"
             - name: FELIX_IPV6SUPPORT
               value: "false"
             - name: FELIX_LOGSEVERITYSYS
               value: "none"
+            - name: FELIX_LOGSEVERITYSCREEN
+              value: "info"
             - name: FELIX_PROMETHEUSMETRICSENABLED
               value: "true"
-            - name: FELIX_HEALTHENABLED
-              value: "true"
+            - name: FELIX_REPORTINGINTERVALSECS
+              value: "0"
+            - name: FELIX_TYPHAK8SSERVICENAME
+              value: "calico-typha"
             - name: IP
               value: ""
             - name: NO_DEFAULT_POOLS
@@ -69,6 +73,7 @@ spec:
             httpGet:
               path: /liveness
               port: 9099
+              host: localhost
             periodSeconds: 10
             initialDelaySeconds: 10
             failureThreshold: 6
@@ -76,6 +81,7 @@ spec:
             httpGet:
               path: /readiness
               port: 9099
+              host: localhost
             periodSeconds: 10
           volumeMounts:
             - mountPath: /lib/modules
@@ -84,10 +90,16 @@ spec:
             - mountPath: /etc/calico
               name: etc-calico
               readOnly: true
+            - mountPath: /var/run/calico
+              name: var-run-calico
+              readOnly: false
+            - mountPath: /var/lib/calico
+              name: var-lib-calico
+              readOnly: false
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v1.11.2
+          image: gcr.io/projectcalico-org/cni:v3.3.1
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -100,7 +112,7 @@ spec:
                   "plugins": [
                     {
                       "type": "calico",
-                      "log_level": "debug",
+                      "log_level": "info",
                       "datastore_type": "kubernetes",
                       "nodename": "__KUBERNETES_NODE_NAME__",
                       "ipam": {
@@ -108,11 +120,9 @@ spec:
                         "subnet": "usePodCidr"
                       },
                       "policy": {
-                        "type": "k8s",
-                        "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__"
+                        "type": "k8s"
                       },
                       "kubernetes": {
-                        "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
                         "kubeconfig": "__KUBECONFIG_FILEPATH__"
                       }
                     },
@@ -149,6 +159,12 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+        - name: var-run-calico
+          hostPath:
+            path: /var/run/calico
+        - name: var-lib-calico
+          hostPath:
+            path: /var/lib/calico
       tolerations:
         # Make sure calico/node gets scheduled on all nodes.
         - effect: NoSchedule

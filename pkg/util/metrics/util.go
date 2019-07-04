@@ -19,21 +19,15 @@ package metrics
 import (
 	"fmt"
 	"sync"
-	"time"
 
 	"k8s.io/client-go/util/flowcontrol"
 
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-)
-
-const (
-	updatePeriod = 5 * time.Second
 )
 
 var (
 	metricsLock        sync.Mutex
-	rateLimiterMetrics = make(map[string]rateLimiterMetric)
+	rateLimiterMetrics = make(map[string]*rateLimiterMetric)
 )
 
 type rateLimiterMetric struct {
@@ -46,7 +40,8 @@ func registerRateLimiterMetric(ownerName string) error {
 	defer metricsLock.Unlock()
 
 	if _, ok := rateLimiterMetrics[ownerName]; ok {
-		return fmt.Errorf("Rate Limiter Metric for %v already registered", ownerName)
+		// only register once in Prometheus. We happen to see an ownerName reused in parallel integration tests.
+		return nil
 	}
 	metric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "rate_limiter_use",
@@ -57,7 +52,7 @@ func registerRateLimiterMetric(ownerName string) error {
 		return fmt.Errorf("error registering rate limiter usage metric: %v", err)
 	}
 	stopCh := make(chan struct{})
-	rateLimiterMetrics[ownerName] = rateLimiterMetric{
+	rateLimiterMetrics[ownerName] = &rateLimiterMetric{
 		metric: metric,
 		stopCh: stopCh,
 	}
@@ -78,23 +73,4 @@ func RegisterMetricAndTrackRateLimiterUsage(ownerName string, rateLimiter flowco
 	//   rateLimiterMetrics[ownerName].metric.Set()
 	// }, updatePeriod, rateLimiterMetrics[ownerName].stopCh)
 	return nil
-}
-
-// UnregisterMetricAndUntrackRateLimiterUsage unregisters a metric ownerName_rate_limiter_use from prometheus and
-// stops the goroutine that updates this metric
-func UnregisterMetricAndUntrackRateLimiterUsage(ownerName string) bool {
-	metricsLock.Lock()
-	defer metricsLock.Unlock()
-
-	rlm, ok := rateLimiterMetrics[ownerName]
-	if !ok {
-		glog.Warningf("Rate Limiter Metric for %v not registered", ownerName)
-		return false
-	}
-
-	close(rlm.stopCh)
-	prometheus.Unregister(rlm.metric)
-	delete(rateLimiterMetrics, ownerName)
-
-	return true
 }

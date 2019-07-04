@@ -22,9 +22,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
@@ -34,8 +35,9 @@ type ConfigMapUpgradeTest struct {
 	configMap *v1.ConfigMap
 }
 
+// Name returns the tracking name of the test.
 func (ConfigMapUpgradeTest) Name() string {
-	return "configmap-upgrade [sig-storage] [sig-api-machinery]"
+	return "[sig-storage] [sig-api-machinery] configmap-upgrade"
 }
 
 // Setup creates a ConfigMap and then verifies that a pod can consume it.
@@ -54,13 +56,13 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 		},
 	}
 
-	By("Creating a ConfigMap")
+	ginkgo.By("Creating a ConfigMap")
 	var err error
 	if t.configMap, err = f.ClientSet.CoreV1().ConfigMaps(ns.Name).Create(t.configMap); err != nil {
-		framework.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
+		e2elog.Failf("unable to create test ConfigMap %s: %v", t.configMap.Name, err)
 	}
 
-	By("Making sure the ConfigMap is consumable")
+	ginkgo.By("Making sure the ConfigMap is consumable")
 	t.testPod(f)
 }
 
@@ -68,7 +70,7 @@ func (t *ConfigMapUpgradeTest) Setup(f *framework.Framework) {
 // pod can still consume the ConfigMap.
 func (t *ConfigMapUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	<-done
-	By("Consuming the ConfigMap after upgrade")
+	ginkgo.By("Consuming the ConfigMap after upgrade")
 	t.testPod(f)
 }
 
@@ -118,7 +120,7 @@ func (t *ConfigMapUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "configmap-env-test",
-					Image:   "busybox",
+					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

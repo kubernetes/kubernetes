@@ -15,11 +15,12 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:protobuf-gen=package
 // +k8s:openapi-gen=true
+// +groupName=admissionregistration.k8s.io
 
 // Package v1beta1 is the v1beta1 version of the API.
 // AdmissionConfiguration and AdmissionPluginConfiguration are legacy static admission plugin configuration
-// InitializerConfiguration and validatingWebhookConfiguration is for the
+// MutatingWebhookConfiguration and ValidatingWebhookConfiguration are for the
 // new dynamic admission controller configuration.
-// +groupName=admissionregistration.k8s.io
 package v1beta1 // import "k8s.io/api/admissionregistration/v1beta1"

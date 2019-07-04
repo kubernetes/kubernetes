@@ -3,6 +3,7 @@ package quobyte
 
 import (
 	"net/http"
+	"regexp"
 )
 
 // retry policy codes
@@ -12,6 +13,8 @@ const (
 	RetryInfinitely    string = "INFINITELY"
 	RetryOncePerTarget string = "ONCE_PER_TARGET"
 )
+
+var UUIDValidator = regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
 
 type QuobyteClient struct {
 	client         *http.Client
@@ -43,11 +46,48 @@ func NewQuobyteClient(url string, username string, password string) *QuobyteClie
 // CreateVolume creates a new Quobyte volume. Its root directory will be owned by given user and group
 func (client QuobyteClient) CreateVolume(request *CreateVolumeRequest) (string, error) {
 	var response volumeUUID
-	if err := client.sendRequest("createVolume", request, &response); err != nil {
+	tenantUUID, err := client.GetTenantUUID(request.TenantID)
+	if err != nil {
+		return "", err
+	}
+	request.TenantID = tenantUUID
+
+	if err = client.sendRequest("createVolume", request, &response); err != nil {
 		return "", err
 	}
 
 	return response.VolumeUUID, nil
+}
+
+// GetVolumeUUID resolves the volumeUUID for the given volume and tenant name.
+// This method should be used when it is not clear if the given string is volume UUID or Name.
+func (client QuobyteClient) GetVolumeUUID(volume, tenant string) (string, error) {
+	if len(volume) != 0 && !IsValidUUID(volume) {
+		tenantUUID, err := client.GetTenantUUID(tenant)
+		if err != nil {
+			return "", err
+		}
+		volUUID, err := client.ResolveVolumeNameToUUID(volume, tenantUUID)
+		if err != nil {
+			return "", err
+		}
+
+		return volUUID, nil
+	}
+	return volume, nil
+}
+
+// GetTenantUUID resolves the tenatnUUID for the given name
+// This method should be used when it is not clear if the given string is Tenant UUID or Name.
+func (client QuobyteClient) GetTenantUUID(tenant string) (string, error) {
+	if len(tenant) != 0 && !IsValidUUID(tenant) {
+		tenantUUID, err := client.ResolveTenantNameToUUID(tenant)
+		if err != nil {
+			return "", err
+		}
+		return tenantUUID, nil
+	}
+	return tenant, nil
 }
 
 // ResolveVolumeNameToUUID resolves a volume name to a UUID
@@ -62,6 +102,18 @@ func (client *QuobyteClient) ResolveVolumeNameToUUID(volumeName, tenant string) 
 	}
 
 	return response.VolumeUUID, nil
+}
+
+// DeleteVolumeByResolvingNamesToUUID deletes the volume by resolving the volume name and tenant name to
+// respective UUID if required.
+// This method should be used if the given volume, tenant information is name or UUID.
+func (client *QuobyteClient) DeleteVolumeByResolvingNamesToUUID(volume, tenant string) error {
+	volumeUUID, err := client.GetVolumeUUID(volume, tenant)
+	if err != nil {
+		return err
+	}
+
+	return client.DeleteVolume(volumeUUID)
 }
 
 // DeleteVolume deletes a Quobyte volume
@@ -166,5 +218,24 @@ func (client *QuobyteClient) SetTenant(tenantName string) (string, error) {
 		return "", err
 	}
 
+	return response.TenantID, nil
+}
+
+// IsValidUUID Validates the given uuid
+func IsValidUUID(uuid string) bool {
+	return UUIDValidator.MatchString(uuid)
+}
+
+// ResolveTenantNameToUUID Returns UUID for given name, error if not found.
+func (client *QuobyteClient) ResolveTenantNameToUUID(name string) (string, error) {
+	request := &resolveTenantNameRequest{
+		TenantName: name,
+	}
+
+	var response resolveTenantNameResponse
+	err := client.sendRequest("resolveTenantName", request, &response)
+	if err != nil {
+		return "", err
+	}
 	return response.TenantID, nil
 }

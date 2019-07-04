@@ -59,7 +59,7 @@ func (c *FakeAPIServices) List(opts v1.ListOptions) (result *apiregistration.API
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &apiregistration.APIServiceList{}
+	list := &apiregistration.APIServiceList{ListMeta: obj.(*apiregistration.APIServiceList).ListMeta}
 	for _, item := range obj.(*apiregistration.APIServiceList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -123,7 +123,7 @@ func (c *FakeAPIServices) DeleteCollection(options *v1.DeleteOptions, listOption
 // Patch applies the patch and returns the patched aPIService.
 func (c *FakeAPIServices) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *apiregistration.APIService, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, data, subresources...), &apiregistration.APIService{})
+		Invokes(testing.NewRootPatchSubresourceAction(apiservicesResource, name, pt, data, subresources...), &apiregistration.APIService{})
 	if obj == nil {
 		return nil, err
 	}

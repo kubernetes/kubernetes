@@ -22,6 +22,14 @@ type resolveVolumeNameRequest struct {
         retryPolicy
 }
 
+type resolveTenantNameRequest struct {
+	TenantName string `json:"tenant_name,omitempty"`
+}
+
+type resolveTenantNameResponse struct {
+	TenantID string `json:"tenant_id,omitempty"`
+}
+
 type volumeUUID struct {
 	VolumeUUID string `json:"volume_uuid,omitempty"`
 }

@@ -21,18 +21,17 @@ syntax = 'proto2';
 
 package k8s.io.api.storage.v1alpha1;
 
-import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
 // VolumeAttachment captures the intent to attach or detach the specified volume
 // to/from the specified node.
-// 
+//
 // VolumeAttachment objects are non-namespaced.
 message VolumeAttachment {
   // Standard object metadata.
@@ -70,6 +69,15 @@ message VolumeAttachmentSource {
   // Name of the persistent volume to attach.
   // +optional
   optional string persistentVolumeName = 1;
+
+  // inlineVolumeSpec contains all the information necessary to attach
+  // a persistent volume defined by a pod's inline VolumeSource. This field
+  // is populated only for the CSIMigration feature. It contains
+  // translated fields from a pod's inline VolumeSource to a
+  // PersistentVolumeSpec. This field is alpha-level and is only
+  // honored by servers that enabled the CSIMigration feature.
+  // +optional
+  optional k8s.io.api.core.v1.PersistentVolumeSpec inlineVolumeSpec = 2;
 }
 
 // VolumeAttachmentSpec is the specification of a VolumeAttachment request.

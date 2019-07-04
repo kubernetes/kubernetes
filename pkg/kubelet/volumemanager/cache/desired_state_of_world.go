@@ -25,6 +25,8 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -150,12 +152,20 @@ type volumeToMount struct {
 	// the volume.Attacher interface
 	pluginIsAttachable bool
 
+	// pluginIsDeviceMountable indicates that the plugin for this volume implements
+	// the volume.DeviceMounter interface
+	pluginIsDeviceMountable bool
+
 	// volumeGidValue contains the value of the GID annotation, if present.
 	volumeGidValue string
 
 	// reportedInUse indicates that the volume was successfully added to the
 	// VolumesInUse field in the node's status.
 	reportedInUse bool
+
+	// desiredSizeLimit indicates the desired upper bound on the size of the volume
+	// (if so implemented)
+	desiredSizeLimit *resource.Quantity
 }
 
 // The pod object represents a pod that references the underlying volume and
@@ -199,11 +209,12 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 
 	var volumeName v1.UniqueVolumeName
 
-	// The unique volume name used depends on whether the volume is attachable
+	// The unique volume name used depends on whether the volume is attachable/device-mountable
 	// or not.
 	attachable := dsw.isAttachableVolume(volumeSpec)
-	if attachable {
-		// For attachable volumes, use the unique volume name as reported by
+	deviceMountable := dsw.isDeviceMountableVolume(volumeSpec)
+	if attachable || deviceMountable {
+		// For attachable/device-mountable volumes, use the unique volume name as reported by
 		// the plugin.
 		volumeName, err =
 			util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
@@ -215,18 +226,34 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 				err)
 		}
 	} else {
-		// For non-attachable volumes, generate a unique name based on the pod
+		// For non-attachable and non-device-mountable volumes, generate a unique name based on the pod
 		// namespace and name and the name of the volume within the pod.
-		volumeName = util.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, volumeSpec)
+		volumeName = util.GetUniqueVolumeNameFromSpecWithPod(podName, volumePlugin, volumeSpec)
 	}
 
 	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
+		var sizeLimit *resource.Quantity
+		if volumeSpec.Volume != nil {
+			if util.IsLocalEphemeralVolume(*volumeSpec.Volume) {
+				_, podLimits := apiv1resource.PodRequestsAndLimits(pod)
+				ephemeralStorageLimit := podLimits[v1.ResourceEphemeralStorage]
+				sizeLimit = resource.NewQuantity(ephemeralStorageLimit.Value(), resource.BinarySI)
+				if volumeSpec.Volume.EmptyDir != nil &&
+					volumeSpec.Volume.EmptyDir.SizeLimit != nil &&
+					volumeSpec.Volume.EmptyDir.SizeLimit.Value() > 0 &&
+					volumeSpec.Volume.EmptyDir.SizeLimit.Value() < sizeLimit.Value() {
+					sizeLimit = resource.NewQuantity(volumeSpec.Volume.EmptyDir.SizeLimit.Value(), resource.BinarySI)
+				}
+			}
+		}
 		dsw.volumesToMount[volumeName] = volumeToMount{
-			volumeName:         volumeName,
-			podsToMount:        make(map[types.UniquePodName]podToMount),
-			pluginIsAttachable: attachable,
-			volumeGidValue:     volumeGidValue,
-			reportedInUse:      false,
+			volumeName:              volumeName,
+			podsToMount:             make(map[types.UniquePodName]podToMount),
+			pluginIsAttachable:      attachable,
+			pluginIsDeviceMountable: deviceMountable,
+			volumeGidValue:          volumeGidValue,
+			reportedInUse:           false,
+			desiredSizeLimit:        sizeLimit,
 		}
 	}
 
@@ -346,14 +373,16 @@ func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {
 				volumesToMount,
 				VolumeToMount{
 					VolumeToMount: operationexecutor.VolumeToMount{
-						VolumeName:          volumeName,
-						PodName:             podName,
-						Pod:                 podObj.pod,
-						VolumeSpec:          podObj.volumeSpec,
-						PluginIsAttachable:  volumeObj.pluginIsAttachable,
-						OuterVolumeSpecName: podObj.outerVolumeSpecName,
-						VolumeGidValue:      volumeObj.volumeGidValue,
-						ReportedInUse:       volumeObj.reportedInUse}})
+						VolumeName:              volumeName,
+						PodName:                 podName,
+						Pod:                     podObj.pod,
+						VolumeSpec:              podObj.volumeSpec,
+						PluginIsAttachable:      volumeObj.pluginIsAttachable,
+						PluginIsDeviceMountable: volumeObj.pluginIsDeviceMountable,
+						OuterVolumeSpecName:     podObj.outerVolumeSpecName,
+						VolumeGidValue:          volumeObj.volumeGidValue,
+						ReportedInUse:           volumeObj.reportedInUse,
+						DesiredSizeLimit:        volumeObj.desiredSizeLimit}})
 		}
 	}
 	return volumesToMount
@@ -365,6 +394,18 @@ func (dsw *desiredStateOfWorld) isAttachableVolume(volumeSpec *volume.Spec) bool
 	if attachableVolumePlugin != nil {
 		volumeAttacher, err := attachableVolumePlugin.NewAttacher()
 		if err == nil && volumeAttacher != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (dsw *desiredStateOfWorld) isDeviceMountableVolume(volumeSpec *volume.Spec) bool {
+	deviceMountableVolumePlugin, _ := dsw.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeSpec)
+	if deviceMountableVolumePlugin != nil {
+		volumeDeviceMounter, err := deviceMountableVolumePlugin.NewDeviceMounter()
+		if err == nil && volumeDeviceMounter != nil {
 			return true
 		}
 	}

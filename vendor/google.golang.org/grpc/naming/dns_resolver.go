@@ -153,10 +153,10 @@ type ipWatcher struct {
 	updateChan chan *Update
 }
 
-// Next returns the adrress resolution Update for the target. For IP address,
-// the resolution is itself, thus polling name server is unncessary. Therefore,
+// Next returns the address resolution Update for the target. For IP address,
+// the resolution is itself, thus polling name server is unnecessary. Therefore,
 // Next() will return an Update the first time it is called, and will be blocked
-// for all following calls as no Update exisits until watcher is closed.
+// for all following calls as no Update exists until watcher is closed.
 func (i *ipWatcher) Next() ([]*Update, error) {
 	u, ok := <-i.updateChan
 	if !ok {

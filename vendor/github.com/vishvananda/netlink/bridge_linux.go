@@ -2,9 +2,9 @@ package netlink
 
 import (
 	"fmt"
+	"syscall"
 
 	"github.com/vishvananda/netlink/nl"
-	"golang.org/x/sys/unix"
 )
 
 // BridgeVlanList gets a map of device id to bridge vlan infos.
@@ -16,12 +16,12 @@ func BridgeVlanList() (map[int32][]*nl.BridgeVlanInfo, error) {
 // BridgeVlanList gets a map of device id to bridge vlan infos.
 // Equivalent to: `bridge vlan show`
 func (h *Handle) BridgeVlanList() (map[int32][]*nl.BridgeVlanInfo, error) {
-	req := h.newNetlinkRequest(unix.RTM_GETLINK, unix.NLM_F_DUMP)
-	msg := nl.NewIfInfomsg(unix.AF_BRIDGE)
+	req := h.newNetlinkRequest(syscall.RTM_GETLINK, syscall.NLM_F_DUMP)
+	msg := nl.NewIfInfomsg(syscall.AF_BRIDGE)
 	req.AddData(msg)
 	req.AddData(nl.NewRtAttr(nl.IFLA_EXT_MASK, nl.Uint32Attr(uint32(nl.RTEXT_FILTER_BRVLAN))))
 
-	msgs, err := req.Execute(unix.NETLINK_ROUTE, unix.RTM_NEWLINK)
+	msgs, err := req.Execute(syscall.NETLINK_ROUTE, syscall.RTM_NEWLINK)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func BridgeVlanAdd(link Link, vid uint16, pvid, untagged, self, master bool) err
 // BridgeVlanAdd adds a new vlan filter entry
 // Equivalent to: `bridge vlan add dev DEV vid VID [ pvid ] [ untagged ] [ self ] [ master ]`
 func (h *Handle) BridgeVlanAdd(link Link, vid uint16, pvid, untagged, self, master bool) error {
-	return h.bridgeVlanModify(unix.RTM_SETLINK, link, vid, pvid, untagged, self, master)
+	return h.bridgeVlanModify(syscall.RTM_SETLINK, link, vid, pvid, untagged, self, master)
 }
 
 // BridgeVlanDel adds a new vlan filter entry
@@ -75,15 +75,15 @@ func BridgeVlanDel(link Link, vid uint16, pvid, untagged, self, master bool) err
 // BridgeVlanDel adds a new vlan filter entry
 // Equivalent to: `bridge vlan del dev DEV vid VID [ pvid ] [ untagged ] [ self ] [ master ]`
 func (h *Handle) BridgeVlanDel(link Link, vid uint16, pvid, untagged, self, master bool) error {
-	return h.bridgeVlanModify(unix.RTM_DELLINK, link, vid, pvid, untagged, self, master)
+	return h.bridgeVlanModify(syscall.RTM_DELLINK, link, vid, pvid, untagged, self, master)
 }
 
 func (h *Handle) bridgeVlanModify(cmd int, link Link, vid uint16, pvid, untagged, self, master bool) error {
 	base := link.Attrs()
 	h.ensureIndex(base)
-	req := h.newNetlinkRequest(cmd, unix.NLM_F_ACK)
+	req := h.newNetlinkRequest(cmd, syscall.NLM_F_ACK)
 
-	msg := nl.NewIfInfomsg(unix.AF_BRIDGE)
+	msg := nl.NewIfInfomsg(syscall.AF_BRIDGE)
 	msg.Index = int32(base.Index)
 	req.AddData(msg)
 
@@ -107,7 +107,7 @@ func (h *Handle) bridgeVlanModify(cmd int, link Link, vid uint16, pvid, untagged
 	}
 	nl.NewRtAttrChild(br, nl.IFLA_BRIDGE_VLAN_INFO, vlanInfo.Serialize())
 	req.AddData(br)
-	_, err := req.Execute(unix.NETLINK_ROUTE, 0)
+	_, err := req.Execute(syscall.NETLINK_ROUTE, 0)
 	if err != nil {
 		return err
 	}

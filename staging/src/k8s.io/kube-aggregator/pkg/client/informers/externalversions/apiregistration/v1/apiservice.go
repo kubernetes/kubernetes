@@ -21,11 +21,11 @@ package v1
 import (
 	time "time"
 
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	apiregistration_v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	clientset "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	internalinterfaces "k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces"
 	v1 "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
@@ -56,20 +56,20 @@ func NewAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duratio
 func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.ApiregistrationV1().APIServices().List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.ApiregistrationV1().APIServices().Watch(options)
 			},
 		},
-		&apiregistration_v1.APIService{},
+		&apiregistrationv1.APIService{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *aPIServiceInformer) defaultInformer(client clientset.Interface, resyncP
 }
 
 func (f *aPIServiceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiregistration_v1.APIService{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiregistrationv1.APIService{}, f.defaultInformer)
 }
 
 func (f *aPIServiceInformer) Lister() v1.APIServiceLister {

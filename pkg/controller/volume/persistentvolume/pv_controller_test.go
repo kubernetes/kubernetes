@@ -17,21 +17,30 @@ limitations under the License.
 package persistentvolume
 
 import (
+	"errors"
 	"testing"
 	"time"
-
-	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+)
+
+var (
+	classNotHere       = "not-here"
+	classNoMode        = "no-mode"
+	classImmediateMode = "immediate-mode"
+	classWaitMode      = "wait-mode"
 )
 
 // Test the real controller methods (add/update/delete claim/volume) with
@@ -50,30 +59,30 @@ func TestControllerSync(t *testing.T) {
 			// addClaim gets a new claim. Check it's bound to a volume.
 			"5-2 - complete bind",
 			newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
-			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
+			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
 			noclaims, /* added in testAddClaim5_2 */
-			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
+			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			noevents, noerrors,
 			// Custom test function that generates an add event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil)
-				reactor.addClaimEvent(claim)
+				reactor.AddClaimEvent(claim)
 				return nil
 			},
 		},
 		{
 			// deleteClaim with a bound claim makes bound volume released.
 			"5-3 - delete claim",
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
-			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController),
-			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
+			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newVolumeArray("volume5-3", "10Gi", "uid5-3", "claim5-3", v1.VolumeReleased, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newClaimArray("claim5-3", "uid5-3", "1Gi", "volume5-3", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			noclaims,
 			noevents, noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.claims.List()[0]
 				claim := obj.(*v1.PersistentVolumeClaim)
-				reactor.deleteClaimEvent(claim)
+				reactor.DeleteClaimEvent(claim)
 				return nil
 			},
 		},
@@ -82,21 +91,145 @@ func TestControllerSync(t *testing.T) {
 			"5-4 - delete volume",
 			newVolumeArray("volume5-4", "1Gi", "uid5-4", "claim5-4", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty),
 			novolumes,
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, annBoundByController, annBindCompleted),
-			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, annBoundByController, annBindCompleted),
+			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
+			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", v1.ClaimLost, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
 			[]string{"Warning ClaimLost"}, noerrors,
 			// Custom test function that generates a delete event
-			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				obj := ctrl.volumes.store.List()[0]
 				volume := obj.(*v1.PersistentVolume)
-				reactor.deleteVolumeEvent(volume)
+				reactor.DeleteVolumeEvent(volume)
+				return nil
+			},
+		},
+		{
+			// deleteClaim with a bound claim makes bound volume released with external deleter.
+			// delete the corresponding volume from apiserver, and report latency metric
+			"5-5 - delete claim and delete volume report metric",
+			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
+			novolumes,
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
+				newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			noclaims,
+			noevents, noerrors,
+			// Custom test function that generates a delete claim event which should have been caught by
+			// "deleteClaim" to remove the claim from controller's cache, after that, a volume deleted
+			// event will be generated to trigger "deleteVolume" call for metric reporting
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				test.initialVolumes[0].Annotations[pvutil.AnnDynamicallyProvisioned] = "gcr.io/vendor-csi"
+				obj := ctrl.claims.List()[0]
+				claim := obj.(*v1.PersistentVolumeClaim)
+				reactor.DeleteClaimEvent(claim)
+				for len(ctrl.claims.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// claim has been removed from controller's cache, generate a volume deleted event
+				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
+				reactor.DeleteVolumeEvent(volume)
+				return nil
+			},
+		},
+		{
+			// deleteClaim with a bound claim makes bound volume released with external deleter pending
+			// there should be an entry in operation timestamps cache in controller
+			"5-6 - delete claim and waiting for external volume deletion",
+			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
+			volumesWithAnnotation(pvutil.AnnDynamicallyProvisioned, "gcr.io/vendor-csi",
+				newVolumeArray("volume5-6", "10Gi", "uid5-6", "claim5-6", v1.VolumeReleased, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController)),
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
+				newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			noclaims,
+			noevents, noerrors,
+			// Custom test function that generates a delete claim event which should have been caught by
+			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				// should have been provisioned by external provisioner
+				obj := ctrl.claims.List()[0]
+				claim := obj.(*v1.PersistentVolumeClaim)
+				reactor.DeleteClaimEvent(claim)
+				// wait until claim is cleared from cache, i.e., deleteClaim is called
+				for len(ctrl.claims.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// make sure the operation timestamp cache is NOT empty
+				if !ctrl.operationTimestamps.Has("volume5-6") {
+					return errors.New("failed checking timestamp cache: should not be empty")
+				}
+				return nil
+			},
+		},
+		{
+			// deleteVolume event issued before deleteClaim, no metric should have been reported
+			// and no delete operation start timestamp should be inserted into controller.operationTimestamps cache
+			"5-7 - delete volume event makes claim lost, delete claim event will not report metric",
+			newVolumeArray("volume5-7", "10Gi", "uid5-7", "claim5-7", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classExternal, pvutil.AnnBoundByController, pvutil.AnnDynamicallyProvisioned),
+			novolumes,
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
+				newClaimArray("claim5-7", "uid5-7", "1Gi", "volume5-7", v1.ClaimBound, &classExternal, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			noclaims,
+			[]string{"Warning ClaimLost"},
+			noerrors,
+			// Custom test function that generates a delete claim event which should have been caught by
+			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				volume := ctrl.volumes.store.List()[0].(*v1.PersistentVolume)
+				reactor.DeleteVolumeEvent(volume)
+				for len(ctrl.volumes.store.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// trying to remove the claim as well
+				obj := ctrl.claims.List()[0]
+				claim := obj.(*v1.PersistentVolumeClaim)
+				reactor.DeleteClaimEvent(claim)
+				// wait until claim is cleared from cache, i.e., deleteClaim is called
+				for len(ctrl.claims.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// make sure operation timestamp cache is empty
+				if ctrl.operationTimestamps.Has("volume5-7") {
+					return errors.New("failed checking timestamp cache")
+				}
+				return nil
+			},
+		},
+		{
+			// delete a claim waiting for being bound cleans up provision(volume ref == "") entry from timestamp cache
+			"5-8 - delete claim cleans up operation timestamp cache for provision",
+			novolumes,
+			novolumes,
+			claimWithAnnotation(pvutil.AnnStorageProvisioner, "gcr.io/vendor-csi",
+				newClaimArray("claim5-8", "uid5-8", "1Gi", "", v1.ClaimPending, &classExternal)),
+			noclaims,
+			[]string{"Normal ExternalProvisioning"},
+			noerrors,
+			// Custom test function that generates a delete claim event which should have been caught by
+			// "deleteClaim" to remove the claim from controller's cache and mark bound volume to be released
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				// wait until the provision timestamp has been inserted
+				for !ctrl.operationTimestamps.Has("default/claim5-8") {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// delete the claim
+				obj := ctrl.claims.List()[0]
+				claim := obj.(*v1.PersistentVolumeClaim)
+				reactor.DeleteClaimEvent(claim)
+				// wait until claim is cleared from cache, i.e., deleteClaim is called
+				for len(ctrl.claims.ListKeys()) > 0 {
+					time.Sleep(10 * time.Millisecond)
+				}
+				// make sure operation timestamp cache is empty
+				if ctrl.operationTimestamps.Has("default/claim5-8") {
+					return errors.New("failed checking timestamp cache")
+				}
 				return nil
 			},
 		},
 	}
 
 	for _, test := range tests {
-		glog.V(4).Infof("starting test %q", test.name)
+		klog.V(4).Infof("starting test %q", test.name)
 
 		// Initialize the controller
 		client := &fake.Clientset{}
@@ -113,15 +246,27 @@ func TestControllerSync(t *testing.T) {
 			t.Fatalf("Test %q construct persistent volume failed: %v", test.name, err)
 		}
 
+		// Inject storage classes into controller via a custom lister for test [5-5]
+		storageClasses := []*storagev1.StorageClass{
+			makeStorageClass(classExternal, &modeImmediate),
+		}
+
+		storageClasses[0].Provisioner = "gcr.io/vendor-csi"
+		indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
+		for _, class := range storageClasses {
+			indexer.Add(class)
+		}
+		ctrl.classLister = storagelisters.NewStorageClassLister(indexer)
+
 		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
-			reactor.claims[claim.Name] = claim
+			reactor.AddClaim(claim)
 			go func(claim *v1.PersistentVolumeClaim) {
 				fakeClaimWatch.Add(claim)
 			}(claim)
 		}
 		for _, volume := range test.initialVolumes {
-			reactor.volumes[volume.Name] = volume
+			reactor.AddVolume(volume)
 			go func(volume *v1.PersistentVolume) {
 				fakeVolumeWatch.Add(volume)
 			}(volume)
@@ -140,10 +285,10 @@ func TestControllerSync(t *testing.T) {
 
 			time.Sleep(10 * time.Millisecond)
 		}
-		glog.V(4).Infof("controller synced, starting test")
+		klog.V(4).Infof("controller synced, starting test")
 
 		// Call the tested function
-		err = test.test(ctrl, reactor, test)
+		err = test.test(ctrl, reactor.VolumeReactor, test)
 		if err != nil {
 			t.Errorf("Test %q initial test call failed: %v", test.name, err)
 		}
@@ -157,7 +302,7 @@ func TestControllerSync(t *testing.T) {
 		}
 		close(stopCh)
 
-		evaluateTestResults(ctrl, reactor, test, t)
+		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 	}
 }
 
@@ -229,20 +374,21 @@ func TestControllerCacheParsingError(t *testing.T) {
 	}
 }
 
-func addVolumeAnnotation(volume *v1.PersistentVolume, annName, annValue string) *v1.PersistentVolume {
-	if volume.Annotations == nil {
-		volume.Annotations = make(map[string]string)
-	}
-	volume.Annotations[annName] = annValue
-	return volume
-}
-
-func makePVCClass(scName *string) *v1.PersistentVolumeClaim {
-	return &v1.PersistentVolumeClaim{
+func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeClaim {
+	claim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{},
+		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			StorageClassName: scName,
 		},
 	}
+
+	if hasSelectNodeAnno {
+		claim.Annotations[pvutil.AnnSelectedNode] = "node-name"
+	}
+
+	return claim
 }
 
 func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storagev1.StorageClass {
@@ -255,41 +401,35 @@ func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storage
 }
 
 func TestDelayBinding(t *testing.T) {
-	var (
-		classNotHere       = "not-here"
-		classNoMode        = "no-mode"
-		classImmediateMode = "immediate-mode"
-		classWaitMode      = "wait-mode"
-
-		modeImmediate = storagev1.VolumeBindingImmediate
-		modeWait      = storagev1.VolumeBindingWaitForFirstConsumer
-	)
-
 	tests := map[string]struct {
 		pvc         *v1.PersistentVolumeClaim
 		shouldDelay bool
 		shouldFail  bool
 	}{
 		"nil-class": {
-			pvc:         makePVCClass(nil),
+			pvc:         makePVCClass(nil, false),
 			shouldDelay: false,
 		},
 		"class-not-found": {
-			pvc:         makePVCClass(&classNotHere),
+			pvc:         makePVCClass(&classNotHere, false),
 			shouldDelay: false,
 		},
 		"no-mode-class": {
-			pvc:         makePVCClass(&classNoMode),
+			pvc:         makePVCClass(&classNoMode, false),
 			shouldDelay: false,
 			shouldFail:  true,
 		},
 		"immediate-mode-class": {
-			pvc:         makePVCClass(&classImmediateMode),
+			pvc:         makePVCClass(&classImmediateMode, false),
 			shouldDelay: false,
 		},
 		"wait-mode-class": {
-			pvc:         makePVCClass(&classWaitMode),
+			pvc:         makePVCClass(&classWaitMode, false),
 			shouldDelay: true,
+		},
+		"wait-mode-class-with-selectedNode": {
+			pvc:         makePVCClass(&classWaitMode, true),
+			shouldDelay: false,
 		},
 	}
 
@@ -312,22 +452,8 @@ func TestDelayBinding(t *testing.T) {
 		}
 	}
 
-	// When feature gate is disabled, should always be delayed
-	name := "feature-disabled"
-	shouldDelay, err := ctrl.shouldDelayBinding(makePVCClass(&classWaitMode))
-	if err != nil {
-		t.Errorf("Test %q returned error: %v", name, err)
-	}
-	if shouldDelay {
-		t.Errorf("Test %q returned true, expected false", name)
-	}
-
-	// Enable feature gate
-	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
-	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
-
 	for name, test := range tests {
-		shouldDelay, err = ctrl.shouldDelayBinding(test.pvc)
+		shouldDelay, err := ctrl.shouldDelayBinding(test.pvc)
 		if err != nil && !test.shouldFail {
 			t.Errorf("Test %q returned error: %v", name, err)
 		}

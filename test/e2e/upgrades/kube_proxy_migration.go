@@ -20,16 +20,16 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
 const (
@@ -43,12 +43,14 @@ const (
 type KubeProxyUpgradeTest struct {
 }
 
+// Name returns the tracking name of the test.
 func (KubeProxyUpgradeTest) Name() string { return "[sig-network] kube-proxy-upgrade" }
 
-// Setup verifies kube-proxy static pods is running before uprgade.
+// Setup verifies kube-proxy static pods is running before upgrade.
 func (t *KubeProxyUpgradeTest) Setup(f *framework.Framework) {
-	By("Waiting for kube-proxy static pods running and ready")
-	Expect(waitForKubeProxyStaticPodsRunning(f.ClientSet)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy static pods running and ready")
+	err := waitForKubeProxyStaticPodsRunning(f.ClientSet)
+	framework.ExpectNoError(err)
 }
 
 // Test validates if kube-proxy is migrated from static pods to DaemonSet.
@@ -56,14 +58,16 @@ func (t *KubeProxyUpgradeTest) Test(f *framework.Framework, done <-chan struct{}
 	c := f.ClientSet
 
 	// Block until upgrade is done.
-	By("Waiting for upgrade to finish")
+	ginkgo.By("Waiting for upgrade to finish")
 	<-done
 
-	By("Waiting for kube-proxy static pods disappear")
-	Expect(waitForKubeProxyStaticPodsDisappear(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy static pods disappear")
+	err := waitForKubeProxyStaticPodsDisappear(c)
+	framework.ExpectNoError(err)
 
-	By("Waiting for kube-proxy DaemonSet running and ready")
-	Expect(waitForKubeProxyDaemonSetRunning(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
+	err = waitForKubeProxyDaemonSetRunning(c)
+	framework.ExpectNoError(err)
 }
 
 // Teardown does nothing.
@@ -74,12 +78,14 @@ func (t *KubeProxyUpgradeTest) Teardown(f *framework.Framework) {
 type KubeProxyDowngradeTest struct {
 }
 
+// Name returns the tracking name of the test.
 func (KubeProxyDowngradeTest) Name() string { return "[sig-network] kube-proxy-downgrade" }
 
-// Setup verifies kube-proxy DaemonSet is running before uprgade.
+// Setup verifies kube-proxy DaemonSet is running before upgrade.
 func (t *KubeProxyDowngradeTest) Setup(f *framework.Framework) {
-	By("Waiting for kube-proxy DaemonSet running and ready")
-	Expect(waitForKubeProxyDaemonSetRunning(f.ClientSet)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy DaemonSet running and ready")
+	err := waitForKubeProxyDaemonSetRunning(f.ClientSet)
+	framework.ExpectNoError(err)
 }
 
 // Test validates if kube-proxy is migrated from DaemonSet to static pods.
@@ -87,14 +93,16 @@ func (t *KubeProxyDowngradeTest) Test(f *framework.Framework, done <-chan struct
 	c := f.ClientSet
 
 	// Block until upgrade is done.
-	By("Waiting for upgrade to finish")
+	ginkgo.By("Waiting for upgrade to finish")
 	<-done
 
-	By("Waiting for kube-proxy DaemonSet disappear")
-	Expect(waitForKubeProxyDaemonSetDisappear(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy DaemonSet disappear")
+	err := waitForKubeProxyDaemonSetDisappear(c)
+	framework.ExpectNoError(err)
 
-	By("Waiting for kube-proxy static pods running and ready")
-	Expect(waitForKubeProxyStaticPodsRunning(c)).NotTo(HaveOccurred())
+	ginkgo.By("Waiting for kube-proxy static pods running and ready")
+	err = waitForKubeProxyStaticPodsRunning(c)
+	framework.ExpectNoError(err)
 }
 
 // Teardown does nothing.
@@ -102,12 +110,12 @@ func (t *KubeProxyDowngradeTest) Teardown(f *framework.Framework) {
 }
 
 func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy static pods running", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy static pods running", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		pods, err := getKubeProxyStaticPods(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy static pods: %v", err)
+			e2elog.Logf("Failed to get kube-proxy static pods: %v", err)
 			return false, nil
 		}
 
@@ -119,7 +127,7 @@ func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
 			}
 		}
 		if numberkubeProxyPods != numberSchedulableNodes {
-			framework.Logf("Expect %v kube-proxy static pods running, got %v running, %v in total", numberSchedulableNodes, numberkubeProxyPods, len(pods.Items))
+			e2elog.Logf("Expect %v kube-proxy static pods running, got %v running, %v in total", numberSchedulableNodes, numberkubeProxyPods, len(pods.Items))
 			return false, nil
 		}
 		return true, nil
@@ -132,17 +140,17 @@ func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
 }
 
 func waitForKubeProxyStaticPodsDisappear(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy static pods disappear", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy static pods disappear", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		pods, err := getKubeProxyStaticPods(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy static pods: %v", err)
+			e2elog.Logf("Failed to get kube-proxy static pods: %v", err)
 			return false, nil
 		}
 
 		if len(pods.Items) != 0 {
-			framework.Logf("Expect kube-proxy static pods to disappear, got %v pods", len(pods.Items))
+			e2elog.Logf("Expect kube-proxy static pods to disappear, got %v pods", len(pods.Items))
 			return false, nil
 		}
 		return true, nil
@@ -155,24 +163,24 @@ func waitForKubeProxyStaticPodsDisappear(c clientset.Interface) error {
 }
 
 func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy DaemonSet running", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy DaemonSet running", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		daemonSets, err := getKubeProxyDaemonSet(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy DaemonSet: %v", err)
+			e2elog.Logf("Failed to get kube-proxy DaemonSet: %v", err)
 			return false, nil
 		}
 
 		if len(daemonSets.Items) != 1 {
-			framework.Logf("Expect only one kube-proxy DaemonSet, got %v", len(daemonSets.Items))
+			e2elog.Logf("Expect only one kube-proxy DaemonSet, got %v", len(daemonSets.Items))
 			return false, nil
 		}
 
 		numberSchedulableNodes := len(framework.GetReadySchedulableNodesOrDie(c).Items)
 		numberkubeProxyPods := int(daemonSets.Items[0].Status.NumberAvailable)
 		if numberkubeProxyPods != numberSchedulableNodes {
-			framework.Logf("Expect %v kube-proxy DaemonSet pods running, got %v", numberSchedulableNodes, numberkubeProxyPods)
+			e2elog.Logf("Expect %v kube-proxy DaemonSet pods running, got %v", numberSchedulableNodes, numberkubeProxyPods)
 			return false, nil
 		}
 		return true, nil
@@ -185,17 +193,17 @@ func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
 }
 
 func waitForKubeProxyDaemonSetDisappear(c clientset.Interface) error {
-	framework.Logf("Waiting up to %v for kube-proxy DaemonSet disappear", defaultTestTimeout)
+	e2elog.Logf("Waiting up to %v for kube-proxy DaemonSet disappear", defaultTestTimeout)
 
 	condition := func() (bool, error) {
 		daemonSets, err := getKubeProxyDaemonSet(c)
 		if err != nil {
-			framework.Logf("Failed to get kube-proxy DaemonSet: %v", err)
+			e2elog.Logf("Failed to get kube-proxy DaemonSet: %v", err)
 			return false, nil
 		}
 
 		if len(daemonSets.Items) != 0 {
-			framework.Logf("Expect kube-proxy DaemonSet to disappear, got %v DaemonSet", len(daemonSets.Items))
+			e2elog.Logf("Expect kube-proxy DaemonSet to disappear, got %v DaemonSet", len(daemonSets.Items))
 			return false, nil
 		}
 		return true, nil
@@ -213,8 +221,8 @@ func getKubeProxyStaticPods(c clientset.Interface) (*v1.PodList, error) {
 	return c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
 }
 
-func getKubeProxyDaemonSet(c clientset.Interface) (*extensions.DaemonSetList, error) {
+func getKubeProxyDaemonSet(c clientset.Interface) (*appsv1.DaemonSetList, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{clusterAddonLabelKey: kubeProxyLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	return c.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).List(listOpts)
+	return c.AppsV1().DaemonSets(metav1.NamespaceSystem).List(listOpts)
 }

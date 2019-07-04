@@ -6,6 +6,7 @@ go:
 
 before_install:
   - go get -t -v ./...
+  - go get -t -v github.com/modern-go/reflect2-tests/...
 
 script:
   - ./test.sh

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -29,7 +30,7 @@ import (
 // set correctly.
 func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&pc.ObjectMeta, false, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
 	// If the priorityClass starts with a system prefix, it must be one of the
 	// predefined system priority classes.
 	if strings.HasPrefix(pc.Name, scheduling.SystemPriorityClassPrefix) {
@@ -39,6 +40,9 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	} else if pc.Value > scheduling.HighestUserDefinablePriority {
 		// Non-system critical priority classes are not allowed to have a value larger than HighestUserDefinablePriority.
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("value"), fmt.Sprintf("maximum allowed value of a user defined priority is %v", scheduling.HighestUserDefinablePriority)))
+	}
+	if pc.PreemptionPolicy != nil {
+		allErrs = append(allErrs, apivalidation.ValidatePreemptionPolicy(pc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	}
 	return allErrs
 }
@@ -51,5 +55,7 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 	if pc.Value != oldPc.Value {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("Value"), "may not be changed in an update."))
 	}
+	// PreemptionPolicy is immutable and is checked by the ObjectMeta validator.
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(pc.PreemptionPolicy, oldPc.PreemptionPolicy, field.NewPath("preemptionPolicy"))...)
 	return allErrs
 }

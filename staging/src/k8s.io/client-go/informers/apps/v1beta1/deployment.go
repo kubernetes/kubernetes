@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	apps_v1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -70,7 +70,7 @@ func NewFilteredDeploymentInformer(client kubernetes.Interface, namespace string
 				return client.AppsV1beta1().Deployments(namespace).Watch(options)
 			},
 		},
-		&apps_v1beta1.Deployment{},
+		&appsv1beta1.Deployment{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *deploymentInformer) defaultInformer(client kubernetes.Interface, resync
 }
 
 func (f *deploymentInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apps_v1beta1.Deployment{}, f.defaultInformer)
+	return f.factory.InformerFor(&appsv1beta1.Deployment{}, f.defaultInformer)
 }
 
 func (f *deploymentInformer) Lister() v1beta1.DeploymentLister {

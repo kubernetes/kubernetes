@@ -44,6 +44,7 @@ type document struct {
 
 var _ Resources = &document{}
 
+// NewOpenAPIData creates a new `Resources` out of the openapi document
 func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
 	models, err := proto.NewOpenAPIData(doc)
 	if err != nil {

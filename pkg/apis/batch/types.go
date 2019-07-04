@@ -21,7 +21,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Job represents the configuration of a single job.
@@ -138,6 +137,18 @@ type JobSpec struct {
 
 	// Describes the pod that will be created when executing a job.
 	Template api.PodTemplateSpec
+
+	// ttlSecondsAfterFinished limits the lifetime of a Job that has finished
+	// execution (either Complete or Failed). If this field is set,
+	// ttlSecondsAfterFinished after the Job finishes, it is eligible to be
+	// automatically deleted. When the Job is being deleted, its lifecycle
+	// guarantees (e.g. finalizers) will be honored. If this field is unset,
+	// the Job won't be automatically deleted. If this field is set to zero,
+	// the Job becomes eligible to be deleted immediately after it finishes.
+	// This field is alpha-level and is only honored by servers that enable the
+	// TTLAfterFinished feature.
+	// +optional
+	TTLSecondsAfterFinished *int32
 }
 
 // JobStatus represents the current state of a Job.
@@ -172,6 +183,7 @@ type JobStatus struct {
 	Failed int32
 }
 
+// JobConditionType is a valid value for JobCondition.Type
 type JobConditionType string
 
 // These are valid conditions of a job.
@@ -202,7 +214,6 @@ type JobCondition struct {
 	Message string
 }
 
-// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CronJob represents the configuration of a single cron job.

@@ -14,10 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// DEPRECATED.
+// We already migrated all periodic and presubmit tests to ClusterLoader2.
+// We are still keeping this directory for optional functionality, but once
+// this is supported in ClusterLoader2 tests, this test will be removed
+// (hopefully in 1.16 release).
+// Please don't add new functionality to this directory and instead see:
+// https://github.com/kubernetes/perf-tests/tree/master/clusterloader2
+
 package scalability
 
 import "github.com/onsi/ginkgo"
 
+// SIGDescribe is the entry point for the sig-scalability e2e framework
 func SIGDescribe(text string, body func()) bool {
 	return ginkgo.Describe("[sig-scalability] "+text, body)
 }

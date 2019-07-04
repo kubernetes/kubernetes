@@ -27,12 +27,14 @@ COPY_SYSTEM_SPEC_FILE
 # REPORT_PATH is the path in the container to save test result and logs.
 # FLAKE_ATTEMPTS is the time to retry when there is a test failure. By default 2.
 # TEST_ARGS is the test arguments passed into the test.
+# EXTRA_ENVS is the extra environment variables needed for node e2e tests.
 ENV FOCUS="\[Conformance\]" \
 	   SKIP="\[Flaky\]|\[Serial\]" \
 	   PARALLELISM=8 \
 	   REPORT_PATH="/var/result" \
 	   FLAKE_ATTEMPTS=2 \
-	   TEST_ARGS=""
+	   TEST_ARGS="" \
+	   EXTRA_ENVS=""
 
 ENTRYPOINT ginkgo --focus="$FOCUS" \
 	--skip="$SKIP" \
@@ -46,4 +48,5 @@ ENTRYPOINT ginkgo --focus="$FOCUS" \
 	--system-spec-name=SYSTEM_SPEC_NAME \
 	# This is a placeholder that will be substituted in the Makefile.
 	--system-spec-file=SYSTEM_SPEC_FILE_PATH \
+	--extra-envs=$EXTRA_ENVS \
 	$TEST_ARGS

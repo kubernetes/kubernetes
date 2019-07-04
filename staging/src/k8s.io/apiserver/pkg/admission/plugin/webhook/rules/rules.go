@@ -20,6 +20,8 @@ import (
 	"strings"
 
 	"k8s.io/api/admissionregistration/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 )
 
@@ -31,7 +33,8 @@ type Matcher struct {
 
 // Matches returns if the Attr matches the Rule.
 func (r *Matcher) Matches() bool {
-	return r.operation() &&
+	return r.scope() &&
+		r.operation() &&
 		r.group() &&
 		r.version() &&
 		r.resource()
@@ -48,6 +51,25 @@ func exactOrWildcard(items []string, requested string) bool {
 	}
 
 	return false
+}
+
+var namespaceResource = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
+
+func (r *Matcher) scope() bool {
+	if r.Rule.Scope == nil || *r.Rule.Scope == v1beta1.AllScopes {
+		return true
+	}
+	// attr.GetNamespace() is set to the name of the namespace for requests of the namespace object itself.
+	switch *r.Rule.Scope {
+	case v1beta1.NamespacedScope:
+		// first make sure that we are not requesting a namespace object (namespace objects are cluster-scoped)
+		return r.Attr.GetResource() != namespaceResource && r.Attr.GetNamespace() != metav1.NamespaceNone
+	case v1beta1.ClusterScope:
+		// also return true if the request is for a namespace object (namespace objects are cluster-scoped)
+		return r.Attr.GetResource() == namespaceResource || r.Attr.GetNamespace() == metav1.NamespaceNone
+	default:
+		return false
+	}
 }
 
 func (r *Matcher) group() bool {

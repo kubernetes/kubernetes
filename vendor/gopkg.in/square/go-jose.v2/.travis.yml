@@ -8,12 +8,12 @@ matrix:
     - go: tip
 
 go:
-- 1.5
-- 1.6
-- 1.7
-- 1.8
-- 1.9
-- tip
+- '1.5.x'
+- '1.6.x'
+- '1.7.x'
+- '1.8.x'
+- '1.9.x'
+- '1.10.x'
 
 go_import_path: gopkg.in/square/go-jose.v2
 

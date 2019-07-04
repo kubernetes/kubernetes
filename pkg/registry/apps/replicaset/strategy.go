@@ -39,8 +39,9 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/apps/validation"
+	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -52,19 +53,20 @@ type rsStrategy struct {
 // Strategy is the default logic that applies when creating and updating ReplicaSet objects.
 var Strategy = rsStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns OrphanDependents by default. For apps/v1, returns DeleteDependents.
+// DefaultGarbageCollectionPolicy returns OrphanDependents for extensions/v1beta1 and apps/v1beta2 for backwards compatibility,
+// and DeleteDependents for all other versions.
 func (rsStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
+	var groupVersion schema.GroupVersion
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		switch groupVersion {
-		case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
-			// for back compatibility
-			return rest.OrphanDependents
-		default:
-			return rest.DeleteDependents
-		}
+		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
-	return rest.OrphanDependents
+	switch groupVersion {
+	case extensionsv1beta1.SchemeGroupVersion, appsv1beta2.SchemeGroupVersion:
+		// for back compatibility
+		return rest.OrphanDependents
+	default:
+		return rest.DeleteDependents
+	}
 }
 
 // NamespaceScoped returns true because all ReplicaSets need to be within a namespace.
@@ -74,23 +76,22 @@ func (rsStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
 func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	rs := obj.(*extensions.ReplicaSet)
-	rs.Status = extensions.ReplicaSetStatus{}
+	rs := obj.(*apps.ReplicaSet)
+	rs.Status = apps.ReplicaSetStatus{}
 
 	rs.Generation = 1
 
-	pod.DropDisabledAlphaFields(&rs.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&rs.Spec.Template, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newRS := obj.(*extensions.ReplicaSet)
-	oldRS := old.(*extensions.ReplicaSet)
+	newRS := obj.(*apps.ReplicaSet)
+	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set status
 	newRS.Status = oldRS.Status
 
-	pod.DropDisabledAlphaFields(&newRS.Spec.Template.Spec)
-	pod.DropDisabledAlphaFields(&oldRS.Spec.Template.Spec)
+	pod.DropDisabledTemplateFields(&newRS.Spec.Template, &oldRS.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object. We push
@@ -107,8 +108,10 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	rs := obj.(*extensions.ReplicaSet)
-	return validation.ValidateReplicaSet(rs)
+	rs := obj.(*apps.ReplicaSet)
+	allErrs := validation.ValidateReplicaSet(rs)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&rs.Spec.Template, nil, field.NewPath("spec.template"))...)
+	return allErrs
 }
 
 // Canonicalize normalizes the object after validation.
@@ -123,10 +126,11 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newReplicaSet := obj.(*extensions.ReplicaSet)
-	oldReplicaSet := old.(*extensions.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(obj.(*extensions.ReplicaSet))
+	newReplicaSet := obj.(*apps.ReplicaSet)
+	oldReplicaSet := old.(*apps.ReplicaSet)
+	allErrs := validation.ValidateReplicaSet(obj.(*apps.ReplicaSet))
 	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet)...)
+	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template, field.NewPath("spec.template"))...)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
@@ -151,7 +155,7 @@ func (rsStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // ReplicaSetToSelectableFields returns a field set that represents the object.
-func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
+func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
@@ -160,12 +164,12 @@ func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
-	rs, ok := obj.(*extensions.ReplicaSet)
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+	rs, ok := obj.(*apps.ReplicaSet)
 	if !ok {
-		return nil, nil, false, fmt.Errorf("given object is not a ReplicaSet.")
+		return nil, nil, fmt.Errorf("given object is not a ReplicaSet.")
 	}
-	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), rs.Initializers != nil, nil
+	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), nil
 }
 
 // MatchReplicaSet is the filter used by the generic etcd backend to route
@@ -186,12 +190,12 @@ type rsStatusStrategy struct {
 var StatusStrategy = rsStatusStrategy{Strategy}
 
 func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newRS := obj.(*extensions.ReplicaSet)
-	oldRS := old.(*extensions.ReplicaSet)
+	newRS := obj.(*apps.ReplicaSet)
+	oldRS := old.(*apps.ReplicaSet)
 	// update is not allowed to set spec
 	newRS.Spec = oldRS.Spec
 }
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateReplicaSetStatusUpdate(obj.(*extensions.ReplicaSet), old.(*extensions.ReplicaSet))
+	return validation.ValidateReplicaSetStatusUpdate(obj.(*apps.ReplicaSet), old.(*apps.ReplicaSet))
 }

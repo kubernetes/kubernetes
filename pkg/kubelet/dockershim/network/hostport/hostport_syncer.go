@@ -25,8 +25,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog"
 
+	"k8s.io/api/core/v1"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
@@ -74,6 +75,12 @@ func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error
 			// Assume hostport is not specified in this portmapping. So skip
 			continue
 		}
+
+		// We do not open host ports for SCTP ports, as we agreed in the Support of SCTP KEP
+		if port.Protocol == v1.ProtocolSCTP {
+			continue
+		}
+
 		hp := hostport{
 			port:     port.HostPort,
 			protocol: strings.ToLower(string(port.Protocol)),
@@ -90,7 +97,7 @@ func (h *hostportSyncer) openHostports(podHostportMapping *PodPortMapping) error
 	if retErr != nil {
 		for hp, socket := range ports {
 			if err := socket.Close(); err != nil {
-				glog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podHostportMapping), err)
+				klog.Errorf("Cannot clean up hostport %d for pod %s: %v", hp.port, getPodFullName(podHostportMapping), err)
 			}
 		}
 		return retErr
@@ -137,6 +144,11 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 	buf.WriteString(strings.Join(words, " ") + "\n")
 }
 
+func writeBytesLine(buf *bytes.Buffer, bytes []byte) {
+	buf.Write(bytes)
+	buf.WriteByte('\n')
+}
+
 //hostportChainName takes containerPort for a pod and returns associated iptables chain.
 // This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
@@ -176,7 +188,7 @@ func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping,
 func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
 	start := time.Now()
 	defer func() {
-		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
+		klog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 	}()
 
 	hostportPodMap, err := gatherAllHostports(activePodPortMappings)
@@ -189,11 +201,11 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 
 	// Get iptables-save output so we can check for existing chains and rules.
 	// This will be a map of chain name to chain with rules as stored in iptables-save/iptables-restore
-	existingNATChains := make(map[utiliptables.Chain]string)
+	existingNATChains := make(map[utiliptables.Chain][]byte)
 	iptablesData := bytes.NewBuffer(nil)
 	err = h.iptables.SaveInto(utiliptables.TableNAT, iptablesData)
 	if err != nil { // if we failed to get any rules
-		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
+		klog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
 		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 	}
@@ -204,7 +216,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 	// Make sure we keep stats for the top-level chains, if they existed
 	// (which most should have because we created them above).
 	if chain, ok := existingNATChains[kubeHostportsChain]; ok {
-		writeLine(natChains, chain)
+		writeBytesLine(natChains, chain)
 	} else {
 		writeLine(natChains, utiliptables.MakeChainLine(kubeHostportsChain))
 	}
@@ -216,7 +228,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 		protocol := strings.ToLower(string(port.Protocol))
 		hostportChain := hostportChainName(port, target.podFullName)
 		if chain, ok := existingNATChains[hostportChain]; ok {
-			writeLine(natChains, chain)
+			writeBytesLine(natChains, chain)
 		} else {
 			writeLine(natChains, utiliptables.MakeChainLine(hostportChain))
 		}
@@ -264,14 +276,14 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 			// We must (as per iptables) write a chain-line for it, which has
 			// the nice effect of flushing the chain.  Then we can remove the
 			// chain.
-			writeLine(natChains, existingNATChains[chain])
+			writeBytesLine(natChains, existingNATChains[chain])
 			writeLine(natRules, "-X", chainString)
 		}
 	}
 	writeLine(natRules, "COMMIT")
 
 	natLines := append(natChains.Bytes(), natRules.Bytes()...)
-	glog.V(3).Infof("Restoring iptables rules: %s", natLines)
+	klog.V(3).Infof("Restoring iptables rules: %s", natLines)
 	err = h.iptables.RestoreAll(natLines, utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		return fmt.Errorf("Failed to execute iptables-restore: %v", err)
@@ -297,7 +309,7 @@ func (h *hostportSyncer) cleanupHostportMap(containerPortMap map[*PortMapping]ta
 	for hp, socket := range h.hostPortMap {
 		if _, ok := currentHostports[hp]; !ok {
 			socket.Close()
-			glog.V(3).Infof("Closed local port %s", hp.String())
+			klog.V(3).Infof("Closed local port %s", hp.String())
 			delete(h.hostPortMap, hp)
 		}
 	}

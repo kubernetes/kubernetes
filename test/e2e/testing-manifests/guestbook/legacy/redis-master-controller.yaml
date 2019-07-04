@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: master
-        image: k8s.gcr.io/redis:e2e  # or just image: redis
+        image: docker.io/library/redis:3.2.9-alpine
         resources:
           requests:
             cpu: 100m

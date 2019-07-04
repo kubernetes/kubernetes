@@ -128,6 +128,12 @@ func CreatesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) 
 	if set.Status.Replicas != 3 {
 		t.Error("Failed to scale statefulset to 3 replicas")
 	}
+	if set.Status.ReadyReplicas != 3 {
+		t.Error("Failed to set ReadyReplicas correctly")
+	}
+	if set.Status.UpdatedReplicas != 3 {
+		t.Error("Failed to set UpdatedReplicas correctly")
+	}
 }
 
 func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
@@ -150,6 +156,12 @@ func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	if set.Status.Replicas != 4 {
 		t.Error("Failed to scale statefulset to 4 replicas")
 	}
+	if set.Status.ReadyReplicas != 4 {
+		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.UpdatedReplicas != 4 {
+		t.Error("Failed to set updatedReplicas correctly")
+	}
 }
 
 func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
@@ -166,6 +178,12 @@ func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	}
 	if set.Status.Replicas != 0 {
 		t.Error("Failed to scale statefulset to 0 replicas")
+	}
+	if set.Status.ReadyReplicas != 0 {
+		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.UpdatedReplicas != 0 {
+		t.Error("Failed to set updatedReplicas correctly")
 	}
 }
 
@@ -298,6 +316,12 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	if set.Status.Replicas != 3 {
 		t.Error("Failed to scale StatefulSet to 3 replicas")
 	}
+	if set.Status.ReadyReplicas != 3 {
+		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.UpdatedReplicas != 3 {
+		t.Error("Failed to updatedReplicas correctly")
+	}
 }
 
 func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
@@ -317,6 +341,12 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	}
 	if set.Status.Replicas != 3 {
 		t.Error("Failed to scale StatefulSet to 3 replicas")
+	}
+	if set.Status.ReadyReplicas != 3 {
+		t.Error("Failed to set readyReplicas correctly")
+	}
+	if set.Status.UpdatedReplicas != 3 {
+		t.Error("Failed to set updatedReplicas correctly")
 	}
 
 	// now mutate a pod's identity
@@ -356,6 +386,12 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 	}
 	if set.Status.Replicas != 3 {
 		t.Error("Failed to scale StatefulSet to 3 replicas")
+	}
+	if set.Status.ReadyReplicas != 3 {
+		t.Error("Failed to set readyReplicas to 3")
+	}
+	if set.Status.UpdatedReplicas != 3 {
+		t.Error("Failed to set updatedReplicas to 3")
 	}
 }
 
@@ -435,6 +471,12 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 	}
 	if set.Status.Replicas != 0 {
 		t.Error("Failed to scale statefulset to 0 replicas")
+	}
+	if set.Status.ReadyReplicas != 0 {
+		t.Error("Failed to set readyReplicas to 0")
+	}
+	if set.Status.UpdatedReplicas != 0 {
+		t.Error("Failed to set updatedReplicas to 0")
 	}
 }
 

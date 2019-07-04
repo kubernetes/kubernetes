@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// security contains admission plugins specific to cluster security.
+// Package security contains admission plugins specific to cluster security.
 package security // import "k8s.io/kubernetes/plugin/pkg/admission/security"

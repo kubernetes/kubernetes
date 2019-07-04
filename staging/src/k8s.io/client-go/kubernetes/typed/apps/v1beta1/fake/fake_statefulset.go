@@ -62,7 +62,7 @@ func (c *FakeStatefulSets) List(opts v1.ListOptions) (result *v1beta1.StatefulSe
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1beta1.StatefulSetList{}
+	list := &v1beta1.StatefulSetList{ListMeta: obj.(*v1beta1.StatefulSetList).ListMeta}
 	for _, item := range obj.(*v1beta1.StatefulSetList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
@@ -131,7 +131,7 @@ func (c *FakeStatefulSets) DeleteCollection(options *v1.DeleteOptions, listOptio
 // Patch applies the patch and returns the patched statefulSet.
 func (c *FakeStatefulSets) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.StatefulSet, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, data, subresources...), &v1beta1.StatefulSet{})
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), &v1beta1.StatefulSet{})
 
 	if obj == nil {
 		return nil, err

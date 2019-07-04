@@ -22,7 +22,7 @@ This plugin provides an integration with Azure Active Directory device flow. If 
    * Replace `TENANT_ID` with your tenant ID.
    * For a list of alternative username claims that are supported by the OIDC issuer check the JSON response at `https://sts.windows.net/TENANT_ID/.well-known/openid-configuration`.
 
-5. Configure `kubectl` to use the `azure` authentication provider 
+5. Configure `kubectl` to use the `azure` authentication provider
 
    ```
    kubectl config set-credentials "USER_NAME" --auth-provider=azure \

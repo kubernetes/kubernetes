@@ -21,12 +21,11 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
+	storagev1listers "k8s.io/client-go/listers/storage/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	pvlister "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
-	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 const (
@@ -44,13 +43,12 @@ func Register(plugins *admission.Plugins) {
 
 var _ admission.Interface = &persistentVolumeClaimResize{}
 var _ admission.ValidationInterface = &persistentVolumeClaimResize{}
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&persistentVolumeClaimResize{})
+var _ = genericadmissioninitializer.WantsExternalKubeInformerFactory(&persistentVolumeClaimResize{})
 
 type persistentVolumeClaimResize struct {
 	*admission.Handler
 
-	pvLister pvlister.PersistentVolumeLister
-	scLister storagelisters.StorageClassLister
+	scLister storagev1listers.StorageClassLister
 }
 
 func newPlugin() *persistentVolumeClaimResize {
@@ -59,28 +57,21 @@ func newPlugin() *persistentVolumeClaimResize {
 	}
 }
 
-func (pvcr *persistentVolumeClaimResize) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
-	pvcInformer := f.Core().InternalVersion().PersistentVolumes()
-	pvcr.pvLister = pvcInformer.Lister()
-	scInformer := f.Storage().InternalVersion().StorageClasses()
+func (pvcr *persistentVolumeClaimResize) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	scInformer := f.Storage().V1().StorageClasses()
 	pvcr.scLister = scInformer.Lister()
-	pvcr.SetReadyFunc(func() bool {
-		return pvcInformer.Informer().HasSynced() && scInformer.Informer().HasSynced()
-	})
+	pvcr.SetReadyFunc(scInformer.Informer().HasSynced)
 }
 
 // ValidateInitialization ensures lister is set.
 func (pvcr *persistentVolumeClaimResize) ValidateInitialization() error {
-	if pvcr.pvLister == nil {
-		return fmt.Errorf("missing persistent volume lister")
-	}
 	if pvcr.scLister == nil {
 		return fmt.Errorf("missing storageclass lister")
 	}
 	return nil
 }
 
-func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error {
+func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}
@@ -117,15 +108,6 @@ func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error 
 			"the storageclass that provisions the pvc must support resize"))
 	}
 
-	// volume plugin must support resize
-	pv, err := pvcr.pvLister.Get(pvc.Spec.VolumeName)
-	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error updating persistent volume claim because fetching associated persistent volume failed"))
-	}
-
-	if !pvcr.checkVolumePlugin(pv) {
-		return admission.NewForbidden(a, fmt.Errorf("volume plugin does not support resize"))
-	}
 	return nil
 }
 
@@ -143,26 +125,6 @@ func (pvcr *persistentVolumeClaimResize) allowResize(pvc, oldPvc *api.Persistent
 	}
 	if sc.AllowVolumeExpansion != nil {
 		return *sc.AllowVolumeExpansion
-	}
-	return false
-}
-
-// checkVolumePlugin checks whether the volume plugin supports resize
-func (pvcr *persistentVolumeClaimResize) checkVolumePlugin(pv *api.PersistentVolume) bool {
-	if pv.Spec.Glusterfs != nil || pv.Spec.Cinder != nil || pv.Spec.RBD != nil || pv.Spec.PortworxVolume != nil {
-		return true
-	}
-
-	if pv.Spec.GCEPersistentDisk != nil {
-		return true
-	}
-
-	if pv.Spec.AWSElasticBlockStore != nil {
-		return true
-	}
-
-	if pv.Spec.AzureFile != nil {
-		return true
 	}
 	return false
 }

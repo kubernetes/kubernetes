@@ -6,8 +6,10 @@ go_library(
         "parse.go",
         "xfs.go",
     ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/xfs",
     importpath = "github.com/prometheus/procfs/xfs",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/github.com/prometheus/procfs/internal/util:go_default_library"],
 )
 
 filegroup(

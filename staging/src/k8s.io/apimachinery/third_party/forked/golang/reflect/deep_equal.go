@@ -44,7 +44,7 @@ func (e Equalities) AddFunc(eqFunc interface{}) error {
 		return fmt.Errorf("expected func, got: %v", ft)
 	}
 	if ft.NumIn() != 2 {
-		return fmt.Errorf("expected three 'in' params, got: %v", ft)
+		return fmt.Errorf("expected two 'in' params, got: %v", ft)
 	}
 	if ft.NumOut() != 1 {
 		return fmt.Errorf("expected one 'out' param, got: %v", ft)

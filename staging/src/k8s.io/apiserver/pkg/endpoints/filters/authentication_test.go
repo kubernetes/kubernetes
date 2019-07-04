@@ -41,15 +41,16 @@ func TestAuthenticateRequest(t *testing.T) {
 			}
 			close(success)
 		}),
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			if req.Header.Get("Authorization") == "Something" {
-				return &user.DefaultInfo{Name: "user"}, true, nil
+				return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
 			}
 			return nil, false, errors.New("Authorization header is missing.")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			t.Errorf("unexpected call to failed")
 		}),
+		nil,
 	)
 
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: map[string][]string{"Authorization": {"Something"}}})
@@ -63,12 +64,13 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
 		}),
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			return nil, false, nil
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
 		}),
+		nil,
 	)
 
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
@@ -82,12 +84,13 @@ func TestAuthenticateRequestError(t *testing.T) {
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
 		}),
-		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 			return nil, false, errors.New("failure")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)
 		}),
+		nil,
 	)
 
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})

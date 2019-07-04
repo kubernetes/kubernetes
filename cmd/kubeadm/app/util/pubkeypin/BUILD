@@ -16,6 +16,7 @@ go_library(
     name = "go_default_library",
     srcs = ["pubkeypin.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
+    deps = ["//vendor/github.com/pkg/errors:go_default_library"],
 )
 
 filegroup(

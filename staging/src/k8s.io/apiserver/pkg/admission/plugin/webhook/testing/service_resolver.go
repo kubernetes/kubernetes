@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/util/webhook"
 )
 
 type serviceResolver struct {
@@ -29,11 +29,11 @@ type serviceResolver struct {
 
 // NewServiceResolver returns a static service resolve that return the given URL or
 // an error for the failResolve namespace.
-func NewServiceResolver(base url.URL) config.ServiceResolver {
+func NewServiceResolver(base url.URL) webhook.ServiceResolver {
 	return &serviceResolver{base}
 }
 
-func (f serviceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+func (f serviceResolver) ResolveEndpoint(namespace, name string, port int32) (*url.URL, error) {
 	if namespace == "failResolve" {
 		return nil, fmt.Errorf("couldn't resolve service location")
 	}

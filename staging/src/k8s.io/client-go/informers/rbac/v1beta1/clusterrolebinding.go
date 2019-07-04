@@ -21,7 +21,7 @@ package v1beta1
 import (
 	time "time"
 
-	rbac_v1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -69,7 +69,7 @@ func NewFilteredClusterRoleBindingInformer(client kubernetes.Interface, resyncPe
 				return client.RbacV1beta1().ClusterRoleBindings().Watch(options)
 			},
 		},
-		&rbac_v1beta1.ClusterRoleBinding{},
+		&rbacv1beta1.ClusterRoleBinding{},
 		resyncPeriod,
 		indexers,
 	)
@@ -80,7 +80,7 @@ func (f *clusterRoleBindingInformer) defaultInformer(client kubernetes.Interface
 }
 
 func (f *clusterRoleBindingInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac_v1beta1.ClusterRoleBinding{}, f.defaultInformer)
+	return f.factory.InformerFor(&rbacv1beta1.ClusterRoleBinding{}, f.defaultInformer)
 }
 
 func (f *clusterRoleBindingInformer) Lister() v1beta1.ClusterRoleBindingLister {

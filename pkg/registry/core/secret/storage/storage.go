@@ -44,9 +44,9 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		DeleteStrategy: secret.Strategy,
 		ExportStrategy: secret.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: secret.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: secret.GetAttrs, TriggerFunc: secret.SecretNameTriggerFunc}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

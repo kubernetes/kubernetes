@@ -5,12 +5,14 @@ go_library(
     srcs = [
         "authorization_manager.go",
         "cluster_compute_resource.go",
+        "container.go",
         "custom_fields_manager.go",
         "datacenter.go",
         "datastore.go",
         "doc.go",
         "dvs.go",
         "entity.go",
+        "environment_browser.go",
         "event_manager.go",
         "file_manager.go",
         "folder.go",
@@ -24,7 +26,10 @@ go_library(
         "ip_pool_manager.go",
         "license_manager.go",
         "model.go",
+        "object.go",
         "option_manager.go",
+        "os_unix.go",
+        "os_windows.go",
         "performance_manager.go",
         "portgroup.go",
         "property_collector.go",
@@ -36,48 +41,16 @@ go_library(
         "session_manager.go",
         "simulator.go",
         "snapshot.go",
+        "storage_resource_manager.go",
         "task.go",
         "task_manager.go",
         "user_directory.go",
         "view_manager.go",
         "virtual_disk_manager.go",
         "virtual_machine.go",
-    ] + select({
-        "@io_bazel_rules_go//go/platform:android": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:darwin": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:dragonfly": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:freebsd": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:linux": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:nacl": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:netbsd": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:openbsd": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:plan9": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:solaris": [
-            "os_unix.go",
-        ],
-        "@io_bazel_rules_go//go/platform:windows": [
-            "os_windows.go",
-        ],
-        "//conditions:default": [],
-    }),
+        "vstorage_object_manager.go",
+    ],
+    importmap = "k8s.io/kubernetes/vendor/github.com/vmware/govmomi/simulator",
     importpath = "github.com/vmware/govmomi/simulator",
     visibility = ["//visibility:public"],
     deps = [

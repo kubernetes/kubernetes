@@ -172,7 +172,7 @@ func ConvertSelectorToLabelsMap(selector string) (Set, error) {
 			return labelsMap, err
 		}
 		value := strings.TrimSpace(l[1])
-		if err := validateLabelValue(value); err != nil {
+		if err := validateLabelValue(key, value); err != nil {
 			return labelsMap, err
 		}
 		labelsMap[key] = value

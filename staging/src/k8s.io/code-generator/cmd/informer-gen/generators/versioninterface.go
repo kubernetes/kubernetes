@@ -63,7 +63,7 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	m := map[string]interface{}{
 		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
 		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
-		"types": g.types,
+		"types":                           g.types,
 	}
 
 	sw.Do(versionTemplate, m)

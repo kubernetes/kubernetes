@@ -242,16 +242,15 @@ func TestHammerController(t *testing.T) {
 			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
-			r := rand.New(rs) // Mustn't use r and f concurrently!
 			for i := 0; i < 100; i++ {
 				var name string
 				var isNew bool
-				if currentNames.Len() == 0 || r.Intn(3) == 1 {
+				if currentNames.Len() == 0 || rand.Intn(3) == 1 {
 					f.Fuzz(&name)
 					isNew = true
 				} else {
 					l := currentNames.List()
-					name = l[r.Intn(len(l))]
+					name = l[rand.Intn(len(l))]
 				}
 
 				pod := &v1.Pod{}
@@ -266,7 +265,7 @@ func TestHammerController(t *testing.T) {
 					source.Add(pod)
 					continue
 				}
-				switch r.Intn(2) {
+				switch rand.Intn(2) {
 				case 0:
 					currentNames.Insert(name)
 					source.Modify(pod)
