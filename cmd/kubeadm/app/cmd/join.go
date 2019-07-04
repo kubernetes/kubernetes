@@ -508,5 +508,13 @@ func fetchInitConfiguration(tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.I
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
 
+	// ignore the bind-address info in `kubeadm-config` ConfigMap for new joined control-plane node
+	delete(initConfiguration.ClusterConfiguration.APIServer.ExtraArgs, "advertise-address")
+	delete(initConfiguration.ClusterConfiguration.APIServer.ExtraArgs, "bind-address")
+	delete(initConfiguration.ClusterConfiguration.ControllerManager.ExtraArgs, "address")
+	delete(initConfiguration.ClusterConfiguration.ControllerManager.ExtraArgs, "bind-address")
+	delete(initConfiguration.ClusterConfiguration.Scheduler.ExtraArgs, "address")
+	delete(initConfiguration.ClusterConfiguration.Scheduler.ExtraArgs, "bind-address")
+
 	return initConfiguration, nil
 }
