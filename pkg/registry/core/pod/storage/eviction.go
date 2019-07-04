@@ -206,13 +206,13 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	pdb.Status.PodDisruptionsAllowed--
-	if pdb.Status.DisruptedPods == nil {
-		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
-	}
-
 	// If this is a dry-run, we don't need to go any further than that.
 	if dryRun == true {
 		return nil
+	}
+
+	if pdb.Status.DisruptedPods == nil {
+		pdb.Status.DisruptedPods = make(map[string]metav1.Time)
 	}
 
 	// Eviction handler needs to inform the PDB controller that it is about to delete a pod
