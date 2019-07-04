@@ -741,3 +741,41 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	}
 	return false
 }
+
+//SidecarsStatus contains three bools, whether the pod has sidecars, if the all the sidecars are ready and if the non sidecars are in a waiting state.
+type SidecarsStatus struct {
+	SidecarsPresent   bool
+	SidecarsReady     bool
+	ContainersWaiting bool
+}
+
+//GetSidecarsStatus returns the SidecarsStatus for the given pod
+func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
+
+	if pod == nil {
+		return SidecarsStatus{SidecarsPresent: false, SidecarsReady: false, ContainersWaiting: false}
+	}
+	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
+		return SidecarsStatus{SidecarsPresent: false, SidecarsReady: false, ContainersWaiting: false}
+	}
+
+	sidecarsStatus := SidecarsStatus{SidecarsPresent: false, SidecarsReady: true, ContainersWaiting: false}
+
+	for _, container := range pod.Spec.Containers {
+		for _, status := range pod.Status.ContainerStatuses {
+			if status.Name == container.Name {
+				if container.Lifecycle != nil && container.Lifecycle.Type != nil && *container.Lifecycle.Type == v1.LifecycleTypeSidecar {
+					sidecarsStatus.SidecarsPresent = true
+					if !status.Ready {
+						sidecarsStatus.SidecarsReady = false
+					}
+					//check if non-sidecars have started
+				} else if status.State.Waiting != nil {
+					sidecarsStatus.ContainersWaiting = true
+				}
+			}
+		}
+	}
+
+	return sidecarsStatus
+}

@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/logs"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -476,6 +477,18 @@ func containerSucceeded(c *v1.Container, podStatus *kubecontainer.PodStatus) boo
 	return cStatus.ExitCode == 0
 }
 
+func getSidecarIDs(pod *v1.Pod) []int {
+	var sidecars []int
+
+	for idx, container := range pod.Spec.Containers {
+		if lifecycleSidecar(container) {
+			sidecars = append(sidecars, idx)
+		}
+	}
+
+	return sidecars
+}
+
 // computePodActions checks whether the pod spec has changed and returns the changes if true.
 func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *kubecontainer.PodStatus) podActions {
 	klog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
@@ -528,6 +541,18 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			changes.NextInitContainerToStart = &pod.Spec.InitContainers[0]
 			return changes
 		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
+			// If pod has sidecars, start them before non sidecars
+			sidecarContainerIDs := getSidecarIDs(pod)
+			if len(sidecarContainerIDs) != 0 {
+				for _, containerID := range sidecarContainerIDs {
+					changes.ContainersToStart = append(changes.ContainersToStart, containerID)
+				}
+				return changes
+			}
+		}
+
 		changes.ContainersToStart = containersToStart
 		return changes
 	}
@@ -569,10 +594,24 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		return changes
 	}
 
+	//check sidecars status
+	sidecarStatus := status.GetSidecarsStatus(pod)
+
 	// Number of running containers to keep.
 	keepCount := 0
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
+			//if the sidecars are still becoming ready during the startup of the pod, skip any non-sidecars
+			if sidecarStatus.SidecarsPresent {
+				if sidecarStatus.ContainersWaiting && !sidecarStatus.SidecarsReady {
+					if !lifecycleSidecar(container) {
+						continue
+					}
+				}
+			}
+		}
 		containerStatus := podStatus.FindContainerStatusByName(container.Name)
 
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
