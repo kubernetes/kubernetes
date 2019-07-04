@@ -25,10 +25,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	viperFileNotFound = "Unsupported Config Type \"\""
-)
-
 // ViperizeFlags checks whether a configuration file was specified, reads it, and updates
 // the configuration variables accordingly. Must be called after framework.HandleFlags()
 // and before framework.AfterReadingAllFlags().
@@ -68,7 +64,7 @@ func ViperizeFlags(requiredConfig, optionalConfig string) error {
 		// of file suffices. Therefore try once more without
 		// suffix.
 		ext := filepath.Ext(viperConfig)
-		if ext != "" && err.Error() == viperFileNotFound {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok && ext != "" {
 			viper.SetConfigName(filepath.Base(viperConfig[0 : len(viperConfig)-len(ext)]))
 			err = viper.ReadInConfig()
 		}
