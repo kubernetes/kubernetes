@@ -132,7 +132,7 @@ func runDensityBatchTest(f *framework.Framework, testArg densityTest) (time.Dura
 
 	for name, create := range createTimes {
 		watch, ok := watchTimes[name]
-		gomega.Expect(ok).To(gomega.Equal(true))
+		framework.ExpectEqual(ok, true)
 
 		e2eLags = append(e2eLags,
 			framework.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
@@ -202,12 +202,12 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				p, ok := obj.(*v1.Pod)
-				gomega.Expect(ok).To(gomega.Equal(true))
+				framework.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				p, ok := newObj.(*v1.Pod)
-				gomega.Expect(ok).To(gomega.Equal(true))
+				framework.ExpectEqual(ok, true)
 				go checkPodRunning(p)
 			},
 		},

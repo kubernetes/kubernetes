@@ -56,7 +56,7 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 		ginkgo.By("Checking the safe sysctl pod keeps running on master upgrade")
 		pod, err := f.ClientSet.CoreV1().Pods(t.validPod.Namespace).Get(t.validPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		framework.ExpectEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
 	ginkgo.By("Checking the old unsafe sysctl pod was not suddenly started during an upgrade")
@@ -108,7 +108,7 @@ func (t *SysctlUpgradeTest) verifyUnsafeSysctlsAreRejected(f *framework.Framewor
 	if ev != nil && ev.Reason == sysctl.UnsupportedReason {
 		framework.Skipf("No sysctl support in Docker <1.12")
 	}
-	gomega.Expect(ev.Reason).To(gomega.Equal(sysctl.ForbiddenReason))
+	framework.ExpectEqual(ev.Reason, sysctl.ForbiddenReason)
 
 	return invalidPod
 }

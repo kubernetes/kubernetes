@@ -103,7 +103,7 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Verifying that the users exist")
 	users, err := t.listUsers()
 	framework.ExpectNoError(err)
-	gomega.Expect(len(users)).To(gomega.Equal(2))
+	framework.ExpectEqual(len(users), 2)
 }
 
 func (t *EtcdUpgradeTest) listUsers() ([]string, error) {
