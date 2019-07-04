@@ -397,7 +397,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v", err))
 					ginkgo.By("expecting host0 node to be re-created")
 					numNodes := countReadyNodes(cs, host0Name)
-					gomega.Expect(numNodes).To(gomega.Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
+					framework.ExpectEqual(numNodes, origNodeCnt, fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 					gomega.Expect(false, strings.Contains(string(output), string(host0Name)))
@@ -470,7 +470,7 @@ func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName
 				break
 			}
 		}
-		gomega.Expect(strings.TrimSpace(value)).To(gomega.Equal(strings.TrimSpace(expectedContents)))
+		framework.ExpectEqual(strings.TrimSpace(value), strings.TrimSpace(expectedContents))
 	}
 }
 

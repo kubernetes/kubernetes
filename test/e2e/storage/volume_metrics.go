@@ -415,8 +415,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// should be 4, and the elements should be bound pv count, unbound pv count, bound
 		// pvc count, unbound pvc count in turn.
 		validator := func(metricValues []map[string]int64) {
-			gomega.Expect(len(metricValues)).To(gomega.Equal(4),
-				"Wrong metric size: %d", len(metricValues))
+			framework.ExpectEqual(len(metricValues), 4, "Wrong metric size: %d", len(metricValues))
 
 			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
@@ -431,8 +430,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				// test suit are equal to expectValues.
 				actualValues := calculateRelativeValues(originMetricValues[i],
 					getPVControllerMetrics(controllerMetrics, metric.name, metric.dimension))
-				gomega.Expect(actualValues).To(gomega.Equal(expectValues),
-					"Wrong pv controller metric %s(%s): wanted %v, got %v",
+				framework.ExpectEqual(actualValues, expectValues, "Wrong pv controller metric %s(%s): wanted %v, got %v",
 					metric.name, metric.dimension, expectValues, actualValues)
 			}
 		}
@@ -660,7 +658,7 @@ func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string
 			}
 		}
 	}
-	gomega.Expect(errCount).To(gomega.Equal(0), "Found invalid samples")
+	framework.ExpectEqual(errCount, 0, "Found invalid samples")
 	return found
 }
 

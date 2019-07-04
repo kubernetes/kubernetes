@@ -237,12 +237,12 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 
 	var err error
 	if class != nil {
-		gomega.Expect(*claim.Spec.StorageClassName).To(gomega.Equal(class.Name))
+		framework.ExpectEqual(*claim.Spec.StorageClassName, class.Name)
 		ginkgo.By("creating a StorageClass " + class.Name)
 		_, err = client.StorageV1().StorageClasses().Create(class)
 		// The "should provision storage with snapshot data source" test already has created the class.
 		// TODO: make class creation optional and remove the IsAlreadyExists exception
-		gomega.Expect(err == nil || apierrs.IsAlreadyExists(err)).To(gomega.Equal(true))
+		framework.ExpectEqual(err == nil || apierrs.IsAlreadyExists(err), true)
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
@@ -300,11 +300,11 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 	// Check sizes
 	expectedCapacity := resource.MustParse(t.ExpectedSize)
 	pvCapacity := pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
-	gomega.Expect(pvCapacity.Value()).To(gomega.Equal(expectedCapacity.Value()), "pvCapacity is not equal to expectedCapacity")
+	framework.ExpectEqual(pvCapacity.Value(), expectedCapacity.Value(), "pvCapacity is not equal to expectedCapacity")
 
 	requestedCapacity := resource.MustParse(t.ClaimSize)
 	claimCapacity := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	gomega.Expect(claimCapacity.Value()).To(gomega.Equal(requestedCapacity.Value()), "claimCapacity is not equal to requestedCapacity")
+	framework.ExpectEqual(claimCapacity.Value(), requestedCapacity.Value(), "claimCapacity is not equal to requestedCapacity")
 
 	// Check PV properties
 	ginkgo.By("checking the PV")
@@ -322,17 +322,17 @@ func (t StorageClassTest) checkProvisioning(client clientset.Interface, claim *v
 		gomega.Expect(found).To(gomega.BeTrue())
 	}
 
-	gomega.Expect(pv.Spec.ClaimRef.Name).To(gomega.Equal(claim.ObjectMeta.Name))
-	gomega.Expect(pv.Spec.ClaimRef.Namespace).To(gomega.Equal(claim.ObjectMeta.Namespace))
+	framework.ExpectEqual(pv.Spec.ClaimRef.Name, claim.ObjectMeta.Name)
+	framework.ExpectEqual(pv.Spec.ClaimRef.Namespace, claim.ObjectMeta.Namespace)
 	if class == nil {
-		gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(v1.PersistentVolumeReclaimDelete))
+		framework.ExpectEqual(pv.Spec.PersistentVolumeReclaimPolicy, v1.PersistentVolumeReclaimDelete)
 	} else {
-		gomega.Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(gomega.Equal(*class.ReclaimPolicy))
-		gomega.Expect(pv.Spec.MountOptions).To(gomega.Equal(class.MountOptions))
+		framework.ExpectEqual(pv.Spec.PersistentVolumeReclaimPolicy, *class.ReclaimPolicy)
+		framework.ExpectEqual(pv.Spec.MountOptions, class.MountOptions)
 	}
 	if claim.Spec.VolumeMode != nil {
 		gomega.Expect(pv.Spec.VolumeMode).NotTo(gomega.BeNil())
-		gomega.Expect(*pv.Spec.VolumeMode).To(gomega.Equal(*claim.Spec.VolumeMode))
+		framework.ExpectEqual(*pv.Spec.VolumeMode, *claim.Spec.VolumeMode)
 	}
 	return pv
 }
@@ -404,7 +404,7 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, claim *v1.Persistent
 //
 // This is a common test that can be called from a StorageClassTest.PvCheck.
 func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClaim, node framework.NodeSelection) {
-	gomega.Expect(node.Name).To(gomega.Equal(""), "this test only works when not locked onto a single node")
+	framework.ExpectEqual(node.Name, "", "this test only works when not locked onto a single node")
 
 	var pod *v1.Pod
 	defer func() {
@@ -526,7 +526,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		framework.ExpectNoError(err)
 		pvs = append(pvs, pv)
 	}
-	gomega.Expect(len(pvs)).To(gomega.Equal(len(createdClaims)))
+	framework.ExpectEqual(len(pvs), len(createdClaims))
 	return pvs, node
 }
 
@@ -608,7 +608,7 @@ func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeCl
 		// Get new copy of the claim
 		claim, err := client.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(claim.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
-		gomega.Expect(claim.Status.Phase).To(gomega.Equal(v1.ClaimPending))
+		framework.ExpectEqual(claim.Status.Phase, v1.ClaimPending)
 	}
 }
 
