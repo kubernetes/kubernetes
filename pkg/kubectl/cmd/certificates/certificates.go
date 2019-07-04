@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+func newCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "certificate SUBCOMMAND",
 		DisableFlagsInUseLine: true,
@@ -47,13 +47,13 @@ func NewCmdCertificate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams)
 		},
 	}
 
-	cmd.AddCommand(NewCmdCertificateApprove(f, ioStreams))
-	cmd.AddCommand(NewCmdCertificateDeny(f, ioStreams))
+	cmd.AddCommand(newCmdCertificateApprove(f, ioStreams))
+	cmd.AddCommand(newCmdCertificateDeny(f, ioStreams))
 
 	return cmd
 }
 
-type CertificateOptions struct {
+type certificateOptions struct {
 	resource.FilenameOptions
 
 	PrintFlags *genericclioptions.PrintFlags
@@ -68,15 +68,15 @@ type CertificateOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewCertificateOptions creates the options for certificate
-func NewCertificateOptions(ioStreams genericclioptions.IOStreams) *CertificateOptions {
-	return &CertificateOptions{
+// newcertificateOptions creates the options for certificate
+func newcertificateOptions(ioStreams genericclioptions.IOStreams) *certificateOptions {
+	return &certificateOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("approved").WithTypeSetter(scheme.Scheme),
 		IOStreams:  ioStreams,
 	}
 }
 
-func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
+func (o *certificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.csrNames = args
 	o.outputStyle = cmdutil.GetFlagString(cmd, "output")
 
@@ -103,15 +103,15 @@ func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	return nil
 }
 
-func (o *CertificateOptions) Validate() error {
+func (o *certificateOptions) Validate() error {
 	if len(o.csrNames) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames, o.Kustomize) {
 		return fmt.Errorf("one or more CSRs must be specified as <name> or -f <filename>")
 	}
 	return nil
 }
 
-func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCertificateOptions(ioStreams)
+func newCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := newcertificateOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "approve (-f FILENAME | NAME)",
@@ -144,7 +144,7 @@ func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOS
 	return cmd
 }
 
-func (o *CertificateOptions) RunCertificateApprove(force bool) error {
+func (o *certificateOptions) RunCertificateApprove(force bool) error {
 	return o.modifyCertificateCondition(o.builder, o.clientSet, force, func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool) {
 		var alreadyApproved bool
 		for _, c := range csr.Status.Conditions {
@@ -165,8 +165,8 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 	})
 }
 
-func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCertificateOptions(ioStreams)
+func newCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
+	o := newcertificateOptions(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "deny (-f FILENAME | NAME)",
@@ -194,7 +194,7 @@ func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	return cmd
 }
 
-func (o *CertificateOptions) RunCertificateDeny(force bool) error {
+func (o *certificateOptions) RunCertificateDeny(force bool) error {
 	return o.modifyCertificateCondition(o.builder, o.clientSet, force, func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool) {
 		var alreadyDenied bool
 		for _, c := range csr.Status.Conditions {
@@ -215,7 +215,7 @@ func (o *CertificateOptions) RunCertificateDeny(force bool) error {
 	})
 }
 
-func (o *CertificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet certificatesv1beta1client.CertificatesV1beta1Interface, force bool, modify func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool)) error {
+func (o *certificateOptions) modifyCertificateCondition(builder *resource.Builder, clientSet certificatesv1beta1client.CertificatesV1beta1Interface, force bool, modify func(csr *certificatesv1beta1.CertificateSigningRequest) (*certificatesv1beta1.CertificateSigningRequest, bool)) error {
 	var found int
 	r := builder.
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
