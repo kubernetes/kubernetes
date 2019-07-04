@@ -1003,7 +1003,9 @@ func selectNodesForPreemption(pod *v1.Pod,
 // preempted.
 // This function is stable and does not change the order of received pods. So, if it
 // receives a sorted list, grouping will preserve the order of the input list.
-func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruptionBudget) (violatingPods, nonViolatingPods []*v1.Pod) {
+func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruptionBudget) (violatingPods, nonViolatingPods util.SortableList) {
+	violatingVictims := util.SortableList{CompFunc: util.MoreImportantPod}
+	nonViolatingVictims := util.SortableList{CompFunc: util.MoreImportantPod}
 	for _, obj := range pods {
 		pod := obj.(*v1.Pod)
 		pdbForPodIsViolated := false
@@ -1029,12 +1031,12 @@ func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruption
 			}
 		}
 		if pdbForPodIsViolated {
-			violatingPods = append(violatingPods, pod)
+			violatingVictims.Items = append(violatingVictims.Items, pod)
 		} else {
-			nonViolatingPods = append(nonViolatingPods, pod)
+			nonViolatingVictims.Items = append(nonViolatingVictims.Items, pod)
 		}
 	}
-	return violatingPods, nonViolatingPods
+	return violatingVictims, nonViolatingVictims
 }
 
 // selectVictimsOnNode finds minimum set of pods on the given node that should
@@ -1101,11 +1103,13 @@ func selectVictimsOnNode(
 	}
 	var victims []*v1.Pod
 	numViolatingVictim := 0
-	potentialVictims.Sort()
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
+	violatingVictims.Sort()
+	nonViolatingVictims.Sort()
+
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
 		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, queue, false)
@@ -1116,14 +1120,14 @@ func selectVictimsOnNode(
 		}
 		return fits
 	}
-	for _, p := range violatingVictims {
-		if !reprievePod(p) {
+	for _, p := range violatingVictims.Items {
+		if !reprievePod(p.(*v1.Pod)) {
 			numViolatingVictim++
 		}
 	}
 	// Now we try to reprieve non-violating victims.
-	for _, p := range nonViolatingVictims {
-		reprievePod(p)
+	for _, p := range nonViolatingVictims.Items {
+		reprievePod(p.(*v1.Pod))
 	}
 	return victims, numViolatingVictim, true
 }
