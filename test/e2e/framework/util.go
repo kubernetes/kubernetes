@@ -350,6 +350,13 @@ func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
 	}
 }
 
+// SkipIfNodeOSDistroIs skips if the node OS distro is included in the unsupportedNodeOsDistros.
+func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
+	if NodeOSDistroIs(unsupportedNodeOsDistros...) {
+		skipInternalf(1, "Not supported for node OS distro %v (is %s)", unsupportedNodeOsDistros, TestContext.NodeOSDistro)
+	}
+}
+
 // SkipUnlessTaintBasedEvictionsEnabled skips if the TaintBasedEvictions is not enabled.
 func SkipUnlessTaintBasedEvictionsEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
