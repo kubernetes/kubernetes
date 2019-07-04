@@ -972,8 +972,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 	queue internalqueue.SchedulingQueue,
 	pdbs []*policy.PodDisruptionBudget,
 ) (map[*v1.Node]*schedulerapi.Victims, error) {
-	nodeToVictims := map[*v1.Node]*schedulerapi.Victims{}
-	var resultLock sync.Mutex
+	nodeToVictims := make(map[*v1.Node]*schedulerapi.Victims, len(potentialNodes))
 
 	// We can use the same metadata producer for all nodes.
 	meta := metadataProducer(pod, nodeNameToInfo)
@@ -985,13 +984,11 @@ func selectNodesForPreemption(pod *v1.Pod,
 		}
 		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
-			resultLock.Lock()
 			victims := schedulerapi.Victims{
 				Pods:             pods,
 				NumPDBViolations: numPDBViolations,
 			}
 			nodeToVictims[potentialNodes[i]] = &victims
-			resultLock.Unlock()
 		}
 	}
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(potentialNodes), checkNode)
