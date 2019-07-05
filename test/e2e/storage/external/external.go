@@ -243,7 +243,7 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 
 	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
 	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
-	gomega.Expect(len(items)).To(gomega.Equal(1), "exactly one item from %s", d.StorageClass.FromFile)
+	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
 	err = f.PatchItems(items...)
 	framework.ExpectNoError(err, "patch items")

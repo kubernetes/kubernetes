@@ -96,7 +96,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Expanding non-expandable pvc")
 		newSize := resource.MustParse("6Gi")
@@ -112,7 +112,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Creating a pod with dynamically provisioned volume")
 		pod, err := framework.CreatePod(c, ns, nil, pvcClaims, false, "")
@@ -147,8 +147,8 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.ExpectNoError(err, "While fetching pvc after controller resize")
 
 		inProgressConditions := pvc.Status.Conditions
-		gomega.Expect(len(inProgressConditions)).To(gomega.Equal(1), "pvc must have file system resize pending condition")
-		gomega.Expect(inProgressConditions[0].Type).To(gomega.Equal(v1.PersistentVolumeClaimFileSystemResizePending), "pvc must have fs resizing condition")
+		framework.ExpectEqual(len(inProgressConditions), 1, "pvc must have file system resize pending condition")
+		framework.ExpectEqual(inProgressConditions[0].Type, v1.PersistentVolumeClaimFileSystemResizePending, "pvc must have fs resizing condition")
 
 		ginkgo.By("Creating a new pod with same volume")
 		pod2, err := framework.CreatePod(c, ns, nil, pvcClaims, false, "")
@@ -163,7 +163,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 	})
 
 	ginkgo.It("should resize volume when PVC is edited while pod is using it", func() {
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Creating a pod with dynamically provisioned volume")
 		pod, err := framework.CreatePod(c, ns, nil, pvcClaims, false, "")
@@ -205,7 +205,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 	})
 
 	ginkgo.It("should allow expansion of block volumes", func() {
@@ -215,7 +215,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
-		gomega.Expect(len(pvs)).To(gomega.Equal(1))
+		framework.ExpectEqual(len(pvs), 1)
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
@@ -237,7 +237,7 @@ var _ = utils.SIGDescribe("Volume expand", func() {
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		gomega.Expect(len(pvcConditions)).To(gomega.Equal(0), "pvc should not have conditions")
+		framework.ExpectEqual(len(pvcConditions), 0, "pvc should not have conditions")
 	})
 })
 
